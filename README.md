@@ -1,6 +1,6 @@
-# MyAgenda
+# TaskFlow
 
-**MyAgenda** is a simple and intuitive app designed to help you efficiently manage your tasks. It organizes your tasks by **due date** and **priority**, ensuring that you stay on top of your schedule. The app sends **daily morning and evening notifications**, highlighting your three most urgent tasks for the day, and offers **reminders 10 minutes before important tasks** to keep you on track.
+**TaskFlow** is a simple and intuitive app designed to help you efficiently manage your tasks. It organizes your tasks by **due date** and **priority**, ensuring that you stay on top of your schedule. The app sends **daily morning and evening notifications**, highlighting your three most urgent tasks for the day, and offers **reminders 10 minutes before important tasks** to keep you on track.
 
 ## Features
 
