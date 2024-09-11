@@ -38,5 +38,5 @@ You are welcome to use and modify the source code to create your custom app. If 
 
 ## Final Notes
 
-Thank you for using **MyAgenda**! If you encounter any issues or have suggestions for improvement, feel free to contribute or open an issue in the repository.
+Thank you for using **TaskFlow**! If you encounter any issues or have suggestions for improvement, feel free to contribute or open an issue in the repository.
 
