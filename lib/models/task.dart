@@ -5,6 +5,8 @@ class Task {
   final int priority;
   final bool isCompleted;
   final String? notes;
+  final List<String> filePaths;
+  final List<String> imagePaths;
 
   Task({
     this.id,
@@ -13,9 +15,11 @@ class Task {
     required this.priority,
     this.isCompleted = false,
     this.notes,
-  });
+    List<String>? filePaths,
+    List<String>? imagePaths,
+  })  : filePaths = filePaths ?? [], // Default to empty list if null
+        imagePaths = imagePaths ?? []; // Default to empty list if null
 
-  // Add the copyWith method
   Task copyWith({
     int? id,
     String? title,
@@ -23,6 +27,8 @@ class Task {
     int? priority,
     bool? isCompleted,
     String? notes,
+    List<String>? filePaths,
+    List<String>? imagePaths,
   }) {
     return Task(
       id: id ?? this.id,
@@ -31,10 +37,11 @@ class Task {
       priority: priority ?? this.priority,
       isCompleted: isCompleted ?? this.isCompleted,
       notes: notes ?? this.notes,
+      filePaths: filePaths ?? this.filePaths,
+      imagePaths: imagePaths ?? this.imagePaths,
     );
   }
 
-  // Method to convert a Task to a Map (used for SQLite)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -43,10 +50,11 @@ class Task {
       'priority': priority,
       'isCompleted': isCompleted ? 1 : 0,
       'notes': notes,
+      'filePaths': filePaths.isNotEmpty ? filePaths.join('|') : null,
+      'imagePaths': imagePaths.isNotEmpty ? imagePaths.join('|') : null,
     };
   }
 
-  // Method to create a Task from a Map (used for SQLite)
   static Task fromMap(Map<String, dynamic> map) {
     return Task(
       id: map['id'],
@@ -55,6 +63,18 @@ class Task {
       priority: map['priority'],
       isCompleted: map['isCompleted'] == 1,
       notes: map['notes'],
+      filePaths: map['filePaths'] != null
+          ? (map['filePaths'] as String)
+              .split('|')
+              .where((path) => path.isNotEmpty)
+              .toList()
+          : [],
+      imagePaths: map['imagePaths'] != null
+          ? (map['imagePaths'] as String)
+              .split('|')
+              .where((path) => path.isNotEmpty)
+              .toList()
+          : [],
     );
   }
 }

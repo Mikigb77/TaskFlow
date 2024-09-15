@@ -24,7 +24,7 @@ class TaskDatabase {
 
     return await openDatabase(
       path,
-      version: 2, // Increment the version number
+      version: 3, // Increment the version number
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE tasks(
@@ -33,13 +33,19 @@ class TaskDatabase {
             dueDate TEXT,
             priority INTEGER,
             isCompleted INTEGER,
-            notes TEXT
+            notes TEXT,
+            filePaths TEXT,
+            imagePaths TEXT
           )
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE tasks ADD COLUMN notes TEXT');
+        }
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN filePaths TEXT');
+          await db.execute('ALTER TABLE tasks ADD COLUMN imagePaths TEXT');
         }
       },
     );
@@ -78,21 +84,14 @@ class TaskDatabase {
     );
   }
 
-  Future<void> close() async {
-    final db = await database;
-    db.close();
-  }
-
-  // Method to get tasks overdue by 4 months
   Future<List<Task>> getTasksOverdueByFourMonths() async {
     final db = await database;
-    final overdueThreshold =
-        DateTime.now().subtract(const Duration(days: 120)); // 4 months ago
-
+    final cutoffDate =
+        DateTime.now().subtract(const Duration(days: 120)).toIso8601String();
     final List<Map<String, dynamic>> maps = await db.query(
       'tasks',
-      where: 'dueDate <= ?',
-      whereArgs: [overdueThreshold.toIso8601String()],
+      where: 'dueDate < ?',
+      whereArgs: [cutoffDate],
     );
 
     return List.generate(maps.length, (i) {
@@ -100,28 +99,32 @@ class TaskDatabase {
     });
   }
 
-  // Method to delete a list of tasks
   Future<void> deleteTasks(List<int> taskIds) async {
     final db = await database;
-    for (int id in taskIds) {
+    for (var id in taskIds) {
       await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
     }
   }
 
-  // Existing method to retrieve tasks due in the next three days
   Future<List<Task>> getTasksForNextThreeDays() async {
     final db = await database;
     final now = DateTime.now();
-    final threeDaysFromNow = now.add(const Duration(days: 3));
+    final threeDaysFromNow = now.add(const Duration(days: 3)).toIso8601String();
+    final nowString = now.toIso8601String();
 
     final List<Map<String, dynamic>> maps = await db.query(
       'tasks',
-      where: 'dueDate >= ? AND dueDate <= ?',
-      whereArgs: [now.toIso8601String(), threeDaysFromNow.toIso8601String()],
+      where: 'dueDate BETWEEN ? AND ?',
+      whereArgs: [nowString, threeDaysFromNow],
     );
 
     return List.generate(maps.length, (i) {
       return Task.fromMap(maps[i]);
     });
+  }
+
+  Future<void> close() async {
+    final db = await database;
+    await db.close();
   }
 }
