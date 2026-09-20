@@ -9,6 +9,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from . import ai
+from .models import User
 from .serializers import DraftRequestSerializer
 
 
@@ -19,7 +20,14 @@ def health(request):
 
 
 def playground(request):
-    return render(request, "playground.html")
+    test_account = None
+    if settings.LOCAL_TEST_ACCOUNT_ENABLED and User.objects.filter(
+        email=settings.LOCAL_TEST_ACCOUNT_EMAIL.strip().casefold(),
+        is_active=True, is_staff=False, is_superuser=False,
+    ).exists():
+        test_account = {"email": settings.LOCAL_TEST_ACCOUNT_EMAIL,
+                        "password": settings.LOCAL_TEST_ACCOUNT_PASSWORD}
+    return render(request, "playground.html", {"test_account": test_account})
 
 
 def reset_page(request):

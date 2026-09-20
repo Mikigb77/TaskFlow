@@ -56,6 +56,10 @@ The real Android flow can also be checked with `flutter test integration_test/ba
 
 ## Accounts and recovery
 
+For repeat testing, use **Use test account** on the local browser page. In the Android app, sign in once with `test@taskflow.local` and `TaskFlow-Dev-2026!`; the app saves the session in secure storage. Both clients use the same account and tasks.
+
+The local `.env` enables this with `LOCAL_TEST_ACCOUNT_ENABLED=1`. Docker startup runs `python manage.py seed_test_user`, which creates a regular user once and preserves its password and tasks on subsequent starts. The shortcut uses the normal JWT login endpoint. Test-account seeding and the browser shortcut are disabled by default in `.env.example`; their email and password are configured with `LOCAL_TEST_ACCOUNT_EMAIL` and `LOCAL_TEST_ACCOUNT_PASSWORD`.
+
 Use an email address and a password of at least 12 characters. Passwords use Argon2 hashing and Django's common-password and similarity checks. Access tokens last 10 minutes; refresh tokens rotate and last 7 days. Tokens are stored in the phone's secure storage. Server session checks revoke both access and refresh tokens immediately on an online logout or password reset. Offline logout removes the device credentials; the server session expires normally.
 
 Login has IP throttling and a 15-minute account lock after 5 failed attempts. Recovery responses do not reveal whether an email is registered. Recovery links last 30 minutes and are single-use. Resetting a password revokes existing sessions.
@@ -112,7 +116,7 @@ Task writes accept `title`, offset-aware `due_date`, `priority` (1–3), `notes`
 
 ## Verification
 
-Verified locally on 2026-09-20: 22 backend tests, 15 Flutter tests, and the Android integration test pass. The live Docker smoke test also passes, including a synthetic English WAV transcribed into a Friday 25 September task at 17:00 Europe/Madrid, high priority, with the blood-test preparation note. Recovery email delivery, single-use reset, revoked sessions, and account isolation were checked against the running PostgreSQL-backed API. Physical-phone microphone input and iOS have not been tested.
+Verified locally on 2026-09-20: 25 backend tests, 15 Flutter tests, and the Android integration test pass. The live Docker smoke test also passes, including a synthetic English WAV transcribed into a Friday 25 September task at 17:00 Europe/Madrid, high priority, with the blood-test preparation note. Recovery email delivery, single-use reset, revoked sessions, and account isolation were checked against the running PostgreSQL-backed API. Physical-phone microphone input and iOS have not been tested.
 
 Flutter analysis reports no errors or warnings, with 9 existing API deprecation notices. Android debug builds succeed; the existing `open_file` package still prints a macOS plugin metadata warning.
 

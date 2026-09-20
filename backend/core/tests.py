@@ -8,6 +8,7 @@ from unittest.mock import patch
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.cache import cache
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -18,6 +19,45 @@ from .ai import AIUnavailable, extract_task, transcribe, generate
 from .models import User, Task, TaskEvent
 
 PASSWORD = "Strong-example-passphrase!2026"
+
+
+@override_settings(LOCAL_TEST_ACCOUNT_ENABLED=True,
+                   LOCAL_TEST_ACCOUNT_EMAIL="test@taskflow.local",
+                   LOCAL_TEST_ACCOUNT_PASSWORD=PASSWORD)
+class LocalTestAccountTests(TestCase):
+    def seed(self):
+        call_command("seed_test_user", stdout=io.StringIO())
+
+    def test_seed_creates_one_regular_user_and_preserves_tasks(self):
+        self.seed()
+        user = User.objects.get(email="test@taskflow.local")
+        original_hash = user.password
+        Task.objects.create(owner=user, title="Keep this test task",
+                            due_date=datetime(2026, 9, 25, 15, tzinfo=timezone.utc))
+        self.seed()
+        user.refresh_from_db()
+        self.assertEqual(User.objects.count(), 1)
+        self.assertEqual(user.password, original_hash)
+        self.assertTrue(user.check_password(PASSWORD))
+        self.assertFalse(user.is_staff or user.is_superuser)
+        self.assertEqual(user.tasks.count(), 1)
+        self.assertContains(self.client.get("/"), "Use test account")
+
+    @override_settings(LOCAL_TEST_ACCOUNT_ENABLED=False)
+    def test_disabled_setting_does_not_seed_or_expose_credentials(self):
+        self.seed()
+        self.assertFalse(User.objects.exists())
+        page = self.client.get("/")
+        self.assertNotContains(page, 'id="test-account-data"')
+        self.assertNotContains(page, PASSWORD)
+
+    def test_existing_credentials_and_privileges_are_not_overwritten(self):
+        user = User.objects.create_user("test@taskflow.local", "Existing-secret!2026", is_staff=True)
+        self.seed()
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("Existing-secret!2026"))
+        self.assertTrue(user.is_staff)
+        self.assertNotContains(self.client.get("/"), 'id="test-account-data"')
 
 
 class APITests(TestCase):

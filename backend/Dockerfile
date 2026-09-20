@@ -6,4 +6,4 @@ RUN pip install -r requirements.lock && useradd --create-home taskflow
 COPY --chown=taskflow:taskflow . .
 USER taskflow
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 120 --access-logfile - --access-logformat '%(h)s %(s)s %(m)s %(U)s'"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_test_user && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 120 --access-logfile - --access-logformat '%(h)s %(s)s %(m)s %(U)s'"]

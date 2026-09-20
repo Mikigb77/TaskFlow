@@ -7,6 +7,7 @@
 <header><div><h1>TaskFlow</h1><p>Speak your plans. Keep what matters.</p></div><span class="badge">Local workspace</span></header>
 <div class="grid">
 <section><h2>Your account</h2><p id="accountHint">Create an account to save and recover your tasks.</p>
+{% if test_account %}<button type="button" id="testLogin">Use test account</button><p>One-click sign-in for local testing. Your test tasks are kept between visits.</p>{{ test_account|json_script:"test-account-data" }}{% endif %}
 <form id="authForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username">
 <label for="password">Password · at least 12 characters</label><input id="password" type="password" minlength="12" maxlength="128" required autocomplete="current-password">
 <button type="submit">Sign in</button><button class="secondary" type="button" id="register">Create account</button></form>
@@ -42,6 +43,7 @@ async function run(button,work){button.disabled=true;say('Working…');try{await
 async function signIn(kind){const t=await api(`auth/${kind}/`,{email:$('email').value,password:$('password').value,timezone:$('zone').value});access=t.access;refresh=t.refresh;$('password').value='';$('accountHint').textContent=`Signed in as ${t.user.email}`;$('logout').classList.remove('hidden');say('Signed in.');await loadTasks()}
 $('authForm').onsubmit=e=>{e.preventDefault();run(e.submitter,()=>signIn('login'))};
 $('register').onclick=e=>{if($('authForm').reportValidity())run(e.target,()=>signIn('register'))};
+if($('testLogin'))$('testLogin').onclick=e=>run(e.target,async()=>{const account=JSON.parse($('test-account-data').textContent);$('email').value=account.email;$('password').value=account.password;await signIn('login')});
 $('logout').onclick=e=>run(e.target,async()=>{await api('auth/logout/',{});access=refresh=null;$('accountHint').textContent='Signed out.';$('tasks').replaceChildren();$('draft').classList.add('hidden');say('Signed out.')});
 $('recover').onclick=e=>run(e.target,async()=>{say((await api('auth/password-reset/',{email:$('email').value})).detail)});
 async function loadTasks(){if(!access)throw Error('Sign in first.');const result=await api('tasks/',null,'GET');$('tasks').replaceChildren();for(const t of result.results){const row=document.createElement('div');row.className='task';const title=document.createElement('strong');title.textContent=t.title;const detail=document.createElement('small');detail.textContent=`${new Date(t.due_date).toLocaleString()} · ${['','Low','Medium','High'][t.priority]} priority`;row.append(title,detail);$('tasks').append(row)}if(!result.results.length)$('tasks').textContent='No tasks yet.'}
