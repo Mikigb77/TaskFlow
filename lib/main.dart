@@ -250,7 +250,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const HomeScreen(),
+        '/': (context) => const CalendarScreen(),
         '/home': (context) => const HomeScreen(),
         '/completedTasks': (context) => const CompletedTasksScreen(),
         '/createTask': (context) => const CreateTaskScreen(),

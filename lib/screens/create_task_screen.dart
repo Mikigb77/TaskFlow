@@ -46,11 +46,8 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final DateTime? selectedDate =
-        ModalRoute.of(context)?.settings.arguments as DateTime?;
-    if (selectedDate != null) {
-      _dueDate = selectedDate;
-    }
+    // The calendar date is only a default. Rebuilds must keep the user's edits.
+    _dueDate ??= ModalRoute.of(context)?.settings.arguments as DateTime?;
   }
 
   @override
@@ -103,11 +100,12 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
       },
     );
 
+    if (!mounted) return;
+
     if (pickedDate != null) {
       TimeOfDay? pickedTime = await showTimePicker(
-        // ignore: use_build_context_synchronously
         context: context,
-        initialTime: TimeOfDay.fromDateTime(DateTime.now()),
+        initialTime: TimeOfDay.fromDateTime(_dueDate ?? DateTime.now()),
         builder: (context, child) {
           return Theme(
             data: ThemeData.dark().copyWith(
@@ -124,7 +122,7 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
         },
       );
 
-      if (pickedTime != null) {
+      if (pickedTime != null && mounted) {
         setState(() {
           _dueDate = DateTime(
             pickedDate.year,
