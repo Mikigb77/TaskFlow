@@ -73,8 +73,11 @@ class _EditTaskScreenState extends ConsumerState<EditTaskScreen> {
     super.dispose();
   }
 
-  void _submitTask() {
-    if (_formKey.currentState!.validate()) {
+  bool _saving = false;
+
+  Future<void> _submitTask() async {
+    if (!_saving && _formKey.currentState!.validate()) {
+      setState(() => _saving = true);
       _formKey.currentState!.save();
       final updatedTask = Task(
         id: widget.taskId,
@@ -91,8 +94,17 @@ class _EditTaskScreenState extends ConsumerState<EditTaskScreen> {
             .where((path) => path.isNotEmpty)
             .toList(),
       );
-      ref.read(taskProvider.notifier).updateTask(updatedTask);
-      Navigator.of(context).pop();
+      try {
+        await ref.read(taskProvider.notifier).updateTask(updatedTask);
+        if (mounted) Navigator.of(context).pop();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Changes could not be saved. Please try again.')));
+        }
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
     }
   }
 
@@ -329,6 +341,7 @@ class _EditTaskScreenState extends ConsumerState<EditTaskScreen> {
                 children: [
                   TextFormField(
                     initialValue: _title,
+                    maxLength: 160,
                     decoration: InputDecoration(
                       labelText: 'Task Title',
                       labelStyle: TextStyle(color: subtitleTextColor),
@@ -419,6 +432,7 @@ class _EditTaskScreenState extends ConsumerState<EditTaskScreen> {
                   const SizedBox(height: 20.0),
                   TextFormField(
                     initialValue: _notes,
+                    maxLength: 8000,
                     decoration: InputDecoration(
                       labelText: 'Additional Notes',
                       labelStyle: TextStyle(color: subtitleTextColor),

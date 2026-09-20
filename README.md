@@ -1,5 +1,7 @@
 # TaskFlow
 
+Local Docker backend, accounts, offline task sync, and voice-to-task setup: [Local backend guide](docs/LOCAL_BACKEND.md).
+
 **TaskFlow** is a simple and intuitive app designed to help you efficiently manage your tasks. It organizes your tasks by **due date** and **priority**, ensuring that you stay on top of your schedule. The app sends **daily morning and evening notifications**, highlighting your three most urgent tasks for the day, and offers a **10 minutes remainder before important tasks** to keep you on track.
 
 ## Features
@@ -39,4 +41,3 @@ You are welcome to use and modify the source code to create your custom app. If 
 ## Final Notes
 
 Thank you for using **TaskFlow**! If you encounter any issues or have suggestions for improvement, feel free to contribute or open an issue in the repository.
-

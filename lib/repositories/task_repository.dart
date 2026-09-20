@@ -6,6 +6,10 @@ class TaskRepository {
 
   TaskRepository(this._database);
 
+  String? syncError;
+  Future<void> sync() async {}
+  Future<int> importLocalTasks() async => 0;
+
   Future<int> addTask(Task task) async {
     return await _database.insertTask(task);
   }

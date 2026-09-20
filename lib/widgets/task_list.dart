@@ -59,40 +59,43 @@ class TaskList extends ConsumerWidget {
                 ),
               ),
             ),
-            child: ListTile(
-              leading: Icon(
-                _getPriorityIcon(task.priority),
-                color: _getPriorityColor(task.priority),
-              ),
-              title: Text(
-                task.title,
-                style: TextStyle(color: textColor),
-              ),
-              subtitle: Text(
-                DateFormat('dd/MM, hh:mm a').format(task.dueDate),
-                style: TextStyle(color: subtitleTextColor),
-              ),
-              trailing: IconButton(
-                icon: Icon(
-                  task.isCompleted
-                      ? Icons.check_box
-                      : Icons.check_box_outline_blank,
-                  color: task.isCompleted ? accentColor : subtitleTextColor,
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: Icon(
+                  _getPriorityIcon(task.priority),
+                  color: _getPriorityColor(task.priority),
                 ),
-                onPressed: () {
-                  final updatedTask =
-                      task.copyWith(isCompleted: !task.isCompleted);
-                  taskNotifier.updateTask(updatedTask);
+                title: Text(
+                  task.title,
+                  style: TextStyle(color: textColor),
+                ),
+                subtitle: Text(
+                  DateFormat('dd/MM, hh:mm a').format(task.dueDate),
+                  style: TextStyle(color: subtitleTextColor),
+                ),
+                trailing: IconButton(
+                  icon: Icon(
+                    task.isCompleted
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank,
+                    color: task.isCompleted ? accentColor : subtitleTextColor,
+                  ),
+                  onPressed: () {
+                    final updatedTask =
+                        task.copyWith(isCompleted: !task.isCompleted);
+                    taskNotifier.updateTask(updatedTask);
+                  },
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TaskDetailScreen(taskId: task.id!),
+                    ),
+                  );
                 },
               ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TaskDetailScreen(taskId: task.id!),
-                  ),
-                );
-              },
             ),
           ),
         );

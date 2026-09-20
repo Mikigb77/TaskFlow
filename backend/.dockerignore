@@ -1,0 +1,7 @@
+.env*
+__pycache__
+*.pyc
+.venv
+*.sqlite3
+.pytest_cache
+tests/fixtures/*.wav

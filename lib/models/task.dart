@@ -59,7 +59,7 @@ class Task {
     return Task(
       id: map['id'],
       title: map['title'],
-      dueDate: DateTime.parse(map['dueDate']),
+      dueDate: DateTime.parse(map['dueDate']).toLocal(),
       priority: map['priority'],
       isCompleted: map['isCompleted'] == 1,
       notes: map['notes'],

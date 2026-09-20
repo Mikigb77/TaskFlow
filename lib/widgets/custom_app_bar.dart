@@ -19,6 +19,12 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           Colors.grey[800], // A dark grey color for a more cohesive dark theme
       actions: [
         IconButton(
+          tooltip: 'Account',
+          icon:
+              const Icon(Icons.account_circle_outlined, color: Colors.white70),
+          onPressed: () => Navigator.pushNamed(context, '/account'),
+        ),
+        IconButton(
           icon: const Icon(Icons.home, color: Colors.white70),
           onPressed: () {
             Navigator.pushNamedAndRemoveUntil(

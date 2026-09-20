@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/utils/constants.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -14,7 +15,8 @@ class CalendarScreen extends ConsumerStatefulWidget {
   _CalendarScreenState createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+class _CalendarScreenState extends ConsumerState<CalendarScreen>
+    with WidgetsBindingObserver {
   late final ValueNotifier<DateTime> _selectedDay;
   late final ValueNotifier<List<Task>> _selectedEvents;
   CalendarFormat _calendarFormat = CalendarFormat.month;
@@ -22,9 +24,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedDay = ValueNotifier(DateTime.now());
     _selectedEvents = ValueNotifier([]);
     _loadSelectedDayEvents();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(taskProvider.notifier).loadTasks();
+    }
   }
 
   void _loadSelectedDayEvents() {
@@ -99,9 +109,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       backgroundColor: defaultBackgroundColor,
       body: Column(
         children: [
+          if (ref.watch(authProvider).account != null)
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(children: [
+                  Expanded(
+                      child: Text(
+                          ref.read(taskRepositoryProvider).syncError ??
+                              'Your tasks are backed up when connected.',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12))),
+                  IconButton(
+                      tooltip: 'Sync tasks',
+                      onPressed: () =>
+                          ref.read(taskProvider.notifier).loadTasks(),
+                      icon: const Icon(Icons.sync, color: Colors.white70)),
+                ])),
           TableCalendar(
             firstDay: DateTime.utc(2010, 10, 16),
-            lastDay: DateTime.utc(2030, 3, 14),
+            lastDay: DateTime.utc(2100, 12, 31),
             focusedDay: _selectedDay.value,
             calendarFormat: _calendarFormat,
             selectedDayPredicate: (day) => isSameDay(_selectedDay.value, day),
@@ -201,42 +227,45 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           ),
                         ),
                       ),
-                      child: ListTile(
-                        leading: Icon(
-                          _getMarkerColorForTask(task) == Colors.green[700]!
-                              ? Icons.check
-                              : _getPriorityIcon(task.priority),
-                          color: _getMarkerColorForTask(task),
-                        ),
-                        title: Text(
-                          task.title,
-                          style: TextStyle(
-                            color: task.isCompleted ? Colors.grey : textColor,
-                            decoration: task.isCompleted
-                                ? TextDecoration.lineThrough
-                                : TextDecoration.none,
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: ListTile(
+                          leading: Icon(
+                            _getMarkerColorForTask(task) == Colors.green[700]!
+                                ? Icons.check
+                                : _getPriorityIcon(task.priority),
+                            color: _getMarkerColorForTask(task),
                           ),
-                        ),
-                        subtitle: Text(
-                          task.notes ?? '',
-                          style: TextStyle(color: subtitleTextColor),
-                        ),
-                        trailing: Checkbox(
-                          value: task.isCompleted,
-                          onChanged: (bool? value) {
-                            _toggleTaskCompletion(task);
+                          title: Text(
+                            task.title,
+                            style: TextStyle(
+                              color: task.isCompleted ? Colors.grey : textColor,
+                              decoration: task.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                            ),
+                          ),
+                          subtitle: Text(
+                            task.notes ?? '',
+                            style: TextStyle(color: subtitleTextColor),
+                          ),
+                          trailing: Checkbox(
+                            value: task.isCompleted,
+                            onChanged: (bool? value) {
+                              _toggleTaskCompletion(task);
+                            },
+                            activeColor: Colors.green[700],
+                            checkColor: Colors.white,
+                            side: const BorderSide(color: Colors.white),
+                          ),
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              '/taskDetails',
+                              arguments: task.id,
+                            );
                           },
-                          activeColor: Colors.green[700],
-                          checkColor: Colors.white,
-                          side: const BorderSide(color: Colors.white),
                         ),
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/taskDetails',
-                            arguments: task.id,
-                          );
-                        },
                       ),
                     );
                   },
@@ -246,22 +275,41 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(
-            context,
-            '/createTask',
-            arguments: _selectedDay.value,
-          );
-        },
-        backgroundColor: Colors.deepPurple[400],
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      floatingActionButton: Column(mainAxisSize: MainAxisSize.min, children: [
+        FloatingActionButton(
+          heroTag: 'voiceTask',
+          tooltip: 'Create task with voice',
+          onPressed: () {
+            Navigator.pushNamed(
+                context,
+                ref.read(authProvider).account == null
+                    ? '/account'
+                    : '/voiceTask');
+          },
+          backgroundColor: accentColor,
+          child: const Icon(Icons.mic, color: Colors.black),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton(
+          heroTag: 'manualTask',
+          tooltip: 'Create task',
+          onPressed: () {
+            Navigator.pushNamed(
+              context,
+              '/createTask',
+              arguments: _selectedDay.value,
+            );
+          },
+          backgroundColor: Colors.deepPurple[400],
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+      ]),
     );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _selectedDay.dispose();
     _selectedEvents.dispose();
     super.dispose();

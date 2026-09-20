@@ -1,6 +1,7 @@
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/utils/constants.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +12,8 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 
 class CreateTaskScreen extends ConsumerStatefulWidget {
-  const CreateTaskScreen({super.key});
+  final TaskDraft? initialDraft;
+  const CreateTaskScreen({super.key, this.initialDraft});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -28,10 +30,21 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
   bool _attachmentsExpanded = true;
   final ScrollController _scrollController = ScrollController();
   bool _showScrollIndicator = true;
+  bool _saving = false;
+  late final TextEditingController _dueController;
 
   @override
   void initState() {
     super.initState();
+    final draft = widget.initialDraft;
+    _title = draft?.title ?? '';
+    _dueDate = draft?.dueDate;
+    _priority = draft?.priority ?? 1;
+    _notes = draft?.notes;
+    _dueController = TextEditingController(
+        text: _dueDate == null
+            ? ''
+            : DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!));
     _scrollController.addListener(() {
       if (_scrollController.position.atEdge) {
         if (_scrollController.position.pixels != 0) {
@@ -47,18 +60,28 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     // The calendar date is only a default. Rebuilds must keep the user's edits.
-    _dueDate ??= ModalRoute.of(context)?.settings.arguments as DateTime?;
+    final selectedDate =
+        ModalRoute.of(context)?.settings.arguments as DateTime?;
+    if (_dueDate == null && selectedDate != null) {
+      _dueDate =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    }
+    _dueController.text = _dueDate == null
+        ? ''
+        : DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!);
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _dueController.dispose();
     super.dispose();
   }
 
-  void _submitTask() {
-    if (_formKey.currentState!.validate()) {
+  Future<void> _submitTask() async {
+    if (!_saving && _formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      setState(() => _saving = true);
       final newTask = Task(
         title: _title,
         dueDate: _dueDate!,
@@ -73,8 +96,17 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
             .where((path) => path.isNotEmpty)
             .toList(),
       );
-      ref.read(taskProvider.notifier).addTask(newTask);
-      Navigator.of(context).pop();
+      try {
+        await ref.read(taskProvider.notifier).addTask(newTask);
+        if (mounted) Navigator.of(context).pop();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('The task could not be saved. Please try again.')));
+        }
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
     }
   }
 
@@ -131,6 +163,8 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
             pickedTime.hour,
             pickedTime.minute,
           );
+          _dueController.text =
+              DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!);
         });
       }
     }
@@ -292,7 +326,8 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(title: "Create Task"),
+      appBar: CustomAppBar(
+          title: widget.initialDraft == null ? 'Create Task' : 'Review task'),
       backgroundColor: defaultBackgroundColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -301,7 +336,21 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.initialDraft != null) ...[
+                Text(widget.initialDraft!.transcript,
+                    style: TextStyle(color: subtitleTextColor)),
+                const SizedBox(height: 12),
+                const Text('Review the details before saving.'),
+                if (widget.initialDraft!.questions.isNotEmpty)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(widget.initialDraft!.questions.join('\n'),
+                          style: const TextStyle(color: Colors.amber))),
+                const SizedBox(height: 20),
+              ],
               TextFormField(
+                initialValue: _title,
+                maxLength: 160,
                 decoration: InputDecoration(
                   labelText: 'Task Title',
                   labelStyle: TextStyle(color: subtitleTextColor),
@@ -314,13 +363,13 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
                 ),
                 style: TextStyle(color: textColor),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                  if (value == null || value.trim().isEmpty) {
                     return 'Please enter a task title';
                   }
                   return null;
                 },
                 onSaved: (value) {
-                  _title = value!;
+                  _title = value!.trim();
                 },
               ),
               const SizedBox(height: 20.0),
@@ -347,11 +396,7 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
                       }
                       return null;
                     },
-                    controller: TextEditingController(
-                      text: _dueDate != null
-                          ? DateFormat('dd/MM/yyyy HH:mm').format(_dueDate!)
-                          : '',
-                    ),
+                    controller: _dueController,
                   ),
                 ),
               ),
@@ -397,6 +442,8 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
               ),
               const SizedBox(height: 20.0),
               TextFormField(
+                initialValue: _notes,
+                maxLength: 8000,
                 decoration: InputDecoration(
                   labelText: 'Additional Notes',
                   labelStyle: TextStyle(color: subtitleTextColor),
@@ -442,7 +489,7 @@ class _CreateTaskScreenState extends ConsumerState<CreateTaskScreen> {
               const SizedBox(height: 20.0),
               Center(
                 child: ElevatedButton(
-                  onPressed: _submitTask,
+                  onPressed: _saving ? null : _submitTask,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accentColor,
                     padding: const EdgeInsets.symmetric(
