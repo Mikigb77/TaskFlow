@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TaskFlow · Local workspace</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#141920;color:#edf3ef}body{max-width:1050px;margin:45px auto;padding:0 22px}header{display:flex;align-items:center;justify-content:space-between}h1{font-size:34px;letter-spacing:-1px;margin-bottom:5px}p{color:#b7c4c2;line-height:1.55}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}section{padding:25px;background:#202831;border:1px solid #35434b;border-radius:18px;margin-top:24px}label{display:block;margin:15px 0 7px;color:#c9d5d2}input,textarea,select,button{font:inherit;border-radius:9px;padding:12px;box-sizing:border-box}input,textarea,select{width:100%;border:1px solid #4a5b64;background:#161d25;color:#fff}textarea{min-height:115px;resize:vertical}button{border:0;background:#9dd8b3;color:#102318;cursor:pointer;margin:14px 6px 0 0;font-weight:650}button.secondary{background:#374751;color:#eef5f1}button:disabled{opacity:.45;cursor:wait}.status{padding:15px 0;white-space:pre-wrap;color:#b5eac8;min-height:24px}.badge{padding:8px 13px;border:1px solid #4c695c;border-radius:30px;color:#b5eac8;font-size:13px}.task{padding:14px 0;border-bottom:1px solid #35434b}.task small{display:block;color:#afbfba;margin-top:5px}.hidden{display:none}@media(max-width:720px){.grid{grid-template-columns:1fr}body{margin-top:20px}}
+</style>
+<header><div><h1>TaskFlow</h1><p>Speak your plans. Keep what matters.</p></div><span class="badge">Local workspace</span></header>
+<div class="grid">
+<section><h2>Your account</h2><p id="accountHint">Create an account to save and recover your tasks.</p>
+{% if test_account %}<button type="button" id="testLogin">Use test account</button><p>One-click sign-in for local testing. Your test tasks are kept between visits.</p>{{ test_account|json_script:"test-account-data" }}{% endif %}
+<form id="authForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username">
+<label for="password">Password · at least 12 characters</label><input id="password" type="password" minlength="12" maxlength="128" required autocomplete="current-password">
+<button type="submit">Sign in</button><button class="secondary" type="button" id="register">Create account</button></form>
+<button class="secondary" id="recover">Recover account</button><button class="secondary hidden" id="logout">Sign out</button>
+<p>Recovery messages are delivered to the local <a href="http://localhost:8026" style="color:#b5eac8">test inbox</a>.</p>
+<h3>Your tasks</h3><button class="secondary" id="reload">Refresh tasks</button><div id="tasks"><p>Sign in to see your tasks.</p></div></section>
+<section><h2>Turn words into a task</h2><p>Type a plan or record up to 60 seconds. Review the result before saving.</p>
+<label for="words">Your plan</label><textarea id="words">On Friday at 5 p.m. I have an appointment with the doctor. I need to bring the blood test results from last month.</textarea>
+<label for="zone">Time zone</label><input id="zone" value="Europe/Madrid">
+<button id="interpret">Create draft</button><button class="secondary" id="mic">● Record</button>
+<label for="audio">Or upload a WAV recording</label><input id="audio" type="file" accept=".wav,audio/wav">
+<div id="draft" class="hidden"><h3>Review your task</h3><p id="transcript"></p><p id="questions"></p>
+<label for="title">Title</label><input id="title" maxlength="160">
+<label for="due">Due date and time · this browser's local time</label><input id="due" type="datetime-local">
+<label for="priority">Priority</label><select id="priority"><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option></select>
+<label for="notes">Notes</label><textarea id="notes"></textarea><button id="save">Save task</button></div></section>
+</div><div class="status" role="status" id="status"></div>
+<script>
+const $=id=>document.getElementById(id);let access=null,refresh=null,refreshing=null,recording=null,recordTimer=null;
+$('zone').value=Intl.DateTimeFormat().resolvedOptions().timeZone;
+const say=text=>$('status').textContent=text;
+function message(data){return typeof data.detail==='string'?data.detail:JSON.stringify(data)}
+async function api(path,data,method='POST',retry=true){
+ const headers={};if(access)headers.Authorization=`Bearer ${access}`;if(!(data instanceof FormData))headers['Content-Type']='application/json';
+ const response=await fetch(`/api/${path}`,{method,headers,body:method==='GET'?undefined:(data instanceof FormData?data:JSON.stringify(data||{}))});
+ const result=response.status===204?{}:await response.json();
+ if(response.status===401&&refresh&&retry&&!path.startsWith('auth/')){
+   refreshing??=fetch('/api/auth/refresh/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh})}).then(async r=>{if(!r.ok)throw Error('Please sign in again.');return r.json()}).then(t=>{access=t.access;refresh=t.refresh}).finally(()=>refreshing=null);
+   await refreshing;return api(path,data,method,false);
+ }if(!response.ok)throw Error(message(result));return result;
+}
+async function run(button,work){button.disabled=true;say('Working…');try{await work()}catch(e){say(e.message)}finally{button.disabled=false}}
+async function signIn(kind){const t=await api(`auth/${kind}/`,{email:$('email').value,password:$('password').value,timezone:$('zone').value});access=t.access;refresh=t.refresh;$('password').value='';$('accountHint').textContent=`Signed in as ${t.user.email}`;$('logout').classList.remove('hidden');say('Signed in.');await loadTasks()}
+$('authForm').onsubmit=e=>{e.preventDefault();run(e.submitter,()=>signIn('login'))};
+$('register').onclick=e=>{if($('authForm').reportValidity())run(e.target,()=>signIn('register'))};
+if($('testLogin'))$('testLogin').onclick=e=>run(e.target,async()=>{const account=JSON.parse($('test-account-data').textContent);$('email').value=account.email;$('password').value=account.password;await signIn('login')});
+$('logout').onclick=e=>run(e.target,async()=>{await api('auth/logout/',{});access=refresh=null;$('accountHint').textContent='Signed out.';$('tasks').replaceChildren();$('draft').classList.add('hidden');say('Signed out.')});
+$('recover').onclick=e=>run(e.target,async()=>{say((await api('auth/password-reset/',{email:$('email').value})).detail)});
+async function loadTasks(){if(!access)throw Error('Sign in first.');const result=await api('tasks/',null,'GET');$('tasks').replaceChildren();for(const t of result.results){const row=document.createElement('div');row.className='task';const title=document.createElement('strong');title.textContent=t.title;const detail=document.createElement('small');const schedule=t.due_date?new Date(t.due_date).toLocaleString():t.scheduled_date?`${t.scheduled_date} · Any time`:'Inbox · No date';detail.textContent=`${schedule} · ${['','Low','Medium','High'][t.priority]} priority${t.recurrence&&t.recurrence!=='none'?` · ${t.recurrence}`:''}`;row.append(title,detail);$('tasks').append(row)}if(!result.results.length)$('tasks').textContent='No tasks yet.'}
+$('reload').onclick=e=>run(e.target,async()=>{await loadTasks();say('Tasks refreshed.')});
+function showDraft(d){$('draft').classList.remove('hidden');$('title').value=d.title;$('notes').value=d.notes;$('priority').value=d.priority;$('transcript').textContent=d.transcript;$('questions').textContent=d.questions.join(' ');let due='';if(d.due_date){const date=new Date(d.due_date);due=new Date(date-date.getTimezoneOffset()*60000).toISOString().slice(0,16)}$('due').value=due;say('Review the title, date, time and notes, then save.')}
+$('interpret').onclick=e=>run(e.target,async()=>{if(!access)throw Error('Sign in first.');showDraft(await api('ai/draft/',{text:$('words').value,timezone:$('zone').value,reference_time:new Date().toISOString()}))});
+async function audioDraft(file){if(!access)throw Error('Sign in first.');const form=new FormData();form.append('audio',file,'task.wav');form.append('timezone',$('zone').value);form.append('reference_time',new Date().toISOString());showDraft(await api('ai/draft/',form))}
+$('audio').onchange=e=>{if(e.target.files[0])run($('interpret'),()=>audioDraft(e.target.files[0]))};
+$('save').onclick=e=>run(e.target,async()=>{if(!$('title').value.trim()||!$('due').value)throw Error('Enter a title, date and time.');await api('tasks/',{title:$('title').value,due_date:new Date($('due').value).toISOString(),priority:Number($('priority').value),notes:$('notes').value});$('draft').classList.add('hidden');await loadTasks();say('Task saved to your account.')});
+async function stopRecording(){const r=recording;if(!r)return;recording=null;clearTimeout(recordTimer);r.processor.disconnect();r.source.disconnect();r.stream.getTracks().forEach(t=>t.stop());await r.context.close();$('mic').textContent='● Record';const samples=r.chunks.reduce((s,c)=>s+c.length,0);const buffer=new ArrayBuffer(44+samples*2),v=new DataView(buffer);function str(o,s){for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))}str(0,'RIFF');v.setUint32(4,36+samples*2,true);str(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,r.rate,true);v.setUint32(28,r.rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);str(36,'data');v.setUint32(40,samples*2,true);let o=44;for(const c of r.chunks)for(const f of c){v.setInt16(o,Math.max(-1,Math.min(1,f))*32767,true);o+=2}await run($('mic'),()=>audioDraft(new Blob([buffer],{type:'audio/wav'})))}
+$('mic').onclick=async()=>{if(recording){await stopRecording();return}if(!access){say('Sign in first.');return}let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true});const context=new AudioContext({sampleRate:16000});const source=context.createMediaStreamSource(stream),processor=context.createScriptProcessor(4096,1,1),chunks=[];processor.onaudioprocess=e=>chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));source.connect(processor);processor.connect(context.destination);recording={stream,context,source,processor,chunks,rate:context.sampleRate};$('mic').textContent='■ Stop & create draft';say('Recording… click Stop when finished.');recordTimer=setTimeout(stopRecording,59000)}catch(e){stream?.getTracks().forEach(t=>t.stop());say(`Microphone unavailable: ${e.message}. You can type your plan instead.`)}};
+window.addEventListener('pagehide',()=>{recording?.stream.getTracks().forEach(t=>t.stop());recording?.context.close()});
+</script></html>

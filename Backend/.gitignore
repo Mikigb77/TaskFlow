@@ -1,0 +1,11 @@
+# Runtime data only. The private prototype .env is intentionally tracked.
+__pycache__/
+*.py[cod]
+*.log
+*.sqlite3
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+artifacts/
+tests/fixtures/*.wav

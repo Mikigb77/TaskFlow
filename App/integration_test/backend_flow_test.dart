@@ -1,0 +1,280 @@
+// Requires the local Docker backend and its configured Google models.
+// Uses synthetic accounts/tasks; never records the user's microphone.
+import 'package:agenda/main.dart';
+import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/review_tasks_screen.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/services/api_client.dart';
+import 'package:agenda/widgets/app_components.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+
+void main() {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Android account, AI review, task backup and re-login',
+      (tester) async {
+    tzdata.initializeTimeZones();
+    final container = ProviderContainer(overrides: [
+      if (const bool.fromEnvironment('FIXTURE_AI'))
+        apiClientProvider.overrideWith((ref) {
+          final api = _FixtureAiClient();
+          ref.onDispose(api.close);
+          return api;
+        }),
+    ]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()));
+    await waitFor(tester, () => !container.read(authProvider).loading);
+    await container.read(authProvider.notifier).signOut();
+    await tester.pumpAndSettle();
+    expect(find.byType(CalendarScreen), findsOneWidget);
+    await binding.convertFlutterSurfaceToImage();
+    await tester.pumpAndSettle();
+
+    // Guest capture exercises the anonymous endpoint and real local persistence.
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/voiceTask');
+    await tester.pumpAndSettle();
+    final guestTitle = 'Buy coffee ${DateTime.now().millisecondsSinceEpoch}';
+    await tester.enterText(find.byType(TextField).first,
+        '$guestTitle sometime. Pay my electricity bill on Friday.');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final guestGenerate = find.text('Review tasks from text');
+    await tester.ensureVisible(guestGenerate);
+    await tester.tap(guestGenerate);
+    await waitFor(
+        tester, () => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 120));
+    await tester.pumpAndSettle();
+    final guestDrafts =
+        tester.widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen)).drafts;
+    expect(guestDrafts.length, 2);
+    expect(guestDrafts.where((draft) => draft.dueDate == null).length, 1);
+    expect(guestDrafts.every((draft) => !draft.hasTime), isTrue);
+    await binding.takeScreenshot('flexible-guest-review');
+    final beforeGuest = (container.read(taskProvider).valueOrNull ?? <Task>[])
+        .map((t) => t.id)
+        .toSet();
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await waitFor(
+        tester, () => find.byType(ReviewTasksScreen).evaluate().isEmpty);
+    await container.read(taskProvider.notifier).loadTasks();
+    final addedGuest = container
+        .read(taskProvider)
+        .requireValue
+        .where((t) => !beforeGuest.contains(t.id))
+        .toList();
+    expect(addedGuest.length, 2);
+    for (final task in addedGuest) {
+      await container.read(taskProvider.notifier).deleteTask(task.id!);
+    }
+    await container.read(taskProvider.notifier).loadTasks();
+    await tester.pumpAndSettle();
+
+    final email =
+        'android-${DateTime.now().microsecondsSinceEpoch}@example.invalid';
+    const password = 'Android-testing-7!only';
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create an account'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('account-email')), email);
+    await tester.enterText(
+        find.byKey(const ValueKey('account-password')), password);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final register = find.widgetWithText(FilledButton, 'Create account');
+    await tester.ensureVisible(register);
+    await tester.tap(register);
+    await waitFor(tester, () => container.read(authProvider).account != null);
+    expect(container.read(authProvider).account!.email, email);
+    await tester.pumpAndSettle();
+    expect(find.byType(CalendarScreen), findsOneWidget);
+
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/voiceTask');
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byType(TextField).first,
+        'On Friday at 5 p.m. I have an appointment with the doctor. '
+        'I need to bring my blood test results from last month. Also buy coffee sometime. '
+        'Water the plants every Sunday at 9 a.m.');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final generate =
+        find.widgetWithText(OutlinedButton, 'Review tasks from text');
+    await tester.ensureVisible(generate);
+    await tester.tap(generate);
+    await waitFor(
+        tester, () => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 120));
+    await tester.pumpAndSettle();
+    final screen =
+        tester.widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen));
+    expect(screen.drafts.length, 3);
+    final draft = screen.drafts
+        .firstWhere((d) => d.title.toLowerCase().contains('doctor'));
+    expect(screen.drafts.any((d) => d.dueDate == null), isTrue);
+    expect(screen.drafts.any((d) => d.recurrence == 'weekly'), isTrue);
+    expect(draft.title.toLowerCase(), contains('doctor'));
+    expect(draft.dueDate!.weekday, DateTime.friday);
+    expect(draft.dueDate!.hour, 17);
+    expect(draft.priority, 3);
+    expect(draft.notes.toLowerCase(), contains('blood'));
+    await binding.takeScreenshot('flexible-batch-review');
+    expect(
+        (await container
+            .read(apiClientProvider)
+            .request('GET', 'tasks/'))['count'],
+        0);
+    final save = find.byKey(const ValueKey('save-drafts'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await waitFor(
+        tester, () => find.byType(ReviewTasksScreen).evaluate().isEmpty);
+    await container.read(taskProvider.notifier).loadTasks();
+    expect(container.read(taskRepositoryProvider).syncError, isNull);
+    final saved =
+        await container.read(apiClientProvider).request('GET', 'tasks/');
+    expect(saved['count'], 3);
+    final doctor =
+        (saved['results'] as List).firstWhere((t) => t['title'] == draft.title);
+    expect(DateTime.parse(doctor['due_date']).toLocal(), draft.dueDate);
+
+    await tester.tap(find.text('Tasks'));
+    await tester.pumpAndSettle();
+    expect(find.text(draft.title), findsOneWidget);
+    await binding.takeScreenshot('flexible-tasks');
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Inbox'));
+    await tester.pumpAndSettle();
+    await binding.takeScreenshot('flexible-inbox');
+    final plants = container
+        .read(taskProvider)
+        .requireValue
+        .firstWhere((t) => t.recurrence == 'weekly');
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/editTask', arguments: plants.id);
+    await tester.pumpAndSettle();
+    await binding.takeScreenshot('flexible-repeat-editor');
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign out'));
+    await waitFor(tester, () => container.read(authProvider).account == null);
+    await tester.pumpAndSettle();
+    expect(find.byType(CalendarScreen), findsOneWidget);
+    expect(container.read(taskProvider).valueOrNull ?? [], isEmpty);
+
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('account-email')), email);
+    await tester.enterText(
+        find.byKey(const ValueKey('account-password')), password);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final login = find.widgetWithText(FilledButton, 'Sign in');
+    await tester.ensureVisible(login);
+    await tester.tap(login);
+    await waitFor(tester, () => container.read(authProvider).account != null);
+    await container.read(taskProvider.notifier).loadTasks();
+    expect(container.read(taskProvider).requireValue.length, 3);
+    expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .any((t) => t.title == draft.title),
+        isTrue);
+    await container.read(authProvider.notifier).signOut();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 5)));
+}
+
+Future<void> waitFor(WidgetTester tester, bool Function() condition,
+    {Duration timeout = const Duration(seconds: 30)}) async {
+  final watch = Stopwatch()..start();
+  while (!condition() && watch.elapsed < timeout) {
+    await tester.pump(const Duration(milliseconds: 250));
+    final errors = tester
+        .widgetList<MessageBanner>(find.byType(MessageBanner))
+        .where((banner) => banner.isError)
+        .map((banner) => banner.message)
+        .toList();
+    if (errors.isNotEmpty) fail('The app reported: ${errors.join(' | ')}');
+  }
+  expect(condition(), isTrue,
+      reason: 'The expected app state was not reached.');
+}
+
+// Only AI is substituted in this optional mode. Auth, SQLite, HTTP sync,
+// PostgreSQL persistence and restoration still use the real running backend.
+class _FixtureAiClient extends ApiClient {
+  @override
+  Future<dynamic> request(String method, String path,
+      {Map<String, dynamic>? data,
+      String? audioPath,
+      bool authenticated = true,
+      int? accountId}) async {
+    if (path != 'ai/drafts/') {
+      return super.request(method, path,
+          data: data,
+          audioPath: audioPath,
+          authenticated: authenticated,
+          accountId: accountId);
+    }
+    expect(authenticated, account != null);
+    final now = DateTime.now();
+    DateTime next(int weekday, int hour) {
+      var date = DateTime(
+          now.year, now.month, now.day + (weekday - now.weekday + 7) % 7, hour);
+      if (date.isBefore(now)) date = date.add(const Duration(days: 7));
+      return date;
+    }
+
+    final friday = next(DateTime.friday, 17);
+    Map<String, dynamic> task(String title,
+            {DateTime? due,
+            String? day,
+            String repeat = 'none',
+            String notes = '',
+            int priority = 1}) =>
+        {
+          'title': title,
+          'due_date': due?.toUtc().toIso8601String(),
+          'scheduled_date': day,
+          'recurrence': repeat,
+          'priority': priority,
+          'notes': notes,
+          'questions': <String>[],
+        };
+    return {
+      'transcript': data!['text'],
+      'tasks': account == null
+          ? [
+              task('Buy coffee'),
+              task('Pay electricity bill', day: Task.dateKey(friday)),
+            ]
+          : [
+              task('Doctor appointment',
+                  due: friday,
+                  priority: 3,
+                  notes: 'Bring blood test results from last month.'),
+              task('Buy coffee'),
+              task('Water plants',
+                  due: next(DateTime.sunday, 9), repeat: 'weekly'),
+            ]
+    };
+  }
+}

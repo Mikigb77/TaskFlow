@@ -1,0 +1,50 @@
+# TaskFlow
+
+All Flutter source, platform projects, tests, dependencies, and builds live in `App/`. Run Flutter commands from this directory (`cd App` from the repository root).
+
+The Django service, Docker Compose configuration, environment files, and backend documentation live in `Backend/`: [Local backend guide](../Backend/README.md).
+
+**TaskFlow** is a simple and intuitive app designed to help you efficiently manage your tasks. It organizes your tasks by **due date** and **priority**, ensuring that you stay on top of your schedule. The app sends **daily morning and evening notifications**, highlighting your three most urgent tasks for the day, and offers a **10 minutes remainder before important tasks** to keep you on track.
+
+## Features
+
+- Organize tasks by **due date** and **priority**.
+- Receive **morning and evening reminders** featuring your three most urgent tasks.
+- Get a **10-minute reminder** before your most important tasks.
+- Simple and user-friendly interface for seamless task management.
+- Light, dark, and device-following appearance, with a one-tap sun/moon switch.
+- Calendar and week agenda, visible task times, search, priority filters, and completion undo.
+- Consistent task editor, voice capture, account screens, and bottom navigation.
+
+The visual system, references, and Android preview workflow are documented in [Design notes](docs/DESIGN.md).
+
+## Getting Started
+
+This project is built using **Flutter**. To compile the app, follow these steps:
+
+1. Run the following command in your terminal to build the APK in release mode:
+   ```
+   flutter build apk --release
+   ```
+2. After building, the APK will be located in:
+   ```
+   build/app/outputs/flutter-apk/
+   ```
+   Historical APK archives are available in the `releses` folder; these are older versions. For local backend testing, build with `flutter build apk --debug --split-per-abi` instead. See the backend guide for the server connection settings.
+
+### Useful Resources
+
+If you're new to Flutter or want to learn more, here are some helpful resources:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For comprehensive Flutter documentation, including tutorials and the full API reference, visit the [official Flutter documentation](https://docs.flutter.dev/).
+
+## Contributing
+
+You are welcome to use and modify the source code to create your custom app. If you find this code helpful and decide to share or distribute your version, I kindly ask that you provide credit for the original source.
+
+## Final Notes
+
+Thank you for using **TaskFlow**! If you encounter any issues or have suggestions for improvement, feel free to contribute or open an issue in the repository.

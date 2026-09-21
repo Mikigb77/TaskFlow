@@ -1,0 +1,11 @@
+.env*
+__pycache__
+*.pyc
+.venv
+*.sqlite3
+.pytest_cache
+tests/fixtures/*.wav
+artifacts/
+compose.yaml
+README.md
+.gitignore
