@@ -42,10 +42,4 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Backend runtime data (the private prototype .env is intentionally tracked).
-__pycache__/
-*.sqlite3
-.venv/
-.pytest_cache/
-backend/tests/fixtures/*.wav
 artifacts/

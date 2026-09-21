@@ -1,6 +1,8 @@
 # TaskFlow
 
-Local Docker backend, accounts, offline task sync, and voice-to-task setup: [Local backend guide](docs/LOCAL_BACKEND.md).
+All Flutter source, platform projects, tests, dependencies, and builds live in `App/`. Run Flutter commands from this directory (`cd App` from the repository root).
+
+The Django service, Docker Compose configuration, environment files, and backend documentation live in `Backend/`: [Local backend guide](../Backend/README.md).
 
 **TaskFlow** is a simple and intuitive app designed to help you efficiently manage your tasks. It organizes your tasks by **due date** and **priority**, ensuring that you stay on top of your schedule. The app sends **daily morning and evening notifications**, highlighting your three most urgent tasks for the day, and offers a **10 minutes remainder before important tasks** to keep you on track.
 
@@ -23,7 +25,7 @@ This project is built using **Flutter**. To compile the app, follow these steps:
    ```
    build/app/outputs/flutter-apk/
    ```
-   Alternatively, a precompiled APK is available in the `release` folder, though it **may not be the latest version**.
+   Historical APK archives are available in the `releses` folder; these are older versions. For local backend testing, build with `flutter build apk --debug --split-per-abi` instead. See the backend guide for the server connection settings.
 
 ### Useful Resources
 

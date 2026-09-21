@@ -1,7 +1,7 @@
 name: taskflow
 services:
   api:
-    build: ./backend
+    build: .
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}

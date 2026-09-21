@@ -2,9 +2,11 @@
 
 All development is on `dev`. The Flutter app still opens on Calendar. You can use it locally without an account, or create an account for task backup and voice creation.
 
+The repository has two project directories: `App/` contains Flutter, and `Backend/` contains Django, Docker Compose, environment files, and this guide. Git metadata remains at the repository root.
+
 ## Start the backend
 
-From the repository root, with Docker Desktop running:
+From `Backend/` (`cd Backend` at the repository root), with Docker Desktop running:
 
 ```powershell
 docker compose up -d --build
@@ -17,13 +19,17 @@ docker compose ps
 
 Compose runs Django/Gunicorn, PostgreSQL, Redis, and Mailpit. PostgreSQL and Redis have persistent volumes and no published database ports. The API uses port 8088 to avoid the other services already running on this computer. Mailpit is accessible only from localhost.
 
-The root `.env` is intentionally tracked for this private prototype at the owner's request. It contains the Google key, model names, Django secret, and local database credentials. Docker injects these at runtime; the image build context and Flutter APK do not contain the key. `.env.example` documents the configuration without real credentials.
+`Backend/.env` is intentionally tracked for this private prototype at the owner's request. It contains the Google key, model names, Django secret, and local database credentials. Docker injects these at runtime; `.dockerignore` excludes the environment files from the image build context, and the Flutter APK does not contain the key. `Backend/.env.example` documents the configuration without real credentials.
+
+The Compose project name stays `taskflow`, so moving the files does not replace the existing PostgreSQL or Redis data volumes. You can also run Compose from the repository root with `docker compose -f Backend/compose.yaml up -d --build`.
 
 Stop services with `docker compose stop`. `docker compose down` also preserves the data volumes; adding `-v` deletes their data.
 
 ## Android emulator and phone
 
 Tested toolchain: Flutter 3.44 / Dart 3.12, Android SDK, JDK 21. Android Gradle/Kotlin configuration was updated to support current Flutter and recording plugins.
+
+Run Flutter commands from `App/` (`cd App` at the repository root):
 
 ```powershell
 flutter pub get
@@ -36,12 +42,12 @@ On a physical Android phone:
 
 1. Connect the phone and computer to the same Wi-Fi.
 2. Find the computer's IPv4 address with `ipconfig`.
-3. Add that exact IP to `DJANGO_ALLOWED_HOSTS` in `.env` if it is not already there, then run `docker compose up -d --force-recreate api`.
+3. Add that exact IP to `DJANGO_ALLOWED_HOSTS` in `Backend/.env` if it is not already there, then run `docker compose up -d --force-recreate api` from `Backend/`.
 4. In Account → Connection settings, use `http://COMPUTER_IP:8088`. Use the debug APK for local HTTP. If Windows Firewall blocks the port, allow it on your private network.
 
 You can also pass the address using `--dart-define=API_BASE_URL=...`. Runtime connection settings are stored on the device and take precedence. Sign out before changing servers. Release builds require HTTPS; local HTTP is enabled only in the Android debug manifest.
 
-Build the local test APK:
+Build the local test APK from `App/`:
 
 ```powershell
 flutter build apk --debug
@@ -49,10 +55,10 @@ flutter build apk --debug
 flutter build apk --debug --split-per-abi
 ```
 
-Output: `build/app/outputs/flutter-apk/app-debug.apk`.
+Output relative to the repository root: `App/build/app/outputs/flutter-apk/app-debug.apk`.
 The split build also creates `app-arm64-v8a-debug.apk` for most current phones and `app-x86_64-debug.apk` for this emulator. These fit more easily on devices with limited free space.
 
-The real Android flow can also be checked with `flutter test integration_test/backend_flow_test.dart -d emulator-5554`. This creates a synthetic account, calls the configured text model, reviews and saves a draft, verifies the server backup, and signs out and back in. It does not record the microphone.
+The real Android flow can also be checked from `App/` with `flutter test integration_test/backend_flow_test.dart -d emulator-5554`. This creates a synthetic account, calls the configured text model, reviews and saves a draft, verifies the server backup, and signs out and back in. It does not record the microphone.
 
 ## Accounts and recovery
 
@@ -121,14 +127,19 @@ Verified locally on 2026-09-20: 25 backend tests, 15 Flutter tests, and the Andr
 Flutter analysis reports no errors or warnings, with 9 existing API deprecation notices. Android debug builds succeed; the existing `open_file` package still prints a macOS plugin metadata warning.
 
 ```powershell
+# From Backend/
 docker compose exec -T api python manage.py test core --settings=config.test_settings
+```
+
+```powershell
+# From App/
 flutter test --no-pub
 flutter analyze --no-pub --no-fatal-infos
 ```
 
 Backend tests isolate their database and mock AI. They cover account isolation, password hashing/validation, throttling, rotating tokens, logout, recovery, optimistic concurrency, time zones, missing times, audio validation, and AI budgets. Flutter tests cover secure token storage/refresh, offline persistence, migration/import, retry idempotence, conflict copies, account isolation, and the original calendar time regression.
 
-The explicit live smoke test uses synthetic accounts and calls the configured Google models:
+The explicit live smoke test runs from `Backend/`, uses synthetic accounts, and calls the configured Google models:
 
 ```powershell
 docker compose exec -T api python scripts/smoke_test.py
