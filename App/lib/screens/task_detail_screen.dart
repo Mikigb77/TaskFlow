@@ -20,7 +20,9 @@ class TaskDetailScreen extends ConsumerWidget {
         context: context,
         builder: (context) => AlertDialog(
                 title: const Text('Delete task?'),
-                content: Text('“${task.title}” will be removed.'),
+                content: Text(task.isRecurring
+                    ? '“${task.title}” and all its occurrences will be removed.'
+                    : '“${task.title}” will be removed.'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -95,12 +97,24 @@ class TaskDetailScreen extends ConsumerWidget {
                           _detail(
                               context,
                               Icons.calendar_today_outlined,
-                              'Date',
-                              DateFormat('EEEE, d MMMM yyyy')
-                                  .format(task.dueDate)),
+                              task.isRecurring ? 'Starts' : 'Date',
+                              task.dueDate == null
+                                  ? 'No date · Inbox'
+                                  : DateFormat('EEEE, d MMMM yyyy')
+                                      .format(task.dueDate!)),
                           const Divider(),
-                          _detail(context, Icons.schedule_outlined, 'Time',
-                              DateFormat('HH:mm').format(task.dueDate)),
+                          _detail(
+                              context,
+                              Icons.schedule_outlined,
+                              'Time',
+                              task.hasTime
+                                  ? DateFormat('HH:mm').format(task.dueDate!)
+                                  : 'Any time'),
+                          if (task.isRecurring) ...[
+                            const Divider(),
+                            _detail(context, Icons.repeat_rounded, 'Repeat',
+                                '${Task.repeats[task.recurrence]}${task.repeatUntil == null ? '' : ' until ${DateFormat('d MMM yyyy').format(task.repeatUntil!)}'}'),
+                          ],
                           const Divider(),
                           _detail(context, Icons.flag_outlined, 'Priority',
                               AppTheme.priorityLabel(task.priority),

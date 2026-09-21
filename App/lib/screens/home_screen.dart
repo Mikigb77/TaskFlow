@@ -5,22 +5,26 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/models/task.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.initialFilter = 0, this.isRoot = true});
+  final int initialFilter;
+  final bool isRoot;
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _query = '';
-  int _filter = 0;
+  late int _filter = widget.initialFilter;
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(taskProvider);
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Tasks', isRoot: true),
+      appBar: CustomAppBar(
+          title: widget.isRoot ? 'Tasks' : 'Inbox', isRoot: widget.isRoot),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerScrolled) => [
           SliverToBoxAdapter(
@@ -54,6 +58,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Wrap(spacing: 8, runSpacing: 4, children: [
                           for (final entry in [
                             (0, 'All tasks'),
+                            (3, 'Inbox'),
                             (1, 'Today'),
                             (2, 'High priority')
                           ])
@@ -69,12 +74,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           data: (all) {
             final now = DateTime.now();
             final filtered = all
+                .map((task) => task.nextOpenOccurrence())
+                .whereType<Task>()
                 .where((task) =>
                     !task.isCompleted &&
                     (_filter == 0 ||
+                        (_filter == 3 && task.dueDate == null) ||
                         (_filter == 2 && task.priority == 3) ||
                         (_filter == 1 &&
-                            DateUtils.isSameDay(task.dueDate, now))) &&
+                            DateUtils.isSameDay(task.displayDate, now))) &&
                     ('${task.title} ${task.notes ?? ''}')
                         .toLowerCase()
                         .contains(_query))

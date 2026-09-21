@@ -62,12 +62,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
     final tasks = tasksState.valueOrNull ?? <Task>[];
-    final events =
-        tasks.where((task) => isSameDay(task.dueDate, _selectedDay)).toList()
-          ..sort((a, b) {
-            if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-            return a.dueDate.compareTo(b.dueDate);
-          });
+    final events = tasks
+        .map((task) => task.occurrenceOn(_selectedDay))
+        .whereType<Task>()
+        .toList()
+      ..sort((a, b) {
+        if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
+        return Task.compareBySchedule(a, b);
+      });
     final completed = events.where((task) => task.isCompleted).length;
     final signedIn = ref.watch(authProvider).account != null;
     final syncError = ref.read(taskRepositoryProvider).syncError;
@@ -117,6 +119,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                           const SizedBox(height: 12),
                           MessageBanner(syncError, isError: true)
                         ],
+                        if (tasks.any((task) =>
+                            task.dueDate == null && !task.isCompleted))
+                          TextButton.icon(
+                              onPressed: () =>
+                                  Navigator.pushNamed(context, '/inbox'),
+                              icon: const Icon(Icons.inbox_outlined, size: 18),
+                              label: Text(
+                                  'Inbox · ${tasks.where((task) => task.dueDate == null && !task.isCompleted).length}')),
                         const SizedBox(height: 20),
                       ]))),
               SliverPadding(
@@ -171,7 +181,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             onPageChanged: (focused) =>
                                 setState(() => _focusedDay = focused),
                             eventLoader: (day) => tasks
-                                .where((task) => isSameDay(task.dueDate, day))
+                                .map((task) => task.occurrenceOn(day))
+                                .whereType<Task>()
                                 .toList(),
                             calendarStyle: CalendarStyle(
                               outsideDaysVisible: false,

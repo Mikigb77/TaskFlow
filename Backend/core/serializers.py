@@ -55,15 +55,34 @@ class ZonedDateTimeField(serializers.DateTimeField):
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    due_date = ZonedDateTimeField()
+    due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
+    scheduled_date = serializers.DateField(allow_null=True, required=False, default=None)
+    repeat_until = serializers.DateField(allow_null=True, required=False, default=None)
+    completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, required=False, default=list)
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "priority", "notes", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "notes", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        due, day = attrs.get("due_date"), attrs.get("scheduled_date")
+        repeat = attrs.get("recurrence", getattr(self.instance, "recurrence", "none"))
+        if due is not None and day is not None:
+            raise serializers.ValidationError("Use a date-only schedule or a timed schedule, not both.")
+        if repeat != "none" and due is None and day is None:
+            raise serializers.ValidationError({"recurrence": "Choose a start date for a repeating task."})
+        if repeat == "none" and (attrs.get("repeat_until") or attrs.get("completed_dates")):
+            raise serializers.ValidationError("Repeat settings require a repeating task.")
+        if repeat != "none" and attrs.get("is_completed"):
+            raise serializers.ValidationError("Complete individual dates of a repeating task.")
+        if day and attrs.get("repeat_until") and attrs["repeat_until"] < day:
+            raise serializers.ValidationError({"repeat_until": "The end date must be on or after the start date."})
+        attrs["completed_dates"] = sorted({value.isoformat() for value in attrs.get("completed_dates", [])})
+        return attrs
 
 
 class DraftRequestSerializer(serializers.Serializer):

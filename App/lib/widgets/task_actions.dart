@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:agenda/providers/auth_provider.dart';
 
 /// Reserve space for capture controls so they never cover the agenda.
 class TaskActions extends ConsumerWidget {
@@ -19,11 +18,8 @@ class TaskActions extends ConsumerWidget {
                     style: OutlinedButton.styleFrom(
                         padding: EdgeInsets.zero,
                         backgroundColor: Theme.of(context).colorScheme.surface),
-                    onPressed: () => Navigator.pushNamed(
-                        context,
-                        ref.read(authProvider).account == null
-                            ? '/account'
-                            : '/voiceTask'),
+                    onPressed: () => Navigator.pushNamed(context, '/voiceTask',
+                        arguments: true),
                     child: const Icon(Icons.mic_none_rounded),
                   ))),
           const SizedBox(width: 12),

@@ -58,6 +58,8 @@ void main() {
         16);
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('task-time')));
+    await tester.pumpAndSettle();
     expect(
         tester
             .widget<TimePickerDialog>(find.byType(TimePickerDialog))
@@ -69,13 +71,12 @@ void main() {
     await tester.enterText(find.byType(TextFormField).first, 'Evening task');
     await _saveTask(tester);
     final savedTask = (await repository.getAllTasks()).single;
-    expect(savedTask.dueDate.day, 16);
-    expect(savedTask.dueDate.hour, 18);
-    expect(savedTask.dueDate.minute, 20);
+    expect(savedTask.dueDate!.day, 16);
+    expect(savedTask.dueDate!.hour, 18);
+    expect(savedTask.dueDate!.minute, 20);
   });
 
-  testWidgets(
-      'creation without a calendar date requires a date and accepts midnight',
+  testWidgets('creation without a calendar date saves to Inbox',
       (tester) async {
     final repository = await _pumpApp(tester);
     await _selectCalendarDay(tester, 15);
@@ -83,16 +84,64 @@ void main() {
         .state<NavigatorState>(find.byType(Navigator))
         .pushNamed('/createTask');
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).first, 'Midnight task');
+    await tester.enterText(find.byType(TextFormField).first, 'Buy coffee');
     await _saveTask(tester);
-    expect(find.text('Please pick a due date and time'), findsOneWidget);
-    expect(await repository.getAllTasks(), isEmpty);
+    expect((await repository.getAllTasks()).single.dueDate, isNull);
+    expect((await repository.getAllTasks()).single.hasTime, isFalse);
+  });
 
+  testWidgets('an explicit midnight stays a timed task', (tester) async {
+    final repository = await _pumpApp(tester);
+    await _openCalendarTask(tester);
+    await tester.enterText(find.byType(TextFormField).first, 'Midnight task');
     await _pickDueDateTime(tester, const TimeOfDay(hour: 0, minute: 0));
     await _saveTask(tester);
     final today = DateTime.now();
     expect((await repository.getAllTasks()).single.dueDate,
         DateTime(today.year, today.month, 16));
+    expect((await repository.getAllTasks()).single.hasTime, isTrue);
+  });
+
+  testWidgets('calendar day defaults to date only and time can be removed',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    await _openCalendarTask(tester);
+    expect(find.text('Any time'), findsOneWidget);
+    await _pickDueDateTime(tester, const TimeOfDay(hour: 14, minute: 35));
+    await tester.tap(find.byTooltip('Remove time'));
+    await tester.enterText(find.byType(TextFormField).first, 'Pay invoice');
+    await _saveTask(tester);
+    final task = (await repository.getAllTasks()).single;
+    expect(task.hasTime, isFalse);
+    expect(task.dueDate!.day, 16);
+  });
+
+  testWidgets('clearing a calendar date moves the task to Inbox',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    await _openCalendarTask(tester);
+    await tester.tap(find.byTooltip('Clear date'));
+    await tester.enterText(find.byType(TextFormField).first, 'Someday');
+    await _saveTask(tester);
+    expect((await repository.getAllTasks()).single.dueDate, isNull);
+  });
+
+  testWidgets('a date-only task can repeat weekly without acquiring a time',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    await _openCalendarTask(tester);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Weekly').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Water plants');
+    await _saveTask(tester);
+    final task = (await repository.getAllTasks()).single;
+    expect(task.recurrence, 'weekly');
+    expect(task.hasTime, isFalse);
+    expect(task.occurrenceOn(task.dueDate!.add(const Duration(days: 7))),
+        isNotNull);
   });
 }
 
@@ -135,6 +184,8 @@ Future<void> _pickDueDateTime(WidgetTester tester, TimeOfDay time) async {
   ));
   await tester.tap(find.text('OK'));
   await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('task-time')));
+  await tester.pumpAndSettle();
   final use24HourFormat = MediaQuery.alwaysUse24HourFormatOf(
       tester.element(find.byType(TimePickerDialog)));
   await tester.tap(find.byIcon(Icons.keyboard_outlined));
@@ -157,8 +208,7 @@ Future<void> _pickDueDateTime(WidgetTester tester, TimeOfDay time) async {
   expect(find.byType(TimePickerDialog), findsNothing);
 }
 
-Finder _dueDateField() => find.byWidgetPredicate(
-    (widget) => widget is GestureDetector && widget.child is AbsorbPointer);
+Finder _dueDateField() => find.byKey(const ValueKey('task-date'));
 
 Future<void> _saveTask(WidgetTester tester) async {
   final button = find.widgetWithText(ElevatedButton, 'Create Task');

@@ -16,5 +16,6 @@ urlpatterns = [
     path("api/auth/password-reset/", auth_views.ResetRequestView.as_view()),
     path("api/auth/password-reset/confirm/", auth_views.ResetConfirmView.as_view()),
     path("api/ai/draft/", views.DraftView.as_view()),
+    path("api/ai/drafts/", views.DraftBatchView.as_view()),
     path("api/", include(router.urls)),
 ]

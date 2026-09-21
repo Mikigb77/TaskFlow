@@ -18,6 +18,8 @@ class TaskRepository {
     return await _database.getTasks();
   }
 
+  Future<void> addTasks(List<Task> tasks) => _database.insertTasks(tasks);
+
   Future<int> updateTask(Task task) async {
     return await _database.updateTask(task);
   }

@@ -9,6 +9,7 @@ import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/main_shell.dart';
+import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
@@ -66,13 +67,13 @@ class MyApp extends ConsumerWidget {
       routes: {
         '/': (_) => const MainShell(),
         '/home': (_) => const MainShell(initialIndex: 1),
+        '/inbox': (_) => const HomeScreen(initialFilter: 3, isRoot: false),
         '/calendar': (_) => const MainShell(),
         '/settings': (_) => const MainShell(initialIndex: 2),
         '/completedTasks': (_) => const CompletedTasksScreen(),
         '/createTask': (_) => const CreateTaskScreen(),
         '/account': (_) => const AccountScreen(),
-        '/voiceTask': (_) =>
-            accountId == null ? const AccountScreen() : const VoiceTaskScreen(),
+        '/voiceTask': (_) => const VoiceTaskScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/taskDetails') {

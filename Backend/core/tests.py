@@ -15,7 +15,7 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from google.genai import types, errors
 
-from .ai import AIUnavailable, extract_task, transcribe, generate
+from .ai import AIUnavailable, extract_task, extract_tasks, transcribe, generate
 from .models import User, Task, TaskEvent
 
 PASSWORD = "Strong-example-passphrase!2026"
@@ -82,10 +82,10 @@ class APITests(TestCase):
         self.assertEqual(other.post("/api/auth/register/", {"email": "weak@example.invalid", "password": "password"}, format="json").status_code, 400)
         self.assertEqual(other.post("/api/auth/register/", {**self.credentials, "email": "OWNER@EXAMPLE.INVALID"}, format="json").status_code, 400)
 
-    def test_unauthenticated_tasks_and_ai_are_blocked(self):
+    def test_unauthenticated_tasks_are_blocked_and_drafts_require_valid_input(self):
         other = APIClient()
         self.assertEqual(other.get("/api/tasks/").status_code, 401)
-        self.assertEqual(other.post("/api/ai/draft/", {}, format="json").status_code, 401)
+        self.assertEqual(other.post("/api/ai/drafts/", {}, format="json").status_code, 400)
 
     def test_tasks_keep_time_offset_and_are_isolated_by_owner(self):
         response = self.client.post("/api/tasks/", self.task_data, format="json")
@@ -117,6 +117,42 @@ class APITests(TestCase):
     def test_invalid_dates_and_priorities_rejected(self):
         for values in [{"priority": 5}, {"due_date": "2026-09-25T17:00:00"}, {"title": ""}]:
             self.assertEqual(self.client.post("/api/tasks/", {**self.task_data, **values}, format="json").status_code, 400)
+
+    def test_inbox_date_only_and_recurrence_roundtrip(self):
+        for schedule in [
+            {"due_date": None},
+            {"due_date": None, "scheduled_date": "2026-09-25"},
+            {"recurrence": "weekly", "repeat_until": "2027-01-31", "completed_dates": ["2026-09-25"]},
+        ]:
+            response = self.client.post("/api/tasks/", {**self.task_data, **schedule}, format="json")
+            self.assertEqual(response.status_code, 201, response.data)
+            restored = self.client.get(f'/api/tasks/{response.data["id"]}/').data
+            for key, value in schedule.items():
+                self.assertEqual(restored[key], value)
+
+    def test_inconsistent_schedules_are_rejected(self):
+        for schedule in [
+            {"scheduled_date": "2026-09-25"},
+            {"due_date": None, "recurrence": "weekly"},
+            {"recurrence": "fortnightly"},
+            {"completed_dates": ["2026-09-25"]},
+            {"recurrence": "weekly", "completed_dates": ["not a date"]},
+            {"recurrence": "weekly", "is_completed": True},
+            {"due_date": None, "scheduled_date": "2026-09-25", "recurrence": "weekly", "repeat_until": "2026-09-24"},
+        ]:
+            response = self.client.post("/api/tasks/", {**self.task_data, **schedule}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+
+    @override_settings(AI_GUEST_REQUESTS_PER_DAY=1)
+    @patch("core.views.ai.make_drafts", return_value={"tasks": [{"title": "Coffee"}], "transcript": "Buy coffee"})
+    def test_guest_trial_cannot_bypass_budget_with_forwarded_headers(self, mock):
+        payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}
+        guest = APIClient()
+        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 200)
+        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json", HTTP_X_FORWARDED_FOR="1.2.3.4").status_code, 429)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 200)
+        self.assertEqual(mock.call_count, 2)
+        self.assertEqual(Task.objects.count(), 0)
 
     def test_malformed_task_id_returns_not_found(self):
         self.assertEqual(self.client.put("/api/tasks/" + "-" * 36 + "/", self.task_data, format="json").status_code, 404)
@@ -168,6 +204,17 @@ class APITests(TestCase):
         self.assertEqual(self.client.post("/api/ai/draft/", payload, format="json").status_code, 429)
         self.assertEqual(mock.call_count, 1)
 
+    @override_settings(AI_GUEST_REQUESTS_PER_DAY=1)
+    @patch("core.views.ai.make_drafts")
+    def test_provider_failure_does_not_spend_guest_trial(self, mock):
+        mock.side_effect = [AIUnavailable("Provider busy"), {"tasks": [{"title": "Coffee"}]}]
+        guest = APIClient()
+        payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}
+        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 503)
+        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 200)
+        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 429)
+        self.assertEqual(mock.call_count, 2)
+
 
 class DraftTests(TestCase):
     def setUp(self):
@@ -203,7 +250,36 @@ class DraftTests(TestCase):
         generate.return_value = json.dumps({**self.output, "time": None})
         result = extract_task("Doctor on Friday", "Europe/Madrid", self.reference)
         self.assertIsNone(result["due_date"])
-        self.assertTrue(result["questions"])
+        self.assertEqual(result["scheduled_date"], "2026-09-25")
+        self.assertEqual(result["questions"], [])
+
+    @patch("core.ai.generate")
+    def test_multiple_tasks_keep_independent_schedules_and_notes(self, provider):
+        provider.return_value = json.dumps({"tasks": [self.output,
+            {"title": "Coffee", "date": None, "time": None, "priority": 1},
+            {"title": "Water plants", "date": "2026-09-27", "time": None, "priority": 1, "recurrence": "weekly"}]})
+        result = extract_tasks("Doctor Friday at 5pm. Buy coffee. Water plants every Sunday.", "Europe/Madrid", self.reference)
+        self.assertEqual(len(result["tasks"]), 3)
+        self.assertEqual(result["tasks"][0]["due_date"], "2026-09-25T17:00:00+02:00")
+        self.assertIsNone(result["tasks"][1]["due_date"])
+        self.assertIsNone(result["tasks"][1]["scheduled_date"])
+        self.assertEqual(result["tasks"][1]["questions"], [])
+        self.assertEqual(result["tasks"][2]["recurrence"], "weekly")
+        self.assertEqual(result["tasks"][2]["scheduled_date"], "2026-09-27")
+
+    @patch("core.ai.generate")
+    def test_ambiguous_time_keeps_date_and_question(self, provider):
+        provider.return_value = json.dumps({**self.output, "time": None, "questions": ["5 a.m. or 5 p.m.?"]})
+        draft = extract_task("Doctor Friday at 5", "Europe/Madrid", self.reference)
+        self.assertEqual(draft["scheduled_date"], "2026-09-25")
+        self.assertTrue(draft["questions"])
+
+    @patch("core.ai.generate")
+    def test_oversized_batch_is_rejected_instead_of_truncated(self, provider):
+        from pydantic import ValidationError
+        provider.return_value = json.dumps({"tasks": [self.output] * 13})
+        with self.assertRaises(ValidationError):
+            extract_tasks("Many tasks", "Europe/Madrid", self.reference)
 
     @patch("core.ai.generate")
     def test_daylight_saving_gap_is_flagged(self, generate):

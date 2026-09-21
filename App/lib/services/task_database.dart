@@ -13,12 +13,15 @@ class TaskDatabase {
   Future<Database> get database async {
     return _database ??= await openDatabase(
       join(await getDatabasesPath(), 'task_database.db'),
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await db.execute('''CREATE TABLE tasks(
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT,
           priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT,
-          imagePaths TEXT, owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
+          imagePaths TEXT, hasTime INTEGER NOT NULL DEFAULT 1,
+          recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
+          completedDates TEXT NOT NULL DEFAULT '[]',
+          owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
           sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
         )''');
@@ -53,6 +56,15 @@ class TaskDatabase {
       await db.execute(
           'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)');
     }
+    if (oldVersion < 5 && newVersion >= 5) {
+      await db.execute(
+          'ALTER TABLE tasks ADD COLUMN hasTime INTEGER NOT NULL DEFAULT 1');
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'");
+      await db.execute('ALTER TABLE tasks ADD COLUMN repeatUntil TEXT');
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN completedDates TEXT NOT NULL DEFAULT '[]'");
+    }
   }
 
   Future<int> insertTask(Task task, {String ownerKey = 'local'}) async {
@@ -69,6 +81,21 @@ class TaskDatabase {
     final rows = await (await database).query('tasks',
         where: 'owner_key = ? AND is_deleted = 0', whereArgs: [ownerKey]);
     return rows.map(Task.fromMap).toList();
+  }
+
+  Future<void> insertTasks(List<Task> tasks,
+      {String ownerKey = 'local'}) async {
+    await (await database).transaction((tx) async {
+      for (final task in tasks) {
+        final values = task.toMap()..remove('id');
+        await tx.insert('tasks', {
+          ...values,
+          'owner_key': ownerKey,
+          'sync_id': const Uuid().v4(),
+          'sync_pending': ownerKey == 'local' ? 0 : 1
+        });
+      }
+    });
   }
 
   Future<int> updateTask(Task task, {String ownerKey = 'local'}) async {
@@ -114,13 +141,10 @@ class TaskDatabase {
   }
 
   Map<String, dynamic> _remoteValues(Map<String, dynamic> remote) => {
-        'title': remote['title'],
-        'dueDate': DateTime.parse(remote['due_date'] as String)
-            .toLocal()
-            .toIso8601String(),
-        'priority': remote['priority'],
-        'notes': remote['notes'],
-        'isCompleted': remote['is_completed'] == true ? 1 : 0,
+        ...(Task.fromApi(remote).toMap()
+          ..remove('id')
+          ..remove('filePaths')
+          ..remove('imagePaths')),
         'is_deleted': remote['is_deleted'] == true ? 1 : 0,
         'remote_version': remote['version'],
         'sync_pending': 0,
@@ -198,7 +222,8 @@ class TaskDatabase {
   Future<List<Task>> getTasksOverdueByFourMonths() async {
     final cutoff = DateTime.now().subtract(const Duration(days: 120));
     return (await getTasks())
-        .where((task) => task.dueDate.isBefore(cutoff))
+        .where((task) =>
+            !task.isRecurring && (task.dueDate?.isBefore(cutoff) ?? false))
         .toList();
   }
 
@@ -213,8 +238,8 @@ class TaskDatabase {
     return (await getTasks())
         .where((task) =>
             !task.isCompleted &&
-            task.dueDate.isAfter(now) &&
-            task.dueDate.isBefore(now.add(const Duration(days: 3))))
+            (task.dueDate?.isAfter(now) ?? false) &&
+            task.dueDate!.isBefore(now.add(const Duration(days: 3))))
         .toList();
   }
 

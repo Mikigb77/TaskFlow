@@ -67,6 +67,37 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     unawaited(loadTasks());
   }
 
+  Future<void> addTasks(List<Task> tasks) async {
+    await _repository.addTasks(tasks);
+    if (mounted) unawaited(loadTasks());
+  }
+
+  Future<void> _completing = Future.value();
+  Future<void> setCompleted(Task occurrence, bool completed) {
+    final operation = _completing.catchError((_) {}).then((_) async {
+      final tasks = await _repository.getAllTasks();
+      final task = tasks.where((t) => t.id == occurrence.id).firstOrNull;
+      if (task == null) throw StateError('Task no longer exists.');
+      if (task.isRecurring) {
+        final date = occurrence.displayDate;
+        if (date == null || task.occurrenceOn(date) == null) return;
+        final dates = {...task.completedDates};
+        if (completed) {
+          dates.add(Task.dateKey(date));
+        } else {
+          dates.remove(Task.dateKey(date));
+        }
+        await _repository
+            .updateTask(task.copyWith(completedDates: dates.toList()..sort()));
+      } else {
+        await _repository.updateTask(task.copyWith(isCompleted: completed));
+      }
+      if (mounted) await loadTasks();
+    });
+    _completing = operation;
+    return operation;
+  }
+
   Future<void> deleteTask(int id) async {
     await _repository.deleteTask(id);
     if (!mounted) return;

@@ -35,6 +35,7 @@ CACHES = {"default": {"BACKEND": "django_redis.cache.RedisCache",
                        "LOCATION": os.getenv("REDIS_URL", "redis://cache:6379/0"),
                        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"}}}
 REST_FRAMEWORK = {
+    "NUM_PROXIES": 0,
     "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.SessionJWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
@@ -74,6 +75,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 AI_TEXT_MODEL = os.getenv("AI_TEXT_MODEL", "gemma-4-31b-it")
 AI_AUDIO_MODEL = os.getenv("AI_AUDIO_MODEL", "gemini-3.5-transcribe")
 AI_REQUESTS_PER_DAY = int(os.getenv("AI_REQUESTS_PER_DAY", "50"))
+AI_GUEST_REQUESTS_PER_DAY = int(os.getenv("AI_GUEST_REQUESTS_PER_DAY", "5"))
 LOCAL_TEST_ACCOUNT_ENABLED = os.getenv("LOCAL_TEST_ACCOUNT_ENABLED", "0") == "1"
 LOCAL_TEST_ACCOUNT_EMAIL = os.getenv("LOCAL_TEST_ACCOUNT_EMAIL", "")
 LOCAL_TEST_ACCOUNT_PASSWORD = os.getenv("LOCAL_TEST_ACCOUNT_PASSWORD", "")

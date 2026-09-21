@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
-import 'package:collection/collection.dart';
 
 class TaskTile extends ConsumerWidget {
   const TaskTile({super.key, required this.task, this.showDate = false});
@@ -17,7 +16,7 @@ class TaskTile extends ConsumerWidget {
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await notifier.updateTask(task.copyWith(isCompleted: !task.isCompleted));
+      await notifier.setCompleted(task, !task.isCompleted);
       if (!messenger.mounted) return;
       HapticFeedback.selectionClick();
       messenger.hideCurrentSnackBar();
@@ -30,17 +29,11 @@ class TaskTile extends ConsumerWidget {
                 // The completed row may already be gone. Use the live account's
                 // notifier and latest task so undo never reverts other edits.
                 if (!messenger.mounted ||
-                    !identical(container.read(taskProvider.notifier), notifier)) {
+                    !identical(
+                        container.read(taskProvider.notifier), notifier)) {
                   return;
                 }
-                final current = container
-                    .read(taskProvider)
-                    .valueOrNull
-                    ?.firstWhereOrNull((item) => item.id == task.id);
-                if (current != null) {
-                  await notifier.updateTask(
-                      current.copyWith(isCompleted: task.isCompleted));
-                }
+                await notifier.setCompleted(task, task.isCompleted);
               } catch (_) {
                 if (messenger.mounted) {
                   messenger.showSnackBar(const SnackBar(
@@ -112,14 +105,21 @@ class TaskTile extends ConsumerWidget {
                             const SizedBox(width: 5),
                             Flexible(
                                 child: Text(
-                                    DateFormat(showDate
-                                            ? 'd MMM · HH:mm'
-                                            : 'HH:mm')
-                                        .format(task.dueDate),
+                                    taskScheduleLabel(task, showDate: showDate),
                                     style: TextStyle(
                                         fontSize: 12,
                                         color: colors.onSurfaceVariant)))
                           ]),
+                          if (task.isRecurring)
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.repeat_rounded,
+                                  size: 14, color: colors.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Text(Task.repeats[task.recurrence]!,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: colors.onSurfaceVariant)),
+                            ]),
                           Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),

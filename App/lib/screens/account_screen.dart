@@ -242,7 +242,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                       Text(
                           _recover
                               ? 'Request a recovery email, then use the code to set a new password.'
-                              : 'Sign in to back up your tasks and turn your voice into a plan.',
+                              : 'Sign in to back up your tasks and get a larger voice allowance.',
                           style: TextStyle(color: colors.onSurfaceVariant)),
                       const SizedBox(height: 28),
                       Form(

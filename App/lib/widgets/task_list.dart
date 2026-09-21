@@ -9,7 +9,7 @@ class TaskList extends ConsumerWidget {
   final List<Task> tasks;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sorted = [...tasks]..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    final sorted = [...tasks]..sort(Task.compareBySchedule);
     final colors = Theme.of(context).colorScheme;
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -19,14 +19,16 @@ class TaskList extends ConsumerWidget {
       itemBuilder: (context, index) {
         final task = sorted[index];
         return Dismissible(
-            key: ValueKey(task.id),
+            key: ValueKey('${task.id}:${task.occurrenceDate}'),
             direction: DismissDirection.endToStart,
             confirmDismiss: (_) async {
               final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
                           title: const Text('Delete task?'),
-                          content: Text('“${task.title}” will be removed.'),
+                          content: Text(task.isRecurring
+                              ? '“${task.title}” and all its occurrences will be removed.'
+                              : '“${task.title}” will be removed.'),
                           actions: [
                             TextButton(
                                 onPressed: () => Navigator.pop(context, false),

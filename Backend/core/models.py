@@ -33,7 +33,12 @@ class Task(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
     title = models.CharField(max_length=160)
-    due_date = models.DateTimeField()
+    due_date = models.DateTimeField(null=True, blank=True)
+    scheduled_date = models.DateField(null=True, blank=True)
+    recurrence = models.CharField(max_length=8, default="none", choices=[
+        (value, value) for value in ("none", "daily", "weekly", "monthly", "yearly")])
+    repeat_until = models.DateField(null=True, blank=True)
+    completed_dates = models.JSONField(default=list, blank=True)
     priority = models.PositiveSmallIntegerField(default=1)
     notes = models.TextField(blank=True, default="", max_length=8000)
     is_completed = models.BooleanField(default=False)

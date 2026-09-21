@@ -14,10 +14,12 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 
 /// One editor keeps manual creation, AI review and editing visually consistent.
 class TaskEditor extends ConsumerStatefulWidget {
-  const TaskEditor({super.key, this.task, this.draft, this.calendarDate});
+  const TaskEditor(
+      {super.key, this.task, this.draft, this.calendarDate, this.onReview});
   final Task? task;
   final TaskDraft? draft;
   final DateTime? calendarDate;
+  final ValueChanged<Task>? onReview;
   @override
   ConsumerState<TaskEditor> createState() => _TaskEditorState();
 }
@@ -26,8 +28,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _notes;
-  late final TextEditingController _due;
   late DateTime? _dueDate;
+  late bool _hasTime;
+  late String _recurrence;
+  DateTime? _repeatUntil;
   late int _priority;
   late final List<String> _attachments;
   bool _saving = false;
@@ -43,37 +47,49 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         text: widget.task?.title ?? widget.draft?.title ?? '');
     _notes = TextEditingController(
         text: widget.task?.notes ?? widget.draft?.notes ?? '');
-    _due = TextEditingController(text: _dateLabel);
+    _hasTime = widget.task?.hasTime ?? widget.draft?.hasTime ?? false;
+    _recurrence = widget.task?.recurrence ?? widget.draft?.recurrence ?? 'none';
+    _repeatUntil = widget.task?.repeatUntil ?? widget.draft?.repeatUntil;
     _priority = widget.task?.priority ?? widget.draft?.priority ?? 1;
     _attachments = [...?widget.task?.filePaths, ...?widget.task?.imagePaths];
   }
 
-  String get _dateLabel => _dueDate == null
-      ? ''
-      : DateFormat('EEE, d MMM yyyy · HH:mm').format(_dueDate!);
   @override
   void dispose() {
     _title.dispose();
     _notes.dispose();
-    _due.dispose();
     super.dispose();
   }
 
-  Future<void> _pickDateTime() async {
+  Future<void> _pickDate() async {
     final date = await showDatePicker(
         context: context,
         initialDate: _dueDate ?? DateTime.now(),
         firstDate: DateTime(2000),
         lastDate: DateTime(2101));
     if (date == null || !mounted) return;
+    setState(() {
+      _dueDate = DateTime(date.year, date.month, date.day,
+          _hasTime ? _dueDate!.hour : 0, _hasTime ? _dueDate!.minute : 0);
+      if (_repeatUntil != null && _repeatUntil!.isBefore(Task.day(date))) {
+        _repeatUntil = null;
+      }
+    });
+  }
+
+  Future<void> _pickTime() async {
+    if (_dueDate == null) await _pickDate();
+    if (_dueDate == null || !mounted) return;
     final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(_dueDate ?? DateTime.now()));
+        initialTime: _hasTime
+            ? TimeOfDay.fromDateTime(_dueDate!)
+            : const TimeOfDay(hour: 9, minute: 0));
     if (time == null || !mounted) return;
     setState(() {
-      _dueDate =
-          DateTime(date.year, date.month, date.day, time.hour, time.minute);
-      _due.text = _dateLabel;
+      _dueDate = DateTime(_dueDate!.year, _dueDate!.month, _dueDate!.day,
+          time.hour, time.minute);
+      _hasTime = true;
     });
   }
 
@@ -87,14 +103,24 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     final task = Task(
       id: widget.task?.id,
       title: _title.text.trim(),
-      dueDate: _dueDate!,
+      dueDate: _dueDate,
+      hasTime: _hasTime,
+      recurrence: _dueDate == null ? 'none' : _recurrence,
+      repeatUntil: _recurrence == 'none' ? null : _repeatUntil,
+      completedDates: _recurrence == 'none' ? [] : widget.task?.completedDates,
       priority: _priority,
-      isCompleted: widget.task?.isCompleted ?? false,
+      isCompleted:
+          _recurrence != 'none' ? false : widget.task?.isCompleted ?? false,
       notes: _notes.text.trim(),
       imagePaths: _attachments.where(_isImage).toList(),
       filePaths: _attachments.where((file) => !_isImage(file)).toList(),
     );
     try {
+      if (widget.onReview != null) {
+        widget.onReview!(task);
+        if (mounted) Navigator.pop(context);
+        return;
+      }
       final notifier = ref.read(taskProvider.notifier);
       if (widget.task == null) {
         await notifier.addTask(task);
@@ -105,7 +131,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(widget.task == null
-              ? 'Task added to your calendar'
+              ? _dueDate == null
+                  ? 'Task saved to Inbox'
+                  : 'Task added to your calendar'
               : 'Changes saved')));
     } catch (_) {
       if (mounted) {
@@ -157,13 +185,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final edit = widget.task != null;
+    final edit = widget.task != null && widget.onReview == null;
     return Scaffold(
       appBar: CustomAppBar(
           title: edit
               ? 'Edit task'
               : widget.draft == null
-                  ? 'New task'
+                  ? widget.onReview != null
+                      ? 'Review task'
+                      : 'New task'
                   : 'Review task'),
       body: SafeArea(
           top: false,
@@ -190,9 +220,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       .headlineMedium),
                               const SizedBox(height: 8),
                               Text(
-                                  widget.draft == null
-                                      ? 'Give it a name. Make a little time for it.'
-                                      : 'Check the details before adding it to your calendar.',
+                                  widget.task?.isRecurring == true
+                                      ? 'Edits apply to the whole repeating task.'
+                                      : widget.draft == null
+                                          ? 'Give it a name. Add a date whenever you’re ready.'
+                                          : 'Check the details before adding it to your calendar.',
                                   style: TextStyle(
                                       color: colors.onSurfaceVariant)),
                               const SizedBox(height: 24),
@@ -235,27 +267,110 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                           : null),
                               const SizedBox(height: 24),
                               const SectionLabel('Schedule'),
-                              Semantics(
-                                  button: true,
-                                  label: 'Choose due date and time',
-                                  child: GestureDetector(
-                                      onTap: _pickDateTime,
-                                      child: AbsorbPointer(
-                                          child: TextFormField(
-                                        key: const ValueKey('task-due'),
-                                        controller: _due,
-                                        decoration: InputDecoration(
-                                            labelText: _dueDate == null
-                                                ? 'Select Due Date & Time'
-                                                : 'Due Date & Time',
-                                            prefixIcon: const Icon(
-                                                Icons.calendar_today_outlined),
-                                            suffixIcon: const Icon(
-                                                Icons.expand_more_rounded)),
-                                        validator: (_) => _dueDate == null
-                                            ? 'Please pick a due date and time'
-                                            : null,
-                                      )))),
+                              AppSurface(
+                                  padding: EdgeInsets.zero,
+                                  child: Column(children: [
+                                    ListTile(
+                                        key: const ValueKey('task-date'),
+                                        leading: const Icon(
+                                            Icons.calendar_today_outlined),
+                                        title: Text(_dueDate == null
+                                            ? 'No date · Inbox'
+                                            : DateFormat('EEE, d MMM yyyy')
+                                                .format(_dueDate!)),
+                                        subtitle: const Text('Date'),
+                                        onTap: _pickDate,
+                                        trailing: _dueDate == null
+                                            ? const Icon(Icons.add_rounded)
+                                            : IconButton(
+                                                tooltip: 'Clear date',
+                                                onPressed: () => setState(() {
+                                                      _dueDate = null;
+                                                      _hasTime = false;
+                                                      _recurrence = 'none';
+                                                      _repeatUntil = null;
+                                                    }),
+                                                icon: const Icon(
+                                                    Icons.close_rounded))),
+                                    if (_dueDate != null)
+                                      ListTile(
+                                          key: const ValueKey('task-time'),
+                                          leading: const Icon(
+                                              Icons.schedule_outlined),
+                                          title: Text(_hasTime
+                                              ? DateFormat('HH:mm')
+                                                  .format(_dueDate!)
+                                              : 'Any time'),
+                                          subtitle:
+                                              const Text('Time (optional)'),
+                                          onTap: _pickTime,
+                                          trailing: !_hasTime
+                                              ? const Icon(Icons.add_rounded)
+                                              : IconButton(
+                                                  tooltip: 'Remove time',
+                                                  onPressed: () => setState(() {
+                                                        _hasTime = false;
+                                                        _dueDate =
+                                                            Task.day(_dueDate!);
+                                                      }),
+                                                  icon: const Icon(
+                                                      Icons.close_rounded))),
+                                  ])),
+                              if (_dueDate != null) ...[
+                                const SizedBox(height: 16),
+                                DropdownButtonFormField<String>(
+                                    isExpanded: true,
+                                    key: ValueKey('repeat-$_recurrence'),
+                                    initialValue: _recurrence,
+                                    decoration: const InputDecoration(
+                                        labelText: 'Repeat',
+                                        prefixIcon: Icon(Icons.repeat_rounded)),
+                                    items: Task.repeats.entries
+                                        .map((e) => DropdownMenuItem(
+                                            value: e.key,
+                                            child: Text(e.value,
+                                                maxLines: 2,
+                                                overflow:
+                                                    TextOverflow.ellipsis)))
+                                        .toList(),
+                                    onChanged: (value) => setState(() {
+                                          _recurrence = value!;
+                                          if (value == 'none') {
+                                            _repeatUntil = null;
+                                          }
+                                        })),
+                                if (_recurrence != 'none')
+                                  Row(children: [
+                                    Expanded(
+                                        child: TextButton.icon(
+                                            icon: const Icon(
+                                                Icons.event_outlined,
+                                                size: 18),
+                                            label: Text(_repeatUntil == null
+                                                ? 'No end date'
+                                                : 'Until ${DateFormat('d MMM yyyy').format(_repeatUntil!)}'),
+                                            onPressed: () async {
+                                              final date = await showDatePicker(
+                                                  context: context,
+                                                  initialDate:
+                                                      _repeatUntil ?? _dueDate!,
+                                                  firstDate:
+                                                      Task.day(_dueDate!),
+                                                  lastDate: DateTime(2101));
+                                              if (date != null && mounted) {
+                                                setState(
+                                                    () => _repeatUntil = date);
+                                              }
+                                            })),
+                                    if (_repeatUntil != null)
+                                      IconButton(
+                                          tooltip: 'Remove end date',
+                                          onPressed: () => setState(
+                                              () => _repeatUntil = null),
+                                          icon:
+                                              const Icon(Icons.close_rounded)),
+                                  ]),
+                              ],
                               const SizedBox(height: 24),
                               const SectionLabel('Priority'),
                               Wrap(spacing: 8, runSpacing: 8, children: [
@@ -360,9 +475,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         size: 20),
                 label: Text(_saving
                     ? 'Saving…'
-                    : edit
-                        ? 'Save changes'
-                        : 'Create Task'),
+                    : widget.onReview != null
+                        ? 'Keep changes'
+                        : edit
+                            ? 'Save changes'
+                            : 'Create Task'),
               ))),
     );
   }

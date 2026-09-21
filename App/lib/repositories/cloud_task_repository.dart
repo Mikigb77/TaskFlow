@@ -18,6 +18,9 @@ class CloudTaskRepository extends TaskRepository {
   Future<int> addTask(Task task) =>
       database.insertTask(task, ownerKey: ownerKey);
   @override
+  Future<void> addTasks(List<Task> tasks) =>
+      database.insertTasks(tasks, ownerKey: ownerKey);
+  @override
   Future<List<Task>> getAllTasks() => database.getTasks(ownerKey: ownerKey);
   @override
   Future<int> updateTask(Task task) =>
@@ -28,12 +31,7 @@ class CloudTaskRepository extends TaskRepository {
   Future<int> importLocalTasks() => database.importLocalTasks(ownerKey);
 
   Map<String, dynamic> _payload(Map<String, dynamic> row) => {
-        'title': row['title'],
-        'due_date':
-            DateTime.parse(row['dueDate'] as String).toUtc().toIso8601String(),
-        'priority': row['priority'],
-        'notes': row['notes'] ?? '',
-        'is_completed': row['isCompleted'] == 1,
+        ...Task.fromMap(row).toApi(),
         'is_deleted': row['is_deleted'] == 1,
         'version': row['remote_version'],
       };
@@ -44,8 +42,18 @@ class CloudTaskRepository extends TaskRepository {
       sent['priority'] == remote['priority'] &&
       sent['is_completed'] == remote['is_completed'] &&
       sent['is_deleted'] == remote['is_deleted'] &&
-      DateTime.parse(sent['due_date'] as String)
-          .isAtSameMomentAs(DateTime.parse(remote['due_date'] as String));
+      sent['scheduled_date'] == remote['scheduled_date'] &&
+      sent['recurrence'] == (remote['recurrence'] ?? 'none') &&
+      sent['repeat_until'] == remote['repeat_until'] &&
+      _sameDates(sent['completed_dates'], remote['completed_dates'] ?? []) &&
+      (sent['due_date'] == null
+          ? remote['due_date'] == null
+          : remote['due_date'] != null &&
+              DateTime.parse(sent['due_date'] as String).isAtSameMomentAs(
+                  DateTime.parse(remote['due_date'] as String)));
+
+  bool _sameDates(List<dynamic> a, List<dynamic> b) =>
+      a.length == b.length && a.toSet().containsAll(b);
 
   @override
   Future<void> sync() =>

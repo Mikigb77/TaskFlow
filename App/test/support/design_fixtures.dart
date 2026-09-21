@@ -79,6 +79,20 @@ class DesignTaskNotifier extends TaskNotifier {
   }
 
   @override
+  Future<void> setCompleted(Task task, bool completed) =>
+      updateTask(task.copyWith(isCompleted: completed));
+
+  @override
+  Future<void> addTasks(List<Task> tasks) async {
+    var id = state.requireValue
+        .fold<int>(0, (max, task) => task.id! > max ? task.id! : max);
+    state = AsyncData([
+      ...state.requireValue,
+      ...tasks.map((task) => task.copyWith(id: ++id))
+    ]);
+  }
+
+  @override
   Future<void> deleteTask(int id) async {
     state =
         AsyncData(state.requireValue.where((item) => item.id != id).toList());

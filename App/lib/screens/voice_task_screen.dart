@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/auth_provider.dart';
-import 'package:agenda/screens/create_task_screen.dart';
+import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
@@ -28,6 +28,20 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   bool _recording = false;
   bool _busy = false;
   String? _error;
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_started) {
+      _started = true;
+      if (ModalRoute.of(context)?.settings.arguments == true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _toggleRecording();
+        });
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -158,20 +172,29 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       _error = null;
     });
     try {
-      final result = await ref
-          .read(apiClientProvider)
-          .request('POST', 'ai/draft/', audioPath: path, data: {
-        'timezone': _zone.text.trim(),
-        'reference_time': DateTime.now().toUtc().toIso8601String(),
-        if (path == null) 'text': _words.text.trim()
-      });
-      final draft =
-          TaskDraft.fromJson(Map<String, dynamic>.from(result as Map));
+      final result = await ref.read(apiClientProvider).request(
+          'POST', 'ai/drafts/',
+          audioPath: path,
+          authenticated: ref.read(authProvider).account != null,
+          data: {
+            'timezone': _zone.text.trim(),
+            'reference_time': DateTime.now().toUtc().toIso8601String(),
+            if (path == null) 'text': _words.text.trim()
+          });
+      final response = Map<String, dynamic>.from(result as Map);
+      final drafts = (response['tasks'] as List)
+          .map((data) => TaskDraft.fromJson({
+                ...Map<String, dynamic>.from(data as Map),
+                'transcript': response['transcript']
+              }))
+          .toList();
       if (!mounted) return;
       await Navigator.pushReplacement(
           context,
           MaterialPageRoute<void>(
-              builder: (_) => CreateTaskScreen(initialDraft: draft)));
+              builder: (_) => ReviewTasksScreen(
+                  drafts: drafts,
+                  transcript: response['transcript'] as String)));
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -195,7 +218,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                     Text('Just say the word.',
                         style: Theme.of(context).textTheme.headlineLarge),
                     const SizedBox(height: 8),
-                    Text('Tell us what, when, and anything to remember.',
+                    Text(
+                        'One thought or several. Dates and times are optional.',
                         style: TextStyle(color: colors.onSurfaceVariant)),
                     const SizedBox(height: 28),
                     AppSurface(
@@ -205,11 +229,11 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                           button: true,
                           label: _recording
                               ? 'Stop and create draft'
-                              : 'Record a task',
+                              : 'Record tasks',
                           child: Tooltip(
                               message: _recording
                                   ? 'Stop recording'
-                                  : 'Record a task',
+                                  : 'Record tasks',
                               child: Material(
                                 color: _recording
                                     ? colors.errorContainer
@@ -236,13 +260,13 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                               ? 'Putting your plan together…'
                               : _recording
                                   ? 'Listening · 00:${_seconds.toString().padLeft(2, '0')}'
-                                  : 'Tap to capture a task',
+                                  : 'Tap to capture your tasks',
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
                       Text(
                           _recording
                               ? 'Tap again when you’re finished.'
-                              : 'Speak naturally. You’ll review everything\nbefore it reaches your calendar.',
+                              : 'Up to 12 tasks in 60 seconds. Review everything\nbefore saving to Calendar or Inbox.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               color: colors.onSurfaceVariant, fontSize: 13)),
@@ -256,7 +280,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                     Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
-                            '“Doctor appointment on Friday at 5 p.m.\nBring my blood test results.”',
+                            '“Doctor on Friday at 5 p.m. Bring my results.\nAlso buy coffee and water the plants every Sunday.”',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 color: colors.onSurfaceVariant,
@@ -279,7 +303,12 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                         onPressed:
                             _recording || _busy ? null : () => _createDraft(),
                         icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                        label: const Text('Create draft from text')),
+                        label: const Text('Review tasks from text')),
+                    if (ref.watch(authProvider).account == null)
+                      const Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: Text(
+                              'Try voice without an account. A small daily allowance is shared by devices on this connection.')),
                     const SizedBox(height: 16),
                     ExpansionTile(
                         tilePadding: EdgeInsets.zero,
@@ -301,7 +330,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                         ]),
                     const SizedBox(height: 12),
                     Text(
-                        'Audio is sent to Google for transcription. Recordings are removed after processing.',
+                        'Your words are sent to Google to create drafts. TaskFlow deletes its recording after processing.',
                         style: TextStyle(
                             fontSize: 11, color: colors.onSurfaceVariant),
                         textAlign: TextAlign.center),
