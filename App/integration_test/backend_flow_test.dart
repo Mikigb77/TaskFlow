@@ -89,7 +89,7 @@ void main() {
     expect(DateTime.parse(saved['results'][0]['due_date']).toLocal(),
         draft.dueDate);
 
-    await tester.tap(find.byIcon(Icons.home));
+    await tester.tap(find.text('Tasks'));
     await tester.pumpAndSettle();
     expect(find.text(draft.title), findsOneWidget);
     await tester.tap(find.byTooltip('Account'));

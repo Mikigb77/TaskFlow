@@ -1,354 +1,200 @@
-import 'package:agenda/providers/task_provider.dart';
-import 'package:agenda/widgets/custom_app_bar.dart';
-import 'package:collection/collection.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:agenda/utils/constants.dart';
+import 'package:collection/collection.dart';
 import 'package:intl/intl.dart';
-import 'package:agenda/screens/edit_task_screen.dart';
-import 'dart:io';
+import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as path;
-import 'package:open_file/open_file.dart'; // Import the open_file package
+import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/app_components.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
+  const TaskDetailScreen({super.key, required this.taskId});
   final int taskId;
 
-  const TaskDetailScreen({super.key, required this.taskId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final taskState = ref.watch(taskProvider);
-
-    return taskState.when(
-      data: (tasks) {
-        final task = tasks.firstWhereOrNull((task) => task.id == taskId);
-
-        if (task == null) {
-          Future.microtask(() {
-            // ignore: use_build_context_synchronously
-            if (Navigator.canPop(context)) {
-              // ignore: use_build_context_synchronously
-              Navigator.of(context).pop();
-            }
-          });
-          return const Center(
-            child: Text(
-              'Task not found.',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-          );
-        }
-
-        // Safely collect all attachments (files and images) and check if there are any
-        final List<String> attachments = [...task.filePaths, ...task.imagePaths]
-            .whereType<String>()
-            .where((path) => path.isNotEmpty)
-            .toList();
-
-        return Scaffold(
-          appBar: const CustomAppBar(title: 'Task Details'),
-          backgroundColor: defaultBackgroundColor,
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 24.0,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16.0),
-                _buildSection(
-                  title: 'Due Date',
-                  content: DateFormat('dd/MM/yyyy').format(task.dueDate),
-                  icon: Icons.calendar_today,
-                  iconColor: Colors.grey,
-                ),
-                _buildSection(
-                  title: 'Time',
-                  content: DateFormat('HH:mm').format(task.dueDate),
-                  icon: Icons.access_time,
-                  iconColor: Colors.lightBlueAccent,
-                ),
-                _buildSection(
-                  title: 'Priority',
-                  content: _priorityToString(task.priority),
-                  icon: Icons.priority_high,
-                  iconColor: _getPriorityColor(task.priority),
-                ),
-                _buildNotesSection(task.notes),
-                if (attachments.isNotEmpty)
-                  _buildAttachmentsSection(attachments),
-              ],
-            ),
-          ),
-          floatingActionButton: _buildFloatingActionButton(context, ref),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stackTrace) => Center(
-        child: Text(
-          'Error: $error',
-          style: const TextStyle(color: Colors.red, fontSize: 18),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSection({
-    required String title,
-    required String content,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
-      ),
-      color: cardColor,
-      elevation: 3,
-      child: ListTile(
-        leading: Icon(icon, color: iconColor),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: textColor,
-            fontSize: 18.0,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text(
-          content,
-          style: TextStyle(
-            color: subtitleTextColor,
-            fontSize: 16.0,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotesSection(String? notes) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
-      ),
-      color: cardColor,
-      elevation: 3,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Notes',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8.0),
-            Text(
-              notes ?? 'No notes added',
-              style: TextStyle(
-                color: subtitleTextColor,
-                fontSize: 16.0,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttachmentsSection(List<String> attachments) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10.0),
-      ),
-      color: cardColor,
-      elevation: 3,
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Attachments',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8.0),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8.0,
-                mainAxisSpacing: 8.0,
-              ),
-              itemCount: attachments.length,
-              itemBuilder: (context, index) {
-                final attachment = attachments[index];
-                final isImage = _isImage(attachment);
-                return GestureDetector(
-                  onTap: () {
-                    _openAttachment(attachment);
-                  },
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: 70,
-                        height: 70,
-                        child: isImage
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(8.0),
-                                child: Image.file(File(attachment),
-                                    fit: BoxFit.cover),
-                              )
-                            : Icon(Icons.insert_drive_file,
-                                size: 50, color: accentColor),
-                      ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        width: 70,
-                        child: Text(
-                          _truncateFileName(path.basename(attachment)),
-                          style: TextStyle(color: textColor, fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openAttachment(String filePath) async {
-    final result = await OpenFile.open(filePath);
-    // ignore: unrelated_type_equality_checks
-    if (result.type != 'done') {
-      // Updated line to handle string type
-      if (kDebugMode) {
-        print('Error opening file: ${result.message}');
+  Future<void> _delete(BuildContext context, WidgetRef ref, Task task) async {
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('Delete task?'),
+                content: Text('“${task.title}” will be removed.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Keep task')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Delete'))
+                ]));
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(taskProvider.notifier).deleteTask(taskId);
+      if (context.mounted) Navigator.pop(context);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Could not delete this task. Please try again.')));
       }
     }
   }
 
-  Widget _buildFloatingActionButton(BuildContext context, WidgetRef ref) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        FloatingActionButton(
-          heroTag: 'edit',
-          backgroundColor: Colors.grey,
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EditTaskScreen(taskId: taskId),
-              ),
+  Future<void> _open(BuildContext context, String file) async {
+    try {
+      final result = await OpenFile.open(file);
+      if (result.type.name != 'done' && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('This attachment is not available on this device.')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open this attachment.')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
+    return ref.watch(taskProvider).when(
+          data: (tasks) {
+            final task = tasks.firstWhereOrNull((task) => task.id == taskId);
+            if (task == null) {
+              return const Scaffold(
+                  appBar: CustomAppBar(title: 'Task details'),
+                  body: EmptyState(
+                      title: 'Task unavailable',
+                      message: 'This task may have been removed.'));
+            }
+            final attachments = [...task.filePaths, ...task.imagePaths]
+                .where((file) => file.isNotEmpty)
+                .toList();
+            return Scaffold(
+              appBar: CustomAppBar(title: 'Task details', actions: [
+                IconButton(
+                    tooltip: 'Delete task',
+                    onPressed: () => _delete(context, ref, task),
+                    icon: Icon(Icons.delete_outline_rounded,
+                        color: colors.onSurfaceVariant))
+              ]),
+              body: ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  children: [
+                    SectionLabel(
+                        task.isCompleted ? 'Completed' : 'Your next step'),
+                    Text(task.title,
+                        style: Theme.of(context).textTheme.headlineLarge),
+                    const SizedBox(height: 24),
+                    AppSurface(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        child: Column(children: [
+                          _detail(
+                              context,
+                              Icons.calendar_today_outlined,
+                              'Date',
+                              DateFormat('EEEE, d MMMM yyyy')
+                                  .format(task.dueDate)),
+                          const Divider(),
+                          _detail(context, Icons.schedule_outlined, 'Time',
+                              DateFormat('HH:mm').format(task.dueDate)),
+                          const Divider(),
+                          _detail(context, Icons.flag_outlined, 'Priority',
+                              AppTheme.priorityLabel(task.priority),
+                              color: AppTheme.priorityColor(
+                                  context, task.priority)),
+                        ])),
+                    const SizedBox(height: 28),
+                    const SectionLabel('Notes'),
+                    AppSurface(
+                        child: SizedBox(
+                            width: double.infinity,
+                            child: Text(
+                                task.notes?.trim().isNotEmpty == true
+                                    ? task.notes!
+                                    : 'No notes added.',
+                                style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                    height: 1.6)))),
+                    if (attachments.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      const SectionLabel('On this device'),
+                      for (final file in attachments)
+                        Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: AppSurface(
+                                padding: EdgeInsets.zero,
+                                child: ListTile(
+                                    leading: task.imagePaths.contains(file)
+                                        ? ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            child: Image.file(File(file),
+                                                width: 40,
+                                                height: 40,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const Icon(Icons
+                                                        .image_not_supported_outlined)))
+                                        : const Icon(
+                                            Icons.insert_drive_file_outlined),
+                                    title: Text(path.basename(file),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis),
+                                    trailing: const Icon(
+                                        Icons.open_in_new_rounded,
+                                        size: 18),
+                                    onTap: () => _open(context, file)))),
+                    ],
+                  ]),
+              bottomNavigationBar: SafeArea(
+                  top: false,
+                  child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                      child: FilledButton.icon(
+                          onPressed: () => Navigator.pushNamed(
+                              context, '/editTask',
+                              arguments: taskId),
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          label: const Text('Edit task')))),
             );
           },
-          child: const Icon(Icons.edit, color: Colors.white),
-        ),
-        const SizedBox(width: 16),
-        FloatingActionButton(
-          heroTag: 'delete',
-          backgroundColor: Colors.red,
-          onPressed: () {
-            _confirmDelete(context, ref);
-          },
-          child: const Icon(Icons.delete, color: Colors.white),
-        ),
-      ],
-    );
-  }
-
-  void _confirmDelete(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Task'),
-          content: const Text('Are you sure you want to delete this task?'),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await ref.read(taskProvider.notifier).deleteTask(taskId);
-                // ignore: use_build_context_synchronously
-                if (Navigator.canPop(context)) {
-                  // ignore: use_build_context_synchronously
-                  Navigator.of(context).pop();
-                }
-              },
-            ),
-          ],
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (_, __) => const Scaffold(
+              appBar: CustomAppBar(title: 'Task details'),
+              body: EmptyState(
+                  title: 'Couldn’t load this task',
+                  message: 'Please try again in a moment.')),
         );
-      },
-    );
   }
 
-  bool _isImage(String filePath) {
-    final extension = path.extension(filePath).toLowerCase();
-    return ['.jpg', '.jpeg', '.png', '.gif'].contains(extension);
-  }
-
-  String _truncateFileName(String fileName, [int maxLength = 15]) {
-    if (fileName.length <= maxLength) return fileName;
-    return '${fileName.substring(0, maxLength)}...';
-  }
-
-  String _priorityToString(int priority) {
-    switch (priority) {
-      case 1:
-        return 'Low';
-      case 2:
-        return 'Medium';
-      case 3:
-        return 'High';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  Color _getPriorityColor(int priority) {
-    switch (priority) {
-      case 1:
-        return Colors.blueGrey[700]!;
-      case 2:
-        return Colors.amber[700]!;
-      case 3:
-        return Colors.deepOrange[900]!;
-      default:
-        return Colors.grey[700]!;
-    }
+  Widget _detail(
+      BuildContext context, IconData icon, String label, String value,
+      {Color? color}) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Row(children: [
+          Icon(icon, color: color ?? colors.primary, size: 22),
+          const SizedBox(width: 16),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(label,
+                    style: TextStyle(
+                        color: colors.onSurfaceVariant, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(value,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium!
+                        .copyWith(color: color)),
+              ])),
+        ]));
   }
 }

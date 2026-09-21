@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -6,8 +8,9 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:agenda/providers/auth_provider.dart';
-import 'package:agenda/screens/home_screen.dart';
-import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/main_shell.dart';
+import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/screens/create_task_screen.dart';
 import 'package:agenda/screens/edit_task_screen.dart';
@@ -17,6 +20,10 @@ import 'package:agenda/screens/voice_task_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+        ['Manrope'], await rootBundle.loadString('assets/fonts/OFL.txt'));
+  });
   tzdata.initializeTimeZones();
   try {
     tz.setLocalLocation(
@@ -32,7 +39,12 @@ Future<void> main() async {
         AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
   }
-  runApp(const ProviderScope(child: MyApp()));
+  final appearance = ThemeController(ThemePreferenceStore());
+  await appearance.ready;
+  runApp(ProviderScope(
+    overrides: [themeModeProvider.overrideWith((ref) => appearance)],
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends ConsumerWidget {
@@ -45,16 +57,17 @@ class MyApp extends ConsumerWidget {
       // Clear forms and navigation when accounts change; never show another account's task.
       key: ValueKey('account-$accountId'),
       title: 'TaskFlow',
-      theme: ThemeData.dark().copyWith(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF81C784), brightness: Brightness.dark),
-        scaffoldBackgroundColor: const Color(0xFF303030),
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ref.watch(themeModeProvider),
+      themeAnimationDuration: const Duration(milliseconds: 220),
       initialRoute: '/',
       routes: {
-        '/': (_) => const CalendarScreen(),
-        '/home': (_) => const HomeScreen(),
-        '/calendar': (_) => const CalendarScreen(),
+        '/': (_) => const MainShell(),
+        '/home': (_) => const MainShell(initialIndex: 1),
+        '/calendar': (_) => const MainShell(),
+        '/settings': (_) => const MainShell(initialIndex: 2),
         '/completedTasks': (_) => const CompletedTasksScreen(),
         '/createTask': (_) => const CreateTaskScreen(),
         '/account': (_) => const AccountScreen(),

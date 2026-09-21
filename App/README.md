@@ -12,6 +12,11 @@ The Django service, Docker Compose configuration, environment files, and backend
 - Receive **morning and evening reminders** featuring your three most urgent tasks.
 - Get a **10-minute reminder** before your most important tasks.
 - Simple and user-friendly interface for seamless task management.
+- Light, dark, and device-following appearance, with a one-tap sun/moon switch.
+- Calendar and week agenda, visible task times, search, priority filters, and completion undo.
+- Consistent task editor, voice capture, account screens, and bottom navigation.
+
+The visual system, references, and Android preview workflow are documented in [Design notes](docs/DESIGN.md).
 
 ## Getting Started
 

@@ -8,6 +8,8 @@ import 'package:record/record.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/create_task_screen.dart';
+import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/custom_app_bar.dart';
 
 class VoiceTaskScreen extends ConsumerStatefulWidget {
   const VoiceTaskScreen({super.key});
@@ -21,6 +23,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   final _words = TextEditingController();
   final _zone = TextEditingController();
   Timer? _timer;
+  int _seconds = 0;
   String? _path;
   bool _recording = false;
   bool _busy = false;
@@ -125,8 +128,18 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         await _recorder.cancel();
         return;
       }
-      setState(() => _recording = true);
-      _timer = Timer(const Duration(seconds: 59), _toggleRecording);
+      setState(() {
+        _recording = true;
+        _seconds = 0;
+      });
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        setState(() => _seconds = timer.tick);
+        if (timer.tick >= 59) _toggleRecording();
+      });
     } catch (error) {
       await _cleanup();
       if (mounted) setState(() => _error = error.toString());
@@ -168,51 +181,135 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Create with your voice')),
-        body: ListView(padding: const EdgeInsets.all(24), children: [
-          const Text('What do you need to do?',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          const Text(
-              '“On Friday at 5 p.m. I have a doctor appointment. Remind me to bring my blood test results.”'),
-          const SizedBox(height: 24),
-          Center(
-              child: FilledButton.icon(
-                  onPressed: _busy ? null : _toggleRecording,
-                  icon: Icon(_recording ? Icons.stop : Icons.mic, size: 32),
-                  label: Text(
-                      _recording ? 'Stop & create draft' : 'Record a task'))),
-          const SizedBox(height: 12),
-          Text(
-              _recording
-                  ? 'Listening… up to 60 seconds.'
-                  : 'Audio is sent to Google for transcription. Review the draft before saving.',
-              textAlign: TextAlign.center),
-          const SizedBox(height: 28),
-          TextField(
-              controller: _words,
-              enabled: !_recording && !_busy,
-              maxLines: 5,
-              maxLength: 4000,
-              decoration: const InputDecoration(
-                  labelText: 'Or type your plan',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder())),
-          TextField(
-              controller: _zone,
-              enabled: !_recording && !_busy,
-              decoration: const InputDecoration(labelText: 'Time zone')),
-          const SizedBox(height: 20),
-          OutlinedButton(
-              onPressed: _recording || _busy ? null : () => _createDraft(),
-              child: const Text('Create draft from text')),
-          if (_busy)
-            const Padding(
-                padding: EdgeInsets.all(20),
-                child: Center(child: CircularProgressIndicator())),
-          if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.amber)),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: const CustomAppBar(title: 'Voice capture'),
+      body: Center(
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 32),
+                  children: [
+                    const SectionLabel('From a thought to a plan'),
+                    Text('Just say the word.',
+                        style: Theme.of(context).textTheme.headlineLarge),
+                    const SizedBox(height: 8),
+                    Text('Tell us what, when, and anything to remember.',
+                        style: TextStyle(color: colors.onSurfaceVariant)),
+                    const SizedBox(height: 28),
+                    AppSurface(
+                        child: Column(children: [
+                      const SizedBox(height: 4),
+                      Semantics(
+                          button: true,
+                          label: _recording
+                              ? 'Stop and create draft'
+                              : 'Record a task',
+                          child: Tooltip(
+                              message: _recording
+                                  ? 'Stop recording'
+                                  : 'Record a task',
+                              child: Material(
+                                color: _recording
+                                    ? colors.errorContainer
+                                    : colors.primaryContainer,
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: _busy ? null : _toggleRecording,
+                                    child: SizedBox(
+                                        width: 100,
+                                        height: 100,
+                                        child: Icon(
+                                            _recording
+                                                ? Icons.stop_rounded
+                                                : Icons.mic_none_rounded,
+                                            size: 42,
+                                            color: _recording
+                                                ? colors.onErrorContainer
+                                                : colors.primary))),
+                              ))),
+                      const SizedBox(height: 20),
+                      Text(
+                          _busy
+                              ? 'Putting your plan together…'
+                              : _recording
+                                  ? 'Listening · 00:${_seconds.toString().padLeft(2, '0')}'
+                                  : 'Tap to capture a task',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Text(
+                          _recording
+                              ? 'Tap again when you’re finished.'
+                              : 'Speak naturally. You’ll review everything\nbefore it reaches your calendar.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: colors.onSurfaceVariant, fontSize: 13)),
+                      if (_busy)
+                        const Padding(
+                            padding: EdgeInsets.only(top: 20),
+                            child: LinearProgressIndicator()),
+                      const SizedBox(height: 8),
+                    ])),
+                    const SizedBox(height: 16),
+                    Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                            '“Doctor appointment on Friday at 5 p.m.\nBring my blood test results.”',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: colors.onSurfaceVariant,
+                                height: 1.7,
+                                fontStyle: FontStyle.italic))),
+                    const SizedBox(height: 28),
+                    const SectionLabel('Prefer to type?'),
+                    TextField(
+                        controller: _words,
+                        enabled: !_recording && !_busy,
+                        maxLines: 4,
+                        maxLength: 4000,
+                        decoration: const InputDecoration(
+                            labelText: 'Or type your plan',
+                            hintText: 'Pick up groceries tomorrow at 6 p.m.…',
+                            alignLabelWithHint: true,
+                            counterText: '')),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                        onPressed:
+                            _recording || _busy ? null : () => _createDraft(),
+                        icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                        label: const Text('Create draft from text')),
+                    const SizedBox(height: 16),
+                    ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        shape: const Border(),
+                        collapsedShape: const Border(),
+                        leading: const Icon(Icons.public_outlined, size: 20),
+                        title: const Text('Time zone'),
+                        subtitle: Text(_zone.text,
+                            style: TextStyle(
+                                fontSize: 12, color: colors.onSurfaceVariant)),
+                        children: [
+                          Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: TextField(
+                                  controller: _zone,
+                                  enabled: !_recording && !_busy,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Time zone'))),
+                        ]),
+                    const SizedBox(height: 12),
+                    Text(
+                        'Audio is sent to Google for transcription. Recordings are removed after processing.',
+                        style: TextStyle(
+                            fontSize: 11, color: colors.onSurfaceVariant),
+                        textAlign: TextAlign.center),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      MessageBanner(_error!, isError: true)
+                    ],
+                  ]))),
+    );
+  }
 }

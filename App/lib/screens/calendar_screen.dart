@@ -1,33 +1,40 @@
-import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
-import 'package:agenda/utils/constants.dart';
+import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/task_tile.dart';
+import 'package:agenda/widgets/task_actions.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
-
   @override
-  // ignore: library_private_types_in_public_api
-  _CalendarScreenState createState() => _CalendarScreenState();
+  ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen>
     with WidgetsBindingObserver {
-  late final ValueNotifier<DateTime> _selectedDay;
-  late final ValueNotifier<List<Task>> _selectedEvents;
-  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _selectedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  CalendarFormat _format = CalendarFormat.month;
+  PageController? _calendarPage;
+  bool _syncing = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _selectedDay = ValueNotifier(DateTime.now());
-    _selectedEvents = ValueNotifier([]);
-    _loadSelectedDayEvents();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
@@ -37,294 +44,297 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     }
   }
 
-  void _loadSelectedDayEvents() {
-    final tasksAsyncValue = ref.read(taskProvider);
-    tasksAsyncValue.when(
-      data: (tasks) {
-        _selectedEvents.value = tasks
-            .where((task) => isSameDay(task.dueDate, _selectedDay.value))
-            .toList();
-      },
-      loading: () {},
-      error: (error, stackTrace) {},
-    );
-  }
-
-  List<Task> _getTasksForDay(DateTime day) {
-    final tasksAsyncValue = ref.watch(taskProvider);
-    return tasksAsyncValue.when(
-      data: (tasks) =>
-          tasks.where((task) => isSameDay(task.dueDate, day)).toList(),
-      loading: () => [],
-      error: (error, stackTrace) => [],
-    );
-  }
-
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    setState(() {
-      _selectedDay.value = selectedDay;
-      _selectedEvents.value = _getTasksForDay(selectedDay);
-    });
-  }
-
-  void _toggleTaskCompletion(Task task) {
-    final taskNotifier = ref.read(taskProvider.notifier);
-    final updatedTask = task.copyWith(isCompleted: !task.isCompleted);
-    taskNotifier.updateTask(updatedTask);
-    setState(() {
-      _selectedEvents.value = _selectedEvents.value.map((t) {
-        if (t.id == task.id) {
-          return updatedTask;
-        }
-        return t;
-      }).toList();
-    });
-  }
-
-  Color _getMarkerColorForTask(Task task) {
-    if (task.isCompleted) {
-      return Colors.green[700]!; // Green for completed tasks
-    } else {
-      switch (task.priority) {
-        case 1:
-          return Colors.blueGrey[700]!;
-        case 2:
-          return Colors.amber[700]!;
-        case 3:
-          return Colors.deepOrange[900]!;
-        default:
-          return Colors.grey[700]!; // Fallback for any unexpected cases
-      }
+  Future<void> _refresh() async {
+    setState(() => _syncing = true);
+    try {
+      await ref.read(taskProvider.notifier).loadTasks();
+    } finally {
+      if (mounted) setState(() => _syncing = false);
     }
   }
+
+  void _create() =>
+      Navigator.pushNamed(context, '/createTask', arguments: _selectedDay);
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(taskProvider, (previous, next) {
-      _loadSelectedDayEvents(); // Reload events when the taskProvider changes
-    });
-
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final tasksState = ref.watch(taskProvider);
+    final tasks = tasksState.valueOrNull ?? <Task>[];
+    final events =
+        tasks.where((task) => isSameDay(task.dueDate, _selectedDay)).toList()
+          ..sort((a, b) {
+            if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
+            return a.dueDate.compareTo(b.dueDate);
+          });
+    final completed = events.where((task) => task.isCompleted).length;
+    final signedIn = ref.watch(authProvider).account != null;
+    final syncError = ref.read(taskRepositoryProvider).syncError;
+    final today = isSameDay(_selectedDay, DateTime.now());
     return Scaffold(
-      appBar: const CustomAppBar(title: "Calendar"),
-      backgroundColor: defaultBackgroundColor,
-      body: Column(
-        children: [
-          if (ref.watch(authProvider).account != null)
-            Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(children: [
-                  Expanded(
-                      child: Text(
-                          ref.read(taskRepositoryProvider).syncError ??
-                              'Your tasks are backed up when connected.',
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12))),
-                  IconButton(
-                      tooltip: 'Sync tasks',
-                      onPressed: () =>
-                          ref.read(taskProvider.notifier).loadTasks(),
-                      icon: const Icon(Icons.sync, color: Colors.white70)),
-                ])),
-          TableCalendar(
-            firstDay: DateTime.utc(2010, 10, 16),
-            lastDay: DateTime.utc(2100, 12, 31),
-            focusedDay: _selectedDay.value,
-            calendarFormat: _calendarFormat,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay.value, day),
-            onDaySelected: _onDaySelected,
-            onFormatChanged: (format) {
-              setState(() {
-                _calendarFormat = format;
-              });
-            },
-            eventLoader: _getTasksForDay,
-            calendarStyle: CalendarStyle(
-              outsideDaysVisible: false,
-              defaultTextStyle: const TextStyle(color: Colors.white),
-              weekendTextStyle: const TextStyle(color: Colors.redAccent),
-              todayDecoration: BoxDecoration(
-                color: Colors.deepPurple[400],
-                shape: BoxShape.circle,
-              ),
-              selectedDecoration: BoxDecoration(
-                color: Colors.blueGrey[600],
-                shape: BoxShape.circle,
-              ),
-              markerDecoration: const BoxDecoration(
-                shape: BoxShape.circle,
-              ),
-              markersAlignment: Alignment.bottomCenter,
-              markersMaxCount: 3,
-              markerSizeScale: 0.2,
-            ),
-            calendarBuilders: CalendarBuilders(
-              markerBuilder: (context, date, tasks) {
-                final taskList = tasks.cast<Task>();
-                if (taskList.isNotEmpty) {
-                  return Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 4.0,
-                    children: taskList.map((task) {
-                      return Container(
-                        width: 5.0,
-                        height: 5.0,
-                        decoration: BoxDecoration(
-                          color: _getMarkerColorForTask(task),
-                          shape: BoxShape.circle,
-                        ),
-                      );
-                    }).toList(),
-                  );
-                }
-                return null;
-              },
-            ),
-            headerStyle: HeaderStyle(
-              titleCentered: true,
-              formatButtonVisible: false,
-              titleTextStyle:
-                  const TextStyle(color: Colors.white, fontSize: 16),
-              leftChevronIcon:
-                  const Icon(Icons.chevron_left, color: Colors.white),
-              rightChevronIcon:
-                  const Icon(Icons.chevron_right, color: Colors.white),
-              decoration: BoxDecoration(color: Colors.grey[800]),
-            ),
-            daysOfWeekStyle: const DaysOfWeekStyle(
-              weekdayStyle: TextStyle(color: Colors.white70),
-              weekendStyle: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-          const SizedBox(height: 8.0),
-          Expanded(
-            child: ValueListenableBuilder<List<Task>>(
-              valueListenable: _selectedEvents,
-              builder: (context, events, _) {
-                if (events.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No tasks for the selected day.',
-                      style: TextStyle(color: Colors.white, fontSize: 18),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final task = events[index];
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12.0,
-                        vertical: 4.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(12.0),
-                        border: Border(
-                          left: BorderSide(
-                            color: _getMarkerColorForTask(task),
-                            width: 4.0,
-                          ),
-                        ),
-                      ),
-                      child: Material(
-                        type: MaterialType.transparency,
-                        child: ListTile(
-                          leading: Icon(
-                            _getMarkerColorForTask(task) == Colors.green[700]!
-                                ? Icons.check
-                                : _getPriorityIcon(task.priority),
-                            color: _getMarkerColorForTask(task),
-                          ),
-                          title: Text(
-                            task.title,
-                            style: TextStyle(
-                              color: task.isCompleted ? Colors.grey : textColor,
-                              decoration: task.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : TextDecoration.none,
+      appBar: const CustomAppBar(title: 'Calendar', isRoot: true),
+      body: RefreshIndicator(
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            key: const PageStorageKey('calendar-scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+                  sliver: SliverToBoxAdapter(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        const SectionLabel('A little focus. A little flow.'),
+                        Text('Your calendar', style: text.headlineLarge),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Expanded(
+                              child: Text(
+                                  DateFormat('EEEE, d MMMM')
+                                      .format(DateTime.now()),
+                                  style: TextStyle(
+                                      color: colors.onSurfaceVariant))),
+                          if (signedIn)
+                            IconButton(
+                                tooltip: 'Sync tasks',
+                                onPressed: _syncing ? null : _refresh,
+                                icon: _syncing
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))
+                                    : Icon(
+                                        syncError == null
+                                            ? Icons.cloud_done_outlined
+                                            : Icons.cloud_off_outlined,
+                                        size: 21,
+                                        color: colors.onSurfaceVariant)),
+                        ]),
+                        if (syncError != null) ...[
+                          const SizedBox(height: 12),
+                          MessageBanner(syncError, isError: true)
+                        ],
+                        const SizedBox(height: 20),
+                      ]))),
+              SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverToBoxAdapter(
+                    child: AppSurface(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 14),
+                        child: Column(children: [
+                          Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Row(children: [
+                                Expanded(
+                                    child: Text(
+                                        DateFormat('MMMM yyyy')
+                                            .format(_focusedDay),
+                                        style: text.titleMedium)),
+                                IconButton(
+                                    tooltip: 'Previous month or week',
+                                    onPressed: () =>
+                                        _calendarPage?.previousPage(
+                                            duration: const Duration(
+                                                milliseconds: 250),
+                                            curve: Curves.easeOut),
+                                    icon:
+                                        const Icon(Icons.chevron_left_rounded)),
+                                IconButton(
+                                    tooltip: 'Next month or week',
+                                    onPressed: () => _calendarPage?.nextPage(
+                                        duration:
+                                            const Duration(milliseconds: 250),
+                                        curve: Curves.easeOut),
+                                    icon: const Icon(
+                                        Icons.chevron_right_rounded)),
+                              ])),
+                          TableCalendar<Task>(
+                            firstDay: DateTime(2010),
+                            lastDay: DateTime(2100, 12, 31),
+                            focusedDay: _focusedDay,
+                            calendarFormat: _format,
+                            headerVisible: false,
+                            startingDayOfWeek: StartingDayOfWeek.monday,
+                            rowHeight: 48,
+                            daysOfWeekHeight: 30,
+                            onCalendarCreated: (controller) =>
+                                _calendarPage = controller,
+                            selectedDayPredicate: (day) =>
+                                isSameDay(_selectedDay, day),
+                            onDaySelected: (selected, focused) => setState(() {
+                              _selectedDay = selected;
+                              _focusedDay = focused;
+                            }),
+                            onPageChanged: (focused) =>
+                                setState(() => _focusedDay = focused),
+                            eventLoader: (day) => tasks
+                                .where((task) => isSameDay(task.dueDate, day))
+                                .toList(),
+                            calendarStyle: CalendarStyle(
+                              outsideDaysVisible: false,
+                              cellMargin: const EdgeInsets.all(4),
+                              defaultTextStyle: TextStyle(
+                                  color: colors.onSurface,
+                                  fontWeight: FontWeight.w600),
+                              weekendTextStyle:
+                                  TextStyle(color: colors.onSurfaceVariant),
+                              selectedTextStyle: TextStyle(
+                                  color: colors.onPrimary,
+                                  fontWeight: FontWeight.w800),
+                              todayTextStyle: TextStyle(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w800),
+                              selectedDecoration: BoxDecoration(
+                                  color: colors.primary,
+                                  borderRadius: BorderRadius.circular(12)),
+                              todayDecoration: BoxDecoration(
+                                  color: colors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(12)),
+                              defaultDecoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12)),
+                              weekendDecoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
+                            daysOfWeekStyle: DaysOfWeekStyle(
+                                weekdayStyle: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                    fontSize: 11),
+                                weekendStyle: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                    fontSize: 11)),
+                            calendarBuilders: CalendarBuilders(
+                                markerBuilder: (context, day, dayTasks) {
+                              if (dayTasks.isEmpty) return null;
+                              return Positioned(
+                                  bottom: 1,
+                                  child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: dayTasks
+                                          .take(3)
+                                          .map((task) => Container(
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 1.5),
+                                                width: 4,
+                                                height: 4,
+                                                decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: task.isCompleted
+                                                        ? colors.primary
+                                                        : AppTheme
+                                                            .priorityColor(
+                                                                context,
+                                                                task.priority)),
+                                              ))
+                                          .toList()));
+                            }),
                           ),
-                          subtitle: Text(
-                            task.notes ?? '',
-                            style: TextStyle(color: subtitleTextColor),
-                          ),
-                          trailing: Checkbox(
-                            value: task.isCompleted,
-                            onChanged: (bool? value) {
-                              _toggleTaskCompletion(task);
-                            },
-                            activeColor: Colors.green[700],
-                            checkColor: Colors.white,
-                            side: const BorderSide(color: Colors.white),
-                          ),
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              '/taskDetails',
-                              arguments: task.id,
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: Column(mainAxisSize: MainAxisSize.min, children: [
-        FloatingActionButton(
-          heroTag: 'voiceTask',
-          tooltip: 'Create task with voice',
-          onPressed: () {
-            Navigator.pushNamed(
-                context,
-                ref.read(authProvider).account == null
-                    ? '/account'
-                    : '/voiceTask');
-          },
-          backgroundColor: accentColor,
-          child: const Icon(Icons.mic, color: Colors.black),
-        ),
-        const SizedBox(height: 12),
-        FloatingActionButton(
-          heroTag: 'manualTask',
-          tooltip: 'Create task',
-          onPressed: () {
-            Navigator.pushNamed(
-              context,
-              '/createTask',
-              arguments: _selectedDay.value,
-            );
-          },
-          backgroundColor: Colors.deepPurple[400],
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-      ]),
+                          const SizedBox(height: 6),
+                          const Divider(),
+                          SizedBox(
+                              width: double.infinity,
+                              child: Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    TextButton(
+                                        onPressed: () => setState(() {
+                                              _selectedDay = DateTime.now();
+                                              _focusedDay = _selectedDay;
+                                            }),
+                                        child: const Text('Today')),
+                                    TextButton.icon(
+                                        key: const ValueKey('calendar-format'),
+                                        onPressed: () => setState(() =>
+                                            _format =
+                                                _format == CalendarFormat.month
+                                                    ? CalendarFormat.week
+                                                    : CalendarFormat.month),
+                                        icon: Icon(
+                                            _format == CalendarFormat.month
+                                                ? Icons.view_week_outlined
+                                                : Icons.calendar_month_outlined,
+                                            size: 17),
+                                        label: Text(
+                                            _format == CalendarFormat.month
+                                                ? 'Week view'
+                                                : 'Month view')),
+                                  ])),
+                        ])),
+                  )),
+              SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 26, 24, 12),
+                  sliver: SliverToBoxAdapter(
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(
+                                  today
+                                      ? 'Today’s agenda'
+                                      : DateFormat('EEEE, d MMM')
+                                          .format(_selectedDay),
+                                  style: text.titleLarge),
+                              const SizedBox(height: 4),
+                              Text(
+                                  events.isEmpty
+                                      ? 'A little breathing room.'
+                                      : '${events.length - completed} to do · $completed completed',
+                                  style: TextStyle(
+                                      color: colors.onSurfaceVariant,
+                                      fontSize: 12)),
+                            ])),
+                        if (events.isNotEmpty)
+                          SizedBox(
+                              width: 34,
+                              height: 34,
+                              child: CircularProgressIndicator(
+                                  value: completed / events.length,
+                                  strokeWidth: 3,
+                                  backgroundColor: colors.outlineVariant,
+                                  semanticsLabel:
+                                      '$completed of ${events.length} tasks completed')),
+                      ]))),
+              if (tasksState.isLoading)
+                const SliverToBoxAdapter(
+                    child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator())))
+              else if (tasksState.hasError)
+                SliverToBoxAdapter(
+                    child: EmptyState(
+                        title: 'Couldn’t load your tasks',
+                        message: 'Try refreshing your calendar.',
+                        action: TextButton(
+                            onPressed: _refresh,
+                            child: const Text('Try again'))))
+              else if (events.isEmpty)
+                SliverToBoxAdapter(
+                    child: EmptyState(
+                        title: 'Make this day your own',
+                        message:
+                            'Add something to look forward to,\nor leave a little space.',
+                        action: TextButton(
+                            onPressed: _create,
+                            child: const Text('Plan a task'))))
+              else
+                SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverList.builder(
+                        itemCount: events.length,
+                        itemBuilder: (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: TaskTile(task: events[index])))),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            ],
+          )),
+      bottomNavigationBar: TaskActions(onCreate: _create),
     );
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _selectedDay.dispose();
-    _selectedEvents.dispose();
-    super.dispose();
-  }
-
-  IconData _getPriorityIcon(int priority) {
-    switch (priority) {
-      case 1:
-        return Icons.low_priority;
-      case 2:
-        return Icons.flag;
-      case 3:
-        return Icons.priority_high;
-      default:
-        return Icons.label;
-    }
   }
 }

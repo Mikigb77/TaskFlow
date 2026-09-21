@@ -4,6 +4,8 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/custom_app_bar.dart';
 
 class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
@@ -20,6 +22,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   bool _register = false;
   bool _recover = false;
   bool _busy = false;
+  bool _showPassword = false;
+  bool _failed = false;
   String? _message;
 
   @override
@@ -40,11 +44,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     setState(() {
       _busy = true;
       _message = null;
+      _failed = false;
     });
     try {
       await action();
     } catch (error) {
-      if (mounted) setState(() => _message = error.toString());
+      if (mounted) {
+        setState(() {
+          _message = error.toString();
+          _failed = true;
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -111,144 +121,261 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final busy = _busy || auth.loading;
+    final colors = Theme.of(context).colorScheme;
     ref.watch(taskProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
-      body: ListView(padding: const EdgeInsets.all(24), children: [
-        if (auth.account != null) ...[
-          const Icon(Icons.account_circle, size: 64),
-          const SizedBox(height: 16),
-          Text(auth.account!.email,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 20),
-          const Text(
-              'Your tasks are saved on this phone and backed up to your account when connected. Attachments stay on the device where you added them.'),
-          const SizedBox(height: 16),
-          Text('Server: ${ref.read(apiClientProvider).baseUrl}'),
-          if (ref.read(taskRepositoryProvider).syncError != null)
-            Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(ref.read(taskRepositoryProvider).syncError!,
-                    style: const TextStyle(color: Colors.amber))),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-              onPressed: busy
-                  ? null
-                  : () => _run(() async {
-                        await ref.read(taskProvider.notifier).loadTasks();
-                        if (mounted) {
-                          setState(() => _message =
-                              ref.read(taskRepositoryProvider).syncError ??
-                                  'Your tasks are up to date.');
-                        }
-                      }),
-              icon: const Icon(Icons.sync),
-              label: const Text('Sync now')),
-          OutlinedButton.icon(
-              onPressed: busy ? null : _import,
-              icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Import local tasks')),
-          TextButton(
-              onPressed: busy
-                  ? null
-                  : () => _run(() => ref.read(authProvider.notifier).signOut()),
-              child: const Text('Sign out')),
-        ] else ...[
-          Text(
-              _recover
-                  ? 'Recover your account'
-                  : (_register ? 'Create your account' : 'Welcome back'),
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
-          const Text(
-              'Sign in for task backup and voice creation. You can also keep using local tasks without an account.'),
-          const SizedBox(height: 20),
-          Form(
-              key: _form,
-              child: Column(children: [
-                TextFormField(
-                    key: const ValueKey('account-email'),
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.username],
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (value) => value == null || !value.contains('@')
-                        ? 'Enter your email'
-                        : null),
-                const SizedBox(height: 16),
-                if (_recover)
-                  TextFormField(
-                      controller: _code,
-                      decoration: const InputDecoration(
-                          labelText: 'Recovery code',
-                          helperText:
-                              'Leave empty to request an email. Paste the code to reset.')),
-                TextFormField(
-                    key: const ValueKey('account-password'),
-                    controller: _password,
-                    obscureText: true,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    autofillHints: [
-                      _register || _recover
-                          ? AutofillHints.newPassword
-                          : AutofillHints.password
+      appBar: const CustomAppBar(title: 'Your account'),
+      body: Center(
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  children: [
+                    if (auth.account != null) ...[
+                      Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                              width: 68,
+                              height: 68,
+                              decoration: BoxDecoration(
+                                  color: colors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(24)),
+                              child: Icon(Icons.person_outline_rounded,
+                                  size: 32, color: colors.primary))),
+                      const SizedBox(height: 24),
+                      Text('Your own little space.',
+                          style: Theme.of(context).textTheme.headlineMedium),
+                      const SizedBox(height: 8),
+                      Text(auth.account!.email,
+                          style: TextStyle(color: colors.onSurfaceVariant)),
+                      const SizedBox(height: 28),
+                      AppSurface(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Icon(Icons.cloud_done_outlined,
+                                color: colors.primary, size: 28),
+                            const SizedBox(height: 12),
+                            Text('Your plans, kept close.',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            Text(
+                                'Tasks are saved on this phone and backed up when connected. Your attachments stay on the device where you added them.',
+                                style:
+                                    TextStyle(color: colors.onSurfaceVariant)),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                    onPressed: busy
+                                        ? null
+                                        : () => _run(() async {
+                                              await ref
+                                                  .read(taskProvider.notifier)
+                                                  .loadTasks();
+                                              if (mounted) {
+                                                setState(() => _message = ref
+                                                        .read(
+                                                            taskRepositoryProvider)
+                                                        .syncError ??
+                                                    'Your tasks are up to date.');
+                                              }
+                                            }),
+                                    icon: const Icon(Icons.sync_rounded,
+                                        size: 20),
+                                    label: const Text('Sync now'))),
+                          ])),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                          onPressed: busy ? null : _import,
+                          icon:
+                              const Icon(Icons.file_upload_outlined, size: 20),
+                          label: const Text('Import local tasks')),
+                      const SizedBox(height: 12),
+                      if (ref.read(taskRepositoryProvider).syncError != null)
+                        MessageBanner(
+                            ref.read(taskRepositoryProvider).syncError!,
+                            isError: true),
+                      ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: const Text('Connection details'),
+                          shape: const Border(),
+                          collapsedShape: const Border(),
+                          children: [
+                            Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: SelectableText(
+                                    ref.read(apiClientProvider).baseUrl)),
+                          ]),
+                      const SizedBox(height: 20),
+                      TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => _run(() =>
+                                  ref.read(authProvider.notifier).signOut()),
+                          child: Text('Sign out',
+                              style: TextStyle(color: colors.error))),
+                    ] else ...[
+                      Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                  color: colors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(22)),
+                              child: Icon(
+                                  _recover
+                                      ? Icons.lock_reset_rounded
+                                      : Icons.waving_hand_outlined,
+                                  color: colors.primary,
+                                  size: 28))),
+                      const SizedBox(height: 24),
+                      Text(
+                          _recover
+                              ? 'Let’s get you back in.'
+                              : _register
+                                  ? 'A space for your plans.'
+                                  : 'Welcome back.',
+                          style: Theme.of(context).textTheme.headlineLarge),
+                      const SizedBox(height: 10),
+                      Text(
+                          _recover
+                              ? 'Request a recovery email, then use the code to set a new password.'
+                              : 'Sign in to back up your tasks and turn your voice into a plan.',
+                          style: TextStyle(color: colors.onSurfaceVariant)),
+                      const SizedBox(height: 28),
+                      Form(
+                          key: _form,
+                          child: AutofillGroup(
+                              child: Column(children: [
+                            TextFormField(
+                                key: const ValueKey('account-email'),
+                                controller: _email,
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.username],
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    prefixIcon: Icon(
+                                        Icons.alternate_email_rounded,
+                                        size: 20)),
+                                validator: (value) =>
+                                    value == null || !value.contains('@')
+                                        ? 'Enter your email'
+                                        : null),
+                            const SizedBox(height: 16),
+                            if (_recover) ...[
+                              TextFormField(
+                                  controller: _code,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Recovery code',
+                                      helperText:
+                                          'Leave empty to request an email.')),
+                              const SizedBox(height: 16),
+                            ],
+                            TextFormField(
+                                key: const ValueKey('account-password'),
+                                controller: _password,
+                                obscureText: !_showPassword,
+                                enableSuggestions: false,
+                                autocorrect: false,
+                                autofillHints: [
+                                  _register || _recover
+                                      ? AutofillHints.newPassword
+                                      : AutofillHints.password
+                                ],
+                                decoration: InputDecoration(
+                                    labelText:
+                                        _recover ? 'New password' : 'Password',
+                                    helperText: _register || _recover
+                                        ? 'At least 12 characters'
+                                        : null,
+                                    prefixIcon: const Icon(
+                                        Icons.lock_outline_rounded,
+                                        size: 20),
+                                    suffixIcon: IconButton(
+                                        tooltip: _showPassword
+                                            ? 'Hide password'
+                                            : 'Show password',
+                                        onPressed: () => setState(() =>
+                                            _showPassword = !_showPassword),
+                                        icon: Icon(
+                                            _showPassword
+                                                ? Icons.visibility_off_outlined
+                                                : Icons.visibility_outlined,
+                                            size: 20))),
+                                validator: (value) =>
+                                    _recover && _code.text.trim().isEmpty
+                                        ? null
+                                        : value == null || value.length < 12
+                                            ? 'Use at least 12 characters'
+                                            : null),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                    onPressed: busy ? null : _submit,
+                                    child: Text(_recover
+                                        ? 'Continue recovery'
+                                        : _register
+                                            ? 'Create account'
+                                            : 'Sign in'))),
+                          ]))),
+                      const SizedBox(height: 8),
+                      TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => setState(() {
+                                    _register = !_register;
+                                    _recover = false;
+                                    _message = null;
+                                  }),
+                          child: Text(_register
+                              ? 'Already have an account? Sign in'
+                              : 'Create an account')),
+                      TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => setState(() {
+                                    _recover = !_recover;
+                                    _message = null;
+                                  }),
+                          child: Text(_recover
+                              ? 'Back to sign in'
+                              : 'Forgot password?')),
+                      const SizedBox(height: 16),
+                      Text(
+                          'You can also use TaskFlow without an account. Your local tasks stay on this phone.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: colors.onSurfaceVariant, fontSize: 12)),
+                      const SizedBox(height: 20),
+                      ExpansionTile(
+                          title: const Text('Connection settings'),
+                          tilePadding: EdgeInsets.zero,
+                          shape: const Border(),
+                          collapsedShape: const Border(),
+                          children: [
+                            TextFormField(
+                                controller: _server,
+                                keyboardType: TextInputType.url,
+                                decoration: const InputDecoration(
+                                    labelText: 'Backend address',
+                                    helperText:
+                                        'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.')),
+                          ]),
                     ],
-                    decoration: InputDecoration(
-                        labelText: _recover ? 'New password' : 'Password',
-                        helperText: 'At least 12 characters'),
-                    validator: (value) => _recover && _code.text.trim().isEmpty
-                        ? null
-                        : (value == null || value.length < 12
-                            ? 'Use at least 12 characters'
-                            : null)),
-                const SizedBox(height: 20),
-                FilledButton(
-                    onPressed: busy ? null : _submit,
-                    child: Text(_recover
-                        ? 'Continue recovery'
-                        : (_register ? 'Create account' : 'Sign in'))),
-              ])),
-          TextButton(
-              onPressed: busy
-                  ? null
-                  : () => setState(() {
-                        _register = !_register;
-                        _recover = false;
-                        _message = null;
-                      }),
-              child: Text(_register
-                  ? 'Already have an account? Sign in'
-                  : 'Create an account')),
-          TextButton(
-              onPressed: busy
-                  ? null
-                  : () => setState(() {
-                        _recover = !_recover;
-                        _message = null;
-                      }),
-              child: Text(_recover ? 'Back to sign in' : 'Forgot password?')),
-          ExpansionTile(title: const Text('Connection settings'), children: [
-            TextFormField(
-                controller: _server,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                    labelText: 'Backend address',
-                    helperText:
-                        'Emulator: http://10.0.2.2:8088\nPhone: use your computer’s LAN IP on the same Wi-Fi.')),
-          ]),
-        ],
-        if (busy)
-          const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator())),
-        if (_message != null || auth.error != null)
-          Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(_message ?? auth.error!,
-                  style: const TextStyle(color: Colors.amber))),
-      ]),
+                    if (busy)
+                      const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator())),
+                    if (_message != null || auth.error != null)
+                      Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: MessageBanner(_message ?? auth.error!,
+                              isError: auth.error != null || _failed)),
+                  ]))),
     );
   }
 }
