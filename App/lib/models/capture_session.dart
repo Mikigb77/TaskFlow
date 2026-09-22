@@ -25,6 +25,8 @@ class CaptureDraft {
           dueDate: draft.dueDate,
           hasTime: draft.hasTime,
           recurrence: draft.recurrence,
+          repeatInterval: draft.repeatInterval,
+          repeatWeekdays: draft.repeatWeekdays,
           repeatUntil: draft.repeatUntil,
           priority: draft.priority,
           checklist: draft.checklist,

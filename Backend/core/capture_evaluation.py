@@ -42,6 +42,8 @@ def score_output(case, output):
             "time": local.strftime("%H:%M") if local else None,
             "priority": task.get("priority"),
             "recurrence": task.get("recurrence", "none"),
+            "repeat_interval": task.get("repeat_interval", 1),
+            "repeat_weekdays": task.get("repeat_weekdays", []),
             "repeat_until": task.get("repeat_until"),
             "questions": bool(task.get("questions")),
         }

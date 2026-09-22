@@ -21,7 +21,7 @@ class TaskTile extends ConsumerWidget {
         .where((list) => list.id == task.listId)
         .firstOrNull;
     return Dismissible(
-        key: ValueKey('gesture:${task.id}:${task.occurrenceDate}'),
+        key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
             await TaskInteractions.toggle(context, ref, task);
@@ -47,7 +47,8 @@ class TaskTile extends ConsumerWidget {
                     settings: const RouteSettings(name: '/taskDetails'),
                     builder: (_) => TaskDetailScreen(
                         taskId: task.id!,
-                        occurrenceDate: task.occurrenceDate))),
+                        occurrenceDate: task.occurrenceDate,
+                        occurrenceKey: task.occurrenceId))),
             onLongPress: () => TaskInteractions.reschedule(context, ref, task),
             child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
@@ -112,11 +113,14 @@ class TaskTile extends ConsumerWidget {
                                               size: 14,
                                               color: colors.onSurfaceVariant),
                                           const SizedBox(width: 4),
-                                          Text(Task.repeats[task.recurrence]!,
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color:
-                                                      colors.onSurfaceVariant)),
+                                          Flexible(
+                                              child: Text(task.repeatLabel,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: colors
+                                                          .onSurfaceVariant))),
                                         ]),
                                   if (list != null)
                                     ConstrainedBox(

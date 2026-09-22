@@ -33,6 +33,9 @@ void main() {
           ..remove('checklist')
           ..remove('listId')
           ..remove('labels')
+          ..remove('repeatInterval')
+          ..remove('repeatWeekdays')
+          ..remove('exceptions')
           ..remove('reminderTime'));
     await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
     database = TaskDatabase.forTesting(sql);
@@ -263,7 +266,9 @@ class _Api extends ApiClient {
       bool authenticated = true,
       int? accountId}) async {
     if (offline) throw ApiException(0, 'Offline');
-    if (method == 'GET' && path.startsWith('lists/')) return {'results': [], 'next': null};
+    if (method == 'GET' && path.startsWith('lists/')) {
+      return {'results': [], 'next': null};
+    }
     if (method == 'GET') return {'results': remote, 'next': null};
     lastUpload = data;
     final id = path.split('/')[1];

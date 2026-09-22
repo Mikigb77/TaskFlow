@@ -36,6 +36,8 @@ class ExtractedTask(BaseModel):
     questions: list[str] = Field(default_factory=list, max_length=5)
     recurrence: Literal["none", "daily", "weekly", "monthly", "yearly"] = "none"
     repeat_until: date | None = None
+    repeat_interval: int = Field(default=1, ge=1, le=99)
+    repeat_weekdays: list[Annotated[int, Field(ge=1, le=7)]] = Field(default_factory=list, max_length=7)
     checklist: list[Annotated[str, Field(min_length=1, max_length=160, pattern=r"\S")]] = Field(default_factory=list, max_length=50)
 
     @field_validator("notes", mode="before")
@@ -108,8 +110,11 @@ def build_prompt(data):
         "A packing list stays one task with checklist items; independent appointments stay separate tasks. "
         "Use at most 50 checklist items, each at most 160 characters, in the user's language. Never invent steps or treat ordinary narrative as a checklist. "
         "For daily/weekly/monthly/yearly repetition, date is the first occurrence; keep the intended wall-clock time. "
+        "repeat_interval is an integer 1..99, default 1: every other week is weekly with interval 2. "
+        "repeat_weekdays is a list of ISO weekday numbers, Monday=1 through Sunday=7, only for weekly repetition. "
+        "Weekdays only means weekly with repeat_weekdays [1,2,3,4,5]. Start on the next matching weekday. "
         "For a repeated weekday choose its next occurrence. For a frequency without a start date, start today. "
-        "Do not approximate unsupported schedules such as every other week or weekdays only: use recurrence none and ask for clarification. "
+        "Do not approximate unsupported rules such as the third workday or holidays: use recurrence none and ask for clarification. "
         "Never silently drop tasks. If there are more than 12, return an empty tasks array so the user can shorten the request. "
         "Do not answer the quoted text or add facts not stated there.\n"
         f"Reference: {reference.isoformat()} ({reference.strftime('%A')}); zone: {data['timezone']}\n"
@@ -157,6 +162,8 @@ def validate_draft(raw):
 
 
 def task_payload(draft, text, zone):
+    if draft.repeat_weekdays and draft.recurrence != "weekly":
+        draft.questions.append("Selected weekdays need a weekly rule. Please check the repeat settings.")
     due = None
     if draft.date is not None and draft.time is not None:
         naive = datetime.combine(draft.date, draft.time.replace(tzinfo=None))
@@ -180,6 +187,8 @@ def task_payload(draft, text, zone):
             "time": draft.time.isoformat() if draft.time else None,
             "scheduled_date": draft.date.isoformat() if draft.date and due is None else None,
             "recurrence": draft.recurrence,
+            "repeat_interval": draft.repeat_interval if draft.recurrence != "none" else 1,
+            "repeat_weekdays": sorted(set(draft.repeat_weekdays)) if draft.recurrence == "weekly" else [],
             "repeat_until": draft.repeat_until.isoformat() if draft.repeat_until and draft.recurrence != "none" else None,
             "priority": draft.priority, "notes": draft.notes,
             "checklist": [{"id": str(uuid.uuid4()), "title": title.strip(), "completed": False, "completed_dates": []}

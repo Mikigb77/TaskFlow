@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
+import 'package:agenda/widgets/repeat_rule_control.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_draft.dart';
@@ -209,6 +210,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
               dueDate: null,
               hasTime: false,
               recurrence: 'none',
+              repeatInterval: 1,
+              repeatWeekdays: [],
+              exceptions: [],
               repeatUntil: null)));
       return;
     }
@@ -378,24 +382,24 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                           child: Chip(
                                               label: Text(
                                                   '${AppTheme.priorityLabel(item.task.priority)} priority'))),
-                                      PopupMenuButton<String>(
-                                          enabled: !_saving &&
-                                              item.task.dueDate != null,
+                                      ActionChip(
                                           tooltip: 'Change repeat',
-                                          onSelected: (r) => _change(
-                                              item.copyWith(
-                                                  task: item.task.copyWith(
-                                                      recurrence: r))),
-                                          itemBuilder: (_) => [
-                                                for (final r
-                                                    in Task.repeats.entries)
-                                                  PopupMenuItem(
-                                                      value: r.key,
-                                                      child: Text(r.value))
-                                              ],
-                                          child: Chip(
-                                              label: Text(Task.repeats[
-                                                  item.task.recurrence]!))),
+                                          label: Text(item.task.repeatLabel),
+                                          onPressed: _saving ||
+                                                  item.task.dueDate == null
+                                              ? null
+                                              : () =>
+                                                  _measureCorrection(() async {
+                                                    final task =
+                                                        await editTaskRepeat(
+                                                            context, item.task);
+                                                    if (task != null &&
+                                                        mounted) {
+                                                      await _change(
+                                                          item.copyWith(
+                                                              task: task));
+                                                    }
+                                                  })),
                                     ]),
                                     TextButton.icon(
                                         onPressed: _saving

@@ -16,9 +16,13 @@ import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen(
-      {super.key, required this.taskId, this.occurrenceDate});
+      {super.key,
+      required this.taskId,
+      this.occurrenceDate,
+      this.occurrenceKey});
   final int taskId;
   final DateTime? occurrenceDate;
+  final String? occurrenceKey;
 
   Future<void> _delete(BuildContext context, WidgetRef ref, Task task) async {
     final confirmed = await showDialog<bool>(
@@ -69,19 +73,35 @@ class TaskDetailScreen extends ConsumerWidget {
     return ref.watch(taskProvider).when(
           data: (tasks) {
             final series = tasks.firstWhereOrNull((task) => task.id == taskId);
-            final task = occurrenceDate == null
-                ? (series?.isRecurring == true
-                    ? series?.nextOpenOccurrence() ?? series
-                    : series)
-                : series?.occurrenceOn(occurrenceDate!) ??
-                    series?.nextOpenOccurrence() ??
-                    series;
+            final task = occurrenceKey != null
+                ? series?.occurrenceByKey(occurrenceKey!) ??
+                    series?.completedOccurrence(occurrenceKey!)
+                : occurrenceDate == null
+                    ? (series?.isRecurring == true
+                        ? series?.nextOpenOccurrence() ?? series
+                        : series)
+                    : series?.occurrenceOn(occurrenceDate!) ??
+                        series?.nextOpenOccurrence() ??
+                        series;
             if (task == null) {
-              return const Scaffold(
-                  appBar: CustomAppBar(title: 'Task details'),
-                  body: EmptyState(
-                      title: 'Task unavailable',
-                      message: 'This task may have been removed.'));
+              return Scaffold(
+                  appBar: const CustomAppBar(title: 'Task details'),
+                  body: SingleChildScrollView(
+                      child: Column(children: [
+                    EmptyState(
+                        title: series == null
+                            ? 'Task unavailable'
+                            : 'Occurrence changed',
+                        message: series == null
+                            ? 'This task may have been removed.'
+                            : 'This date is skipped or no longer part of the repeating schedule.'),
+                    if (series != null)
+                      TextButton(
+                          onPressed: () => Navigator.pushNamed(
+                              context, '/editTask',
+                              arguments: taskId),
+                          child: const Text('Edit repeating task')),
+                  ])));
             }
             final attachments = [...task.filePaths, ...task.imagePaths]
                 .where((file) => file.isNotEmpty)
@@ -159,7 +179,7 @@ class TaskDetailScreen extends ConsumerWidget {
                           if (task.isRecurring) ...[
                             const Divider(),
                             _detail(context, Icons.repeat_rounded, 'Repeat',
-                                '${Task.repeats[task.recurrence]}${task.repeatUntil == null ? '' : ' until ${DateFormat('d MMM yyyy').format(task.repeatUntil!)}'}'),
+                                '${task.repeatLabel}${task.repeatUntil == null ? '' : ' until ${DateFormat('d MMM yyyy').format(task.repeatUntil!)}'}'),
                           ],
                           const Divider(),
                           _detail(context, Icons.flag_outlined, 'Priority',

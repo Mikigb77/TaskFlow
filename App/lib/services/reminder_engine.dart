@@ -93,19 +93,19 @@ class ReminderEngine {
   }
 
   static String identity(String owner, Task task) =>
-      '$owner/task/${task.id}/${task.isRecurring ? Task.dateKey(task.displayDate!) : 'once'}';
+      '$owner/task/${task.id}/${task.occurrenceId ?? 'once'}';
 
   static List<Task> upcoming(List<Task> tasks, DateTime now, {int days = 365}) {
     final result = <Task>[];
     for (final task in tasks) {
       if (task.isRecurring) {
         for (var offset = 0; offset <= days; offset++) {
-          final occurrence = task
-              .occurrenceOn(DateTime(now.year, now.month, now.day + offset));
-          if (occurrence != null &&
-              !occurrence.isCompleted &&
-              (!occurrence.hasTime || occurrence.displayDate!.isAfter(now))) {
-            result.add(occurrence);
+          for (final occurrence in task
+              .occurrencesOn(DateTime(now.year, now.month, now.day + offset))) {
+            if (!occurrence.isCompleted &&
+                (!occurrence.hasTime || occurrence.displayDate!.isAfter(now))) {
+              result.add(occurrence);
+            }
           }
         }
       } else if (!task.isCompleted &&
@@ -137,7 +137,7 @@ class ReminderEngine {
       result.add(PlannedReminder(
           identity: identity(owner, task),
           taskId: task.id,
-          occurrence: task.isRecurring ? Task.dateKey(date) : null,
+          occurrence: task.occurrenceId,
           due: date,
           when: when,
           title: task.title,
@@ -352,7 +352,7 @@ class ReminderEngine {
     if (task.isRecurring) {
       final date = DateTime.tryParse(row['occurrence'] as String? ?? '');
       if (date == null) return null;
-      task = task.occurrenceOn(date);
+      task = task.occurrenceByKey(Task.dateKey(date));
     }
     if (task == null ||
         task.isCompleted ||
@@ -400,11 +400,9 @@ class ReminderEngine {
       if (action == 'complete') {
         final values = task.isRecurring
             ? {
-                'completedDates': jsonEncode(({
-                  ...task.completedDates,
-                  Task.dateKey(task.displayDate!)
-                }.toList()
-                  ..sort()))
+                'completedDates': jsonEncode(
+                    ({...task.completedDates, task.occurrenceId!}.toList()
+                      ..sort()))
               }
             : {'isCompleted': 1};
         await tx.update(

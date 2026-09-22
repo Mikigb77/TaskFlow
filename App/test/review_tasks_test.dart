@@ -106,7 +106,14 @@ void main() {
       await tester.ensureVisible(repeat);
       await tester.tap(repeat);
       await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Weekly').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Keep repeat'), 120,
+          scrollable: find.byType(Scrollable).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep repeat'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }

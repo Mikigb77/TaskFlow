@@ -137,7 +137,9 @@ class _MyAppState extends ConsumerState<MyApp> {
             builder: (_) => task == null
                 ? const MainShell()
                 : TaskDetailScreen(
-                    taskId: task.id!, occurrenceDate: task.occurrenceDate)));
+                    taskId: task.id!,
+                    occurrenceDate: task.occurrenceDate,
+                    occurrenceKey: task.occurrenceId)));
       }
     });
   }

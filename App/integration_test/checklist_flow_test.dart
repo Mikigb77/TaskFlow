@@ -16,6 +16,8 @@ import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/task_list_store.dart';
+import 'package:agenda/services/reminder_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,6 +67,8 @@ void main() {
           .delete('tasks', where: 'owner_key = ?', whereArgs: [owner]);
       await (await database.database)
           .delete('task_lists', where: 'owner_key = ?', whereArgs: [owner]);
+      await (await database.database).delete('app_preferences',
+          where: 'scope = ?', whereArgs: ['reminders:$owner']);
       await api.signOut();
       api.close();
       await TaskReminders.activate(originalOwner ?? 'local');
@@ -210,6 +214,86 @@ void main() {
             .singleWhere((list) => list.id == personal.id)
             .archived,
         isTrue);
+    expect(await database.pending(owner), isEmpty);
+    // Real recurrence sync and notification scheduling, with two occurrences
+    // intentionally landing on the same day. Keep the original completion key.
+    final secondDay = start.add(const Duration(days: 1));
+    task = task.copyWith(
+        repeatInterval: 2,
+        repeatWeekdays: [start.weekday, secondDay.weekday],
+        repeatUntil: start.add(const Duration(days: 35)),
+        reminderMinutes: 0);
+    final notifier = container.read(taskProvider.notifier);
+    await repository.updateTask(task);
+    await notifier.loadTasks();
+    await ReminderPreferenceStore(database).write(
+        owner, const ReminderPreferences(enabled: true, dateOnlyTime: 600));
+    await TaskReminders.activate(owner);
+    final key = Task.dateKey(start);
+    await notifier.changeOccurrence(task.occurrenceByKey(key)!,
+        DateTime(secondDay.year, secondDay.month, secondDay.day, 9), true);
+    await TaskReminders.engine.reconcile(owner);
+    task = (await repository.getAllTasks()).single;
+    expect(task.occurrencesOn(secondDay).length, 2);
+    expect(task.occurrenceByKey(key)!.checklistDone, 1);
+    final alerts =
+        await ReminderPreferenceStore(database).upcomingAlerts(owner);
+    final alert = alerts.singleWhere((row) => row['occurrence'] == key);
+    final nativePending =
+        await FlutterLocalNotificationsPlugin().pendingNotificationRequests();
+    expect(nativePending.any((row) => row.id == alert['id']), isTrue);
+    tester.state<NavigatorState>(find.byType(Navigator)).push(
+        MaterialPageRoute<void>(
+            builder: (_) =>
+                TaskDetailScreen(taskId: task.id!, occurrenceKey: key)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reschedule'));
+    await tester.pumpAndSettle();
+    expect(find.text('This occurrence'), findsOneWidget);
+    await tester.tap(find.text('Skip this occurrence'));
+    await _until(
+        tester,
+        () async =>
+            (await repository.getAllTasks()).single.occurrenceByKey(key) ==
+            null);
+    await tester.pumpAndSettle();
+    expect(find.text('Occurrence changed'), findsOneWidget);
+    await _until(tester, () async => find.text('Undo').evaluate().isNotEmpty);
+    await tester.tap(find.text('Undo'));
+    await _until(
+        tester,
+        () async =>
+            (await repository.getAllTasks()).single.occurrenceByKey(key) !=
+            null);
+    await tester.pumpAndSettle();
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      await container.read(themeModeProvider.notifier).setMode(mode);
+      await tester.pumpAndSettle();
+      await binding.takeScreenshot('recurrence-detail-${mode.name}');
+      expect(tester.takeException(), isNull);
+    }
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    await TaskReminders.engine.reconcile(owner);
+    final current =
+        (await ReminderPreferenceStore(database).upcomingAlerts(owner))
+            .singleWhere((row) => row['occurrence'] == key);
+    expect(
+        await TaskReminders.engine.action(current['id'] as int, 'complete',
+            token: current['token'] as String),
+        isTrue);
+    await notifier.loadTasks();
+    await (await database.database)
+        .delete('tasks', where: 'owner_key = ?', whereArgs: [owner]);
+    await notifier.loadTasks();
+    task = (await repository.getAllTasks()).single;
+    expect(task.repeatInterval, 2);
+    expect(task.repeatWeekdays.toSet(), {start.weekday, secondDay.weekday});
+    expect(task.occurrenceByKey(key)!.hasTime, isTrue);
+    expect(task.occurrenceByKey(key)!.displayDate!.hour, 9);
+    expect(task.occurrenceByKey(key)!.checklistDone, 1);
+    expect(task.completedDates, [key]);
+    expect(task.occurrenceByKey(Task.dateKey(secondDay))!.isCompleted, isFalse);
     expect(await database.pending(owner), isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

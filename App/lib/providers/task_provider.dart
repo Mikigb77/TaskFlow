@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_schedule_change.dart';
+import 'package:agenda/models/occurrence_change.dart';
+import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
@@ -113,19 +115,75 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         return true;
       });
 
+  Future<OccurrenceChange> changeOccurrence(
+          Task occurrence, DateTime? date, bool hasTime,
+          {bool skip = false, bool reset = false}) =>
+      _mutate(() async {
+        final task = (await _repository.getAllTasks())
+            .where((task) => task.id == occurrence.id)
+            .firstOrNull;
+        final key = occurrence.occurrenceId;
+        if (task == null ||
+            key == null ||
+            !task.isBaseOccurrence(DateTime.parse(key))) {
+          throw StateError('This occurrence has changed. Open the task again.');
+        }
+        if (!skip && !reset && date == null) {
+          throw ArgumentError('Choose a date for this occurrence.');
+        }
+        final before = task.exceptions
+            .where((change) => change.originalDate == key)
+            .firstOrNull;
+        if (!reset && before == null && task.exceptions.length >= 500) {
+          throw StateError(
+              'This series has reached its limit of individual changes.');
+        }
+        final after = reset
+            ? null
+            : OccurrenceException(
+                originalDate: key,
+                skipped: skip,
+                date: skip
+                    ? null
+                    : hasTime
+                        ? date
+                        : Task.day(date!),
+                hasTime: !skip && hasTime);
+        await _repository.updateTask(task.copyWith(exceptions: [
+          ...task.exceptions.where((change) => change.originalDate != key),
+          if (after != null) after,
+        ]));
+        if (mounted) await loadTasks();
+        return OccurrenceChange(task, key, before, after);
+      });
+
+  Future<bool> undoOccurrence(OccurrenceChange change) => _mutate(() async {
+        final task = (await _repository.getAllTasks())
+            .where((task) => task.id == change.series.id)
+            .firstOrNull;
+        if (task == null || !change.canUndo(task)) return false;
+        await _repository.updateTask(change.restore(task));
+        if (mounted) await loadTasks();
+        return true;
+      });
+
   Future<void> setCompleted(Task occurrence, bool completed) {
     return _mutate(() async {
       final tasks = await _repository.getAllTasks();
       final task = tasks.where((t) => t.id == occurrence.id).firstOrNull;
       if (task == null) throw StateError('Task no longer exists.');
       if (task.isRecurring) {
-        final date = occurrence.displayDate;
-        if (date == null || task.occurrenceOn(date) == null) return;
+        final key = occurrence.occurrenceId;
+        if (key == null ||
+            (task.occurrenceByKey(key) == null &&
+                (completed || !task.completedDates.contains(key)))) {
+          return;
+        }
         final dates = {...task.completedDates};
         if (completed) {
-          dates.add(Task.dateKey(date));
+          dates.add(key);
         } else {
-          dates.remove(Task.dateKey(date));
+          dates.remove(key);
         }
         await _repository
             .updateTask(task.copyWith(completedDates: dates.toList()..sort()));
@@ -143,9 +201,9 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
             .where((t) => t.id == occurrence.id)
             .firstOrNull;
         if (task == null) throw StateError('Task no longer exists.');
-        final date = task.isRecurring ? occurrence.displayDate : null;
+        final key = task.isRecurring ? occurrence.occurrenceId : null;
         if (task.isRecurring &&
-            (date == null || task.occurrenceOn(date) == null)) {
+            (key == null || task.occurrenceByKey(key) == null)) {
           throw StateError('This occurrence has changed. Open it again.');
         }
         if (!task.checklist.any((item) => item.id == itemId)) {
@@ -154,8 +212,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         await _repository.updateTask(task.copyWith(
             checklist: task.checklist
                 .map((item) => item.id == itemId
-                    ? item.setDone(completed,
-                        occurrence: date == null ? null : Task.dateKey(date))
+                    ? item.setDone(completed, occurrence: key)
                     : item)
                 .toList()));
         if (mounted) await loadTasks();

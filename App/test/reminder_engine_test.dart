@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
@@ -40,6 +41,53 @@ void main() {
     await engine.activate('local');
   });
   tearDown(() => database.close());
+
+  test(
+      'move collision and skip reconcile only affected identities; notification completes original date',
+      () async {
+    await enable();
+    await database.insertTask(Task(
+        title: 'Daily',
+        priority: 1,
+        dueDate: DateTime(2026, 9, 22, 10),
+        recurrence: 'daily',
+        repeatUntil: DateTime(2026, 9, 24)));
+    await engine.reconcile('local');
+    final original =
+        (await alerts()).firstWhere((row) => row['occurrence'] == '2026-09-22');
+    final unchanged =
+        (await alerts()).firstWhere((row) => row['occurrence'] == '2026-09-23');
+    var task = (await database.getTasks()).single;
+    await database.updateTask(task.copyWith(exceptions: [
+      OccurrenceException(
+          originalDate: '2026-09-22',
+          date: DateTime(2026, 9, 23, 9),
+          hasTime: true),
+      const OccurrenceException(originalDate: '2026-09-24', skipped: true),
+    ]));
+    await engine.reconcile('local');
+    expect(driver.pending.length, 2);
+    final moved =
+        (await alerts()).firstWhere((row) => row['occurrence'] == '2026-09-22');
+    expect(moved['id'], original['id']);
+    expect(moved['token'], isNot(original['token']));
+    final remaining =
+        (await alerts()).firstWhere((row) => row['occurrence'] == '2026-09-23');
+    expect(remaining['id'], unchanged['id']);
+    expect(remaining['token'], unchanged['token']);
+    expect(
+        await engine.action(original['id'] as int, 'complete',
+            token: original['token'] as String),
+        isFalse);
+    expect(
+        await engine.action(moved['id'] as int, 'complete',
+            token: moved['token'] as String),
+        isTrue);
+    task = (await database.getTasks()).single;
+    expect(task.completedDates, ['2026-09-22']);
+    expect(task.occurrenceByKey('2026-09-23')!.isCompleted, isFalse);
+    expect(driver.pending.values.single.occurrence, '2026-09-23');
+  });
 
   test('no permission or default alert is implied by task priority', () async {
     await database.insertTasks([

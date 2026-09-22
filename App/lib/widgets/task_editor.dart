@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,8 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
+import 'package:agenda/widgets/repeat_rule_control.dart';
+import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -44,6 +47,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   late DateTime? _dueDate;
   late bool _hasTime;
   late String _recurrence;
+  late int _repeatInterval;
+  late List<int> _repeatWeekdays;
+  late List<OccurrenceException> _exceptions;
   DateTime? _repeatUntil;
   late int _priority;
   int? _reminderMinutes;
@@ -72,6 +78,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _listId = widget.task?.listId ?? widget.initialListId;
     _hasTime = widget.task?.hasTime ?? widget.draft?.hasTime ?? false;
     _recurrence = widget.task?.recurrence ?? widget.draft?.recurrence ?? 'none';
+    _repeatInterval =
+        widget.task?.repeatInterval ?? widget.draft?.repeatInterval ?? 1;
+    _repeatWeekdays = [
+      ...(widget.task?.repeatWeekdays ?? widget.draft?.repeatWeekdays ?? [])
+    ];
+    _exceptions = [...?widget.task?.exceptions];
     _repeatUntil = widget.task?.repeatUntil ?? widget.draft?.repeatUntil;
     _priority = widget.task?.priority ?? widget.draft?.priority ?? 1;
     _reminderMinutes = widget.task?.reminderMinutes;
@@ -171,6 +183,32 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
+    final before = widget.task;
+    final ruleChanged = before != null &&
+        (before.dueDate != _dueDate ||
+            before.hasTime != _hasTime ||
+            before.recurrence != _recurrence ||
+            before.repeatInterval != _repeatInterval ||
+            before.repeatUntil != _repeatUntil ||
+            !const ListEquality<int>()
+                .equals(before.repeatWeekdays, _repeatWeekdays));
+    if (ruleChanged && _exceptions.isNotEmpty) {
+      final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+                  title: const Text('Change the repeating schedule?'),
+                  content: const Text(
+                      'This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Keep editing')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Reset and save'))
+                  ]));
+      if (confirmed != true || !mounted) return;
+    }
     setState(() => _saving = true);
     final task = Task(
       id: widget.task?.id,
@@ -178,6 +216,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       dueDate: _dueDate,
       hasTime: _hasTime,
       recurrence: _dueDate == null ? 'none' : _recurrence,
+      repeatInterval: _recurrence == 'none' ? 1 : _repeatInterval,
+      repeatWeekdays: _recurrence == 'weekly' ? _repeatWeekdays : [],
+      exceptions: ruleChanged || _recurrence == 'none' ? [] : _exceptions,
       repeatUntil: _recurrence == 'none' ? null : _repeatUntil,
       completedDates: _recurrence == 'none' ? [] : widget.task?.completedDates,
       priority: _priority,
@@ -500,8 +541,43 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                             _recurrence = value!;
                                             if (value == 'none') {
                                               _repeatUntil = null;
+                                              _repeatInterval = 1;
+                                            }
+                                            if (value != 'weekly') {
+                                              _repeatWeekdays = [];
                                             }
                                           })),
+                                  if (_recurrence != 'none')
+                                    RepeatRuleControl(
+                                        recurrence: _recurrence,
+                                        interval: _repeatInterval,
+                                        weekdays: _repeatWeekdays,
+                                        onChanged: (interval, days) =>
+                                            setState(() {
+                                              _repeatInterval = interval;
+                                              _repeatWeekdays = days;
+                                            })),
+                                  if (_exceptions.isNotEmpty)
+                                    ExpansionTile(
+                                        tilePadding: EdgeInsets.zero,
+                                        title: Text(
+                                            '${_exceptions.length} individual date changes'),
+                                        subtitle: const Text(
+                                            'Reset a date, then save your changes.'),
+                                        children: [
+                                          for (final exception in _exceptions)
+                                            ListTile(
+                                                title: Text(
+                                                    exception.originalDate),
+                                                subtitle: Text(exception.skipped
+                                                    ? 'Skipped'
+                                                    : 'Moved to ${Task.dateKey(exception.date!)}${exception.hasTime ? ' · ${TimeOfDay.fromDateTime(exception.date!).format(context)}' : ''}'),
+                                                trailing: TextButton(
+                                                    onPressed: () => setState(
+                                                        () => _exceptions
+                                                            .remove(exception)),
+                                                    child: const Text('Reset')))
+                                        ]),
                                   if (_recurrence != 'none')
                                     Row(children: [
                                       Expanded(

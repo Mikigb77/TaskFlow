@@ -52,6 +52,9 @@ class Task(models.Model):
     recurrence = models.CharField(max_length=8, default="none", choices=[
         (value, value) for value in ("none", "daily", "weekly", "monthly", "yearly")])
     repeat_until = models.DateField(null=True, blank=True)
+    repeat_interval = models.PositiveSmallIntegerField(default=1)
+    repeat_weekdays = models.JSONField(default=list, blank=True)
+    exceptions = models.JSONField(default=list, blank=True)
     completed_dates = models.JSONField(default=list, blank=True)
     priority = models.PositiveSmallIntegerField(default=1)
     reminder_minutes = models.SmallIntegerField(null=True, blank=True)

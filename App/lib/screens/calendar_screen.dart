@@ -62,14 +62,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
     final tasks = tasksState.valueOrNull ?? <Task>[];
-    final events = tasks
-        .map((task) => task.occurrenceOn(_selectedDay))
-        .whereType<Task>()
-        .toList()
-      ..sort((a, b) {
-        if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-        return Task.compareBySchedule(a, b);
-      });
+    final events =
+        tasks.expand((task) => task.occurrencesOn(_selectedDay)).toList()
+          ..sort((a, b) {
+            if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
+            return Task.compareBySchedule(a, b);
+          });
     final completed = events.where((task) => task.isCompleted).length;
     final signedIn = ref.watch(authProvider).account != null;
     final syncError = ref.read(taskRepositoryProvider).syncError;
@@ -174,8 +172,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             onPageChanged: (focused) =>
                                 setState(() => _focusedDay = focused),
                             eventLoader: (day) => tasks
-                                .map((task) => task.occurrenceOn(day))
-                                .whereType<Task>()
+                                .expand((task) => task.occurrencesOn(day))
                                 .toList(),
                             calendarStyle: CalendarStyle(
                               outsideDaysVisible: false,

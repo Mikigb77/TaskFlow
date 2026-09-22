@@ -54,6 +54,18 @@ class CloudTaskRepository extends TaskRepository {
       sent['is_deleted'] == remote['is_deleted'] &&
       sent['scheduled_date'] == remote['scheduled_date'] &&
       sent['recurrence'] == (remote['recurrence'] ?? 'none') &&
+      sent['repeat_interval'] == (remote['repeat_interval'] ?? 1) &&
+      const DeepCollectionEquality()
+          .equals(sent['repeat_weekdays'], remote['repeat_weekdays'] ?? []) &&
+      const DeepCollectionEquality().equals(
+          Task.fromApi(sent)
+              .exceptions
+              .map((change) => change.toJson())
+              .toList(),
+          Task.fromApi(remote)
+              .exceptions
+              .map((change) => change.toJson())
+              .toList()) &&
       sent['repeat_until'] == remote['repeat_until'] &&
       _sameDates(sent['completed_dates'], remote['completed_dates'] ?? []) &&
       (sent['due_date'] == null

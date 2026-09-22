@@ -43,7 +43,8 @@ class TaskInteractions {
     final container = ProviderScope.containerOf(context, listen: false);
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
-    final result = await showModalBottomSheet<({DateTime? date, bool hasTime})>(
+    final result = await showModalBottomSheet<
+            ({DateTime? date, bool hasTime, String scope})>(
         context: context,
         isScrollControlled: true,
         builder: (_) => _ScheduleSheet(task: task));
@@ -53,13 +54,23 @@ class TaskInteractions {
       return;
     }
     try {
-      final change =
-          await notifier.rescheduleTask(task.id!, result.date, result.hasTime);
+      final seriesChange = result.scope == 'series'
+          ? await notifier.rescheduleTask(task.id!, result.date, result.hasTime)
+          : null;
+      final occurrenceChange = result.scope != 'series'
+          ? await notifier.changeOccurrence(task, result.date, result.hasTime,
+              skip: result.scope == 'skip', reset: result.scope == 'reset')
+          : null;
       if (!messenger.mounted) return;
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(
-          content:
-              Text(result.date == null ? 'Moved to Inbox' : 'Schedule updated'),
+          content: Text(result.scope == 'skip'
+              ? 'Occurrence skipped'
+              : result.scope == 'reset'
+                  ? 'Original date restored'
+                  : result.date == null
+                      ? 'Moved to Inbox'
+                      : 'Schedule updated'),
           action: SnackBarAction(
               label: 'Undo',
               onPressed: () async {
@@ -69,7 +80,10 @@ class TaskInteractions {
                   return;
                 }
                 try {
-                  if (!await notifier.undoSchedule(change)) {
+                  final restored = seriesChange != null
+                      ? await notifier.undoSchedule(seriesChange)
+                      : await notifier.undoOccurrence(occurrenceChange!);
+                  if (!restored) {
                     _error(messenger,
                         'The schedule changed again. Open the task to review it.');
                   }
@@ -97,7 +111,8 @@ class _ScheduleSheet extends StatefulWidget {
 }
 
 class _ScheduleSheetState extends State<_ScheduleSheet> {
-  late DateTime? _date = widget.task.dueDate;
+  late String _scope = widget.task.isRecurring ? 'occurrence' : 'series';
+  late DateTime? _date = widget.task.displayDate;
   late bool _hasTime = widget.task.hasTime;
   void _setDay(DateTime? day) => setState(() {
         _date = day == null
@@ -130,10 +145,33 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                         : 'Reschedule task',
                     style: Theme.of(context).textTheme.titleLarge),
                 if (widget.task.isRecurring)
-                  const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                          'This changes the start of the whole series. Moving to Inbox stops the repeat.')),
+                  Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(spacing: 8, children: [
+                              for (final scope in ['occurrence', 'series'])
+                                ChoiceChip(
+                                    label: Text(scope == 'occurrence'
+                                        ? 'This occurrence'
+                                        : 'Whole series'),
+                                    selected: _scope == scope,
+                                    onSelected: (_) => setState(() {
+                                          _scope = scope;
+                                          _date = scope == 'series'
+                                              ? widget.task.dueDate
+                                              : widget.task.displayDate;
+                                          _hasTime = scope == 'series'
+                                              ? widget.task.seriesHasTime
+                                              : widget.task.hasTime;
+                                        }))
+                            ]),
+                            const SizedBox(height: 8),
+                            Text(_scope == 'series'
+                                ? 'Changes the start of the series and resets individual moves or skips. Inbox stops the repeat.'
+                                : 'Other dates in the series stay the same.'),
+                          ])),
                 const SizedBox(height: 16),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   ActionChip(
@@ -145,9 +183,10 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                         final now = DateTime.now();
                         _setDay(DateTime(now.year, now.month, now.day + 1));
                       }),
-                  ActionChip(
-                      label: const Text('Inbox'),
-                      onPressed: () => _setDay(null)),
+                  if (_scope == 'series')
+                    ActionChip(
+                        label: const Text('Inbox'),
+                        onPressed: () => _setDay(null)),
                 ]),
                 ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -192,8 +231,21 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                 SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                        onPressed: () => Navigator.pop(
-                            context, (date: _date, hasTime: _hasTime)),
+                        onPressed: () => Navigator.pop(context,
+                            (date: _date, hasTime: _hasTime, scope: _scope)),
                         child: const Text('Save schedule'))),
+                if (widget.task.isRecurring && _scope == 'occurrence') ...[
+                  TextButton.icon(
+                      onPressed: () => Navigator.pop(
+                          context, (date: null, hasTime: false, scope: 'skip')),
+                      icon: const Icon(Icons.event_busy_outlined),
+                      label: const Text('Skip this occurrence')),
+                  if (widget.task.exceptions.any((change) =>
+                      change.originalDate == widget.task.occurrenceId))
+                    TextButton(
+                        onPressed: () => Navigator.pop(context,
+                            (date: null, hasTime: false, scope: 'reset')),
+                        child: const Text('Restore original date')),
+                ],
               ])));
 }

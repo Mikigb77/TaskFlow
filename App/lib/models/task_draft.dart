@@ -5,6 +5,8 @@ class TaskDraft {
   final DateTime? dueDate;
   final bool hasTime;
   final String recurrence;
+  final int repeatInterval;
+  final List<int> repeatWeekdays;
   final DateTime? repeatUntil;
   final int priority;
   final String notes;
@@ -22,6 +24,8 @@ class TaskDraft {
             : DateTime.parse(data['due_date'] as String).toLocal(),
         hasTime = data['due_date'] != null,
         recurrence = data['recurrence'] as String? ?? 'none',
+        repeatInterval = data['repeat_interval'] as int? ?? 1,
+        repeatWeekdays = List<int>.from(data['repeat_weekdays'] ?? []),
         repeatUntil = data['repeat_until'] == null
             ? null
             : DateTime.parse(data['repeat_until']),

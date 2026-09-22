@@ -16,8 +16,7 @@ class CompletedTasksScreen extends ConsumerWidget {
                 final completed = tasks
                     .expand((task) => task.isRecurring
                         ? task.completedDates
-                            .map((date) =>
-                                task.occurrenceOn(DateTime.parse(date)))
+                            .map(task.completedOccurrence)
                             .whereType<Task>()
                         : task.isCompleted
                             ? [task]

@@ -63,6 +63,24 @@ class TaskListSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "updated_at"]
 
 
+class OccurrenceExceptionSerializer(serializers.Serializer):
+    original_date = serializers.DateField()
+    skipped = serializers.BooleanField(default=False)
+    due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
+    scheduled_date = serializers.DateField(allow_null=True, required=False, default=None)
+
+    def validate(self, attrs):
+        due, day = attrs["due_date"], attrs["scheduled_date"]
+        if attrs["skipped"]:
+            if due is not None or day is not None:
+                raise serializers.ValidationError("A skipped occurrence cannot also be rescheduled.")
+        elif (due is None) == (day is None):
+            raise serializers.ValidationError("Choose a date-only or timed schedule for this occurrence.")
+        return {"original_date": attrs["original_date"].isoformat(), "skipped": attrs["skipped"],
+                "due_date": due.isoformat().replace("+00:00", "Z") if due else None,
+                "scheduled_date": day.isoformat() if day else None}
+
+
 class ChecklistItemSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     title = serializers.CharField(max_length=160)
@@ -89,6 +107,19 @@ class TaskSerializer(serializers.ModelSerializer):
     list_id = serializers.PrimaryKeyRelatedField(source="task_list", queryset=TaskList.objects.none(),
                                                 allow_null=True, required=False)
     labels = serializers.ListField(child=serializers.CharField(max_length=32), max_length=10, required=False)
+    repeat_interval = serializers.IntegerField(min_value=1, max_value=99, required=False)
+    repeat_weekdays = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=7), max_length=7, required=False)
+    exceptions = OccurrenceExceptionSerializer(many=True, required=False)
+
+    def validate_repeat_weekdays(self, value):
+        return sorted(set(value))
+
+    def validate_exceptions(self, value):
+        if len(value) > 500:
+            raise serializers.ValidationError("Use no more than 500 occurrence changes per series.")
+        if len({item["original_date"] for item in value}) != len(value):
+            raise serializers.ValidationError("Change each original occurrence at most once.")
+        return sorted(value, key=lambda item: item["original_date"])
 
     def get_fields(self):
         fields = super().get_fields()
@@ -109,12 +140,21 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
         due, day = attrs.get("due_date"), attrs.get("scheduled_date")
         repeat = attrs.get("recurrence", getattr(self.instance, "recurrence", "none"))
+        weekdays = attrs.get("repeat_weekdays", getattr(self.instance, "repeat_weekdays", []))
+        if repeat == "none":
+            if attrs.get("repeat_interval", 1) != 1 or attrs.get("repeat_weekdays") or attrs.get("exceptions"):
+                raise serializers.ValidationError("Recurrence rules require a repeating task.")
+            attrs.update(repeat_interval=1, repeat_weekdays=[], exceptions=[])
+        elif repeat != "weekly" and weekdays:
+            if "repeat_weekdays" in attrs:
+                raise serializers.ValidationError({"repeat_weekdays": "Selected weekdays require weekly repetition."})
+            attrs["repeat_weekdays"] = []
         if due is not None and day is not None:
             raise serializers.ValidationError("Use a date-only schedule or a timed schedule, not both.")
         if repeat != "none" and due is None and day is None:

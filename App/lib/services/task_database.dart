@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 9;
+  static const schemaVersion = 10;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -42,6 +42,8 @@ class TaskDatabase {
           reminderMinutes INTEGER, reminderTime INTEGER,
           checklist TEXT NOT NULL DEFAULT '[]',
           listId TEXT, labels TEXT NOT NULL DEFAULT '[]',
+          repeatInterval INTEGER NOT NULL DEFAULT 1,
+          repeatWeekdays TEXT NOT NULL DEFAULT '[]', exceptions TEXT NOT NULL DEFAULT '[]',
           owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
           sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
@@ -104,6 +106,14 @@ class TaskDatabase {
       await db.execute(
           "ALTER TABLE tasks ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'");
       await createListTables(db);
+    }
+    if (oldVersion < 10 && newVersion >= 10) {
+      await db.execute(
+          'ALTER TABLE tasks ADD COLUMN repeatInterval INTEGER NOT NULL DEFAULT 1');
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN repeatWeekdays TEXT NOT NULL DEFAULT '[]'");
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN exceptions TEXT NOT NULL DEFAULT '[]'");
     }
   }
 

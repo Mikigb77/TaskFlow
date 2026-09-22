@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:agenda/models/checklist_item.dart';
+import 'package:agenda/models/occurrence_exception.dart';
 
 const _unchanged = Object();
 
@@ -10,13 +11,23 @@ class Task {
 
   /// First occurrence. Null means Inbox; hasTime=false is a calendar date.
   final DateTime? dueDate;
-  final bool hasTime;
+  final bool _hasTime;
+  bool get hasTime => occurrenceHasTime ?? _hasTime;
+  bool get seriesHasTime => _hasTime;
   final String recurrence;
+  final int repeatInterval;
+  final List<int> repeatWeekdays;
+  final List<OccurrenceException> exceptions;
   final DateTime? repeatUntil;
   final List<String> completedDates;
 
   /// A calendar projection, never persisted as the series start date.
   final DateTime? occurrenceDate;
+  final String? occurrenceKey;
+  final bool? occurrenceHasTime;
+  String? get occurrenceId => isRecurring && displayDate != null
+      ? occurrenceKey ?? dateKey(displayDate!)
+      : null;
   final int priority;
 
   /// Null follows device defaults; -1 disables; otherwise minutes before.
@@ -31,8 +42,7 @@ class Task {
   final List<ChecklistItem> checklist;
   final String? listId;
   final List<String> labels;
-  String? get checklistOccurrence =>
-      isRecurring && displayDate != null ? dateKey(displayDate!) : null;
+  String? get checklistOccurrence => occurrenceId;
   int get checklistDone => checklist
       .where((item) => item.done(occurrence: checklistOccurrence))
       .length;
@@ -43,9 +53,14 @@ class Task {
       this.dueDate,
       bool hasTime = true,
       this.recurrence = 'none',
+      this.repeatInterval = 1,
+      List<int> repeatWeekdays = const [],
+      List<OccurrenceException> exceptions = const [],
       this.repeatUntil,
       List<String>? completedDates,
       this.occurrenceDate,
+      this.occurrenceKey,
+      this.occurrenceHasTime,
       required this.priority,
       this.reminderMinutes,
       this.reminderTime,
@@ -56,7 +71,11 @@ class Task {
       List<ChecklistItem>? checklist,
       this.listId,
       List<String>? labels})
-      : hasTime = dueDate != null && hasTime,
+      : _hasTime = dueDate != null && hasTime,
+        repeatWeekdays =
+            List.unmodifiable(repeatWeekdays.toSet().toList()..sort()),
+        exceptions = List.unmodifiable([...exceptions]
+          ..sort((a, b) => a.originalDate.compareTo(b.originalDate))),
         _isCompleted = isCompleted,
         completedDates = List.unmodifiable(completedDates ?? []),
         filePaths = filePaths ?? [],
@@ -65,7 +84,13 @@ class Task {
             .map((label) => label.trim().toLowerCase())
             .where((label) => label.isNotEmpty)
             .toSet()),
-        imagePaths = imagePaths ?? [];
+        imagePaths = imagePaths ?? [] {
+    if (repeatInterval < 1 ||
+        repeatInterval > 99 ||
+        repeatWeekdays.any((day) => day < 1 || day > 7)) {
+      throw ArgumentError('Invalid repeat interval or weekdays.');
+    }
+  }
 
   static const repeats = {
     'none': 'Does not repeat',
@@ -77,8 +102,25 @@ class Task {
   bool get isRecurring => recurrence != 'none' && dueDate != null;
   DateTime? get displayDate => occurrenceDate ?? dueDate;
   bool get isCompleted => isRecurring && occurrenceDate != null
-      ? completedDates.contains(dateKey(occurrenceDate!))
+      ? completedDates.contains(occurrenceId)
       : _isCompleted;
+  String get repeatLabel {
+    final unit = switch (recurrence) {
+      'daily' => 'days',
+      'weekly' => 'weeks',
+      'monthly' => 'months',
+      'yearly' => 'years',
+      _ => ''
+    };
+    final frequency = repeatInterval == 1
+        ? repeats[recurrence]!
+        : 'Every $repeatInterval $unit';
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return repeatWeekdays.isEmpty || recurrence != 'weekly'
+        ? frequency
+        : '$frequency · ${repeatWeekdays.map((day) => names[day - 1]).join(', ')}';
+  }
+
   static String dateKey(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   static DateTime day(DateTime value) =>
@@ -94,17 +136,27 @@ class Task {
     var year = start.year;
     var month = start.month;
     var date = start.day;
-    if (recurrence == 'daily') date += index;
-    if (recurrence == 'weekly') date += index * 7;
+    if (recurrence == 'daily') date += index * repeatInterval;
+    if (recurrence == 'weekly') {
+      if (repeatWeekdays.isEmpty) {
+        date += index * 7 * repeatInterval;
+      } else {
+        date += -(start.weekday - 1) +
+            (index ~/ repeatWeekdays.length) * 7 * repeatInterval +
+            repeatWeekdays[index % repeatWeekdays.length] -
+            1;
+      }
+    }
     if (recurrence == 'monthly' || recurrence == 'yearly') {
-      final target = DateTime(year + (recurrence == 'yearly' ? index : 0),
-          month + (recurrence == 'monthly' ? index : 0));
+      final target = DateTime(
+          year + (recurrence == 'yearly' ? index * repeatInterval : 0),
+          month + (recurrence == 'monthly' ? index * repeatInterval : 0));
       year = target.year;
       month = target.month;
       date = math.min(start.day, DateTime(year, month + 1, 0).day);
     }
-    return DateTime(year, month, date, hasTime ? start.hour : 0,
-        hasTime ? start.minute : 0);
+    return DateTime(year, month, date, _hasTime ? start.hour : 0,
+        _hasTime ? start.minute : 0);
   }
 
   int _indexNear(DateTime date) {
@@ -115,45 +167,118 @@ class Task {
     return math.max(
         0,
         switch (recurrence) {
-          'daily' => days,
-          'weekly' => days ~/ 7,
-          'monthly' => (date.year - start.year) * 12 + date.month - start.month,
-          'yearly' => date.year - start.year,
+          'daily' => days ~/ repeatInterval,
+          'weekly' => repeatWeekdays.isEmpty
+              ? days ~/ (7 * repeatInterval)
+              : ((days + start.weekday - 1) ~/ (7 * repeatInterval)) *
+                  repeatWeekdays.length,
+          'monthly' =>
+            ((date.year - start.year) * 12 + date.month - start.month) ~/
+                repeatInterval,
+          'yearly' => (date.year - start.year) ~/ repeatInterval,
           _ => 0,
         });
   }
 
-  Task? occurrenceOn(DateTime date) {
-    if (dueDate == null) return null;
-    if (!isRecurring) return dateKey(dueDate!) == dateKey(date) ? this : null;
+  bool isBaseOccurrence(DateTime date) {
+    if (!isRecurring) return false;
     if (day(date).isBefore(day(dueDate!)) ||
         (repeatUntil != null && day(date).isAfter(day(repeatUntil!)))) {
-      return null;
+      return false;
     }
-    final occurrence = _dateAt(_indexNear(date));
-    return dateKey(occurrence) == dateKey(date)
-        ? copyWith(occurrenceDate: occurrence)
-        : null;
+    final index = _indexNear(date);
+    final length = recurrence == 'weekly' && repeatWeekdays.isNotEmpty
+        ? repeatWeekdays.length
+        : 1;
+    return List.generate(length, (offset) => _dateAt(index + offset))
+        .any((value) => dateKey(value) == dateKey(date));
   }
+
+  /// Lookup by the original date, which stays stable after a one-off move.
+  Task? occurrenceByKey(String key) {
+    final original = DateTime.tryParse(key);
+    if (original == null || !isBaseOccurrence(original)) return null;
+    final change =
+        exceptions.where((item) => item.originalDate == key).firstOrNull;
+    if (change?.skipped == true) return null;
+    final date = change?.date ??
+        DateTime(original.year, original.month, original.day,
+            _hasTime ? dueDate!.hour : 0, _hasTime ? dueDate!.minute : 0);
+    return copyWith(
+        occurrenceDate: date,
+        occurrenceKey: key,
+        occurrenceHasTime: change?.hasTime ?? _hasTime);
+  }
+
+  /// A moved instance can share its new day with a normal occurrence.
+  List<Task> occurrencesOn(DateTime date) {
+    if (!isRecurring) {
+      return dueDate != null && dateKey(dueDate!) == dateKey(date)
+          ? [this]
+          : [];
+    }
+    final key = dateKey(date);
+    final original = occurrenceByKey(key);
+    final result = <Task>[
+      if (original != null && dateKey(original.displayDate!) == key) original,
+      for (final change in exceptions)
+        if (!change.skipped &&
+            change.originalDate != key &&
+            change.date != null &&
+            dateKey(change.date!) == key)
+          ...[occurrenceByKey(change.originalDate)].whereType<Task>(),
+    ];
+    return result..sort(compareBySchedule);
+  }
+
+  Task? occurrenceOn(DateTime date) => occurrencesOn(date).firstOrNull;
+
+  /// Keep completion history visible after the repeating pattern changes.
+  Task? completedOccurrence(String key) => !completedDates.contains(key)
+      ? null
+      : occurrenceByKey(key) ??
+          copyWith(
+              occurrenceDate: DateTime.parse(key),
+              occurrenceKey: key,
+              occurrenceHasTime: false);
 
   /// Show the next open occurrence from today; past occurrences stay in Calendar.
   Task? nextOpenOccurrence({DateTime? from}) {
     if (!isRecurring) return isCompleted ? null : this;
     final first = day(from ?? DateTime.now());
+    final moved = exceptions
+        .map((change) => occurrenceByKey(change.originalDate))
+        .whereType<Task>()
+        .where((task) =>
+            !task.isCompleted && !day(task.displayDate!).isBefore(first))
+        .toList()
+      ..sort(compareBySchedule);
+    Task? best = moved.firstOrNull;
     var index = _indexNear(first);
     for (var attempts = 0;
-        attempts <= completedDates.length + 2;
+        attempts <=
+            completedDates.length +
+                exceptions.length +
+                repeatWeekdays.length +
+                2;
         attempts++, index++) {
       final date = _dateAt(index);
       if (repeatUntil != null && day(date).isAfter(day(repeatUntil!))) {
-        return null;
+        break;
       }
       if (!day(date).isBefore(first) &&
-          !completedDates.contains(dateKey(date))) {
-        return copyWith(occurrenceDate: date);
+          !completedDates.contains(dateKey(date)) &&
+          !exceptions.any((change) => change.originalDate == dateKey(date))) {
+        final candidate = occurrenceByKey(dateKey(date));
+        if (candidate != null) {
+          if (best == null || compareBySchedule(candidate, best) < 0) {
+            best = candidate;
+          }
+          break;
+        }
       }
     }
-    return null;
+    return best;
   }
 
   Task copyWith(
@@ -162,9 +287,14 @@ class Task {
           Object? dueDate = _unchanged,
           bool? hasTime,
           String? recurrence,
+          int? repeatInterval,
+          List<int>? repeatWeekdays,
+          List<OccurrenceException>? exceptions,
           Object? repeatUntil = _unchanged,
           List<String>? completedDates,
           Object? occurrenceDate = _unchanged,
+          Object? occurrenceKey = _unchanged,
+          Object? occurrenceHasTime = _unchanged,
           int? priority,
           Object? reminderMinutes = _unchanged,
           Object? reminderTime = _unchanged,
@@ -181,8 +311,11 @@ class Task {
           dueDate: identical(dueDate, _unchanged)
               ? this.dueDate
               : dueDate as DateTime?,
-          hasTime: hasTime ?? this.hasTime,
+          hasTime: hasTime ?? _hasTime,
           recurrence: recurrence ?? this.recurrence,
+          repeatInterval: repeatInterval ?? this.repeatInterval,
+          repeatWeekdays: repeatWeekdays ?? this.repeatWeekdays,
+          exceptions: exceptions ?? this.exceptions,
           repeatUntil: identical(repeatUntil, _unchanged)
               ? this.repeatUntil
               : repeatUntil as DateTime?,
@@ -190,6 +323,12 @@ class Task {
           occurrenceDate: identical(occurrenceDate, _unchanged)
               ? this.occurrenceDate
               : occurrenceDate as DateTime?,
+          occurrenceKey: identical(occurrenceKey, _unchanged)
+              ? this.occurrenceKey
+              : occurrenceKey as String?,
+          occurrenceHasTime: identical(occurrenceHasTime, _unchanged)
+              ? this.occurrenceHasTime
+              : occurrenceHasTime as bool?,
           priority: priority ?? this.priority,
           reminderMinutes: identical(reminderMinutes, _unchanged)
               ? this.reminderMinutes
@@ -211,11 +350,15 @@ class Task {
         'title': title,
         'dueDate': dueDate == null
             ? null
-            : hasTime
+            : _hasTime
                 ? dueDate!.toIso8601String()
                 : dateKey(dueDate!),
-        'hasTime': hasTime ? 1 : 0,
+        'hasTime': _hasTime ? 1 : 0,
         'recurrence': recurrence,
+        'repeatInterval': repeatInterval,
+        'repeatWeekdays': jsonEncode(repeatWeekdays),
+        'exceptions':
+            jsonEncode(exceptions.map((change) => change.toJson()).toList()),
         'repeatUntil': repeatUntil == null ? null : dateKey(repeatUntil!),
         'completedDates': jsonEncode(completedDates),
         'priority': priority,
@@ -239,6 +382,12 @@ class Task {
           : DateTime.parse(map['dueDate']).toLocal(),
       hasTime: (map['hasTime'] ?? 1) == 1,
       recurrence: map['recurrence'] ?? 'none',
+      repeatInterval: map['repeatInterval'] ?? 1,
+      repeatWeekdays: List<int>.from(jsonDecode(map['repeatWeekdays'] ?? '[]')),
+      exceptions: (jsonDecode(map['exceptions'] ?? '[]') as List)
+          .map((value) =>
+              OccurrenceException.fromJson(Map<String, dynamic>.from(value)))
+          .toList(),
       repeatUntil: map['repeatUntil'] == null
           ? null
           : DateTime.parse(map['repeatUntil']),
@@ -266,10 +415,13 @@ class Task {
 
   Map<String, dynamic> toApi() => {
         'title': title,
-        'due_date': hasTime ? dueDate?.toUtc().toIso8601String() : null,
+        'due_date': _hasTime ? dueDate?.toUtc().toIso8601String() : null,
         'scheduled_date':
-            !hasTime && dueDate != null ? dateKey(dueDate!) : null,
+            !_hasTime && dueDate != null ? dateKey(dueDate!) : null,
         'recurrence': recurrence,
+        'repeat_interval': repeatInterval,
+        'repeat_weekdays': repeatWeekdays,
+        'exceptions': exceptions.map((change) => change.toJson()).toList(),
         'repeat_until': repeatUntil == null ? null : dateKey(repeatUntil!),
         'completed_dates': completedDates,
         'priority': priority,
@@ -291,6 +443,12 @@ class Task {
               : null,
       hasTime: data['due_date'] != null,
       recurrence: data['recurrence'] ?? 'none',
+      repeatInterval: data['repeat_interval'] ?? 1,
+      repeatWeekdays: List<int>.from(data['repeat_weekdays'] ?? []),
+      exceptions: (data['exceptions'] as List? ?? [])
+          .map((value) =>
+              OccurrenceException.fromJson(Map<String, dynamic>.from(value)))
+          .toList(),
       repeatUntil: data['repeat_until'] == null
           ? null
           : DateTime.parse(data['repeat_until']),
