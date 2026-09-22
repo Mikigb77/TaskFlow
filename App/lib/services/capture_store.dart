@@ -177,6 +177,7 @@ class CaptureStore {
       timezone: session.timezone,
       kind: session.kind,
       audioPath: session.audioPath,
+      audioFormat: session.audioFormat,
       status: session.status,
       drafts: session.drafts
           .map((d) => CaptureDraft(
@@ -222,14 +223,42 @@ class CaptureStore {
     }
   }
 
-  /// Finalize a conventional PCM WAV left open by a killed recording process.
-  /// Refuse unfamiliar formats; never rewrite or remove the captured samples.
-  static Future<void> recoverWav(String path) async {
+  /// Finalize retained PCM audio without rewriting its samples. Android's WAV
+  /// writer leaves 44 zero bytes until normal Stop: reconstruct those only when
+  /// the capture journal identifies our exact recorder format. Unknown formats
+  /// and old journals without that evidence are left intact.
+  static Future<void> recoverWav(String path, {String? audioFormat}) async {
     final file = File(path);
     if (!await file.exists() || await file.length() < 44) return;
     final handle = await file.open(mode: FileMode.append);
     try {
       final bytes = await file.readAsBytes();
+      if (audioFormat == CaptureSession.androidPcmWav &&
+          bytes.length > 44 &&
+          bytes.take(44).every((value) => value == 0)) {
+        if ((bytes.length - 44).isOdd) {
+          throw const FormatException('The retained PCM frame is incomplete.');
+        }
+        final header = Uint8List(44);
+        header.setRange(0, 4, ascii.encode('RIFF'));
+        header.setRange(8, 12, ascii.encode('WAVE'));
+        header.setRange(12, 16, ascii.encode('fmt '));
+        header.setRange(36, 40, ascii.encode('data'));
+        ByteData.sublistView(header)
+          ..setUint32(4, bytes.length - 8, Endian.little)
+          ..setUint32(16, 16, Endian.little)
+          ..setUint16(20, 1, Endian.little)
+          ..setUint16(22, 1, Endian.little)
+          ..setUint32(24, 16000, Endian.little)
+          ..setUint32(28, 32000, Endian.little)
+          ..setUint16(32, 2, Endian.little)
+          ..setUint16(34, 16, Endian.little)
+          ..setUint32(40, bytes.length - 44, Endian.little);
+        await handle.setPosition(0);
+        await handle.writeFrom(header);
+        await handle.flush();
+        return;
+      }
       if (ascii.decode(bytes.sublist(0, 4), allowInvalid: true) != 'RIFF' ||
           ascii.decode(bytes.sublist(8, 12), allowInvalid: true) != 'WAVE') {
         return;

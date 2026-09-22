@@ -73,6 +73,9 @@ class CaptureDraft {
 }
 
 class CaptureSession {
+  // Matches the Android AudioRecorder configuration used by VoiceTaskScreen.
+  // A blank unfinished header cannot identify its format without this journal.
+  static const androidPcmWav = 'android-pcm16-mono-16000';
   final String id;
   final String ownerKey;
   final DateTime capturedAt;
@@ -81,6 +84,7 @@ class CaptureSession {
   final String text;
   final String transcript;
   final String? audioPath;
+  final String? audioFormat;
   final String status;
   final String? error;
   final List<CaptureDraft> drafts;
@@ -94,6 +98,7 @@ class CaptureSession {
       this.text = '',
       this.transcript = '',
       this.audioPath,
+      this.audioFormat,
       this.status = 'editing',
       this.error,
       this.drafts = const []});
@@ -106,6 +111,7 @@ class CaptureSession {
           {String? text,
           String? transcript,
           String? audioPath,
+          String? audioFormat,
           String? status,
           String? error,
           String? kind,
@@ -119,6 +125,7 @@ class CaptureSession {
           text: text ?? this.text,
           transcript: transcript ?? this.transcript,
           audioPath: audioPath ?? this.audioPath,
+          audioFormat: audioFormat ?? this.audioFormat,
           status: status ?? this.status,
           error: error,
           drafts: drafts ?? this.drafts);
@@ -132,6 +139,7 @@ class CaptureSession {
         'text': text,
         'transcript': transcript,
         'audioPath': audioPath,
+        'audioFormat': audioFormat,
         'status': status,
         'error': error,
         'drafts': drafts.map((d) => d.toJson()).toList()
@@ -146,6 +154,7 @@ class CaptureSession {
       text: json['text'] ?? '',
       transcript: json['transcript'] ?? '',
       audioPath: json['audioPath'],
+      audioFormat: json['audioFormat'],
       status: json['status'],
       error: json['error'],
       drafts: (json['drafts'] as List? ?? [])

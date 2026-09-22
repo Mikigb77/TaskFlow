@@ -57,7 +57,8 @@ class CaptureProcessor {
         return next;
       }
       if (existing.audioPath != null) {
-        await CaptureStore.recoverWav(existing.audioPath!);
+        await CaptureStore.recoverWav(existing.audioPath!,
+            audioFormat: existing.audioFormat);
       }
       final raw = await api.request('POST', 'ai/drafts/',
           audioPath: existing.audioPath,

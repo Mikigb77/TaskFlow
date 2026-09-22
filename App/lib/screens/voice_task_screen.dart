@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -312,7 +313,10 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         _session =
             _session!.copyWith(audioPath: await _store.audioPathFor(_session!));
       }
-      _session = _session!.copyWith(status: 'recording');
+      _session = _session!.copyWith(
+          status: 'recording',
+          audioFormat:
+              Platform.isAndroid ? CaptureSession.androidPcmWav : null);
       await _store.update(_session!);
       if (!mounted) return;
       await _recorder.start(

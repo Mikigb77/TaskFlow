@@ -19,6 +19,8 @@ References: [Android SpeechRecognizer](https://developer.android.com/reference/a
 
 **Remaining device evaluation**
 
+Android saved-audio recovery now also has actual process-termination evidence for recording, background interruption and typed input. That test found and fixed the native recorder's blank-until-Stop WAV header; see [process recovery validation](CAPTURE_PROCESS_VALIDATION.md). It used emulator-generated audio and controlled processing responses, so the real-speech/model limitations above remain unchanged.
+
 Install the desired language through the visible speech setup action, or use a physical target device with its on-device model available. Test English and Spanish short utterances, long pauses, corrections, multiple commitments, noisy input, microphone denial/revocation, activity interruption, and airplane-mode retention. Measure time to first partial, service endpoint timing and stop-to-review separately. Repeat on physical target devices before advertising offline speech or a latency/accuracy figure. Apple native speech is not implemented or validated; its audio path remains available.
 
 Run the Android test with `flutter drive --keep-app-running --no-pub --driver=test_driver/appearance_test.dart --target=integration_test/native_speech_flow_test.dart -d emulator-5554`. Keep the flag: the default driver teardown uninstalls the app. Restore the ordinary main APK using `adb install -r` after test builds.

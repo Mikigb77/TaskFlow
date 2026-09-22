@@ -242,6 +242,62 @@ void main() {
     expect(await file.readAsBytes(), repaired);
   });
 
+  test('Android blank-header audio survives restart and processing retry',
+      () async {
+    var session = await store.create('local', 'Europe/Madrid', audio: true);
+    session = session.copyWith(
+        status: 'recording', audioFormat: CaptureSession.androidPcmWav);
+    await store.update(session);
+    final bytes = Uint8List(3244);
+    for (var i = 44; i < bytes.length; i++) {
+      bytes[i] = i % 251;
+    }
+    await File(session.audioPath!).writeAsBytes(bytes);
+    await database.close();
+    await reopen();
+    final restored = (await store.read(session.id, 'local'))!;
+    expect(restored.audioFormat, CaptureSession.androidPcmWav);
+    final ready =
+        await CaptureProcessor(store, _CaptureApi()).process(restored);
+    expect(ready.status, 'ready');
+    final repaired = await File(session.audioPath!).readAsBytes();
+    final header = ByteData.sublistView(repaired);
+    expect(repaired.length, bytes.length);
+    expect(ascii.decode(repaired.sublist(0, 4)), 'RIFF');
+    expect(header.getUint32(4, Endian.little), bytes.length - 8);
+    expect(header.getUint32(24, Endian.little), 16000);
+    expect(header.getUint16(22, Endian.little), 1);
+    expect(header.getUint16(34, Endian.little), 16);
+    expect(header.getUint32(40, Endian.little), bytes.length - 44);
+    expect(repaired.sublist(44), bytes.sublist(44));
+    await CaptureStore.recoverWav(session.audioPath!,
+        audioFormat: restored.audioFormat);
+    expect(await File(session.audioPath!).readAsBytes(), repaired);
+  });
+
+  test('blank headers without a known format and partial frames stay intact',
+      () async {
+    final file = File(p.join(directory.path, 'unknown.wav'));
+    final bytes = Uint8List(60)..[44] = 12;
+    await file.writeAsBytes(bytes);
+    for (final format in [null, 'unknown-codec']) {
+      await CaptureStore.recoverWav(file.path, audioFormat: format);
+      expect(await file.readAsBytes(), bytes);
+    }
+    final partial = Uint8List(61)..[44] = 12;
+    await file.writeAsBytes(partial);
+    await expectLater(
+        CaptureStore.recoverWav(file.path,
+            audioFormat: CaptureSession.androidPcmWav),
+        throwsFormatException);
+    expect(await file.readAsBytes(), partial);
+    final malformed = Uint8List(60)..[0] = 12;
+    await file.writeAsBytes(malformed);
+    await CaptureStore.recoverWav(file.path,
+        audioFormat: CaptureSession.androidPcmWav);
+    expect(await file.readAsBytes(), malformed);
+  });
+
   test('typed extraction never contributes fake audio transcription timings',
       () async {
     final session = await store.create('local', 'UTC', text: 'Buy coffee');
