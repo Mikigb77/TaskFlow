@@ -1,4 +1,5 @@
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
@@ -8,6 +9,44 @@ import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+      'recurring checklist completion is occurrence-specific and preserves concurrent edits',
+      () async {
+    final passport = ChecklistItem(title: 'Passport');
+    final charger = ChecklistItem(title: 'Charger');
+    final task = Task(
+        id: 1,
+        title: 'Pack',
+        priority: 1,
+        recurrence: 'weekly',
+        dueDate: DateTime(2026, 9, 25),
+        hasTime: false,
+        checklist: [passport, charger]);
+    final repository = _Tasks(task);
+    final notifier = TaskNotifier(repository);
+    addTearDown(notifier.dispose);
+    await notifier.loadTasks();
+    final friday = task.occurrenceOn(DateTime(2026, 9, 25))!;
+    await Future.wait([
+      notifier.setChecklistCompleted(friday, passport.id, true),
+      notifier.setChecklistCompleted(friday, charger.id, true),
+    ]);
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 9, 25))!.checklistDone, 2);
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 10, 2))!.checklistDone, 0);
+    expect(repository.task.isCompleted, isFalse);
+    repository.task = repository.task.copyWith(title: 'Edited meanwhile');
+    await notifier.setChecklistCompleted(friday, charger.id, false);
+    expect(repository.task.title, 'Edited meanwhile');
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 9, 25))!.checklistDone, 1);
+    final restored =
+        Task.fromApi(Task.fromMap(repository.task.toMap()).toApi());
+    expect(restored.occurrenceOn(DateTime(2026, 9, 25))!.checklistDone, 1);
+    expect(restored.checklist.first.id, passport.id);
+  });
+
   test('date-only API storage is independent of timezone offsets', () {
     final date = Task(
         title: 'Invoice',

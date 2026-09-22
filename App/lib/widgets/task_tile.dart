@@ -113,6 +113,12 @@ class TaskTile extends ConsumerWidget {
                                                   color:
                                                       colors.onSurfaceVariant)),
                                         ]),
+                                  if (task.checklist.isNotEmpty)
+                                    Text(
+                                        '${task.checklistDone}/${task.checklist.length} steps',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: colors.onSurfaceVariant)),
                                   if (task.priority > 1)
                                     Container(
                                         padding: const EdgeInsets.symmetric(

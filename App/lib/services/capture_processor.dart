@@ -67,7 +67,9 @@ class CaptureProcessor {
           CaptureEvent.extraction: 'extraction_ms'
         }.entries) {
           if (entry.key == CaptureEvent.transcription &&
-              existing.audioPath == null) continue;
+              existing.audioPath == null) {
+            continue;
+          }
           final elapsed = timings[entry.value];
           if (elapsed is int) {
             await diagnostics.record(entry.key, elapsedMs: elapsed);

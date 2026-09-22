@@ -1,3 +1,5 @@
+import 'package:agenda/models/checklist_item.dart';
+
 class TaskDraft {
   final String title;
   final DateTime? dueDate;
@@ -8,6 +10,7 @@ class TaskDraft {
   final String notes;
   final String transcript;
   final List<String> questions;
+  final List<ChecklistItem> checklist;
 
   TaskDraft.fromJson(Map<String, dynamic> data)
       : title = data['title'] as String,
@@ -24,6 +27,10 @@ class TaskDraft {
             : DateTime.parse(data['repeat_until']),
         priority = data['priority'] as int,
         notes = data['notes'] as String,
+        checklist = (data['checklist'] as List? ?? [])
+            .map((item) =>
+                ChecklistItem.fromJson(Map<String, dynamic>.from(item)))
+            .toList(),
         transcript = data['transcript'] as String,
         questions = List<String>.from(data['questions'] as List);
 }

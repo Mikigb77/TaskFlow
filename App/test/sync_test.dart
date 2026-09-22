@@ -1,4 +1,5 @@
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/task_database.dart';
@@ -29,8 +30,9 @@ void main() {
           ..remove('repeatUntil')
           ..remove('completedDates')
           ..remove('reminderMinutes')
+          ..remove('checklist')
           ..remove('reminderTime'));
-    await TaskDatabase.upgrade(sql, 3, 7);
+    await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
     database = TaskDatabase.forTesting(sql);
     api = _Api();
     repository = CloudTaskRepository(database, api, 1);
@@ -155,6 +157,59 @@ void main() {
         ]),
         throwsA(isA<DatabaseException>()));
     expect(await repository.getAllTasks(), isEmpty);
+  });
+
+  test(
+      'offline checklist edits survive sync restoration and conflicting completions',
+      () async {
+    final passport = ChecklistItem(title: 'Passport');
+    final charger = ChecklistItem(title: 'Charger');
+    final packing =
+        task.copyWith(title: 'Pack', checklist: [passport, charger]);
+    api.offline = true;
+    final id = await repository.addTask(packing);
+    await repository.updateTask(packing.copyWith(id: id, checklist: [
+      charger.setDone(true),
+      passport.copyWith(title: 'New passport')
+    ]));
+    await repository.sync();
+    expect((await repository.getAllTasks()).single.checklist.first.completed,
+        isTrue);
+    api.offline = false;
+    await repository.sync();
+    expect(repository.syncError, isNull);
+    final sql = await database.database;
+    await sql.delete('tasks',
+        where: 'owner_key = ?', whereArgs: [repository.ownerKey]);
+    await repository.sync();
+    final restored = (await repository.getAllTasks()).single;
+    expect(
+        restored.checklist.map((item) => item.id), [charger.id, passport.id]);
+    expect(restored.checklist.first.completed, isTrue);
+    expect(restored.checklist.last.title, 'New passport');
+    expect(restored.isCompleted, isFalse);
+    api.remote.single['version'] = 2;
+    api.remote.single['checklist'] = [
+      charger.setDone(false).toJson(),
+      passport.toJson()
+    ];
+    await repository.updateTask(restored
+        .copyWith(checklist: [charger.setDone(true), passport.setDone(true)]));
+    await repository.sync();
+    final all = await repository.getAllTasks();
+    expect(all.length, 2);
+    expect(
+        all
+            .singleWhere((task) => task.title.endsWith('(offline copy)'))
+            .checklist
+            .every((item) => item.completed),
+        isTrue);
+    expect(
+        all
+            .singleWhere((task) => task.title == 'Pack')
+            .checklist
+            .every((item) => !item.completed),
+        isTrue);
   });
 
   test('retry after lost upload response is idempotent', () async {

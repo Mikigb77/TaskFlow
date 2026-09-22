@@ -38,6 +38,47 @@ Future<ProviderContainer> openReview(
 
 void main() {
   testWidgets(
+      'AI checklist stays within one saved task and can be corrected in review',
+      (tester) async {
+    final container = await openReview(tester, [
+      TaskDraft.fromJson({
+        'title': 'Pack',
+        'due_date': null,
+        'priority': 1,
+        'notes': '',
+        'transcript': 'Pack passport and charger',
+        'questions': [],
+        'checklist': [
+          {'id': '7dd965fb-212f-4b37-a5dc-9339e2575447', 'title': 'Passport'},
+          {'id': '57bb8ccf-0c13-4a06-928c-f4f0587a4f70', 'title': 'Charger'}
+        ],
+      })
+    ]);
+    final edit = find.byTooltip('Edit Passport');
+    await tester.scrollUntilVisible(edit, 180);
+    await tester.pumpAndSettle();
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit step'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('checklist-title')), 'Renewed passport');
+    await tester.tap(find.text('Keep step'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    final saved = container
+        .read(taskProvider)
+        .requireValue
+        .singleWhere((task) => task.title == 'Pack');
+    expect(saved.checklist.map((item) => item.title),
+        ['Renewed passport', 'Charger']);
+    expect(saved.checklist.first.id, '7dd965fb-212f-4b37-a5dc-9339e2575447');
+    expect(saved.isCompleted, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'inline review controls fit small screens with large text in both themes',
       (tester) async {
     final container = await openReview(tester, [

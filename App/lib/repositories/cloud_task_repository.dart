@@ -1,4 +1,5 @@
 import 'package:agenda/models/task.dart';
+import 'package:collection/collection.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/task_database.dart';
@@ -40,6 +41,8 @@ class CloudTaskRepository extends TaskRepository {
   bool _sameContent(Map<String, dynamic> sent, Map<String, dynamic> remote) =>
       sent['title'] == remote['title'] &&
       sent['notes'] == remote['notes'] &&
+      const DeepCollectionEquality()
+          .equals(sent['checklist'], remote['checklist'] ?? []) &&
       sent['priority'] == remote['priority'] &&
       sent['reminder_minutes'] == remote['reminder_minutes'] &&
       sent['reminder_time'] == remote['reminder_time'] &&

@@ -43,6 +43,7 @@ class Task(models.Model):
     reminder_minutes = models.SmallIntegerField(null=True, blank=True)
     reminder_time = models.PositiveSmallIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True, default="", max_length=8000)
+    checklist = models.JSONField(default=list, blank=True)
     is_completed = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)

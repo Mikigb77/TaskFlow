@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'package:agenda/models/checklist_item.dart';
 
 const _unchanged = Object();
 
@@ -27,6 +28,12 @@ class Task {
   final String? notes;
   final List<String> filePaths;
   final List<String> imagePaths;
+  final List<ChecklistItem> checklist;
+  String? get checklistOccurrence =>
+      isRecurring && displayDate != null ? dateKey(displayDate!) : null;
+  int get checklistDone => checklist
+      .where((item) => item.done(occurrence: checklistOccurrence))
+      .length;
 
   Task(
       {this.id,
@@ -43,11 +50,13 @@ class Task {
       bool isCompleted = false,
       this.notes,
       List<String>? filePaths,
-      List<String>? imagePaths})
+      List<String>? imagePaths,
+      List<ChecklistItem>? checklist})
       : hasTime = dueDate != null && hasTime,
         _isCompleted = isCompleted,
         completedDates = List.unmodifiable(completedDates ?? []),
         filePaths = filePaths ?? [],
+        checklist = List.unmodifiable(checklist ?? []),
         imagePaths = imagePaths ?? [];
 
   static const repeats = {
@@ -154,7 +163,8 @@ class Task {
           bool? isCompleted,
           String? notes,
           List<String>? filePaths,
-          List<String>? imagePaths}) =>
+          List<String>? imagePaths,
+          List<ChecklistItem>? checklist}) =>
       Task(
           id: id ?? this.id,
           title: title ?? this.title,
@@ -180,6 +190,7 @@ class Task {
           isCompleted: isCompleted ?? _isCompleted,
           notes: notes ?? this.notes,
           filePaths: filePaths ?? this.filePaths,
+          checklist: checklist ?? this.checklist,
           imagePaths: imagePaths ?? this.imagePaths);
 
   Map<String, dynamic> toMap() => {
@@ -199,6 +210,8 @@ class Task {
         'reminderTime': reminderTime,
         'isCompleted': _isCompleted ? 1 : 0,
         'notes': notes,
+        'checklist':
+            jsonEncode(checklist.map((item) => item.toJson()).toList()),
         'filePaths': filePaths.isEmpty ? null : filePaths.join('|'),
         'imagePaths': imagePaths.isEmpty ? null : imagePaths.join('|'),
       };
@@ -221,6 +234,10 @@ class Task {
       reminderTime: map['reminderTime'],
       isCompleted: map['isCompleted'] == 1,
       notes: map['notes'],
+      checklist: (jsonDecode(map['checklist'] ?? '[]') as List)
+          .map(
+              (item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
       filePaths: (map['filePaths'] as String?)
           ?.split('|')
           .where((p) => p.isNotEmpty)
@@ -242,6 +259,7 @@ class Task {
         'reminder_minutes': reminderMinutes,
         'reminder_time': reminderTime,
         'notes': notes ?? '',
+        'checklist': checklist.map((item) => item.toJson()).toList(),
         'is_completed': _isCompleted,
       };
 
@@ -262,5 +280,9 @@ class Task {
       reminderMinutes: data['reminder_minutes'],
       reminderTime: data['reminder_time'],
       notes: data['notes'],
+      checklist: (data['checklist'] as List? ?? [])
+          .map(
+              (item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
       isCompleted: data['is_completed'] == true);
 }

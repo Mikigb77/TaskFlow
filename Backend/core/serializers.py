@@ -54,6 +54,18 @@ class ZonedDateTimeField(serializers.DateTimeField):
         return super().to_internal_value(value)
 
 
+class ChecklistItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField(max_length=160)
+    completed = serializers.BooleanField(default=False)
+    completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, default=list)
+
+    def validate(self, attrs):
+        attrs["id"] = str(attrs["id"])
+        attrs["completed_dates"] = sorted({value.isoformat() for value in attrs["completed_dates"]})
+        return attrs
+
+
 class TaskSerializer(serializers.ModelSerializer):
     due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
     scheduled_date = serializers.DateField(allow_null=True, required=False, default=None)
@@ -64,10 +76,18 @@ class TaskSerializer(serializers.ModelSerializer):
     reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, default=None)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
+    checklist = ChecklistItemSerializer(many=True, required=False)
+
+    def validate_checklist(self, value):
+        if len(value) > 50:
+            raise serializers.ValidationError("Use no more than 50 checklist items.")
+        if len({item["id"] for item in value}) != len(value):
+            raise serializers.ValidationError("Each checklist item must have a unique ID.")
+        return value
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):

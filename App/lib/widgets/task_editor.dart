@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
+import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -42,6 +44,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   late bool _detailsExpanded;
   final _referenceTime = DateTime.now();
   String? _ignoredSuggestion;
+  late List<ChecklistItem> _checklist;
 
   @override
   void initState() {
@@ -63,6 +66,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _reminderMinutes = widget.task?.reminderMinutes;
     _reminderTime = widget.task?.reminderTime;
     _attachments = [...?widget.task?.filePaths, ...?widget.task?.imagePaths];
+    _checklist = [...(widget.task?.checklist ?? widget.draft?.checklist ?? [])];
   }
 
   @override
@@ -170,6 +174,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       isCompleted:
           _recurrence != 'none' ? false : widget.task?.isCompleted ?? false,
       notes: _notes.text.trim(),
+      checklist: _checklist,
       imagePaths: _attachments.where(_isImage).toList(),
       filePaths: _attachments.where((file) => !_isImage(file)).toList(),
     );
@@ -543,6 +548,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 ]),
                                 const SizedBox(height: 24),
                                 const SectionLabel('The details'),
+                                ChecklistEditor(
+                                    items: _checklist,
+                                    recurring: _recurrence != 'none',
+                                    onChanged: (items) =>
+                                        setState(() => _checklist = items)),
+                                const SizedBox(height: 12),
                                 TextFormField(
                                     key: const ValueKey('task-notes'),
                                     controller: _notes,

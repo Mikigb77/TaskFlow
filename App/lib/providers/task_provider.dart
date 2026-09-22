@@ -127,6 +127,31 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     });
   }
 
+  Future<void> setChecklistCompleted(
+          Task occurrence, String itemId, bool completed) =>
+      _mutate(() async {
+        final task = (await _repository.getAllTasks())
+            .where((t) => t.id == occurrence.id)
+            .firstOrNull;
+        if (task == null) throw StateError('Task no longer exists.');
+        final date = task.isRecurring ? occurrence.displayDate : null;
+        if (task.isRecurring &&
+            (date == null || task.occurrenceOn(date) == null)) {
+          throw StateError('This occurrence has changed. Open it again.');
+        }
+        if (!task.checklist.any((item) => item.id == itemId)) {
+          throw StateError('This step was removed.');
+        }
+        await _repository.updateTask(task.copyWith(
+            checklist: task.checklist
+                .map((item) => item.id == itemId
+                    ? item.setDone(completed,
+                        occurrence: date == null ? null : Task.dateKey(date))
+                    : item)
+                .toList()));
+        if (mounted) await loadTasks();
+      });
+
   Future<void> deleteTask(int id) async {
     await _repository.deleteTask(id);
     if (!mounted) return;

@@ -7,8 +7,9 @@ import json
 import logging
 import time as clock
 import wave
+import uuid
 from datetime import date, datetime, time, timezone
-from typing import Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -35,6 +36,7 @@ class ExtractedTask(BaseModel):
     questions: list[str] = Field(default_factory=list, max_length=5)
     recurrence: Literal["none", "daily", "weekly", "monthly", "yearly"] = "none"
     repeat_until: date | None = None
+    checklist: list[Annotated[str, Field(min_length=1, max_length=160, pattern=r"\S")]] = Field(default_factory=list, max_length=50)
 
     @field_validator("notes", mode="before")
     @classmethod
@@ -102,6 +104,9 @@ def build_prompt(data):
         "An omitted date means an unscheduled Inbox task; an omitted time means a date-only task. Do NOT ask for omitted dates or times. "
         "Ask only when the user supplied ambiguous or contradictory scheduling details. Honor corrections such as 'Friday, actually Saturday'. "
         "Separate independent tasks, but keep preparation details with their appointment. Honor shared dates/times only when clearly stated. "
+        "Return a checklist array of short strings for explicit steps or grouped items within ONE goal, such as packing or shopping. "
+        "A packing list stays one task with checklist items; independent appointments stay separate tasks. "
+        "Use at most 50 checklist items, each at most 160 characters, in the user's language. Never invent steps or treat ordinary narrative as a checklist. "
         "For daily/weekly/monthly/yearly repetition, date is the first occurrence; keep the intended wall-clock time. "
         "For a repeated weekday choose its next occurrence. For a frequency without a start date, start today. "
         "Do not approximate unsupported schedules such as every other week or weekdays only: use recurrence none and ask for clarification. "
@@ -177,6 +182,8 @@ def task_payload(draft, text, zone):
             "recurrence": draft.recurrence,
             "repeat_until": draft.repeat_until.isoformat() if draft.repeat_until and draft.recurrence != "none" else None,
             "priority": draft.priority, "notes": draft.notes,
+            "checklist": [{"id": str(uuid.uuid4()), "title": title.strip(), "completed": False, "completed_dates": []}
+                          for title in draft.checklist],
             "questions": draft.questions, "transcript": text, "timezone": zone}
 
 

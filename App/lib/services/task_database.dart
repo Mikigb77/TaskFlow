@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
+  static const schemaVersion = 8;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -27,7 +28,7 @@ class TaskDatabase {
       // Each background engine owns its connection; transactions must never
       // share an Android connection with a different Dart isolate.
       singleInstance: false,
-      version: 7,
+      version: schemaVersion,
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA busy_timeout = 5000');
       },
@@ -39,6 +40,7 @@ class TaskDatabase {
           recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
           completedDates TEXT NOT NULL DEFAULT '[]',
           reminderMinutes INTEGER, reminderTime INTEGER,
+          checklist TEXT NOT NULL DEFAULT '[]',
           owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
           sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
@@ -90,6 +92,10 @@ class TaskDatabase {
       await db.execute('ALTER TABLE tasks ADD COLUMN reminderMinutes INTEGER');
       await db.execute('ALTER TABLE tasks ADD COLUMN reminderTime INTEGER');
       await createReminderTables(db);
+    }
+    if (oldVersion < 8 && newVersion >= 8) {
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN checklist TEXT NOT NULL DEFAULT '[]'");
     }
   }
 

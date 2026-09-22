@@ -166,6 +166,43 @@ class TaskDetailScreen extends ConsumerWidget {
                                 }
                               })),
                     const SizedBox(height: 16),
+                    if (task.checklist.isNotEmpty) ...[
+                      SectionLabel(
+                          'Checklist · ${task.checklistDone}/${task.checklist.length}'),
+                      AppSurface(
+                          child: Column(children: [
+                        LinearProgressIndicator(
+                            value: task.checklistDone / task.checklist.length,
+                            semanticsLabel:
+                                'Checklist, ${task.checklistDone} of ${task.checklist.length} steps completed'),
+                        for (final item in task.checklist)
+                          CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              key: ValueKey('check-step-${item.id}'),
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title: Text(item.title),
+                              value: item.done(
+                                  occurrence: task.checklistOccurrence),
+                              onChanged: (value) async {
+                                try {
+                                  await ref
+                                      .read(taskProvider.notifier)
+                                      .setChecklistCompleted(
+                                          task, item.id, value == true);
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Could not update this step. Please retry.')));
+                                  }
+                                }
+                              }),
+                        const Text(
+                            'Completing the checklist does not complete the task. Use Complete when you are finished.'),
+                      ])),
+                      const SizedBox(height: 24),
+                    ],
                     const SectionLabel('Notes'),
                     AppSurface(
                         child: SizedBox(

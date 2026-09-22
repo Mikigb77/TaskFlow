@@ -141,6 +141,33 @@ class APITests(TestCase):
         self.assertIsNone(created.data["reminder_minutes"])
         self.assertIsNone(created.data["reminder_time"])
 
+    def test_checklist_roundtrip_conflict_and_older_client_preservation(self):
+        items = [{"id": str(uuid.uuid4()), "title": "Passport", "completed": False,
+                  "completed_dates": ["2026-09-25"]},
+                 {"id": str(uuid.uuid4()), "title": "Charger", "completed": True, "completed_dates": []}]
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        payload = {**self.task_data, "checklist": items, "recurrence": "weekly", "version": 0}
+        created = self.client.put(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(self.client.get(path).data["checklist"], items)
+        changed = [{**items[0], "title": "Updated passport"}, items[1]]
+        updated = self.client.put(path, {**payload, "checklist": changed, "version": 1}, format="json")
+        self.assertEqual(updated.status_code, 200, updated.data)
+        conflict = self.client.put(path, {**payload, "version": 1}, format="json")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.data["current"]["checklist"], changed)
+        old_client = self.client.put(path, {**self.task_data, "recurrence": "weekly", "version": 2}, format="json")
+        self.assertEqual(old_client.status_code, 200, old_client.data)
+        self.assertEqual(old_client.data["checklist"], changed)
+
+    def test_checklist_rejects_invalid_ids_duplicate_ids_empty_titles_and_limits(self):
+        item = {"id": str(uuid.uuid4()), "title": "Passport", "completed": False}
+        for items in [[{**item, "id": "bad"}], [item, item], [{**item, "title": "   "}],
+                      [{**item, "title": "x" * 161}], [{**item, "completed_dates": ["bad-date"]}],
+                      [{**item, "id": str(uuid.uuid4())} for _ in range(51)]]:
+            response = self.client.post("/api/tasks/", {**self.task_data, "checklist": items}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+
     def test_inbox_date_only_and_recurrence_roundtrip(self):
         for schedule in [
             {"due_date": None},
@@ -240,6 +267,29 @@ class APITests(TestCase):
 
 
 class DraftTests(TestCase):
+    @patch("core.ai.generate")
+    def test_checklist_extraction_stays_one_task_with_stable_validated_step_ids(self, provider):
+        provider.return_value = json.dumps({"tasks": [
+            {"title": "Pack for the trip", "date": None, "time": None, "priority": 1,
+             "checklist": ["Passport", "Charger", "Coat"]},
+            {"title": "Doctor appointment", "date": "2026-09-25", "time": "17:00", "priority": 3}]})
+        result = extract_tasks("Pack passport, charger and coat. Doctor Friday at 5 pm.", "Europe/Madrid", self.reference)
+        self.assertEqual(len(result["tasks"]), 2)
+        items = result["tasks"][0]["checklist"]
+        self.assertEqual([item["title"] for item in items], ["Passport", "Charger", "Coat"])
+        self.assertEqual(len({uuid.UUID(item["id"]) for item in items}), 3)
+        self.assertTrue(all(item["completed"] is False and not item["completed_dates"] for item in items))
+        self.assertEqual(result["tasks"][1]["checklist"], [])
+        self.assertIn("packing list stays one task", provider.call_args.args[0])
+
+    @patch("core.ai.generate")
+    def test_invalid_or_oversized_ai_checklist_is_not_silently_truncated(self, provider):
+        from pydantic import ValidationError
+        for checklist in [["   "], ["x" * 161], ["Step"] * 51]:
+            provider.return_value = json.dumps({**self.output, "checklist": checklist})
+            with self.assertRaises(ValidationError):
+                extract_tasks("Pack for the trip", "Europe/Madrid", self.reference)
+
     @patch("core.ai.clock.monotonic", side_effect=[10.0, 10.5, 12.0])
     @patch("core.ai.extract_tasks", return_value={"tasks": [], "transcript": "Synthetic words"})
     @patch("core.ai.transcribe", return_value="Synthetic words")

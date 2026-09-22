@@ -32,7 +32,7 @@ void main() {
     final sql = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
     await sql.execute(
         'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)');
-    await TaskDatabase.upgrade(sql, 3, 7);
+    await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
     database = TaskDatabase.forTesting(sql);
     now = DateTime(2026, 9, 22, 8);
     driver = _Driver();

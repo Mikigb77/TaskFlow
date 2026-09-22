@@ -27,6 +27,7 @@ class CaptureDraft {
           recurrence: draft.recurrence,
           repeatUntil: draft.repeatUntil,
           priority: draft.priority,
+          checklist: draft.checklist,
           notes: draft.notes),
       questions: draft.questions,
       confirmed: draft.questions.isEmpty);

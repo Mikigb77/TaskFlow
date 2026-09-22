@@ -52,6 +52,12 @@ def score_output(case, output):
             if normalize(word) not in normalize(task.get("notes", "")):
                 errors.append(f"task_{index}:notes")
                 break
+        if "checklist" in want:
+            steps = [normalize(item["title"]) for item in task.get("checklist", [])]
+            if len(steps) != len(want["checklist"]) or any(
+                not any(normalize(word) in step for step in steps) for word in want["checklist"]
+            ):
+                errors.append(f"task_{index}:checklist")
     if remaining:
         errors.append(f"extra_tasks:{len(remaining)}")
     return {"passed": not errors, "errors": errors,
