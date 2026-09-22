@@ -2,7 +2,14 @@ import 'package:agenda/services/task_database.dart';
 
 /// Deliberately accepts no text, transcript, account ID, audio or arbitrary tags.
 enum CaptureEvent {
+  opened,
+  ready,
   started,
+  typedStarted,
+  permissionDenied,
+  nativeStarted,
+  firstPartial,
+  nativeListening,
   recordingStopped,
   transcription,
   extraction,
@@ -10,9 +17,42 @@ enum CaptureEvent {
   failed,
   retried,
   edited,
+  reviewOpened,
+  reviewTime,
+  correction,
   saved,
   discarded,
-  resumed
+  resumed,
+  leftCapturePending,
+  leftReviewPending
+}
+
+extension CaptureEventLabel on CaptureEvent {
+  String get label => switch (this) {
+        CaptureEvent.opened => 'Capture opened',
+        CaptureEvent.ready => 'Capture ready to use',
+        CaptureEvent.started => 'New durable captures',
+        CaptureEvent.typedStarted => 'Typed input started',
+        CaptureEvent.permissionDenied => 'Microphone permission denied',
+        CaptureEvent.nativeStarted => 'On-device listening started',
+        CaptureEvent.firstPartial => 'First on-device words',
+        CaptureEvent.nativeListening => 'On-device listening duration',
+        CaptureEvent.recordingStopped => 'Saved audio duration',
+        CaptureEvent.transcription => 'Online audio transcription',
+        CaptureEvent.extraction => 'Online task extraction',
+        CaptureEvent.processing => 'Request and retained drafts',
+        CaptureEvent.failed => 'Failed requests',
+        CaptureEvent.retried => 'Retried requests',
+        CaptureEvent.edited => 'Draft changes',
+        CaptureEvent.reviewOpened => 'Review opened',
+        CaptureEvent.reviewTime => 'Time in review',
+        CaptureEvent.correction => 'Correction dialog time',
+        CaptureEvent.saved => 'Confirmed to local save',
+        CaptureEvent.discarded => 'Explicitly discarded captures',
+        CaptureEvent.resumed => 'Resumed captures',
+        CaptureEvent.leftCapturePending => 'Capture kept for later',
+        CaptureEvent.leftReviewPending => 'Review kept for later',
+      };
 }
 
 class CaptureDiagnostics {
@@ -51,7 +91,13 @@ class CaptureDiagnostics {
         : times[((times.length * p).ceil() - 1).clamp(0, times.length - 1)];
     return {
       'event': event.name,
+      'label': event.label,
       'samples': matches.length,
+      'timed_samples': times.length,
+      'items': matches
+          .map((row) => row['count'])
+          .whereType<int>()
+          .fold<int>(0, (a, b) => a + b),
       'p50_ms': percentile(.5),
       'p95_ms': percentile(.95)
     };

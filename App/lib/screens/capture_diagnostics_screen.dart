@@ -28,16 +28,19 @@ class CaptureDiagnosticsScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               const Text(
                   'Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.'),
+              const SizedBox(height: 8),
+              const Text(
+                  'Keeping a capture for later is not a failure. Counts can include several visits to the same draft; they are not a user conversion rate. Correction time covers open editing dialogs, including cancelled ones. Local save timing excludes cloud sync. Audio transcription excludes typed and on-device input.'),
               const SizedBox(height: 16),
               for (final row in rows)
                 ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                        '${row['event']} · ${row['samples']} observations'),
+                        '${row['label']} · ${row['samples']} observations${row['items'] == 0 ? '' : ' · ${row['items']} tasks'}'),
                     subtitle: row['p50_ms'] == null
                         ? null
                         : Text(
-                            'Median ${_seconds(row['p50_ms'])} · P95 ${_seconds(row['p95_ms'])}')),
+                            'Median ${_seconds(row['p50_ms'])} · P95 ${_seconds(row['p95_ms'])} · ${row['timed_samples']} timed')),
               const SizedBox(height: 12),
               OutlinedButton(
                   onPressed: () async {

@@ -242,6 +242,16 @@ void main() {
     expect(await file.readAsBytes(), repaired);
   });
 
+  test('typed extraction never contributes fake audio transcription timings',
+      () async {
+    final session = await store.create('local', 'UTC', text: 'Buy coffee');
+    await CaptureProcessor(store, _CaptureApi()).process(session);
+    final rows = await CaptureDiagnostics(database).summary();
+    expect(
+        rows.singleWhere((r) => r['event'] == 'transcription')['samples'], 0);
+    expect(rows.singleWhere((r) => r['event'] == 'extraction')['samples'], 1);
+  });
+
   test('diagnostics retain only bounded counters and timing percentiles',
       () async {
     final diagnostics = CaptureDiagnostics(database);
@@ -250,8 +260,10 @@ void main() {
     }
     final summary = (await diagnostics.summary())
         .firstWhere((r) => r['event'] == 'processing');
-    expect(summary,
-        {'event': 'processing', 'samples': 5, 'p50_ms': 300, 'p95_ms': 500});
+    expect(summary, containsPair('samples', 5));
+    expect(summary, containsPair('timed_samples', 5));
+    expect(summary, containsPair('p50_ms', 300));
+    expect(summary, containsPair('p95_ms', 500));
     final row = (await (await database.database).query('diagnostics')).first;
     expect(
         row.keys.toSet(), {'id', 'event', 'elapsed_ms', 'count', 'created_at'});

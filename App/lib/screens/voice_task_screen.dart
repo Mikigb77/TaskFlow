@@ -58,11 +58,18 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   String? _language;
   String _nativePrefix = '';
   int _nativeRun = DateTime.now().millisecondsSinceEpoch % 2000000000;
+  final _openingWatch = Stopwatch()..start();
+  Stopwatch? _listeningWatch;
+  bool _firstWords = false;
+  bool _typedStarted = false;
+  bool _movedToReview = false;
+  bool _discarded = false;
 
   @override
   void initState() {
     super.initState();
     _store = ref.read(captureStoreProvider);
+    unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.opened));
     _speech = ref.read(nativeSpeechProvider);
     _owner = ref.read(captureOwnerProvider);
     _zone = ref.read(authProvider).account?.timezone ?? 'UTC';
@@ -110,6 +117,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       _busy = false;
       _initialized = true;
     });
+    unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.ready,
+        elapsedMs: _openingWatch.elapsedMilliseconds));
     _tryAutoStart();
   }
 
@@ -138,6 +147,11 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   }
 
   void _changedText(String text) {
+    if (!_acceptSpeech && !_typedStarted && text.trim().isNotEmpty) {
+      _typedStarted = true;
+      unawaited(CaptureDiagnostics(_store.database)
+          .record(CaptureEvent.typedStarted));
+    }
     _writes = _writes.catchError((Object _) {}).then((_) async {
       if (text.trim().isEmpty && _session == null) return;
       await _ensureSession(text: text);
@@ -173,6 +187,12 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   void _receiveSpeech(SpeechEvent event) {
     if (!_acceptSpeech || event.run != _nativeRun) return;
     if (event.text?.trim().isNotEmpty == true) {
+      if (!_firstWords) {
+        _firstWords = true;
+        unawaited(CaptureDiagnostics(_store.database).record(
+            CaptureEvent.firstPartial,
+            elapsedMs: _listeningWatch?.elapsedMilliseconds));
+      }
       final words = [_nativePrefix, event.text!.trim()]
           .where((s) => s.isNotEmpty)
           .join(' ');
@@ -223,6 +243,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       if (!await (_usingNative
           ? _speech.permission()
           : _recorder.hasPermission())) {
+        await CaptureDiagnostics(_store.database)
+            .record(CaptureEvent.permissionDenied);
         throw StateError('Allow microphone access to record, or type below.');
       }
       if (!mounted) return;
@@ -245,6 +267,10 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
               error: 'Speech stopped. Your retained words are safe.'));
         });
         _recording = true;
+        _firstWords = false;
+        _listeningWatch = Stopwatch()..start();
+        unawaited(CaptureDiagnostics(_store.database)
+            .record(CaptureEvent.nativeStarted));
         await _speech.start(_nativeRun, _capability.language);
         if (_recording) _armTimer();
         if (!mounted ||
@@ -268,6 +294,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
               encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1),
           path: _session!.audioPath!);
       _recording = true;
+      _listeningWatch = Stopwatch()..start();
       _armTimer();
       if (!mounted ||
           WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
@@ -303,6 +330,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   Future<void> _stopRecording(bool submit) async {
     if (!_recording) return;
     _recording = false;
+    _listeningWatch?.stop();
     _timer?.cancel();
     await _amplitude?.cancel();
     if (mounted) {
@@ -325,8 +353,11 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       if (_session != null) {
         _session = _session!.copyWith(status: 'editing');
         await _store.update(_session!);
-        await CaptureDiagnostics(_store.database)
-            .record(CaptureEvent.recordingStopped, elapsedMs: _seconds * 1000);
+        await CaptureDiagnostics(_store.database).record(
+            _usingNative
+                ? CaptureEvent.nativeListening
+                : CaptureEvent.recordingStopped,
+            elapsedMs: _listeningWatch?.elapsedMilliseconds);
       }
       if (mounted &&
           submit &&
@@ -382,10 +413,13 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     }
   }
 
-  void _review(CaptureSession session) => Navigator.pushReplacement(
-      context,
-      MaterialPageRoute<void>(
-          builder: (_) => ReviewTasksScreen(session: session)));
+  void _review(CaptureSession session) {
+    _movedToReview = true;
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute<void>(
+            builder: (_) => ReviewTasksScreen(session: session)));
+  }
 
   Future<void> _discard() async {
     final confirmed = await showDialog<bool>(
@@ -406,6 +440,9 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     try {
       await _writes;
       if (_session != null) await _store.discard(_session!.id, _owner);
+      _discarded = true;
+      unawaited(
+          CaptureDiagnostics(_store.database).record(CaptureEvent.discarded));
       if (mounted) {
         ref.invalidate(pendingCapturesProvider);
         Navigator.pop(context);
@@ -444,6 +481,13 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       _acceptSpeech = false;
       await _speechEvents?.cancel();
       await _recorder.dispose();
+      if (!_movedToReview &&
+          !_discarded &&
+          _session != null &&
+          !_session!.terminal) {
+        await CaptureDiagnostics(_store.database)
+            .record(CaptureEvent.leftCapturePending);
+      }
     } catch (_) {/* The durable capture remains available on next launch. */}
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,11 +33,38 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
   Future<void> _writes = Future.value();
   bool _saving = false;
   String? _error;
+  final _reviewWatch = Stopwatch()..start();
+  bool _finished = false;
 
   @override
   void initState() {
     super.initState();
     _store = ref.read(captureStoreProvider);
+    unawaited(
+        CaptureDiagnostics(_store.database).record(CaptureEvent.reviewOpened));
+  }
+
+  Future<void> _measureCorrection(Future<void> Function() change) async {
+    final watch = Stopwatch()..start();
+    try {
+      await change();
+    } finally {
+      unawaited(CaptureDiagnostics(_store.database).record(
+          CaptureEvent.correction,
+          elapsedMs: watch.elapsedMilliseconds));
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!_finished && _items.any((d) => d.pending)) {
+      unawaited(CaptureDiagnostics(_store.database)
+          .record(CaptureEvent.leftReviewPending));
+      unawaited(CaptureDiagnostics(_store.database).record(
+          CaptureEvent.reviewTime,
+          elapsedMs: _reviewWatch.elapsedMilliseconds));
+    }
+    super.dispose();
   }
 
   Future<void> _change(CaptureDraft draft) async {
@@ -64,6 +92,10 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
   Future<void> _save() async {
     final ready = _items.where((d) => d.ready).toList();
     if (_saving || ready.isEmpty) return;
+    final saveWatch = Stopwatch()..start();
+    unawaited(CaptureDiagnostics(_store.database).record(
+        CaptureEvent.reviewTime,
+        elapsedMs: _reviewWatch.elapsedMilliseconds));
     setState(() {
       _saving = true;
       _error = null;
@@ -76,8 +108,10 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
             _session!.id, _session!.ownerKey, ready.map((d) => d.id).toSet());
         _session = result;
         _items = result.drafts;
-        await CaptureDiagnostics(_store.database)
-            .record(CaptureEvent.saved, count: ready.length);
+        await CaptureDiagnostics(_store.database).record(CaptureEvent.saved,
+            elapsedMs: saveWatch.elapsedMilliseconds, count: ready.length);
+        _reviewWatch.reset();
+        _finished = !_items.any((d) => d.pending);
         await notifier.loadTasks();
       } else {
         await notifier.addTasks(ready.map((d) => d.task).toList());
@@ -89,6 +123,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
       if (!mounted) return;
       ref.invalidate(pendingCapturesProvider);
       final remaining = _items.where((d) => d.pending).length;
+      _finished = remaining == 0;
       final messenger = ScaffoldMessenger.of(context);
       if (remaining == 0) Navigator.pop(context);
       messenger.showSnackBar(SnackBar(
@@ -105,6 +140,10 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
   }
 
   Future<void> _editWords(CaptureDraft item, {bool notes = false}) async {
+    await _measureCorrection(() => _editWordsImpl(item, notes: notes));
+  }
+
+  Future<void> _editWordsImpl(CaptureDraft item, {bool notes = false}) async {
     var text = (notes ? item.task.notes : item.task.title) ?? '';
     final result = await showDialog<String>(
         context: context,
@@ -142,6 +181,10 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
   }
 
   Future<void> _date(CaptureDraft item) async {
+    await _measureCorrection(() => _dateImpl(item));
+  }
+
+  Future<void> _dateImpl(CaptureDraft item) async {
     final now = DateTime.now();
     final selected = await showModalBottomSheet<String>(
         context: context,
@@ -188,8 +231,12 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
   }
 
   Future<void> _time(CaptureDraft item) async {
+    await _measureCorrection(() => _timeImpl(item));
+  }
+
+  Future<void> _timeImpl(CaptureDraft item) async {
     if (item.task.dueDate == null) {
-      await _date(item);
+      await _dateImpl(item);
       if (!mounted) return;
       item = _items.firstWhere((d) => d.id == item.id);
     }
@@ -213,6 +260,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
       await _writes;
       await _store.discard(_session!.id, _session!.ownerKey);
     }
+    _finished = true;
+    unawaited(
+        CaptureDiagnostics(_store.database).record(CaptureEvent.discarded));
     if (mounted) {
       ref.invalidate(pendingCapturesProvider);
       Navigator.pop(context);
