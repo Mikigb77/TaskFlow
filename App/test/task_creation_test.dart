@@ -18,6 +18,7 @@ void main() {
         tester.state<NavigatorState>(find.byType(Navigator)).canPop(), isFalse);
     await _openCalendarTask(tester);
     await _pickDueDateTime(tester, const TimeOfDay(hour: 14, minute: 35));
+    await _showDetails(tester);
 
     // Opening the keyboard changes inherited dependencies while editing.
     tester.view.viewInsets = const FakeViewPadding(bottom: 250);
@@ -102,6 +103,74 @@ void main() {
     expect((await repository.getAllTasks()).single.hasTime, isTrue);
   });
 
+  testWidgets('quick capture saves plain text without expanding details',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/createTask');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('task-notes')), findsNothing);
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Buy coffee');
+    await _saveTask(tester);
+    final task = (await repository.getAllTasks()).single;
+    expect(task.title, 'Buy coffee');
+    expect(task.dueDate, isNull);
+  });
+
+  testWidgets('schedule suggestion can be dismissed without changing the title',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/createTask');
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Call tomorrow at 5 pm');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('schedule-suggestion')), findsOneWidget);
+    await tester.tap(find.text('Keep as title'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('schedule-suggestion')), findsNothing);
+    await _saveTask(tester);
+    final task = (await repository.getAllTasks()).single;
+    expect(task.title, 'Call tomorrow at 5 pm');
+    expect(task.dueDate, isNull);
+  });
+
+  testWidgets(
+      'accepted schedule is reversible and an ambiguous hour stays unset',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/createTask');
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Call tomorrow at 5 pm');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('schedule-suggestion')));
+    await tester.pumpAndSettle();
+    expect(find.text('Call'), findsOneWidget);
+    expect(find.text('17:00'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Call tomorrow at 5 pm'), findsOneWidget);
+    expect(find.text('No date · Inbox'), findsOneWidget);
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Call tomorrow at 5');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('schedule-suggestion')));
+    await tester.pumpAndSettle();
+    await _saveTask(tester);
+    final task = (await repository.getAllTasks()).single;
+    final now = DateTime.now();
+    expect(task.title, 'Call at 5');
+    expect(task.dueDate, DateTime(now.year, now.month, now.day + 1));
+    expect(task.hasTime, isFalse);
+  });
+
   testWidgets('calendar day defaults to date only and time can be removed',
       (tester) async {
     final repository = await _pumpApp(tester);
@@ -130,6 +199,7 @@ void main() {
       (tester) async {
     final repository = await _pumpApp(tester);
     await _openCalendarTask(tester);
+    await _showDetails(tester);
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Weekly').last);
@@ -143,6 +213,13 @@ void main() {
     expect(task.occurrenceOn(task.dueDate!.add(const Duration(days: 7))),
         isNotNull);
   });
+}
+
+Future<void> _showDetails(WidgetTester tester) async {
+  final button = find.byKey(const ValueKey('task-more-details'));
+  await tester.ensureVisible(button);
+  await tester.tap(button);
+  await tester.pumpAndSettle();
 }
 
 Future<_MemoryTaskRepository> _pumpApp(WidgetTester tester) async {
@@ -162,6 +239,10 @@ Future<_MemoryTaskRepository> _pumpApp(WidgetTester tester) async {
 }
 
 Future<void> _selectCalendarDay(WidgetTester tester, int day) async {
+  if (find.text('Month view').evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const ValueKey('calendar-format')));
+    await tester.pumpAndSettle();
+  }
   await tester.tap(find
       .descendant(of: find.byType(CalendarScreen), matching: find.text('$day'))
       .hitTestable());

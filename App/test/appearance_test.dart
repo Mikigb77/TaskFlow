@@ -111,18 +111,67 @@ void main() {
     expect(find.text('Doctor appointment'), findsOneWidget);
   });
 
-  testWidgets('swipe deletion removes only the confirmed task', (tester) async {
+  testWidgets('swipe reschedule and Undo preserve other task fields',
+      (tester) async {
     final container = await _pump(tester);
     await tester.tap(find.text('Tasks'));
     await tester.pumpAndSettle();
     await tester.drag(find.widgetWithText(TaskTile, 'Review the new designs'),
         const Offset(-500, 0));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
+    await tester.tap(find.widgetWithText(ActionChip, 'Inbox'));
+    await tester.tap(find.text('Save schedule'));
     await tester.pumpAndSettle();
-    expect(container.read(taskProvider).requireValue.length, 3);
-    expect(find.text('Review the new designs'), findsNothing);
+    final moved =
+        container.read(taskProvider).requireValue.firstWhere((t) => t.id == 2);
+    expect(moved.dueDate, isNull);
+    expect(moved.notes, 'Bring your ideas for the next release.');
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .firstWhere((t) => t.id == 2)
+            .dueDate,
+        isNotNull);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'Calendar starts compact, keeps empty Inbox visible and opens task actions',
+      (tester) async {
+    final container = await _pump(tester);
+    expect(find.text('Month view'), findsOneWidget);
+    expect(find.byKey(const ValueKey('calendar-inbox')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('calendar-inbox')));
+    await tester.pumpAndSettle();
+    expect(find.text('NO DATE NEEDED'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'All tasks'), findsNothing);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    final row = find.widgetWithText(TaskTile, 'Review the new designs');
+    await tester.scrollUntilVisible(row, 160,
+        scrollable: find
+            .descendant(
+                of: find.byType(CalendarScreen),
+                matching: find.byType(Scrollable))
+            .first);
+    await tester.pumpAndSettle();
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, 'Reschedule'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Complete'));
+    await tester.pumpAndSettle();
+    expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .firstWhere((t) => t.id == 2)
+            .isCompleted,
+        isTrue);
+    expect(find.widgetWithText(FilledButton, 'Reopen'), findsOneWidget);
+    expect(find.text('Low priority'), findsNothing);
   });
 
   for (final size in [

@@ -11,6 +11,7 @@ import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/widgets/task_interactions.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen(
@@ -68,8 +69,12 @@ class TaskDetailScreen extends ConsumerWidget {
           data: (tasks) {
             final series = tasks.firstWhereOrNull((task) => task.id == taskId);
             final task = occurrenceDate == null
-                ? series
-                : series?.occurrenceOn(occurrenceDate!);
+                ? (series?.isRecurring == true
+                    ? series?.nextOpenOccurrence() ?? series
+                    : series)
+                : series?.occurrenceOn(occurrenceDate!) ??
+                    series?.nextOpenOccurrence() ??
+                    series;
             if (task == null) {
               return const Scaffold(
                   appBar: CustomAppBar(title: 'Task details'),
@@ -82,6 +87,11 @@ class TaskDetailScreen extends ConsumerWidget {
                 .toList();
             return Scaffold(
               appBar: CustomAppBar(title: 'Task details', actions: [
+                IconButton(
+                    tooltip: 'Edit task',
+                    onPressed: () => Navigator.pushNamed(context, '/editTask',
+                        arguments: taskId),
+                    icon: const Icon(Icons.edit_outlined)),
                 IconButton(
                     tooltip: 'Delete task',
                     onPressed: () => _delete(context, ref, task),
@@ -103,7 +113,11 @@ class TaskDetailScreen extends ConsumerWidget {
                           _detail(
                               context,
                               Icons.calendar_today_outlined,
-                              task.isRecurring ? 'Starts' : 'Date',
+                              task.occurrenceDate != null
+                                  ? 'Occurrence'
+                                  : task.isRecurring
+                                      ? 'Starts'
+                                      : 'Date',
                               task.displayDate == null
                                   ? 'No date · Inbox'
                                   : DateFormat('EEEE, d MMMM yyyy')
@@ -129,7 +143,6 @@ class TaskDetailScreen extends ConsumerWidget {
                                   context, task.priority)),
                         ])),
                     const SizedBox(height: 28),
-                    const SectionLabel('Notes'),
                     if (task.dueDate != null)
                       Align(
                           alignment: Alignment.centerLeft,
@@ -152,6 +165,8 @@ class TaskDetailScreen extends ConsumerWidget {
                                   }
                                 }
                               })),
+                    const SizedBox(height: 16),
+                    const SectionLabel('Notes'),
                     AppSurface(
                         child: SizedBox(
                             width: double.infinity,
@@ -197,12 +212,25 @@ class TaskDetailScreen extends ConsumerWidget {
                   top: false,
                   child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                      child: FilledButton.icon(
-                          onPressed: () => Navigator.pushNamed(
-                              context, '/editTask',
-                              arguments: taskId),
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                          label: const Text('Edit task')))),
+                      child: Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            FilledButton.icon(
+                                onPressed: () =>
+                                    TaskInteractions.toggle(context, ref, task),
+                                icon: Icon(task.isCompleted
+                                    ? Icons.undo_rounded
+                                    : Icons.check_rounded),
+                                label: Text(
+                                    task.isCompleted ? 'Reopen' : 'Complete')),
+                            OutlinedButton.icon(
+                                onPressed: () => TaskInteractions.reschedule(
+                                    context, ref, task),
+                                icon: const Icon(Icons.event_outlined),
+                                label: const Text('Reschedule')),
+                          ]))),
             );
           },
           loading: () =>

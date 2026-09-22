@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_schedule_change.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
@@ -72,9 +73,39 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     if (mounted) unawaited(loadTasks());
   }
 
-  Future<void> _completing = Future.value();
+  Future<void> _mutating = Future.value();
+  Future<T> _mutate<T>(Future<T> Function() action) {
+    final operation = _mutating.then((_) => action());
+    _mutating =
+        operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return operation;
+  }
+
+  Future<TaskScheduleChange> rescheduleTask(
+          int id, DateTime? date, bool hasTime) =>
+      _mutate(() async {
+        final task = (await _repository.getAllTasks())
+            .where((t) => t.id == id)
+            .firstOrNull;
+        if (task == null) throw StateError('Task no longer exists.');
+        final after = TaskScheduleChange.apply(task, date, hasTime);
+        await _repository.updateTask(after);
+        if (mounted) await loadTasks();
+        return TaskScheduleChange(task, after);
+      });
+
+  Future<bool> undoSchedule(TaskScheduleChange change) => _mutate(() async {
+        final task = (await _repository.getAllTasks())
+            .where((t) => t.id == change.after.id)
+            .firstOrNull;
+        if (task == null || !change.canUndo(task)) return false;
+        await _repository.updateTask(change.restore(task));
+        if (mounted) await loadTasks();
+        return true;
+      });
+
   Future<void> setCompleted(Task occurrence, bool completed) {
-    final operation = _completing.catchError((_) {}).then((_) async {
+    return _mutate(() async {
       final tasks = await _repository.getAllTasks();
       final task = tasks.where((t) => t.id == occurrence.id).firstOrNull;
       if (task == null) throw StateError('Task no longer exists.');
@@ -94,8 +125,6 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
       }
       if (mounted) await loadTasks();
     });
-    _completing = operation;
-    return operation;
   }
 
   Future<void> deleteTask(int id) async {

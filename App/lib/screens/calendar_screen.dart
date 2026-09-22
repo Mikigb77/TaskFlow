@@ -21,7 +21,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     with WidgetsBindingObserver {
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
-  CalendarFormat _format = CalendarFormat.month;
+  CalendarFormat _format = CalendarFormat.week;
   PageController? _calendarPage;
   bool _syncing = false;
 
@@ -88,16 +88,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                        const SectionLabel('A little focus. A little flow.'),
-                        Text('Your calendar', style: text.headlineLarge),
-                        const SizedBox(height: 6),
                         Row(children: [
                           Expanded(
-                              child: Text(
-                                  DateFormat('EEEE, d MMMM')
-                                      .format(DateTime.now()),
-                                  style: TextStyle(
-                                      color: colors.onSurfaceVariant))),
+                              child: Text('Your calendar',
+                                  style: text.titleLarge)),
                           if (signedIn)
                             IconButton(
                                 tooltip: 'Sync tasks',
@@ -119,15 +113,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                           const SizedBox(height: 12),
                           MessageBanner(syncError, isError: true)
                         ],
-                        if (tasks.any((task) =>
-                            task.dueDate == null && !task.isCompleted))
-                          TextButton.icon(
-                              onPressed: () =>
-                                  Navigator.pushNamed(context, '/inbox'),
-                              icon: const Icon(Icons.inbox_outlined, size: 18),
-                              label: Text(
-                                  'Inbox · ${tasks.where((task) => task.dueDate == null && !task.isCompleted).length}')),
-                        const SizedBox(height: 20),
+                        TextButton.icon(
+                            key: const ValueKey('calendar-inbox'),
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/inbox'),
+                            icon: const Icon(Icons.inbox_outlined, size: 18),
+                            label: Text(
+                                'Inbox · ${tasks.where((task) => task.dueDate == null && !task.isCompleted).length}')),
+                        const SizedBox(height: 8),
                       ]))),
               SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -328,12 +321,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
               else if (events.isEmpty)
                 SliverToBoxAdapter(
                     child: EmptyState(
-                        title: 'Make this day your own',
+                        title: 'What would you like to remember?',
                         message:
-                            'Add something to look forward to,\nor leave a little space.',
+                            'Tap Say a task and speak naturally, or New task to type.\nNo date yet? Keep it in Inbox.',
                         action: TextButton(
                             onPressed: _create,
-                            child: const Text('Plan a task'))))
+                            child: const Text('Type a task'))))
               else
                 SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),

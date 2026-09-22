@@ -33,10 +33,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionLabel('One thing at a time'),
+                        SectionLabel(widget.isRoot
+                            ? 'Everything you want to do'
+                            : 'No date needed'),
                         Row(children: [
                           Expanded(
-                              child: Text('Your tasks',
+                              child: Text(
+                                  widget.isRoot ? 'Your tasks' : 'Inbox',
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineLarge)),
@@ -55,19 +58,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 prefixIcon: Icon(Icons.search_rounded),
                                 isDense: true)),
                         const SizedBox(height: 12),
-                        Wrap(spacing: 8, runSpacing: 4, children: [
-                          for (final entry in [
-                            (0, 'All tasks'),
-                            (3, 'Inbox'),
-                            (1, 'Today'),
-                            (2, 'High priority')
-                          ])
-                            ChoiceChip(
-                                label: Text(entry.$2),
-                                selected: _filter == entry.$1,
-                                onSelected: (_) =>
-                                    setState(() => _filter = entry.$1)),
-                        ]),
+                        if (widget.isRoot)
+                          Wrap(spacing: 8, runSpacing: 4, children: [
+                            for (final entry in [
+                              (0, 'All tasks'),
+                              (3, 'Inbox'),
+                              (1, 'Today'),
+                              (2, 'High priority')
+                            ])
+                              ChoiceChip(
+                                  label: Text(entry.$2),
+                                  selected: _filter == entry.$1,
+                                  onSelected: (_) =>
+                                      setState(() => _filter = entry.$1)),
+                          ]),
                       ]))),
         ],
         body: tasks.when(
@@ -95,7 +99,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : 'A fresh start',
                     message: _query.isNotEmpty
                         ? 'Try a different word or filter.'
-                        : 'Capture what’s on your mind.\nWe’ll keep it right here.',
+                        : widget.isRoot
+                            ? 'Use Say a task to speak, or New task to type.\nAdd a date now or leave it for later.'
+                            : 'Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.',
                     icon: Icons.checklist_rounded),
               ]);
             }

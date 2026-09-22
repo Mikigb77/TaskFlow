@@ -136,6 +136,62 @@ void main() {
     expect(draft.dueDate, DateTime(2026, 9, 25));
     expect(draft.hasTime, isFalse);
   });
+
+  test(
+      'reschedule Undo preserves intervening edits and refuses a newer schedule',
+      () async {
+    final repository = _Tasks(Task(
+        id: 1,
+        title: 'Call',
+        priority: 2,
+        dueDate: DateTime(2026, 9, 22, 14, 35),
+        reminderMinutes: 30));
+    final notifier = TaskNotifier(repository);
+    addTearDown(notifier.dispose);
+    await notifier.loadTasks();
+    final change = await notifier.rescheduleTask(1, null, false);
+    expect(repository.task.dueDate, isNull);
+    repository.task = repository.task.copyWith(
+        title: 'Call the clinic',
+        notes: 'Updated on another device',
+        isCompleted: true);
+    expect(await notifier.undoSchedule(change), isTrue);
+    expect(repository.task.dueDate, DateTime(2026, 9, 22, 14, 35));
+    expect(repository.task.title, 'Call the clinic');
+    expect(repository.task.isCompleted, isTrue);
+    expect(repository.task.reminderMinutes, 30);
+    final second =
+        await notifier.rescheduleTask(1, DateTime(2026, 10, 1), false);
+    repository.task = repository.task.copyWith(dueDate: DateTime(2026, 10, 2));
+    expect(await notifier.undoSchedule(second), isFalse);
+    expect(repository.task.dueDate, DateTime(2026, 10, 2));
+  });
+
+  test(
+      'series reschedule keeps anchor time and clears an invalid end; Undo restores it',
+      () async {
+    final before = Task(
+        id: 1,
+        title: 'Plants',
+        priority: 1,
+        dueDate: DateTime(2026, 9, 22, 9),
+        recurrence: 'weekly',
+        repeatUntil: DateTime(2026, 10, 22));
+    final repository = _Tasks(before);
+    final notifier = TaskNotifier(repository);
+    addTearDown(notifier.dispose);
+    await notifier.loadTasks();
+    final change =
+        await notifier.rescheduleTask(1, DateTime(2026, 11, 1, 9), true);
+    expect(repository.task.repeatUntil, isNull);
+    expect(repository.task.recurrence, 'weekly');
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 11, 8))!.displayDate!.hour,
+        9);
+    expect(await notifier.undoSchedule(change), isTrue);
+    expect(repository.task.repeatUntil, before.repeatUntil);
+    expect(repository.task.dueDate, before.dueDate);
+  });
 }
 
 class _Tasks extends TaskRepository {

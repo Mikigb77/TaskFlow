@@ -12,6 +12,7 @@ import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/services/quick_schedule_parser.dart';
 
 /// One editor keeps manual creation, AI review and editing visually consistent.
 class TaskEditor extends ConsumerStatefulWidget {
@@ -38,10 +39,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   int? _reminderTime;
   late final List<String> _attachments;
   bool _saving = false;
+  late bool _detailsExpanded;
+  final _referenceTime = DateTime.now();
+  String? _ignoredSuggestion;
 
   @override
   void initState() {
     super.initState();
+    _detailsExpanded =
+        widget.task != null || widget.draft != null || widget.onReview != null;
     final day = widget.calendarDate;
     _dueDate = widget.task?.dueDate ??
         widget.draft?.dueDate ??
@@ -100,6 +106,51 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
 
   bool _isImage(String file) => ['.jpg', '.jpeg', '.png', '.gif', '.webp']
       .contains(path.extension(file).toLowerCase());
+
+  void _quickDate(DateTime? date) => setState(() {
+        if (date == null) {
+          _dueDate = null;
+          _hasTime = false;
+          _recurrence = 'none';
+          _repeatUntil = null;
+        } else {
+          _dueDate = DateTime(date.year, date.month, date.day,
+              _hasTime ? _dueDate!.hour : 0, _hasTime ? _dueDate!.minute : 0);
+          if (_repeatUntil != null && _repeatUntil!.isBefore(Task.day(date))) {
+            _repeatUntil = null;
+          }
+        }
+      });
+
+  void _acceptSchedule(ScheduleSuggestion suggestion) {
+    final previousTitle = _title.text;
+    final previousDate = _dueDate;
+    final previousHasTime = _hasTime;
+    final previousRepeatUntil = _repeatUntil;
+    setState(() {
+      _title.text = suggestion.title;
+      _dueDate = suggestion.date;
+      _hasTime = suggestion.hasTime;
+      if (_repeatUntil != null &&
+          _repeatUntil!.isBefore(Task.day(suggestion.date))) {
+        _repeatUntil = null;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Schedule suggestion applied'),
+        action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              if (mounted) {
+                setState(() {
+                  _title.text = previousTitle;
+                  _dueDate = previousDate;
+                  _hasTime = previousHasTime;
+                  _repeatUntil = previousRepeatUntil;
+                });
+              }
+            })));
+  }
 
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
@@ -197,6 +248,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final edit = widget.task != null && widget.onReview == null;
+    final suggestion = widget.task == null &&
+            widget.draft == null &&
+            widget.onReview == null &&
+            _ignoredSuggestion != _title.text
+        ? QuickScheduleParser.parse(_title.text, _referenceTime)
+        : null;
     return Scaffold(
       appBar: CustomAppBar(
           title: edit
@@ -265,6 +322,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                               TextFormField(
                                   key: const ValueKey('task-title'),
                                   controller: _title,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _save(),
+                                  onChanged: (_) => setState(() {}),
                                   maxLength: 160,
                                   textCapitalization:
                                       TextCapitalization.sentences,
@@ -276,8 +336,48 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       value == null || value.trim().isEmpty
                                           ? 'Please enter a task title'
                                           : null),
+                              if (suggestion != null) ...[
+                                const SizedBox(height: 10),
+                                Wrap(spacing: 8, runSpacing: 4, children: [
+                                  ActionChip(
+                                      key:
+                                          const ValueKey('schedule-suggestion'),
+                                      avatar: const Icon(
+                                          Icons.auto_awesome_outlined,
+                                          size: 16),
+                                      label: Text(
+                                          'Use ${DateFormat('EEE, d MMM').format(suggestion.date)}${suggestion.hasTime ? ' · ${TimeOfDay.fromDateTime(suggestion.date).format(context)}' : ' · no time'}'),
+                                      onPressed: () =>
+                                          _acceptSchedule(suggestion)),
+                                  TextButton(
+                                      onPressed: () => setState(() =>
+                                          _ignoredSuggestion = _title.text),
+                                      child: const Text('Keep as title')),
+                                ]),
+                                if (suggestion.ambiguousTime)
+                                  const Text(
+                                      'Choose AM/PM or add the time yourself. No hour has been inferred.'),
+                              ],
                               const SizedBox(height: 24),
                               const SectionLabel('Schedule'),
+                              Wrap(spacing: 8, runSpacing: 4, children: [
+                                ActionChip(
+                                    label: const Text('Today'),
+                                    onPressed: () =>
+                                        _quickDate(DateTime.now())),
+                                ActionChip(
+                                    label: const Text('Tomorrow'),
+                                    onPressed: () {
+                                      final now = DateTime.now();
+                                      _quickDate(DateTime(
+                                          now.year, now.month, now.day + 1));
+                                    }),
+                                if (_dueDate != null)
+                                  ActionChip(
+                                      label: const Text('Inbox'),
+                                      onPressed: () => _quickDate(null)),
+                              ]),
+                              const SizedBox(height: 8),
                               AppSurface(
                                   padding: EdgeInsets.zero,
                                   child: Column(children: [
@@ -327,158 +427,195 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                                   icon: const Icon(
                                                       Icons.close_rounded))),
                                   ])),
-                              if (_dueDate != null) ...[
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<String>(
-                                    isExpanded: true,
-                                    key: ValueKey('repeat-$_recurrence'),
-                                    initialValue: _recurrence,
-                                    decoration: const InputDecoration(
-                                        labelText: 'Repeat',
-                                        prefixIcon: Icon(Icons.repeat_rounded)),
-                                    items: Task.repeats.entries
-                                        .map((e) => DropdownMenuItem(
-                                            value: e.key,
-                                            child: Text(e.value,
-                                                maxLines: 2,
-                                                overflow:
-                                                    TextOverflow.ellipsis)))
-                                        .toList(),
-                                    onChanged: (value) => setState(() {
-                                          _recurrence = value!;
-                                          if (value == 'none') {
-                                            _repeatUntil = null;
-                                          }
+                              const SizedBox(height: 12),
+                              if (!_detailsExpanded && _dueDate != null)
+                                ReminderChip(
+                                    task: Task(
+                                        title: _title.text,
+                                        dueDate: _dueDate,
+                                        hasTime: _hasTime,
+                                        priority: _priority,
+                                        reminderMinutes: _reminderMinutes,
+                                        reminderTime: _reminderTime),
+                                    onChanged: (task) => setState(() {
+                                          _reminderMinutes =
+                                              task.reminderMinutes;
+                                          _reminderTime = task.reminderTime;
                                         })),
-                                if (_recurrence != 'none')
-                                  Row(children: [
-                                    Expanded(
-                                        child: TextButton.icon(
+                              if (!edit &&
+                                  widget.draft == null &&
+                                  widget.onReview == null)
+                                TextButton.icon(
+                                    key: const ValueKey('task-more-details'),
+                                    onPressed: () => setState(() =>
+                                        _detailsExpanded = !_detailsExpanded),
+                                    icon: Icon(_detailsExpanded
+                                        ? Icons.expand_less_rounded
+                                        : Icons.tune_rounded),
+                                    label: Text(_detailsExpanded
+                                        ? 'Fewer details'
+                                        : 'More details')),
+                              if (_detailsExpanded) ...[
+                                if (_dueDate != null) ...[
+                                  const SizedBox(height: 16),
+                                  DropdownButtonFormField<String>(
+                                      isExpanded: true,
+                                      key: ValueKey('repeat-$_recurrence'),
+                                      initialValue: _recurrence,
+                                      decoration: const InputDecoration(
+                                          labelText: 'Repeat',
+                                          prefixIcon:
+                                              Icon(Icons.repeat_rounded)),
+                                      items: Task.repeats.entries
+                                          .map((e) => DropdownMenuItem(
+                                              value: e.key,
+                                              child: Text(e.value,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis)))
+                                          .toList(),
+                                      onChanged: (value) => setState(() {
+                                            _recurrence = value!;
+                                            if (value == 'none') {
+                                              _repeatUntil = null;
+                                            }
+                                          })),
+                                  if (_recurrence != 'none')
+                                    Row(children: [
+                                      Expanded(
+                                          child: TextButton.icon(
+                                              icon: const Icon(
+                                                  Icons.event_outlined,
+                                                  size: 18),
+                                              label: Text(_repeatUntil == null
+                                                  ? 'No end date'
+                                                  : 'Until ${DateFormat('d MMM yyyy').format(_repeatUntil!)}'),
+                                              onPressed: () async {
+                                                final date =
+                                                    await showDatePicker(
+                                                        context: context,
+                                                        initialDate:
+                                                            _repeatUntil ??
+                                                                _dueDate!,
+                                                        firstDate:
+                                                            Task.day(_dueDate!),
+                                                        lastDate:
+                                                            DateTime(2101));
+                                                if (date != null && mounted) {
+                                                  setState(() =>
+                                                      _repeatUntil = date);
+                                                }
+                                              })),
+                                      if (_repeatUntil != null)
+                                        IconButton(
+                                            tooltip: 'Remove end date',
+                                            onPressed: () => setState(
+                                                () => _repeatUntil = null),
                                             icon: const Icon(
-                                                Icons.event_outlined,
-                                                size: 18),
-                                            label: Text(_repeatUntil == null
-                                                ? 'No end date'
-                                                : 'Until ${DateFormat('d MMM yyyy').format(_repeatUntil!)}'),
-                                            onPressed: () async {
-                                              final date = await showDatePicker(
-                                                  context: context,
-                                                  initialDate:
-                                                      _repeatUntil ?? _dueDate!,
-                                                  firstDate:
-                                                      Task.day(_dueDate!),
-                                                  lastDate: DateTime(2101));
-                                              if (date != null && mounted) {
-                                                setState(
-                                                    () => _repeatUntil = date);
-                                              }
-                                            })),
-                                    if (_repeatUntil != null)
-                                      IconButton(
-                                          tooltip: 'Remove end date',
-                                          onPressed: () => setState(
-                                              () => _repeatUntil = null),
-                                          icon:
-                                              const Icon(Icons.close_rounded)),
-                                  ]),
+                                                Icons.close_rounded)),
+                                    ]),
+                                ],
+                                const SizedBox(height: 24),
+                                ReminderControl(
+                                    hasDate: _dueDate != null,
+                                    hasTime: _hasTime,
+                                    minutes: _reminderMinutes,
+                                    time: _reminderTime,
+                                    onMinutes: (value) => setState(
+                                        () => _reminderMinutes = value),
+                                    onTime: (value) =>
+                                        setState(() => _reminderTime = value)),
+                                const SizedBox(height: 16),
+                                const SectionLabel('Priority'),
+                                Wrap(spacing: 8, runSpacing: 8, children: [
+                                  for (final value in [1, 2, 3])
+                                    ChoiceChip(
+                                        showCheckmark: false,
+                                        label:
+                                            Text(AppTheme.priorityLabel(value)),
+                                        avatar: Icon(Icons.flag_outlined,
+                                            size: 17,
+                                            color: AppTheme.priorityColor(
+                                                context, value)),
+                                        selected: _priority == value,
+                                        onSelected: (_) =>
+                                            setState(() => _priority = value)),
+                                ]),
+                                const SizedBox(height: 24),
+                                const SectionLabel('The details'),
+                                TextFormField(
+                                    key: const ValueKey('task-notes'),
+                                    controller: _notes,
+                                    maxLength: 8000,
+                                    minLines: 3,
+                                    maxLines: 6,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    decoration: const InputDecoration(
+                                        labelText: 'Additional Notes',
+                                        hintText:
+                                            'Anything you’d like to remember…',
+                                        alignLabelWithHint: true,
+                                        counterText: '')),
+                                const SizedBox(height: 20),
+                                if (_attachments.isNotEmpty) ...[
+                                  const SectionLabel('Attachments'),
+                                  for (var i = 0; i < _attachments.length; i++)
+                                    Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: AppSurface(
+                                            padding: const EdgeInsets.fromLTRB(
+                                                12, 4, 4, 4),
+                                            child: Row(children: [
+                                              if (_isImage(_attachments[i]))
+                                                ClipRRect(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    child: Image.file(
+                                                        File(_attachments[i]),
+                                                        width: 40,
+                                                        height: 40,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, __,
+                                                                ___) =>
+                                                            const Icon(Icons
+                                                                .broken_image_outlined)))
+                                              else
+                                                Icon(
+                                                    Icons
+                                                        .insert_drive_file_outlined,
+                                                    color: colors.primary),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                  child: Text(
+                                                      path.basename(
+                                                          _attachments[i]),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow
+                                                          .ellipsis)),
+                                              IconButton(
+                                                  tooltip:
+                                                      'Remove ${path.basename(_attachments[i])}',
+                                                  onPressed: () => setState(
+                                                      () => _attachments
+                                                          .removeAt(i)),
+                                                  icon: const Icon(
+                                                      Icons.close_rounded,
+                                                      size: 18)),
+                                            ]))),
+                                ],
+                                TextButton.icon(
+                                    onPressed: _attach,
+                                    icon: const Icon(Icons.attach_file_rounded,
+                                        size: 20),
+                                    label: const Text('Add attachment')),
+                                Text('Attachments stay on this device.',
+                                    style: TextStyle(
+                                        color: colors.onSurfaceVariant,
+                                        fontSize: 12)),
                               ],
-                              const SizedBox(height: 24),
-                              ReminderControl(
-                                  hasDate: _dueDate != null,
-                                  hasTime: _hasTime,
-                                  minutes: _reminderMinutes,
-                                  time: _reminderTime,
-                                  onMinutes: (value) =>
-                                      setState(() => _reminderMinutes = value),
-                                  onTime: (value) =>
-                                      setState(() => _reminderTime = value)),
-                              const SizedBox(height: 16),
-                              const SectionLabel('Priority'),
-                              Wrap(spacing: 8, runSpacing: 8, children: [
-                                for (final value in [1, 2, 3])
-                                  ChoiceChip(
-                                      showCheckmark: false,
-                                      label:
-                                          Text(AppTheme.priorityLabel(value)),
-                                      avatar: Icon(Icons.flag_outlined,
-                                          size: 17,
-                                          color: AppTheme.priorityColor(
-                                              context, value)),
-                                      selected: _priority == value,
-                                      onSelected: (_) =>
-                                          setState(() => _priority = value)),
-                              ]),
-                              const SizedBox(height: 24),
-                              const SectionLabel('The details'),
-                              TextFormField(
-                                  key: const ValueKey('task-notes'),
-                                  controller: _notes,
-                                  maxLength: 8000,
-                                  minLines: 3,
-                                  maxLines: 6,
-                                  textCapitalization:
-                                      TextCapitalization.sentences,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Additional Notes',
-                                      hintText:
-                                          'Anything you’d like to remember…',
-                                      alignLabelWithHint: true,
-                                      counterText: '')),
-                              const SizedBox(height: 20),
-                              if (_attachments.isNotEmpty) ...[
-                                const SectionLabel('Attachments'),
-                                for (var i = 0; i < _attachments.length; i++)
-                                  Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: AppSurface(
-                                          padding: const EdgeInsets.fromLTRB(
-                                              12, 4, 4, 4),
-                                          child: Row(children: [
-                                            if (_isImage(_attachments[i]))
-                                              ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  child: Image.file(
-                                                      File(_attachments[i]),
-                                                      width: 40,
-                                                      height: 40,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (_, __,
-                                                              ___) =>
-                                                          const Icon(Icons
-                                                              .broken_image_outlined)))
-                                            else
-                                              Icon(
-                                                  Icons
-                                                      .insert_drive_file_outlined,
-                                                  color: colors.primary),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                                child: Text(
-                                                    path.basename(
-                                                        _attachments[i]),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis)),
-                                            IconButton(
-                                                tooltip:
-                                                    'Remove ${path.basename(_attachments[i])}',
-                                                onPressed: () => setState(() =>
-                                                    _attachments.removeAt(i)),
-                                                icon: const Icon(
-                                                    Icons.close_rounded,
-                                                    size: 18)),
-                                          ]))),
-                              ],
-                              TextButton.icon(
-                                  onPressed: _attach,
-                                  icon: const Icon(Icons.attach_file_rounded,
-                                      size: 20),
-                                  label: const Text('Add attachment')),
-                              Text('Attachments stay on this device.',
-                                  style: TextStyle(
-                                      color: colors.onSurfaceVariant,
-                                      fontSize: 12)),
                             ])),
                   )))),
       bottomNavigationBar: SafeArea(

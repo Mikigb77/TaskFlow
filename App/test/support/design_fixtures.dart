@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_schedule_change.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
@@ -82,6 +83,24 @@ class DesignTaskNotifier extends TaskNotifier {
   @override
   Future<void> setCompleted(Task task, bool completed) =>
       updateTask(task.copyWith(isCompleted: completed));
+
+  @override
+  Future<TaskScheduleChange> rescheduleTask(
+      int id, DateTime? date, bool hasTime) async {
+    final before = state.requireValue.firstWhere((task) => task.id == id);
+    final after = TaskScheduleChange.apply(before, date, hasTime);
+    await updateTask(after);
+    return TaskScheduleChange(before, after);
+  }
+
+  @override
+  Future<bool> undoSchedule(TaskScheduleChange change) async {
+    final current =
+        state.requireValue.firstWhere((task) => task.id == change.after.id);
+    if (!change.canUndo(current)) return false;
+    await updateTask(change.restore(current));
+    return true;
+  }
 
   @override
   Future<void> addTasks(List<Task> tasks) async {
