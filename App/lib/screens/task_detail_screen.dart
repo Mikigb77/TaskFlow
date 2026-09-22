@@ -10,10 +10,13 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/reminder_control.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
-  const TaskDetailScreen({super.key, required this.taskId});
+  const TaskDetailScreen(
+      {super.key, required this.taskId, this.occurrenceDate});
   final int taskId;
+  final DateTime? occurrenceDate;
 
   Future<void> _delete(BuildContext context, WidgetRef ref, Task task) async {
     final confirmed = await showDialog<bool>(
@@ -63,7 +66,10 @@ class TaskDetailScreen extends ConsumerWidget {
     final colors = Theme.of(context).colorScheme;
     return ref.watch(taskProvider).when(
           data: (tasks) {
-            final task = tasks.firstWhereOrNull((task) => task.id == taskId);
+            final series = tasks.firstWhereOrNull((task) => task.id == taskId);
+            final task = occurrenceDate == null
+                ? series
+                : series?.occurrenceOn(occurrenceDate!);
             if (task == null) {
               return const Scaffold(
                   appBar: CustomAppBar(title: 'Task details'),
@@ -98,17 +104,18 @@ class TaskDetailScreen extends ConsumerWidget {
                               context,
                               Icons.calendar_today_outlined,
                               task.isRecurring ? 'Starts' : 'Date',
-                              task.dueDate == null
+                              task.displayDate == null
                                   ? 'No date · Inbox'
                                   : DateFormat('EEEE, d MMMM yyyy')
-                                      .format(task.dueDate!)),
+                                      .format(task.displayDate!)),
                           const Divider(),
                           _detail(
                               context,
                               Icons.schedule_outlined,
                               'Time',
                               task.hasTime
-                                  ? DateFormat('HH:mm').format(task.dueDate!)
+                                  ? DateFormat('HH:mm')
+                                      .format(task.displayDate!)
                                   : 'Any time'),
                           if (task.isRecurring) ...[
                             const Divider(),
@@ -123,6 +130,28 @@ class TaskDetailScreen extends ConsumerWidget {
                         ])),
                     const SizedBox(height: 28),
                     const SectionLabel('Notes'),
+                    if (task.dueDate != null)
+                      Align(
+                          alignment: Alignment.centerLeft,
+                          child: ReminderChip(
+                              task: task,
+                              onChanged: (updated) async {
+                                try {
+                                  await ref
+                                      .read(taskProvider.notifier)
+                                      .updateTask(series!.copyWith(
+                                          reminderMinutes:
+                                              updated.reminderMinutes,
+                                          reminderTime: updated.reminderTime));
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Could not update the reminder. Please retry.')));
+                                  }
+                                }
+                              })),
                     AppSurface(
                         child: SizedBox(
                             width: double.infinity,

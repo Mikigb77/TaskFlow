@@ -17,6 +17,12 @@ class Task {
   /// A calendar projection, never persisted as the series start date.
   final DateTime? occurrenceDate;
   final int priority;
+
+  /// Null follows device defaults; -1 disables; otherwise minutes before.
+  final int? reminderMinutes;
+
+  /// Local minute of day for date-only tasks. Null follows device defaults.
+  final int? reminderTime;
   final bool _isCompleted;
   final String? notes;
   final List<String> filePaths;
@@ -32,6 +38,8 @@ class Task {
       List<String>? completedDates,
       this.occurrenceDate,
       required this.priority,
+      this.reminderMinutes,
+      this.reminderTime,
       bool isCompleted = false,
       this.notes,
       List<String>? filePaths,
@@ -141,6 +149,8 @@ class Task {
           List<String>? completedDates,
           Object? occurrenceDate = _unchanged,
           int? priority,
+          Object? reminderMinutes = _unchanged,
+          Object? reminderTime = _unchanged,
           bool? isCompleted,
           String? notes,
           List<String>? filePaths,
@@ -161,6 +171,12 @@ class Task {
               ? this.occurrenceDate
               : occurrenceDate as DateTime?,
           priority: priority ?? this.priority,
+          reminderMinutes: identical(reminderMinutes, _unchanged)
+              ? this.reminderMinutes
+              : reminderMinutes as int?,
+          reminderTime: identical(reminderTime, _unchanged)
+              ? this.reminderTime
+              : reminderTime as int?,
           isCompleted: isCompleted ?? _isCompleted,
           notes: notes ?? this.notes,
           filePaths: filePaths ?? this.filePaths,
@@ -179,6 +195,8 @@ class Task {
         'repeatUntil': repeatUntil == null ? null : dateKey(repeatUntil!),
         'completedDates': jsonEncode(completedDates),
         'priority': priority,
+        'reminderMinutes': reminderMinutes,
+        'reminderTime': reminderTime,
         'isCompleted': _isCompleted ? 1 : 0,
         'notes': notes,
         'filePaths': filePaths.isEmpty ? null : filePaths.join('|'),
@@ -199,6 +217,8 @@ class Task {
       completedDates:
           List<String>.from(jsonDecode(map['completedDates'] ?? '[]')),
       priority: map['priority'],
+      reminderMinutes: map['reminderMinutes'],
+      reminderTime: map['reminderTime'],
       isCompleted: map['isCompleted'] == 1,
       notes: map['notes'],
       filePaths: (map['filePaths'] as String?)
@@ -219,6 +239,8 @@ class Task {
         'repeat_until': repeatUntil == null ? null : dateKey(repeatUntil!),
         'completed_dates': completedDates,
         'priority': priority,
+        'reminder_minutes': reminderMinutes,
+        'reminder_time': reminderTime,
         'notes': notes ?? '',
         'is_completed': _isCompleted,
       };
@@ -237,6 +259,8 @@ class Task {
           : DateTime.parse(data['repeat_until']),
       completedDates: List<String>.from(data['completed_dates'] ?? []),
       priority: data['priority'],
+      reminderMinutes: data['reminder_minutes'],
+      reminderTime: data['reminder_time'],
       notes: data['notes'],
       isCompleted: data['is_completed'] == true);
 }

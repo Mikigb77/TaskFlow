@@ -7,6 +7,7 @@ class CloudTaskRepository extends TaskRepository {
   final TaskDatabase database;
   final ApiClient api;
   final int accountId;
+  @override
   final String ownerKey;
   Future<void>? _syncing;
 
@@ -40,6 +41,8 @@ class CloudTaskRepository extends TaskRepository {
       sent['title'] == remote['title'] &&
       sent['notes'] == remote['notes'] &&
       sent['priority'] == remote['priority'] &&
+      sent['reminder_minutes'] == remote['reminder_minutes'] &&
+      sent['reminder_time'] == remote['reminder_time'] &&
       sent['is_completed'] == remote['is_completed'] &&
       sent['is_deleted'] == remote['is_deleted'] &&
       sent['scheduled_date'] == remote['scheduled_date'] &&

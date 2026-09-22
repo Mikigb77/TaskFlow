@@ -7,8 +7,8 @@ Baseline: existing toolchain changes and critique review committed and pushed as
 | Item | Required outcome | State / current evidence |
 |---|---|---|
 | B01 | Durable, account-isolated capture sessions with retry/resume/discard and no duplicate saves | Implemented; SQLite restart, failed requests, interrupted WAV recovery, transactions and duplicate-save tests pass. Android route exit/resume passes. OS process-kill/real microphone matrix remains. |
-| B02 | Explicit task reminder controls and notification Settings | Pending |
-| B03 | Inspectable reminder scheduling, continuing summaries, delivery/reboot checks | Pending |
+| B02 | Explicit task reminder controls and notification Settings | Implemented. Task defaults/off/custom leads and date-only alert times sync; account/device opt-in settings and OS permission/access links are visible. Android integration and 2× text checks pass. |
+| B03 | Inspectable reminder scheduling, continuing summaries, delivery/reboot checks | Implemented with stable identities, visible failures, generic daily check-ins, bounded replenishment and background refresh. Android closed-process and actual reboot receipts observed. Physical-device and iOS validation remains. |
 | B04 | Content-free diagnostics and repeatable capture evaluation | Local bounded counts/timings and Settings view implemented; evaluation corpus and remaining funnel events pending. |
 | B05 | Correct website/app claims and guest/attachment disclosures | Current guest and local-attachment disclosures corrected in both repositories; web commit b93b596 pushed. Recheck as later features ship. |
 | B06 | Prominent voice and typed capture, simpler capture UI and onboarding | Labeled primary voice entry, retained typed entry and simpler capture screen implemented. Empty-state teaching / usability checks remain. |
@@ -18,7 +18,7 @@ Baseline: existing toolchain changes and critique review committed and pushed as
 | B10 | Agenda hierarchy, stable Inbox, clear navigation and direct task actions | Pending |
 | B11 | Consistent gestures, Undo, quieter metadata and retained theme access | Pending |
 | B12 | Android shortcut, share entry and microphone widget | Pending |
-| B13 | Notification open/complete/snooze for the correct occurrence | Pending |
+| B13 | Notification open/complete/snooze for the correct occurrence | Implemented with account/occurrence checks and versioned payloads. Android integration verifies navigation; native drawer Complete and Snooze were observed updating SQLite/scheduling after process death and reboot. |
 | B14 | Synced checklists, progress and structured AI extraction | Pending |
 | B15 | Personal lists and labels, preserving task identity and sync | Pending |
 | B16 | Interval/weekday recurrence and single-occurrence exceptions | Pending |
@@ -33,3 +33,5 @@ Baseline: existing toolchain changes and critique review committed and pushed as
 Completion requires inspecting each acceptance criterion and recording applicable tests, app builds, backend/API checks and runtime evidence. Emulator checks must be distinguished from physical-device delivery/speech tests and human usability research. Missing evidence remains outstanding. Tests must exercise behavior and failure recovery, not merely mirror implementation.
 
 Capture checkpoint, 22 September 2026: all 50 Flutter tests pass; flutter analyze reports no issues; Android x64 debug APK builds. Docker backend's 32 tests pass. The Android integration driver passes capture exit/resume, batch review, registration, local save, real HTTP/PostgreSQL sync and re-login restoration. That run substitutes only AI responses (`FIXTURE_AI=true`); it is not a speech/provider accuracy or latency measurement. Web Next.js type generation and TypeScript checks pass. Logs are in the ignored App/artifacts directory.
+
+Reminder checkpoint, 22 September 2026: all 58 Flutter tests and static analysis pass. The rebuilt Docker image passes 35 backend tests, including reminder validation/version conflicts and capture timing metadata (the earlier 32-test container run covered the baseline image). Migration 0003 is deployed locally. Android integration passes settings, actual plugin scheduling, snooze, recurrence navigation/completion and a real WorkManager execution. A separate fixture produced native receipt after process kill and after actual reboot; its notification drawer actions updated the scoped task and created a snooze. The reboot alert was due while Android was booting and arrived after boot broadcast delivery, so this is recovery evidence, not an on-time delivery claim. Test fixtures were cleaned up, prior ownership restored, and exact-access test override returned to its original default. See REMINDER_VALIDATION.md. No physical-device or Apple-platform validation is claimed.

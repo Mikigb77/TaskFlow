@@ -7,6 +7,7 @@ class TaskRepository {
   TaskRepository(this._database);
 
   String? syncError;
+  String get ownerKey => 'local';
   Future<void> sync() async {}
   Future<int> importLocalTasks() async => 0;
 

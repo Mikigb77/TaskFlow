@@ -27,8 +27,10 @@ void main() {
           ..remove('hasTime')
           ..remove('recurrence')
           ..remove('repeatUntil')
-          ..remove('completedDates'));
-    await TaskDatabase.upgrade(sql, 3, 5);
+          ..remove('completedDates')
+          ..remove('reminderMinutes')
+          ..remove('reminderTime'));
+    await TaskDatabase.upgrade(sql, 3, 7);
     database = TaskDatabase.forTesting(sql);
     api = _Api();
     repository = CloudTaskRepository(database, api, 1);

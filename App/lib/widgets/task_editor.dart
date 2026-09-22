@@ -11,6 +11,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/reminder_control.dart';
 
 /// One editor keeps manual creation, AI review and editing visually consistent.
 class TaskEditor extends ConsumerStatefulWidget {
@@ -33,6 +34,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   late String _recurrence;
   DateTime? _repeatUntil;
   late int _priority;
+  int? _reminderMinutes;
+  int? _reminderTime;
   late final List<String> _attachments;
   bool _saving = false;
 
@@ -51,6 +54,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _recurrence = widget.task?.recurrence ?? widget.draft?.recurrence ?? 'none';
     _repeatUntil = widget.task?.repeatUntil ?? widget.draft?.repeatUntil;
     _priority = widget.task?.priority ?? widget.draft?.priority ?? 1;
+    _reminderMinutes = widget.task?.reminderMinutes;
+    _reminderTime = widget.task?.reminderTime;
     _attachments = [...?widget.task?.filePaths, ...?widget.task?.imagePaths];
   }
 
@@ -109,6 +114,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       repeatUntil: _recurrence == 'none' ? null : _repeatUntil,
       completedDates: _recurrence == 'none' ? [] : widget.task?.completedDates,
       priority: _priority,
+      reminderMinutes: _reminderMinutes,
+      reminderTime: _reminderTime,
       isCompleted:
           _recurrence != 'none' ? false : widget.task?.isCompleted ?? false,
       notes: _notes.text.trim(),
@@ -376,6 +383,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                   ]),
                               ],
                               const SizedBox(height: 24),
+                              ReminderControl(
+                                  hasDate: _dueDate != null,
+                                  hasTime: _hasTime,
+                                  minutes: _reminderMinutes,
+                                  time: _reminderTime,
+                                  onMinutes: (value) =>
+                                      setState(() => _reminderMinutes = value),
+                                  onTime: (value) =>
+                                      setState(() => _reminderTime = value)),
+                              const SizedBox(height: 16),
                               const SectionLabel('Priority'),
                               Wrap(spacing: 8, runSpacing: 8, children: [
                                 for (final value in [1, 2, 3])

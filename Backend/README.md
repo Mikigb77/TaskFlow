@@ -91,7 +91,9 @@ Tasks can have no schedule (Inbox), a date without a time (Any time), or a date 
 
 Repetition supports daily, weekly, monthly and yearly schedules, with an optional inclusive end date. The calendar projects occurrences from one series; completion dates are stored separately, so completing/undoing an occurrence never moves the series start or creates duplicate successors. Monthly tasks anchored on the 31st use the last day of shorter months and return to the 31st afterward. Tasks shows the next open occurrence from today; previous occurrences remain in Calendar and completed ones in Completed tasks. Editing/deleting applies to the whole series. Custom intervals and individual occurrence rescheduling are not implemented.
 
-The existing ten-minute advance reminders apply only to timed, high-priority tasks. Date-only tasks appear in summaries without midnight alarms. Recurring reminders use a rolling 60-day window, capped at 50 upcoming alarms across tasks, refreshed on launch/resume/changes. Summaries are scheduled once to avoid repeating stale dates indefinitely.
+Reminders are independent of priority. Each task can follow an editable device default, choose an explicit lead time, or turn alerts off. Date-only tasks need an explicit alert time or a configured date-only default; Inbox tasks have no alert. Notifications are opt-in from Settings, where permission, precise-alarm access, upcoming alerts, failures and the scheduling window are visible. Device preferences are account-scoped; task choices sync.
+
+The scheduler keeps stable alert identities, preserves snoozes, rejects stale notification actions after schedule changes, and completes the notified recurring occurrence only. Optional daily check-ins use generic wording rather than stale task-title summaries. A rolling year of recurrence is projected, with the earliest 400 alerts on Android / 60 on iOS queued (including check-ins). Android WorkManager requests an hourly replenishment; app launch, resume and edits also refresh the window. Background scheduling is subject to OS battery and force-stop restrictions. iOS background configuration is included but requires validation on Apple hardware. Accepted schedules are not proof of notification delivery.
 
 The bounded LangChain pipeline is:
 
@@ -127,7 +129,7 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | POST | `ai/draft/` | JSON text or multipart WAV + timezone |
 | POST | `ai/drafts/` | Guest or signed-in text/WAV capture; returns up to 12 reviewed drafts |
 
-Task writes accept `title`, nullable offset-aware `due_date`, nullable `scheduled_date` (YYYY-MM-DD), `recurrence` (none/daily/weekly/monthly/yearly), nullable `repeat_until`, `completed_dates` (ISO calendar dates), `priority` (1–3), `notes`, `is_completed`, `is_deleted`, and `version`. Recurrence requires a start date; `is_completed` applies to one-off tasks and `completed_dates` to repeating tasks. A new client-generated UUID uses version 0. Updates/deletes require the current version; HTTP 409 returns `current`. List with `?include_deleted=true` for synchronization; follow pagination until `next` is null. The legacy single-draft endpoint rejects multi-task output instead of discarding tasks.
+Task writes accept `title`, nullable offset-aware `due_date`, nullable `scheduled_date` (YYYY-MM-DD), `recurrence` (none/daily/weekly/monthly/yearly), nullable `repeat_until`, `completed_dates` (ISO calendar dates), `priority` (1–3), `reminder_minutes` (null follows device default, -1 off, 0–10080 lead minutes), `reminder_time` (null default or 0–1439 local minute of day for date-only tasks), `notes`, `is_completed`, `is_deleted`, and `version`. Recurrence requires a start date; `is_completed` applies to one-off tasks and `completed_dates` to repeating tasks. A new client-generated UUID uses version 0. Updates/deletes require the current version; HTTP 409 returns `current`. List with `?include_deleted=true` for synchronization; follow pagination until `next` is null. The legacy single-draft endpoint rejects multi-task output instead of discarding tasks.
 
 ## Verification
 
@@ -147,7 +149,7 @@ flutter analyze --no-pub --no-fatal-infos
 # Live AI + local Django + Android:
 flutter test --no-pub integration_test/backend_flow_test.dart -d emulator-5554
 # Stable UI/auth/sync verification when Google is unavailable (only AI is substituted):
-flutter drive --no-pub --driver=test_driver/appearance_test.dart --target=integration_test/backend_flow_test.dart --dart-define=FIXTURE_AI=true -d emulator-5554
+flutter drive --keep-app-running --no-pub --driver=test_driver/appearance_test.dart --target=integration_test/backend_flow_test.dart --dart-define=FIXTURE_AI=true -d emulator-5554
 ```
 
 Backend tests isolate their database and mock AI. They cover account isolation, password hashing/validation, throttling, rotating tokens, logout, recovery, optimistic concurrency, time zones, missing times, audio validation, and AI budgets. Flutter tests cover secure token storage/refresh, offline persistence, migration/import, retry idempotence, conflict copies, account isolation, and the original calendar time regression.

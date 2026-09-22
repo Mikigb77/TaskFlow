@@ -27,7 +27,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> restore() async {
     try {
       await api.restore();
+      await TaskReminders.activate(api.account == null
+          ? 'local'
+          : '${api.baseUrl}/users/${api.account!.id}');
       if (mounted) state = AuthState(account: api.account);
+      await TaskReminders.handleLaunch();
     } catch (_) {
       if (mounted) {
         state = const AuthState(
@@ -41,7 +45,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState(account: state.account, loading: true);
     try {
       await api.signIn(email, password, register: register, timezone: timezone);
-      await TaskReminders.sync([]);
+      await TaskReminders.activate('${api.baseUrl}/users/${api.account!.id}');
       if (mounted) state = AuthState(account: api.account);
     } catch (error) {
       if (mounted) {
@@ -52,7 +56,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> signOut() async {
     await api.signOut();
-    await TaskReminders.sync([]);
+    await TaskReminders.activate('local');
     if (mounted) state = const AuthState();
   }
 }

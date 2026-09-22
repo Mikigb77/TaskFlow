@@ -123,6 +123,18 @@ class SettingsScreen extends ConsumerWidget {
                   ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 8),
+                      leading: Icon(Icons.notifications_outlined,
+                          color: colors.primary),
+                      title: const Text('Notifications'),
+                      subtitle:
+                          const Text('Reminder choices and upcoming alerts'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () =>
+                          Navigator.pushNamed(context, '/notifications')),
+                  const Divider(indent: 20, endIndent: 20),
+                  ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
                       leading: Icon(Icons.person_outline_rounded,
                           color: colors.primary),
                       title: const Text('Account & backup'),

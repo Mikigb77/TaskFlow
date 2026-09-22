@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:agenda/widgets/reminder_control.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_draft.dart';
@@ -356,6 +357,13 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                                 ? item.task.notes!
                                                 : 'Add notes',
                                             textAlign: TextAlign.start)),
+                                    if (item.task.dueDate != null)
+                                      ReminderChip(
+                                          task: item.task,
+                                          onChanged: _saving
+                                              ? null
+                                              : (task) => _change(
+                                                  item.copyWith(task: task))),
                                     if (item.questions.isNotEmpty &&
                                         !item.confirmed) ...[
                                       MessageBanner(item.questions.join('\n')),

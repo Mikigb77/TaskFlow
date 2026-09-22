@@ -60,12 +60,14 @@ class TaskSerializer(serializers.ModelSerializer):
     repeat_until = serializers.DateField(allow_null=True, required=False, default=None)
     completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, required=False, default=list)
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
+    reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, default=None)
+    reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, default=None)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "notes", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):

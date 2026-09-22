@@ -6,14 +6,31 @@ import 'package:agenda/models/task.dart';
 class TaskDatabase {
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
+  Future<Database>? _opening;
   factory TaskDatabase() => _instance;
   TaskDatabase._internal();
   TaskDatabase.forTesting(Database database) : _database = database;
 
   Future<Database> get database async {
-    return _database ??= await openDatabase(
+    if (_database != null) return _database!;
+    return _opening ??= _open().then((db) {
+      _database = db;
+      return db;
+    }).whenComplete(() {
+      _opening = null;
+    });
+  }
+
+  Future<Database> _open() async {
+    return openDatabase(
       join(await getDatabasesPath(), 'task_database.db'),
-      version: 6,
+      // Each background engine owns its connection; transactions must never
+      // share an Android connection with a different Dart isolate.
+      singleInstance: false,
+      version: 7,
+      onConfigure: (db) async {
+        await db.rawQuery('PRAGMA busy_timeout = 5000');
+      },
       onCreate: (db, version) async {
         await db.execute('''CREATE TABLE tasks(
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT,
@@ -21,6 +38,7 @@ class TaskDatabase {
           imagePaths TEXT, hasTime INTEGER NOT NULL DEFAULT 1,
           recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
           completedDates TEXT NOT NULL DEFAULT '[]',
+          reminderMinutes INTEGER, reminderTime INTEGER,
           owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
           sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
@@ -28,6 +46,7 @@ class TaskDatabase {
         await db.execute(
             'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)');
         await createCaptureTables(db);
+        await createReminderTables(db);
       },
       onUpgrade: upgrade,
     );
@@ -67,6 +86,26 @@ class TaskDatabase {
           "ALTER TABLE tasks ADD COLUMN completedDates TEXT NOT NULL DEFAULT '[]'");
     }
     if (oldVersion < 6 && newVersion >= 6) await createCaptureTables(db);
+    if (oldVersion < 7 && newVersion >= 7) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN reminderMinutes INTEGER');
+      await db.execute('ALTER TABLE tasks ADD COLUMN reminderTime INTEGER');
+      await createReminderTables(db);
+    }
+  }
+
+  static Future<void> createReminderTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS app_preferences(
+      scope TEXT PRIMARY KEY, data TEXT NOT NULL)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS reminder_meta(
+      key TEXT PRIMARY KEY, value TEXT NOT NULL)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS reminder_state(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, owner_key TEXT NOT NULL,
+      identity TEXT NOT NULL UNIQUE, task_id INTEGER, occurrence TEXT,
+      due_at TEXT, fire_at TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
+      daily INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL,
+      error TEXT, signature TEXT, token TEXT, updated_at TEXT NOT NULL)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS reminder_snoozes(
+      identity TEXT PRIMARY KEY, owner_key TEXT NOT NULL, fire_at TEXT NOT NULL)''');
   }
 
   static Future<void> createCaptureTables(Database db) async {

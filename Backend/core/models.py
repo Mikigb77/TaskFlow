@@ -40,6 +40,8 @@ class Task(models.Model):
     repeat_until = models.DateField(null=True, blank=True)
     completed_dates = models.JSONField(default=list, blank=True)
     priority = models.PositiveSmallIntegerField(default=1)
+    reminder_minutes = models.SmallIntegerField(null=True, blank=True)
+    reminder_time = models.PositiveSmallIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True, default="", max_length=8000)
     is_completed = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)

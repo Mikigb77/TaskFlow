@@ -39,13 +39,13 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         final local = await _repository.getAllTasks();
         if (!mounted) return;
         state = AsyncValue.data(local);
-        unawaited(TaskReminders.sync(local));
+        unawaited(TaskReminders.sync(local, ownerKey: _repository.ownerKey));
         await _repository.sync();
         if (!mounted) return;
         final synced = await _repository.getAllTasks();
         if (!mounted) return;
         state = AsyncValue.data(synced);
-        unawaited(TaskReminders.sync(synced));
+        unawaited(TaskReminders.sync(synced, ownerKey: _repository.ownerKey));
       } catch (error, stack) {
         if (!mounted) return;
         if (!state.hasValue) state = AsyncValue.error(error, stack);

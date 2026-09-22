@@ -1,12 +1,10 @@
-import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
-import 'package:timezone/timezone.dart' as tz;
+import 'package:agenda/services/notification_service.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/main_shell.dart';
 import 'package:agenda/screens/home_screen.dart';
@@ -20,6 +18,7 @@ import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
 import 'package:agenda/screens/capture_diagnostics_screen.dart';
+import 'package:agenda/screens/notification_settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,20 +26,11 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks(
         ['Manrope'], await rootBundle.loadString('assets/fonts/OFL.txt'));
   });
-  tzdata.initializeTimeZones();
   try {
-    tz.setLocalLocation(
-        tz.getLocation((await FlutterTimezone.getLocalTimezone()).identifier));
-  } catch (_) {/* UTC fallback. */}
-  if (Platform.isAndroid || Platform.isIOS) {
-    final notifications = FlutterLocalNotificationsPlugin();
-    await notifications.initialize(const InitializationSettings(
-      android: AndroidInitializationSettings('app_icon'),
-      iOS: DarwinInitializationSettings(),
-    ));
-    final android = notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
+    await TaskReminders.initialize();
+  } catch (_) {
+    await TaskReminders.recordError(
+        'Notification setup could not finish. Retry from Settings.');
   }
   final appearance = ThemeController(ThemePreferenceStore());
   await appearance.ready;
@@ -50,15 +40,65 @@ Future<void> main() async {
   ));
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+  StreamSubscription<void>? _actions;
+  @override
+  void initState() {
+    super.initState();
+    TaskReminders.openRequest.addListener(_openReminder);
+    // Scheduling also emits changes; reload only in response to action callbacks.
+    _actions = TaskReminders.actionChanges.stream.listen((_) {
+      if (mounted) ref.read(taskProvider.notifier).loadTasks();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+  }
+
+  @override
+  void dispose() {
+    TaskReminders.openRequest.removeListener(_openReminder);
+    _actions?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _openReminder() async {
+    if (!mounted || ref.read(authProvider).loading) return;
+    final id = TaskReminders.openRequest.value;
+    if (id == null) return;
+    TaskReminders.openRequest.value = null;
+    final task =
+        await TaskReminders.engine.taskForAlert(id.id, token: id.token);
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _navigator.currentState != null) {
+        _navigator.currentState!.push(MaterialPageRoute<void>(
+            builder: (_) => task == null
+                ? const MainShell()
+                : TaskDetailScreen(
+                    taskId: task.id!, occurrenceDate: task.occurrenceDate)));
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(authProvider, (previous, next) {
+      if (!next.loading) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+      }
+    });
     final accountId =
         ref.watch(authProvider.select((value) => value.account?.id));
     return MaterialApp(
       // Clear forms and navigation when accounts change; never show another account's task.
       key: ValueKey('account-$accountId'),
+      navigatorKey: _navigator,
       title: 'TaskFlow',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
@@ -78,6 +118,7 @@ class MyApp extends ConsumerWidget {
         '/voiceTask': (_) => const VoiceTaskScreen(),
         '/captures': (_) => const CapturesScreen(),
         '/captureDiagnostics': (_) => const CaptureDiagnosticsScreen(),
+        '/notifications': (_) => const NotificationSettingsScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/taskDetails') {

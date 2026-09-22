@@ -15,7 +15,7 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from google.genai import types, errors
 
-from .ai import AIUnavailable, extract_task, extract_tasks, transcribe, generate
+from .ai import AIUnavailable, extract_task, extract_tasks, transcribe, generate, make_drafts
 from .models import User, Task, TaskEvent
 
 PASSWORD = "Strong-example-passphrase!2026"
@@ -118,6 +118,29 @@ class APITests(TestCase):
         for values in [{"priority": 5}, {"due_date": "2026-09-25T17:00:00"}, {"title": ""}]:
             self.assertEqual(self.client.post("/api/tasks/", {**self.task_data, **values}, format="json").status_code, 400)
 
+    def test_reminder_choices_roundtrip_and_conflict_without_priority_coupling(self):
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        payload = {**self.task_data, "priority": 1, "reminder_minutes": 30, "reminder_time": 540, "version": 0}
+        created = self.client.put(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        restored = self.client.get(path).data
+        self.assertEqual(restored["reminder_minutes"], 30)
+        self.assertEqual(restored["reminder_time"], 540)
+        updated = self.client.put(path, {**payload, "reminder_minutes": -1, "version": 1}, format="json")
+        self.assertEqual(updated.status_code, 200, updated.data)
+        conflict = self.client.put(path, {**payload, "version": 1}, format="json")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.data["current"]["reminder_minutes"], -1)
+
+    def test_reminder_limits_and_defaults(self):
+        for field, value in [("reminder_minutes", -2), ("reminder_minutes", 10081),
+                             ("reminder_time", -1), ("reminder_time", 1440)]:
+            response = self.client.post("/api/tasks/", {**self.task_data, field: value}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+        created = self.client.post("/api/tasks/", self.task_data, format="json")
+        self.assertIsNone(created.data["reminder_minutes"])
+        self.assertIsNone(created.data["reminder_time"])
+
     def test_inbox_date_only_and_recurrence_roundtrip(self):
         for schedule in [
             {"due_date": None},
@@ -217,6 +240,15 @@ class APITests(TestCase):
 
 
 class DraftTests(TestCase):
+    @patch("core.ai.clock.monotonic", side_effect=[10.0, 10.5, 12.0])
+    @patch("core.ai.extract_tasks", return_value={"tasks": [], "transcript": "Synthetic words"})
+    @patch("core.ai.transcribe", return_value="Synthetic words")
+    def test_capture_stage_timings_are_numeric_without_input_in_metadata(self, transcription, extraction, clock):
+        result = make_drafts({"audio": object(), "timezone": "UTC", "reference_time": datetime.now(timezone.utc)})
+        self.assertEqual(result["timings"], {"transcription_ms": 500, "extraction_ms": 1500})
+        transcription.assert_called_once()
+        extraction.assert_called_once()
+
     def setUp(self):
         self.output = {"title": "Doctor appointment", "date": "2026-09-25", "time": "17:00", "priority": 3, "notes": "Bring last month's blood test results.", "questions": []}
         self.reference = datetime(2026, 9, 20, 10, tzinfo=timezone.utc)
