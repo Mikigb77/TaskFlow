@@ -127,6 +127,13 @@ class SettingsScreen extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.pushNamed(context, '/region')),
             const SizedBox(height: 16),
+            ListTile(
+                leading:
+                    Icon(Icons.calendar_month_outlined, color: colors.primary),
+                title: Text(context.l10n.deviceCalendars),
+                subtitle: Text(context.l10n.deviceCalendarHelp),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.pushNamed(context, '/deviceCalendars')),
             SectionLabel(context.l10n.yourSpace),
             AppSurface(
                 padding: EdgeInsets.zero,

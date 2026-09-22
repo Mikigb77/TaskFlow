@@ -27,6 +27,7 @@ import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/screens/regional_settings_screen.dart';
+import 'package:agenda/screens/device_calendars_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -213,6 +214,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         '/lists': (_) => const TaskListsScreen(),
         '/dataTransfer': (_) => const DataTransferScreen(),
         '/region': (_) => const RegionalSettingsScreen(),
+        '/deviceCalendars': (_) => const DeviceCalendarsScreen(),
         '/calendar': (_) => const MainShell(),
         '/settings': (_) => const MainShell(initialIndex: 2),
         '/completedTasks': (_) => const CompletedTasksScreen(),

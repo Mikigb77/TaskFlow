@@ -98,6 +98,174 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// No description provided for @deviceCalendars.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone calendars'**
+  String get deviceCalendars;
+
+  /// No description provided for @deviceCalendarHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'See events from calendars connected to this phone beside your tasks.'**
+  String get deviceCalendarHelp;
+
+  /// No description provided for @deviceCalendarPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which calendars to display. Events are read-only in TaskFlow and stay on this device; they are not uploaded or sent to AI. Manage their reminders in your calendar app.'**
+  String get deviceCalendarPrivacy;
+
+  /// No description provided for @calendarEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect phone calendars'**
+  String get calendarEnable;
+
+  /// No description provided for @calendarDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide calendar events'**
+  String get calendarDisable;
+
+  /// No description provided for @calendarChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose calendars'**
+  String get calendarChoose;
+
+  /// No description provided for @calendarChooseHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select up to 50 calendars. Calendar times follow your device; all-day dates stay on their original days.'**
+  String get calendarChooseHelp;
+
+  /// No description provided for @calendarDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow calendar access to display your events. Your tasks still work without it.'**
+  String get calendarDenied;
+
+  /// No description provided for @calendarBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar access is off. You can enable it in the phone’s app settings.'**
+  String get calendarBlocked;
+
+  /// No description provided for @calendarUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone calendar display is currently available on Android.'**
+  String get calendarUnsupported;
+
+  /// No description provided for @calendarSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open app settings'**
+  String get calendarSettings;
+
+  /// No description provided for @calendarEmptySources.
+  ///
+  /// In en, this message translates to:
+  /// **'No visible calendars are synced to this phone. Connect an account in your calendar app, then refresh here.'**
+  String get calendarEmptySources;
+
+  /// No description provided for @calendarRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh calendars'**
+  String get calendarRefresh;
+
+  /// No description provided for @calendarClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get calendarClear;
+
+  /// No description provided for @calendarReadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar events could not be read. Refresh to try again; this view may be missing commitments.'**
+  String get calendarReadError;
+
+  /// No description provided for @calendarPreferenceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save that calendar choice. Try again. You can select up to 50 calendars.'**
+  String get calendarPreferenceError;
+
+  /// No description provided for @calendarTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'This calendar result is too large to show in full. Select fewer calendars to see the remaining events.'**
+  String get calendarTruncated;
+
+  /// No description provided for @calendarEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar events'**
+  String get calendarEvents;
+
+  /// No description provided for @calendarReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar event · view only'**
+  String get calendarReadOnly;
+
+  /// No description provided for @calendarNoEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'No events from your selected calendars on this day.'**
+  String get calendarNoEvents;
+
+  /// No description provided for @calendarNoSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose calendars to show your existing commitments.'**
+  String get calendarNoSelection;
+
+  /// No description provided for @calendarAllDay.
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get calendarAllDay;
+
+  /// No description provided for @calendarUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled event'**
+  String get calendarUntitled;
+
+  /// No description provided for @calendarShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all calendar events'**
+  String get calendarShowAll;
+
+  /// No description provided for @calendarOpenEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in calendar app'**
+  String get calendarOpenEvent;
+
+  /// No description provided for @calendarOpenError.
+  ///
+  /// In en, this message translates to:
+  /// **'The calendar app could not open this event.'**
+  String get calendarOpenError;
+
+  /// No description provided for @calendarEventGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This event is no longer available in the selected calendars.'**
+  String get calendarEventGone;
+
+  /// No description provided for @noScheduledTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'No TaskFlow tasks scheduled'**
+  String get noScheduledTasks;
+
   /// No description provided for @calendar.
   ///
   /// In en, this message translates to:

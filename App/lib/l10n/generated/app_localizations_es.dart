@@ -9,6 +9,104 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get deviceCalendars => 'Calendarios del teléfono';
+
+  @override
+  String get deviceCalendarHelp =>
+      'Consulta los eventos de los calendarios conectados a este teléfono junto a tus tareas.';
+
+  @override
+  String get deviceCalendarPrivacy =>
+      'Elige qué calendarios mostrar. Los eventos son de solo lectura en TaskFlow y permanecen en este dispositivo; no se suben ni se envían a la IA. Gestiona sus recordatorios en tu aplicación de calendario.';
+
+  @override
+  String get calendarEnable => 'Conectar calendarios del teléfono';
+
+  @override
+  String get calendarDisable => 'Ocultar eventos del calendario';
+
+  @override
+  String get calendarChoose => 'Elegir calendarios';
+
+  @override
+  String get calendarChooseHelp =>
+      'Selecciona hasta 50 calendarios. Las horas siguen la zona de tu dispositivo; los eventos de día completo conservan sus fechas originales.';
+
+  @override
+  String get calendarDenied =>
+      'Permite el acceso al calendario para mostrar tus eventos. Tus tareas siguen funcionando sin él.';
+
+  @override
+  String get calendarBlocked =>
+      'El acceso al calendario está desactivado. Puedes activarlo en los ajustes de la aplicación del teléfono.';
+
+  @override
+  String get calendarUnsupported =>
+      'La visualización de calendarios del teléfono está disponible actualmente en Android.';
+
+  @override
+  String get calendarSettings => 'Abrir ajustes de la aplicación';
+
+  @override
+  String get calendarEmptySources =>
+      'No hay calendarios visibles sincronizados en este teléfono. Conecta una cuenta en tu aplicación de calendario y actualiza aquí.';
+
+  @override
+  String get calendarRefresh => 'Actualizar calendarios';
+
+  @override
+  String get calendarClear => 'Borrar selección';
+
+  @override
+  String get calendarReadError =>
+      'No se pudieron leer los eventos. Actualiza para volver a intentarlo; pueden faltar compromisos en esta vista.';
+
+  @override
+  String get calendarPreferenceError =>
+      'No se pudo guardar esa selección. Vuelve a intentarlo. Puedes elegir hasta 50 calendarios.';
+
+  @override
+  String get calendarTruncated =>
+      'Hay demasiados eventos para mostrarlos todos. Selecciona menos calendarios para ver los restantes.';
+
+  @override
+  String get calendarEvents => 'Eventos del calendario';
+
+  @override
+  String get calendarReadOnly => 'Evento del calendario · solo lectura';
+
+  @override
+  String get calendarNoEvents =>
+      'No hay eventos de tus calendarios seleccionados este día.';
+
+  @override
+  String get calendarNoSelection =>
+      'Elige calendarios para mostrar tus compromisos existentes.';
+
+  @override
+  String get calendarAllDay => 'Todo el día';
+
+  @override
+  String get calendarUntitled => 'Evento sin título';
+
+  @override
+  String get calendarShowAll => 'Ver todos los eventos';
+
+  @override
+  String get calendarOpenEvent => 'Abrir en la aplicación de calendario';
+
+  @override
+  String get calendarOpenError =>
+      'La aplicación de calendario no pudo abrir este evento.';
+
+  @override
+  String get calendarEventGone =>
+      'Este evento ya no está disponible en los calendarios seleccionados.';
+
+  @override
+  String get noScheduledTasks => 'No hay tareas de TaskFlow programadas';
+
+  @override
   String get calendar => 'Calendario';
 
   @override

@@ -11,6 +11,8 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/providers/device_calendar_provider.dart';
+import 'package:agenda/widgets/device_calendar_events.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -42,13 +44,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(taskProvider.notifier).loadTasks();
+      ref.read(deviceCalendarProvider.notifier).refresh();
+    } else {
+      ref.read(deviceCalendarProvider.notifier).suspend();
     }
   }
 
   Future<void> _refresh() async {
     setState(() => _syncing = true);
     try {
-      await ref.read(taskProvider.notifier).loadTasks();
+      await Future.wait([
+        ref.read(taskProvider.notifier).loadTasks(),
+        ref.read(deviceCalendarProvider.notifier).refresh(),
+      ]);
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
@@ -73,6 +81,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final signedIn = ref.watch(authProvider).account != null;
     final syncError = ref.read(taskRepositoryProvider).syncError;
     final today = isSameDay(_selectedDay, DateTime.now());
+    final phoneCalendars =
+        ref.watch(deviceCalendarProvider).preferences.enabled;
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.calendar, isRoot: true),
       body: RefreshIndicator(
@@ -293,7 +303,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                               const SizedBox(height: 4),
                               Text(
                                   events.isEmpty
-                                      ? context.l10n.breathingRoom
+                                      ? phoneCalendars
+                                          ? context.l10n.noScheduledTasks
+                                          : context.l10n.breathingRoom
                                       : context.l10n.agendaCounts(
                                           events.length - completed, completed),
                                   style: TextStyle(
@@ -311,6 +323,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                   semanticsLabel: context.l10n.completionCount(
                                       completed, events.length))),
                       ]))),
+              SliverToBoxAdapter(
+                  child: DeviceCalendarEvents(day: _selectedDay)),
               if (tasksState.isLoading)
                 const SliverToBoxAdapter(
                     child: Padding(
