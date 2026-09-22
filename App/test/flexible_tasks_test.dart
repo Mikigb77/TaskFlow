@@ -191,6 +191,15 @@ void main() {
     expect(await notifier.undoSchedule(change), isTrue);
     expect(repository.task.repeatUntil, before.repeatUntil);
     expect(repository.task.dueDate, before.dueDate);
+    repository.task = repository.task.copyWith(completedDates: ['2026-09-22']);
+    final inbox = await notifier.rescheduleTask(1, null, false);
+    expect(repository.task.completedDates, isEmpty);
+    expect(repository.task.toApi()['recurrence'], 'none');
+    expect(await notifier.undoSchedule(inbox), isTrue);
+    expect(repository.task.completedDates, ['2026-09-22']);
+    final newer = await notifier.rescheduleTask(1, null, false);
+    repository.task = repository.task.copyWith(isCompleted: true);
+    expect(await notifier.undoSchedule(newer), isFalse);
   });
 }
 

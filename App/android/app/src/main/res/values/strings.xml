@@ -1,0 +1,5 @@
+<resources>
+    <string name="capture_voice">Say a task</string>
+    <string name="capture_text">Capture text</string>
+    <string name="capture_widget_description">Open TaskFlow to record a task. Uses the same microphone permission and retained capture flow.</string>
+</resources>

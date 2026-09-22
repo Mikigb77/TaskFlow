@@ -10,12 +10,15 @@ import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/native_speech.dart';
+import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
 class VoiceTaskScreen extends ConsumerStatefulWidget {
-  const VoiceTaskScreen({super.key, this.captureId});
+  const VoiceTaskScreen(
+      {super.key, this.captureId, this.startRecording = false});
   final String? captureId;
+  final bool startRecording;
   @override
   ConsumerState<VoiceTaskScreen> createState() => _VoiceTaskScreenState();
 }
@@ -64,13 +67,15 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     _owner = ref.read(captureOwnerProvider);
     _zone = ref.read(authProvider).account?.timezone ?? 'UTC';
     WidgetsBinding.instance.addObserver(this);
+    CaptureInterruption.active = _interruptCapture;
     unawaited(_load());
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _autoStart = ModalRoute.of(context)?.settings.arguments == true;
+    _autoStart = widget.startRecording ||
+        ModalRoute.of(context)?.settings.arguments == true;
     _tryAutoStart();
   }
 
@@ -112,12 +117,16 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     if (!_initialized ||
         !_autoStart ||
         _autoStarted ||
-        widget.captureId != null) {
+        _session?.audioPath != null ||
+        _words.text.trim().isNotEmpty ||
+        _session?.drafts.isNotEmpty == true) {
       return;
     }
     _autoStarted = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _beginRecording();
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        _beginRecording();
+      }
     });
   }
 
@@ -411,11 +420,20 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
 
   @override
   void dispose() {
+    if (CaptureInterruption.active == _interruptCapture) {
+      CaptureInterruption.active = null;
+    }
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     unawaited(_release());
     _words.dispose();
     super.dispose();
+  }
+
+  Future<void> _interruptCapture() async {
+    await _writes;
+    await _starting;
+    await _finishRecording(submit: false);
   }
 
   Future<void> _release() async {
@@ -475,11 +493,16 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                                     ? 'Stop and create draft'
                                     : 'Record tasks',
                                 child: IconButton.filledTonal(
+                                    key: const ValueKey('capture-mic'),
                                     iconSize: 44,
                                     padding: const EdgeInsets.all(24),
-                                    tooltip: _recording
-                                        ? 'Stop recording'
-                                        : 'Record tasks',
+                                    // Tooltip's long-press recognizer would consume
+                                    // the hold gesture before the parent sees it.
+                                    tooltip: _holdToTalk
+                                        ? null
+                                        : _recording
+                                            ? 'Stop recording'
+                                            : 'Record tasks',
                                     onPressed:
                                         _busy || (recorded && !_recording)
                                             ? null
@@ -521,78 +544,89 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                       ])),
                       if (!recorded && !_recording && !_busy) ...[
                         const SizedBox(height: 12),
-                        Wrap(spacing: 8, runSpacing: 4, children: [
-                          if (_capability.usable)
-                            ChoiceChip(
-                                label: const Text('Live transcript'),
-                                selected: _nativeMode,
-                                onSelected: (_) =>
-                                    setState(() => _nativeMode = true)),
-                          ChoiceChip(
-                              label: const Text('Saved audio'),
-                              selected: !_nativeMode,
-                              onSelected: (_) =>
-                                  setState(() => _nativeMode = false)),
-                          PopupMenuButton<String>(
-                              tooltip: 'Speech language',
-                              enabled: !_probing,
-                              onSelected: (value) => _chooseLanguage(
-                                  value == 'device' ? null : value),
-                              itemBuilder: (_) => [
-                                    for (final entry in {
-                                      'device': 'Device language',
-                                      'en-US': 'English',
-                                      'es-ES': 'Español'
-                                    }.entries)
-                                      CheckedPopupMenuItem(
-                                          value: entry.key,
-                                          checked: (_language ?? 'device') ==
-                                              entry.key,
-                                          child: Text(entry.value)),
-                                  ],
-                              child: const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: Text('Speech language'))),
-                        ]),
-                        if (!_capability.usable)
-                          const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text(
-                                  'On-device speech is unavailable for this language on this device. Record audio for online processing, or type.')),
-                        if (_capability.onDevice && !_capability.usable)
-                          Wrap(spacing: 8, children: [
-                            TextButton(
-                                onPressed: () async {
-                                  try {
-                                    final opened = await _speech
-                                        .prepareLanguage(_capability.language);
-                                    if (mounted) {
-                                      setState(() => _error = opened
-                                          ? 'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.'
-                                          : 'Speech setup is unavailable here. Use saved audio or type.');
-                                    }
-                                  } catch (_) {
-                                    if (mounted) {
-                                      setState(() => _error =
-                                          'Could not open speech setup. Use saved audio or type.');
-                                    }
-                                  }
-                                },
-                                child: const Text('Set up on-device speech')),
-                            TextButton(
-                                onPressed: _probing
-                                    ? null
-                                    : () => _chooseLanguage(_language),
-                                child: const Text('Check again')),
-                          ]),
-                        SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Hold to talk'),
-                            subtitle: const Text(
-                                'Hold the mic, then release. Tapping still works.'),
-                            value: _holdToTalk,
-                            onChanged: (value) =>
-                                setState(() => _holdToTalk = value)),
+                        ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            title: const Text('Speech options'),
+                            subtitle: Text(_nativeMode
+                                ? 'On-device live transcript'
+                                : 'Saved audio · online transcription'),
+                            children: [
+                              Wrap(spacing: 8, runSpacing: 4, children: [
+                                if (_capability.usable)
+                                  ChoiceChip(
+                                      label: const Text('Live transcript'),
+                                      selected: _nativeMode,
+                                      onSelected: (_) =>
+                                          setState(() => _nativeMode = true)),
+                                ChoiceChip(
+                                    label: const Text('Saved audio'),
+                                    selected: !_nativeMode,
+                                    onSelected: (_) =>
+                                        setState(() => _nativeMode = false)),
+                                PopupMenuButton<String>(
+                                    tooltip: 'Speech language',
+                                    enabled: !_probing,
+                                    onSelected: (value) => _chooseLanguage(
+                                        value == 'device' ? null : value),
+                                    itemBuilder: (_) => [
+                                          for (final entry in {
+                                            'device': 'Device language',
+                                            'en-US': 'English',
+                                            'es-ES': 'Español'
+                                          }.entries)
+                                            CheckedPopupMenuItem(
+                                                value: entry.key,
+                                                checked:
+                                                    (_language ?? 'device') ==
+                                                        entry.key,
+                                                child: Text(entry.value)),
+                                        ],
+                                    child: const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: Text('Speech language'))),
+                              ]),
+                              if (!_capability.usable)
+                                const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                        'On-device speech is unavailable for this language on this device. Record audio for online processing, or type.')),
+                              if (_capability.onDevice && !_capability.usable)
+                                Wrap(spacing: 8, children: [
+                                  TextButton(
+                                      onPressed: () async {
+                                        try {
+                                          final opened =
+                                              await _speech.prepareLanguage(
+                                                  _capability.language);
+                                          if (mounted) {
+                                            setState(() => _error = opened
+                                                ? 'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.'
+                                                : 'Speech setup is unavailable here. Use saved audio or type.');
+                                          }
+                                        } catch (_) {
+                                          if (mounted) {
+                                            setState(() => _error =
+                                                'Could not open speech setup. Use saved audio or type.');
+                                          }
+                                        }
+                                      },
+                                      child: const Text(
+                                          'Set up on-device speech')),
+                                  TextButton(
+                                      onPressed: _probing
+                                          ? null
+                                          : () => _chooseLanguage(_language),
+                                      child: const Text('Check again')),
+                                ]),
+                              SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text('Hold to talk'),
+                                  subtitle: const Text(
+                                      'Hold the mic, then release. Tapping still works.'),
+                                  value: _holdToTalk,
+                                  onChanged: (value) =>
+                                      setState(() => _holdToTalk = value)),
+                            ]),
                       ],
                       if (!recorded) ...[
                         const SizedBox(height: 24),

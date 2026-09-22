@@ -1,0 +1,9 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/capture_widget_button" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:padding="8dp"
+    android:background="@drawable/capture_widget_background" android:contentDescription="@string/capture_voice">
+    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/capture_mic"
+        android:importantForAccessibility="no" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/capture_voice"
+        android:textColor="#FFFFFF" android:textSize="12sp" android:gravity="center" android:maxLines="2" />
+</LinearLayout>

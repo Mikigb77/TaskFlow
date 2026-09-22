@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -56,6 +57,37 @@ class CaptureStore {
 
   Future<String> audioPathFor(CaptureSession session) async =>
       p.join((await _directory()).path, '${session.id}.wav');
+
+  /// Android acknowledges a share only after this idempotent write. A lost
+  /// acknowledgement cannot duplicate a capture or move it to another account.
+  Future<CaptureSession?> acceptEntry(
+      String id, String ownerKey, String timezone,
+      {required String text, required DateTime capturedAt}) async {
+    if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id) || text.length > 4000) {
+      throw ArgumentError('Invalid external capture');
+    }
+    final session = CaptureSession(
+        id: id,
+        ownerKey: ownerKey,
+        timezone: timezone,
+        text: text,
+        capturedAt: capturedAt.toUtc());
+    return (await database.database).transaction((tx) async {
+      await tx.insert(
+          'captures',
+          {
+            'id': id,
+            'owner_key': ownerKey,
+            'status': session.status,
+            'captured_at': session.capturedAt.toIso8601String(),
+            'data': jsonEncode(session.toJson())
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+      final rows = await tx.query('captures',
+          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      return rows.isEmpty ? null : _decode(rows.single);
+    });
+  }
 
   Future<CaptureSession?> read(String id, String ownerKey) async {
     final rows = await (await database.database).query('captures',

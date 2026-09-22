@@ -19,6 +19,9 @@ import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
 import 'package:agenda/screens/capture_diagnostics_screen.dart';
 import 'package:agenda/screens/notification_settings_screen.dart';
+import 'package:agenda/services/capture_entries.dart';
+import 'package:agenda/services/capture_store.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +52,8 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> {
   final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<void>? _actions;
+  StreamSubscription<void>? _entries;
+  bool _openingEntry = false;
   @override
   void initState() {
     super.initState();
@@ -58,13 +63,63 @@ class _MyAppState extends ConsumerState<MyApp> {
       if (mounted) ref.read(taskProvider.notifier).loadTasks();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+    _entries =
+        ref.read(captureEntriesProvider).changes.listen((_) => _openEntries());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openEntries());
   }
 
   @override
   void dispose() {
     TaskReminders.openRequest.removeListener(_openReminder);
     _actions?.cancel();
+    _entries?.cancel();
     super.dispose();
+  }
+
+  Future<void> _openEntries() async {
+    if (!mounted ||
+        _openingEntry ||
+        ref.read(authProvider).loading ||
+        _navigator.currentState == null) {
+      return;
+    }
+    _openingEntry = true;
+    final entries = ref.read(captureEntriesProvider);
+    try {
+      while (mounted && !ref.read(authProvider).loading) {
+        final pending = await entries.pending();
+        if (pending.isEmpty || !mounted) break;
+        final entry = pending.first;
+        final owner = ref.read(captureOwnerProvider);
+        var zone = ref.read(authProvider).account?.timezone ?? 'UTC';
+        try {
+          zone = (await FlutterTimezone.getLocalTimezone()).identifier;
+        } catch (_) {/* Account/UTC fallback. */}
+        final session = await ref.read(captureStoreProvider).acceptEntry(
+            entry.id, owner, zone,
+            text: entry.text, capturedAt: entry.capturedAt);
+        await entries.acknowledge(entry.id);
+        if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
+        ref.invalidate(pendingCapturesProvider);
+        if (session == null || session.terminal) continue;
+        await CaptureInterruption.stop();
+        if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
+        unawaited(_navigator.currentState!.push(MaterialPageRoute<void>(
+            settings: const RouteSettings(name: '/voiceTask'),
+            builder: (_) => VoiceTaskScreen(
+                captureId: session.id,
+                startRecording: entry.kind == 'voice'))));
+      }
+    } catch (_) {
+      if (mounted && _navigator.currentContext != null) {
+        ScaffoldMessenger.maybeOf(_navigator.currentContext!)?.showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Your shared capture is retained. Reopen TaskFlow to try again.')));
+      }
+    } finally {
+      _openingEntry = false;
+    }
   }
 
   Future<void> _openReminder() async {
@@ -91,6 +146,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     ref.listen(authProvider, (previous, next) {
       if (!next.loading) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+        WidgetsBinding.instance.addPostFrameCallback((_) => _openEntries());
       }
     });
     final accountId =

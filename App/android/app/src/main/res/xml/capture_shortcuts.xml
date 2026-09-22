@@ -1,0 +1,10 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="capture_voice" android:enabled="true" android:icon="@drawable/app_icon"
+        android:shortcutShortLabel="@string/capture_voice">
+        <intent android:action="com.example.agenda.CAPTURE_VOICE" android:targetPackage="com.example.agenda" android:targetClass="com.example.agenda.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="capture_text" android:enabled="true" android:icon="@drawable/app_icon"
+        android:shortcutShortLabel="@string/capture_text">
+        <intent android:action="com.example.agenda.CAPTURE_TEXT" android:targetPackage="com.example.agenda" android:targetClass="com.example.agenda.MainActivity" />
+    </shortcut>
+</shortcuts>

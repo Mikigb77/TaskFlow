@@ -4,6 +4,7 @@ import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/services/capture_entries.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -120,6 +121,33 @@ class SettingsScreen extends ConsumerWidget {
             AppSurface(
                 padding: EdgeInsets.zero,
                 child: Column(children: [
+                  ListTile(
+                      leading:
+                          Icon(Icons.widgets_outlined, color: colors.primary),
+                      title: const Text('Capture from your home screen'),
+                      subtitle: const Text(
+                          'Android mic widget, app shortcuts and text sharing'),
+                      onTap: () async {
+                        try {
+                          final opened = await ref
+                              .read(captureEntriesProvider)
+                              .pinWidget();
+                          if (!opened && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.')));
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Add the TaskFlow widget from your launcher’s widget picker.')));
+                          }
+                        }
+                      }),
+                  const Divider(indent: 20, endIndent: 20),
                   ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 8),

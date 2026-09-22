@@ -126,6 +126,42 @@ void main() {
     expect(store.session!.text, 'Remember the keys');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'hold to talk releases the mic and retains input when extraction is offline',
+      (tester) async {
+    final speech = _Speech();
+    final store = _Captures();
+    final api = _OfflineExtraction();
+    await _open(tester, speech, store, api);
+    await tester.tap(find.text('Speech options'));
+    await tester.pumpAndSettle();
+    final hold = find.byType(SwitchListTile);
+    await tester.ensureVisible(hold);
+    await tester.pumpAndSettle();
+    await tester.tap(hold);
+    await tester.pumpAndSettle();
+    final mic = find.byKey(const ValueKey('capture-mic'));
+    await tester.scrollUntilVisible(mic, -180,
+        scrollable: find
+            .descendant(
+                of: find.byType(VoiceTaskScreen),
+                matching: find.byType(Scrollable))
+            .first);
+    await tester.pumpAndSettle();
+    final gesture = await tester.startGesture(tester.getCenter(mic));
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    expect(speech.run, isNotNull);
+    speech.emit('partial', text: 'Bring the keys');
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(speech.cancelled, isTrue);
+    expect(store.session!.text, 'Bring the keys');
+    expect(api.requests, 1);
+    expect(store.session!.status, 'failed');
+  });
 }
 
 Future<void> _open(WidgetTester tester, _Speech speech, _Captures store,

@@ -37,7 +37,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/capture_shortcuts" />
         </activity>
+
+        <receiver android:name=".CaptureWidget" android:exported="false" android:label="@string/capture_voice">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/capture_widget_info" />
+        </receiver>
 
         <!-- Don't delete the meta-data below. This is used by the Flutter tool to generate
         GeneratedPluginRegistrant.java -->

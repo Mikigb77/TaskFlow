@@ -66,6 +66,34 @@ void main() {
   });
 
   test(
+      'external capture acknowledgement retries are idempotent and account-isolated',
+      () async {
+    const id = '3b9d0032-1fe0-41fa-a1b8-fb71fba4e84a';
+    final time = DateTime.utc(2026, 9, 22, 22, 59);
+    final original = await store.acceptEntry(id, 'local', 'UTC',
+        text: 'Shared tomorrow', capturedAt: time);
+    await store.update(original!.copyWith(text: 'Edited shared words'));
+    await database.close();
+    await reopen();
+    final again = await store.acceptEntry(id, 'local', 'UTC',
+        text: 'Shared tomorrow', capturedAt: time.add(const Duration(days: 1)));
+    expect(again!.text, 'Edited shared words');
+    expect(again.capturedAt, time);
+    expect((await store.pending('local')).length, 1);
+    expect(
+        await store.acceptEntry(id, 'other-account', 'UTC',
+            text: 'Attempt', capturedAt: time),
+        isNull);
+    await store.discard(id, 'local');
+    expect(
+        (await store.acceptEntry(id, 'local', 'UTC',
+                text: 'Shared tomorrow', capturedAt: time))!
+            .terminal,
+        isTrue);
+    expect(await store.pending('local'), isEmpty);
+  });
+
+  test(
       'failed processing preserves input and retries with the original reference time',
       () async {
     final session = await store.create('local', 'Europe/Madrid',
