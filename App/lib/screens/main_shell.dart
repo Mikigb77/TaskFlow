@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
@@ -26,19 +27,19 @@ class _MainShellState extends State<MainShell> {
                 selectedIndex: _index,
                 onDestinationSelected: (index) =>
                     setState(() => _index = index),
-                destinations: const [
+                destinations: [
                   NavigationDestination(
-                      icon: Icon(Icons.calendar_today_outlined),
-                      selectedIcon: Icon(Icons.calendar_month_rounded),
-                      label: 'Calendar'),
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      selectedIcon: const Icon(Icons.calendar_month_rounded),
+                      label: context.l10n.calendar),
                   NavigationDestination(
-                      icon: Icon(Icons.checklist_rounded),
-                      selectedIcon: Icon(Icons.checklist_rounded),
-                      label: 'Tasks'),
+                      icon: const Icon(Icons.checklist_rounded),
+                      selectedIcon: const Icon(Icons.checklist_rounded),
+                      label: context.l10n.tasks),
                   NavigationDestination(
-                      icon: Icon(Icons.tune_rounded),
-                      selectedIcon: Icon(Icons.tune_rounded),
-                      label: 'Settings'),
+                      icon: const Icon(Icons.tune_rounded),
+                      selectedIcon: const Icon(Icons.tune_rounded),
+                      label: context.l10n.settings),
                 ])),
       );
 }

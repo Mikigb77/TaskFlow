@@ -20,7 +20,7 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
-    timezone = models.CharField(max_length=64, default="Europe/Madrid")
+    timezone = models.CharField(max_length=64, default="UTC")
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = UserManager()

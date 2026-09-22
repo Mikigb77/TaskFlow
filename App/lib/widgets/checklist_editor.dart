@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:agenda/models/checklist_item.dart';
 
@@ -20,7 +21,9 @@ class ChecklistEditor extends StatelessWidget {
     final title = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-              title: Text(item == null ? 'Add a step' : 'Edit step'),
+              title: Text(item == null
+                  ? context.l10n.addStepDialog
+                  : context.l10n.editStep),
               content: Form(
                   key: form,
                   child: TextFormField(
@@ -31,23 +34,23 @@ class ChecklistEditor extends StatelessWidget {
                     minLines: 1,
                     maxLines: 3,
                     textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(labelText: 'Step'),
+                    decoration: InputDecoration(labelText: context.l10n.step),
                     validator: (text) => text?.trim().isNotEmpty == true
                         ? null
-                        : 'Add a short step.',
+                        : context.l10n.shortStep,
                     onChanged: (text) => value = text,
                   )),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel')),
+                    child: Text(context.l10n.cancel)),
                 FilledButton(
                     onPressed: () {
                       if (form.currentState!.validate()) {
                         Navigator.pop(context, value.trim());
                       }
                     },
-                    child: const Text('Keep step'))
+                    child: Text(context.l10n.keepStep))
               ],
             ));
     if (title == null || !context.mounted) return;
@@ -66,18 +69,17 @@ class ChecklistEditor extends StatelessWidget {
         items.where((item) => item.done(occurrence: occurrence)).length;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (items.isNotEmpty) ...[
-        Text('Checklist · $complete/${items.length}',
+        Text(context.l10n.checklistCount(complete, items.length),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         LinearProgressIndicator(
             value: complete / items.length,
             semanticsLabel:
-                'Checklist, $complete of ${items.length} steps completed'),
+                context.l10n.checklistSemantics(complete, items.length)),
         if (recurring && occurrence == null)
-          const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                  'These steps repeat with the task. Check them off from an occurrence’s details.')),
+          Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(context.l10n.repeatingSteps)),
         for (var index = 0; index < items.length; index++)
           Row(
               key: ValueKey('checklist-${items[index].id}'),
@@ -103,16 +105,19 @@ class ChecklistEditor extends StatelessWidget {
                     tooltip: 'Edit ${items[index].title}',
                     enabled: onChanged != null,
                     itemBuilder: (_) => [
-                          const PopupMenuItem(
-                              value: 'edit', child: Text('Edit step')),
+                          PopupMenuItem(
+                              value: 'edit',
+                              child: Text(context.l10n.editStep)),
                           if (index > 0)
-                            const PopupMenuItem(
-                                value: 'up', child: Text('Move up')),
+                            PopupMenuItem(
+                                value: 'up', child: Text(context.l10n.moveUp)),
                           if (index < items.length - 1)
-                            const PopupMenuItem(
-                                value: 'down', child: Text('Move down')),
-                          const PopupMenuItem(
-                              value: 'remove', child: Text('Remove step')),
+                            PopupMenuItem(
+                                value: 'down',
+                                child: Text(context.l10n.moveDown)),
+                          PopupMenuItem(
+                              value: 'remove',
+                              child: Text(context.l10n.removeStep)),
                         ],
                     onSelected: (action) {
                       if (action == 'edit') {
@@ -133,7 +138,9 @@ class ChecklistEditor extends StatelessWidget {
             key: const ValueKey('add-checklist-item'),
             onPressed: onChanged == null ? null : () => _edit(context),
             icon: const Icon(Icons.playlist_add_rounded),
-            label: Text(items.isEmpty ? 'Add checklist' : 'Add step')),
+            label: Text(items.isEmpty
+                ? context.l10n.addChecklist
+                : context.l10n.addStep)),
     ]);
   }
 }

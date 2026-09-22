@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'dart:io';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -104,8 +105,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     final date = await showDatePicker(
         context: context,
         initialDate: _dueDate ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2101));
+        firstDate: pickerFirstDate(_dueDate),
+        lastDate: pickerLastDate(_dueDate));
     if (date == null || !mounted) return;
     setState(() {
       _dueDate = DateTime(date.year, date.month, date.day,
@@ -165,9 +166,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Schedule suggestion applied'),
+        content: Text(context.l10n.suggestionApplied),
         action: SnackBarAction(
-            label: 'Undo',
+            label: context.l10n.undo,
             onPressed: () {
               if (mounted) {
                 setState(() {
@@ -196,16 +197,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-                  title: const Text('Change the repeating schedule?'),
-                  content: const Text(
-                      'This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.'),
+                  title: Text(context.l10n.changeSeriesQuestion),
+                  content: Text(context.l10n.changeSeriesHelp),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Keep editing')),
+                        child: Text(context.l10n.keepEditing)),
                     FilledButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Reset and save'))
+                        child: Text(context.l10n.resetSave))
                   ]));
       if (confirmed != true || !mounted) return;
     }
@@ -253,13 +253,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(widget.task == null
               ? _dueDate == null
-                  ? 'Task saved to Inbox'
-                  : 'Task added to your calendar'
-              : 'Changes saved')));
+                  ? context.l10n.taskSavedInbox
+                  : context.l10n.taskAddedCalendar
+              : context.l10n.changesSaved)));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not save your task. Please try again.')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(context.l10n.taskSaveError)));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -273,17 +273,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                          'Attachments currently stay on this phone. Signing in restores your tasks, but these files will not appear on another device.')),
+                  Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(context.l10n.localAttachmentHelp)),
                   ListTile(
                       leading: const Icon(Icons.photo_outlined),
-                      title: const Text('Choose a photo'),
+                      title: Text(context.l10n.choosePhoto),
                       onTap: () => Navigator.pop(context, true)),
                   ListTile(
                       leading: const Icon(Icons.attach_file_rounded),
-                      title: const Text('Attach a file'),
+                      title: Text(context.l10n.attachFile),
                       onTap: () => Navigator.pop(context, false)),
                 ]))));
     if (gallery == null || !mounted) return;
@@ -301,8 +300,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not attach that file. Please try again.')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(context.l10n.attachError)));
       }
     }
   }
@@ -320,12 +319,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     return Scaffold(
       appBar: CustomAppBar(
           title: edit
-              ? 'Edit task'
+              ? context.l10n.editTask
               : widget.draft == null
                   ? widget.onReview != null
-                      ? 'Review task'
-                      : 'New task'
-                  : 'Review task'),
+                      ? context.l10n.reviewTask
+                      : context.l10n.newTask
+                  : context.l10n.reviewTask),
       body: SafeArea(
           top: false,
           bottom: false,
@@ -342,20 +341,20 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             children: [
                               Text(
                                   edit
-                                      ? 'Fine-tune your plan.'
+                                      ? context.l10n.fineTunePlan
                                       : widget.draft == null
-                                          ? 'What’s on your mind?'
-                                          : 'Your words, a clear plan.',
+                                          ? context.l10n.onYourMind
+                                          : context.l10n.wordsPlan,
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineMedium),
                               const SizedBox(height: 8),
                               Text(
                                   widget.task?.isRecurring == true
-                                      ? 'Edits apply to the whole repeating task.'
+                                      ? context.l10n.seriesEdits
                                       : widget.draft == null
-                                          ? 'Give it a name. Add a date whenever you’re ready.'
-                                          : 'Check the details before adding it to your calendar.',
+                                          ? context.l10n.giveName
+                                          : context.l10n.checkBeforeAdd,
                                   style: TextStyle(
                                       color: colors.onSurfaceVariant)),
                               const SizedBox(height: 24),
@@ -367,8 +366,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          const SectionLabel(
-                                              'Captured from your words'),
+                                          SectionLabel(
+                                              context.l10n.capturedWords),
                                           Text(widget.draft!.transcript,
                                               style: TextStyle(
                                                   color: colors
@@ -391,13 +390,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                   maxLength: 160,
                                   textCapitalization:
                                       TextCapitalization.sentences,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Task Title',
+                                  decoration: InputDecoration(
+                                      labelText: context.l10n.taskTitle,
                                       hintText: 'e.g. Doctor appointment',
                                       counterText: ''),
                                   validator: (value) =>
                                       value == null || value.trim().isEmpty
-                                          ? 'Please enter a task title'
+                                          ? context.l10n.titleRequiredField
                                           : null),
                               if (suggestion != null) ...[
                                 const SizedBox(height: 10),
@@ -408,28 +407,27 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       avatar: const Icon(
                                           Icons.auto_awesome_outlined,
                                           size: 16),
-                                      label: Text(
-                                          'Use ${DateFormat('EEE, d MMM').format(suggestion.date)}${suggestion.hasTime ? ' · ${TimeOfDay.fromDateTime(suggestion.date).format(context)}' : ' · no time'}'),
+                                      label: Text(context.l10n.useSchedule(
+                                          '${DateFormat.MMMEd(context.localeName).format(suggestion.date)} · ${suggestion.hasTime ? context.clockTime(suggestion.date) : context.l10n.anyTime}')),
                                       onPressed: () =>
                                           _acceptSchedule(suggestion)),
                                   TextButton(
                                       onPressed: () => setState(() =>
                                           _ignoredSuggestion = _title.text),
-                                      child: const Text('Keep as title')),
+                                      child: Text(context.l10n.keepAsTitle)),
                                 ]),
                                 if (suggestion.ambiguousTime)
-                                  const Text(
-                                      'Choose AM/PM or add the time yourself. No hour has been inferred.'),
+                                  Text(context.l10n.ambiguousTimeHelp),
                               ],
                               const SizedBox(height: 24),
-                              const SectionLabel('Schedule'),
+                              SectionLabel(context.l10n.schedule),
                               Wrap(spacing: 8, runSpacing: 4, children: [
                                 ActionChip(
-                                    label: const Text('Today'),
+                                    label: Text(context.l10n.today),
                                     onPressed: () =>
                                         _quickDate(DateTime.now())),
                                 ActionChip(
-                                    label: const Text('Tomorrow'),
+                                    label: Text(context.l10n.tomorrow),
                                     onPressed: () {
                                       final now = DateTime.now();
                                       _quickDate(DateTime(
@@ -437,7 +435,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                     }),
                                 if (_dueDate != null)
                                   ActionChip(
-                                      label: const Text('Inbox'),
+                                      label: Text(context.l10n.inbox),
                                       onPressed: () => _quickDate(null)),
                               ]),
                               const SizedBox(height: 8),
@@ -449,15 +447,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                         leading: const Icon(
                                             Icons.calendar_today_outlined),
                                         title: Text(_dueDate == null
-                                            ? 'No date · Inbox'
-                                            : DateFormat('EEE, d MMM yyyy')
+                                            ? context.l10n.inboxDate
+                                            : DateFormat.yMMMEd(
+                                                    context.localeName)
                                                 .format(_dueDate!)),
-                                        subtitle: const Text('Date'),
+                                        subtitle: Text(context.l10n.date),
                                         onTap: _pickDate,
                                         trailing: _dueDate == null
                                             ? const Icon(Icons.add_rounded)
                                             : IconButton(
-                                                tooltip: 'Clear date',
+                                                tooltip: context.l10n.clearDate,
                                                 onPressed: () => setState(() {
                                                       _dueDate = null;
                                                       _hasTime = false;
@@ -472,16 +471,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                           leading: const Icon(
                                               Icons.schedule_outlined),
                                           title: Text(_hasTime
-                                              ? DateFormat('HH:mm')
-                                                  .format(_dueDate!)
-                                              : 'Any time'),
+                                              ? context.clockTime(_dueDate!)
+                                              : context.l10n.anyTime),
                                           subtitle:
-                                              const Text('Time (optional)'),
+                                              Text(context.l10n.optionalTime),
                                           onTap: _pickTime,
                                           trailing: !_hasTime
                                               ? const Icon(Icons.add_rounded)
                                               : IconButton(
-                                                  tooltip: 'Remove time',
+                                                  tooltip:
+                                                      context.l10n.removeTime,
                                                   onPressed: () => setState(() {
                                                         _hasTime = false;
                                                         _dueDate =
@@ -516,8 +515,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                         ? Icons.expand_less_rounded
                                         : Icons.tune_rounded),
                                     label: Text(_detailsExpanded
-                                        ? 'Fewer details'
-                                        : 'More details')),
+                                        ? context.l10n.fewerDetails
+                                        : context.l10n.moreDetails)),
                               if (_detailsExpanded) ...[
                                 if (_dueDate != null) ...[
                                   const SizedBox(height: 16),
@@ -525,14 +524,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       isExpanded: true,
                                       key: ValueKey('repeat-$_recurrence'),
                                       initialValue: _recurrence,
-                                      decoration: const InputDecoration(
-                                          labelText: 'Repeat',
+                                      decoration: InputDecoration(
+                                          labelText: context.l10n.repeat,
                                           prefixIcon:
-                                              Icon(Icons.repeat_rounded)),
+                                              const Icon(Icons.repeat_rounded)),
                                       items: Task.repeats.entries
                                           .map((e) => DropdownMenuItem(
                                               value: e.key,
-                                              child: Text(e.value,
+                                              child: Text(
+                                                  context.repeatName(e.key),
                                                   maxLines: 2,
                                                   overflow:
                                                       TextOverflow.ellipsis)))
@@ -562,21 +562,22 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                         tilePadding: EdgeInsets.zero,
                                         title: Text(
                                             '${_exceptions.length} individual date changes'),
-                                        subtitle: const Text(
-                                            'Reset a date, then save your changes.'),
+                                        subtitle:
+                                            Text(context.l10n.resetDateHelp),
                                         children: [
                                           for (final exception in _exceptions)
                                             ListTile(
                                                 title: Text(
                                                     exception.originalDate),
                                                 subtitle: Text(exception.skipped
-                                                    ? 'Skipped'
+                                                    ? context.l10n.skipped
                                                     : 'Moved to ${Task.dateKey(exception.date!)}${exception.hasTime ? ' · ${TimeOfDay.fromDateTime(exception.date!).format(context)}' : ''}'),
                                                 trailing: TextButton(
                                                     onPressed: () => setState(
                                                         () => _exceptions
                                                             .remove(exception)),
-                                                    child: const Text('Reset')))
+                                                    child: Text(
+                                                        context.l10n.reset)))
                                         ]),
                                   if (_recurrence != 'none')
                                     Row(children: [
@@ -586,8 +587,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                                   Icons.event_outlined,
                                                   size: 18),
                                               label: Text(_repeatUntil == null
-                                                  ? 'No end date'
-                                                  : 'Until ${DateFormat('d MMM yyyy').format(_repeatUntil!)}'),
+                                                  ? context.l10n.noEndDate
+                                                  : context.l10n.untilDate(
+                                                      context.shortDate(
+                                                          _repeatUntil!))),
                                               onPressed: () async {
                                                 final date =
                                                     await showDatePicker(
@@ -598,7 +601,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                                         firstDate:
                                                             Task.day(_dueDate!),
                                                         lastDate:
-                                                            DateTime(2101));
+                                                            pickerLastDate(
+                                                                _repeatUntil ??
+                                                                    _dueDate));
                                                 if (date != null && mounted) {
                                                   setState(() =>
                                                       _repeatUntil = date);
@@ -606,7 +611,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                               })),
                                       if (_repeatUntil != null)
                                         IconButton(
-                                            tooltip: 'Remove end date',
+                                            tooltip: context.l10n.removeEndDate,
                                             onPressed: () => setState(
                                                 () => _repeatUntil = null),
                                             icon: const Icon(
@@ -624,13 +629,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                     onTime: (value) =>
                                         setState(() => _reminderTime = value)),
                                 const SizedBox(height: 16),
-                                const SectionLabel('Priority'),
+                                SectionLabel(context.l10n.priority),
                                 Wrap(spacing: 8, runSpacing: 8, children: [
                                   for (final value in [1, 2, 3])
                                     ChoiceChip(
                                         showCheckmark: false,
                                         label:
-                                            Text(AppTheme.priorityLabel(value)),
+                                            Text(context.priorityName(value)),
                                         avatar: Icon(Icons.flag_outlined,
                                             size: 17,
                                             color: AppTheme.priorityColor(
@@ -640,7 +645,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                             setState(() => _priority = value)),
                                 ]),
                                 const SizedBox(height: 24),
-                                const SectionLabel('The details'),
+                                SectionLabel(context.l10n.theDetails),
                                 TaskListPicker(
                                     listId: _listId,
                                     onChanged: (id) =>
@@ -649,8 +654,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 TextFormField(
                                     key: const ValueKey('task-labels'),
                                     controller: _labels,
-                                    decoration: const InputDecoration(
-                                        labelText: 'Labels',
+                                    decoration: InputDecoration(
+                                        labelText: context.l10n.labels,
                                         hintText: 'home, errands, calls'),
                                     validator: (text) {
                                       final labels = (text ?? '')
@@ -661,7 +666,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       return labels.length > 10 ||
                                               labels.any(
                                                   (label) => label.length > 32)
-                                          ? 'Use up to 10 labels, each under 33 characters.'
+                                          ? context.l10n.labelLimit
                                           : null;
                                     }),
                                 const SizedBox(height: 16),
@@ -679,15 +684,14 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                     maxLines: 6,
                                     textCapitalization:
                                         TextCapitalization.sentences,
-                                    decoration: const InputDecoration(
-                                        labelText: 'Additional Notes',
-                                        hintText:
-                                            'Anything you’d like to remember…',
+                                    decoration: InputDecoration(
+                                        labelText: context.l10n.additionalNotes,
+                                        hintText: context.l10n.notesHint,
                                         alignLabelWithHint: true,
                                         counterText: '')),
                                 const SizedBox(height: 20),
                                 if (_attachments.isNotEmpty) ...[
-                                  const SectionLabel('Attachments'),
+                                  SectionLabel(context.l10n.attachments),
                                   for (var i = 0; i < _attachments.length; i++)
                                     Padding(
                                         padding:
@@ -738,8 +742,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                     onPressed: _attach,
                                     icon: const Icon(Icons.attach_file_rounded,
                                         size: 20),
-                                    label: const Text('Add attachment')),
-                                Text('Attachments stay on this device.',
+                                    label: Text(context.l10n.addAttachment)),
+                                Text(context.l10n.localAttachments,
                                     style: TextStyle(
                                         color: colors.onSurfaceVariant,
                                         fontSize: 12)),
@@ -760,12 +764,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                     : Icon(edit ? Icons.check_rounded : Icons.add_rounded,
                         size: 20),
                 label: Text(_saving
-                    ? 'Saving…'
+                    ? context.l10n.saving
                     : widget.onReview != null
-                        ? 'Keep changes'
+                        ? context.l10n.keepChanges
                         : edit
-                            ? 'Save changes'
-                            : 'Create Task'),
+                            ? context.l10n.saveChangesSentence
+                            : context.l10n.createTask),
               ))),
     );
   }

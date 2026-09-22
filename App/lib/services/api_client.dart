@@ -86,7 +86,7 @@ class ApiClient {
   }
 
   Future<void> signIn(String email, String password,
-      {bool register = false, String timezone = 'Europe/Madrid'}) async {
+      {bool register = false, String timezone = 'UTC'}) async {
     final result = await request(
         'POST', 'auth/${register ? 'register' : 'login'}/',
         authenticated: false,

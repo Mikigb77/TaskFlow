@@ -41,7 +41,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signIn(String email, String password,
-      {bool register = false, String timezone = 'Europe/Madrid'}) async {
+      {bool register = false, String timezone = 'UTC'}) async {
     state = AuthState(account: state.account, loading: true);
     try {
       await api.signIn(email, password, register: register, timezone: timezone);

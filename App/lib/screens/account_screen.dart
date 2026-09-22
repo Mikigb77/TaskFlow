@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/task_database.dart';
@@ -78,12 +78,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         if (mounted) setState(() => _message = result['detail'] as String);
         return;
       }
-      String zone = 'Europe/Madrid';
-      try {
-        zone = (await FlutterTimezone.getLocalTimezone()).identifier;
-      } catch (_) {/* Editable in voice form. */}
+      await ref.read(regionalProvider.notifier).ready;
+      final zone = await CaptureTimezone.resolve(ref.read(regionalProvider));
       await ref.read(authProvider.notifier).signIn(_email.text, _password.text,
-          register: _register, timezone: zone);
+          register: _register, timezone: zone.identifier);
     });
   }
 

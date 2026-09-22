@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
@@ -30,10 +31,13 @@ class TaskTile extends ConsumerWidget {
           }
           return false;
         },
-        background: _gestureBackground(context, Icons.check_rounded,
-            task.isCompleted ? 'Reopen' : 'Complete', Alignment.centerLeft),
-        secondaryBackground: _gestureBackground(
-            context, Icons.event_outlined, 'Reschedule', Alignment.centerRight),
+        background: _gestureBackground(
+            context,
+            Icons.check_rounded,
+            task.isCompleted ? context.l10n.reopen : context.l10n.complete,
+            Alignment.centerLeft),
+        secondaryBackground: _gestureBackground(context, Icons.event_outlined,
+            context.l10n.reschedule, Alignment.centerRight),
         child: Material(
           color: colors.surface,
           shape: RoundedRectangleBorder(
@@ -99,7 +103,8 @@ class TaskTile extends ConsumerWidget {
                                         Flexible(
                                             child: Text(
                                                 taskScheduleLabel(task,
-                                                    showDate: showDate),
+                                                    showDate: showDate,
+                                                    context: context),
                                                 style: TextStyle(
                                                     fontSize: 12,
                                                     color: colors
@@ -114,7 +119,8 @@ class TaskTile extends ConsumerWidget {
                                               color: colors.onSurfaceVariant),
                                           const SizedBox(width: 4),
                                           Flexible(
-                                              child: Text(task.repeatLabel,
+                                              child: Text(
+                                                  context.repeatLabel(task),
                                                   overflow:
                                                       TextOverflow.ellipsis,
                                                   style: TextStyle(
@@ -159,7 +165,8 @@ class TaskTile extends ConsumerWidget {
                                             borderRadius:
                                                 BorderRadius.circular(6)),
                                         child: Text(
-                                            '${AppTheme.priorityLabel(task.priority)} priority',
+                                            context.l10n.priorityValue(context
+                                                .priorityName(task.priority)),
                                             style: TextStyle(
                                                 color: priority,
                                                 fontSize: 10,

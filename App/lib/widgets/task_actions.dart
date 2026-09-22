@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/services/capture_store.dart';
@@ -17,25 +18,26 @@ class TaskActions extends ConsumerWidget {
                       onPressed: () =>
                           Navigator.pushNamed(context, '/captures'),
                       icon: const Icon(Icons.restore_rounded, size: 18),
-                      label: Text('Unfinished captures · ${sessions.length}')),
+                      label: Text(
+                          context.l10n.pendingCaptureCount(sessions.length))),
               loading: () => const SizedBox.shrink(),
               error: (_, __) => TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/captures'),
-                  child: const Text('Check unfinished captures'))),
+                  child: Text(context.l10n.checkCaptures))),
           LayoutBuilder(builder: (context, constraints) {
             final voice = Tooltip(
-                message: 'Create task with voice',
+                message: context.l10n.createVoiceTask,
                 child: FilledButton.icon(
                     onPressed: () => Navigator.pushNamed(context, '/voiceTask',
                         arguments: true),
                     icon: const Icon(Icons.mic_none_rounded),
-                    label: const Text('Say a task')));
+                    label: Text(context.l10n.sayTask)));
             final typed = Tooltip(
-                message: 'Create task',
+                message: context.l10n.createTaskTooltip,
                 child: OutlinedButton.icon(
                     onPressed: onCreate,
                     icon: const Icon(Icons.edit_outlined),
-                    label: const Text('New task')));
+                    label: Text(context.l10n.newTask)));
             if (constraints.maxWidth < 340 ||
                 MediaQuery.textScalerOf(context).scale(14) > 18) {
               return Column(

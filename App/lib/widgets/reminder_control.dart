@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/reminder_provider.dart';
@@ -14,17 +15,18 @@ class ReminderChip extends ConsumerWidget {
         const ReminderPreferences();
     final minute = task.reminderTime ?? preferences.dateOnlyTime;
     final label = task.reminderMinutes == -1
-        ? 'Off'
+        ? context.l10n.off
         : task.hasTime
-            ? reminderLeadLabel(task.reminderMinutes ?? preferences.leadMinutes)
+            ? context
+                .reminderLead(task.reminderMinutes ?? preferences.leadMinutes)
             : minute == null
-                ? 'Off'
+                ? context.l10n.off
                 : TimeOfDay(hour: minute ~/ 60, minute: minute % 60)
                     .format(context);
     return ActionChip(
         avatar: const Icon(Icons.notifications_outlined, size: 16),
-        label: Text(
-            'Reminder: $label${preferences.enabled ? '' : ' · device off'}'),
+        label: Text(context.l10n.reminderValue(
+            '$label${preferences.enabled ? '' : ' · ${context.l10n.deviceOff}'}')),
         onPressed: onChanged == null
             ? null
             : () async {
@@ -54,7 +56,8 @@ class ReminderChip extends ConsumerWidget {
                                       FilledButton(
                                           onPressed: () =>
                                               Navigator.pop(context, edited),
-                                          child: const Text('Use reminder')),
+                                          child:
+                                              Text(context.l10n.useReminder)),
                                     ])))));
                 if (result != null) onChanged?.call(result);
               });
@@ -82,22 +85,22 @@ class ReminderControl extends ConsumerWidget {
     final settings = preferences.valueOrNull ?? const ReminderPreferences();
     final minute = time ?? settings.dateOnlyTime;
     final label = !hasDate
-        ? 'Add a date to use a reminder'
+        ? context.l10n.dateForReminder
         : hasTime
-            ? '${reminderLeadLabel(minutes ?? settings.leadMinutes)}${minutes == null ? ' · default' : ''}'
+            ? '${context.reminderLead(minutes ?? settings.leadMinutes)}${minutes == null ? ' · ${context.l10n.defaultChoice}' : ''}'
             : minutes == -1 || minute == null
-                ? 'Off'
+                ? context.l10n.off
                 : TimeOfDay(hour: minute ~/ 60, minute: minute % 60)
                     .format(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.notifications_outlined),
-          title: const Text('Reminder'),
+          title: Text(context.l10n.reminder),
           subtitle: Text(label),
           trailing: hasDate
               ? PopupMenuButton<int>(
-                  tooltip: 'Choose reminder',
+                  tooltip: context.l10n.chooseReminder,
                   onSelected: (value) => onMinutes(value == -2 ? null : value),
                   itemBuilder: (_) => [
                         for (final value in hasTime
@@ -114,8 +117,8 @@ class ReminderControl extends ConsumerWidget {
                             : <int>{-2, -1})
                           PopupMenuItem(
                               value: value,
-                              child: Text(reminderLeadLabel(
-                                  value == -2 ? null : value)))
+                              child: Text(context
+                                  .reminderLead(value == -2 ? null : value)))
                       ])
               : null),
       if (hasDate && !hasTime)
@@ -132,21 +135,19 @@ class ReminderControl extends ConsumerWidget {
                   onTime(value.hour * 60 + value.minute);
                 }
               },
-              child: const Text('Choose alert time')),
+              child: Text(context.l10n.chooseAlertTime)),
           if (time != null)
             TextButton(
                 onPressed: () => onTime(null),
-                child: const Text('Use default time')),
+                child: Text(context.l10n.defaultTime)),
         ]),
-      if (preferences.hasError)
-        const Text(
-            'Reminder defaults could not load. Check notification settings.'),
-      if (preferences.isLoading) const Text('Loading reminder settings…'),
+      if (preferences.hasError) Text(context.l10n.reminderDefaultsError),
+      if (preferences.isLoading) Text(context.l10n.loadingReminders),
       if (!preferences.isLoading && !settings.enabled)
         TextButton.icon(
             onPressed: () => Navigator.pushNamed(context, '/notifications'),
             icon: const Icon(Icons.notifications_off_outlined, size: 18),
-            label: const Text('Reminders are off on this device')),
+            label: Text(context.l10n.remindersDisabled)),
     ]);
   }
 }

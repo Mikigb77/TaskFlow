@@ -23,7 +23,10 @@ import 'package:agenda/screens/task_lists_screen.dart';
 import 'package:agenda/screens/data_transfer_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_store.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/screens/regional_settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,9 +41,13 @@ Future<void> main() async {
         'Notification setup could not finish. Retry from Settings.');
   }
   final appearance = ThemeController(ThemePreferenceStore());
-  await appearance.ready;
+  final regional = RegionalController(RegionalPreferenceStore());
+  await Future.wait([appearance.ready, regional.ready]);
   runApp(ProviderScope(
-    overrides: [themeModeProvider.overrideWith((ref) => appearance)],
+    overrides: [
+      themeModeProvider.overrideWith((ref) => appearance),
+      regionalProvider.overrideWith((ref) => regional)
+    ],
     child: const MyApp(),
   ));
 }
@@ -51,7 +58,7 @@ class MyApp extends ConsumerStatefulWidget {
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends ConsumerState<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   final _navigator = GlobalKey<NavigatorState>();
   StreamSubscription<void>? _actions;
   StreamSubscription<void>? _entries;
@@ -59,6 +66,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     TaskReminders.openRequest.addListener(_openReminder);
     // Scheduling also emits changes; reload only in response to action callbacks.
     _actions = TaskReminders.actionChanges.stream.listen((_) {
@@ -73,9 +81,21 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   void dispose() {
     TaskReminders.openRequest.removeListener(_openReminder);
+    WidgetsBinding.instance.removeObserver(this);
     _actions?.cancel();
     _entries?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh the device clock choice after returning from system settings.
+    if (state == AppLifecycleState.resumed && mounted) setState(() {});
   }
 
   Future<void> _openEntries() async {
@@ -93,12 +113,11 @@ class _MyAppState extends ConsumerState<MyApp> {
         if (pending.isEmpty || !mounted) break;
         final entry = pending.first;
         final owner = ref.read(captureOwnerProvider);
-        var zone = ref.read(authProvider).account?.timezone ?? 'UTC';
-        try {
-          zone = (await FlutterTimezone.getLocalTimezone()).identifier;
-        } catch (_) {/* Account/UTC fallback. */}
+        await ref.read(regionalProvider.notifier).ready;
+        final zone = await CaptureTimezone.resolve(ref.read(regionalProvider),
+            accountTimezone: ref.read(authProvider).account?.timezone);
         final session = await ref.read(captureStoreProvider).acceptEntry(
-            entry.id, owner, zone,
+            entry.id, owner, zone.identifier,
             text: entry.text, capturedAt: entry.capturedAt);
         await entries.acknowledge(entry.id);
         if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
@@ -155,12 +174,33 @@ class _MyAppState extends ConsumerState<MyApp> {
     });
     final accountId =
         ref.watch(authProvider.select((value) => value.account?.id));
+    final regional = ref.watch(regionalProvider);
+    final system24Hour = !kIsWeb &&
+            [TargetPlatform.android, TargetPlatform.iOS]
+                .contains(defaultTargetPlatform)
+        ? WidgetsBinding.instance.platformDispatcher.alwaysUse24HourFormat
+        : null;
     return MaterialApp(
       // Clear forms and navigation when accounts change; never show another account's task.
       key: ValueKey('account-$accountId'),
       navigatorKey: _navigator,
       title: 'TaskFlow',
       debugShowCheckedModeBanner: false,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: regional
+          .localeFor(WidgetsBinding.instance.platformDispatcher.locales),
+      localeListResolutionCallback: (devices, supported) =>
+          regional.localeFor(devices),
+      localizationsDelegates: [
+        RegionalMaterialDelegate(
+            regional,
+            WidgetsBinding.instance.platformDispatcher.locales.firstOrNull ??
+                const Locale('en'),
+            system24Hour: system24Hour),
+        ...AppLocalizations.localizationsDelegates
+      ],
+      builder: (context, child) =>
+          regionalMedia(regional, context, child, system24Hour: system24Hour),
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
@@ -172,6 +212,7 @@ class _MyAppState extends ConsumerState<MyApp> {
         '/inbox': (_) => const HomeScreen(initialFilter: 3, isRoot: false),
         '/lists': (_) => const TaskListsScreen(),
         '/dataTransfer': (_) => const DataTransferScreen(),
+        '/region': (_) => const RegionalSettingsScreen(),
         '/calendar': (_) => const MainShell(),
         '/settings': (_) => const MainShell(initialIndex: 2),
         '/completedTasks': (_) => const CompletedTasksScreen(),

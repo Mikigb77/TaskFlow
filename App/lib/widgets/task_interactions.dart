@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,15 +13,17 @@ class TaskInteractions {
     final container = ProviderScope.containerOf(context, listen: false);
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
     try {
       await notifier.setCompleted(task, !task.isCompleted);
       if (!messenger.mounted) return;
       HapticFeedback.selectionClick();
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(
-        content: Text(task.isCompleted ? 'Task reopened' : 'Task completed'),
+        content: Text(
+            task.isCompleted ? strings.taskReopened : strings.taskCompleted),
         action: SnackBarAction(
-            label: 'Undo',
+            label: strings.undo,
             onPressed: () async {
               if (!messenger.mounted ||
                   !identical(container.read(taskProvider.notifier), notifier)) {
@@ -29,12 +32,12 @@ class TaskInteractions {
               try {
                 await notifier.setCompleted(task, task.isCompleted);
               } catch (_) {
-                _error(messenger, 'Could not undo. Please try again.');
+                _error(messenger, strings.undoError);
               }
             }),
       ));
     } catch (_) {
-      _error(messenger, 'Could not update this task. Please try again.');
+      _error(messenger, strings.taskUpdateError);
     }
   }
 
@@ -43,6 +46,7 @@ class TaskInteractions {
     final container = ProviderScope.containerOf(context, listen: false);
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
     final result = await showModalBottomSheet<
             ({DateTime? date, bool hasTime, String scope})>(
         context: context,
@@ -65,14 +69,14 @@ class TaskInteractions {
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(
           content: Text(result.scope == 'skip'
-              ? 'Occurrence skipped'
+              ? strings.occurrenceSkippedNotice
               : result.scope == 'reset'
-                  ? 'Original date restored'
+                  ? strings.originalRestored
                   : result.date == null
-                      ? 'Moved to Inbox'
-                      : 'Schedule updated'),
+                      ? strings.movedInbox
+                      : strings.scheduleUpdated),
           action: SnackBarAction(
-              label: 'Undo',
+              label: strings.undo,
               onPressed: () async {
                 if (!messenger.mounted ||
                     !identical(
@@ -84,15 +88,14 @@ class TaskInteractions {
                       ? await notifier.undoSchedule(seriesChange)
                       : await notifier.undoOccurrence(occurrenceChange!);
                   if (!restored) {
-                    _error(messenger,
-                        'The schedule changed again. Open the task to review it.');
+                    _error(messenger, strings.scheduleChangedAgain);
                   }
                 } catch (_) {
-                  _error(messenger, 'Could not undo. Please try again.');
+                  _error(messenger, strings.undoError);
                 }
               })));
     } catch (_) {
-      _error(messenger, 'Could not change the schedule. Please try again.');
+      _error(messenger, strings.scheduleError);
     }
   }
 
@@ -126,8 +129,8 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
     final date = await showDatePicker(
         context: context,
         initialDate: _date ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2101));
+        firstDate: pickerFirstDate(_date),
+        lastDate: pickerLastDate(_date));
     if (date != null && mounted) _setDay(date);
   }
 
@@ -141,8 +144,8 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
               children: [
                 Text(
                     widget.task.isRecurring
-                        ? 'Reschedule repeating task'
-                        : 'Reschedule task',
+                        ? context.l10n.rescheduleRepeating
+                        : context.l10n.rescheduleTask,
                     style: Theme.of(context).textTheme.titleLarge),
                 if (widget.task.isRecurring)
                   Padding(
@@ -154,8 +157,8 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                               for (final scope in ['occurrence', 'series'])
                                 ChoiceChip(
                                     label: Text(scope == 'occurrence'
-                                        ? 'This occurrence'
-                                        : 'Whole series'),
+                                        ? context.l10n.thisOccurrence
+                                        : context.l10n.wholeSeries),
                                     selected: _scope == scope,
                                     onSelected: (_) => setState(() {
                                           _scope = scope;
@@ -169,32 +172,32 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                             ]),
                             const SizedBox(height: 8),
                             Text(_scope == 'series'
-                                ? 'Changes the start of the series and resets individual moves or skips. Inbox stops the repeat.'
-                                : 'Other dates in the series stay the same.'),
+                                ? context.l10n.seriesRescheduleHelp
+                                : context.l10n.occurrenceRescheduleHelp),
                           ])),
                 const SizedBox(height: 16),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   ActionChip(
-                      label: const Text('Today'),
+                      label: Text(context.l10n.today),
                       onPressed: () => _setDay(DateTime.now())),
                   ActionChip(
-                      label: const Text('Tomorrow'),
+                      label: Text(context.l10n.tomorrow),
                       onPressed: () {
                         final now = DateTime.now();
                         _setDay(DateTime(now.year, now.month, now.day + 1));
                       }),
                   if (_scope == 'series')
                     ActionChip(
-                        label: const Text('Inbox'),
+                        label: Text(context.l10n.inbox),
                         onPressed: () => _setDay(null)),
                 ]),
                 ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.calendar_today_outlined),
                     title: Text(_date == null
-                        ? 'No date · Inbox'
-                        : DateFormat.yMMMEd().format(_date!)),
-                    subtitle: const Text('Choose date'),
+                        ? context.l10n.inboxDate
+                        : DateFormat.yMMMEd(context.localeName).format(_date!)),
+                    subtitle: Text(context.l10n.chooseDate),
                     onTap: _pickDay),
                 if (_date != null)
                   ListTile(
@@ -202,11 +205,11 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                       leading: const Icon(Icons.schedule_rounded),
                       title: Text(_hasTime
                           ? TimeOfDay.fromDateTime(_date!).format(context)
-                          : 'Any time'),
-                      subtitle: const Text('Choose time'),
+                          : context.l10n.anyTime),
+                      subtitle: Text(context.l10n.chooseTime),
                       trailing: _hasTime
                           ? IconButton(
-                              tooltip: 'Remove time',
+                              tooltip: context.l10n.removeTime,
                               icon: const Icon(Icons.close_rounded),
                               onPressed: () => setState(() {
                                     _hasTime = false;
@@ -233,19 +236,19 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
                     child: FilledButton(
                         onPressed: () => Navigator.pop(context,
                             (date: _date, hasTime: _hasTime, scope: _scope)),
-                        child: const Text('Save schedule'))),
+                        child: Text(context.l10n.saveSchedule))),
                 if (widget.task.isRecurring && _scope == 'occurrence') ...[
                   TextButton.icon(
                       onPressed: () => Navigator.pop(
                           context, (date: null, hasTime: false, scope: 'skip')),
                       icon: const Icon(Icons.event_busy_outlined),
-                      label: const Text('Skip this occurrence')),
+                      label: Text(context.l10n.skipOccurrence)),
                   if (widget.task.exceptions.any((change) =>
                       change.originalDate == widget.task.occurrenceId))
                     TextButton(
                         onPressed: () => Navigator.pop(context,
                             (date: null, hasTime: false, scope: 'reset')),
-                        child: const Text('Restore original date')),
+                        child: Text(context.l10n.restoreOriginal)),
                 ],
               ])));
 }

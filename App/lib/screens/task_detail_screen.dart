@@ -1,8 +1,8 @@
+import 'package:agenda/l10n/region.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
-import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as path;
 import 'package:agenda/models/task.dart';
@@ -28,17 +28,17 @@ class TaskDetailScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Delete task?'),
+                title: Text(context.l10n.deleteTaskQuestion),
                 content: Text(task.isRecurring
                     ? '“${task.title}” and all its occurrences will be removed.'
                     : '“${task.title}” will be removed.'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Keep task')),
+                      child: Text(context.l10n.keepTask)),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Delete'))
+                      child: Text(context.l10n.delete))
                 ]));
     if (confirmed != true || !context.mounted) return;
     try {
@@ -46,8 +46,8 @@ class TaskDetailScreen extends ConsumerWidget {
       if (context.mounted) Navigator.pop(context);
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not delete this task. Please try again.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.l10n.deleteTaskError)));
       }
     }
   }
@@ -56,13 +56,13 @@ class TaskDetailScreen extends ConsumerWidget {
     try {
       final result = await OpenFile.open(file);
       if (result.type.name != 'done' && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('This attachment is not available on this device.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.l10n.attachmentUnavailable)));
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open this attachment.')));
+            SnackBar(content: Text(context.l10n.attachmentOpenError)));
       }
     }
   }
@@ -85,36 +85,36 @@ class TaskDetailScreen extends ConsumerWidget {
                         series;
             if (task == null) {
               return Scaffold(
-                  appBar: const CustomAppBar(title: 'Task details'),
+                  appBar: CustomAppBar(title: context.l10n.taskDetails),
                   body: SingleChildScrollView(
                       child: Column(children: [
                     EmptyState(
                         title: series == null
-                            ? 'Task unavailable'
-                            : 'Occurrence changed',
+                            ? context.l10n.taskUnavailable
+                            : context.l10n.occurrenceChanged,
                         message: series == null
-                            ? 'This task may have been removed.'
-                            : 'This date is skipped or no longer part of the repeating schedule.'),
+                            ? context.l10n.taskRemoved
+                            : context.l10n.occurrenceSkipped),
                     if (series != null)
                       TextButton(
                           onPressed: () => Navigator.pushNamed(
                               context, '/editTask',
                               arguments: taskId),
-                          child: const Text('Edit repeating task')),
+                          child: Text(context.l10n.editRepeating)),
                   ])));
             }
             final attachments = [...task.filePaths, ...task.imagePaths]
                 .where((file) => file.isNotEmpty)
                 .toList();
             return Scaffold(
-              appBar: CustomAppBar(title: 'Task details', actions: [
+              appBar: CustomAppBar(title: context.l10n.taskDetails, actions: [
                 IconButton(
-                    tooltip: 'Edit task',
+                    tooltip: context.l10n.editTask,
                     onPressed: () => Navigator.pushNamed(context, '/editTask',
                         arguments: taskId),
                     icon: const Icon(Icons.edit_outlined)),
                 IconButton(
-                    tooltip: 'Delete task',
+                    tooltip: context.l10n.deleteTask,
                     onPressed: () => _delete(context, ref, task),
                     icon: Icon(Icons.delete_outline_rounded,
                         color: colors.onSurfaceVariant))
@@ -122,8 +122,9 @@ class TaskDetailScreen extends ConsumerWidget {
               body: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                   children: [
-                    SectionLabel(
-                        task.isCompleted ? 'Completed' : 'Your next step'),
+                    SectionLabel(task.isCompleted
+                        ? context.l10n.completed
+                        : context.l10n.nextStep),
                     Text(task.title,
                         style: Theme.of(context).textTheme.headlineLarge),
                     const SizedBox(height: 12),
@@ -139,9 +140,9 @@ class TaskDetailScreen extends ConsumerWidget {
                               } catch (_) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Could not move this task. Please retry.')));
+                                      SnackBar(
+                                          content:
+                                              Text(context.l10n.moveError)));
                                 }
                               }
                             })),
@@ -159,31 +160,35 @@ class TaskDetailScreen extends ConsumerWidget {
                               context,
                               Icons.calendar_today_outlined,
                               task.occurrenceDate != null
-                                  ? 'Occurrence'
+                                  ? context.l10n.occurrence
                                   : task.isRecurring
-                                      ? 'Starts'
-                                      : 'Date',
+                                      ? context.l10n.starts
+                                      : context.l10n.date,
                               task.displayDate == null
-                                  ? 'No date · Inbox'
-                                  : DateFormat('EEEE, d MMMM yyyy')
-                                      .format(task.displayDate!)),
+                                  ? context.l10n.inboxDate
+                                  : context.fullDate(task.displayDate!)),
                           const Divider(),
                           _detail(
                               context,
                               Icons.schedule_outlined,
-                              'Time',
+                              context.l10n.time,
                               task.hasTime
-                                  ? DateFormat('HH:mm')
-                                      .format(task.displayDate!)
-                                  : 'Any time'),
+                                  ? context.clockTime(task.displayDate!)
+                                  : context.l10n.anyTime),
                           if (task.isRecurring) ...[
                             const Divider(),
-                            _detail(context, Icons.repeat_rounded, 'Repeat',
-                                '${task.repeatLabel}${task.repeatUntil == null ? '' : ' until ${DateFormat('d MMM yyyy').format(task.repeatUntil!)}'}'),
+                            _detail(
+                                context,
+                                Icons.repeat_rounded,
+                                context.l10n.repeat,
+                                '${context.repeatLabel(task)}${task.repeatUntil == null ? '' : ' · ${context.l10n.untilDate(context.shortDate(task.repeatUntil!))}'}'),
                           ],
                           const Divider(),
-                          _detail(context, Icons.flag_outlined, 'Priority',
-                              AppTheme.priorityLabel(task.priority),
+                          _detail(
+                              context,
+                              Icons.flag_outlined,
+                              context.l10n.priority,
+                              context.priorityName(task.priority),
                               color: AppTheme.priorityColor(
                                   context, task.priority)),
                         ])),
@@ -204,9 +209,9 @@ class TaskDetailScreen extends ConsumerWidget {
                                 } catch (_) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                'Could not update the reminder. Please retry.')));
+                                        SnackBar(
+                                            content: Text(context
+                                                .l10n.updateReminderError)));
                                   }
                                 }
                               })),
@@ -248,7 +253,7 @@ class TaskDetailScreen extends ConsumerWidget {
                       ])),
                       const SizedBox(height: 24),
                     ],
-                    const SectionLabel('Notes'),
+                    SectionLabel(context.l10n.notes),
                     AppSurface(
                         child: SizedBox(
                             width: double.infinity,
@@ -305,23 +310,24 @@ class TaskDetailScreen extends ConsumerWidget {
                                 icon: Icon(task.isCompleted
                                     ? Icons.undo_rounded
                                     : Icons.check_rounded),
-                                label: Text(
-                                    task.isCompleted ? 'Reopen' : 'Complete')),
+                                label: Text(task.isCompleted
+                                    ? context.l10n.reopen
+                                    : context.l10n.complete)),
                             OutlinedButton.icon(
                                 onPressed: () => TaskInteractions.reschedule(
                                     context, ref, task),
                                 icon: const Icon(Icons.event_outlined),
-                                label: const Text('Reschedule')),
+                                label: Text(context.l10n.reschedule)),
                           ]))),
             );
           },
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (_, __) => const Scaffold(
-              appBar: CustomAppBar(title: 'Task details'),
+          error: (_, __) => Scaffold(
+              appBar: CustomAppBar(title: context.l10n.taskDetails),
               body: EmptyState(
                   title: 'Couldn’t load this task',
-                  message: 'Please try again in a moment.')),
+                  message: context.l10n.tryLater)),
         );
   }
 

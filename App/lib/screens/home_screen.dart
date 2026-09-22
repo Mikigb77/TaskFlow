@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -31,10 +32,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .where((list) => list.id == widget.listId)
         .firstOrNull;
     final title = widget.listId != null
-        ? list?.name ?? 'List'
+        ? list?.name ?? context.l10n.list
         : widget.isRoot
-            ? 'Tasks'
-            : 'Inbox';
+            ? context.l10n.tasks
+            : context.l10n.inbox;
     final labels = (tasks.valueOrNull ?? [])
         .expand((task) => task.labels)
         .toSet()
@@ -52,25 +53,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       children: [
                         SectionLabel(widget.listId != null
                             ? (list?.archived == true
-                                ? 'Archived list'
-                                : 'Your list')
+                                ? context.l10n.archivedList
+                                : context.l10n.yourList)
                             : widget.isRoot
-                                ? 'Everything you want to do'
-                                : 'No date needed'),
+                                ? context.l10n.everythingToDo
+                                : context.l10n.noDateNeeded),
                         Row(children: [
                           Expanded(
-                              child: Text(widget.isRoot ? 'Your tasks' : title,
+                              child: Text(
+                                  widget.isRoot
+                                      ? context.l10n.yourTasks
+                                      : title,
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineLarge)),
                           if (widget.isRoot)
                             IconButton(
-                                tooltip: 'Lists',
+                                tooltip: context.l10n.lists,
                                 onPressed: () =>
                                     Navigator.pushNamed(context, '/lists'),
                                 icon: const Icon(Icons.folder_outlined)),
                           IconButton(
-                              tooltip: 'Completed tasks',
+                              tooltip: context.l10n.completedTasks,
                               onPressed: () => Navigator.pushNamed(
                                   context, '/completedTasks'),
                               icon: const Icon(Icons.task_alt_rounded)),
@@ -79,19 +83,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         TextField(
                             onChanged: (value) => setState(
                                 () => _query = value.trim().toLowerCase()),
-                            decoration: const InputDecoration(
-                                hintText: 'Find a task…',
-                                prefixIcon: Icon(Icons.search_rounded),
+                            decoration: InputDecoration(
+                                hintText: context.l10n.findTask,
+                                prefixIcon: const Icon(Icons.search_rounded),
                                 isDense: true)),
                         const SizedBox(height: 12),
                         if (widget.isRoot)
                           Wrap(spacing: 8, runSpacing: 4, children: [
                             for (final entry in [
-                              (0, 'All tasks'),
-                              (3, 'Inbox'),
-                              (4, 'No list'),
-                              (1, 'Today'),
-                              (2, 'High priority')
+                              (0, context.l10n.allTasks),
+                              (3, context.l10n.inbox),
+                              (4, context.l10n.noList),
+                              (1, context.l10n.today),
+                              (2, context.l10n.highPriority)
                             ])
                               ChoiceChip(
                                   label: Text(entry.$2),
@@ -101,12 +105,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ]),
                         if (labels.isNotEmpty)
                           DropdownButton<String>(
-                              hint: const Text('Filter by label'),
+                              hint: Text(context.l10n.filterLabel),
                               value: labels.contains(_label) ? _label : null,
                               isExpanded: true,
                               items: [
-                                const DropdownMenuItem(
-                                    value: '', child: Text('All labels')),
+                                DropdownMenuItem(
+                                    value: '',
+                                    child: Text(context.l10n.allLabels)),
                                 for (final label in labels)
                                   DropdownMenuItem(
                                       value: label, child: Text('#$label'))
@@ -139,15 +144,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               return ListView(children: [
                 EmptyState(
                     title: _query.isNotEmpty
-                        ? 'No matching tasks'
-                        : 'A fresh start',
+                        ? context.l10n.noMatches
+                        : context.l10n.freshStart,
                     message: _query.isNotEmpty
-                        ? 'Try a different word or filter.'
+                        ? context.l10n.differentFilter
                         : widget.listId != null
-                            ? 'Add a task to this list. Its date and reminder are yours to choose.'
+                            ? context.l10n.listEmpty
                             : widget.isRoot
-                                ? 'Use Say a task to speak, or New task to type.\nAdd a date now or leave it for later.'
-                                : 'Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.',
+                                ? context.l10n.tasksEmpty
+                                : context.l10n.inboxEmpty,
                     icon: Icons.checklist_rounded),
               ]);
             }
@@ -157,11 +162,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, __) => EmptyState(
-              title: 'Couldn’t load your tasks',
-              message: 'Your saved tasks are still on your device.',
+              title: context.l10n.loadTasksError,
+              message: context.l10n.savedOnDevice,
               action: TextButton(
                   onPressed: () => ref.read(taskProvider.notifier).loadTasks(),
-                  child: Text('Try again',
+                  child: Text(context.l10n.tryAgain,
                       style: TextStyle(color: colors.primary)))),
         ),
       ),

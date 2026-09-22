@@ -10,6 +10,20 @@ import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/providers/regional_provider.dart';
+
+class MemoryRegionalStore extends RegionalPreferenceStore {
+  MemoryRegionalStore(
+      [this.value = const RegionalPreferences(
+          language: 'en', clock: ClockFormat.twentyFour, weekStart: 1)]);
+  RegionalPreferences value;
+  @override
+  Future<RegionalPreferences> read() async => value;
+  @override
+  Future<void> write(RegionalPreferences value) async {
+    this.value = value;
+  }
+}
 
 // Isolated UI fixtures: no real accounts, persistence, reminders or AI calls.
 class MemoryThemeStore extends ThemePreferenceStore {
@@ -120,8 +134,11 @@ class DesignTaskNotifier extends TaskNotifier {
   }
 }
 
-ProviderContainer designContainer({MemoryThemeStore? store}) =>
+ProviderContainer designContainer(
+        {MemoryThemeStore? store, RegionalPreferenceStore? regionalStore}) =>
     ProviderContainer(overrides: [
+      regionalStoreProvider
+          .overrideWithValue(regionalStore ?? MemoryRegionalStore()),
       pendingCapturesProvider.overrideWith((ref) async => []),
       taskListsProvider.overrideWith((ref) async => []),
       apiClientProvider.overrideWith((ref) {

@@ -8,6 +8,8 @@ import 'package:agenda/services/task_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'support/design_fixtures.dart';
 
 void main() {
   testWidgets('calendar task saves the chosen date and time after form changes',
@@ -231,7 +233,10 @@ Future<_MemoryTaskRepository> _pumpApp(WidgetTester tester) async {
 
   final repository = _MemoryTaskRepository();
   await tester.pumpWidget(ProviderScope(
-    overrides: [taskRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      taskRepositoryProvider.overrideWithValue(repository),
+      regionalStoreProvider.overrideWithValue(MemoryRegionalStore())
+    ],
     child: const MyApp(),
   ));
   await tester.pumpAndSettle();

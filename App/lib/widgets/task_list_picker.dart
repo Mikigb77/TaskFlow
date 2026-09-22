@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task_list_info.dart';
@@ -28,7 +29,9 @@ class TaskListPicker extends ConsumerWidget {
             constraints: const BoxConstraints(maxWidth: 230),
             child: Text(
                 selected?.name ??
-                    (listId == null ? 'No list' : 'List unavailable'),
+                    (listId == null
+                        ? context.l10n.noList
+                        : context.l10n.listUnavailable),
                 overflow: TextOverflow.ellipsis)),
         onPressed: onChanged == null
             ? null
@@ -37,13 +40,12 @@ class TaskListPicker extends ConsumerWidget {
                     context: context,
                     builder: (context) => SafeArea(
                             child: ListView(shrinkWrap: true, children: [
-                          const ListTile(
-                              title: Text('Move to a list'),
-                              subtitle: Text(
-                                  'Your date, reminder and task details stay the same.')),
+                          ListTile(
+                              title: Text(context.l10n.moveToList),
+                              subtitle: Text(context.l10n.moveToListHelp)),
                           ListTile(
                               leading: const Icon(Icons.folder_off_outlined),
-                              title: const Text('No list'),
+                              title: Text(context.l10n.noList),
                               selected: listId == null,
                               onTap: () => Navigator.pop(context, '')),
                           for (final list in lists.where(
@@ -53,14 +55,12 @@ class TaskListPicker extends ConsumerWidget {
                                     color: taskListColor(list.color)),
                                 title: Text(list.name),
                                 subtitle: list.archived
-                                    ? const Text('Archived')
+                                    ? Text(context.l10n.archived)
                                     : null,
                                 selected: listId == list.id,
                                 onTap: () => Navigator.pop(context, list.id)),
                           if (lists.isEmpty)
-                            const ListTile(
-                                title: Text(
-                                    'Create your first list from Tasks → Lists.')),
+                            ListTile(title: Text(context.l10n.createListHelp)),
                         ])));
                 if (chosen != null) onChanged!(chosen.isEmpty ? null : chosen);
               });

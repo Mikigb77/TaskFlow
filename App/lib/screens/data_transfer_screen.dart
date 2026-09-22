@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -127,7 +128,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
     return PopScope(
         canPop: !_busy,
         child: Scaffold(
-          appBar: const CustomAppBar(title: 'Export & import'),
+          appBar: CustomAppBar(title: context.l10n.exportImport),
           body: ListView(padding: const EdgeInsets.all(24), children: [
             Text('Keep your tasks with you.',
                 style: Theme.of(context).textTheme.headlineMedium),
@@ -206,7 +207,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
                           if (_imported.contains(row.sourceId))
                             'Already imported on this phone',
                           if (row.task != null)
-                            '${taskScheduleLabel(row.task!)} · ${row.task!.repeatLabel}',
+                            '${taskScheduleLabel(row.task!, context: context)} · ${context.repeatLabel(row.task!)}',
                           ...row.warnings,
                         ].join('\n')))),
               const SizedBox(height: 16),

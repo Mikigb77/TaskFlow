@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agenda/widgets/reminder_control.dart';
@@ -14,7 +15,6 @@ import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
-import 'package:agenda/theme/app_theme.dart';
 
 class ReviewTasksScreen extends ConsumerStatefulWidget {
   const ReviewTasksScreen(
@@ -162,19 +162,19 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                     minLines: notes ? 3 : 1,
                     maxLines: notes ? 6 : 2,
                     maxLength: notes ? 8000 : 160,
-                    decoration:
-                        InputDecoration(labelText: notes ? 'Notes' : 'Title')),
+                    decoration: InputDecoration(
+                        labelText: notes ? context.l10n.notes : 'Title')),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel')),
+                      child: Text(context.l10n.cancel)),
                   FilledButton(
                       onPressed: () {
                         if (notes || text.trim().isNotEmpty) {
                           Navigator.pop(context, text.trim());
                         }
                       },
-                      child: const Text('Keep changes'))
+                      child: Text(context.l10n.keepChanges))
                 ]));
     if (result == null || !mounted) return;
     await _change(item.copyWith(
@@ -194,17 +194,17 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
         builder: (context) => SafeArea(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
               for (final option in [
-                'Today',
-                'Tomorrow',
-                'Pick a date',
-                'No date'
+                ('today', context.l10n.today),
+                ('tomorrow', context.l10n.tomorrow),
+                ('pick', context.l10n.pickDate),
+                ('inbox', context.l10n.noDate)
               ])
                 ListTile(
-                    title: Text(option),
-                    onTap: () => Navigator.pop(context, option))
+                    title: Text(option.$2),
+                    onTap: () => Navigator.pop(context, option.$1))
             ])));
     if (selected == null || !mounted) return;
-    if (selected == 'No date') {
+    if (selected == 'inbox') {
       await _change(item.copyWith(
           task: item.task.copyWith(
               dueDate: null,
@@ -216,14 +216,14 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
               repeatUntil: null)));
       return;
     }
-    final day = selected == 'Pick a date'
+    final day = selected == 'pick'
         ? await showDatePicker(
             context: context,
             initialDate: item.task.dueDate ?? now,
-            firstDate: DateTime(2000),
-            lastDate: DateTime(2101))
+            firstDate: pickerFirstDate(item.task.dueDate),
+            lastDate: pickerLastDate(item.task.dueDate))
         : DateTime(
-            now.year, now.month, now.day + (selected == 'Tomorrow' ? 1 : 0));
+            now.year, now.month, now.day + (selected == 'tomorrow' ? 1 : 0));
     if (day == null || !mounted) return;
     final old = item.task.dueDate;
     final date = DateTime(day.year, day.month, day.day,
@@ -284,7 +284,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
     return PopScope(
         canPop: !_saving,
         child: Scaffold(
-          appBar: const CustomAppBar(title: 'Check your tasks'),
+          appBar: CustomAppBar(title: context.l10n.checkTasks),
           body: Center(
               child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 640),
@@ -293,14 +293,14 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                       children: [
                         Text(
                             pending.length == 1
-                                ? 'Look right?'
-                                : '$ready ready to save',
+                                ? context.l10n.lookRight
+                                : context.l10n.readyCount(ready),
                             style: Theme.of(context).textTheme.headlineMedium),
                         const SizedBox(height: 8),
                         Text(
                             uncertain > 0
-                                ? '$uncertain ${uncertain == 1 ? 'task needs' : 'tasks need'} a quick check. Save the ready ones whenever you like.'
-                                : 'Tap a detail to change it. You have the final say.',
+                                ? context.l10n.needsCheckCount(uncertain)
+                                : context.l10n.finalSay,
                             style: TextStyle(color: colors.onSurfaceVariant)),
                         if (_error != null)
                           Padding(
@@ -342,8 +342,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                           avatar: const Icon(
                                               Icons.calendar_today_outlined,
                                               size: 16),
-                                          label: Text(
-                                              taskScheduleLabel(item.task)),
+                                          label: Text(taskScheduleLabel(
+                                              item.task,
+                                              context: context)),
                                           onPressed: _saving
                                               ? null
                                               : () => _date(item)),
@@ -355,7 +356,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                               ? TimeOfDay.fromDateTime(
                                                       item.task.dueDate!)
                                                   .format(context)
-                                              : 'Add time'),
+                                              : context.l10n.addTime),
                                           onPressed: _saving
                                               ? null
                                               : () => _time(item),
@@ -367,7 +368,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                                   : null),
                                       PopupMenuButton<int>(
                                           enabled: !_saving,
-                                          tooltip: 'Change priority',
+                                          tooltip: context.l10n.changePriority,
                                           onSelected: (p) => _change(
                                               item.copyWith(
                                                   task: item.task
@@ -376,15 +377,20 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                                 for (final p in [1, 2, 3])
                                                   PopupMenuItem(
                                                       value: p,
-                                                      child: Text(
-                                                          '${AppTheme.priorityLabel(p)} priority'))
+                                                      child: Text(context.l10n
+                                                          .priorityValue(context
+                                                              .priorityName(
+                                                                  p))))
                                               ],
                                           child: Chip(
-                                              label: Text(
-                                                  '${AppTheme.priorityLabel(item.task.priority)} priority'))),
+                                              label: Text(context.l10n
+                                                  .priorityValue(
+                                                      context.priorityName(item
+                                                          .task.priority))))),
                                       ActionChip(
-                                          tooltip: 'Change repeat',
-                                          label: Text(item.task.repeatLabel),
+                                          tooltip: context.l10n.changeRepeat,
+                                          label: Text(
+                                              context.repeatLabel(item.task)),
                                           onPressed: _saving ||
                                                   item.task.dueDate == null
                                               ? null
@@ -411,7 +417,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                         label: Text(
                                             item.task.notes?.isNotEmpty == true
                                                 ? item.task.notes!
-                                                : 'Add notes',
+                                                : context.l10n.addNotes,
                                             textAlign: TextAlign.start)),
                                     TaskListPicker(
                                         listId: item.task.listId,
@@ -483,7 +489,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.done_all_rounded),
                       label: Text(_saving
-                          ? 'Saving…'
+                          ? context.l10n.saving
                           : ready == 0
                               ? 'Check the details above'
                               : 'Save $ready ${ready == 1 ? 'task' : 'tasks'}')))),

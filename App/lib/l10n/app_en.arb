@@ -1,0 +1,463 @@
+{
+  "@@locale": "en",
+  "calendar": "Calendar",
+  "tasks": "Tasks",
+  "settings": "Settings",
+  "yourCalendar": "Your calendar",
+  "inbox": "Inbox",
+  "inboxCount": "Inbox · {count}",
+  "@inboxCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "today": "Today",
+  "tomorrow": "Tomorrow",
+  "all": "All",
+  "upcoming": "Upcoming",
+  "completed": "Completed",
+  "noDate": "No date",
+  "anyTime": "Any time",
+  "addTime": "Add time",
+  "chooseDate": "Choose date",
+  "chooseTime": "Choose time",
+  "removeDate": "Remove date",
+  "removeTime": "Remove time",
+  "newTask": "New task",
+  "editTask": "Edit task",
+  "taskDetails": "Task details",
+  "sayTask": "Say a task",
+  "typeTasks": "Type tasks",
+  "unfinishedCaptures": "Unfinished captures",
+  "captureDiagnostics": "Capture diagnostics",
+  "lists": "Lists",
+  "labels": "Labels",
+  "noList": "No list",
+  "priority": "Priority",
+  "low": "Low",
+  "medium": "Medium",
+  "high": "High",
+  "schedule": "Schedule",
+  "date": "Date",
+  "time": "Time",
+  "repeat": "Repeat",
+  "neverRepeat": "Does not repeat",
+  "daily": "Daily",
+  "weekly": "Weekly",
+  "monthly": "Monthly",
+  "yearly": "Yearly",
+  "noEndDate": "No end date",
+  "notes": "Notes",
+  "addNotes": "Add notes",
+  "attachments": "Attachments",
+  "checklist": "Checklist",
+  "complete": "Complete",
+  "reopen": "Reopen",
+  "reschedule": "Reschedule",
+  "undo": "Undo",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "keepChanges": "Keep changes",
+  "createTask": "Create Task",
+  "saveChanges": "Save Changes",
+  "taskTitle": "Task Title",
+  "additionalNotes": "Additional Notes",
+  "moreDetails": "More details",
+  "fewerDetails": "Fewer details",
+  "appearance": "Appearance",
+  "chooseAppearance": "Choose your appearance",
+  "appearanceHelp": "Choose your look, or follow your device.",
+  "light": "Light",
+  "dark": "Dark",
+  "system": "System",
+  "yourSpace": "Your space",
+  "welcomeSettings": "Make yourself at home",
+  "notifications": "Notifications",
+  "notificationsHelp": "Reminder choices and upcoming alerts",
+  "accountBackup": "Account & backup",
+  "completedTasks": "Completed tasks",
+  "progressHelp": "A little record of your progress",
+  "exportImport": "Export & import",
+  "exportImportHelp": "TaskFlow backups and Todoist CSV migration",
+  "regionalSettings": "Language & region",
+  "regionalSettingsHelp": "Language, clock, week start and capture timezone",
+  "language": "Language",
+  "deviceDefault": "Follow device",
+  "clockFormat": "Time format",
+  "clock12": "12-hour clock",
+  "clock24": "24-hour clock",
+  "weekStart": "First day of the week",
+  "monday": "Monday",
+  "sunday": "Sunday",
+  "saturday": "Saturday",
+  "captureTimezone": "Capture timezone",
+  "timezoneHelp": "Used to interpret dates in new captures. Existing tasks and unfinished captures keep their schedules. Task times are displayed in your device timezone.",
+  "searchTimezone": "Find a timezone",
+  "regionHelp": "These preferences stay on this device. Changing them does not change stored task dates or times.",
+  "preferenceError": "Could not save this preference. Please try again.",
+  "timezoneFallback": "The device timezone is unavailable. New captures will use {zone}.",
+  "@timezoneFallback": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "week": "Week",
+  "month": "Month",
+  "syncTasks": "Sync tasks",
+  "previousPeriod": "Previous month or week",
+  "nextPeriod": "Next month or week",
+  "moreClarity": "More clarity. More room for life.",
+  "licenses": "Open-source licences",
+  "weekView": "Week view",
+  "monthView": "Month view",
+  "todayAgenda": "Today’s agenda",
+  "breathingRoom": "A little breathing room.",
+  "loadTasksError": "Couldn’t load your tasks",
+  "refreshCalendar": "Try refreshing your calendar.",
+  "tryAgain": "Try again",
+  "rememberPrompt": "What would you like to remember?",
+  "calendarEmpty": "Tap Say a task and speak naturally, or New task to type. Dates are optional; unscheduled tasks go to Inbox.",
+  "planTask": "Plan a task",
+  "homeCapture": "Capture from your home screen",
+  "homeCaptureHelp": "Android mic widget, app shortcuts and text sharing",
+  "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.",
+  "widgetPickerHelp": "Add the TaskFlow widget from your launcher’s widget picker.",
+  "signInHelp": "Sign in to keep your tasks with you",
+  "diagnosticsHelp": "Local timing and counters, without your words",
+  "appearanceError": "Could not save your appearance preference.",
+  "appearanceChangedError": "Appearance changed. Could not save the preference on this device.",
+  "switchLight": "Switch to light mode",
+  "switchDark": "Switch to dark mode",
+  "list": "List",
+  "archivedList": "Archived list",
+  "yourList": "Your list",
+  "yourTasks": "Your tasks",
+  "everythingToDo": "Everything you want to do",
+  "noDateNeeded": "No date needed",
+  "findTask": "Find a task…",
+  "allTasks": "All tasks",
+  "highPriority": "High priority",
+  "filterLabel": "Filter by label",
+  "allLabels": "All labels",
+  "noMatches": "No matching tasks",
+  "freshStart": "A fresh start",
+  "differentFilter": "Try a different word or filter.",
+  "listEmpty": "Add a task to this list. Its date and reminder are yours to choose.",
+  "tasksEmpty": "Use Say a task to speak, or New task to type.\nAdd a date now or leave it for later.",
+  "inboxEmpty": "Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.",
+  "savedOnDevice": "Your saved tasks are still on your device.",
+  "checkCaptures": "Check unfinished captures",
+  "createVoiceTask": "Create task with voice",
+  "createTaskTooltip": "Create task",
+  "reviewTask": "Review task",
+  "fineTunePlan": "Fine-tune your plan.",
+  "onYourMind": "What’s on your mind?",
+  "wordsPlan": "Your words, a clear plan.",
+  "seriesEdits": "Edits apply to the whole repeating task.",
+  "giveName": "Give it a name. Add a date whenever you’re ready.",
+  "checkBeforeAdd": "Check the details before adding it to your calendar.",
+  "titleRequired": "Please enter a task title.",
+  "nameTask": "What would you like to do?",
+  "chooseReminder": "Choose reminder",
+  "reminder": "Reminder",
+  "off": "Off",
+  "useReminder": "Use reminder",
+  "dateForReminder": "Add a date to use a reminder",
+  "chooseAlertTime": "Choose alert time",
+  "defaultTime": "Use default time",
+  "reminderDefaultsError": "Reminder defaults could not load. Check notification settings.",
+  "loadingReminders": "Loading reminder settings…",
+  "remindersDisabled": "Reminders are off on this device",
+  "repeatInterval": "Repeat interval",
+  "repeatOn": "Repeat on",
+  "repeatUsesStart": "Uses the weekday of the start date.",
+  "intervalRange": "Choose a number from 1 to 99.",
+  "removeEndDate": "Remove end date",
+  "keepRepeat": "Keep repeat",
+  "days": "days",
+  "weeks": "weeks",
+  "months": "months",
+  "years": "years",
+  "deleteTask": "Delete task",
+  "deleteTaskQuestion": "Delete task?",
+  "keepTask": "Keep task",
+  "deleteTaskError": "Could not delete this task. Please try again.",
+  "attachmentUnavailable": "This attachment is not available on this device.",
+  "attachmentOpenError": "Could not open this attachment.",
+  "taskUnavailable": "Task unavailable",
+  "occurrenceChanged": "Occurrence changed",
+  "taskRemoved": "This task may have been removed.",
+  "occurrenceSkipped": "This date is skipped or no longer part of the repeating schedule.",
+  "editRepeating": "Edit repeating task",
+  "nextStep": "Your next step",
+  "moveError": "Could not move this task. Please retry.",
+  "occurrence": "Occurrence",
+  "starts": "Starts",
+  "inboxDate": "No date · Inbox",
+  "updateReminderError": "Could not update the reminder. Please retry.",
+  "thisOccurrence": "This occurrence",
+  "wholeSeries": "Whole series",
+  "skipOccurrence": "Skip this occurrence",
+  "resetOccurrence": "Reset this occurrence",
+  "reset": "Reset",
+  "captureThought": "Capture a thought",
+  "captureIntro": "One task or several. Say it naturally, or type your plan.",
+  "stopDraft": "Stop and create draft",
+  "recordTasks": "Record tasks",
+  "stopRecording": "Stop recording",
+  "puttingPlanTogether": "Putting your plan together…",
+  "recordingKept": "Recording kept on this phone",
+  "tapSpeak": "Tap to speak",
+  "inputLevel": "Microphone input level",
+  "tapStopHelp": "Tap stop when you’re finished. Up to 60 seconds.",
+  "returnCaptureHelp": "You can leave and return. Unfinished recordings are kept.",
+  "speechOptions": "Speech options",
+  "onDeviceTranscript": "On-device live transcript",
+  "onlineAudio": "Saved audio · online transcription",
+  "liveTranscript": "Live transcript",
+  "savedAudio": "Saved audio",
+  "speechLanguage": "Speech language",
+  "deviceLanguage": "Device language",
+  "onDeviceUnavailable": "On-device speech is unavailable for this language on this device. Record audio for online processing, or type.",
+  "setUpSpeech": "Set up on-device speech",
+  "checkAgain": "Check again",
+  "holdTalk": "Hold to talk",
+  "holdTalkHelp": "Hold the mic, then release. Tapping still works.",
+  "typePlan": "Or type your plan",
+  "examplePlan": "Doctor Friday at 5 p.m. Bring my results. Also buy coffee.",
+  "tryRecording": "Try this recording",
+  "reviewText": "Review tasks from text",
+  "discardCapture": "Discard capture",
+  "discardCaptureQuestion": "Discard this capture?",
+  "discard": "Discard",
+  "keep": "Keep",
+  "guestTrialHelp": "Try voice without an account. A small daily allowance is shared by devices on this connection.",
+  "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.",
+  "checkTasks": "Check your tasks",
+  "lookRight": "Look right?",
+  "finalSay": "Tap a detail to change it. You have the final say.",
+  "changePriority": "Change priority",
+  "changeRepeat": "Change repeat",
+  "confirmedDetails": "I’ve checked this task",
+  "agendaCounts": "{remaining} to do · {done} completed",
+  "@agendaCounts": {
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "completionCount": "{done} of {total} tasks completed",
+  "@completionCount": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pendingCaptureCount": "Unfinished captures · {count}",
+  "@pendingCaptureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningSeconds": "Listening · {time}",
+  "@listeningSeconds": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "nativeSpeechHelp": "On-device speech · {language}. Words appear below and are kept as you speak.",
+  "@nativeSpeechHelp": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatEvery": "Every {interval} {unit}",
+  "@repeatEvery": {
+    "placeholders": {
+      "interval": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatEveryPrompt": "Repeat every… {unit}",
+  "@repeatEveryPrompt": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "untilDate": "Until {date}",
+  "@untilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "readyCount": "{count} ready to save",
+  "@readyCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "needsCheckCount": "{count, plural, =1{1 task needs} other{{count} tasks need}} a quick check. Save the ready ones whenever you like.",
+  "@needsCheckCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "priorityValue": "{priority} priority",
+  "@priorityValue": {
+    "placeholders": {
+      "priority": {
+        "type": "String"
+      }
+    }
+  },
+  "pickDate": "Pick a date",
+  "typeTask": "Type a task",
+  "addStepDialog": "Add a step",
+  "editStep": "Edit step",
+  "step": "Step",
+  "shortStep": "Add a short step.",
+  "keepStep": "Keep step",
+  "repeatingSteps": "These steps repeat with the task. Check them off from an occurrence’s details.",
+  "moveUp": "Move up",
+  "moveDown": "Move down",
+  "removeStep": "Remove step",
+  "addChecklist": "Add checklist",
+  "addStep": "Add step",
+  "listUnavailable": "List unavailable",
+  "moveToList": "Move to a list",
+  "moveToListHelp": "Your date, reminder and task details stay the same.",
+  "archived": "Archived",
+  "createListHelp": "Create your first list from Tasks → Lists.",
+  "taskReopened": "Task reopened",
+  "taskCompleted": "Task completed",
+  "undoError": "Could not undo. Please try again.",
+  "taskUpdateError": "Could not update this task. Please try again.",
+  "occurrenceSkippedNotice": "Occurrence skipped",
+  "originalRestored": "Original date restored",
+  "movedInbox": "Moved to Inbox",
+  "scheduleUpdated": "Schedule updated",
+  "scheduleChangedAgain": "The schedule changed again. Open the task to review it.",
+  "scheduleError": "Could not change the schedule. Please try again.",
+  "rescheduleRepeating": "Reschedule repeating task",
+  "rescheduleTask": "Reschedule task",
+  "seriesRescheduleHelp": "Changes the start of the series and resets individual moves or skips. Inbox stops the repeat.",
+  "occurrenceRescheduleHelp": "Other dates in the series stay the same.",
+  "saveSchedule": "Save schedule",
+  "restoreOriginal": "Restore original date",
+  "progressSmall": "Progress starts small",
+  "completedEmpty": "Every task you finish will find a home here.",
+  "progressHeading": "Look how far you’ve come.",
+  "completedLoadError": "Couldn’t load completed tasks",
+  "tryLater": "Please try again in a moment.",
+  "suggestionApplied": "Schedule suggestion applied",
+  "changeSeriesQuestion": "Change the repeating schedule?",
+  "changeSeriesHelp": "This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.",
+  "keepEditing": "Keep editing",
+  "resetSave": "Reset and save",
+  "taskSavedInbox": "Task saved to Inbox",
+  "taskAddedCalendar": "Task added to your calendar",
+  "changesSaved": "Changes saved",
+  "taskSaveError": "Could not save your task. Please try again.",
+  "localAttachmentHelp": "Attachments currently stay on this phone. Signing in restores your tasks, but these files will not appear on another device.",
+  "choosePhoto": "Choose a photo",
+  "attachFile": "Attach a file",
+  "attachError": "Could not attach that file. Please try again.",
+  "capturedWords": "Captured from your words",
+  "titleRequiredField": "Please enter a task title",
+  "keepAsTitle": "Keep as title",
+  "ambiguousTimeHelp": "Choose AM/PM or add the time yourself. No hour has been inferred.",
+  "clearDate": "Clear date",
+  "optionalTime": "Time (optional)",
+  "resetDateHelp": "Reset a date, then save your changes.",
+  "skipped": "Skipped",
+  "theDetails": "The details",
+  "labelLimit": "Use up to 10 labels, each under 33 characters.",
+  "notesHint": "Anything you’d like to remember…",
+  "addAttachment": "Add attachment",
+  "localAttachments": "Attachments stay on this device.",
+  "saving": "Saving…",
+  "saveChangesSentence": "Save changes",
+  "useSchedule": "Use {schedule}",
+  "@useSchedule": {
+    "placeholders": {
+      "schedule": {
+        "type": "String"
+      }
+    }
+  },
+  "checklistCount": "Checklist · {done}/{total}",
+  "@checklistCount": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "checklistSemantics": "Checklist, {done} of {total} steps completed",
+  "@checklistSemantics": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "useDefault": "Use default",
+  "atScheduledTime": "At the scheduled time",
+  "hourBefore": "1 hour before",
+  "dayBefore": "1 day before",
+  "deviceOff": "device off",
+  "defaultChoice": "default",
+  "minutesBefore": "{minutes} minutes before",
+  "@minutesBefore": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderValue": "Reminder: {value}",
+  "@reminderValue": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  }
+}

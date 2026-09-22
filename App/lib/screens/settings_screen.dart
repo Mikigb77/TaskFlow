@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/theme_provider.dart';
@@ -14,22 +15,23 @@ class SettingsScreen extends ConsumerWidget {
     final colors = Theme.of(context).colorScheme;
     final account = ref.watch(authProvider).account;
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Settings', isRoot: true),
+      appBar: CustomAppBar(title: context.l10n.settings, isRoot: true),
       body: ListView(
           padding: const EdgeInsets.fromLTRB(24, 10, 24, 32),
           children: [
-            const SectionLabel('Make yourself at home'),
-            Text('Settings', style: Theme.of(context).textTheme.headlineLarge),
+            SectionLabel(context.l10n.welcomeSettings),
+            Text(context.l10n.settings,
+                style: Theme.of(context).textTheme.headlineLarge),
             const SizedBox(height: 28),
-            const SectionLabel('Appearance'),
+            SectionLabel(context.l10n.appearance),
             AppSurface(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text('Choose your appearance',
+                  Text(context.l10n.chooseAppearance,
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 6),
-                  Text('Choose your look, or follow your device.',
+                  Text(context.l10n.appearanceHelp,
                       style: TextStyle(color: colors.onSurfaceVariant)),
                   const SizedBox(height: 20),
                   LayoutBuilder(
@@ -39,17 +41,17 @@ class SettingsScreen extends ConsumerWidget {
                               (
                                 ThemeMode.light,
                                 Icons.light_mode_outlined,
-                                'Light'
+                                context.l10n.light
                               ),
                               (
                                 ThemeMode.dark,
                                 Icons.dark_mode_outlined,
-                                'Dark'
+                                context.l10n.dark
                               ),
                               (
                                 ThemeMode.system,
                                 Icons.brightness_auto_outlined,
-                                'System'
+                                context.l10n.system
                               )
                             ])
                               SizedBox(
@@ -73,9 +75,10 @@ class SettingsScreen extends ConsumerWidget {
                                               } catch (_) {
                                                 if (context.mounted) {
                                                   ScaffoldMessenger.of(context)
-                                                      .showSnackBar(const SnackBar(
-                                                          content: Text(
-                                                              'Could not save your appearance preference.')));
+                                                      .showSnackBar(SnackBar(
+                                                          content: Text(context
+                                                              .l10n
+                                                              .appearanceError)));
                                                 }
                                               }
                                             },
@@ -117,33 +120,36 @@ class SettingsScreen extends ConsumerWidget {
                           ])),
                 ])),
             const SizedBox(height: 28),
-            const SectionLabel('Your space'),
+            ListTile(
+                leading: Icon(Icons.language, color: colors.primary),
+                title: Text(context.l10n.regionalSettings),
+                subtitle: Text(context.l10n.regionalSettingsHelp),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.pushNamed(context, '/region')),
+            const SizedBox(height: 16),
+            SectionLabel(context.l10n.yourSpace),
             AppSurface(
                 padding: EdgeInsets.zero,
                 child: Column(children: [
                   ListTile(
                       leading:
                           Icon(Icons.widgets_outlined, color: colors.primary),
-                      title: const Text('Capture from your home screen'),
-                      subtitle: const Text(
-                          'Android mic widget, app shortcuts and text sharing'),
+                      title: Text(context.l10n.homeCapture),
+                      subtitle: Text(context.l10n.homeCaptureHelp),
                       onTap: () async {
                         try {
                           final opened = await ref
                               .read(captureEntriesProvider)
                               .pinWidget();
                           if (!opened && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.')));
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(
+                                    context.l10n.homeCaptureInstructions)));
                           }
                         } catch (_) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Add the TaskFlow widget from your launcher’s widget picker.')));
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(context.l10n.widgetPickerHelp)));
                           }
                         }
                       }),
@@ -151,9 +157,8 @@ class SettingsScreen extends ConsumerWidget {
                   ListTile(
                       leading: Icon(Icons.import_export_rounded,
                           color: colors.primary),
-                      title: const Text('Export & import'),
-                      subtitle: const Text(
-                          'TaskFlow backups and Todoist CSV migration'),
+                      title: Text(context.l10n.exportImport),
+                      subtitle: Text(context.l10n.exportImportHelp),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () =>
                           Navigator.pushNamed(context, '/dataTransfer')),
@@ -163,9 +168,8 @@ class SettingsScreen extends ConsumerWidget {
                           horizontal: 20, vertical: 8),
                       leading: Icon(Icons.notifications_outlined,
                           color: colors.primary),
-                      title: const Text('Notifications'),
-                      subtitle:
-                          const Text('Reminder choices and upcoming alerts'),
+                      title: Text(context.l10n.notifications),
+                      subtitle: Text(context.l10n.notificationsHelp),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () =>
                           Navigator.pushNamed(context, '/notifications')),
@@ -175,10 +179,8 @@ class SettingsScreen extends ConsumerWidget {
                           horizontal: 20, vertical: 8),
                       leading: Icon(Icons.person_outline_rounded,
                           color: colors.primary),
-                      title: const Text('Account & backup'),
-                      subtitle: Text(
-                          account?.email ??
-                              'Sign in to keep your tasks with you',
+                      title: Text(context.l10n.accountBackup),
+                      subtitle: Text(account?.email ?? context.l10n.signInHelp,
                           overflow: TextOverflow.ellipsis),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => Navigator.pushNamed(context, '/account')),
@@ -188,8 +190,8 @@ class SettingsScreen extends ConsumerWidget {
                           horizontal: 20, vertical: 8),
                       leading:
                           Icon(Icons.task_alt_rounded, color: colors.primary),
-                      title: const Text('Completed tasks'),
-                      subtitle: const Text('A little record of your progress'),
+                      title: Text(context.l10n.completedTasks),
+                      subtitle: Text(context.l10n.progressHelp),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () =>
                           Navigator.pushNamed(context, '/completedTasks')),
@@ -197,16 +199,15 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             ListTile(
                 leading: const Icon(Icons.speed_rounded),
-                title: const Text('Capture diagnostics'),
-                subtitle:
-                    const Text('Local timing and counters, without your words'),
+                title: Text(context.l10n.captureDiagnostics),
+                subtitle: Text(context.l10n.diagnosticsHelp),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () =>
                     Navigator.pushNamed(context, '/captureDiagnostics')),
             TextButton(
                 onPressed: () => showLicensePage(
                     context: context, applicationName: 'TaskFlow'),
-                child: const Text('Open-source licences')),
+                child: Text(context.l10n.licenses)),
             const SizedBox(height: 16),
             Text('taskflow',
                 textAlign: TextAlign.center,
@@ -215,7 +216,7 @@ class SettingsScreen extends ConsumerWidget {
                     .titleMedium!
                     .copyWith(color: colors.onSurfaceVariant)),
             const SizedBox(height: 6),
-            Text('More clarity. More room for life.',
+            Text(context.l10n.moreClarity,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
           ]),

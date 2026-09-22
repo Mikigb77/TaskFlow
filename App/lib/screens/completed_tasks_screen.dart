@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -10,7 +11,7 @@ class CompletedTasksScreen extends ConsumerWidget {
   const CompletedTasksScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-        appBar: const CustomAppBar(title: 'Completed tasks'),
+        appBar: CustomAppBar(title: context.l10n.completedTasks),
         body: ref.watch(taskProvider).when(
               data: (tasks) {
                 final completed = tasks
@@ -23,11 +24,10 @@ class CompletedTasksScreen extends ConsumerWidget {
                             : <Task>[])
                     .toList();
                 if (completed.isEmpty) {
-                  return const SingleChildScrollView(
+                  return SingleChildScrollView(
                       child: EmptyState(
-                          title: 'Progress starts small',
-                          message:
-                              'Every task you finish will find a home here.',
+                          title: context.l10n.progressSmall,
+                          message: context.l10n.completedEmpty,
                           icon: Icons.task_alt_rounded));
                 }
                 return Column(
@@ -38,7 +38,7 @@ class CompletedTasksScreen extends ConsumerWidget {
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Look how far you’ve come.',
+                                Text(context.l10n.progressHeading,
                                     style: Theme.of(context)
                                         .textTheme
                                         .headlineSmall),
@@ -50,9 +50,9 @@ class CompletedTasksScreen extends ConsumerWidget {
                     ]);
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const EmptyState(
-                  title: 'Couldn’t load completed tasks',
-                  message: 'Please try again in a moment.'),
+              error: (_, __) => EmptyState(
+                  title: context.l10n.completedLoadError,
+                  message: context.l10n.tryLater),
             ),
       );
 }

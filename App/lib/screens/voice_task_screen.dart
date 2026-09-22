@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -31,6 +32,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   late final String _owner;
   CaptureSession? _session;
   String _zone = 'UTC';
+  bool _timezoneFallback = false;
   Timer? _timer;
   StreamSubscription<Amplitude>? _amplitude;
   Future<void> _writes = Future.value();
@@ -90,9 +92,11 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     try {
       _capability = await _speech.capability();
       _nativeMode = _capability.usable;
-      try {
-        _zone = (await FlutterTimezone.getLocalTimezone()).identifier;
-      } catch (_) {/* Account or UTC fallback. */}
+      await ref.read(regionalProvider.notifier).ready;
+      final zone = await CaptureTimezone.resolve(ref.read(regionalProvider),
+          accountTimezone: _zone);
+      _zone = zone.identifier;
+      _timezoneFallback = zone.fallback;
       await _store.cleanFinished(_owner);
       if (widget.captureId != null) {
         _session = await _store.read(widget.captureId!, _owner);
@@ -101,6 +105,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         }
         if (!mounted) return;
         _zone = _session!.timezone;
+        _timezoneFallback = false;
         _words.text = _session!.text;
         await CaptureDiagnostics(_store.database).record(CaptureEvent.resumed);
         if (_session!.drafts.isNotEmpty && mounted) {
@@ -425,16 +430,16 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Discard this capture?'),
+                title: Text(context.l10n.discardCaptureQuestion),
                 content: const Text(
                     'The recording and unsaved drafts will be removed. Tasks already saved will stay.'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Keep')),
+                      child: Text(context.l10n.keep)),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Discard'))
+                      child: Text(context.l10n.discard))
                 ]));
     if (confirmed != true) return;
     try {
@@ -496,18 +501,17 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     final colors = Theme.of(context).colorScheme;
     final recorded = _session?.audioPath != null;
     return Scaffold(
-        appBar: const CustomAppBar(title: 'Capture a thought'),
+        appBar: CustomAppBar(title: context.l10n.captureThought),
         body: Center(
             child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: ListView(
                     padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
                     children: [
-                      Text('What’s on your mind?',
+                      Text(context.l10n.onYourMind,
                           style: Theme.of(context).textTheme.headlineMedium),
                       const SizedBox(height: 8),
-                      Text(
-                          'One task or several. Say it naturally, or type your plan.',
+                      Text(context.l10n.captureIntro,
                           style: TextStyle(color: colors.onSurfaceVariant)),
                       const SizedBox(height: 24),
                       AppSurface(
@@ -534,8 +538,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                             child: Semantics(
                                 button: true,
                                 label: _recording
-                                    ? 'Stop and create draft'
-                                    : 'Record tasks',
+                                    ? context.l10n.stopDraft
+                                    : context.l10n.recordTasks,
                                 child: IconButton.filledTonal(
                                     key: const ValueKey('capture-mic'),
                                     iconSize: 44,
@@ -545,8 +549,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                                     tooltip: _holdToTalk
                                         ? null
                                         : _recording
-                                            ? 'Stop recording'
-                                            : 'Record tasks',
+                                            ? context.l10n.stopRecording
+                                            : context.l10n.recordTasks,
                                     onPressed:
                                         _busy || (recorded && !_recording)
                                             ? null
@@ -563,26 +567,28 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                         const SizedBox(height: 16),
                         Text(
                             _recording
-                                ? 'Listening · 00:${_seconds.toString().padLeft(2, '0')}'
+                                ? context.l10n.listeningSeconds(
+                                    '00:${_seconds.toString().padLeft(2, '0')}')
                                 : _busy
-                                    ? 'Putting your plan together…'
+                                    ? context.l10n.puttingPlanTogether
                                     : recorded
-                                        ? 'Recording kept on this phone'
-                                        : 'Tap to speak',
+                                        ? context.l10n.recordingKept
+                                        : context.l10n.tapSpeak,
                             style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 12),
                         if (_recording)
                           LinearProgressIndicator(
                               value: _level,
-                              semanticsLabel: 'Microphone input level'),
+                              semanticsLabel: context.l10n.inputLevel),
                         if (_busy) const LinearProgressIndicator(),
                         const SizedBox(height: 12),
                         Text(
                             _recording
-                                ? 'Tap stop when you’re finished. Up to 60 seconds.'
+                                ? context.l10n.tapStopHelp
                                 : _nativeMode
-                                    ? 'On-device speech · ${_capability.language}. Words appear below and are kept as you speak.'
-                                    : 'You can leave and return. Unfinished recordings are kept.',
+                                    ? context.l10n
+                                        .nativeSpeechHelp(_capability.language)
+                                    : context.l10n.returnCaptureHelp,
                             textAlign: TextAlign.center,
                             style: TextStyle(color: colors.onSurfaceVariant)),
                       ])),
@@ -590,31 +596,32 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                         const SizedBox(height: 12),
                         ExpansionTile(
                             tilePadding: EdgeInsets.zero,
-                            title: const Text('Speech options'),
+                            title: Text(context.l10n.speechOptions),
                             subtitle: Text(_nativeMode
-                                ? 'On-device live transcript'
-                                : 'Saved audio · online transcription'),
+                                ? context.l10n.onDeviceTranscript
+                                : context.l10n.onlineAudio),
                             children: [
                               Wrap(spacing: 8, runSpacing: 4, children: [
                                 if (_capability.usable)
                                   ChoiceChip(
-                                      label: const Text('Live transcript'),
+                                      label: Text(context.l10n.liveTranscript),
                                       selected: _nativeMode,
                                       onSelected: (_) =>
                                           setState(() => _nativeMode = true)),
                                 ChoiceChip(
-                                    label: const Text('Saved audio'),
+                                    label: Text(context.l10n.savedAudio),
                                     selected: !_nativeMode,
                                     onSelected: (_) =>
                                         setState(() => _nativeMode = false)),
                                 PopupMenuButton<String>(
-                                    tooltip: 'Speech language',
+                                    tooltip: context.l10n.speechLanguage,
                                     enabled: !_probing,
                                     onSelected: (value) => _chooseLanguage(
                                         value == 'device' ? null : value),
                                     itemBuilder: (_) => [
                                           for (final entry in {
-                                            'device': 'Device language',
+                                            'device':
+                                                context.l10n.deviceLanguage,
                                             'en-US': 'English',
                                             'es-ES': 'Español'
                                           }.entries)
@@ -625,15 +632,17 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                                                         entry.key,
                                                 child: Text(entry.value)),
                                         ],
-                                    child: const Padding(
-                                        padding: EdgeInsets.all(12),
-                                        child: Text('Speech language'))),
+                                    child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child:
+                                            Text(context.l10n.speechLanguage))),
                               ]),
                               if (!_capability.usable)
-                                const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 8),
-                                    child: Text(
-                                        'On-device speech is unavailable for this language on this device. Record audio for online processing, or type.')),
+                                Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    child:
+                                        Text(context.l10n.onDeviceUnavailable)),
                               if (_capability.onDevice && !_capability.usable)
                                 Wrap(spacing: 8, children: [
                                   TextButton(
@@ -654,19 +663,17 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                                           }
                                         }
                                       },
-                                      child: const Text(
-                                          'Set up on-device speech')),
+                                      child: Text(context.l10n.setUpSpeech)),
                                   TextButton(
                                       onPressed: _probing
                                           ? null
                                           : () => _chooseLanguage(_language),
-                                      child: const Text('Check again')),
+                                      child: Text(context.l10n.checkAgain)),
                                 ]),
                               SwitchListTile.adaptive(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('Hold to talk'),
-                                  subtitle: const Text(
-                                      'Hold the mic, then release. Tapping still works.'),
+                                  title: Text(context.l10n.holdTalk),
+                                  subtitle: Text(context.l10n.holdTalkHelp),
                                   value: _holdToTalk,
                                   onChanged: (value) =>
                                       setState(() => _holdToTalk = value)),
@@ -683,10 +690,9 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                             maxLength: 4000,
                             decoration: InputDecoration(
                                 labelText: _usingNative && _recording
-                                    ? 'Live transcript'
-                                    : 'Or type your plan',
-                                hintText:
-                                    'Doctor Friday at 5 p.m. Bring my results. Also buy coffee.',
+                                    ? context.l10n.liveTranscript
+                                    : context.l10n.typePlan,
+                                hintText: context.l10n.examplePlan,
                                 counterText: '')),
                       ],
                       const SizedBox(height: 16),
@@ -694,8 +700,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                           onPressed: _busy || _recording ? null : _process,
                           icon: const Icon(Icons.auto_awesome_outlined),
                           label: Text(recorded
-                              ? 'Try this recording'
-                              : 'Review tasks from text')),
+                              ? context.l10n.tryRecording
+                              : context.l10n.reviewText)),
                       if (_error != null)
                         Padding(
                             padding: const EdgeInsets.only(top: 16),
@@ -703,14 +709,14 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                       if (_session != null)
                         TextButton(
                             onPressed: _busy || _recording ? null : _discard,
-                            child: const Text('Discard capture')),
+                            child: Text(context.l10n.discardCapture)),
                       const SizedBox(height: 16),
+                      if (_timezoneFallback)
+                        MessageBanner(context.l10n.timezoneFallback(_zone)),
                       if (ref.watch(authProvider).account == null)
-                        const Text(
-                            'Try voice without an account. A small daily allowance is shared by devices on this connection.'),
+                        Text(context.l10n.guestTrialHelp),
                       const SizedBox(height: 12),
-                      Text(
-                          'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.',
+                      Text(context.l10n.capturePrivacy,
                           style: TextStyle(
                               fontSize: 12, color: colors.onSurfaceVariant)),
                     ]))));

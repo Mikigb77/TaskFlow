@@ -124,7 +124,7 @@ void main() {
     final container =
         await openReview(tester, [draft('Buy coffee'), draft('Pay invoice')]);
     expect(find.text('Inbox · No date'), findsOneWidget);
-    expect(find.text('25 Sep · Any time'), findsOneWidget);
+    expect(find.text('Sep 25 · Any time'), findsOneWidget);
     expect(container.read(taskProvider).requireValue.length, 4);
     await tester.tap(find.byTooltip('Edit Buy coffee'));
     await tester.pumpAndSettle();

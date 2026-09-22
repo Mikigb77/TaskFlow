@@ -77,6 +77,14 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("password", response.data["user"])
 
+    def test_missing_registration_timezone_uses_utc_without_changing_existing_profiles(self):
+        response = APIClient().post("/api/auth/register/", {
+            "email": "no-zone@example.invalid", "password": PASSWORD,
+        }, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["user"]["timezone"], "UTC")
+        self.assertEqual(User.objects.get(email=self.credentials["email"]).timezone, "Europe/Madrid")
+
     def test_personal_lists_are_private_and_foreign_assignment_is_rejected(self):
         list_id = str(uuid.uuid4())
         payload = {"name": "Work", "color": "blue", "version": 0}

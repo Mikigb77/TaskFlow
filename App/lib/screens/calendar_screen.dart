@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -73,7 +74,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final syncError = ref.read(taskRepositoryProvider).syncError;
     final today = isSameDay(_selectedDay, DateTime.now());
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Calendar', isRoot: true),
+      appBar: CustomAppBar(title: context.l10n.calendar, isRoot: true),
       body: RefreshIndicator(
           onRefresh: _refresh,
           child: CustomScrollView(
@@ -88,11 +89,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                           children: [
                         Row(children: [
                           Expanded(
-                              child: Text('Your calendar',
+                              child: Text(context.l10n.yourCalendar,
                                   style: text.titleLarge)),
                           if (signedIn)
                             IconButton(
-                                tooltip: 'Sync tasks',
+                                tooltip: context.l10n.syncTasks,
                                 onPressed: _syncing ? null : _refresh,
                                 icon: _syncing
                                     ? const SizedBox(
@@ -116,8 +117,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             onPressed: () =>
                                 Navigator.pushNamed(context, '/inbox'),
                             icon: const Icon(Icons.inbox_outlined, size: 18),
-                            label: Text(
-                                'Inbox · ${tasks.where((task) => task.dueDate == null && !task.isCompleted).length}')),
+                            label: Text(context.l10n.inboxCount(tasks
+                                .where((task) =>
+                                    task.dueDate == null && !task.isCompleted)
+                                .length))),
                         const SizedBox(height: 8),
                       ]))),
               SliverPadding(
@@ -131,11 +134,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                               child: Row(children: [
                                 Expanded(
                                     child: Text(
-                                        DateFormat('MMMM yyyy')
+                                        DateFormat.yMMMM(context.localeName)
                                             .format(_focusedDay),
                                         style: text.titleMedium)),
                                 IconButton(
-                                    tooltip: 'Previous month or week',
+                                    tooltip: context.l10n.previousPeriod,
                                     onPressed: () =>
                                         _calendarPage?.previousPage(
                                             duration: const Duration(
@@ -144,7 +147,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                     icon:
                                         const Icon(Icons.chevron_left_rounded)),
                                 IconButton(
-                                    tooltip: 'Next month or week',
+                                    tooltip: context.l10n.nextPeriod,
                                     onPressed: () => _calendarPage?.nextPage(
                                         duration:
                                             const Duration(milliseconds: 250),
@@ -158,7 +161,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             focusedDay: _focusedDay,
                             calendarFormat: _format,
                             headerVisible: false,
-                            startingDayOfWeek: StartingDayOfWeek.monday,
+                            locale: context.localeName,
+                            startingDayOfWeek: StartingDayOfWeek.values[
+                                (MaterialLocalizations.of(context)
+                                            .firstDayOfWeekIndex +
+                                        6) %
+                                    7],
                             rowHeight: 48,
                             daysOfWeekHeight: 30,
                             onCalendarCreated: (controller) =>
@@ -246,7 +254,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                               _selectedDay = DateTime.now();
                                               _focusedDay = _selectedDay;
                                             }),
-                                        child: const Text('Today')),
+                                        child: Text(context.l10n.today)),
                                     TextButton.icon(
                                         key: const ValueKey('calendar-format'),
                                         onPressed: () => setState(() =>
@@ -261,8 +269,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                             size: 17),
                                         label: Text(
                                             _format == CalendarFormat.month
-                                                ? 'Week view'
-                                                : 'Month view')),
+                                                ? context.l10n.weekView
+                                                : context.l10n.monthView)),
                                   ])),
                         ])),
                   )),
@@ -278,15 +286,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                 children: [
                               Text(
                                   today
-                                      ? 'Today’s agenda'
-                                      : DateFormat('EEEE, d MMM')
+                                      ? context.l10n.todayAgenda
+                                      : DateFormat.MMMMEEEEd(context.localeName)
                                           .format(_selectedDay),
                                   style: text.titleLarge),
                               const SizedBox(height: 4),
                               Text(
                                   events.isEmpty
-                                      ? 'A little breathing room.'
-                                      : '${events.length - completed} to do · $completed completed',
+                                      ? context.l10n.breathingRoom
+                                      : context.l10n.agendaCounts(
+                                          events.length - completed, completed),
                                   style: TextStyle(
                                       color: colors.onSurfaceVariant,
                                       fontSize: 12)),
@@ -299,8 +308,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                   value: completed / events.length,
                                   strokeWidth: 3,
                                   backgroundColor: colors.outlineVariant,
-                                  semanticsLabel:
-                                      '$completed of ${events.length} tasks completed')),
+                                  semanticsLabel: context.l10n.completionCount(
+                                      completed, events.length))),
                       ]))),
               if (tasksState.isLoading)
                 const SliverToBoxAdapter(
@@ -310,20 +319,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
               else if (tasksState.hasError)
                 SliverToBoxAdapter(
                     child: EmptyState(
-                        title: 'Couldn’t load your tasks',
-                        message: 'Try refreshing your calendar.',
+                        title: context.l10n.loadTasksError,
+                        message: context.l10n.refreshCalendar,
                         action: TextButton(
                             onPressed: _refresh,
-                            child: const Text('Try again'))))
+                            child: Text(context.l10n.tryAgain))))
               else if (events.isEmpty)
                 SliverToBoxAdapter(
                     child: EmptyState(
-                        title: 'What would you like to remember?',
-                        message:
-                            'Tap Say a task and speak naturally, or New task to type.\nNo date yet? Keep it in Inbox.',
+                        title: context.l10n.rememberPrompt,
+                        message: context.l10n.calendarEmpty,
                         action: TextButton(
                             onPressed: _create,
-                            child: const Text('Type a task'))))
+                            child: Text(context.l10n.typeTask))))
               else
                 SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),

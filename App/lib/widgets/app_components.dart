@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/theme_provider.dart';
@@ -9,7 +10,7 @@ class ThemeToggle extends ConsumerWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return IconButton(
         key: const ValueKey('theme-toggle'),
-        tooltip: dark ? 'Switch to light mode' : 'Switch to dark mode',
+        tooltip: dark ? context.l10n.switchLight : context.l10n.switchDark,
         onPressed: () async {
           try {
             await ref
@@ -17,9 +18,8 @@ class ThemeToggle extends ConsumerWidget {
                 .setMode(dark ? ThemeMode.light : ThemeMode.dark);
           } catch (_) {
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text(
-                      'Appearance changed. Could not save the preference on this device.')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(context.l10n.appearanceChangedError)));
             }
           }
         },
