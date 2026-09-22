@@ -44,4 +44,4 @@ Follow the printed `CALENDAR_HOST_*` markers. Deny then allow the actual permiss
 
 Primary references: [Calendar Provider](https://developer.android.com/identity/providers/calendar-provider), [Instances](https://developer.android.com/reference/android/provider/CalendarContract.Instances), [permission requests](https://developer.android.com/training/permissions/requesting), [PermissionChecker](https://developer.android.com/reference/androidx/core/content/PermissionChecker).
 
-This is Android emulator evidence. Physical-device provider variations, installed third-party calendar handoff and Apple platforms remain unverified. It does not establish two-way calendar sync or a free/busy scheduling guarantee.
+This is Android emulator evidence. An additional [handoff check](HANDOFF_VALIDATION.md) started Google Calendar, which returned without displaying the synthetic event; external calendar display remains unverified. Physical-device provider variations and Apple platforms also need validation. This does not establish two-way calendar sync or a free/busy scheduling guarantee.

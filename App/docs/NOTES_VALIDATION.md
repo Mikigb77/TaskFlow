@@ -22,4 +22,4 @@ Tasks represent commitments; notes retain reference information. The selected ty
 
 Logs: `App/artifacts/notes-final-tests.log`, `notes-final-analyze.log`, `notes-final-android.log`; `Backend/artifacts/notes-postgres-tests.log`, `notes-capability-tests.log`, `notes-live-transcription.log`. Screenshots live in `App/artifacts/design/notes-*.png`. Artifacts are ignored by Git.
 
-Real microphone recovery, installed native speech models, physical-phone behavior, actual external-browser handoff and first-user understanding of Task versus Note remain unverified. See [remaining evidence](VALIDATION_REMAINING.md). Automated tests do not establish product preference or retention.
+An additional [external handoff check](HANDOFF_VALIDATION.md) confirms a note link opens Chrome and renders the local health page on Android. Real microphone recovery, installed native speech models, physical-phone behavior and first-user understanding of Task versus Note remain unverified. See [remaining evidence](VALIDATION_REMAINING.md). Automated tests do not establish product preference or retention.
