@@ -70,6 +70,9 @@
     <!-- Required to query activities that can process text -->
     <queries>
         <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>

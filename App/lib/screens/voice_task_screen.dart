@@ -9,6 +9,7 @@ import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
+import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
@@ -40,11 +41,26 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   int _seconds = 0;
   double _level = 0;
   String? _error;
+  late final NativeSpeech _speech;
+  SpeechCapability _capability = const SpeechCapability();
+  StreamSubscription<SpeechEvent>? _speechEvents;
+  Completer<void>? _speechEnded;
+  bool _nativeMode = false;
+  bool _usingNative = false;
+  bool _acceptSpeech = false;
+  bool _holdToTalk = false;
+  bool _holding = false;
+  bool _holdSession = false;
+  bool _probing = false;
+  String? _language;
+  String _nativePrefix = '';
+  int _nativeRun = DateTime.now().millisecondsSinceEpoch % 2000000000;
 
   @override
   void initState() {
     super.initState();
     _store = ref.read(captureStoreProvider);
+    _speech = ref.read(nativeSpeechProvider);
     _owner = ref.read(captureOwnerProvider);
     _zone = ref.read(authProvider).account?.timezone ?? 'UTC';
     WidgetsBinding.instance.addObserver(this);
@@ -60,6 +76,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
 
   Future<void> _load() async {
     try {
+      _capability = await _speech.capability();
+      _nativeMode = _capability.usable;
       try {
         _zone = (await FlutterTimezone.getLocalTimezone()).identifier;
       } catch (_) {/* Account or UTC fallback. */}
@@ -114,7 +132,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     _writes = _writes.catchError((Object _) {}).then((_) async {
       if (text.trim().isEmpty && _session == null) return;
       await _ensureSession(text: text);
-      _session = _session!.copyWith(text: text, status: 'editing');
+      _session = _session!
+          .copyWith(text: text, status: _recording ? 'recording' : 'editing');
       await _store.update(_session!);
     });
     unawaited(_writes.catchError((Object error) {
@@ -130,24 +149,102 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     _starting = _startRecording();
   }
 
+  Future<void> _chooseLanguage(String? language) async {
+    setState(() => _probing = true);
+    final capability = await _speech.capability(language: language);
+    if (!mounted) return;
+    setState(() {
+      _language = language;
+      _capability = capability;
+      _nativeMode = capability.usable;
+      _probing = false;
+    });
+  }
+
+  void _receiveSpeech(SpeechEvent event) {
+    if (!_acceptSpeech || event.run != _nativeRun) return;
+    if (event.text?.trim().isNotEmpty == true) {
+      final words = [_nativePrefix, event.text!.trim()]
+          .where((s) => s.isNotEmpty)
+          .join(' ');
+      final bounded = words.length > 4000 ? words.substring(0, 4000) : words;
+      if (mounted) {
+        _words.text = bounded;
+        _words.selection = TextSelection.collapsed(offset: bounded.length);
+      }
+      _changedText(bounded);
+    }
+    if (event.level != null && mounted && _recording) {
+      setState(() => _level = event.level!.clamp(0, 1));
+    }
+    if (event.error != null && mounted) setState(() => _error = event.error);
+    if (event.terminal) {
+      if (_speechEnded?.isCompleted == false) _speechEnded!.complete();
+      // Automatic endpointing retains editable words. Only an explicit stop /
+      // review action sends them for online extraction.
+      if (_recording) unawaited(_finishRecording(submit: false));
+    }
+  }
+
+  void _armTimer() {
+    _seconds = 0;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _seconds = timer.tick);
+      if (timer.tick >= 59) unawaited(_finishRecording(submit: false));
+    });
+  }
+
   Future<void> _startRecording() async {
+    _holdSession = _holding;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await _writes;
-      if (_words.text.trim().isNotEmpty) {
+      _usingNative = _nativeMode && _capability.usable;
+      if (!_usingNative && _words.text.trim().isNotEmpty) {
         throw StateError(
             'Save or discard this typed capture before starting a recording.');
       }
-      if (!await _recorder.hasPermission()) {
+      if (!await (_usingNative
+          ? _speech.permission()
+          : _recorder.hasPermission())) {
         throw StateError('Allow microphone access to record, or type below.');
       }
       if (!mounted) return;
       if (_session?.audioPath != null) {
         throw StateError(
             'Retry this recording or discard it before recording another.');
+      }
+      if (_usingNative) {
+        await _ensureSession(text: _words.text);
+        _nativePrefix = _words.text.trim();
+        _session = _session!.copyWith(status: 'recording');
+        await _store.update(_session!);
+        if (!mounted) return;
+        _speechEnded = Completer<void>();
+        _nativeRun++;
+        _acceptSpeech = true;
+        _speechEvents ??=
+            _speech.events.listen(_receiveSpeech, onError: (Object _) {
+          _receiveSpeech(SpeechEvent(_nativeRun, 'error',
+              error: 'Speech stopped. Your retained words are safe.'));
+        });
+        _recording = true;
+        await _speech.start(_nativeRun, _capability.language);
+        if (_recording) _armTimer();
+        if (!mounted ||
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed ||
+            (_holdSession && !_holding)) {
+          await _finishRecording(submit: false);
+        }
+        return;
       }
       await _ensureSession(audio: true);
       if (_session!.audioPath == null) {
@@ -162,9 +259,10 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
               encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1),
           path: _session!.audioPath!);
       _recording = true;
-      _seconds = 0;
+      _armTimer();
       if (!mounted ||
-          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+          (_holdSession && !_holding)) {
         await _finishRecording(submit: false);
         return;
       }
@@ -175,15 +273,15 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
           setState(() => _level = ((value.current + 60) / 60).clamp(0, 1));
         }
       });
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
-        setState(() => _seconds = timer.tick);
-        if (timer.tick >= 59) unawaited(_finishRecording());
-      });
     } catch (error) {
+      _recording = false;
+      _acceptSpeech = false;
+      _timer?.cancel();
+      if (_usingNative) {
+        try {
+          await _speech.cancel(_nativeRun);
+        } catch (_) {/* Preserve the transcript. */}
+      }
       if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -205,19 +303,34 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       });
     }
     try {
-      await _recorder.stop();
+      if (_usingNative) {
+        await _speech.stop(_nativeRun);
+        await _speechEnded?.future
+            .timeout(const Duration(seconds: 2), onTimeout: () {});
+        _acceptSpeech = false;
+        await _speech.cancel(_nativeRun);
+        await _writes;
+      } else {
+        await _recorder.stop();
+      }
       if (_session != null) {
         _session = _session!.copyWith(status: 'editing');
         await _store.update(_session!);
         await CaptureDiagnostics(_store.database)
             .record(CaptureEvent.recordingStopped, elapsedMs: _seconds * 1000);
       }
-      if (mounted && submit) await _process();
+      if (mounted &&
+          submit &&
+          (!_usingNative || _session!.text.trim().isNotEmpty)) {
+        await _process();
+      }
     } catch (error) {
       if (mounted) {
-        setState(() => _error = 'Your recording is kept. ${error.toString()}');
+        setState(
+            () => _error = 'Your retained input is kept. ${error.toString()}');
       }
     } finally {
+      _acceptSpeech = false;
       if (mounted) {
         ref.invalidate(pendingCapturesProvider);
         setState(() => _busy = false);
@@ -310,6 +423,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       await _writes;
       await _starting;
       await _finishRecording(submit: false);
+      _acceptSpeech = false;
+      await _speechEvents?.cancel();
       await _recorder.dispose();
     } catch (_) {/* The durable capture remains available on next launch. */}
   }
@@ -335,29 +450,49 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                       const SizedBox(height: 24),
                       AppSurface(
                           child: Column(children: [
-                        Semantics(
-                            button: true,
-                            label: _recording
-                                ? 'Stop and create draft'
-                                : 'Record tasks',
-                            child: IconButton.filledTonal(
-                                iconSize: 44,
-                                padding: const EdgeInsets.all(24),
-                                tooltip: _recording
-                                    ? 'Stop recording'
+                        GestureDetector(
+                            onLongPressStart: _holdToTalk && !_busy && !recorded
+                                ? (_) {
+                                    _holding = true;
+                                    _beginRecording();
+                                  }
+                                : null,
+                            onLongPressEnd: _holdToTalk
+                                ? (_) {
+                                    _holding = false;
+                                    unawaited(_finishRecording());
+                                  }
+                                : null,
+                            onLongPressCancel: _holdToTalk
+                                ? () {
+                                    _holding = false;
+                                    unawaited(_finishRecording(submit: false));
+                                  }
+                                : null,
+                            child: Semantics(
+                                button: true,
+                                label: _recording
+                                    ? 'Stop and create draft'
                                     : 'Record tasks',
-                                onPressed: _busy || (recorded && !_recording)
-                                    ? null
-                                    : () {
-                                        if (_recording) {
-                                          unawaited(_finishRecording());
-                                        } else {
-                                          _beginRecording();
-                                        }
-                                      },
-                                icon: Icon(_recording
-                                    ? Icons.stop_rounded
-                                    : Icons.mic_none_rounded))),
+                                child: IconButton.filledTonal(
+                                    iconSize: 44,
+                                    padding: const EdgeInsets.all(24),
+                                    tooltip: _recording
+                                        ? 'Stop recording'
+                                        : 'Record tasks',
+                                    onPressed:
+                                        _busy || (recorded && !_recording)
+                                            ? null
+                                            : () {
+                                                if (_recording) {
+                                                  unawaited(_finishRecording());
+                                                } else {
+                                                  _beginRecording();
+                                                }
+                                              },
+                                    icon: Icon(_recording
+                                        ? Icons.stop_rounded
+                                        : Icons.mic_none_rounded)))),
                         const SizedBox(height: 16),
                         Text(
                             _recording
@@ -378,21 +513,100 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                         Text(
                             _recording
                                 ? 'Tap stop when you’re finished. Up to 60 seconds.'
-                                : 'You can leave and return. Unfinished captures are kept.',
+                                : _nativeMode
+                                    ? 'On-device speech · ${_capability.language}. Words appear below and are kept as you speak.'
+                                    : 'You can leave and return. Unfinished recordings are kept.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: colors.onSurfaceVariant)),
                       ])),
+                      if (!recorded && !_recording && !_busy) ...[
+                        const SizedBox(height: 12),
+                        Wrap(spacing: 8, runSpacing: 4, children: [
+                          if (_capability.usable)
+                            ChoiceChip(
+                                label: const Text('Live transcript'),
+                                selected: _nativeMode,
+                                onSelected: (_) =>
+                                    setState(() => _nativeMode = true)),
+                          ChoiceChip(
+                              label: const Text('Saved audio'),
+                              selected: !_nativeMode,
+                              onSelected: (_) =>
+                                  setState(() => _nativeMode = false)),
+                          PopupMenuButton<String>(
+                              tooltip: 'Speech language',
+                              enabled: !_probing,
+                              onSelected: (value) => _chooseLanguage(
+                                  value == 'device' ? null : value),
+                              itemBuilder: (_) => [
+                                    for (final entry in {
+                                      'device': 'Device language',
+                                      'en-US': 'English',
+                                      'es-ES': 'Español'
+                                    }.entries)
+                                      CheckedPopupMenuItem(
+                                          value: entry.key,
+                                          checked: (_language ?? 'device') ==
+                                              entry.key,
+                                          child: Text(entry.value)),
+                                  ],
+                              child: const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Text('Speech language'))),
+                        ]),
+                        if (!_capability.usable)
+                          const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                  'On-device speech is unavailable for this language on this device. Record audio for online processing, or type.')),
+                        if (_capability.onDevice && !_capability.usable)
+                          Wrap(spacing: 8, children: [
+                            TextButton(
+                                onPressed: () async {
+                                  try {
+                                    final opened = await _speech
+                                        .prepareLanguage(_capability.language);
+                                    if (mounted) {
+                                      setState(() => _error = opened
+                                          ? 'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.'
+                                          : 'Speech setup is unavailable here. Use saved audio or type.');
+                                    }
+                                  } catch (_) {
+                                    if (mounted) {
+                                      setState(() => _error =
+                                          'Could not open speech setup. Use saved audio or type.');
+                                    }
+                                  }
+                                },
+                                child: const Text('Set up on-device speech')),
+                            TextButton(
+                                onPressed: _probing
+                                    ? null
+                                    : () => _chooseLanguage(_language),
+                                child: const Text('Check again')),
+                          ]),
+                        SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Hold to talk'),
+                            subtitle: const Text(
+                                'Hold the mic, then release. Tapping still works.'),
+                            value: _holdToTalk,
+                            onChanged: (value) =>
+                                setState(() => _holdToTalk = value)),
+                      ],
                       if (!recorded) ...[
                         const SizedBox(height: 24),
                         TextField(
                             controller: _words,
-                            enabled: !_busy && !_recording,
+                            readOnly: _busy || _recording,
                             onChanged: _changedText,
                             minLines: 2,
                             maxLines: 5,
                             maxLength: 4000,
-                            decoration: const InputDecoration(
-                                labelText: 'Or type your plan',
+                            decoration: InputDecoration(
+                                labelText: _usingNative && _recording
+                                    ? 'Live transcript'
+                                    : 'Or type your plan',
                                 hintText:
                                     'Doctor Friday at 5 p.m. Bring my results. Also buy coffee.',
                                 counterText: '')),
@@ -418,7 +632,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                             'Try voice without an account. A small daily allowance is shared by devices on this connection.'),
                       const SizedBox(height: 12),
                       Text(
-                          'AI processing sends your words to Google. Unfinished input stays on this phone until you save or discard it.',
+                          'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.',
                           style: TextStyle(
                               fontSize: 12, color: colors.onSurfaceVariant)),
                     ]))));
