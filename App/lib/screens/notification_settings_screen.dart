@@ -1,3 +1,5 @@
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/reminder_locale.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -86,8 +88,7 @@ class _NotificationSettingsScreenState
       }
     } catch (_) {
       if (mounted) {
-        setState(() =>
-            _error = 'Could not load notification settings. Please retry.');
+        setState(() => _error = 'load');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -108,8 +109,7 @@ class _NotificationSettingsScreenState
       if (mounted) ref.invalidate(reminderPreferencesProvider);
     } catch (_) {
       if (mounted) {
-        setState(
-            () => _error = 'Could not save reminder settings. Please retry.');
+        setState(() => _error = 'save');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -135,7 +135,7 @@ class _NotificationSettingsScreenState
               identical(evening, _same) ? _settings!.evening : evening as int?);
   static const _same = Object();
   String _time(int? minute) => minute == null
-      ? 'Off'
+      ? context.l10n.off
       : TimeOfDay(hour: minute ~/ 60, minute: minute % 60).format(context);
   Future<void> _pick(int? current, ValueChanged<int?> save) async {
     final value = await showTimePicker(
@@ -149,19 +149,24 @@ class _NotificationSettingsScreenState
   Widget build(BuildContext context) {
     final settings = _settings;
     return Scaffold(
-        appBar: const CustomAppBar(title: 'Notifications'),
+        appBar: CustomAppBar(title: context.l10n.notifications),
         body: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.all(24), children: [
-              if (_error != null) MessageBanner(_error!, isError: true),
-              if (_schedulerError != null) MessageBanner(_schedulerError!),
+              if (_error != null)
+                MessageBanner(
+                    _error == 'load'
+                        ? context.l10n.notificationLoadError
+                        : context.l10n.notificationSaveError,
+                    isError: true),
+              if (_schedulerError != null)
+                MessageBanner(context.reminderDiagnostic(_schedulerError!)),
               if (_busy) const LinearProgressIndicator(),
               if (settings != null) ...[
                 SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Enable reminders'),
-                    subtitle: const Text(
-                        'For this account on this device. Task choices sync; device preferences stay here.'),
+                    title: Text(context.l10n.enableReminders),
+                    subtitle: Text(context.l10n.deviceReminderScope),
                     value: settings.enabled,
                     onChanged: _busy || !TaskReminders.supported
                         ? null
@@ -172,18 +177,18 @@ class _NotificationSettingsScreenState
                         ? Icons.notifications_active_outlined
                         : Icons.notifications_off_outlined),
                     title: Text(!TaskReminders.supported
-                        ? 'Mobile notifications only'
+                        ? context.l10n.mobileNotificationsOnly
                         : _capability.allowed
-                            ? 'System permission is on'
-                            : 'System permission is off'),
+                            ? context.l10n.notificationPermissionOn
+                            : context.l10n.notificationPermissionOff),
                     subtitle: Text(_capability.exact
-                        ? 'Precise alarm access available'
-                        : 'Alerts are approximate until precise alarm access is enabled')),
+                        ? context.l10n.preciseAlarmsAvailable
+                        : context.l10n.approximateAlarmsHelp)),
                 Wrap(spacing: 8, children: [
                   OutlinedButton(
                       onPressed:
                           TaskReminders.supported ? openAppSettings : null,
-                      child: const Text('Open system settings')),
+                      child: Text(context.l10n.openSystemSettings)),
                   if (Platform.isAndroid && !_capability.exact)
                     TextButton(
                         onPressed: _busy
@@ -192,53 +197,55 @@ class _NotificationSettingsScreenState
                                 await TaskReminders.requestExactAccess();
                                 if (mounted) _load();
                               },
-                        child: const Text('Allow precise alarms')),
+                        child: Text(context.l10n.allowPreciseAlarms)),
                 ]),
                 const SizedBox(height: 24),
-                const SectionLabel('Task defaults'),
+                SectionLabel(context.l10n.taskDefaults),
                 DropdownButtonFormField<int>(
                     key: ValueKey(settings.leadMinutes),
                     initialValue: settings.leadMinutes,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Timed tasks'),
+                    decoration:
+                        InputDecoration(labelText: context.l10n.timedTasks),
                     items: <int>{-1, 0, 10, 30, 60, 1440, settings.leadMinutes}
                         .map((value) => DropdownMenuItem(
                             value: value,
-                            child: Text(reminderLeadLabel(value))))
+                            child: Text(context.reminderLead(value))))
                         .toList(),
                     onChanged:
                         _busy ? null : (value) => _save(_changed(lead: value))),
-                _timeRow('Date-only tasks', settings.dateOnlyTime,
+                _timeRow(context.l10n.dateOnlyTasks, settings.dateOnlyTime,
                     (value) => _save(_changed(dateOnly: value))),
                 const SizedBox(height: 24),
-                const SectionLabel('Daily check-ins'),
-                const Text('A gentle prompt to review your current tasks.'),
-                _timeRow('Morning', settings.morning,
+                SectionLabel(context.l10n.dailyCheckIns),
+                Text(context.l10n.dailyCheckInsHelp),
+                _timeRow(context.l10n.morningCheckIn, settings.morning,
                     (value) => _save(_changed(morning: value))),
-                _timeRow('Evening', settings.evening,
+                _timeRow(context.l10n.eveningCheckIn, settings.evening,
                     (value) => _save(_changed(evening: value))),
                 const SizedBox(height: 24),
-                const SectionLabel('Upcoming alerts'),
-                const Text(
-                    'Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.'),
+                SectionLabel(context.l10n.upcomingAlerts),
+                Text(context.l10n.scheduledAlertHelp),
                 if (_deferred > 0)
-                  MessageBanner(
-                      '$_deferred later alerts are outside the current window. The next refresh adds the earliest ones that fit.'),
+                  MessageBanner(context.l10n.deferredAlerts(_deferred)),
                 const SizedBox(height: 8),
                 Text(Platform.isAndroid
-                    ? 'The window refreshes on app use and through an hourly background job when Android permits.'
-                    : 'The window refreshes on app use and when the system allows background refresh.'),
+                    ? context.l10n.androidAlertRefreshHelp
+                    : context.l10n.backgroundAlertRefreshHelp),
                 if (_alerts.isEmpty)
-                  const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                          'No upcoming alerts. Choose a reminder on a scheduled task.')),
+                  Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Text(context.l10n.noUpcomingAlerts)),
                 for (final alert in _alerts)
                   ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(alert['title'] as String),
+                      title: Text(alert['daily'] == 1
+                          ? ((alert['identity'] as String).endsWith('/morning')
+                              ? context.l10n.morningCheckIn
+                              : context.l10n.eveningCheckIn)
+                          : alert['title'] as String),
                       subtitle: Text(
-                          '${_alertDate(alert)} · ${alert['status']}${alert['daily'] == 1 ? ' · repeats daily' : ''}${alert['error'] == null ? '' : '\n${alert['error']}'}'),
+                          '${_alertDate(alert)} · ${context.reminderStatus(alert['status'] as String)}${alert['daily'] == 1 ? ' · ${context.l10n.repeatsDaily}' : ''}${alert['error'] == null ? '' : '\n${context.reminderDiagnostic(alert['error'] as String)}'}'),
                       isThreeLine: alert['error'] != null),
               ],
               OutlinedButton(
@@ -248,12 +255,11 @@ class _NotificationSettingsScreenState
                           try {
                             await TaskReminders.retrySetup();
                           } catch (_) {
-                            await TaskReminders.recordError(
-                                'Notification setup could not finish. Retry again or check system settings.');
+                            await TaskReminders.recordError('setup_failed');
                           }
                           if (mounted) _load();
                         },
-                  child: const Text('Refresh and retry scheduling')),
+                  child: Text(context.l10n.retryScheduling)),
             ])));
   }
 
@@ -271,7 +277,7 @@ class _NotificationSettingsScreenState
           trailing: value == null
               ? const Icon(Icons.add_rounded)
               : IconButton(
-                  tooltip: 'Turn off $title',
+                  tooltip: context.l10n.turnOffReminder(title),
                   onPressed: _busy ? null : () => save(null),
                   icon: const Icon(Icons.close_rounded)));
 }

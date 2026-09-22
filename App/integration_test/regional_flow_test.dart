@@ -9,6 +9,10 @@ import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/regional_settings_screen.dart';
+import 'package:agenda/screens/data_transfer_screen.dart';
+import 'package:agenda/services/archive_files.dart';
+import 'package:agenda/services/archive_store.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
@@ -66,6 +70,7 @@ void main() {
       regionalStoreProvider.overrideWithValue(store),
       taskListStoreProvider.overrideWithValue(TaskListStore(database, owner)),
       pendingCapturesProvider.overrideWith((ref) async => []),
+      archiveFilesProvider.overrideWithValue(_RegionalArchiveFiles()),
     ]);
     addTearDown(() async {
       container.dispose();
@@ -73,6 +78,10 @@ void main() {
       await sql.delete('captures', where: 'owner_key = ?', whereArgs: [owner]);
       await sql
           .delete('task_lists', where: 'owner_key = ?', whereArgs: [owner]);
+      await sql.delete('archive_imports',
+          where: 'owner_key = ?', whereArgs: [owner]);
+      await sql.delete('app_preferences',
+          where: 'scope = ?', whereArgs: ['reminders:$owner']);
       await sql.delete('app_preferences',
           where: 'scope = ?', whereArgs: ['regional']);
       if (priorPreferences.isNotEmpty) {
@@ -169,6 +178,97 @@ void main() {
     }
     navigator.pop();
     await tester.pumpAndSettle();
+    tester
+        .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+        .hideCurrentSnackBar();
+
+    // The translated reminder choices still store minutes, not display labels.
+    navigator.pushNamed('/notifications');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.byType(DropdownButtonFormField<int>), 160,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('30 minutos antes').last);
+    await tester.pumpAndSettle();
+    expect(
+        (await ReminderPreferenceStore(database).read(owner)).leadMinutes, 30);
+    await binding.takeScreenshot('regional-reminder-settings-spanish');
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    // The picker returns synthetic bytes; parsing, receipt checks, selection and
+    // the import transaction use the production screen and real Android SQLite.
+    navigator.pushNamed('/dataTransfer');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.text('Elegir archivo para importar'), 180,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Elegir archivo para importar'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.text('Vista previa de importación'), 180,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    await binding.takeScreenshot('regional-import-preview-spanish');
+    final invalid =
+        find.widgetWithText(CheckboxListTile, 'Invalid priority fixture');
+    await tester.scrollUntilVisible(invalid, 180,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<CheckboxListTile>(invalid).onChanged, isNull);
+    expect(find.textContaining('prioridad: valor no válido (1–3)'),
+        findsOneWidget);
+    await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('confirm-import')), 120,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    await binding.takeScreenshot('regional-import-warning-spanish');
+    await container
+        .read(regionalProvider.notifier)
+        .set(container.read(regionalProvider).withLanguage('en'));
+    await tester.pumpAndSettle();
+    expect(find.text('Import 1 selected item and lists'), findsOneWidget);
+    await container
+        .read(regionalProvider.notifier)
+        .set(container.read(regionalProvider).withLanguage('es'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('confirm-import')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-import')));
+    await tester.pumpAndSettle();
+    final imported = (await database.getTasks(ownerKey: owner))
+        .where((task) => task.title == _RegionalArchiveFiles.title)
+        .single;
+    expect(imported.dueDate, DateTime(2030, 10, 2));
+    expect(imported.hasTime, isFalse);
+    expect(imported.notes, 'Original note · keep these words');
+    expect(
+        (await ArchiveStore(database, owner).imported(_RegionalArchiveFiles.id))
+            .length,
+        1);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.text('Elegir archivo para importar'), -200,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Elegir archivo para importar'));
+    await tester.pumpAndSettle();
+    final retained =
+        find.widgetWithText(CheckboxListTile, _RegionalArchiveFiles.title);
+    await tester.scrollUntilVisible(retained, 180,
+        scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<CheckboxListTile>(retained).onChanged, isNull);
+    expect((await database.getTasks(ownerKey: owner)).length, 3);
+    navigator.pop();
+    await tester.pumpAndSettle();
+    await sql.delete('tasks',
+        where: 'id = ? AND owner_key = ?', whereArgs: [imported.id, owner]);
     expect(
         jsonEncode(await sql
             .query('tasks', where: 'owner_key = ?', whereArgs: [owner])),
@@ -206,4 +306,36 @@ class _RegionalRepository extends TaskRepository {
   String get ownerKey => owner;
   @override
   Future<List<Task>> getAllTasks() => database.getTasks(ownerKey: owner);
+}
+
+class _RegionalArchiveFiles extends ArchiveFiles {
+  static const id = 'da83e122-42f6-47dd-bf46-ec77512cf6d8';
+  static const title = 'Archive fixture · original words';
+  @override
+  Future<ArchiveFile?> choose() async => ArchiveFile(
+      'regional-fixture.json',
+      jsonEncode({
+        'format': 'taskflow',
+        'version': 2,
+        'export_id': id,
+        'lists': [],
+        'tasks': [
+          {
+            'id': 'c1a79663-87c7-42d8-8f1a-b6c148f5b8e1',
+            ...Task(
+                    title: title,
+                    priority: 1,
+                    notes: 'Original note · keep these words',
+                    dueDate: DateTime(2030, 10, 2),
+                    hasTime: false,
+                    reminderMinutes: -1)
+                .toApi(),
+            'attachments': ['fixture.pdf'],
+          },
+          {
+            'id': 'c1a79663-87c7-42d8-8f1a-b6c148f5b8e2',
+            ...Task(title: 'Invalid priority fixture', priority: 8).toApi(),
+          },
+        ],
+      }));
 }

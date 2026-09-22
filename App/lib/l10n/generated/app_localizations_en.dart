@@ -1829,4 +1829,538 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get fileManageHelp =>
       'Open task details to download, upload, or remove account attachments.';
+
+  @override
+  String get notificationLoadError =>
+      'Could not load notification settings. Please retry.';
+
+  @override
+  String get notificationSaveError =>
+      'Could not save reminder settings. Please retry.';
+
+  @override
+  String get enableReminders => 'Enable reminders';
+
+  @override
+  String get deviceReminderScope =>
+      'For this account on this device. Task choices sync; device preferences stay here.';
+
+  @override
+  String get mobileNotificationsOnly => 'Mobile notifications only';
+
+  @override
+  String get notificationPermissionOn => 'System permission is on';
+
+  @override
+  String get notificationPermissionOff => 'System permission is off';
+
+  @override
+  String get preciseAlarmsAvailable => 'Precise alarm access available';
+
+  @override
+  String get approximateAlarmsHelp =>
+      'Alerts are approximate until precise alarm access is enabled';
+
+  @override
+  String get openSystemSettings => 'Open system settings';
+
+  @override
+  String get allowPreciseAlarms => 'Allow precise alarms';
+
+  @override
+  String get taskDefaults => 'Task defaults';
+
+  @override
+  String get timedTasks => 'Timed tasks';
+
+  @override
+  String get dateOnlyTasks => 'Date-only tasks';
+
+  @override
+  String get dailyCheckIns => 'Daily check-ins';
+
+  @override
+  String get dailyCheckInsHelp =>
+      'A gentle prompt to review your current tasks.';
+
+  @override
+  String get morningCheckIn => 'Morning';
+
+  @override
+  String get eveningCheckIn => 'Evening';
+
+  @override
+  String get upcomingAlerts => 'Upcoming alerts';
+
+  @override
+  String get scheduledAlertHelp =>
+      'Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.';
+
+  @override
+  String get androidAlertRefreshHelp =>
+      'The window refreshes on app use and through an hourly background job when Android permits.';
+
+  @override
+  String get backgroundAlertRefreshHelp =>
+      'The window refreshes on app use and when the system allows background refresh.';
+
+  @override
+  String get noUpcomingAlerts =>
+      'No upcoming alerts. Choose a reminder on a scheduled task.';
+
+  @override
+  String get repeatsDaily => 'repeats daily';
+
+  @override
+  String get retryScheduling => 'Refresh and retry scheduling';
+
+  @override
+  String get alertPending => 'pending';
+
+  @override
+  String get alertScheduled => 'scheduled';
+
+  @override
+  String get alertApproximate => 'approximate';
+
+  @override
+  String get alertBlocked => 'blocked';
+
+  @override
+  String get alertFailed => 'failed';
+
+  @override
+  String get alertInactive => 'inactive';
+
+  @override
+  String get alertElapsed => 'elapsed';
+
+  @override
+  String get reminderPermissionError =>
+      'Notifications are disabled in system settings.';
+
+  @override
+  String get reminderScheduleError =>
+      'The phone could not schedule this alert. Retry from Settings.';
+
+  @override
+  String get reminderBackgroundError =>
+      'Background refresh could not finish. Open TaskFlow to retry.';
+
+  @override
+  String get reminderBackgroundUnavailable =>
+      'Automatic background refresh is unavailable. Alerts refresh when you open TaskFlow.';
+
+  @override
+  String get reminderActionError =>
+      'A notification action could not finish. Open the task to retry.';
+
+  @override
+  String get reminderSetupError =>
+      'Notification setup could not finish. Retry from Settings.';
+
+  @override
+  String get reminderAccountError =>
+      'Account reminders could not refresh. Open notification settings to retry.';
+
+  @override
+  String get reminderRefreshError =>
+      'Reminders could not refresh. Your tasks are saved; retry from notification settings.';
+
+  @override
+  String get transferError =>
+      'Could not finish. Your existing tasks and notes are unchanged. Please retry.';
+
+  @override
+  String get exportSaved => 'Export saved. Keep the file somewhere private.';
+
+  @override
+  String get keepYourTasks => 'Keep your tasks with you.';
+
+  @override
+  String get archiveContentsHelp =>
+      'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal lists. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.';
+
+  @override
+  String get exportTaskFlowFile => 'Export TaskFlow file';
+
+  @override
+  String get chooseImportFile => 'Choose import file';
+
+  @override
+  String get chooseImportFileHelp =>
+      'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.';
+
+  @override
+  String get importPreview => 'Import preview';
+
+  @override
+  String get importCopiesHelp =>
+      'Selected tasks, notes and the file’s lists are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.';
+
+  @override
+  String get listsIncluded => 'Lists included';
+
+  @override
+  String get archivedPersonalCopy => 'Archived personal copy';
+
+  @override
+  String get personalCopy => 'Personal copy';
+
+  @override
+  String get alreadyImported => 'Already imported on this phone';
+
+  @override
+  String get taskFlowExportSource => 'TaskFlow export';
+
+  @override
+  String get todoistCsvSource => 'Todoist project CSV';
+
+  @override
+  String deferredAlerts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count later alerts are',
+      one: '1 later alert is',
+    );
+    return '$_temp0 outside the current window. The next refresh adds the earliest ones that fit.';
+  }
+
+  @override
+  String turnOffReminder(String title) {
+    return 'Turn off $title';
+  }
+
+  @override
+  String importResult(int items, int lists) {
+    String _temp0 = intl.Intl.pluralLogic(
+      items,
+      locale: localeName,
+      other: '$items items',
+      one: '1 item',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      lists,
+      locale: localeName,
+      other: '$lists lists',
+      one: '1 list',
+    );
+    return 'Added $_temp0 and $_temp1.';
+  }
+
+  @override
+  String importSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count already imported items',
+      one: '1 already imported item',
+    );
+    return 'Skipped $_temp0.';
+  }
+
+  @override
+  String importCounts(String source, int tasks, int notes, int lists) {
+    return '$source · $tasks tasks · $notes notes · $lists lists';
+  }
+
+  @override
+  String cannotImport(String reason) {
+    return 'Cannot import: $reason';
+  }
+
+  @override
+  String importSelected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count selected items',
+      one: '1 selected item',
+    );
+    return 'Import $_temp0 and lists';
+  }
+
+  @override
+  String importRow(int row) {
+    return 'Record $row';
+  }
+
+  @override
+  String get archiveFileTooLarge => 'Choose a file smaller than 32 MB.';
+
+  @override
+  String get archiveUnsupportedArchive =>
+      'This is not a supported TaskFlow export (versions 1 and 2).';
+
+  @override
+  String get archiveInvalidList => 'Invalid list metadata.';
+
+  @override
+  String get archiveDuplicateLists => 'Duplicate list identifiers.';
+
+  @override
+  String get archiveInvalidListStyle => 'Invalid list color or archive status.';
+
+  @override
+  String get archiveInvalidTask => 'Invalid task record.';
+
+  @override
+  String get archiveDuplicateTask => 'Duplicate task identifier.';
+
+  @override
+  String get archiveInvalidAttachments => 'Invalid attachment information.';
+
+  @override
+  String get archiveMissingList =>
+      'The task refers to a list missing from this file.';
+
+  @override
+  String get archiveInvalidTaskFields => 'Invalid task fields.';
+
+  @override
+  String get archiveUnsupportedKind => 'Unsupported task or note type.';
+
+  @override
+  String get archiveInvalidCompletion => 'Invalid completion status.';
+
+  @override
+  String get archiveTwoSchedules => 'A task cannot have two schedules.';
+
+  @override
+  String get archiveTwoDeadlines => 'Choose a timed or date-only deadline.';
+
+  @override
+  String get archiveInvalidReminderDate => 'Choose an available reminder date.';
+
+  @override
+  String get archiveUnsupportedRepeat => 'Unsupported repeat rule.';
+
+  @override
+  String get archiveWeekdaysNeedWeekly => 'Weekdays require a weekly repeat.';
+
+  @override
+  String get archiveRepeatNeedsStart => 'A repeating task needs a start date.';
+
+  @override
+  String get archiveInvalidOccurrence => 'Invalid occurrence change.';
+
+  @override
+  String get archiveDuplicateOccurrence => 'Duplicate occurrence changes.';
+
+  @override
+  String get archiveInvalidSkipped => 'Invalid skipped date.';
+
+  @override
+  String get archiveInvalidOccurrenceSchedule => 'Invalid occurrence schedule.';
+
+  @override
+  String get archiveRepeatSettingsNeedRepeat =>
+      'Repeat settings need a repeating task.';
+
+  @override
+  String get archiveRepeatUsesCompletedDates =>
+      'Repeating tasks use individual completed dates.';
+
+  @override
+  String get archiveInvalidChecklist => 'Invalid checklist item.';
+
+  @override
+  String get archiveDuplicateChecklist => 'Duplicate checklist identifiers.';
+
+  @override
+  String get archiveInvalidChecklistProgress => 'Invalid checklist progress.';
+
+  @override
+  String get archiveRepeatEndBeforeStart => 'Repeat end precedes the start.';
+
+  @override
+  String get archiveOccurrenceOutsideRepeat =>
+      'An occurrence change is outside this repeat rule.';
+
+  @override
+  String get archiveExportTooLarge =>
+      'This export exceeds the supported 32 MB or 5,000-task limit.';
+
+  @override
+  String get archiveInvalidDateFormat => 'Dates must use YYYY-MM-DD.';
+
+  @override
+  String get archiveInvalidDate => 'Invalid calendar date.';
+
+  @override
+  String get archiveMissingTimezone =>
+      'Timed dates need an ISO time and timezone offset.';
+
+  @override
+  String get archiveInvalidClock => 'Invalid clock time.';
+
+  @override
+  String get archiveInvalidOffset => 'Invalid timezone offset.';
+
+  @override
+  String get archiveInvalidTimedDate => 'Invalid timed date.';
+
+  @override
+  String get archiveFileUnreadable =>
+      'This file could not be read. Choose a local copy.';
+
+  @override
+  String get archiveEmptyCsv => 'This CSV is empty.';
+
+  @override
+  String get archiveCsvHeader =>
+      'Choose a Todoist project CSV with TYPE and CONTENT columns.';
+
+  @override
+  String get archiveCsvTaskLimit => 'Choose a CSV with at most 5,000 tasks.';
+
+  @override
+  String get archiveCsvPriority => 'Priority must be 1–4.';
+
+  @override
+  String get archiveCsvIndent => 'Indent must be 1–4.';
+
+  @override
+  String get archiveCsvRecordLimit => 'This CSV has too many records.';
+
+  @override
+  String get archiveCsvQuoting => 'Malformed CSV quoting.';
+
+  @override
+  String get archiveCsvUnclosedQuote =>
+      'An unfinished quoted CSV field was found.';
+
+  @override
+  String get archiveNotesTooLong =>
+      'Task and comments exceed 8,000 note characters.';
+
+  @override
+  String get archiveInvalidFile => 'The file is not valid JSON or UTF-8 text.';
+
+  @override
+  String get archiveUnknownFields =>
+      'Unrecognized task fields will be omitted.';
+
+  @override
+  String get archivePersonalCopies =>
+      'Imports create new personal copies. Account access, files, notification preferences and unfinished captures are not included.';
+
+  @override
+  String get archiveCsvPriorities =>
+      'Todoist priorities 3 and 4 both become Low. Subtasks become separate tasks.';
+
+  @override
+  String get archiveCsvDates =>
+      'Only ISO calendar dates and times with explicit timezone offsets are scheduled. Other date expressions are kept in notes for you to review.';
+
+  @override
+  String get archiveCsvPersonalCopies =>
+      'This creates personal copies. Assignments, files and sharing access are not transferred. Todoist project CSV exports may omit completed tasks.';
+
+  @override
+  String get archiveReviewSchedule =>
+      'The original schedule needs review; this task will go to Inbox.';
+
+  @override
+  String get archiveFlattenedSubtasks => 'Subtask nesting will be flattened.';
+
+  @override
+  String get archiveInlineLabels => 'Inline @labels remain in the title.';
+
+  @override
+  String archiveAttachmentsOmitted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attachment files are',
+      one: '1 attachment file is',
+    );
+    return '$_temp0 not included.';
+  }
+
+  @override
+  String archiveInvalidCollection(String field, int max) {
+    return 'Invalid $field (maximum $max).';
+  }
+
+  @override
+  String archiveInvalidText(String field, int max) {
+    return 'Invalid $field (maximum $max characters).';
+  }
+
+  @override
+  String archiveInvalidInteger(String field, int min, int max) {
+    return 'Invalid $field ($min–$max).';
+  }
+
+  @override
+  String archiveInvalidIdentifier(String field) {
+    return 'Invalid $field.';
+  }
+
+  @override
+  String archiveCsvExtraFields(int row) {
+    return 'Row $row has more fields than the header.';
+  }
+
+  @override
+  String archiveCsvInvalidSection(int row) {
+    return 'Row $row: section name is invalid; its tasks will have no list.';
+  }
+
+  @override
+  String archiveCsvListDescription(int row) {
+    return 'Row $row: list descriptions are not supported.';
+  }
+
+  @override
+  String archiveCsvOrphanComment(int row) {
+    return 'Row $row: comment has no valid preceding task; it will be skipped.';
+  }
+
+  @override
+  String archiveCsvUnsupportedRow(int row) {
+    return 'Row $row: unsupported record type; it will be skipped.';
+  }
+
+  @override
+  String archiveCsvFieldInNotes(String field) {
+    return '$field will be kept as text in notes.';
+  }
+
+  @override
+  String archiveField(String field) {
+    String _temp0 = intl.Intl.selectLogic(
+      field,
+      {
+        'export_id': 'export_id',
+        'tasks': 'tasks',
+        'lists': 'lists',
+        'list_id': 'list id',
+        'list_name': 'list name',
+        'task_identifier': 'task identifier',
+        'title': 'title',
+        'notes': 'notes',
+        'priority': 'priority',
+        'duration': 'duration',
+        'repeat_interval': 'repeat interval',
+        'repeat_weekdays': 'repeat weekdays',
+        'weekday': 'weekday',
+        'completed_dates': 'completed dates',
+        'individual_date_changes': 'individual date changes',
+        'list_identifier': 'list identifier',
+        'labels': 'labels',
+        'label': 'label',
+        'checklist': 'checklist',
+        'checklist_identifier': 'checklist identifier',
+        'checklist_title': 'checklist title',
+        'checklist_dates': 'checklist dates',
+        'reminder_lead': 'reminder lead',
+        'reminder_time': 'reminder time',
+        'other': 'field',
+      },
+    );
+    return '$_temp0';
+  }
 }

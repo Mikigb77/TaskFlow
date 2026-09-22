@@ -1,3 +1,4 @@
+import 'package:agenda/models/archive_diagnostic.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -23,18 +24,17 @@ class ArchiveFiles {
     if (result == null) return null;
     final file = result.files.single;
     if (file.size > TaskArchive.maxBytes) {
-      throw const FormatException('Choose a file smaller than 32 MB.');
+      throw const ArchiveDiagnostic(ArchiveCode.fileTooLarge);
     }
     final stream = file.readStream ??
         (file.path == null ? null : File(file.path!).openRead());
     if (stream == null) {
-      throw const FormatException(
-          'This file could not be read. Choose a local copy.');
+      throw const ArchiveDiagnostic(ArchiveCode.fileUnreadable);
     }
     final bytes = BytesBuilder(copy: false);
     await for (final chunk in stream) {
       if (bytes.length + chunk.length > TaskArchive.maxBytes) {
-        throw const FormatException('Choose a file smaller than 32 MB.');
+        throw const ArchiveDiagnostic(ArchiveCode.fileTooLarge);
       }
       bytes.add(chunk);
     }
@@ -44,7 +44,6 @@ class ArchiveFiles {
   Future<bool> save(String contents) async {
     final bytes = Uint8List.fromList(utf8.encode(contents));
     final selected = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save TaskFlow export',
         fileName: fileName ?? 'taskflow-${Task.dateKey(DateTime.now())}.json',
         type: FileType.custom,
         allowedExtensions: ['json'],

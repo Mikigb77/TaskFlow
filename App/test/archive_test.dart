@@ -1,3 +1,4 @@
+import 'package:agenda/models/archive_diagnostic.dart';
 import 'dart:convert';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/occurrence_exception.dart';
@@ -76,7 +77,9 @@ void main() {
     expect(contents, isNot(contains('private')));
     final archive = TaskArchive.parse(contents);
     expect(archive.tasks.every((row) => row.error == null), isTrue);
-    expect(archive.tasks.last.warnings.single, contains('1 attachment'));
+    expect(archive.tasks.last.warnings.single.code,
+        ArchiveCode.attachmentsOmitted);
+    expect(archive.tasks.last.warnings.single.count, 1);
     final target = ArchiveStore(database, 'account-B');
     final first = await target.import(archive, {archive.tasks.first.sourceId});
     expect(first.added, 1);
@@ -110,16 +113,19 @@ void main() {
   test('failed imports roll back task, list and receipt writes together',
       () async {
     final list = TaskListInfo(name: 'New');
-    final archive =
-        TaskArchive(id: const Uuid().v4(), source: 'Fixture', lists: [
-      list
-    ], tasks: [
-      for (final title in ['First', 'Fails'])
-        ImportTask(
-            sourceId: const Uuid().v4(),
-            title: title,
-            task: Task(title: title, priority: 1, listId: list.id)),
-    ]);
+    final archive = TaskArchive(
+        id: const Uuid().v4(),
+        source: ArchiveSource.taskflow,
+        lists: [
+          list
+        ],
+        tasks: [
+          for (final title in ['First', 'Fails'])
+            ImportTask(
+                sourceId: const Uuid().v4(),
+                title: title,
+                task: Task(title: title, priority: 1, listId: list.id)),
+        ]);
     final sql = await database.database;
     await sql.execute(
         "CREATE TRIGGER fail_import BEFORE INSERT ON tasks WHEN NEW.title = 'Fails' BEGIN SELECT RAISE(ABORT, 'fixture interruption'); END");
@@ -188,8 +194,7 @@ void main() {
     expect(second.task!.notes, contains('30'));
     expect(second.task!.notes, isNot(contains('Orphan')));
     expect(second.warnings.length, 3);
-    expect(
-        archive.warnings.last, contains('comment has no valid preceding task'));
+    expect(archive.warnings.last.code, ArchiveCode.csvOrphanComment);
   });
 
   test('CSV rejects malformed quoting and preserves explicit timezone offsets',

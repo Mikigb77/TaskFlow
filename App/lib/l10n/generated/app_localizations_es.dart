@@ -1850,4 +1850,563 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get fileManageHelp =>
       'Abre los detalles de la tarea para descargar, subir o eliminar archivos de tu cuenta.';
+
+  @override
+  String get notificationLoadError =>
+      'No se pudieron cargar los ajustes de notificaciones. Inténtalo de nuevo.';
+
+  @override
+  String get notificationSaveError =>
+      'No se pudieron guardar los ajustes de recordatorios. Inténtalo de nuevo.';
+
+  @override
+  String get enableReminders => 'Activar recordatorios';
+
+  @override
+  String get deviceReminderScope =>
+      'Para esta cuenta en este dispositivo. Las opciones de cada tarea se sincronizan; los ajustes del dispositivo se quedan aquí.';
+
+  @override
+  String get mobileNotificationsOnly =>
+      'Notificaciones solo en dispositivos móviles';
+
+  @override
+  String get notificationPermissionOn => 'Permiso del sistema activado';
+
+  @override
+  String get notificationPermissionOff => 'Permiso del sistema desactivado';
+
+  @override
+  String get preciseAlarmsAvailable => 'Acceso a alarmas exactas disponible';
+
+  @override
+  String get approximateAlarmsHelp =>
+      'Los avisos son aproximados hasta que actives el acceso a alarmas exactas';
+
+  @override
+  String get openSystemSettings => 'Abrir ajustes del sistema';
+
+  @override
+  String get allowPreciseAlarms => 'Permitir alarmas exactas';
+
+  @override
+  String get taskDefaults => 'Opciones predeterminadas';
+
+  @override
+  String get timedTasks => 'Tareas con hora';
+
+  @override
+  String get dateOnlyTasks => 'Tareas sin hora';
+
+  @override
+  String get dailyCheckIns => 'Revisiones diarias';
+
+  @override
+  String get dailyCheckInsHelp => 'Un aviso para revisar tus tareas actuales.';
+
+  @override
+  String get morningCheckIn => 'Mañana';
+
+  @override
+  String get eveningCheckIn => 'Tarde';
+
+  @override
+  String get upcomingAlerts => 'Próximos avisos';
+
+  @override
+  String get scheduledAlertHelp =>
+      'Programado significa que el teléfono ha aceptado el aviso. Las restricciones de batería, los ajustes del sistema y el cierre forzado pueden retrasarlo o impedir su entrega.';
+
+  @override
+  String get androidAlertRefreshHelp =>
+      'La programación se actualiza al usar la app y mediante una tarea cada hora en segundo plano, cuando Android lo permite.';
+
+  @override
+  String get backgroundAlertRefreshHelp =>
+      'La programación se actualiza al usar la app y cuando el sistema permite actualizar en segundo plano.';
+
+  @override
+  String get noUpcomingAlerts =>
+      'No hay próximos avisos. Elige un recordatorio en una tarea con fecha.';
+
+  @override
+  String get repeatsDaily => 'se repite cada día';
+
+  @override
+  String get retryScheduling => 'Actualizar y reintentar';
+
+  @override
+  String get alertPending => 'pendiente';
+
+  @override
+  String get alertScheduled => 'programado';
+
+  @override
+  String get alertApproximate => 'aproximado';
+
+  @override
+  String get alertBlocked => 'bloqueado';
+
+  @override
+  String get alertFailed => 'no programado';
+
+  @override
+  String get alertInactive => 'inactivo';
+
+  @override
+  String get alertElapsed => 'pasado';
+
+  @override
+  String get reminderPermissionError =>
+      'Las notificaciones están desactivadas en los ajustes del sistema.';
+
+  @override
+  String get reminderScheduleError =>
+      'El teléfono no pudo programar este aviso. Reinténtalo desde Ajustes.';
+
+  @override
+  String get reminderBackgroundError =>
+      'No se pudo completar la actualización en segundo plano. Abre TaskFlow para reintentarlo.';
+
+  @override
+  String get reminderBackgroundUnavailable =>
+      'La actualización automática en segundo plano no está disponible. Los avisos se actualizan al abrir TaskFlow.';
+
+  @override
+  String get reminderActionError =>
+      'No se pudo completar la acción del aviso. Abre la tarea para reintentarlo.';
+
+  @override
+  String get reminderSetupError =>
+      'No se pudo completar la configuración de notificaciones. Reinténtalo desde Ajustes.';
+
+  @override
+  String get reminderAccountError =>
+      'No se pudieron actualizar los recordatorios de la cuenta. Abre los ajustes de notificaciones para reintentarlo.';
+
+  @override
+  String get reminderRefreshError =>
+      'No se pudieron actualizar los recordatorios. Tus tareas están guardadas; reinténtalo desde los ajustes de notificaciones.';
+
+  @override
+  String get transferError =>
+      'No se pudo completar la operación. Tus tareas y notas no han cambiado. Inténtalo de nuevo.';
+
+  @override
+  String get exportSaved => 'Archivo exportado. Guárdalo en un lugar privado.';
+
+  @override
+  String get keepYourTasks => 'Llévate tus tareas.';
+
+  @override
+  String get archiveContentsHelp =>
+      'Las exportaciones de TaskFlow incluyen tareas, notas, fechas, cambios de repeticiones, progreso, listas de pasos, etiquetas y listas personales. Se incluyen los nombres de los adjuntos, pero no su contenido, las credenciales de la cuenta, los ajustes del dispositivo ni las capturas sin terminar.';
+
+  @override
+  String get exportTaskFlowFile => 'Exportar archivo TaskFlow';
+
+  @override
+  String get chooseImportFile => 'Elegir archivo para importar';
+
+  @override
+  String get chooseImportFileHelp =>
+      'Elige una exportación JSON de TaskFlow o un CSV de proyecto de Todoist (hasta 32 MB y 5.000 tareas y notas). Podrás revisarlo antes de importar.';
+
+  @override
+  String get importPreview => 'Vista previa de importación';
+
+  @override
+  String get importCopiesHelp =>
+      'Las tareas y notas seleccionadas y las listas del archivo se añaden como copias personales. Se conserva el contenido existente. Si vuelves a importar este mismo archivo, se omiten los registros ya importados en este teléfono; un archivo modificado o exportado de nuevo cuenta como una importación diferente.';
+
+  @override
+  String get listsIncluded => 'Listas incluidas';
+
+  @override
+  String get archivedPersonalCopy => 'Copia personal archivada';
+
+  @override
+  String get personalCopy => 'Copia personal';
+
+  @override
+  String get alreadyImported => 'Ya importado en este teléfono';
+
+  @override
+  String get taskFlowExportSource => 'Exportación de TaskFlow';
+
+  @override
+  String get todoistCsvSource => 'CSV de proyecto de Todoist';
+
+  @override
+  String deferredAlerts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Hay $count avisos posteriores fuera de la programación actual.',
+      one: 'Hay 1 aviso posterior fuera de la programación actual.',
+    );
+    return '$_temp0 La próxima actualización añadirá los primeros que quepan.';
+  }
+
+  @override
+  String turnOffReminder(String title) {
+    return 'Desactivar $title';
+  }
+
+  @override
+  String importResult(int items, int lists) {
+    String _temp0 = intl.Intl.pluralLogic(
+      items,
+      locale: localeName,
+      other: '$items elementos',
+      one: '1 elemento',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      lists,
+      locale: localeName,
+      other: '$lists listas',
+      one: '1 lista',
+    );
+    return 'Se han añadido $_temp0 y $_temp1.';
+  }
+
+  @override
+  String importSkipped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos ya importados',
+      one: '1 elemento ya importado',
+    );
+    return 'Se han omitido $_temp0.';
+  }
+
+  @override
+  String importCounts(String source, int tasks, int notes, int lists) {
+    return '$source · $tasks tareas · $notes notas · $lists listas';
+  }
+
+  @override
+  String cannotImport(String reason) {
+    return 'No se puede importar: $reason';
+  }
+
+  @override
+  String importSelected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos seleccionados',
+      one: '1 elemento seleccionado',
+    );
+    return 'Importar $_temp0 y listas';
+  }
+
+  @override
+  String importRow(int row) {
+    return 'Registro $row';
+  }
+
+  @override
+  String get archiveFileTooLarge => 'Elige un archivo de menos de 32 MB.';
+
+  @override
+  String get archiveUnsupportedArchive =>
+      'Este archivo no es una exportación compatible de TaskFlow (versiones 1 y 2).';
+
+  @override
+  String get archiveInvalidList => 'Los datos de la lista no son válidos.';
+
+  @override
+  String get archiveDuplicateLists =>
+      'Hay identificadores de lista duplicados.';
+
+  @override
+  String get archiveInvalidListStyle =>
+      'El color o el estado de archivo de la lista no es válido.';
+
+  @override
+  String get archiveInvalidTask => 'El registro de tarea no es válido.';
+
+  @override
+  String get archiveDuplicateTask =>
+      'El identificador de tarea está duplicado.';
+
+  @override
+  String get archiveInvalidAttachments =>
+      'Los datos de los adjuntos no son válidos.';
+
+  @override
+  String get archiveMissingList =>
+      'La tarea hace referencia a una lista que no está en el archivo.';
+
+  @override
+  String get archiveInvalidTaskFields =>
+      'Los campos de la tarea no son válidos.';
+
+  @override
+  String get archiveUnsupportedKind =>
+      'El tipo de tarea o nota no es compatible.';
+
+  @override
+  String get archiveInvalidCompletion =>
+      'El estado de finalización no es válido.';
+
+  @override
+  String get archiveTwoSchedules =>
+      'Una tarea no puede tener dos fechas programadas.';
+
+  @override
+  String get archiveTwoDeadlines => 'Elige un plazo con hora o solo con fecha.';
+
+  @override
+  String get archiveInvalidReminderDate =>
+      'Elige una fecha disponible para el recordatorio.';
+
+  @override
+  String get archiveUnsupportedRepeat =>
+      'La regla de repetición no es compatible.';
+
+  @override
+  String get archiveWeekdaysNeedWeekly =>
+      'Los días de la semana requieren una repetición semanal.';
+
+  @override
+  String get archiveRepeatNeedsStart =>
+      'Una tarea repetida necesita una fecha de inicio.';
+
+  @override
+  String get archiveInvalidOccurrence =>
+      'El cambio de una repetición no es válido.';
+
+  @override
+  String get archiveDuplicateOccurrence =>
+      'Hay cambios de repetición duplicados.';
+
+  @override
+  String get archiveInvalidSkipped => 'La fecha omitida no es válida.';
+
+  @override
+  String get archiveInvalidOccurrenceSchedule =>
+      'La fecha de la repetición no es válida.';
+
+  @override
+  String get archiveRepeatSettingsNeedRepeat =>
+      'Los ajustes de repetición requieren una tarea repetida.';
+
+  @override
+  String get archiveRepeatUsesCompletedDates =>
+      'Las tareas repetidas usan fechas de finalización individuales.';
+
+  @override
+  String get archiveInvalidChecklist => 'El paso de la lista no es válido.';
+
+  @override
+  String get archiveDuplicateChecklist =>
+      'Hay identificadores de pasos duplicados.';
+
+  @override
+  String get archiveInvalidChecklistProgress =>
+      'El progreso de la lista de pasos no es válido.';
+
+  @override
+  String get archiveRepeatEndBeforeStart =>
+      'El final de la repetición es anterior al inicio.';
+
+  @override
+  String get archiveOccurrenceOutsideRepeat =>
+      'Un cambio de fecha queda fuera de esta regla de repetición.';
+
+  @override
+  String get archiveExportTooLarge =>
+      'La exportación supera el límite de 32 MB o 5.000 tareas y notas.';
+
+  @override
+  String get archiveInvalidDateFormat =>
+      'Las fechas deben usar el formato AAAA-MM-DD.';
+
+  @override
+  String get archiveInvalidDate => 'La fecha del calendario no es válida.';
+
+  @override
+  String get archiveMissingTimezone =>
+      'Las fechas con hora requieren formato ISO y un desplazamiento de zona horaria.';
+
+  @override
+  String get archiveInvalidClock => 'La hora no es válida.';
+
+  @override
+  String get archiveInvalidOffset =>
+      'El desplazamiento de zona horaria no es válido.';
+
+  @override
+  String get archiveInvalidTimedDate => 'La fecha con hora no es válida.';
+
+  @override
+  String get archiveFileUnreadable =>
+      'No se pudo leer este archivo. Elige una copia local.';
+
+  @override
+  String get archiveEmptyCsv => 'Este CSV está vacío.';
+
+  @override
+  String get archiveCsvHeader =>
+      'Elige un CSV de proyecto de Todoist con columnas TYPE y CONTENT.';
+
+  @override
+  String get archiveCsvTaskLimit =>
+      'Elige un CSV con un máximo de 5.000 tareas.';
+
+  @override
+  String get archiveCsvPriority => 'La prioridad debe estar entre 1 y 4.';
+
+  @override
+  String get archiveCsvIndent => 'El nivel de sangría debe estar entre 1 y 4.';
+
+  @override
+  String get archiveCsvRecordLimit => 'Este CSV tiene demasiados registros.';
+
+  @override
+  String get archiveCsvQuoting =>
+      'Las comillas del CSV no están bien formadas.';
+
+  @override
+  String get archiveCsvUnclosedQuote =>
+      'Hay un campo entre comillas sin cerrar en el CSV.';
+
+  @override
+  String get archiveNotesTooLong =>
+      'La tarea y sus comentarios superan los 8.000 caracteres de notas.';
+
+  @override
+  String get archiveInvalidFile =>
+      'El archivo no contiene JSON o texto UTF-8 válido.';
+
+  @override
+  String get archiveUnknownFields =>
+      'Se omitirán los campos de tarea no reconocidos.';
+
+  @override
+  String get archivePersonalCopies =>
+      'La importación crea copias personales nuevas. No incluye el acceso a cuentas, los archivos, los ajustes de notificaciones ni las capturas sin terminar.';
+
+  @override
+  String get archiveCsvPriorities =>
+      'Las prioridades 3 y 4 de Todoist pasan a Baja. Las subtareas se convierten en tareas independientes.';
+
+  @override
+  String get archiveCsvDates =>
+      'Solo se programan fechas ISO y horas con zona horaria explícita. Las demás expresiones de fecha se conservan en las notas para revisarlas.';
+
+  @override
+  String get archiveCsvPersonalCopies =>
+      'Se crean copias personales. No se transfieren las asignaciones, los archivos ni el acceso compartido. Los CSV de proyecto de Todoist pueden omitir las tareas completadas.';
+
+  @override
+  String get archiveReviewSchedule =>
+      'La fecha original necesita revisión; esta tarea irá a la Bandeja de entrada.';
+
+  @override
+  String get archiveFlattenedSubtasks =>
+      'Las subtareas pasarán a ser tareas independientes.';
+
+  @override
+  String get archiveInlineLabels =>
+      'Las @etiquetas del texto se conservan en el título.';
+
+  @override
+  String archiveAttachmentsOmitted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'el contenido de $count archivos adjuntos',
+      one: '1 archivo adjunto',
+    );
+    return 'No se incluye $_temp0.';
+  }
+
+  @override
+  String archiveInvalidCollection(String field, int max) {
+    return '$field: valor no válido (máximo $max).';
+  }
+
+  @override
+  String archiveInvalidText(String field, int max) {
+    return '$field: texto no válido (máximo $max caracteres).';
+  }
+
+  @override
+  String archiveInvalidInteger(String field, int min, int max) {
+    return '$field: valor no válido ($min–$max).';
+  }
+
+  @override
+  String archiveInvalidIdentifier(String field) {
+    return '$field: identificador no válido.';
+  }
+
+  @override
+  String archiveCsvExtraFields(int row) {
+    return 'La fila $row tiene más campos que la cabecera.';
+  }
+
+  @override
+  String archiveCsvInvalidSection(int row) {
+    return 'Fila $row: el nombre de sección no es válido; sus tareas no tendrán lista.';
+  }
+
+  @override
+  String archiveCsvListDescription(int row) {
+    return 'Fila $row: las descripciones de lista no son compatibles.';
+  }
+
+  @override
+  String archiveCsvOrphanComment(int row) {
+    return 'Fila $row: el comentario no tiene una tarea válida anterior; se omitirá.';
+  }
+
+  @override
+  String archiveCsvUnsupportedRow(int row) {
+    return 'Fila $row: el tipo de registro no es compatible; se omitirá.';
+  }
+
+  @override
+  String archiveCsvFieldInNotes(String field) {
+    return '$field se conservará como texto en las notas.';
+  }
+
+  @override
+  String archiveField(String field) {
+    String _temp0 = intl.Intl.selectLogic(
+      field,
+      {
+        'export_id': 'identificador de exportación',
+        'tasks': 'tareas',
+        'lists': 'listas',
+        'list_id': 'identificador de lista',
+        'list_name': 'nombre de lista',
+        'task_identifier': 'identificador de tarea',
+        'title': 'título',
+        'notes': 'notas',
+        'priority': 'prioridad',
+        'duration': 'duración',
+        'repeat_interval': 'intervalo de repetición',
+        'repeat_weekdays': 'días de repetición',
+        'weekday': 'día de la semana',
+        'completed_dates': 'fechas completadas',
+        'individual_date_changes': 'cambios de fecha individuales',
+        'list_identifier': 'identificador de lista',
+        'labels': 'etiquetas',
+        'label': 'etiqueta',
+        'checklist': 'lista de pasos',
+        'checklist_identifier': 'identificador de paso',
+        'checklist_title': 'título de paso',
+        'checklist_dates': 'fechas de pasos',
+        'reminder_lead': 'antelación del recordatorio',
+        'reminder_time': 'hora del recordatorio',
+        'other': 'campo',
+      },
+    );
+    return '$_temp0';
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:agenda/models/archive_diagnostic.dart';
 import 'package:agenda/models/task_archive.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/services/task_database.dart';
@@ -73,7 +74,7 @@ class ArchiveStore {
       TaskArchive.validatedTask(row.task!.toApi());
       if (row.task!.listId != null &&
           !archive.lists.any((list) => list.id == row.task!.listId)) {
-        throw const FormatException('A selected task is missing its list.');
+        throw const ArchiveDiagnostic(ArchiveCode.missingList);
       }
     }
     return (await database.database).transaction((tx) async {
@@ -103,7 +104,7 @@ class ArchiveStore {
         final source =
             archive.lists.where((list) => list.id == sourceId).firstOrNull;
         if (source == null) {
-          throw const FormatException('A selected task is missing its list.');
+          throw const ArchiveDiagnostic(ArchiveCode.missingList);
         }
         final targetId = mappings[sourceId] ?? const Uuid().v4();
         mappings[sourceId] = targetId;

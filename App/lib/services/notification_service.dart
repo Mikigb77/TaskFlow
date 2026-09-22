@@ -32,8 +32,7 @@ void reminderWorker() {
       if (owner != null) await TaskReminders.engine.reconcile(owner);
       return true;
     } catch (_) {
-      await TaskReminders.recordError(
-          'Background refresh could not finish. Open TaskFlow to retry.');
+      await TaskReminders.recordError('background_failed');
       return false;
     }
   });
@@ -170,8 +169,7 @@ class TaskReminders {
               existingWorkPolicy: ExistingPeriodicWorkPolicy.keep);
         }
       } catch (_) {
-        await recordError(
-            'Automatic background refresh is unavailable. Alerts refresh when you open TaskFlow.');
+        await recordError('background_unavailable');
       }
     }
   }
@@ -199,8 +197,7 @@ class TaskReminders {
         changes.add(null);
         actionChanges.add(null);
       } catch (_) {
-        await recordError(
-            'A notification action could not finish. Open the task to retry.');
+        await recordError('action_failed');
       }
     } else {
       openRequest.value = ReminderReference(id, token);
@@ -220,16 +217,14 @@ class TaskReminders {
     try {
       await initialize();
     } catch (_) {
-      await recordError(
-          'Notification setup could not finish. Retry from Settings.');
+      await recordError('setup_failed');
     }
     try {
       // Persist ownership even if notification initialization failed.
       await engine.activate(owner);
       await engine.reconcile(owner);
     } catch (_) {
-      await recordError(
-          'Account reminders could not refresh. Open notification settings to retry.');
+      await recordError('account_refresh_failed');
     }
   }
 
@@ -242,8 +237,7 @@ class TaskReminders {
         await engine.reconcile(ownerKey);
         changes.add(null);
       } catch (_) {
-        await recordError(
-            'Reminders could not refresh. Your tasks are saved; retry from notification settings.');
+        await recordError('refresh_failed');
       }
     });
     return _queue;

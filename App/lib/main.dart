@@ -39,8 +39,7 @@ Future<void> main() async {
   try {
     await TaskReminders.initialize();
   } catch (_) {
-    await TaskReminders.recordError(
-        'Notification setup could not finish. Retry from Settings.');
+    await TaskReminders.recordError('setup_failed');
   }
   final appearance = ThemeController(ThemePreferenceStore());
   final regional = RegionalController(RegionalPreferenceStore());

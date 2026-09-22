@@ -282,7 +282,7 @@ class ReminderEngine {
         if (!capabilities.allowed) {
           await driver.cancel(id);
           status = 'blocked';
-          error = 'Notifications are disabled in system settings.';
+          error = 'permission_denied';
         } else {
           status = capabilities.exact ? 'scheduled' : 'approximate';
           if (existing?['signature'] != signature ||
@@ -304,8 +304,7 @@ class ReminderEngine {
               // A previously scheduled version must not survive a failed edit.
               await driver.cancel(id);
               status = 'failed';
-              error =
-                  'The phone could not schedule this alert. Retry from Settings.';
+              error = 'schedule_failed';
             }
           }
         }

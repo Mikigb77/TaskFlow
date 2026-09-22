@@ -1,3 +1,5 @@
+import 'package:agenda/models/archive_diagnostic.dart';
+import 'package:agenda/l10n/archive_locale.dart';
 import 'package:agenda/l10n/region.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -27,10 +29,12 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
   Set<String> _selected = {};
   Set<String> _imported = {};
   bool _busy = false;
-  String? _message;
+  String Function(BuildContext)? _message;
   bool _error = false;
 
-  Future<void> _run(Future<String?> Function(ArchiveStore) operation) async {
+  Future<void> _run(
+      Future<String Function(BuildContext)?> Function(ArchiveStore)
+          operation) async {
     if (_busy) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     final store = ref.read(archiveStoreProvider);
@@ -45,22 +49,26 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
         setState(() => _message = message);
         if (message != null) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content:
-                  Text(message, maxLines: 3, overflow: TextOverflow.ellipsis)));
+              behavior: SnackBarBehavior.fixed,
+              content: Builder(
+                  builder: (context) => Text(message(context),
+                      maxLines: 3, overflow: TextOverflow.ellipsis))));
         }
       }
     } on FormatException catch (error) {
       if (mounted) {
         setState(() {
-          _message = error.message;
+          final issue = error is ArchiveDiagnostic
+              ? error
+              : const ArchiveDiagnostic(ArchiveCode.invalidFile);
+          _message = (context) => context.archiveDiagnostic(issue);
           _error = true;
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _message =
-              'Could not finish. Your existing tasks are unchanged. Please retry.';
+          _message = (context) => context.l10n.transferError;
           _error = true;
         });
       }
@@ -75,7 +83,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
           return null;
         }
         return await ref.read(archiveFilesProvider).save(contents)
-            ? 'Export saved. Keep the file somewhere private.'
+            ? (BuildContext context) => context.l10n.exportSaved
             : null;
       });
 
@@ -86,6 +94,13 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
             !identical(store, ref.read(archiveStoreProvider))) {
           return null;
         }
+        // Selecting another file replaces the preview even if parsing fails.
+        // Keep a cancelled picker separate so it can preserve the prior choice.
+        setState(() {
+          _archive = null;
+          _selected = {};
+          _imported = {};
+        });
         final archive = file.name.toLowerCase().endsWith('.csv')
             ? TodoistImport.parse(file.contents)
             : TaskArchive.parse(file.contents);
@@ -118,7 +133,11 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
           _imported = imported;
         });
         unawaited(ref.read(taskProvider.notifier).loadTasks());
-        return 'Added ${result.added} ${result.added == 1 ? 'item' : 'items'} and ${result.listsAdded} ${result.listsAdded == 1 ? 'list' : 'lists'}.${result.alreadyImported > 0 ? ' Skipped ${result.alreadyImported} already imported.' : ''}';
+        return (BuildContext context) => [
+              context.l10n.importResult(result.added, result.listsAdded),
+              if (result.alreadyImported > 0)
+                context.l10n.importSkipped(result.alreadyImported)
+            ].join(' ');
       });
 
   @override
@@ -130,25 +149,23 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
         child: Scaffold(
           appBar: CustomAppBar(title: context.l10n.exportImport),
           body: ListView(padding: const EdgeInsets.all(24), children: [
-            Text('Keep your tasks with you.',
+            Text(context.l10n.keepYourTasks,
                 style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 12),
-            const Text(
-                'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal lists. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.'),
+            Text(context.l10n.archiveContentsHelp),
             const SizedBox(height: 16),
             Wrap(spacing: 8, runSpacing: 8, children: [
               FilledButton.icon(
                   onPressed: _busy ? null : _export,
                   icon: const Icon(Icons.download_outlined),
-                  label: const Text('Export TaskFlow file')),
+                  label: Text(context.l10n.exportTaskFlowFile)),
               OutlinedButton.icon(
                   onPressed: _busy ? null : _preview,
                   icon: const Icon(Icons.upload_file_outlined),
-                  label: const Text('Choose import file')),
+                  label: Text(context.l10n.chooseImportFile)),
             ]),
             const SizedBox(height: 8),
-            const Text(
-                'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.'),
+            Text(context.l10n.chooseImportFileHelp),
             if (_busy)
               const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
@@ -156,35 +173,43 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
             if (_message != null)
               Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: MessageBanner(_message!, isError: _error)),
+                  child: MessageBanner(_message!(context), isError: _error)),
             if (archive != null) ...[
               const SizedBox(height: 24),
-              Text('Import preview',
+              Text(context.l10n.importPreview,
                   style: Theme.of(context).textTheme.titleLarge),
-              Text(
-                  '${archive.source} · ${archive.tasks.where((item) => item.task?.isNote != true).length} tasks · ${archive.tasks.where((item) => item.task?.isNote == true).length} notes · ${archive.lists.length} lists'),
+              Text(context.l10n.importCounts(
+                  archive.source == ArchiveSource.taskflow
+                      ? context.l10n.taskFlowExportSource
+                      : context.l10n.todoistCsvSource,
+                  archive.tasks
+                      .where((item) => item.task?.isNote != true)
+                      .length,
+                  archive.tasks
+                      .where((item) => item.task?.isNote == true)
+                      .length,
+                  archive.lists.length)),
               const SizedBox(height: 12),
               for (final warning in archive.warnings)
                 Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(warning,
+                    child: Text(context.archiveDiagnostic(warning),
                         style: TextStyle(color: colors.onSurfaceVariant))),
-              const Text(
-                  'Selected tasks, notes and the file’s lists are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.'),
+              Text(context.l10n.importCopiesHelp),
               if (archive.lists.isNotEmpty)
                 ExpansionTile(
                     tilePadding: EdgeInsets.zero,
-                    title: const Text('Lists included'),
+                    title: Text(context.l10n.listsIncluded),
                     children: [
                       for (final list in archive.lists)
                         ListTile(
                             title: Text(list.name),
                             subtitle: Text(list.archived
-                                ? 'Archived personal copy'
-                                : 'Personal copy'))
+                                ? context.l10n.archivedPersonalCopy
+                                : context.l10n.personalCopy))
                     ]),
               const SizedBox(height: 12),
-              for (final row in archive.tasks)
+              for (final (index, row) in archive.tasks.indexed)
                 AppSurface(
                     padding: EdgeInsets.zero,
                     child: CheckboxListTile(
@@ -201,17 +226,25 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
                                     _selected.remove(row.sourceId);
                                   }
                                 }),
-                        title: Text(row.title),
-                        subtitle: Text([
-                          if (row.error != null) 'Cannot import: ${row.error}',
-                          if (_imported.contains(row.sourceId))
-                            'Already imported on this phone',
-                          if (row.task != null)
-                            row.task!.isNote
-                                ? context.l10n.note
-                                : '${taskScheduleLabel(row.task!, context: context)} · ${context.repeatLabel(row.task!)}',
-                          ...row.warnings,
-                        ].join('\n')))),
+                        title: Text(
+                            row.title.isEmpty
+                                ? context.l10n.importRow(index + 1)
+                                : row.title,
+                            style: TextStyle(color: colors.onSurface)),
+                        subtitle: Text(
+                            [
+                              if (row.error != null)
+                                context.l10n.cannotImport(
+                                    context.archiveDiagnostic(row.error!)),
+                              if (_imported.contains(row.sourceId))
+                                context.l10n.alreadyImported,
+                              if (row.task != null)
+                                row.task!.isNote
+                                    ? context.l10n.note
+                                    : '${taskScheduleLabel(row.task!, context: context)} · ${context.repeatLabel(row.task!)}',
+                              ...row.warnings.map(context.archiveDiagnostic),
+                            ].join('\n'),
+                            style: TextStyle(color: colors.onSurfaceVariant)))),
               const SizedBox(height: 16),
               FilledButton.icon(
                   key: const ValueKey('confirm-import'),
@@ -220,8 +253,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
                           ? null
                           : _import,
                   icon: const Icon(Icons.add_task),
-                  label: Text(
-                      'Import ${_selected.length} selected items and lists')),
+                  label: Text(context.l10n.importSelected(_selected.length))),
             ],
           ]),
         ));

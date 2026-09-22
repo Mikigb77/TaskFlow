@@ -28,7 +28,13 @@
   "durationUnset": "Sin duración",
   "durationEstimateHelp": "Una estimación hasta que elijas una hora de inicio.",
   "durationMinutes": "{minutes} min",
-  "@durationMinutes": {"placeholders": {"minutes": {"type": "int"}}},
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "durationInput": "Minutos (1–1440)",
   "durationInvalid": "Introduce un número entero de 1 a 1440.",
   "removeDuration": "Quitar duración",
@@ -42,7 +48,13 @@
   "deadlineLatePlan": "El plan termina después de la fecha límite. Revisa el inicio o la duración.",
   "deadlineOverdue": "Fecha límite vencida",
   "deadlineLabel": "Vence {date}",
-  "@deadlineLabel": {"placeholders": {"date": {"type": "String"}}},
+  "@deadlineLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "reminderAnchor": "Recordar con respecto a",
   "reminderAnchorHelp": "Un recordatorio por instancia, según la fecha elegida aquí.",
   "dayTimeline": "Horario del día",
@@ -54,7 +66,13 @@
   "timelinePoint": "Sin duración · solo hora",
   "timelineShortBlocks": "Los eventos cortos tienen una zona táctil más grande; la barra de color muestra su duración real.",
   "timelineHours": "{hours} horas en este día",
-  "@timelineHours": {"placeholders": {"hours": {"type": "int"}}},
+  "@timelineHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "@@locale": "es",
   "deviceCalendars": "Calendarios del teléfono",
   "deviceCalendarHelp": "Consulta los eventos de los calendarios conectados a este teléfono junto a tus tareas.",
@@ -551,5 +569,299 @@
   "fileUploadHelp": "Los archivos nuevos se suben a tu cuenta al guardar: hasta 6 MiB por archivo y 64 MiB por cuenta. Los archivos locales anteriores permanecen aquí hasta que elijas Subir en los detalles de la tarea.",
   "fileLocalHelp": "Los archivos permanecen en este dispositivo hasta que inicies sesión y elijas Subir en los detalles de la tarea. Hasta 6 MiB por archivo.",
   "fileLimit": "Elige un archivo no vacío de hasta 6 MiB. Puedes adjuntar hasta 20 archivos por tarea.",
-  "fileManageHelp": "Abre los detalles de la tarea para descargar, subir o eliminar archivos de tu cuenta."
+  "fileManageHelp": "Abre los detalles de la tarea para descargar, subir o eliminar archivos de tu cuenta.",
+  "notificationLoadError": "No se pudieron cargar los ajustes de notificaciones. Inténtalo de nuevo.",
+  "notificationSaveError": "No se pudieron guardar los ajustes de recordatorios. Inténtalo de nuevo.",
+  "enableReminders": "Activar recordatorios",
+  "deviceReminderScope": "Para esta cuenta en este dispositivo. Las opciones de cada tarea se sincronizan; los ajustes del dispositivo se quedan aquí.",
+  "mobileNotificationsOnly": "Notificaciones solo en dispositivos móviles",
+  "notificationPermissionOn": "Permiso del sistema activado",
+  "notificationPermissionOff": "Permiso del sistema desactivado",
+  "preciseAlarmsAvailable": "Acceso a alarmas exactas disponible",
+  "approximateAlarmsHelp": "Los avisos son aproximados hasta que actives el acceso a alarmas exactas",
+  "openSystemSettings": "Abrir ajustes del sistema",
+  "allowPreciseAlarms": "Permitir alarmas exactas",
+  "taskDefaults": "Opciones predeterminadas",
+  "timedTasks": "Tareas con hora",
+  "dateOnlyTasks": "Tareas sin hora",
+  "dailyCheckIns": "Revisiones diarias",
+  "dailyCheckInsHelp": "Un aviso para revisar tus tareas actuales.",
+  "morningCheckIn": "Mañana",
+  "eveningCheckIn": "Tarde",
+  "upcomingAlerts": "Próximos avisos",
+  "scheduledAlertHelp": "Programado significa que el teléfono ha aceptado el aviso. Las restricciones de batería, los ajustes del sistema y el cierre forzado pueden retrasarlo o impedir su entrega.",
+  "androidAlertRefreshHelp": "La programación se actualiza al usar la app y mediante una tarea cada hora en segundo plano, cuando Android lo permite.",
+  "backgroundAlertRefreshHelp": "La programación se actualiza al usar la app y cuando el sistema permite actualizar en segundo plano.",
+  "noUpcomingAlerts": "No hay próximos avisos. Elige un recordatorio en una tarea con fecha.",
+  "repeatsDaily": "se repite cada día",
+  "retryScheduling": "Actualizar y reintentar",
+  "alertPending": "pendiente",
+  "alertScheduled": "programado",
+  "alertApproximate": "aproximado",
+  "alertBlocked": "bloqueado",
+  "alertFailed": "no programado",
+  "alertInactive": "inactivo",
+  "alertElapsed": "pasado",
+  "reminderPermissionError": "Las notificaciones están desactivadas en los ajustes del sistema.",
+  "reminderScheduleError": "El teléfono no pudo programar este aviso. Reinténtalo desde Ajustes.",
+  "reminderBackgroundError": "No se pudo completar la actualización en segundo plano. Abre TaskFlow para reintentarlo.",
+  "reminderBackgroundUnavailable": "La actualización automática en segundo plano no está disponible. Los avisos se actualizan al abrir TaskFlow.",
+  "reminderActionError": "No se pudo completar la acción del aviso. Abre la tarea para reintentarlo.",
+  "reminderSetupError": "No se pudo completar la configuración de notificaciones. Reinténtalo desde Ajustes.",
+  "reminderAccountError": "No se pudieron actualizar los recordatorios de la cuenta. Abre los ajustes de notificaciones para reintentarlo.",
+  "reminderRefreshError": "No se pudieron actualizar los recordatorios. Tus tareas están guardadas; reinténtalo desde los ajustes de notificaciones.",
+  "transferError": "No se pudo completar la operación. Tus tareas y notas no han cambiado. Inténtalo de nuevo.",
+  "exportSaved": "Archivo exportado. Guárdalo en un lugar privado.",
+  "keepYourTasks": "Llévate tus tareas.",
+  "archiveContentsHelp": "Las exportaciones de TaskFlow incluyen tareas, notas, fechas, cambios de repeticiones, progreso, listas de pasos, etiquetas y listas personales. Se incluyen los nombres de los adjuntos, pero no su contenido, las credenciales de la cuenta, los ajustes del dispositivo ni las capturas sin terminar.",
+  "exportTaskFlowFile": "Exportar archivo TaskFlow",
+  "chooseImportFile": "Elegir archivo para importar",
+  "chooseImportFileHelp": "Elige una exportación JSON de TaskFlow o un CSV de proyecto de Todoist (hasta 32 MB y 5.000 tareas y notas). Podrás revisarlo antes de importar.",
+  "importPreview": "Vista previa de importación",
+  "importCopiesHelp": "Las tareas y notas seleccionadas y las listas del archivo se añaden como copias personales. Se conserva el contenido existente. Si vuelves a importar este mismo archivo, se omiten los registros ya importados en este teléfono; un archivo modificado o exportado de nuevo cuenta como una importación diferente.",
+  "listsIncluded": "Listas incluidas",
+  "archivedPersonalCopy": "Copia personal archivada",
+  "personalCopy": "Copia personal",
+  "alreadyImported": "Ya importado en este teléfono",
+  "taskFlowExportSource": "Exportación de TaskFlow",
+  "todoistCsvSource": "CSV de proyecto de Todoist",
+  "deferredAlerts": "{count, plural, =1{Hay 1 aviso posterior fuera de la programación actual.} other{Hay {count} avisos posteriores fuera de la programación actual.}} La próxima actualización añadirá los primeros que quepan.",
+  "@deferredAlerts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "turnOffReminder": "Desactivar {title}",
+  "@turnOffReminder": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "importResult": "Se han añadido {items, plural, =1{1 elemento} other{{items} elementos}} y {lists, plural, =1{1 lista} other{{lists} listas}}.",
+  "@importResult": {
+    "placeholders": {
+      "items": {
+        "type": "int"
+      },
+      "lists": {
+        "type": "int"
+      }
+    }
+  },
+  "importSkipped": "Se han omitido {count, plural, =1{1 elemento ya importado} other{{count} elementos ya importados}}.",
+  "@importSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importCounts": "{source} · {tasks} tareas · {notes} notas · {lists} listas",
+  "@importCounts": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "tasks": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      },
+      "lists": {
+        "type": "int"
+      }
+    }
+  },
+  "cannotImport": "No se puede importar: {reason}",
+  "@cannotImport": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "importSelected": "Importar {count, plural, =1{1 elemento seleccionado} other{{count} elementos seleccionados}} y listas",
+  "@importSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importRow": "Registro {row}",
+  "@importRow": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveFileTooLarge": "Elige un archivo de menos de 32 MB.",
+  "archiveUnsupportedArchive": "Este archivo no es una exportación compatible de TaskFlow (versiones 1 y 2).",
+  "archiveInvalidList": "Los datos de la lista no son válidos.",
+  "archiveDuplicateLists": "Hay identificadores de lista duplicados.",
+  "archiveInvalidListStyle": "El color o el estado de archivo de la lista no es válido.",
+  "archiveInvalidTask": "El registro de tarea no es válido.",
+  "archiveDuplicateTask": "El identificador de tarea está duplicado.",
+  "archiveInvalidAttachments": "Los datos de los adjuntos no son válidos.",
+  "archiveMissingList": "La tarea hace referencia a una lista que no está en el archivo.",
+  "archiveInvalidTaskFields": "Los campos de la tarea no son válidos.",
+  "archiveUnsupportedKind": "El tipo de tarea o nota no es compatible.",
+  "archiveInvalidCompletion": "El estado de finalización no es válido.",
+  "archiveTwoSchedules": "Una tarea no puede tener dos fechas programadas.",
+  "archiveTwoDeadlines": "Elige un plazo con hora o solo con fecha.",
+  "archiveInvalidReminderDate": "Elige una fecha disponible para el recordatorio.",
+  "archiveUnsupportedRepeat": "La regla de repetición no es compatible.",
+  "archiveWeekdaysNeedWeekly": "Los días de la semana requieren una repetición semanal.",
+  "archiveRepeatNeedsStart": "Una tarea repetida necesita una fecha de inicio.",
+  "archiveInvalidOccurrence": "El cambio de una repetición no es válido.",
+  "archiveDuplicateOccurrence": "Hay cambios de repetición duplicados.",
+  "archiveInvalidSkipped": "La fecha omitida no es válida.",
+  "archiveInvalidOccurrenceSchedule": "La fecha de la repetición no es válida.",
+  "archiveRepeatSettingsNeedRepeat": "Los ajustes de repetición requieren una tarea repetida.",
+  "archiveRepeatUsesCompletedDates": "Las tareas repetidas usan fechas de finalización individuales.",
+  "archiveInvalidChecklist": "El paso de la lista no es válido.",
+  "archiveDuplicateChecklist": "Hay identificadores de pasos duplicados.",
+  "archiveInvalidChecklistProgress": "El progreso de la lista de pasos no es válido.",
+  "archiveRepeatEndBeforeStart": "El final de la repetición es anterior al inicio.",
+  "archiveOccurrenceOutsideRepeat": "Un cambio de fecha queda fuera de esta regla de repetición.",
+  "archiveExportTooLarge": "La exportación supera el límite de 32 MB o 5.000 tareas y notas.",
+  "archiveInvalidDateFormat": "Las fechas deben usar el formato AAAA-MM-DD.",
+  "archiveInvalidDate": "La fecha del calendario no es válida.",
+  "archiveMissingTimezone": "Las fechas con hora requieren formato ISO y un desplazamiento de zona horaria.",
+  "archiveInvalidClock": "La hora no es válida.",
+  "archiveInvalidOffset": "El desplazamiento de zona horaria no es válido.",
+  "archiveInvalidTimedDate": "La fecha con hora no es válida.",
+  "archiveFileUnreadable": "No se pudo leer este archivo. Elige una copia local.",
+  "archiveEmptyCsv": "Este CSV está vacío.",
+  "archiveCsvHeader": "Elige un CSV de proyecto de Todoist con columnas TYPE y CONTENT.",
+  "archiveCsvTaskLimit": "Elige un CSV con un máximo de 5.000 tareas.",
+  "archiveCsvPriority": "La prioridad debe estar entre 1 y 4.",
+  "archiveCsvIndent": "El nivel de sangría debe estar entre 1 y 4.",
+  "archiveCsvRecordLimit": "Este CSV tiene demasiados registros.",
+  "archiveCsvQuoting": "Las comillas del CSV no están bien formadas.",
+  "archiveCsvUnclosedQuote": "Hay un campo entre comillas sin cerrar en el CSV.",
+  "archiveNotesTooLong": "La tarea y sus comentarios superan los 8.000 caracteres de notas.",
+  "archiveInvalidFile": "El archivo no contiene JSON o texto UTF-8 válido.",
+  "archiveUnknownFields": "Se omitirán los campos de tarea no reconocidos.",
+  "archivePersonalCopies": "La importación crea copias personales nuevas. No incluye el acceso a cuentas, los archivos, los ajustes de notificaciones ni las capturas sin terminar.",
+  "archiveCsvPriorities": "Las prioridades 3 y 4 de Todoist pasan a Baja. Las subtareas se convierten en tareas independientes.",
+  "archiveCsvDates": "Solo se programan fechas ISO y horas con zona horaria explícita. Las demás expresiones de fecha se conservan en las notas para revisarlas.",
+  "archiveCsvPersonalCopies": "Se crean copias personales. No se transfieren las asignaciones, los archivos ni el acceso compartido. Los CSV de proyecto de Todoist pueden omitir las tareas completadas.",
+  "archiveReviewSchedule": "La fecha original necesita revisión; esta tarea irá a la Bandeja de entrada.",
+  "archiveFlattenedSubtasks": "Las subtareas pasarán a ser tareas independientes.",
+  "archiveInlineLabels": "Las @etiquetas del texto se conservan en el título.",
+  "archiveAttachmentsOmitted": "No se incluye {count, plural, =1{1 archivo adjunto} other{el contenido de {count} archivos adjuntos}}.",
+  "@archiveAttachmentsOmitted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidCollection": "{field}: valor no válido (máximo {max}).",
+  "@archiveInvalidCollection": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidText": "{field}: texto no válido (máximo {max} caracteres).",
+  "@archiveInvalidText": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidInteger": "{field}: valor no válido ({min}–{max}).",
+  "@archiveInvalidInteger": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidIdentifier": "{field}: identificador no válido.",
+  "@archiveInvalidIdentifier": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveCsvExtraFields": "La fila {row} tiene más campos que la cabecera.",
+  "@archiveCsvExtraFields": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvInvalidSection": "Fila {row}: el nombre de sección no es válido; sus tareas no tendrán lista.",
+  "@archiveCsvInvalidSection": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvListDescription": "Fila {row}: las descripciones de lista no son compatibles.",
+  "@archiveCsvListDescription": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvOrphanComment": "Fila {row}: el comentario no tiene una tarea válida anterior; se omitirá.",
+  "@archiveCsvOrphanComment": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvUnsupportedRow": "Fila {row}: el tipo de registro no es compatible; se omitirá.",
+  "@archiveCsvUnsupportedRow": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvFieldInNotes": "{field} se conservará como texto en las notas.",
+  "@archiveCsvFieldInNotes": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveField": "{field, select, export_id{identificador de exportación} tasks{tareas} lists{listas} list_id{identificador de lista} list_name{nombre de lista} task_identifier{identificador de tarea} title{título} notes{notas} priority{prioridad} duration{duración} repeat_interval{intervalo de repetición} repeat_weekdays{días de repetición} weekday{día de la semana} completed_dates{fechas completadas} individual_date_changes{cambios de fecha individuales} list_identifier{identificador de lista} labels{etiquetas} label{etiqueta} checklist{lista de pasos} checklist_identifier{identificador de paso} checklist_title{título de paso} checklist_dates{fechas de pasos} reminder_lead{antelación del recordatorio} reminder_time{hora del recordatorio} other{campo}}",
+  "@archiveField": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  }
 }

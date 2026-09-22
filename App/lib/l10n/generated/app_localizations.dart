@@ -3391,6 +3391,786 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open task details to download, upload, or remove account attachments.'**
   String get fileManageHelp;
+
+  /// No description provided for @notificationLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load notification settings. Please retry.'**
+  String get notificationLoadError;
+
+  /// No description provided for @notificationSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save reminder settings. Please retry.'**
+  String get notificationSaveError;
+
+  /// No description provided for @enableReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable reminders'**
+  String get enableReminders;
+
+  /// No description provided for @deviceReminderScope.
+  ///
+  /// In en, this message translates to:
+  /// **'For this account on this device. Task choices sync; device preferences stay here.'**
+  String get deviceReminderScope;
+
+  /// No description provided for @mobileNotificationsOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile notifications only'**
+  String get mobileNotificationsOnly;
+
+  /// No description provided for @notificationPermissionOn.
+  ///
+  /// In en, this message translates to:
+  /// **'System permission is on'**
+  String get notificationPermissionOn;
+
+  /// No description provided for @notificationPermissionOff.
+  ///
+  /// In en, this message translates to:
+  /// **'System permission is off'**
+  String get notificationPermissionOff;
+
+  /// No description provided for @preciseAlarmsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Precise alarm access available'**
+  String get preciseAlarmsAvailable;
+
+  /// No description provided for @approximateAlarmsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts are approximate until precise alarm access is enabled'**
+  String get approximateAlarmsHelp;
+
+  /// No description provided for @openSystemSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open system settings'**
+  String get openSystemSettings;
+
+  /// No description provided for @allowPreciseAlarms.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow precise alarms'**
+  String get allowPreciseAlarms;
+
+  /// No description provided for @taskDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Task defaults'**
+  String get taskDefaults;
+
+  /// No description provided for @timedTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed tasks'**
+  String get timedTasks;
+
+  /// No description provided for @dateOnlyTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Date-only tasks'**
+  String get dateOnlyTasks;
+
+  /// No description provided for @dailyCheckIns.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily check-ins'**
+  String get dailyCheckIns;
+
+  /// No description provided for @dailyCheckInsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'A gentle prompt to review your current tasks.'**
+  String get dailyCheckInsHelp;
+
+  /// No description provided for @morningCheckIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning'**
+  String get morningCheckIn;
+
+  /// No description provided for @eveningCheckIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening'**
+  String get eveningCheckIn;
+
+  /// No description provided for @upcomingAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming alerts'**
+  String get upcomingAlerts;
+
+  /// No description provided for @scheduledAlertHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.'**
+  String get scheduledAlertHelp;
+
+  /// No description provided for @androidAlertRefreshHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The window refreshes on app use and through an hourly background job when Android permits.'**
+  String get androidAlertRefreshHelp;
+
+  /// No description provided for @backgroundAlertRefreshHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The window refreshes on app use and when the system allows background refresh.'**
+  String get backgroundAlertRefreshHelp;
+
+  /// No description provided for @noUpcomingAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'No upcoming alerts. Choose a reminder on a scheduled task.'**
+  String get noUpcomingAlerts;
+
+  /// No description provided for @repeatsDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'repeats daily'**
+  String get repeatsDaily;
+
+  /// No description provided for @retryScheduling.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh and retry scheduling'**
+  String get retryScheduling;
+
+  /// No description provided for @alertPending.
+  ///
+  /// In en, this message translates to:
+  /// **'pending'**
+  String get alertPending;
+
+  /// No description provided for @alertScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'scheduled'**
+  String get alertScheduled;
+
+  /// No description provided for @alertApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'approximate'**
+  String get alertApproximate;
+
+  /// No description provided for @alertBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'blocked'**
+  String get alertBlocked;
+
+  /// No description provided for @alertFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'failed'**
+  String get alertFailed;
+
+  /// No description provided for @alertInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'inactive'**
+  String get alertInactive;
+
+  /// No description provided for @alertElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'elapsed'**
+  String get alertElapsed;
+
+  /// No description provided for @reminderPermissionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are disabled in system settings.'**
+  String get reminderPermissionError;
+
+  /// No description provided for @reminderScheduleError.
+  ///
+  /// In en, this message translates to:
+  /// **'The phone could not schedule this alert. Retry from Settings.'**
+  String get reminderScheduleError;
+
+  /// No description provided for @reminderBackgroundError.
+  ///
+  /// In en, this message translates to:
+  /// **'Background refresh could not finish. Open TaskFlow to retry.'**
+  String get reminderBackgroundError;
+
+  /// No description provided for @reminderBackgroundUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic background refresh is unavailable. Alerts refresh when you open TaskFlow.'**
+  String get reminderBackgroundUnavailable;
+
+  /// No description provided for @reminderActionError.
+  ///
+  /// In en, this message translates to:
+  /// **'A notification action could not finish. Open the task to retry.'**
+  String get reminderActionError;
+
+  /// No description provided for @reminderSetupError.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification setup could not finish. Retry from Settings.'**
+  String get reminderSetupError;
+
+  /// No description provided for @reminderAccountError.
+  ///
+  /// In en, this message translates to:
+  /// **'Account reminders could not refresh. Open notification settings to retry.'**
+  String get reminderAccountError;
+
+  /// No description provided for @reminderRefreshError.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders could not refresh. Your tasks are saved; retry from notification settings.'**
+  String get reminderRefreshError;
+
+  /// No description provided for @transferError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not finish. Your existing tasks and notes are unchanged. Please retry.'**
+  String get transferError;
+
+  /// No description provided for @exportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Export saved. Keep the file somewhere private.'**
+  String get exportSaved;
+
+  /// No description provided for @keepYourTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your tasks with you.'**
+  String get keepYourTasks;
+
+  /// No description provided for @archiveContentsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal lists. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.'**
+  String get archiveContentsHelp;
+
+  /// No description provided for @exportTaskFlowFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Export TaskFlow file'**
+  String get exportTaskFlowFile;
+
+  /// No description provided for @chooseImportFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose import file'**
+  String get chooseImportFile;
+
+  /// No description provided for @chooseImportFileHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.'**
+  String get chooseImportFileHelp;
+
+  /// No description provided for @importPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Import preview'**
+  String get importPreview;
+
+  /// No description provided for @importCopiesHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected tasks, notes and the file’s lists are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.'**
+  String get importCopiesHelp;
+
+  /// No description provided for @listsIncluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Lists included'**
+  String get listsIncluded;
+
+  /// No description provided for @archivedPersonalCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived personal copy'**
+  String get archivedPersonalCopy;
+
+  /// No description provided for @personalCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal copy'**
+  String get personalCopy;
+
+  /// No description provided for @alreadyImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Already imported on this phone'**
+  String get alreadyImported;
+
+  /// No description provided for @taskFlowExportSource.
+  ///
+  /// In en, this message translates to:
+  /// **'TaskFlow export'**
+  String get taskFlowExportSource;
+
+  /// No description provided for @todoistCsvSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Todoist project CSV'**
+  String get todoistCsvSource;
+
+  /// No description provided for @deferredAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 later alert is} other{{count} later alerts are}} outside the current window. The next refresh adds the earliest ones that fit.'**
+  String deferredAlerts(int count);
+
+  /// No description provided for @turnOffReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off {title}'**
+  String turnOffReminder(String title);
+
+  /// No description provided for @importResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {items, plural, =1{1 item} other{{items} items}} and {lists, plural, =1{1 list} other{{lists} lists}}.'**
+  String importResult(int items, int lists);
+
+  /// No description provided for @importSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {count, plural, =1{1 already imported item} other{{count} already imported items}}.'**
+  String importSkipped(int count);
+
+  /// No description provided for @importCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'{source} · {tasks} tasks · {notes} notes · {lists} lists'**
+  String importCounts(String source, int tasks, int notes, int lists);
+
+  /// No description provided for @cannotImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot import: {reason}'**
+  String cannotImport(String reason);
+
+  /// No description provided for @importSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Import {count, plural, =1{1 selected item} other{{count} selected items}} and lists'**
+  String importSelected(int count);
+
+  /// No description provided for @importRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Record {row}'**
+  String importRow(int row);
+
+  /// No description provided for @archiveFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a file smaller than 32 MB.'**
+  String get archiveFileTooLarge;
+
+  /// No description provided for @archiveUnsupportedArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a supported TaskFlow export (versions 1 and 2).'**
+  String get archiveUnsupportedArchive;
+
+  /// No description provided for @archiveInvalidList.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid list metadata.'**
+  String get archiveInvalidList;
+
+  /// No description provided for @archiveDuplicateLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate list identifiers.'**
+  String get archiveDuplicateLists;
+
+  /// No description provided for @archiveInvalidListStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid list color or archive status.'**
+  String get archiveInvalidListStyle;
+
+  /// No description provided for @archiveInvalidTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid task record.'**
+  String get archiveInvalidTask;
+
+  /// No description provided for @archiveDuplicateTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate task identifier.'**
+  String get archiveDuplicateTask;
+
+  /// No description provided for @archiveInvalidAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid attachment information.'**
+  String get archiveInvalidAttachments;
+
+  /// No description provided for @archiveMissingList.
+  ///
+  /// In en, this message translates to:
+  /// **'The task refers to a list missing from this file.'**
+  String get archiveMissingList;
+
+  /// No description provided for @archiveInvalidTaskFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid task fields.'**
+  String get archiveInvalidTaskFields;
+
+  /// No description provided for @archiveUnsupportedKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported task or note type.'**
+  String get archiveUnsupportedKind;
+
+  /// No description provided for @archiveInvalidCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid completion status.'**
+  String get archiveInvalidCompletion;
+
+  /// No description provided for @archiveTwoSchedules.
+  ///
+  /// In en, this message translates to:
+  /// **'A task cannot have two schedules.'**
+  String get archiveTwoSchedules;
+
+  /// No description provided for @archiveTwoDeadlines.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a timed or date-only deadline.'**
+  String get archiveTwoDeadlines;
+
+  /// No description provided for @archiveInvalidReminderDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an available reminder date.'**
+  String get archiveInvalidReminderDate;
+
+  /// No description provided for @archiveUnsupportedRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported repeat rule.'**
+  String get archiveUnsupportedRepeat;
+
+  /// No description provided for @archiveWeekdaysNeedWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekdays require a weekly repeat.'**
+  String get archiveWeekdaysNeedWeekly;
+
+  /// No description provided for @archiveRepeatNeedsStart.
+  ///
+  /// In en, this message translates to:
+  /// **'A repeating task needs a start date.'**
+  String get archiveRepeatNeedsStart;
+
+  /// No description provided for @archiveInvalidOccurrence.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid occurrence change.'**
+  String get archiveInvalidOccurrence;
+
+  /// No description provided for @archiveDuplicateOccurrence.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate occurrence changes.'**
+  String get archiveDuplicateOccurrence;
+
+  /// No description provided for @archiveInvalidSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid skipped date.'**
+  String get archiveInvalidSkipped;
+
+  /// No description provided for @archiveInvalidOccurrenceSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid occurrence schedule.'**
+  String get archiveInvalidOccurrenceSchedule;
+
+  /// No description provided for @archiveRepeatSettingsNeedRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat settings need a repeating task.'**
+  String get archiveRepeatSettingsNeedRepeat;
+
+  /// No description provided for @archiveRepeatUsesCompletedDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeating tasks use individual completed dates.'**
+  String get archiveRepeatUsesCompletedDates;
+
+  /// No description provided for @archiveInvalidChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid checklist item.'**
+  String get archiveInvalidChecklist;
+
+  /// No description provided for @archiveDuplicateChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate checklist identifiers.'**
+  String get archiveDuplicateChecklist;
+
+  /// No description provided for @archiveInvalidChecklistProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid checklist progress.'**
+  String get archiveInvalidChecklistProgress;
+
+  /// No description provided for @archiveRepeatEndBeforeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat end precedes the start.'**
+  String get archiveRepeatEndBeforeStart;
+
+  /// No description provided for @archiveOccurrenceOutsideRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'An occurrence change is outside this repeat rule.'**
+  String get archiveOccurrenceOutsideRepeat;
+
+  /// No description provided for @archiveExportTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This export exceeds the supported 32 MB or 5,000-task limit.'**
+  String get archiveExportTooLarge;
+
+  /// No description provided for @archiveInvalidDateFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Dates must use YYYY-MM-DD.'**
+  String get archiveInvalidDateFormat;
+
+  /// No description provided for @archiveInvalidDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid calendar date.'**
+  String get archiveInvalidDate;
+
+  /// No description provided for @archiveMissingTimezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed dates need an ISO time and timezone offset.'**
+  String get archiveMissingTimezone;
+
+  /// No description provided for @archiveInvalidClock.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid clock time.'**
+  String get archiveInvalidClock;
+
+  /// No description provided for @archiveInvalidOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid timezone offset.'**
+  String get archiveInvalidOffset;
+
+  /// No description provided for @archiveInvalidTimedDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid timed date.'**
+  String get archiveInvalidTimedDate;
+
+  /// No description provided for @archiveFileUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'This file could not be read. Choose a local copy.'**
+  String get archiveFileUnreadable;
+
+  /// No description provided for @archiveEmptyCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'This CSV is empty.'**
+  String get archiveEmptyCsv;
+
+  /// No description provided for @archiveCsvHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a Todoist project CSV with TYPE and CONTENT columns.'**
+  String get archiveCsvHeader;
+
+  /// No description provided for @archiveCsvTaskLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a CSV with at most 5,000 tasks.'**
+  String get archiveCsvTaskLimit;
+
+  /// No description provided for @archiveCsvPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority must be 1–4.'**
+  String get archiveCsvPriority;
+
+  /// No description provided for @archiveCsvIndent.
+  ///
+  /// In en, this message translates to:
+  /// **'Indent must be 1–4.'**
+  String get archiveCsvIndent;
+
+  /// No description provided for @archiveCsvRecordLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This CSV has too many records.'**
+  String get archiveCsvRecordLimit;
+
+  /// No description provided for @archiveCsvQuoting.
+  ///
+  /// In en, this message translates to:
+  /// **'Malformed CSV quoting.'**
+  String get archiveCsvQuoting;
+
+  /// No description provided for @archiveCsvUnclosedQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'An unfinished quoted CSV field was found.'**
+  String get archiveCsvUnclosedQuote;
+
+  /// No description provided for @archiveNotesTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Task and comments exceed 8,000 note characters.'**
+  String get archiveNotesTooLong;
+
+  /// No description provided for @archiveInvalidFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not valid JSON or UTF-8 text.'**
+  String get archiveInvalidFile;
+
+  /// No description provided for @archiveUnknownFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Unrecognized task fields will be omitted.'**
+  String get archiveUnknownFields;
+
+  /// No description provided for @archivePersonalCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Imports create new personal copies. Account access, files, notification preferences and unfinished captures are not included.'**
+  String get archivePersonalCopies;
+
+  /// No description provided for @archiveCsvPriorities.
+  ///
+  /// In en, this message translates to:
+  /// **'Todoist priorities 3 and 4 both become Low. Subtasks become separate tasks.'**
+  String get archiveCsvPriorities;
+
+  /// No description provided for @archiveCsvDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Only ISO calendar dates and times with explicit timezone offsets are scheduled. Other date expressions are kept in notes for you to review.'**
+  String get archiveCsvDates;
+
+  /// No description provided for @archiveCsvPersonalCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'This creates personal copies. Assignments, files and sharing access are not transferred. Todoist project CSV exports may omit completed tasks.'**
+  String get archiveCsvPersonalCopies;
+
+  /// No description provided for @archiveReviewSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'The original schedule needs review; this task will go to Inbox.'**
+  String get archiveReviewSchedule;
+
+  /// No description provided for @archiveFlattenedSubtasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtask nesting will be flattened.'**
+  String get archiveFlattenedSubtasks;
+
+  /// No description provided for @archiveInlineLabels.
+  ///
+  /// In en, this message translates to:
+  /// **'Inline @labels remain in the title.'**
+  String get archiveInlineLabels;
+
+  /// No description provided for @archiveAttachmentsOmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attachment file is} other{{count} attachment files are}} not included.'**
+  String archiveAttachmentsOmitted(int count);
+
+  /// No description provided for @archiveInvalidCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid {field} (maximum {max}).'**
+  String archiveInvalidCollection(String field, int max);
+
+  /// No description provided for @archiveInvalidText.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid {field} (maximum {max} characters).'**
+  String archiveInvalidText(String field, int max);
+
+  /// No description provided for @archiveInvalidInteger.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid {field} ({min}–{max}).'**
+  String archiveInvalidInteger(String field, int min, int max);
+
+  /// No description provided for @archiveInvalidIdentifier.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid {field}.'**
+  String archiveInvalidIdentifier(String field);
+
+  /// No description provided for @archiveCsvExtraFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row} has more fields than the header.'**
+  String archiveCsvExtraFields(int row);
+
+  /// No description provided for @archiveCsvInvalidSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: section name is invalid; its tasks will have no list.'**
+  String archiveCsvInvalidSection(int row);
+
+  /// No description provided for @archiveCsvListDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: list descriptions are not supported.'**
+  String archiveCsvListDescription(int row);
+
+  /// No description provided for @archiveCsvOrphanComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: comment has no valid preceding task; it will be skipped.'**
+  String archiveCsvOrphanComment(int row);
+
+  /// No description provided for @archiveCsvUnsupportedRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: unsupported record type; it will be skipped.'**
+  String archiveCsvUnsupportedRow(int row);
+
+  /// No description provided for @archiveCsvFieldInNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'{field} will be kept as text in notes.'**
+  String archiveCsvFieldInNotes(String field);
+
+  /// No description provided for @archiveField.
+  ///
+  /// In en, this message translates to:
+  /// **'{field, select, export_id{export_id} tasks{tasks} lists{lists} list_id{list id} list_name{list name} task_identifier{task identifier} title{title} notes{notes} priority{priority} duration{duration} repeat_interval{repeat interval} repeat_weekdays{repeat weekdays} weekday{weekday} completed_dates{completed dates} individual_date_changes{individual date changes} list_identifier{list identifier} labels{labels} label{label} checklist{checklist} checklist_identifier{checklist identifier} checklist_title{checklist title} checklist_dates{checklist dates} reminder_lead{reminder lead} reminder_time{reminder time} other{field}}'**
+  String archiveField(String field);
 }
 
 class _AppLocalizationsDelegate

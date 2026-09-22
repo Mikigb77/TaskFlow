@@ -28,7 +28,13 @@
   "durationUnset": "No duration set",
   "durationEstimateHelp": "An estimate until you choose a planned start time.",
   "durationMinutes": "{minutes} min",
-  "@durationMinutes": {"placeholders": {"minutes": {"type": "int"}}},
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "durationInput": "Minutes (1–1440)",
   "durationInvalid": "Enter a whole number from 1 to 1440.",
   "removeDuration": "Remove duration",
@@ -42,7 +48,13 @@
   "deadlineLatePlan": "This plan finishes after the deadline. Check the start or duration.",
   "deadlineOverdue": "Deadline passed",
   "deadlineLabel": "Due {date}",
-  "@deadlineLabel": {"placeholders": {"date": {"type": "String"}}},
+  "@deadlineLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "reminderAnchor": "Remind me relative to",
   "reminderAnchorHelp": "One reminder per occurrence, using the date selected here.",
   "dayTimeline": "Day timeline",
@@ -54,7 +66,13 @@
   "timelinePoint": "No duration · time only",
   "timelineShortBlocks": "Short events have larger tap targets; the accent bar shows their actual duration.",
   "timelineHours": "{hours} hours in this day",
-  "@timelineHours": {"placeholders": {"hours": {"type": "int"}}},
+  "@timelineHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
   "@@locale": "en",
   "deviceCalendars": "Phone calendars",
   "deviceCalendarHelp": "See events from calendars connected to this phone beside your tasks.",
@@ -755,6 +773,300 @@
   "@reminderValue": {
     "placeholders": {
       "value": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationLoadError": "Could not load notification settings. Please retry.",
+  "notificationSaveError": "Could not save reminder settings. Please retry.",
+  "enableReminders": "Enable reminders",
+  "deviceReminderScope": "For this account on this device. Task choices sync; device preferences stay here.",
+  "mobileNotificationsOnly": "Mobile notifications only",
+  "notificationPermissionOn": "System permission is on",
+  "notificationPermissionOff": "System permission is off",
+  "preciseAlarmsAvailable": "Precise alarm access available",
+  "approximateAlarmsHelp": "Alerts are approximate until precise alarm access is enabled",
+  "openSystemSettings": "Open system settings",
+  "allowPreciseAlarms": "Allow precise alarms",
+  "taskDefaults": "Task defaults",
+  "timedTasks": "Timed tasks",
+  "dateOnlyTasks": "Date-only tasks",
+  "dailyCheckIns": "Daily check-ins",
+  "dailyCheckInsHelp": "A gentle prompt to review your current tasks.",
+  "morningCheckIn": "Morning",
+  "eveningCheckIn": "Evening",
+  "upcomingAlerts": "Upcoming alerts",
+  "scheduledAlertHelp": "Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.",
+  "androidAlertRefreshHelp": "The window refreshes on app use and through an hourly background job when Android permits.",
+  "backgroundAlertRefreshHelp": "The window refreshes on app use and when the system allows background refresh.",
+  "noUpcomingAlerts": "No upcoming alerts. Choose a reminder on a scheduled task.",
+  "repeatsDaily": "repeats daily",
+  "retryScheduling": "Refresh and retry scheduling",
+  "alertPending": "pending",
+  "alertScheduled": "scheduled",
+  "alertApproximate": "approximate",
+  "alertBlocked": "blocked",
+  "alertFailed": "failed",
+  "alertInactive": "inactive",
+  "alertElapsed": "elapsed",
+  "reminderPermissionError": "Notifications are disabled in system settings.",
+  "reminderScheduleError": "The phone could not schedule this alert. Retry from Settings.",
+  "reminderBackgroundError": "Background refresh could not finish. Open TaskFlow to retry.",
+  "reminderBackgroundUnavailable": "Automatic background refresh is unavailable. Alerts refresh when you open TaskFlow.",
+  "reminderActionError": "A notification action could not finish. Open the task to retry.",
+  "reminderSetupError": "Notification setup could not finish. Retry from Settings.",
+  "reminderAccountError": "Account reminders could not refresh. Open notification settings to retry.",
+  "reminderRefreshError": "Reminders could not refresh. Your tasks are saved; retry from notification settings.",
+  "transferError": "Could not finish. Your existing tasks and notes are unchanged. Please retry.",
+  "exportSaved": "Export saved. Keep the file somewhere private.",
+  "keepYourTasks": "Keep your tasks with you.",
+  "archiveContentsHelp": "TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal lists. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.",
+  "exportTaskFlowFile": "Export TaskFlow file",
+  "chooseImportFile": "Choose import file",
+  "chooseImportFileHelp": "Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.",
+  "importPreview": "Import preview",
+  "importCopiesHelp": "Selected tasks, notes and the file’s lists are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.",
+  "listsIncluded": "Lists included",
+  "archivedPersonalCopy": "Archived personal copy",
+  "personalCopy": "Personal copy",
+  "alreadyImported": "Already imported on this phone",
+  "taskFlowExportSource": "TaskFlow export",
+  "todoistCsvSource": "Todoist project CSV",
+  "deferredAlerts": "{count, plural, =1{1 later alert is} other{{count} later alerts are}} outside the current window. The next refresh adds the earliest ones that fit.",
+  "@deferredAlerts": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "turnOffReminder": "Turn off {title}",
+  "@turnOffReminder": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "importResult": "Added {items, plural, =1{1 item} other{{items} items}} and {lists, plural, =1{1 list} other{{lists} lists}}.",
+  "@importResult": {
+    "placeholders": {
+      "items": {
+        "type": "int"
+      },
+      "lists": {
+        "type": "int"
+      }
+    }
+  },
+  "importSkipped": "Skipped {count, plural, =1{1 already imported item} other{{count} already imported items}}.",
+  "@importSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importCounts": "{source} · {tasks} tasks · {notes} notes · {lists} lists",
+  "@importCounts": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "tasks": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      },
+      "lists": {
+        "type": "int"
+      }
+    }
+  },
+  "cannotImport": "Cannot import: {reason}",
+  "@cannotImport": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "importSelected": "Import {count, plural, =1{1 selected item} other{{count} selected items}} and lists",
+  "@importSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importRow": "Record {row}",
+  "@importRow": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveFileTooLarge": "Choose a file smaller than 32 MB.",
+  "archiveUnsupportedArchive": "This is not a supported TaskFlow export (versions 1 and 2).",
+  "archiveInvalidList": "Invalid list metadata.",
+  "archiveDuplicateLists": "Duplicate list identifiers.",
+  "archiveInvalidListStyle": "Invalid list color or archive status.",
+  "archiveInvalidTask": "Invalid task record.",
+  "archiveDuplicateTask": "Duplicate task identifier.",
+  "archiveInvalidAttachments": "Invalid attachment information.",
+  "archiveMissingList": "The task refers to a list missing from this file.",
+  "archiveInvalidTaskFields": "Invalid task fields.",
+  "archiveUnsupportedKind": "Unsupported task or note type.",
+  "archiveInvalidCompletion": "Invalid completion status.",
+  "archiveTwoSchedules": "A task cannot have two schedules.",
+  "archiveTwoDeadlines": "Choose a timed or date-only deadline.",
+  "archiveInvalidReminderDate": "Choose an available reminder date.",
+  "archiveUnsupportedRepeat": "Unsupported repeat rule.",
+  "archiveWeekdaysNeedWeekly": "Weekdays require a weekly repeat.",
+  "archiveRepeatNeedsStart": "A repeating task needs a start date.",
+  "archiveInvalidOccurrence": "Invalid occurrence change.",
+  "archiveDuplicateOccurrence": "Duplicate occurrence changes.",
+  "archiveInvalidSkipped": "Invalid skipped date.",
+  "archiveInvalidOccurrenceSchedule": "Invalid occurrence schedule.",
+  "archiveRepeatSettingsNeedRepeat": "Repeat settings need a repeating task.",
+  "archiveRepeatUsesCompletedDates": "Repeating tasks use individual completed dates.",
+  "archiveInvalidChecklist": "Invalid checklist item.",
+  "archiveDuplicateChecklist": "Duplicate checklist identifiers.",
+  "archiveInvalidChecklistProgress": "Invalid checklist progress.",
+  "archiveRepeatEndBeforeStart": "Repeat end precedes the start.",
+  "archiveOccurrenceOutsideRepeat": "An occurrence change is outside this repeat rule.",
+  "archiveExportTooLarge": "This export exceeds the supported 32 MB or 5,000-task limit.",
+  "archiveInvalidDateFormat": "Dates must use YYYY-MM-DD.",
+  "archiveInvalidDate": "Invalid calendar date.",
+  "archiveMissingTimezone": "Timed dates need an ISO time and timezone offset.",
+  "archiveInvalidClock": "Invalid clock time.",
+  "archiveInvalidOffset": "Invalid timezone offset.",
+  "archiveInvalidTimedDate": "Invalid timed date.",
+  "archiveFileUnreadable": "This file could not be read. Choose a local copy.",
+  "archiveEmptyCsv": "This CSV is empty.",
+  "archiveCsvHeader": "Choose a Todoist project CSV with TYPE and CONTENT columns.",
+  "archiveCsvTaskLimit": "Choose a CSV with at most 5,000 tasks.",
+  "archiveCsvPriority": "Priority must be 1–4.",
+  "archiveCsvIndent": "Indent must be 1–4.",
+  "archiveCsvRecordLimit": "This CSV has too many records.",
+  "archiveCsvQuoting": "Malformed CSV quoting.",
+  "archiveCsvUnclosedQuote": "An unfinished quoted CSV field was found.",
+  "archiveNotesTooLong": "Task and comments exceed 8,000 note characters.",
+  "archiveInvalidFile": "The file is not valid JSON or UTF-8 text.",
+  "archiveUnknownFields": "Unrecognized task fields will be omitted.",
+  "archivePersonalCopies": "Imports create new personal copies. Account access, files, notification preferences and unfinished captures are not included.",
+  "archiveCsvPriorities": "Todoist priorities 3 and 4 both become Low. Subtasks become separate tasks.",
+  "archiveCsvDates": "Only ISO calendar dates and times with explicit timezone offsets are scheduled. Other date expressions are kept in notes for you to review.",
+  "archiveCsvPersonalCopies": "This creates personal copies. Assignments, files and sharing access are not transferred. Todoist project CSV exports may omit completed tasks.",
+  "archiveReviewSchedule": "The original schedule needs review; this task will go to Inbox.",
+  "archiveFlattenedSubtasks": "Subtask nesting will be flattened.",
+  "archiveInlineLabels": "Inline @labels remain in the title.",
+  "archiveAttachmentsOmitted": "{count, plural, =1{1 attachment file is} other{{count} attachment files are}} not included.",
+  "@archiveAttachmentsOmitted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidCollection": "Invalid {field} (maximum {max}).",
+  "@archiveInvalidCollection": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidText": "Invalid {field} (maximum {max} characters).",
+  "@archiveInvalidText": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidInteger": "Invalid {field} ({min}–{max}).",
+  "@archiveInvalidInteger": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidIdentifier": "Invalid {field}.",
+  "@archiveInvalidIdentifier": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveCsvExtraFields": "Row {row} has more fields than the header.",
+  "@archiveCsvExtraFields": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvInvalidSection": "Row {row}: section name is invalid; its tasks will have no list.",
+  "@archiveCsvInvalidSection": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvListDescription": "Row {row}: list descriptions are not supported.",
+  "@archiveCsvListDescription": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvOrphanComment": "Row {row}: comment has no valid preceding task; it will be skipped.",
+  "@archiveCsvOrphanComment": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvUnsupportedRow": "Row {row}: unsupported record type; it will be skipped.",
+  "@archiveCsvUnsupportedRow": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvFieldInNotes": "{field} will be kept as text in notes.",
+  "@archiveCsvFieldInNotes": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveField": "{field, select, export_id{export_id} tasks{tasks} lists{lists} list_id{list id} list_name{list name} task_identifier{task identifier} title{title} notes{notes} priority{priority} duration{duration} repeat_interval{repeat interval} repeat_weekdays{repeat weekdays} weekday{weekday} completed_dates{completed dates} individual_date_changes{individual date changes} list_identifier{list identifier} labels{labels} label{label} checklist{checklist} checklist_identifier{checklist identifier} checklist_title{checklist title} checklist_dates{checklist dates} reminder_lead{reminder lead} reminder_time{reminder time} other{field}}",
+  "@archiveField": {
+    "placeholders": {
+      "field": {
         "type": "String"
       }
     }
