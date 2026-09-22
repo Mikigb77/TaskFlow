@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:record/record.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -22,6 +23,66 @@ void main() {
         .setMockMethodCallHandler(
             const MethodChannel('flutter_timezone'), (_) async => 'UTC');
   });
+
+  for (final interruption in [
+    'pause',
+    'stop',
+    'during-start',
+    'stop-during-start'
+  ]) {
+    testWidgets(
+        'audio $interruption keeps the foreground capture without sending',
+        (tester) async {
+      final speech = _Speech()..installed = false;
+      final recorder = _Recorder()
+        ..pauseDuringStart = interruption == 'during-start'
+        ..stopDuringStart = interruption == 'stop-during-start';
+      final store = _Captures();
+      final api = _OfflineExtraction();
+      await _open(tester, speech, store, api, recorder: recorder);
+      await tester.tap(find.byTooltip('Record tasks'));
+      await tester.pumpAndSettle();
+      final id = store.session!.id;
+      final capturedAt = store.session!.capturedAt;
+      if (!interruption.contains('during-start')) {
+        expect(store.session!.status, 'recording');
+        await tester.runAsync(() async {
+          recorder.states.add(
+              interruption == 'pause' ? RecordState.pause : RecordState.stop);
+          // Stream cancellation may complete outside the fake frame clock.
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pumpAndSettle();
+      }
+      expect(tester.binding.lifecycleState, AppLifecycleState.resumed);
+      expect(store.session!.status, 'editing');
+      expect(store.session!.id, id);
+      expect(store.session!.capturedAt, capturedAt);
+      expect(store.session!.audioPath, '/synthetic/capture.wav');
+      expect(recorder.stops, 1);
+      expect(api.requests, 0);
+      expect(find.textContaining('Listening ·'), findsNothing);
+      final retry = find.widgetWithText(FilledButton, 'Try this recording');
+      await tester.scrollUntilVisible(retry, 180,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(retry).onPressed, isNotNull);
+      // Late platform events and the former time limit cannot send or reopen it.
+      recorder.states.add(RecordState.record);
+      recorder.states.add(RecordState.pause);
+      await tester.pump(const Duration(seconds: 61));
+      await tester.pumpAndSettle();
+      expect(store.session!.status, 'editing');
+      expect(recorder.stops, 1);
+      expect(api.requests, 0);
+      expect(tester.takeException(), isNull);
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(recorder.disposed, isTrue);
+    });
+  }
   test('capability handles absent bridges and unsupported languages', () async {
     const channel = MethodChannel('taskflow/speech-test');
     final speech = NativeSpeech(channel: channel);
@@ -165,13 +226,16 @@ void main() {
 }
 
 Future<void> _open(WidgetTester tester, _Speech speech, _Captures store,
-    _OfflineExtraction api) async {
+    _OfflineExtraction api,
+    {_Recorder? recorder}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   final container = ProviderContainer(overrides: [
+    if (recorder != null)
+      captureRecorderFactoryProvider.overrideWithValue(() => recorder),
     nativeSpeechProvider.overrideWithValue(speech),
     captureStoreProvider.overrideWithValue(store),
     pendingCapturesProvider.overrideWith((ref) async => []),
@@ -195,12 +259,13 @@ class _Speech extends NativeSpeech {
   final controller = StreamController<SpeechEvent>.broadcast(sync: true);
   int? run;
   bool allowed = true;
+  bool installed = true;
   bool cancelled = false;
   String? text;
   @override
   Future<SpeechCapability> capability({String? language}) async =>
-      const SpeechCapability(
-          onDevice: true, language: 'en-US', languageInstalled: true);
+      SpeechCapability(
+          onDevice: true, language: 'en-US', languageInstalled: installed);
   @override
   Stream<SpeechEvent> get events => controller.stream;
   @override
@@ -243,6 +308,7 @@ class _Captures extends CaptureStore {
           ownerKey: ownerKey,
           timezone: timezone,
           capturedAt: (now ?? DateTime.now()).toUtc(),
+          audioPath: audio ? '/synthetic/capture.wav' : null,
           text: text);
   @override
   Future<void> update(CaptureSession value) async {
@@ -267,5 +333,43 @@ class _OfflineExtraction extends OfflineApiClient {
       bool retry = true}) async {
     requests++;
     throw ApiException(0, 'Offline. Retry when connected.');
+  }
+}
+
+class _Recorder extends Fake implements AudioRecorder {
+  final states = StreamController<RecordState>.broadcast(sync: true);
+  final amplitudes = StreamController<Amplitude>.broadcast();
+  bool pauseDuringStart = false;
+  bool stopDuringStart = false;
+  bool disposed = false;
+  int stops = 0;
+  @override
+  Stream<RecordState> onStateChanged() => states.stream;
+  @override
+  Future<bool> hasPermission({bool request = true}) async => true;
+  @override
+  Future<void> start(RecordConfig config, {required String path}) async {
+    if (pauseDuringStart) states.add(RecordState.pause);
+    if (stopDuringStart) states.add(RecordState.stop);
+  }
+
+  @override
+  Future<bool> isPaused() async => pauseDuringStart;
+  @override
+  Future<bool> isRecording() async => !stopDuringStart;
+  @override
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) => amplitudes.stream;
+  @override
+  Future<String?> stop() async {
+    stops++;
+    states.add(RecordState.stop);
+    return '/synthetic/capture.wav';
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+    await amplitudes.close();
+    await states.close();
   }
 }

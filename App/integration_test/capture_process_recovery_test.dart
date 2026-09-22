@@ -33,8 +33,8 @@ const _words = 'Synthetic reference\nFriday at five is an example, not a task.';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('native process recovery: $_case', (tester) async {
-    expect(
-        ['audio-abrupt', 'audio-background', 'text-abrupt'], contains(_case));
+    expect(['audio-abrupt', 'audio-background', 'audio-call', 'text-abrupt'],
+        contains(_case));
     final database = TaskDatabase();
     final sql = await database.database;
     final store = CaptureStore(database);
@@ -129,6 +129,23 @@ void main() {
       }
       await sql.insert(
           'app_preferences', {'scope': _marker, 'data': jsonEncode(metadata)});
+      if (_case == 'audio-call') {
+        // The host simulates a GSM call, verifies Android's RINGING/OFFHOOK
+        // states, then cancels that exact call and returns to this activity.
+        debugPrint('CAPTURE_CALL_READY: $_case');
+        await _until(
+            tester,
+            () async =>
+                (await store.read(session.id, _owner))?.status == 'editing');
+        expect(find.textContaining('Listening ·'), findsNothing,
+            reason: 'An interrupted recorder must not look active.');
+        expect(api.calls, 0, reason: 'An interruption must not submit audio.');
+        final stopped = (await store.read(session.id, _owner))!;
+        final retained = await File(stopped.audioPath!).readAsBytes();
+        _dataOffset(retained); // Normal interruption must finalize the WAV.
+        _assertRetainedSamples(retained, metadata);
+        debugPrint('CAPTURE_CALL_RETAINED: ${retained.length} bytes');
+      }
       debugPrint('CAPTURE_KILL_READY: $_case');
       // The host terminates this process before the 59-second capture limit.
       // No successful test result is possible without a second process launch.

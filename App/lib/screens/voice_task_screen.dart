@@ -16,6 +16,11 @@ import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
+// Each capture screen owns and releases its recorder. A factory also lets the
+// interruption contract be exercised without recording from a test machine.
+final captureRecorderFactoryProvider =
+    Provider<AudioRecorder Function()>((ref) => AudioRecorder.new);
+
 class VoiceTaskScreen extends ConsumerStatefulWidget {
   const VoiceTaskScreen(
       {super.key,
@@ -31,7 +36,7 @@ class VoiceTaskScreen extends ConsumerStatefulWidget {
 
 class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     with WidgetsBindingObserver {
-  final _recorder = AudioRecorder();
+  late final AudioRecorder _recorder;
   final _words = TextEditingController();
   late final CaptureStore _store;
   late final String _owner;
@@ -41,6 +46,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   bool _timezoneFallback = false;
   Timer? _timer;
   StreamSubscription<Amplitude>? _amplitude;
+  StreamSubscription<RecordState>? _recorderStates;
   Future<void> _writes = Future.value();
   Future<void>? _starting;
   Future<void>? _stopping;
@@ -76,6 +82,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   @override
   void initState() {
     super.initState();
+    _recorder = ref.read(captureRecorderFactoryProvider)();
     _store = ref.read(captureStoreProvider);
     unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.opened));
     _speech = ref.read(nativeSpeechProvider);
@@ -319,12 +326,30 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
               Platform.isAndroid ? CaptureSession.androidPcmWav : null);
       await _store.update(_session!);
       if (!mounted) return;
+      _recorderStates ??= _recorder
+          .onStateChanged()
+          .listen(_receiveRecorderState, onError: (Object error) {
+        if (mounted && _recording && !_usingNative) {
+          setState(() => _error = error.toString());
+          unawaited(_finishRecording(submit: false));
+        }
+      });
       await _recorder.start(
           const RecordConfig(
-              encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1),
+              encoder: AudioEncoder.wav,
+              sampleRate: 16000,
+              numChannels: 1,
+              audioInterruption: AudioInterruptionMode.pause),
           path: _session!.audioPath!);
       _recording = true;
       _listeningWatch = Stopwatch()..start();
+      // A call can take audio focus while start() is still awaiting the native
+      // reply, before the state listener can see _recording=true.
+      if (await _recorder.isPaused() || !await _recorder.isRecording()) {
+        await _finishRecording(submit: false);
+        return;
+      }
+      if (!_recording) return;
       _armTimer();
       if (!mounted ||
           WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
@@ -350,12 +375,26 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       }
       if (mounted) setState(() => _error = error.toString());
     } finally {
+      await _stopping;
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _finishRecording({bool submit = true}) =>
       _stopping ??= _stopRecording(submit).whenComplete(() => _stopping = null);
+
+  void _receiveRecorderState(RecordState state) {
+    if (!mounted ||
+        !_recording ||
+        _usingNative ||
+        state == RecordState.record) {
+      return;
+    }
+    // Audio focus can be lost with TaskFlow still in the foreground. Finalize
+    // the partial file without submitting it or leaving a paused mic labelled
+    // "Listening" until the ordinary recording timer expires.
+    unawaited(_finishRecording(submit: false));
+  }
 
   Future<void> _stopRecording(bool submit) async {
     if (!_recording) return;
@@ -510,6 +549,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       await _finishRecording(submit: false);
       _acceptSpeech = false;
       await _speechEvents?.cancel();
+      await _recorderStates?.cancel();
       await _recorder.dispose();
       if (!_movedToReview &&
           !_discarded &&
