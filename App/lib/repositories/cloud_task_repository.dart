@@ -1,5 +1,6 @@
 import 'package:agenda/models/task.dart';
 import 'package:collection/collection.dart';
+import 'package:agenda/services/task_list_store.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/task_database.dart';
@@ -41,6 +42,9 @@ class CloudTaskRepository extends TaskRepository {
   bool _sameContent(Map<String, dynamic> sent, Map<String, dynamic> remote) =>
       sent['title'] == remote['title'] &&
       sent['notes'] == remote['notes'] &&
+      sent['list_id'] == remote['list_id'] &&
+      const DeepCollectionEquality()
+          .equals(sent['labels'], remote['labels'] ?? []) &&
       const DeepCollectionEquality()
           .equals(sent['checklist'], remote['checklist'] ?? []) &&
       sent['priority'] == remote['priority'] &&
@@ -68,6 +72,12 @@ class CloudTaskRepository extends TaskRepository {
   Future<void> _synchronize() async {
     syncError = null;
     try {
+      final lists = TaskListStore(database, ownerKey);
+      await lists.sync(api, accountId);
+      if ((await lists.all()).any((list) => list.conflict != null)) {
+        syncError =
+            'A list changed on another device. Choose which version to keep in Lists.';
+      }
       for (final row in await database.pending(ownerKey)) {
         final data = _payload(row);
         try {

@@ -29,6 +29,20 @@ class User(AbstractUser):
         constraints = [models.UniqueConstraint(Lower("email"), name="unique_email_case_insensitive")]
 
 
+class TaskList(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="task_lists")
+    name = models.CharField(max_length=80)
+    color = models.CharField(max_length=8, default="teal", choices=[
+        (value, value) for value in ("teal", "blue", "violet", "amber", "rose")])
+    archived = models.BooleanField(default=False)
+    version = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+
+
 class Task(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
@@ -44,6 +58,8 @@ class Task(models.Model):
     reminder_time = models.PositiveSmallIntegerField(null=True, blank=True)
     notes = models.TextField(blank=True, default="", max_length=8000)
     checklist = models.JSONField(default=list, blank=True)
+    task_list = models.ForeignKey(TaskList, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks")
+    labels = models.JSONField(default=list, blank=True)
     is_completed = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)

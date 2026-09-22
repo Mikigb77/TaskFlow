@@ -29,6 +29,8 @@ class Task {
   final List<String> filePaths;
   final List<String> imagePaths;
   final List<ChecklistItem> checklist;
+  final String? listId;
+  final List<String> labels;
   String? get checklistOccurrence =>
       isRecurring && displayDate != null ? dateKey(displayDate!) : null;
   int get checklistDone => checklist
@@ -51,12 +53,18 @@ class Task {
       this.notes,
       List<String>? filePaths,
       List<String>? imagePaths,
-      List<ChecklistItem>? checklist})
+      List<ChecklistItem>? checklist,
+      this.listId,
+      List<String>? labels})
       : hasTime = dueDate != null && hasTime,
         _isCompleted = isCompleted,
         completedDates = List.unmodifiable(completedDates ?? []),
         filePaths = filePaths ?? [],
         checklist = List.unmodifiable(checklist ?? []),
+        labels = List.unmodifiable((labels ?? [])
+            .map((label) => label.trim().toLowerCase())
+            .where((label) => label.isNotEmpty)
+            .toSet()),
         imagePaths = imagePaths ?? [];
 
   static const repeats = {
@@ -164,7 +172,9 @@ class Task {
           String? notes,
           List<String>? filePaths,
           List<String>? imagePaths,
-          List<ChecklistItem>? checklist}) =>
+          List<ChecklistItem>? checklist,
+          Object? listId = _unchanged,
+          List<String>? labels}) =>
       Task(
           id: id ?? this.id,
           title: title ?? this.title,
@@ -191,6 +201,9 @@ class Task {
           notes: notes ?? this.notes,
           filePaths: filePaths ?? this.filePaths,
           checklist: checklist ?? this.checklist,
+          listId:
+              identical(listId, _unchanged) ? this.listId : listId as String?,
+          labels: labels ?? this.labels,
           imagePaths: imagePaths ?? this.imagePaths);
 
   Map<String, dynamic> toMap() => {
@@ -210,6 +223,8 @@ class Task {
         'reminderTime': reminderTime,
         'isCompleted': _isCompleted ? 1 : 0,
         'notes': notes,
+        'listId': listId,
+        'labels': jsonEncode(labels),
         'checklist':
             jsonEncode(checklist.map((item) => item.toJson()).toList()),
         'filePaths': filePaths.isEmpty ? null : filePaths.join('|'),
@@ -234,6 +249,8 @@ class Task {
       reminderTime: map['reminderTime'],
       isCompleted: map['isCompleted'] == 1,
       notes: map['notes'],
+      listId: map['listId'],
+      labels: List<String>.from(jsonDecode(map['labels'] ?? '[]')),
       checklist: (jsonDecode(map['checklist'] ?? '[]') as List)
           .map(
               (item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)))
@@ -259,6 +276,8 @@ class Task {
         'reminder_minutes': reminderMinutes,
         'reminder_time': reminderTime,
         'notes': notes ?? '',
+        'list_id': listId,
+        'labels': labels,
         'checklist': checklist.map((item) => item.toJson()).toList(),
         'is_completed': _isCompleted,
       };
@@ -280,6 +299,8 @@ class Task {
       reminderMinutes: data['reminder_minutes'],
       reminderTime: data['reminder_time'],
       notes: data['notes'],
+      listId: data['list_id'],
+      labels: List<String>.from(data['labels'] ?? []),
       checklist: (data['checklist'] as List? ?? [])
           .map(
               (item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)))

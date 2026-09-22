@@ -2,7 +2,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.password_validation import validate_password
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
-from .models import User, Task
+from .models import User, Task, TaskList
 
 
 def validate_timezone(value):
@@ -54,6 +54,15 @@ class ZonedDateTimeField(serializers.DateTimeField):
         return super().to_internal_value(value)
 
 
+class TaskListSerializer(serializers.ModelSerializer):
+    version = serializers.IntegerField(min_value=0, default=0)
+
+    class Meta:
+        model = TaskList
+        fields = ["id", "name", "color", "archived", "version", "updated_at"]
+        read_only_fields = ["id", "updated_at"]
+
+
 class ChecklistItemSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     title = serializers.CharField(max_length=160)
@@ -77,6 +86,19 @@ class TaskSerializer(serializers.ModelSerializer):
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
     checklist = ChecklistItemSerializer(many=True, required=False)
+    list_id = serializers.PrimaryKeyRelatedField(source="task_list", queryset=TaskList.objects.none(),
+                                                allow_null=True, required=False)
+    labels = serializers.ListField(child=serializers.CharField(max_length=32), max_length=10, required=False)
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            fields["list_id"].queryset = TaskList.objects.filter(owner=request.user)
+        return fields
+
+    def validate_labels(self, value):
+        return list(dict.fromkeys(item.lower() for item in value))
 
     def validate_checklist(self, value):
         if len(value) > 50:
@@ -87,7 +109,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):

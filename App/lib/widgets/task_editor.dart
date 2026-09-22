@@ -8,6 +8,7 @@ import 'package:path/path.dart' as path;
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -19,11 +20,17 @@ import 'package:agenda/services/quick_schedule_parser.dart';
 /// One editor keeps manual creation, AI review and editing visually consistent.
 class TaskEditor extends ConsumerStatefulWidget {
   const TaskEditor(
-      {super.key, this.task, this.draft, this.calendarDate, this.onReview});
+      {super.key,
+      this.task,
+      this.draft,
+      this.calendarDate,
+      this.onReview,
+      this.initialListId});
   final Task? task;
   final TaskDraft? draft;
   final DateTime? calendarDate;
   final ValueChanged<Task>? onReview;
+  final String? initialListId;
   @override
   ConsumerState<TaskEditor> createState() => _TaskEditorState();
 }
@@ -32,6 +39,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _notes;
+  late final TextEditingController _labels;
+  String? _listId;
   late DateTime? _dueDate;
   late bool _hasTime;
   late String _recurrence;
@@ -59,6 +68,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         text: widget.task?.title ?? widget.draft?.title ?? '');
     _notes = TextEditingController(
         text: widget.task?.notes ?? widget.draft?.notes ?? '');
+    _labels = TextEditingController(text: widget.task?.labels.join(', ') ?? '');
+    _listId = widget.task?.listId ?? widget.initialListId;
     _hasTime = widget.task?.hasTime ?? widget.draft?.hasTime ?? false;
     _recurrence = widget.task?.recurrence ?? widget.draft?.recurrence ?? 'none';
     _repeatUntil = widget.task?.repeatUntil ?? widget.draft?.repeatUntil;
@@ -73,6 +84,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   void dispose() {
     _title.dispose();
     _notes.dispose();
+    _labels.dispose();
     super.dispose();
   }
 
@@ -175,6 +187,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           _recurrence != 'none' ? false : widget.task?.isCompleted ?? false,
       notes: _notes.text.trim(),
       checklist: _checklist,
+      listId: _listId,
+      labels: _labels.text
+          .split(',')
+          .where((label) => label.trim().isNotEmpty)
+          .toList(),
       imagePaths: _attachments.where(_isImage).toList(),
       filePaths: _attachments.where((file) => !_isImage(file)).toList(),
     );
@@ -548,6 +565,30 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 ]),
                                 const SizedBox(height: 24),
                                 const SectionLabel('The details'),
+                                TaskListPicker(
+                                    listId: _listId,
+                                    onChanged: (id) =>
+                                        setState(() => _listId = id)),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                    key: const ValueKey('task-labels'),
+                                    controller: _labels,
+                                    decoration: const InputDecoration(
+                                        labelText: 'Labels',
+                                        hintText: 'home, errands, calls'),
+                                    validator: (text) {
+                                      final labels = (text ?? '')
+                                          .split(',')
+                                          .map((label) => label.trim())
+                                          .where((label) => label.isNotEmpty)
+                                          .toSet();
+                                      return labels.length > 10 ||
+                                              labels.any(
+                                                  (label) => label.length > 32)
+                                          ? 'Use up to 10 labels, each under 33 characters.'
+                                          : null;
+                                    }),
+                                const SizedBox(height: 16),
                                 ChecklistEditor(
                                     items: _checklist,
                                     recurring: _recurrence != 'none',

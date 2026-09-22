@@ -137,6 +137,7 @@ class CaptureStore {
         if (!draft.confirmed) {
           throw StateError('Confirm the uncertain details first.');
         }
+        await TaskDatabase.validateList(tx, draft.task, ownerKey);
         final values = draft.task.toMap()..remove('id');
         final taskId = await tx.insert('tasks', {
           ...values,

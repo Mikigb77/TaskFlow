@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 8;
+  static const schemaVersion = 9;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -41,6 +41,7 @@ class TaskDatabase {
           completedDates TEXT NOT NULL DEFAULT '[]',
           reminderMinutes INTEGER, reminderTime INTEGER,
           checklist TEXT NOT NULL DEFAULT '[]',
+          listId TEXT, labels TEXT NOT NULL DEFAULT '[]',
           owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
           sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
@@ -49,6 +50,7 @@ class TaskDatabase {
             'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)');
         await createCaptureTables(db);
         await createReminderTables(db);
+        await createListTables(db);
       },
       onUpgrade: upgrade,
     );
@@ -97,6 +99,33 @@ class TaskDatabase {
       await db.execute(
           "ALTER TABLE tasks ADD COLUMN checklist TEXT NOT NULL DEFAULT '[]'");
     }
+    if (oldVersion < 9 && newVersion >= 9) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN listId TEXT');
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'");
+      await createListTables(db);
+    }
+  }
+
+  static Future<void> createListTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS task_lists(
+      id TEXT NOT NULL, owner_key TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'teal',
+      archived INTEGER NOT NULL DEFAULT 0, remote_version INTEGER NOT NULL DEFAULT 0,
+      revision INTEGER NOT NULL DEFAULT 0, sync_pending INTEGER NOT NULL DEFAULT 0, conflict TEXT,
+      PRIMARY KEY(owner_key, id))''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS list_imports(
+      owner_key TEXT NOT NULL, source_id TEXT NOT NULL, target_id TEXT NOT NULL,
+      PRIMARY KEY(owner_key, source_id))''');
+  }
+
+  static Future<void> validateList(
+      DatabaseExecutor db, Task task, String owner) async {
+    if (task.listId == null) return;
+    final rows = await db.query('task_lists',
+        columns: ['id'],
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [task.listId, owner]);
+    if (rows.isEmpty) throw StateError('Choose a list from this account.');
   }
 
   static Future<void> createReminderTables(Database db) async {
@@ -126,6 +155,7 @@ class TaskDatabase {
   }
 
   Future<int> insertTask(Task task, {String ownerKey = 'local'}) async {
+    await validateList(await database, task, ownerKey);
     final values = task.toMap()..remove('id');
     return (await database).insert('tasks', {
       ...values,
@@ -145,6 +175,7 @@ class TaskDatabase {
       {String ownerKey = 'local'}) async {
     await (await database).transaction((tx) async {
       for (final task in tasks) {
+        await validateList(tx, task, ownerKey);
         final values = task.toMap()..remove('id');
         await tx.insert('tasks', {
           ...values,
@@ -159,6 +190,7 @@ class TaskDatabase {
   Future<int> updateTask(Task task, {String ownerKey = 'local'}) async {
     final db = await database;
     return db.transaction((tx) async {
+      await validateList(tx, task, ownerKey);
       final values = task.toMap()..remove('id');
       final count = await tx.update(
           'tasks', {...values, 'sync_pending': ownerKey == 'local' ? 0 : 1},
@@ -262,11 +294,39 @@ class TaskDatabase {
     return db.transaction((tx) async {
       final rows = await tx.query('tasks',
           where: "owner_key = 'local' AND is_deleted = 0");
+      final importedLists = <String, String>{};
+      for (final sourceId
+          in rows.map((row) => row['listId']).whereType<String>().toSet()) {
+        final mapping = await tx.query('list_imports',
+            where: 'owner_key = ? AND source_id = ?',
+            whereArgs: [ownerKey, sourceId]);
+        if (mapping.isNotEmpty) {
+          importedLists[sourceId] = mapping.single['target_id'] as String;
+          continue;
+        }
+        final localLists = await tx.query('task_lists',
+            where: "owner_key = 'local' AND id = ?", whereArgs: [sourceId]);
+        if (localLists.isEmpty) continue;
+        final newId = const Uuid().v4();
+        await tx.insert('task_lists', {
+          ...localLists.single,
+          'id': newId,
+          'owner_key': ownerKey,
+          'sync_pending': 1,
+          'remote_version': 0,
+          'revision': 0,
+          'conflict': null
+        });
+        await tx.insert('list_imports',
+            {'owner_key': ownerKey, 'source_id': sourceId, 'target_id': newId});
+        importedLists[sourceId] = newId;
+      }
       for (final row in rows) {
         await tx.update(
             'tasks',
             {
               'owner_key': ownerKey,
+              'listId': importedLists[row['listId']],
               'sync_id': row['sync_id'] ?? const Uuid().v4(),
               'sync_pending': 1
             },

@@ -12,6 +12,7 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/task_interactions.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen(
@@ -105,6 +106,30 @@ class TaskDetailScreen extends ConsumerWidget {
                         task.isCompleted ? 'Completed' : 'Your next step'),
                     Text(task.title,
                         style: Theme.of(context).textTheme.headlineLarge),
+                    const SizedBox(height: 12),
+                    Align(
+                        alignment: Alignment.centerLeft,
+                        child: TaskListPicker(
+                            listId: task.listId,
+                            onChanged: (id) async {
+                              try {
+                                await ref
+                                    .read(taskProvider.notifier)
+                                    .moveToList(task.id!, id);
+                              } catch (_) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Could not move this task. Please retry.')));
+                                }
+                              }
+                            })),
+                    if (task.labels.isNotEmpty)
+                      Wrap(spacing: 8, children: [
+                        for (final label in task.labels)
+                          Chip(label: Text('#$label'))
+                      ]),
                     const SizedBox(height: 24),
                     AppSurface(
                         padding: const EdgeInsets.symmetric(

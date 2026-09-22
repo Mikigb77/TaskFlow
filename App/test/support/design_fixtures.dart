@@ -5,6 +5,7 @@ import 'package:agenda/models/task_schedule_change.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/api_client.dart';
@@ -122,6 +123,7 @@ class DesignTaskNotifier extends TaskNotifier {
 ProviderContainer designContainer({MemoryThemeStore? store}) =>
     ProviderContainer(overrides: [
       pendingCapturesProvider.overrideWith((ref) async => []),
+      taskListsProvider.overrideWith((ref) async => []),
       apiClientProvider.overrideWith((ref) {
         final api = OfflineApiClient();
         ref.onDispose(api.close);

@@ -3,6 +3,7 @@
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -14,6 +15,8 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/task_list_store.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -24,7 +27,7 @@ import '../test/support/design_fixtures.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
-      'Android checklist review, occurrence progress and fresh cache restoration',
+      'Android lists, checklist review, occurrence progress and fresh cache restoration',
       (tester) async {
     await TaskReminders.initialize();
     final originalOwner = await TaskReminders.engine.activeOwner();
@@ -37,6 +40,11 @@ void main() {
     final database = TaskDatabase();
     final repository = CloudTaskRepository(database, api, api.account!.id);
     final owner = repository.ownerKey;
+    final lists = TaskListStore(database, owner);
+    final work = TaskListInfo(name: 'Work', color: 'blue');
+    final personal = TaskListInfo(name: 'Personal', color: 'violet');
+    await lists.create(work);
+    await lists.create(personal);
     final container = ProviderContainer(overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
@@ -55,12 +63,14 @@ void main() {
       container.dispose();
       await (await database.database)
           .delete('tasks', where: 'owner_key = ?', whereArgs: [owner]);
+      await (await database.database)
+          .delete('task_lists', where: 'owner_key = ?', whereArgs: [owner]);
       await api.signOut();
       api.close();
       await TaskReminders.activate(originalOwner ?? 'local');
     });
     final start = Task.day(DateTime.now()).add(const Duration(days: 1));
-    final session = (await store.create(owner, 'Europe/Madrid',
+    var session = (await store.create(owner, 'Europe/Madrid',
             text: 'Pack passport and charger every week'))
         .copyWith(status: 'ready', drafts: [
       CaptureDraft.fromAI(TaskDraft.fromJson({
@@ -78,6 +88,12 @@ void main() {
         ],
       }))
     ]);
+    session = session.copyWith(
+        drafts: session.drafts
+            .map((draft) => draft.copyWith(
+                task: draft.task
+                    .copyWith(listId: work.id, labels: ['travel', 'packing'])))
+            .toList());
     await store.update(session);
     await tester.pumpWidget(
         UncontrolledProviderScope(container: container, child: const MyApp()));
@@ -106,6 +122,8 @@ void main() {
     await container.read(taskProvider.notifier).loadTasks();
     var task = (await repository.getAllTasks()).single;
     expect(task.checklist.first.title, 'Renewed passport');
+    expect(task.listId, work.id);
+    expect(task.labels, ['travel', 'packing']);
     expect(await database.pending(owner), isEmpty);
     tester.state<NavigatorState>(find.byType(Navigator)).push(
         MaterialPageRoute<void>(
@@ -136,8 +154,47 @@ void main() {
     }
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
+    tester.state<NavigatorState>(find.byType(Navigator)).push(
+        MaterialPageRoute<void>(
+            builder: (_) =>
+                TaskDetailScreen(taskId: task.id!, occurrenceDate: start)));
+    await tester.pumpAndSettle();
+    final picker = find.descendant(
+        of: find.byType(TaskListPicker), matching: find.byType(ActionChip));
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Personal'));
+    await _until(
+        tester,
+        () async =>
+            (await repository.getAllTasks()).single.listId == personal.id);
+    await container.read(taskProvider.notifier).loadTasks();
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/lists');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Manage Personal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Archive list'));
+    await _until(
+        tester,
+        () async => (await lists.all())
+            .singleWhere((list) => list.id == personal.id)
+            .archived);
+    await container.read(taskProvider.notifier).loadTasks();
+    await tester.pumpAndSettle();
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      await container.read(themeModeProvider.notifier).setMode(mode);
+      await tester.pumpAndSettle();
+      await binding.takeScreenshot('personal-lists-${mode.name}');
+      expect(tester.takeException(), isNull);
+    }
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
     await (await database.database)
         .delete('tasks', where: 'owner_key = ?', whereArgs: [owner]);
+    await (await database.database)
+        .delete('task_lists', where: 'owner_key = ?', whereArgs: [owner]);
     await container.read(taskProvider.notifier).loadTasks();
     task = (await repository.getAllTasks()).single;
     expect(task.checklist.first.id, '3fd9a2be-b0e2-4c90-8e2c-845b2c8279fb');
@@ -146,6 +203,13 @@ void main() {
     expect(task.occurrenceOn(start.add(const Duration(days: 7)))!.checklistDone,
         0);
     expect(task.isCompleted, isFalse);
+    expect(task.listId, personal.id);
+    expect(task.labels, ['travel', 'packing']);
+    expect(
+        (await lists.all())
+            .singleWhere((list) => list.id == personal.id)
+            .archived,
+        isTrue);
     expect(await database.pending(owner), isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

@@ -74,6 +74,15 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
   }
 
   Future<void> _mutating = Future.value();
+  Future<void> moveToList(int taskId, String? listId) => _mutate(() async {
+        final task = (await _repository.getAllTasks())
+            .where((task) => task.id == taskId)
+            .firstOrNull;
+        if (task == null) throw StateError('This task no longer exists.');
+        await _repository.updateTask(task.copyWith(listId: listId));
+        if (mounted) await loadTasks();
+      });
+
   Future<T> _mutate<T>(Future<T> Function() action) {
     final operation = _mutating.then((_) => action());
     _mutating =

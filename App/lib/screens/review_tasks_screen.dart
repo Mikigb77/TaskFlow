@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_draft.dart';
@@ -408,6 +409,13 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                                 ? item.task.notes!
                                                 : 'Add notes',
                                             textAlign: TextAlign.start)),
+                                    TaskListPicker(
+                                        listId: item.task.listId,
+                                        onChanged: _saving
+                                            ? null
+                                            : (id) => _change(item.copyWith(
+                                                task: item.task
+                                                    .copyWith(listId: id)))),
                                     ChecklistEditor(
                                         items: item.task.checklist,
                                         recurring: item.task.isRecurring,

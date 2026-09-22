@@ -5,6 +5,8 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/widgets/task_interactions.dart';
 import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskTile extends ConsumerWidget {
   const TaskTile({super.key, required this.task, this.showDate = false});
@@ -15,6 +17,9 @@ class TaskTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
     final priority = AppTheme.priorityColor(context, task.priority);
+    final list = (ref.watch(taskListsProvider).valueOrNull ?? [])
+        .where((list) => list.id == task.listId)
+        .firstOrNull;
     return Dismissible(
         key: ValueKey('gesture:${task.id}:${task.occurrenceDate}'),
         confirmDismiss: (direction) async {
@@ -113,6 +118,27 @@ class TaskTile extends ConsumerWidget {
                                                   color:
                                                       colors.onSurfaceVariant)),
                                         ]),
+                                  if (list != null)
+                                    ConstrainedBox(
+                                        constraints:
+                                            const BoxConstraints(maxWidth: 180),
+                                        child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.folder_outlined,
+                                                  size: 14,
+                                                  color: taskListColor(
+                                                      list.color)),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                  child: Text(list.name,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: colors
+                                                              .onSurfaceVariant))),
+                                            ])),
                                   if (task.checklist.isNotEmpty)
                                     Text(
                                         '${task.checklistDone}/${task.checklist.length} steps',

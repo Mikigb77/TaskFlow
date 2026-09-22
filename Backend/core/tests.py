@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 from google.genai import types, errors
 
 from .ai import AIUnavailable, extract_task, extract_tasks, transcribe, generate, make_drafts
-from .models import User, Task, TaskEvent
+from .models import User, Task, TaskEvent, TaskList
 
 PASSWORD = "Strong-example-passphrase!2026"
 
@@ -76,6 +76,52 @@ class APITests(TestCase):
         response = other.post("/api/auth/login/", {"email": "OWNER@EXAMPLE.INVALID", "password": PASSWORD}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("password", response.data["user"])
+
+    def test_personal_lists_are_private_and_foreign_assignment_is_rejected(self):
+        list_id = str(uuid.uuid4())
+        payload = {"name": "Work", "color": "blue", "version": 0}
+        created = self.client.put(f"/api/lists/{list_id}/", payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        other = APIClient()
+        token = other.post("/api/auth/register/", {**self.credentials, "email": "other-list@example.invalid"}, format="json").data
+        other.credentials(HTTP_AUTHORIZATION="Bearer " + token["access"])
+        self.assertEqual(other.get("/api/lists/").data["results"], [])
+        self.assertEqual(other.get(f"/api/lists/{list_id}/").status_code, 404)
+        self.assertEqual(other.put(f"/api/lists/{list_id}/", payload, format="json").status_code, 404)
+        self.assertEqual(other.post("/api/tasks/", {**self.task_data, "list_id": list_id}, format="json").status_code, 400)
+        self.assertEqual(APIClient().get("/api/lists/").status_code, 401)
+
+    def test_list_move_archive_and_conflict_preserve_task_fields(self):
+        owner = User.objects.get(email=self.credentials["email"])
+        work = TaskList.objects.create(owner=owner, name="Work")
+        personal = TaskList.objects.create(owner=owner, name="Personal")
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        payload = {**self.task_data, "list_id": str(work.id), "labels": ["Errands", "errands", "Health"], "version": 0, "reminder_minutes": 15}
+        created = self.client.put(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(created.data["labels"], ["errands", "health"])
+        moved = self.client.put(path, {**payload, "list_id": str(personal.id), "version": 1}, format="json")
+        self.assertEqual(moved.status_code, 200, moved.data)
+        self.assertEqual(moved.data["id"], created.data["id"])
+        for field in ["due_date", "reminder_minutes", "notes", "priority", "labels"]:
+            self.assertEqual(moved.data[field], created.data[field])
+        archived = self.client.put(f"/api/lists/{personal.id}/", {"name": "Home", "archived": True, "version": 1}, format="json")
+        self.assertEqual(archived.status_code, 200, archived.data)
+        self.assertEqual(self.client.get(path).data["list_id"], personal.id)
+        conflict = self.client.put(f"/api/lists/{personal.id}/", {"name": "Conflicting", "version": 1}, format="json")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.data["current"]["name"], "Home")
+        old_client = self.client.put(path, {**self.task_data, "version": 2}, format="json")
+        self.assertEqual(old_client.data["list_id"], personal.id)
+        self.assertEqual(old_client.data["labels"], ["errands", "health"])
+
+    def test_list_and_label_bounds_are_enforced(self):
+        for name in ["", " " * 5, "x" * 81]:
+            response = self.client.put(f"/api/lists/{uuid.uuid4()}/", {"name": name}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+        for labels in [[""], ["x" * 33], [f"label-{i}" for i in range(11)]]:
+            response = self.client.post("/api/tasks/", {**self.task_data, "labels": labels}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
 
     def test_weak_password_and_duplicate_email_rejected(self):
         other = APIClient()
