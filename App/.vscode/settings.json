@@ -1,3 +1,6 @@
 {
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+    "cmake.configureOnOpen": false,
+    "cmake.configureOnEdit": false,
+    "cmake.automaticReconfigure": false
 }

@@ -27,7 +27,7 @@ Stop services with `docker compose stop`. `docker compose down` also preserves t
 
 ## Android emulator and phone
 
-Tested toolchain: Flutter 3.44 / Dart 3.12, Android SDK, JDK 21. Android Gradle/Kotlin configuration was updated to support current Flutter and recording plugins.
+Android toolchain: Flutter 3.44 / Dart 3.12, JDK 26, Gradle 9.7.1, Android Gradle Plugin 9.4.1 and Kotlin 2.4.20. The Gradle JVM criteria pin Java 26 for consistent editor and Flutter builds. See [the app setup guide](../App/README.md#getting-started) for JDK and VS Code settings.
 
 Run Flutter commands from `App/` (`cd App` at the repository root):
 

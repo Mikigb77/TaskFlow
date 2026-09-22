@@ -22,6 +22,14 @@ The visual system, references, and Android preview workflow are documented in [D
 
 This project is built using **Flutter**. To compile the app, follow these steps:
 
+The Android build uses **Gradle 9.7.1**, **Android Gradle Plugin 9.4.1**, **Kotlin 2.4.20**, and **JDK 26**. Install a JDK 26 distribution and set `JAVA_HOME` to its installation directory. The checked-in `android/gradle/gradle-daemon-jvm.properties` selects Java 26 for the build, including when Flutter starts Gradle through Android Studio's bundled Java. Gradle's distribution is pinned with its SHA-256 checksum.
+
+For VS Code, set `java.import.gradle.java.home` and `java.jdt.ls.java.home` in your active workspace settings to that same JDK directory, then reload the window. When opening the parent folder containing both repositories, use that folder's settings; VS Code does not inherit settings from `App/.vscode/`. CMake auto-configuration is disabled in the app settings because Flutter prepares the generated Windows files before native builds.
+
+Java 26 is the newest runtime supported by Gradle 9.7.1. Android Java/Kotlin bytecode still targets Java 17 for device compatibility. Flutter's `android.builtInKotlin=false` and `android.newDsl=false` compatibility settings remain required by the current Flutter SDK and plugins.
+
+Verified on 2026-09-21 with Temurin 26.0.2.1: Gradle configuration and build-task discovery succeed, and `flutter build apk --debug --target-platform=android-x64 --no-pub` builds the APK. Existing Flutter/plugin deprecation warnings remain; the unsupported Java class-version error is resolved.
+
 1. Run the following command in your terminal to build the APK in release mode:
    ```
    flutter build apk --release
@@ -30,7 +38,7 @@ This project is built using **Flutter**. To compile the app, follow these steps:
    ```
    build/app/outputs/flutter-apk/
    ```
-   Historical APK archives are available in the `releses` folder; these are older versions. For local backend testing, build with `flutter build apk --debug --split-per-abi` instead. See the backend guide for the server connection settings.
+   Historical APK archives are available in the `releses` folder; these are older versions. For local backend testing on a current phone, build with `flutter build apk --debug --target-platform=android-arm64`. See the backend guide for the server connection settings.
 
 ### Useful Resources
 
