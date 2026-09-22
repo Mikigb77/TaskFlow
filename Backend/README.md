@@ -79,7 +79,9 @@ For local recovery, choose Forgot password in the app or browser, enter the acco
 - Guest tasks stay in the original SQLite database. The migration preserves existing tasks and attachments.
 - Signed-in accounts have separate local caches, scoped by both backend address and user ID. Titles, schedules, repetition rules, per-occurrence completion, priorities and notes sync to PostgreSQL.
 - Existing guest tasks are imported only by choosing **Import local tasks** in Account. The import moves them once into the selected account.
-- Files and images remain on the phone where they were attached. Attachment binaries and paths are not uploaded and cannot be restored onto another phone yet.
+- Newly attached files in signed-in tasks queue for upload after the task is saved. Task details show local, queued, backed-up, downloadable and removal-pending states. Guest files and older device-only files remain local until explicitly uploaded from task details; importing guest tasks does not upload their files automatically.
+- Each file is limited to 6 MiB, each task to 20 uploaded files, and each account to 64 MiB / 1,000 active files. Transfers use stable UUIDs and SHA-256 checks; interrupted uploads retry without duplicating files. Downloads are explicit and verified before they become available locally. An upload error does not undo the saved task.
+- Files are account-private, stored in the `taskflow_media` Docker volume at `/app/private_media`, and served only through authenticated endpoints. Original filenames are metadata; no public storage URL is exposed. Removing an attachment or task revokes its download and propagates a deletion tombstone. This local volume is persistence across container recreation, not an off-host backup service.
 - Changes are saved locally first. Sync runs after changes, on app launch, when Calendar resumes, and when you press Sync. Offline changes wait in the local queue.
 - UUIDs make retries idempotent. Version checks prevent overwriting another device's updates. Conflicting edits are kept as an **offline copy**, ready for the next sync. Conflicting deletions are cancelled so a newer remote edit is preserved. The Calendar/Account sync message explains conflicts or connection failures.
 - Deletions are stored as server tombstones so other devices also remove the task. Task history records creation, updates, and deletion without copying task contents into logs.
@@ -89,7 +91,9 @@ For local recovery, choose Forgot password in the app or browser, enter the acco
 
 Tasks can have no schedule (Inbox), a date without a time (Any time), or a date and time. Date-only schedules use `scheduled_date`, which does not shift with time zones. Timed tasks use `due_date`; these fields are mutually exclusive. Existing SQLite and PostgreSQL timestamps are preserved by the migrations.
 
-Repetition supports daily, weekly, monthly and yearly schedules, with an optional inclusive end date. The calendar projects occurrences from one series; completion dates are stored separately, so completing/undoing an occurrence never moves the series start or creates duplicate successors. Monthly tasks anchored on the 31st use the last day of shorter months and return to the 31st afterward. Tasks shows the next open occurrence from today; previous occurrences remain in Calendar and completed ones in Completed tasks. Editing/deleting applies to the whole series. Custom intervals and individual occurrence rescheduling are not implemented.
+Repetition supports daily, weekly, monthly and yearly schedules, intervals from 1 to 99, selected weekdays, and an optional inclusive end date. Individual occurrences can be moved, skipped or reset; their original date retains checklist/completion/reminder identity. The calendar projects one series without duplicate successors. Monthly tasks anchored on the 31st clamp to shorter months and return to the 31st afterward. Tasks shows the next open occurrence; previous occurrences remain in Calendar and completed ones in Completed tasks. Whole-series changes remain explicit. Ordinal rules such as the first Monday and holiday calendars remain unsupported.
+
+Settings includes versioned TaskFlow JSON export/import, conservative Todoist CSV import with preview, and English/Spanish core UI with device-aware clock/week preferences. Archives include attachment filenames but not file bytes or private paths. Imported task copies require their own attachments. See the validation documents in `App/docs` for feature scope and remaining device/provider checks.
 
 Reminders are independent of priority. Each task can follow an editable device default, choose an explicit lead time, or turn alerts off. Date-only tasks need an explicit alert time or a configured date-only default; Inbox tasks have no alert. Notifications are opt-in from Settings, where permission, precise-alarm access, upcoming alerts, failures and the scheduling window are visible. Device preferences are account-scoped; task choices sync.
 
@@ -126,6 +130,9 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | GET, POST | `tasks/` | Paginated list or create task |
 | GET, PUT, DELETE | `tasks/<uuid>/` | Read, idempotent upsert, soft delete |
 | GET | `tasks/<uuid>/history/` | Task event history |
+| GET | `attachments/` | Account-scoped metadata; optional task_id / include_deleted=true |
+| GET, PUT, DELETE | `attachments/<uuid>/` | Metadata, immutable multipart upload (task_id/name/file), removal |
+| GET | `attachments/<uuid>/content/` | Authenticated private download; no public file URL |
 | POST | `ai/draft/` | JSON text or multipart WAV + timezone |
 | POST | `ai/drafts/` | Guest or signed-in text/WAV capture; returns up to 12 reviewed drafts |
 

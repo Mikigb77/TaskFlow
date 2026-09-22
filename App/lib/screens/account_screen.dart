@@ -158,7 +158,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                 style: Theme.of(context).textTheme.titleMedium),
                             const SizedBox(height: 8),
                             Text(
-                                'Tasks are saved on this phone and backed up when connected. Your attachments stay on the device where you added them.',
+                                'Tasks are saved on this phone and backed up when connected. New attachments upload after saving; check their status in task details. Older device-only files need an explicit Upload.',
                                 style:
                                     TextStyle(color: colors.onSurfaceVariant)),
                             const SizedBox(height: 20),

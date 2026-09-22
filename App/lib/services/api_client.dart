@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -221,6 +222,112 @@ class ApiClient {
       throw ApiException(0,
           'Cannot reach the server. Check your connection and server address.');
     }
+  }
+
+  Future<Map<String, dynamic>> uploadAttachment(
+      {required String id,
+      required String taskId,
+      required String name,
+      required String filePath,
+      required int accountId}) async {
+    final response = await _fileRequest(
+        'attachments/$id/',
+        accountId,
+        (url) async => http.MultipartRequest('PUT', url)
+          ..fields.addAll({'task_id': taskId, 'name': name})
+          ..files.add(await http.MultipartFile.fromPath('file', filePath,
+              filename: 'upload.bin')),
+        maxResponseBytes: 64 * 1024);
+    try {
+      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    } on FormatException {
+      throw ApiException(502, 'The server returned invalid file information.');
+    } on TypeError {
+      throw ApiException(502, 'The server returned invalid file information.');
+    }
+  }
+
+  Future<Uint8List> downloadAttachment(String id,
+          {required int accountId}) async =>
+      (await _fileRequest('attachments/$id/content/', accountId,
+              (url) async => http.Request('GET', url),
+              maxResponseBytes: 6 * 1024 * 1024))
+          .bodyBytes;
+
+  Future<http.Response> _fileRequest(
+      String path, int accountId, Future<http.BaseRequest> Function(Uri) create,
+      {required int maxResponseBytes}) async {
+    final generation = _generation;
+    void checkAccount() {
+      if (generation != _generation || account?.id != accountId) {
+        throw ApiException(401, 'Sign in to this account to transfer files.');
+      }
+    }
+
+    checkAccount();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      checkAccount();
+      final request = await create(Uri.parse('$baseUrl/api/$path'));
+      checkAccount();
+      request.followRedirects = false;
+      request.headers['Authorization'] = 'Bearer ${_session!['access']}';
+      Future<http.Response> transfer() async {
+        final response = await _http.send(request);
+        final bytes = BytesBuilder(copy: false);
+        await for (final chunk in response.stream) {
+          if (bytes.length + chunk.length > maxResponseBytes) {
+            throw ApiException(
+                413, 'The server file is larger than the supported limit.');
+          }
+          bytes.add(chunk);
+        }
+        return http.Response.bytes(bytes.takeBytes(), response.statusCode,
+            headers: response.headers);
+      }
+
+      late http.Response response;
+      try {
+        response = await transfer().timeout(const Duration(seconds: 45));
+      } on TimeoutException {
+        throw ApiException(0,
+            'The file transfer timed out. Your local copy is safe; retry when connected.');
+      } on SocketException {
+        throw ApiException(
+            0, 'Cannot reach the server. Your local file is safe.');
+      } on http.ClientException {
+        throw ApiException(
+            0, 'The connection was interrupted. Retry this file.');
+      }
+      checkAccount();
+      if (response.statusCode == 401 && attempt == 0) {
+        _refreshing ??=
+            _refresh(generation).whenComplete(() => _refreshing = null);
+        await _refreshing;
+        continue;
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        Map<String, dynamic>? body;
+        try {
+          final value = jsonDecode(response.body);
+          if (value is Map) body = Map<String, dynamic>.from(value);
+        } on FormatException {/* A proxy can return non-JSON errors. */}
+        final detail = body?['detail'];
+        final message = detail is String
+            ? detail
+            : body?.entries
+                .map((e) =>
+                    '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}')
+                .join('\n');
+        throw ApiException(
+            response.statusCode,
+            message?.isNotEmpty == true
+                ? message!
+                : 'The file transfer failed. Please retry.',
+            body);
+      }
+      return response;
+    }
+    throw ApiException(401, 'Your session has ended. Please sign in again.');
   }
 
   void close() => _http.close();

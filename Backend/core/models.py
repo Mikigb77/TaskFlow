@@ -82,6 +82,28 @@ class TaskEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+def attachment_path(instance, _filename):
+    # Original names are metadata, never part of the storage path.
+    return f"attachments/{instance.owner_id}/{instance.pk}.blob"
+
+
+class Attachment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="attachments")
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="attachments")
+    name = models.CharField(max_length=180)
+    file = models.FileField(upload_to=attachment_path, max_length=240)
+    size = models.PositiveIntegerField()
+    sha256 = models.CharField(max_length=64)
+    is_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["owner", "updated_at"], name="attachment_owner_updated")]
+
+
 class LoginSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)

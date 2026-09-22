@@ -5,6 +5,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from .models import Task, TaskEvent
 from .serializers import TaskSerializer
+from .attachment_views import delete_task_attachments
 
 
 class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -50,6 +51,8 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
                     raise NotFound()
                 return Response({"detail": "Task was already uploaded.", "current": self.get_serializer(current).data}, status=409)
             TaskEvent.objects.create(task=task, version=task.version, action="deleted" if task.is_deleted else ("created" if is_new else "updated"))
+            if task.is_deleted:
+                delete_task_attachments(task)
             return Response(self.get_serializer(task).data, status=201 if is_new else 200)
 
     def destroy(self, request, pk=None):
@@ -62,6 +65,7 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
             task.is_deleted = True
             task.version += 1
             task.save()
+            delete_task_attachments(task)
             TaskEvent.objects.create(task=task, version=task.version, action="deleted")
         return Response(status=204)
 

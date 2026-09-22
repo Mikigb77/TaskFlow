@@ -3,10 +3,12 @@ from rest_framework.routers import DefaultRouter
 from core import auth_views, views
 from core.task_views import TaskViewSet
 from core.list_views import TaskListViewSet
+from core.attachment_views import AttachmentViewSet
 
 router = DefaultRouter()
 router.register("tasks", TaskViewSet, basename="task")
 router.register("lists", TaskListViewSet, basename="task-list")
+router.register("attachments", AttachmentViewSet, basename="attachment")
 urlpatterns = [
     path("", views.playground), path("reset-password/", views.reset_page),
     path("api/health/", views.health),

@@ -1053,4 +1053,76 @@ class AppLocalizationsEs extends AppLocalizations {
   String reminderValue(String value) {
     return 'Recordatorio: $value';
   }
+
+  @override
+  String get fileLocal => 'Solo en este dispositivo';
+
+  @override
+  String get fileQueued => 'Subida pendiente';
+
+  @override
+  String get fileBackedUp => 'Guardado en tu cuenta';
+
+  @override
+  String get fileDownloadAvailable => 'Disponible para descargar';
+
+  @override
+  String get fileMissing => 'Archivo no disponible en este dispositivo';
+
+  @override
+  String get fileRemovalPending => 'Eliminación pendiente';
+
+  @override
+  String get fileUpload => 'Subir';
+
+  @override
+  String get fileDownload => 'Descargar';
+
+  @override
+  String get fileOpen => 'Abrir';
+
+  @override
+  String get fileRetry => 'Reintentar transferencia';
+
+  @override
+  String get fileRemove => 'Eliminar archivo adjunto';
+
+  @override
+  String get fileRemoveQuestion => '¿Eliminar este archivo adjunto?';
+
+  @override
+  String get fileRemoveHelp =>
+      'Se eliminará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
+
+  @override
+  String get fileEmpty =>
+      'No hay archivos adjuntos. Añade un archivo al editar esta tarea.';
+
+  @override
+  String get fileLoadError =>
+      'No se pudo cargar el estado de los archivos. Vuelve a intentarlo.';
+
+  @override
+  String get fileActionError =>
+      'No se pudo completar la acción. Tu tarea está guardada; vuelve a intentarlo.';
+
+  @override
+  String get fileSignInHelp =>
+      'Inicia sesión para subir tus archivos y recuperarlos en otro dispositivo.';
+
+  @override
+  String get fileUploadHelp =>
+      'Los archivos nuevos se suben a tu cuenta al guardar: hasta 6 MiB por archivo y 64 MiB por cuenta. Los archivos locales anteriores permanecen aquí hasta que elijas Subir en los detalles de la tarea.';
+
+  @override
+  String get fileLocalHelp =>
+      'Los archivos permanecen en este dispositivo hasta que inicies sesión y elijas Subir en los detalles de la tarea. Hasta 6 MiB por archivo.';
+
+  @override
+  String get fileLimit =>
+      'Elige un archivo no vacío de hasta 6 MiB. Puedes adjuntar hasta 20 archivos por tarea.';
+
+  @override
+  String get fileManageHelp =>
+      'Abre los detalles de la tarea para descargar, subir o eliminar archivos de tu cuenta.';
 }

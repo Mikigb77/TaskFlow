@@ -122,6 +122,7 @@ class CloudTaskRepository extends TaskRepository {
         if (result['next'] == null) break;
         page++;
       }
+      await attachments.sync(api, accountId);
     } on ApiException catch (error) {
       syncError = 'Saved on this phone. ${error.message}';
     }

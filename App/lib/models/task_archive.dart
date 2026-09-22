@@ -235,7 +235,8 @@ class TaskArchive {
   }
 
   static String encode(
-      List<Map<String, dynamic>> rows, List<TaskListInfo> lists) {
+      List<Map<String, dynamic>> rows, List<TaskListInfo> lists,
+      {Map<int, List<String>> attachmentNames = const {}}) {
     final data = <String, dynamic>{
       'format': format,
       'version': version,
@@ -254,9 +255,10 @@ class TaskArchive {
         return {
           'id': row['sync_id'] ?? const Uuid().v4(),
           ...task.toApi(),
-          'attachments': [...task.filePaths, ...task.imagePaths]
-              .map((path) => path.replaceAll('\\', '/').split('/').last)
-              .toList()
+          'attachments': attachmentNames[row['id']] ??
+              [...task.filePaths, ...task.imagePaths]
+                  .map((path) => path.replaceAll('\\', '/').split('/').last)
+                  .toList()
         };
       }).toList(),
     };

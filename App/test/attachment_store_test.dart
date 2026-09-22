@@ -1,0 +1,339 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_attachment.dart';
+import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/archive_store.dart';
+import 'package:agenda/services/attachment_files.dart';
+import 'package:agenda/services/attachment_store.dart';
+import 'package:agenda/services/task_database.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+void main() {
+  sqfliteFfiInit();
+  late Directory directory;
+  late TaskDatabase database;
+  late AttachmentFiles files;
+  late AttachmentStore store;
+  late _FilesApi api;
+  const owner = 'http://files.test/users/1';
+  Future<int> task(String path) async {
+    final id = await database.insertTask(
+        Task(title: 'Doctor', priority: 3, filePaths: [path]),
+        ownerKey: owner);
+    await (await database.database).update(
+        'tasks', {'remote_version': 1, 'sync_pending': 0},
+        where: 'id = ?', whereArgs: [id]);
+    return id;
+  }
+
+  setUp(() async {
+    directory =
+        await Directory.systemTemp.createTemp('taskflow-attachment-store-');
+    final sql = await databaseFactoryFfi
+        .openDatabase(p.join(directory.path, 'data.db'));
+    await sql.execute(
+        'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)');
+    await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
+    database = TaskDatabase.forTesting(sql);
+    files =
+        AttachmentFiles(directory: Directory(p.join(directory.path, 'owned')));
+    store = AttachmentStore(database, owner, files: files);
+    api = _FilesApi();
+  });
+  tearDown(() async {
+    await database.close();
+    api.close();
+    expect(p.isWithin(Directory.systemTemp.path, directory.path), isTrue);
+    await directory.delete(recursive: true);
+  });
+
+  test(
+      'saved queue survives restart and response loss without duplicate uploads',
+      () async {
+    final source = File(p.join(directory.path, 're\u0301sults.pdf'));
+    await source.writeAsBytes([1, 2, 255, 4]);
+    final id = await task(source.path);
+    final queuedId = (await store.forTask(id)).single.id;
+    api.loseResponse = true;
+    api.failList = true;
+    await expectLater(store.sync(api, 1), throwsA(isA<ApiException>()));
+    expect(api.records.length, 1);
+    expect((await store.forTask(id)).single.uploadPending, isTrue);
+    await database.close();
+    database = TaskDatabase.forTesting(await databaseFactoryFfi
+        .openDatabase(p.join(directory.path, 'data.db')));
+    store = AttachmentStore(database, owner, files: files);
+    api.failList = false;
+    await store.sync(api, 1);
+    final saved = (await store.forTask(id)).single;
+    expect(saved.id, queuedId);
+    expect(saved.name, 'résults.pdf');
+    expect(saved.remote, isTrue);
+    expect(saved.uploadPending, isFalse);
+    expect(saved.error, isNull);
+    expect(api.uploadIds, [queuedId, queuedId]);
+    expect(api.records.length, 1);
+    expect(await File(saved.localPath!).readAsBytes(), [1, 2, 255, 4]);
+    expect(await source.exists(), isTrue);
+    final row = (await (await database.database)
+            .query('tasks', where: 'id = ?', whereArgs: [id]))
+        .single;
+    expect(row['remote_version'], 1);
+    expect(row['revision'], 0);
+  });
+
+  test(
+      'fresh cache restores metadata, validates download and exports names only',
+      () async {
+    final source = File(p.join(directory.path, 'results.pdf'));
+    await source.writeAsBytes([0, 8, 255, 11]);
+    final id = await task(source.path);
+    await store.sync(api, 1);
+    final saved = (await store.forTask(id)).single;
+    await files.removeOwned(saved.localPath!);
+    final db = await database.database;
+    await db
+        .delete('task_attachments', where: 'owner_key = ?', whereArgs: [owner]);
+    await db.update('tasks', {'filePaths': null},
+        where: 'id = ?', whereArgs: [id]);
+    await store.sync(api, 1);
+    var restored = (await store.forTask(id)).single;
+    expect(restored.localPath, isNull);
+    expect(restored.remote, isTrue);
+    api.corrupt = true;
+    await expectLater(
+        store.download(restored.id, api, 1), throwsFormatException);
+    expect((await store.forTask(id)).single.localPath, isNull);
+    api.corrupt = false;
+    final downloaded = await store.download(restored.id, api, 1);
+    expect(await File(downloaded).readAsBytes(), [0, 8, 255, 11]);
+    restored = (await store.forTask(id)).single;
+    expect(restored.error, isNull);
+    final archive = await ArchiveStore(database, owner).export();
+    expect(archive, contains('results.pdf'));
+    expect(archive, isNot(contains(directory.path.replaceAll('\\', '\\\\'))));
+    expect(
+        await AttachmentStore(database, 'http://files.test/users/2',
+                files: files)
+            .forTask(id),
+        isEmpty);
+    await expectLater(
+        AttachmentStore(database, 'http://files.test/users/2', files: files)
+            .download(saved.id, api, 2),
+        throwsStateError);
+  });
+
+  test(
+      'deletion during upload cannot resurrect the file and never deletes originals',
+      () async {
+    final source = File(p.join(directory.path, 'appointment.txt'));
+    await source.writeAsString('bring results');
+    final id = await task(source.path);
+    api.uploadWait = Completer<void>();
+    final syncing = store.sync(api, 1);
+    await api.uploadStarted.future;
+    final item = (await store.forTask(id)).single;
+    await store.remove(item.id);
+    expect((await store.forTask(id)).single.deletePending, isTrue);
+    api.uploadWait!.complete();
+    await syncing;
+    expect(await store.forTask(id), isEmpty);
+    expect(api.records[item.id]!['is_deleted'], isTrue);
+    expect(
+        (await database.getTasks(ownerKey: owner)).single.filePaths, isEmpty);
+    expect(await source.readAsString(), 'bring results');
+    expect(await File(item.localPath!).exists(), isFalse);
+  });
+
+  test('failed removal is visible and retries without uploading again',
+      () async {
+    final source = File(p.join(directory.path, 'receipt.txt'));
+    await source.writeAsString('receipt');
+    final id = await task(source.path);
+    await store.sync(api, 1);
+    final item = (await store.forTask(id)).single;
+    await store.remove(item.id);
+    api.failDelete = true;
+    await store.sync(api, 1);
+    final pending = (await store.forTask(id)).single;
+    expect(pending.deleted, isTrue);
+    expect(pending.deletePending, isTrue);
+    expect(pending.error, isNotNull);
+    expect(api.uploadIds.length, 1);
+    api.failDelete = false;
+    await store.sync(api, 1);
+    expect(await store.forTask(id), isEmpty);
+    expect(api.uploadIds.length, 1);
+  });
+
+  test(
+      'guest imports stay device-only until explicit backup and missing files remain errors',
+      () async {
+    final source = File(p.join(directory.path, 'legacy.txt'));
+    await source.writeAsString('legacy');
+    final id = await database.insertTask(
+        Task(title: 'Old task', priority: 1, filePaths: [source.path]));
+    await database.importLocalTasks(owner);
+    await (await database.database).update('tasks', {'remote_version': 1},
+        where: 'id = ?', whereArgs: [id]);
+    await store.sync(api, 1);
+    expect(api.records, isEmpty);
+    await Future.wait(
+        [store.enqueue(id, source.path), store.enqueue(id, source.path)]);
+    expect((await store.forTask(id)).length, 1);
+    await store.sync(api, 1);
+    expect(api.records.length, 1);
+    final missing = await task(p.join(directory.path, 'missing.pdf'));
+    await store.sync(api, 1);
+    expect((await store.forTask(missing)).single.uploadPending, isTrue);
+    expect((await store.forTask(missing)).single.error, isNotNull);
+    expect((await database.getTasks(ownerKey: owner)).length, 2);
+  });
+
+  test(
+      'export keeps separate same-name files without counting local paths twice',
+      () async {
+    final paths = <String>[];
+    for (final folder in ['first', 'second']) {
+      final file = File(p.join(directory.path, folder, 'results.txt'));
+      await file.parent.create();
+      await file.writeAsString(folder);
+      paths.add(file.path);
+    }
+    final id = await database.insertTask(
+        Task(title: 'Results', priority: 2, filePaths: paths),
+        ownerKey: owner);
+    await (await database.database).update('tasks', {'remote_version': 1},
+        where: 'id = ?', whereArgs: [id]);
+    await store.sync(api, 1);
+    expect((await store.forTask(id)).length, 2);
+    final archive = jsonDecode(await ArchiveStore(database, owner).export());
+    expect(
+        archive['tasks'].single['attachments'], ['results.txt', 'results.txt']);
+  });
+
+  test('remote removal revokes cached references without changing task version',
+      () async {
+    final source = File(p.join(directory.path, 'owned-original.txt'));
+    await source.writeAsString('original');
+    final retained = await files.retain(source.path);
+    final id = await task(retained);
+    await store.sync(api, 1);
+    final saved = (await store.forTask(id)).single;
+    api.records[saved.id]!['is_deleted'] = true;
+    await store.sync(api, 1);
+    expect(await store.forTask(id), isEmpty);
+    expect(
+        (await database.getTasks(ownerKey: owner)).single.filePaths, isEmpty);
+    expect(await File(retained).exists(), isFalse);
+    expect(await source.exists(), isTrue);
+    final row = (await (await database.database)
+            .query('tasks', where: 'id = ?', whereArgs: [id]))
+        .single;
+    expect(row['remote_version'], 1);
+    expect(row['revision'], 0);
+  });
+
+  test(
+      'file retention is bounded and unsafe download identities cannot escape storage',
+      () async {
+    final empty = File(p.join(directory.path, 'empty.txt'));
+    await empty.writeAsBytes([]);
+    await expectLater(files.retain(empty.path), throwsFormatException);
+    final large = File(p.join(directory.path, 'large.txt'));
+    final handle = await large.open(mode: FileMode.write);
+    await handle.truncate(TaskAttachment.maxBytes + 1);
+    await handle.close();
+    await expectLater(files.retain(large.path), throwsFormatException);
+    expect(await files.owns(empty.path), isFalse);
+    await files.removeOwned(empty.path);
+    expect(await empty.exists(), isTrue);
+    await expectLater(
+        files.downloaded(
+            owner,
+            TaskAttachment(
+                id: '../../escape',
+                taskId: 'bad',
+                name: 'bad.txt',
+                size: 1,
+                sha256: sha256.convert([0]).toString()),
+            Uint8List.fromList([0])),
+        throwsFormatException);
+  });
+}
+
+class _FilesApi extends ApiClient {
+  _FilesApi() : super(url: 'http://files.test');
+  @override
+  Account get account => Account.fromJson(
+      {'id': 1, 'email': 'files@example.invalid', 'timezone': 'UTC'});
+  final records = <String, Map<String, dynamic>>{};
+  final bytes = <String, Uint8List>{};
+  final uploadIds = <String>[];
+  bool loseResponse = false,
+      failList = false,
+      corrupt = false,
+      failDelete = false;
+  Completer<void>? uploadWait;
+  final uploadStarted = Completer<void>();
+
+  @override
+  Future<Map<String, dynamic>> uploadAttachment(
+      {required String id,
+      required String taskId,
+      required String name,
+      required String filePath,
+      required int accountId}) async {
+    expect(accountId, 1);
+    uploadIds.add(id);
+    bytes[id] = await File(filePath).readAsBytes();
+    records[id] = {
+      'id': id,
+      'task_id': taskId,
+      'name': name.replaceAll('e\u0301', 'é'),
+      'size': bytes[id]!.length,
+      'sha256': sha256.convert(bytes[id]!).toString(),
+      'is_deleted': false
+    };
+    if (!uploadStarted.isCompleted) uploadStarted.complete();
+    if (uploadWait != null) await uploadWait!.future;
+    if (loseResponse) {
+      loseResponse = false;
+      throw ApiException(503, 'Response lost.');
+    }
+    return records[id]!;
+  }
+
+  @override
+  Future<Uint8List> downloadAttachment(String id,
+      {required int accountId}) async {
+    expect(accountId, 1);
+    return corrupt ? Uint8List.fromList([9]) : bytes[id]!;
+  }
+
+  @override
+  Future<dynamic> request(String method, String path,
+      {Map<String, dynamic>? data,
+      String? audioPath,
+      bool authenticated = true,
+      int? accountId}) async {
+    expect(accountId, 1);
+    if (method == 'GET') {
+      if (failList) throw ApiException(503, 'Metadata unavailable.');
+      return {'results': records.values.toList(), 'next': null};
+    }
+    if (method == 'DELETE') {
+      if (failDelete) throw ApiException(503, 'Removal unavailable.');
+      final id = path.split('/')[1];
+      records[id]?['is_deleted'] = true;
+      return null;
+    }
+    throw StateError('Unexpected request $method $path');
+  }
+}

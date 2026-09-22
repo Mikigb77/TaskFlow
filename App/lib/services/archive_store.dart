@@ -25,8 +25,27 @@ class ArchiveStore {
             orderBy: 'id');
         final lists = await tx.query('task_lists',
             where: 'owner_key = ?', whereArgs: [owner], orderBy: 'id');
+        final attachments = await tx.query('task_attachments',
+            columns: ['task_id', 'name', 'source_path'],
+            where: 'owner_key = ? AND is_deleted = 0',
+            whereArgs: [owner]);
+        final names = <int, List<String>>{};
+        for (final row in rows) {
+          final linked = attachments
+              .where((file) => file['task_id'] == row['sync_id'])
+              .toList();
+          final sources = linked.map((file) => file['source_path']).toSet();
+          names[row['id'] as int] = [
+            for (final field in ['filePaths', 'imagePaths'])
+              for (final path in (row[field] as String? ?? '').split('|'))
+                if (path.isNotEmpty && !sources.contains(path))
+                  path.replaceAll('\\', '/').split('/').last,
+            ...linked.map((file) => file['name'] as String),
+          ];
+        }
         return TaskArchive.encode(
-            rows, lists.map(TaskListInfo.fromRow).toList());
+            rows, lists.map(TaskListInfo.fromRow).toList(),
+            attachmentNames: names);
       });
 
   Future<Set<String>> imported(String archiveId) async =>

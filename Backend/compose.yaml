@@ -10,6 +10,7 @@ services:
       EMAIL_PORT: 1025
     ports:
       - "${API_PORT:-8088}:8000"
+    volumes: [taskflow_media:/app/private_media]
     depends_on:
       db:
         condition: service_healthy
@@ -52,3 +53,4 @@ services:
 volumes:
   taskflow_db:
   taskflow_cache:
+  taskflow_media:

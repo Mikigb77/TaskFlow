@@ -2011,6 +2011,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reminder: {value}'**
   String reminderValue(String value);
+
+  /// No description provided for @fileLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Only on this device'**
+  String get fileLocal;
+
+  /// No description provided for @fileQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload queued'**
+  String get fileQueued;
+
+  /// No description provided for @fileBackedUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Backed up to your account'**
+  String get fileBackedUp;
+
+  /// No description provided for @fileDownloadAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available to download'**
+  String get fileDownloadAvailable;
+
+  /// No description provided for @fileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'File unavailable on this device'**
+  String get fileMissing;
+
+  /// No description provided for @fileRemovalPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Removal pending'**
+  String get fileRemovalPending;
+
+  /// No description provided for @fileUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get fileUpload;
+
+  /// No description provided for @fileDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get fileDownload;
+
+  /// No description provided for @fileOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get fileOpen;
+
+  /// No description provided for @fileRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry transfer'**
+  String get fileRetry;
+
+  /// No description provided for @fileRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove attachment'**
+  String get fileRemove;
+
+  /// No description provided for @fileRemoveQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this attachment?'**
+  String get fileRemoveQuestion;
+
+  /// No description provided for @fileRemoveHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.'**
+  String get fileRemoveHelp;
+
+  /// No description provided for @fileEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No attachments. Add a file when editing this task.'**
+  String get fileEmpty;
+
+  /// No description provided for @fileLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load attachment status. Please retry.'**
+  String get fileLoadError;
+
+  /// No description provided for @fileActionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete this action. Your task is saved; please retry.'**
+  String get fileActionError;
+
+  /// No description provided for @fileSignInHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to upload your files and restore them on another device.'**
+  String get fileSignInHelp;
+
+  /// No description provided for @fileUploadHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'New files upload to your account after saving: up to 6 MiB each, 64 MiB per account. Older local files stay on this device until you choose Upload in task details.'**
+  String get fileUploadHelp;
+
+  /// No description provided for @fileLocalHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MiB per file.'**
+  String get fileLocalHelp;
+
+  /// No description provided for @fileLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a non-empty file up to 6 MiB. You can attach up to 20 files per task.'**
+  String get fileLimit;
+
+  /// No description provided for @fileManageHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Open task details to download, upload, or remove account attachments.'**
+  String get fileManageHelp;
 }
 
 class _AppLocalizationsDelegate

@@ -1,10 +1,7 @@
 import 'package:agenda/l10n/region.dart';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path/path.dart' as path;
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -13,6 +10,7 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/task_interactions.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
+import 'package:agenda/widgets/attachment_panel.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen(
@@ -48,21 +46,6 @@ class TaskDetailScreen extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.l10n.deleteTaskError)));
-      }
-    }
-  }
-
-  Future<void> _open(BuildContext context, String file) async {
-    try {
-      final result = await OpenFile.open(file);
-      if (result.type.name != 'done' && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.attachmentUnavailable)));
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.attachmentOpenError)));
       }
     }
   }
@@ -103,9 +86,6 @@ class TaskDetailScreen extends ConsumerWidget {
                           child: Text(context.l10n.editRepeating)),
                   ])));
             }
-            final attachments = [...task.filePaths, ...task.imagePaths]
-                .where((file) => file.isNotEmpty)
-                .toList();
             return Scaffold(
               appBar: CustomAppBar(title: context.l10n.taskDetails, actions: [
                 IconButton(
@@ -264,36 +244,7 @@ class TaskDetailScreen extends ConsumerWidget {
                                 style: TextStyle(
                                     color: colors.onSurfaceVariant,
                                     height: 1.6)))),
-                    if (attachments.isNotEmpty) ...[
-                      const SizedBox(height: 28),
-                      const SectionLabel('On this device'),
-                      for (final file in attachments)
-                        Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: AppSurface(
-                                padding: EdgeInsets.zero,
-                                child: ListTile(
-                                    leading: task.imagePaths.contains(file)
-                                        ? ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            child: Image.file(File(file),
-                                                width: 40,
-                                                height: 40,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    const Icon(Icons
-                                                        .image_not_supported_outlined)))
-                                        : const Icon(
-                                            Icons.insert_drive_file_outlined),
-                                    title: Text(path.basename(file),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis),
-                                    trailing: const Icon(
-                                        Icons.open_in_new_rounded,
-                                        size: 18),
-                                    onTap: () => _open(context, file)))),
-                    ],
+                    AttachmentPanel(task: task),
                   ]),
               bottomNavigationBar: SafeArea(
                   top: false,

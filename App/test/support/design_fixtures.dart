@@ -11,6 +11,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/widgets/attachment_panel.dart';
 
 class MemoryRegionalStore extends RegionalPreferenceStore {
   MemoryRegionalStore(
@@ -137,6 +138,7 @@ class DesignTaskNotifier extends TaskNotifier {
 ProviderContainer designContainer(
         {MemoryThemeStore? store, RegionalPreferenceStore? regionalStore}) =>
     ProviderContainer(overrides: [
+      attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
       regionalStoreProvider
           .overrideWithValue(regionalStore ?? MemoryRegionalStore()),
       pendingCapturesProvider.overrideWith((ref) async => []),

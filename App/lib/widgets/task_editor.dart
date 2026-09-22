@@ -15,6 +15,7 @@ import 'package:agenda/widgets/repeat_rule_control.dart';
 import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
@@ -57,6 +58,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   int? _reminderTime;
   late final List<String> _attachments;
   bool _saving = false;
+  bool _pickingFile = false;
   late bool _detailsExpanded;
   final _referenceTime = DateTime.now();
   String? _ignoredSuggestion;
@@ -267,6 +269,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   }
 
   Future<void> _attach() async {
+    if (_pickingFile || _saving) return;
+    if (_attachments.length >= 20) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.fileLimit)));
+      return;
+    }
+    final local = ref.read(taskRepositoryProvider).ownerKey == 'local';
     final gallery = await showModalBottomSheet<bool>(
         context: context,
         builder: (context) => SafeArea(
@@ -275,7 +284,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text(context.l10n.localAttachmentHelp)),
+                      child: Text(local
+                          ? context.l10n.fileLocalHelp
+                          : context.l10n.fileUploadHelp)),
                   ListTile(
                       leading: const Icon(Icons.photo_outlined),
                       title: Text(context.l10n.choosePhoto),
@@ -286,6 +297,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                       onTap: () => Navigator.pop(context, false)),
                 ]))));
     if (gallery == null || !mounted) return;
+    setState(() => _pickingFile = true);
     try {
       final String? file;
       if (gallery) {
@@ -294,15 +306,20 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       } else {
         file = (await FilePicker.platform.pickFiles())?.files.single.path;
       }
-      final selectedFile = file;
+      final selectedFile =
+          file == null ? null : await AttachmentFiles().retain(file);
       if (selectedFile != null && mounted) {
         setState(() => _attachments.add(selectedFile));
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(context.l10n.attachError)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(error is FormatException
+                ? context.l10n.fileLimit
+                : context.l10n.attachError)));
       }
+    } finally {
+      if (mounted) setState(() => _pickingFile = false);
     }
   }
 
@@ -739,14 +756,26 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                             ]))),
                                 ],
                                 TextButton.icon(
-                                    onPressed: _attach,
+                                    onPressed: _pickingFile || _saving
+                                        ? null
+                                        : _attach,
                                     icon: const Icon(Icons.attach_file_rounded,
                                         size: 20),
                                     label: Text(context.l10n.addAttachment)),
-                                Text(context.l10n.localAttachments,
+                                Text(
+                                    ref
+                                                .watch(taskRepositoryProvider)
+                                                .ownerKey ==
+                                            'local'
+                                        ? context.l10n.fileLocalHelp
+                                        : context.l10n.fileUploadHelp,
                                     style: TextStyle(
                                         color: colors.onSurfaceVariant,
                                         fontSize: 12)),
+                                if (edit)
+                                  Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(context.l10n.fileManageHelp)),
                               ],
                             ])),
                   )))),
@@ -755,7 +784,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
               child: ElevatedButton.icon(
-                onPressed: _saving ? null : _save,
+                onPressed: _saving || _pickingFile ? null : _save,
                 icon: _saving
                     ? const SizedBox(
                         width: 18,

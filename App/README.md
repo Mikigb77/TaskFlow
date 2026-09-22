@@ -4,14 +4,16 @@ All Flutter source, platform projects, tests, dependencies, and builds live in `
 
 The Django service, Docker Compose configuration, environment files, and backend documentation live in `Backend/`: [Local backend guide](../Backend/README.md).
 
-**TaskFlow** is a simple and intuitive app designed to help you efficiently manage your tasks. It organizes your tasks by **due date** and **priority**, ensuring that you stay on top of your schedule. The app sends **daily morning and evening notifications**, highlighting your three most urgent tasks for the day, and offers a **10 minutes remainder before important tasks** to keep you on track.
+**TaskFlow** captures thoughts as tasks and keeps scheduled commitments in a calendar-first agenda. Tasks work locally; signed-in accounts add synchronization and attachment recovery. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for delivered features, validation evidence and remaining work.
 
 ## Features
 
-- Organize tasks by **due date** and **priority**.
-- Receive **morning and evening reminders** featuring your three most urgent tasks.
-- Get a **10-minute reminder** before your most important tasks.
-- Simple and user-friendly interface for seamless task management.
+- Voice and typed capture with retained unfinished input, editable drafts and partial-batch saving. AI processing needs a connection; provider failures keep the input available for retry.
+- Unscheduled Inbox, date-only and timed tasks, personal lists, labels and checklists.
+- Recurrence intervals, selected weekdays and individual occurrence move/skip controls.
+- Opt-in reminders with explicit lead times, snooze, notification actions and configurable daily check-ins. Scheduling/delivery limitations are documented in [reminder validation](docs/REMINDER_VALIDATION.md).
+- Local task storage with account-isolated sync, conflict preservation and private attachment upload/download. Older device-only files require an explicit Upload.
+- TaskFlow export/import, Todoist CSV preview, English/Spanish core UI and regional clock/week preferences.
 - Light, dark, and device-following appearance, with a one-tap sun/moon switch.
 - Calendar and week agenda, visible task times, search, priority filters, and completion undo.
 - Consistent task editor, voice capture, account screens, and bottom navigation.

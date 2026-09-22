@@ -40,7 +40,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"auth": "10/min", "recovery": "5/hour", "tasks": "120/min", "ai": "6/min"},
+    "DEFAULT_THROTTLE_RATES": {"auth": "10/min", "recovery": "5/hour", "tasks": "120/min", "ai": "6/min", "attachments": "60/min"},
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
 }
@@ -71,6 +71,11 @@ SESSION_COOKIE_SECURE = SECURE_SSL_REDIRECT
 CSRF_COOKIE_SECURE = SECURE_SSL_REDIRECT
 DATA_UPLOAD_MAX_MEMORY_SIZE = 7 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FILES = 1
+FILE_UPLOAD_HANDLERS = ["core.attachment_views.BoundedUploadHandler", "django.core.files.uploadhandler.MemoryFileUploadHandler", "django.core.files.uploadhandler.TemporaryFileUploadHandler"]
+MEDIA_ROOT = BASE_DIR / "private_media"
+ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024
+ATTACHMENT_ACCOUNT_BYTES = 64 * 1024 * 1024
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 AI_TEXT_MODEL = os.getenv("AI_TEXT_MODEL", "gemma-4-31b-it")
 AI_AUDIO_MODEL = os.getenv("AI_AUDIO_MODEL", "gemini-3.5-transcribe")

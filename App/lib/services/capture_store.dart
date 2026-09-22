@@ -139,12 +139,14 @@ class CaptureStore {
         }
         await TaskDatabase.validateList(tx, draft.task, ownerKey);
         final values = draft.task.toMap()..remove('id');
+        final syncId = const Uuid().v4();
         final taskId = await tx.insert('tasks', {
           ...values,
           'owner_key': ownerKey,
-          'sync_id': const Uuid().v4(),
+          'sync_id': syncId,
           'sync_pending': ownerKey == 'local' ? 0 : 1
         });
+        await TaskDatabase.stageAttachments(tx, ownerKey, syncId, draft.task);
         updated.add(draft.copyWith(savedTaskId: taskId));
       }
       final completed = updated.isNotEmpty && updated.every((d) => !d.pending);

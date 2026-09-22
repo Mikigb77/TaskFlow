@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 11;
+  static const schemaVersion = 12;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -54,6 +54,7 @@ class TaskDatabase {
         await createReminderTables(db);
         await createListTables(db);
         await createImportTables(db);
+        await createAttachmentTables(db);
       },
       onUpgrade: upgrade,
     );
@@ -117,6 +118,45 @@ class TaskDatabase {
           "ALTER TABLE tasks ADD COLUMN exceptions TEXT NOT NULL DEFAULT '[]'");
     }
     if (oldVersion < 11 && newVersion >= 11) await createImportTables(db);
+    if (oldVersion < 12 && newVersion >= 12) await createAttachmentTables(db);
+  }
+
+  static Future<void> createAttachmentTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS task_attachments(
+      owner_key TEXT NOT NULL, id TEXT NOT NULL, task_id TEXT NOT NULL,
+      name TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, sha256 TEXT NOT NULL DEFAULT '',
+      local_path TEXT, source_path TEXT, remote INTEGER NOT NULL DEFAULT 0,
+      upload_pending INTEGER NOT NULL DEFAULT 0, delete_pending INTEGER NOT NULL DEFAULT 0,
+      is_deleted INTEGER NOT NULL DEFAULT 0, error TEXT,
+      PRIMARY KEY(owner_key, id))''');
+    await db.execute('''CREATE UNIQUE INDEX IF NOT EXISTS attachment_source
+      ON task_attachments(owner_key, task_id, source_path)
+      WHERE is_deleted = 0 AND source_path IS NOT NULL''');
+    await db.execute('''CREATE INDEX IF NOT EXISTS attachment_task
+      ON task_attachments(owner_key, task_id)''');
+  }
+
+  /// Queue only newly added signed-in files, in the same transaction as the
+  /// task. Legacy files and guest imports require an explicit upload choice.
+  static Future<void> stageAttachments(
+      DatabaseExecutor tx, String owner, String taskId, Task task,
+      {Task? before}) async {
+    if (owner == 'local') return;
+    final previous = {...?before?.filePaths, ...?before?.imagePaths};
+    final current = {...task.filePaths, ...task.imagePaths};
+    for (final source in previous.difference(current)) {
+      await tx.update('task_attachments',
+          {'is_deleted': 1, 'delete_pending': 1, 'error': null},
+          where:
+              'owner_key = ? AND task_id = ? AND source_path = ? AND is_deleted = 0',
+          whereArgs: [owner, taskId, source]);
+    }
+    for (final source in current.difference(previous)) {
+      await tx.rawInsert('''INSERT OR IGNORE INTO task_attachments
+        (owner_key, id, task_id, name, local_path, source_path, upload_pending)
+        VALUES(?,?,?,?,?,?,1)''',
+          [owner, const Uuid().v4(), taskId, basename(source), source, source]);
+    }
   }
 
   static Future<void> createImportTables(Database db) async {
@@ -174,13 +214,18 @@ class TaskDatabase {
   }
 
   Future<int> insertTask(Task task, {String ownerKey = 'local'}) async {
-    await validateList(await database, task, ownerKey);
-    final values = task.toMap()..remove('id');
-    return (await database).insert('tasks', {
-      ...values,
-      'owner_key': ownerKey,
-      'sync_id': const Uuid().v4(),
-      'sync_pending': ownerKey == 'local' ? 0 : 1
+    return (await database).transaction((tx) async {
+      await validateList(tx, task, ownerKey);
+      final values = task.toMap()..remove('id');
+      final syncId = const Uuid().v4();
+      final id = await tx.insert('tasks', {
+        ...values,
+        'owner_key': ownerKey,
+        'sync_id': syncId,
+        'sync_pending': ownerKey == 'local' ? 0 : 1
+      });
+      await stageAttachments(tx, ownerKey, syncId, task);
+      return id;
     });
   }
 
@@ -196,12 +241,14 @@ class TaskDatabase {
       for (final task in tasks) {
         await validateList(tx, task, ownerKey);
         final values = task.toMap()..remove('id');
+        final syncId = const Uuid().v4();
         await tx.insert('tasks', {
           ...values,
           'owner_key': ownerKey,
-          'sync_id': const Uuid().v4(),
+          'sync_id': syncId,
           'sync_pending': ownerKey == 'local' ? 0 : 1
         });
+        await stageAttachments(tx, ownerKey, syncId, task);
       }
     });
   }
@@ -210,6 +257,12 @@ class TaskDatabase {
     final db = await database;
     return db.transaction((tx) async {
       await validateList(tx, task, ownerKey);
+      final previous = await tx.query('tasks',
+          where: 'id = ? AND owner_key = ? AND is_deleted = 0',
+          whereArgs: [task.id, ownerKey]);
+      if (previous.isEmpty) {
+        throw StateError('This task is no longer in the current account.');
+      }
       final values = task.toMap()..remove('id');
       final count = await tx.update(
           'tasks', {...values, 'sync_pending': ownerKey == 'local' ? 0 : 1},
@@ -221,6 +274,11 @@ class TaskDatabase {
       await tx.rawUpdate(
           'UPDATE tasks SET revision = revision + 1 WHERE id = ? AND owner_key = ?',
           [task.id, ownerKey]);
+      if (ownerKey != 'local') {
+        await stageAttachments(
+            tx, ownerKey, previous.single['sync_id'] as String, task,
+            before: Task.fromMap(previous.single));
+      }
       return count;
     });
   }

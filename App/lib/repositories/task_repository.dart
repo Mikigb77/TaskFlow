@@ -1,5 +1,6 @@
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/attachment_store.dart';
 
 class TaskRepository {
   final TaskDatabase _database;
@@ -8,6 +9,7 @@ class TaskRepository {
 
   String? syncError;
   String get ownerKey => 'local';
+  AttachmentStore get attachments => AttachmentStore(_database, ownerKey);
   Future<void> sync() async {}
   Future<int> importLocalTasks() async => 0;
 

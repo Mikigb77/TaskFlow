@@ -1038,4 +1038,74 @@ class AppLocalizationsEn extends AppLocalizations {
   String reminderValue(String value) {
     return 'Reminder: $value';
   }
+
+  @override
+  String get fileLocal => 'Only on this device';
+
+  @override
+  String get fileQueued => 'Upload queued';
+
+  @override
+  String get fileBackedUp => 'Backed up to your account';
+
+  @override
+  String get fileDownloadAvailable => 'Available to download';
+
+  @override
+  String get fileMissing => 'File unavailable on this device';
+
+  @override
+  String get fileRemovalPending => 'Removal pending';
+
+  @override
+  String get fileUpload => 'Upload';
+
+  @override
+  String get fileDownload => 'Download';
+
+  @override
+  String get fileOpen => 'Open';
+
+  @override
+  String get fileRetry => 'Retry transfer';
+
+  @override
+  String get fileRemove => 'Remove attachment';
+
+  @override
+  String get fileRemoveQuestion => 'Remove this attachment?';
+
+  @override
+  String get fileRemoveHelp =>
+      'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.';
+
+  @override
+  String get fileEmpty => 'No attachments. Add a file when editing this task.';
+
+  @override
+  String get fileLoadError => 'Could not load attachment status. Please retry.';
+
+  @override
+  String get fileActionError =>
+      'Could not complete this action. Your task is saved; please retry.';
+
+  @override
+  String get fileSignInHelp =>
+      'Sign in to upload your files and restore them on another device.';
+
+  @override
+  String get fileUploadHelp =>
+      'New files upload to your account after saving: up to 6 MiB each, 64 MiB per account. Older local files stay on this device until you choose Upload in task details.';
+
+  @override
+  String get fileLocalHelp =>
+      'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MiB per file.';
+
+  @override
+  String get fileLimit =>
+      'Choose a non-empty file up to 6 MiB. You can attach up to 20 files per task.';
+
+  @override
+  String get fileManageHelp =>
+      'Open task details to download, upload, or remove account attachments.';
 }
