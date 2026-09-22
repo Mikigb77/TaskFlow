@@ -22,7 +22,7 @@ class TaskArchive {
   static const maxBytes = 32 * 1024 * 1024;
   static const maxTasks = 5000;
   static const format = 'taskflow';
-  static const version = 1;
+  static const version = 2;
   final String id;
   final String source;
   final List<TaskListInfo> lists;
@@ -42,9 +42,9 @@ class TaskArchive {
     final data = jsonDecode(contents);
     if (data is! Map ||
         data['format'] != format ||
-        data['version'] != version) {
+        ![1, version].contains(data['version'])) {
       throw const FormatException(
-          'This is not a supported TaskFlow version 1 export.');
+          'This is not a supported TaskFlow export (versions 1 and 2).');
     }
     _uuid(data['export_id'], 'export_id');
     final rows = _list(data['tasks'], 'tasks', maxTasks);
@@ -124,6 +124,9 @@ class TaskArchive {
   }
 
   static Task validatedTask(Map<String, dynamic> data) {
+    if (!['task', 'note'].contains(data['kind'] ?? 'task')) {
+      throw const FormatException('Unsupported task or note type.');
+    }
     _string(data['title'], 'title', 160);
     _string(data['notes'] ?? '', 'notes', 8000, blank: true);
     _integer(data['priority'], 'priority', 1, 3);

@@ -230,6 +230,8 @@ void main() {
     final repository = await _pumpApp(tester);
     await _openCalendarTask(tester);
     await _showDetails(tester);
+    await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Weekly').last);

@@ -41,6 +41,7 @@ class CloudTaskRepository extends TaskRepository {
 
   bool _sameContent(Map<String, dynamic> sent, Map<String, dynamic> remote) =>
       sent['title'] == remote['title'] &&
+      sent['kind'] == (remote['kind'] ?? 'task') &&
       sent['notes'] == remote['notes'] &&
       sent['list_id'] == remote['list_id'] &&
       const DeepCollectionEquality()
@@ -98,7 +99,18 @@ class CloudTaskRepository extends TaskRepository {
         syncError =
             'A list changed on another device. Choose which version to keep in Lists.';
       }
-      for (final row in await database.pending(ownerKey)) {
+      final pending = await database.pending(ownerKey);
+      if (pending.any((row) => row['kind'] == 'note')) {
+        final health =
+            await api.request('GET', 'health/', accountId: accountId);
+        if (health is! Map ||
+            health['features'] is! Map ||
+            health['features']['notes'] != true) {
+          throw ApiException(0,
+              'Update this server before syncing notes. Your notes are kept on this phone.');
+        }
+      }
+      for (final row in pending) {
         final data = _payload(row);
         try {
           if (row['listId'] != null) {
@@ -125,6 +137,10 @@ class CloudTaskRepository extends TaskRepository {
           final remote = Map<String, dynamic>.from(await api.request(
               'PUT', 'tasks/${row['sync_id']}/',
               data: data, accountId: accountId) as Map);
+          if ((remote['kind'] ?? 'task') != data['kind']) {
+            throw ApiException(0,
+                'The server did not preserve this content type. Your local copy is kept.');
+          }
           await database.acknowledge(ownerKey, row, remote);
         } on ApiException catch (error) {
           if (error.status == 403 || error.status == 404) {

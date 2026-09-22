@@ -22,6 +22,7 @@ class CaptureDraft {
       id: const Uuid().v4(),
       task: Task(
           title: draft.title,
+          kind: draft.kind,
           dueDate: draft.dueDate,
           hasTime: draft.hasTime,
           deadline: draft.deadline,
@@ -76,6 +77,7 @@ class CaptureSession {
   final String ownerKey;
   final DateTime capturedAt;
   final String timezone;
+  final String kind;
   final String text;
   final String transcript;
   final String? audioPath;
@@ -88,6 +90,7 @@ class CaptureSession {
       required this.ownerKey,
       required this.capturedAt,
       required this.timezone,
+      this.kind = 'task',
       this.text = '',
       this.transcript = '',
       this.audioPath,
@@ -105,12 +108,14 @@ class CaptureSession {
           String? audioPath,
           String? status,
           String? error,
+          String? kind,
           List<CaptureDraft>? drafts}) =>
       CaptureSession(
           id: id,
           ownerKey: ownerKey,
           capturedAt: capturedAt,
           timezone: timezone,
+          kind: kind ?? this.kind,
           text: text ?? this.text,
           transcript: transcript ?? this.transcript,
           audioPath: audioPath ?? this.audioPath,
@@ -123,6 +128,7 @@ class CaptureSession {
         'ownerKey': ownerKey,
         'capturedAt': capturedAt.toUtc().toIso8601String(),
         'timezone': timezone,
+        'kind': kind,
         'text': text,
         'transcript': transcript,
         'audioPath': audioPath,
@@ -136,6 +142,7 @@ class CaptureSession {
       ownerKey: json['ownerKey'],
       capturedAt: DateTime.parse(json['capturedAt']),
       timezone: json['timezone'],
+      kind: json['kind'] ?? 'task',
       text: json['text'] ?? '',
       transcript: json['transcript'] ?? '',
       audioPath: json['audioPath'],

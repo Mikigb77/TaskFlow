@@ -6,6 +6,8 @@ Partial and final recognized words are serialized into the existing account-scop
 
 The recognizer's own endpointing is retained, rather than imposing a short silence timeout. A 59-second application limit stops and retains input. Explicit on-device recognition can work offline when its model is installed; structured AI extraction still needs the backend. Network errors retain the capture and its original reference time.
 
+B23 adds an explicit Note type. Typed and on-device-recognized note text is prepared locally without task extraction. Saved-audio notes still need online transcription. The missing emulator speech-model and real-speech evidence described below remains unchanged.
+
 References: [Android SpeechRecognizer](https://developer.android.com/reference/android/speech/SpeechRecognizer), [recognizer intent and silence guidance](https://developer.android.com/reference/android/speech/RecognizerIntent), [installed language support](https://developer.android.com/reference/android/speech/RecognitionSupport).
 
 **Evidence, 22 September 2026**

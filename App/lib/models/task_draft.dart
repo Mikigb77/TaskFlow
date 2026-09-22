@@ -2,6 +2,7 @@ import 'package:agenda/models/checklist_item.dart';
 
 class TaskDraft {
   final String title;
+  final String kind;
   final DateTime? dueDate;
   final bool hasTime;
   final DateTime? deadline;
@@ -19,6 +20,7 @@ class TaskDraft {
 
   TaskDraft.fromJson(Map<String, dynamic> data)
       : title = data['title'] as String,
+        kind = data['kind'] as String? ?? 'task',
         dueDate = data['due_date'] == null
             ? (data['scheduled_date'] ?? data['date']) == null
                 ? null

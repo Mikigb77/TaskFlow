@@ -5,6 +5,7 @@ import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/l10n/region.dart';
 
 class CapturesScreen extends ConsumerWidget {
   const CapturesScreen({super.key});
@@ -51,9 +52,8 @@ class CapturesScreen extends ConsumerWidget {
                                   title: Text(_title(session),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
-                                  subtitle: Text(session.remaining.isNotEmpty
-                                      ? '${session.remaining.length} drafts · ${session.ready.length} ready'
-                                      : 'Kept on this phone · Tap to resume'),
+                                  subtitle: Text(
+                                      '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${session.remaining.isNotEmpty ? '${session.remaining.length} drafts · ${session.ready.length} ready' : 'Kept on this phone · Tap to resume'}'),
                                   trailing:
                                       const Icon(Icons.chevron_right_rounded),
                                   onTap: () => Navigator.push(

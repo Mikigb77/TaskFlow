@@ -9,6 +9,7 @@ import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_editor.dart';
+import 'package:agenda/screens/notes_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen(
@@ -80,6 +81,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               icon: const Icon(Icons.task_alt_rounded)),
                         ]),
                         const SizedBox(height: 16),
+                        if (widget.listId != null)
+                          TextButton.icon(
+                              icon: const Icon(Icons.notes_rounded),
+                              label: Text(context.l10n.notes),
+                              onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                      builder: (_) => NotesScreen(
+                                          listId: widget.listId,
+                                          isRoot: false)))),
                         TextField(
                             onChanged: (value) => setState(
                                 () => _query = value.trim().toLowerCase()),

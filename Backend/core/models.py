@@ -72,6 +72,7 @@ class Task(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
     title = models.CharField(max_length=160)
+    kind = models.CharField(max_length=4, default="task", choices=[("task", "task"), ("note", "note")])
     due_date = models.DateTimeField(null=True, blank=True)
     scheduled_date = models.DateField(null=True, blank=True)
     # due_date/scheduled_date are the legacy API names for the planned start.
@@ -103,6 +104,7 @@ class Task(models.Model):
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["owner", "updated_at"])]
         constraints = [
+            models.CheckConstraint(condition=models.Q(kind="task") | (models.Q(kind="note", due_date__isnull=True, scheduled_date__isnull=True, deadline_at__isnull=True, deadline_date__isnull=True, duration_minutes__isnull=True, recurrence="none", priority=1, is_completed=False, reminder_time__isnull=True, reminder_anchor="planned") & (models.Q(reminder_minutes__isnull=True) | models.Q(reminder_minutes=-1))), name="valid_item_kind"),
             models.CheckConstraint(condition=models.Q(priority__gte=1, priority__lte=3), name="valid_priority"),
             models.CheckConstraint(condition=models.Q(deadline_at__isnull=True) | models.Q(deadline_date__isnull=True), name="one_task_deadline"),
             models.CheckConstraint(condition=models.Q(duration_minutes__isnull=True) | models.Q(duration_minutes__gte=1, duration_minutes__lte=1440), name="valid_task_duration"),

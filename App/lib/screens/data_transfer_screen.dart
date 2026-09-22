@@ -118,7 +118,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
           _imported = imported;
         });
         unawaited(ref.read(taskProvider.notifier).loadTasks());
-        return 'Added ${result.added} ${result.added == 1 ? 'task' : 'tasks'} and ${result.listsAdded} ${result.listsAdded == 1 ? 'list' : 'lists'}.${result.alreadyImported > 0 ? ' Skipped ${result.alreadyImported} already imported.' : ''}';
+        return 'Added ${result.added} ${result.added == 1 ? 'item' : 'items'} and ${result.listsAdded} ${result.listsAdded == 1 ? 'list' : 'lists'}.${result.alreadyImported > 0 ? ' Skipped ${result.alreadyImported} already imported.' : ''}';
       });
 
   @override
@@ -148,7 +148,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
             ]),
             const SizedBox(height: 8),
             const Text(
-                'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks). You will review it before importing.'),
+                'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.'),
             if (_busy)
               const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
@@ -162,7 +162,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
               Text('Import preview',
                   style: Theme.of(context).textTheme.titleLarge),
               Text(
-                  '${archive.source} · ${archive.tasks.length} tasks · ${archive.lists.length} lists'),
+                  '${archive.source} · ${archive.tasks.where((item) => item.task?.isNote != true).length} tasks · ${archive.tasks.where((item) => item.task?.isNote == true).length} notes · ${archive.lists.length} lists'),
               const SizedBox(height: 12),
               for (final warning in archive.warnings)
                 Padding(
@@ -170,7 +170,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
                     child: Text(warning,
                         style: TextStyle(color: colors.onSurfaceVariant))),
               const Text(
-                  'Selected tasks and the file’s lists are added as copies. Existing tasks are kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.'),
+                  'Selected tasks, notes and the file’s lists are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.'),
               if (archive.lists.isNotEmpty)
                 ExpansionTile(
                     tilePadding: EdgeInsets.zero,
@@ -207,7 +207,9 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
                           if (_imported.contains(row.sourceId))
                             'Already imported on this phone',
                           if (row.task != null)
-                            '${taskScheduleLabel(row.task!, context: context)} · ${context.repeatLabel(row.task!)}',
+                            row.task!.isNote
+                                ? context.l10n.note
+                                : '${taskScheduleLabel(row.task!, context: context)} · ${context.repeatLabel(row.task!)}',
                           ...row.warnings,
                         ].join('\n')))),
               const SizedBox(height: 16),
@@ -218,7 +220,8 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
                           ? null
                           : _import,
                   icon: const Icon(Icons.add_task),
-                  label: Text('Import ${_selected.length} tasks and lists')),
+                  label: Text(
+                      'Import ${_selected.length} selected items and lists')),
             ],
           ]),
         ));

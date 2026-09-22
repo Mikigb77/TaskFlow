@@ -17,7 +17,11 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 
 class VoiceTaskScreen extends ConsumerStatefulWidget {
   const VoiceTaskScreen(
-      {super.key, this.captureId, this.startRecording = false});
+      {super.key,
+      this.captureId,
+      this.startRecording = false,
+      this.kind = 'task'});
+  final String kind;
   final String? captureId;
   final bool startRecording;
   @override
@@ -31,6 +35,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   late final CaptureStore _store;
   late final String _owner;
   CaptureSession? _session;
+  late String _kind = widget.kind;
   String _zone = 'UTC';
   bool _timezoneFallback = false;
   Timer? _timer;
@@ -105,6 +110,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         }
         if (!mounted) return;
         _zone = _session!.timezone;
+        _kind = _session!.kind;
         _timezoneFallback = false;
         _words.text = _session!.text;
         await CaptureDiagnostics(_store.database).record(CaptureEvent.resumed);
@@ -146,7 +152,8 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
 
   Future<void> _ensureSession({bool audio = false, String text = ''}) async {
     if (_session != null) return;
-    _session = await _store.create(_owner, _zone, text: text, audio: audio);
+    _session = await _store.create(_owner, _zone,
+        text: text, audio: audio, kind: _kind);
     await CaptureDiagnostics(_store.database).record(CaptureEvent.started);
     if (mounted) ref.invalidate(pendingCapturesProvider);
   }
@@ -169,6 +176,20 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         setState(() => _error =
             'Could not keep this draft on your phone. ${error.toString()}');
       }
+    }));
+  }
+
+  void _chooseKind(String kind) {
+    if (_busy || _recording || kind == _kind) return;
+    setState(() => _kind = kind);
+    _writes = _writes.catchError((Object _) {}).then((_) async {
+      if (_session != null) {
+        _session = _session!.copyWith(kind: kind);
+        await _store.update(_session!);
+      }
+    });
+    unawaited(_writes.catchError((Object error) {
+      if (mounted) setState(() => _error = error.toString());
     }));
   }
 
@@ -511,8 +532,25 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                       Text(context.l10n.onYourMind,
                           style: Theme.of(context).textTheme.headlineMedium),
                       const SizedBox(height: 8),
-                      Text(context.l10n.captureIntro,
+                      Text(
+                          _kind == 'note'
+                              ? context.l10n.noteCaptureHelp
+                              : context.l10n.captureIntro,
                           style: TextStyle(color: colors.onSurfaceVariant)),
+                      Wrap(spacing: 8, children: [
+                        ChoiceChip(
+                            label: Text(context.l10n.tasks),
+                            selected: _kind == 'task',
+                            onSelected: _busy || _recording
+                                ? null
+                                : (_) => _chooseKind('task')),
+                        ChoiceChip(
+                            label: Text(context.l10n.note),
+                            selected: _kind == 'note',
+                            onSelected: _busy || _recording
+                                ? null
+                                : (_) => _chooseKind('note')),
+                      ]),
                       const SizedBox(height: 24),
                       AppSurface(
                           child: Column(children: [
@@ -682,6 +720,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                       if (!recorded) ...[
                         const SizedBox(height: 24),
                         TextField(
+                            key: const ValueKey('capture-words'),
                             controller: _words,
                             readOnly: _busy || _recording,
                             onChanged: _changedText,
@@ -691,17 +730,25 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                             decoration: InputDecoration(
                                 labelText: _usingNative && _recording
                                     ? context.l10n.liveTranscript
-                                    : context.l10n.typePlan,
-                                hintText: context.l10n.examplePlan,
+                                    : _kind == 'note'
+                                        ? context.l10n.noteBody
+                                        : context.l10n.typePlan,
+                                hintText: _kind == 'note'
+                                    ? context.l10n.noteHint
+                                    : context.l10n.examplePlan,
                                 counterText: '')),
                       ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
                           onPressed: _busy || _recording ? null : _process,
-                          icon: const Icon(Icons.auto_awesome_outlined),
-                          label: Text(recorded
-                              ? context.l10n.tryRecording
-                              : context.l10n.reviewText)),
+                          icon: Icon(_kind == 'note'
+                              ? Icons.notes_rounded
+                              : Icons.auto_awesome_outlined),
+                          label: Text(_kind == 'note'
+                              ? context.l10n.reviewNote
+                              : recorded
+                                  ? context.l10n.tryRecording
+                                  : context.l10n.reviewText)),
                       if (_error != null)
                         Padding(
                             padding: const EdgeInsets.only(top: 16),

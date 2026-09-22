@@ -98,6 +98,138 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// No description provided for @note.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get note;
+
+  /// No description provided for @noteEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No text added.'**
+  String get noteEmptyBody;
+
+  /// No description provided for @fileNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No attachments.'**
+  String get fileNone;
+
+  /// No description provided for @newNote.
+  ///
+  /// In en, this message translates to:
+  /// **'New note'**
+  String get newNote;
+
+  /// No description provided for @editNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit note'**
+  String get editNote;
+
+  /// No description provided for @noteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note title'**
+  String get noteTitle;
+
+  /// No description provided for @noteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your note'**
+  String get noteBody;
+
+  /// No description provided for @notesHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep information, ideas and reference material. Use a task for something you need to do.'**
+  String get notesHelp;
+
+  /// No description provided for @notesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'A place for your thoughts'**
+  String get notesEmpty;
+
+  /// No description provided for @notesEmptyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Write or dictate a note. Add links or a checklist when useful.'**
+  String get notesEmptyHelp;
+
+  /// No description provided for @findNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Search notes'**
+  String get findNote;
+
+  /// No description provided for @reviewNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Review note'**
+  String get reviewNote;
+
+  /// No description provided for @saveNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Save note'**
+  String get saveNote;
+
+  /// No description provided for @noteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Note saved'**
+  String get noteSaved;
+
+  /// No description provided for @recordNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictate a note'**
+  String get recordNote;
+
+  /// No description provided for @noteCaptureHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your words as one note. Typed notes stay on your phone until sync; saved recordings need online transcription.'**
+  String get noteCaptureHelp;
+
+  /// No description provided for @noteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ideas, meeting details, useful links…'**
+  String get noteHint;
+
+  /// No description provided for @deleteNoteQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this note?'**
+  String get deleteNoteQuestion;
+
+  /// No description provided for @keepNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep note'**
+  String get keepNote;
+
+  /// No description provided for @viewOnlyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'View-only note. The list owner manages editing access.'**
+  String get viewOnlyNote;
+
+  /// No description provided for @linkOpenError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this link. You can copy it from the note.'**
+  String get linkOpenError;
+
+  /// No description provided for @noteLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Links'**
+  String get noteLinks;
+
   /// No description provided for @plannedFor.
   ///
   /// In en, this message translates to:
@@ -2447,7 +2579,7 @@ abstract class AppLocalizations {
   /// No description provided for @fileEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No attachments. Add a file when editing this task.'**
+  /// **'No attachments. Add a file when editing.'**
   String get fileEmpty;
 
   /// No description provided for @fileLoadError.

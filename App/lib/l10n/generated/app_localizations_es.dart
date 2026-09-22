@@ -9,6 +9,77 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get note => 'Nota';
+
+  @override
+  String get noteEmptyBody => 'Sin texto añadido.';
+
+  @override
+  String get fileNone => 'No hay archivos adjuntos.';
+
+  @override
+  String get newNote => 'Nueva nota';
+
+  @override
+  String get editNote => 'Editar nota';
+
+  @override
+  String get noteTitle => 'Título de la nota';
+
+  @override
+  String get noteBody => 'Tu nota';
+
+  @override
+  String get notesHelp =>
+      'Guarda información, ideas y material de referencia. Usa una tarea para algo que tengas que hacer.';
+
+  @override
+  String get notesEmpty => 'Un lugar para tus ideas';
+
+  @override
+  String get notesEmptyHelp =>
+      'Escribe o dicta una nota. Añade enlaces o una lista de verificación cuando los necesites.';
+
+  @override
+  String get findNote => 'Buscar notas';
+
+  @override
+  String get reviewNote => 'Revisar nota';
+
+  @override
+  String get saveNote => 'Guardar nota';
+
+  @override
+  String get noteSaved => 'Nota guardada';
+
+  @override
+  String get recordNote => 'Dictar una nota';
+
+  @override
+  String get noteCaptureHelp =>
+      'Conserva tus palabras en una nota. El texto se guarda en el teléfono hasta sincronizar; las grabaciones necesitan transcripción en línea.';
+
+  @override
+  String get noteHint => 'Ideas, detalles de reuniones, enlaces útiles…';
+
+  @override
+  String get deleteNoteQuestion => '¿Eliminar esta nota?';
+
+  @override
+  String get keepNote => 'Conservar nota';
+
+  @override
+  String get viewOnlyNote =>
+      'Nota de solo lectura. El propietario de la lista gestiona el permiso de edición.';
+
+  @override
+  String get linkOpenError =>
+      'No se ha podido abrir el enlace. Puedes copiarlo desde la nota.';
+
+  @override
+  String get noteLinks => 'Enlaces';
+
+  @override
   String get plannedFor => 'Planificado para';
 
   @override
@@ -1303,7 +1374,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get fileEmpty =>
-      'No hay archivos adjuntos. Añade un archivo al editar esta tarea.';
+      'No hay archivos adjuntos. Añade un archivo al editar.';
 
   @override
   String get fileLoadError =>

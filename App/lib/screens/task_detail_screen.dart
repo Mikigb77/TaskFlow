@@ -13,6 +13,7 @@ import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/task_interactions.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/widgets/note_text.dart';
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen(
@@ -28,14 +29,18 @@ class TaskDetailScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: Text(context.l10n.deleteTaskQuestion),
+                title: Text(task.isNote
+                    ? context.l10n.deleteNoteQuestion
+                    : context.l10n.deleteTaskQuestion),
                 content: Text(task.isRecurring
                     ? '“${task.title}” and all its occurrences will be removed.'
                     : '“${task.title}” will be removed.'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: Text(context.l10n.keepTask)),
+                      child: Text(task.isNote
+                          ? context.l10n.keepNote
+                          : context.l10n.keepTask)),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
                       child: Text(context.l10n.delete))
@@ -90,32 +95,45 @@ class TaskDetailScreen extends ConsumerWidget {
             }
             final canEdit = ref.watch(listCanEditProvider(task.listId));
             return Scaffold(
-              appBar: CustomAppBar(title: context.l10n.taskDetails, actions: [
-                if (canEdit)
-                  IconButton(
-                      tooltip: context.l10n.editTask,
-                      onPressed: () => Navigator.pushNamed(context, '/editTask',
-                          arguments: taskId),
-                      icon: const Icon(Icons.edit_outlined)),
-                if (canEdit)
-                  IconButton(
-                      tooltip: context.l10n.deleteTask,
-                      onPressed: () => _delete(context, ref, task),
-                      icon: Icon(Icons.delete_outline_rounded,
-                          color: colors.onSurfaceVariant))
-              ]),
+              appBar: CustomAppBar(
+                  title: task.isNote
+                      ? context.l10n.note
+                      : context.l10n.taskDetails,
+                  actions: [
+                    if (canEdit)
+                      IconButton(
+                          tooltip: task.isNote
+                              ? context.l10n.editNote
+                              : context.l10n.editTask,
+                          onPressed: () => Navigator.pushNamed(
+                              context, '/editTask',
+                              arguments: taskId),
+                          icon: const Icon(Icons.edit_outlined)),
+                    if (canEdit)
+                      IconButton(
+                          tooltip: task.isNote
+                              ? context.l10n.delete
+                              : context.l10n.deleteTask,
+                          onPressed: () => _delete(context, ref, task),
+                          icon: Icon(Icons.delete_outline_rounded,
+                              color: colors.onSurfaceVariant))
+                  ]),
               body: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                   children: [
-                    SectionLabel(task.isCompleted
-                        ? context.l10n.completed
-                        : context.l10n.nextStep),
+                    SectionLabel(task.isNote
+                        ? context.l10n.note
+                        : task.isCompleted
+                            ? context.l10n.completed
+                            : context.l10n.nextStep),
                     Text(task.title,
                         style: Theme.of(context).textTheme.headlineLarge),
                     const SizedBox(height: 12),
                     if (!canEdit)
-                      const MessageBanner(
-                          'View-only shared task. The list owner manages editing access.',
+                      MessageBanner(
+                          task.isNote
+                              ? context.l10n.viewOnlyNote
+                              : 'View-only shared task. The list owner manages editing access.',
                           icon: Icons.visibility_outlined),
                     Align(
                         alignment: Alignment.centerLeft,
@@ -142,65 +160,66 @@ class TaskDetailScreen extends ConsumerWidget {
                           Chip(label: Text('#$label'))
                       ]),
                     const SizedBox(height: 24),
-                    AppSurface(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
-                        child: Column(children: [
-                          _detail(
-                              context,
-                              Icons.calendar_today_outlined,
-                              context.l10n.plannedFor,
-                              task.displayDate == null
-                                  ? context.l10n.inboxDate
-                                  : context.fullDate(task.displayDate!)),
-                          const Divider(),
-                          _detail(
-                              context,
-                              Icons.schedule_outlined,
-                              context.l10n.time,
-                              task.hasTime
-                                  ? context.clockTime(task.displayDate!)
-                                  : context.l10n.anyTime),
-                          if (task.durationMinutes != null) ...[
+                    if (!task.isNote)
+                      AppSurface(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 8),
+                          child: Column(children: [
+                            _detail(
+                                context,
+                                Icons.calendar_today_outlined,
+                                context.l10n.plannedFor,
+                                task.displayDate == null
+                                    ? context.l10n.inboxDate
+                                    : context.fullDate(task.displayDate!)),
                             const Divider(),
                             _detail(
                                 context,
-                                Icons.timelapse_outlined,
-                                context.l10n.duration,
-                                '${context.l10n.durationMinutes(task.durationMinutes!)}${task.plannedEnd == null ? '' : ' · ${context.clockTime(task.displayDate!)} – ${context.shortDate(task.plannedEnd!)} ${context.clockTime(task.plannedEnd!)}'}'),
-                          ],
-                          if (task.deadline != null) ...[
+                                Icons.schedule_outlined,
+                                context.l10n.time,
+                                task.hasTime
+                                    ? context.clockTime(task.displayDate!)
+                                    : context.l10n.anyTime),
+                            if (task.durationMinutes != null) ...[
+                              const Divider(),
+                              _detail(
+                                  context,
+                                  Icons.timelapse_outlined,
+                                  context.l10n.duration,
+                                  '${context.l10n.durationMinutes(task.durationMinutes!)}${task.plannedEnd == null ? '' : ' · ${context.clockTime(task.displayDate!)} – ${context.shortDate(task.plannedEnd!)} ${context.clockTime(task.plannedEnd!)}'}'),
+                            ],
+                            if (task.deadline != null) ...[
+                              const Divider(),
+                              _detail(
+                                  context,
+                                  Icons.flag_outlined,
+                                  context.l10n.deadline,
+                                  '${taskDeadlineLabel(context, task)}${task.deadlineHasTime ? '' : '\n${context.l10n.deadlineEndDay}'}',
+                                  color: task.deadlinePassed(DateTime.now())
+                                      ? colors.error
+                                      : null),
+                              if (task.plannedAfterDeadline)
+                                MessageBanner(context.l10n.deadlineLatePlan,
+                                    icon: Icons.info_outline),
+                            ],
+                            if (task.isRecurring) ...[
+                              const Divider(),
+                              _detail(
+                                  context,
+                                  Icons.repeat_rounded,
+                                  context.l10n.repeat,
+                                  '${context.repeatLabel(task)}${task.repeatUntil == null ? '' : ' · ${context.l10n.untilDate(context.shortDate(task.repeatUntil!))}'}'),
+                            ],
                             const Divider(),
                             _detail(
                                 context,
                                 Icons.flag_outlined,
-                                context.l10n.deadline,
-                                '${taskDeadlineLabel(context, task)}${task.deadlineHasTime ? '' : '\n${context.l10n.deadlineEndDay}'}',
-                                color: task.deadlinePassed(DateTime.now())
-                                    ? colors.error
-                                    : null),
-                            if (task.plannedAfterDeadline)
-                              MessageBanner(context.l10n.deadlineLatePlan,
-                                  icon: Icons.info_outline),
-                          ],
-                          if (task.isRecurring) ...[
-                            const Divider(),
-                            _detail(
-                                context,
-                                Icons.repeat_rounded,
-                                context.l10n.repeat,
-                                '${context.repeatLabel(task)}${task.repeatUntil == null ? '' : ' · ${context.l10n.untilDate(context.shortDate(task.repeatUntil!))}'}'),
-                          ],
-                          const Divider(),
-                          _detail(
-                              context,
-                              Icons.flag_outlined,
-                              context.l10n.priority,
-                              context.priorityName(task.priority),
-                              color: AppTheme.priorityColor(
-                                  context, task.priority)),
-                        ])),
-                    const SizedBox(height: 28),
+                                context.l10n.priority,
+                                context.priorityName(task.priority),
+                                color: AppTheme.priorityColor(
+                                    context, task.priority)),
+                          ])),
+                    if (!task.isNote) const SizedBox(height: 28),
                     if (task.reminderDate != null)
                       Align(
                           alignment: Alignment.centerLeft,
@@ -226,7 +245,11 @@ class TaskDetailScreen extends ConsumerWidget {
                                         }
                                       }
                                     })),
-                    const SizedBox(height: 16),
+                    if (!task.isNote) const SizedBox(height: 16),
+                    if (task.isNote) ...[
+                      _body(context, task),
+                      const SizedBox(height: 24),
+                    ],
                     if (task.checklist.isNotEmpty) ...[
                       SectionLabel(
                           'Checklist · ${task.checklistDone}/${task.checklist.length}'),
@@ -261,26 +284,16 @@ class TaskDetailScreen extends ConsumerWidget {
                                         }
                                       }
                                     }),
-                        if (canEdit)
+                        if (canEdit && !task.isNote)
                           const Text(
                               'Completing the checklist does not complete the task. Use Complete when you are finished.'),
                       ])),
                       const SizedBox(height: 24),
                     ],
-                    SectionLabel(context.l10n.notes),
-                    AppSurface(
-                        child: SizedBox(
-                            width: double.infinity,
-                            child: Text(
-                                task.notes?.trim().isNotEmpty == true
-                                    ? task.notes!
-                                    : 'No notes added.',
-                                style: TextStyle(
-                                    color: colors.onSurfaceVariant,
-                                    height: 1.6)))),
+                    if (!task.isNote) _body(context, task),
                     AttachmentPanel(task: task),
                   ]),
-              bottomNavigationBar: !canEdit
+              bottomNavigationBar: !canEdit || task.isNote
                   ? null
                   : SafeArea(
                       top: false,
@@ -344,4 +357,15 @@ class TaskDetailScreen extends ConsumerWidget {
               ])),
         ]));
   }
+
+  Widget _body(BuildContext context, Task task) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SectionLabel(task.isNote ? context.l10n.noteBody : context.l10n.notes),
+        AppSurface(
+            child: SizedBox(
+                width: double.infinity,
+                child: NoteText(task.notes?.trim().isNotEmpty == true
+                    ? task.notes!
+                    : context.l10n.noteEmptyBody))),
+      ]);
 }

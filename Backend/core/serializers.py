@@ -99,6 +99,7 @@ class ChecklistItemSerializer(serializers.Serializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
+    kind = serializers.ChoiceField(choices=["task", "note"], required=False)
     due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
     scheduled_date = serializers.DateField(allow_null=True, required=False, default=None)
     deadline_at = ZonedDateTimeField(allow_null=True, required=False)
@@ -150,11 +151,23 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
         due, day = attrs.get("due_date"), attrs.get("scheduled_date")
+        kind = attrs.get("kind", getattr(self.instance, "kind", "task"))
+        if self.instance and kind != self.instance.kind:
+            raise serializers.ValidationError({"kind": "Keep the original type. Create a separate task or note instead."})
+        if kind == "note":
+            effective = lambda key, default=None: attrs.get(key, getattr(self.instance, key, default))
+            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_time", "repeat_until"))
+                    or effective("priority", 1) != 1 or effective("is_completed", False)
+                    or effective("recurrence", "none") != "none" or effective("repeat_interval", 1) != 1
+                    or effective("reminder_anchor", "planned") != "planned" or effective("reminder_minutes") not in (None, -1)
+                    or any(effective(key, []) for key in ("completed_dates", "repeat_weekdays", "exceptions"))
+                    or any(item.get("completed_dates") for item in effective("checklist", []))):
+                raise serializers.ValidationError({"kind": "Notes hold information and checklists, without task schedules, priority, reminders or completion."})
         deadline_at = attrs.get("deadline_at", getattr(self.instance, "deadline_at", None))
         deadline_date = attrs.get("deadline_date", getattr(self.instance, "deadline_date", None))
         if deadline_at is not None and deadline_date is not None:
@@ -186,6 +199,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class DraftRequestSerializer(serializers.Serializer):
+    capture_type = serializers.ChoiceField(choices=["task", "note"], required=False, default="task")
     text = serializers.CharField(min_length=3, max_length=4000, required=False)
     timezone = serializers.CharField(max_length=64, validators=[validate_timezone])
     reference_time = ZonedDateTimeField(required=False)

@@ -25,6 +25,7 @@ void main() {
     await sql.insert(
         'tasks',
         task.toMap()
+          ..remove('kind')
           ..remove('hasTime')
           ..remove('recurrence')
           ..remove('repeatUntil')
@@ -290,12 +291,59 @@ void main() {
     expect((await repository.getAllTasks()).single.title,
         'Offline edit (offline copy)');
   });
+
+  test('notes retain type after lost upload, fresh cache and conflict copy',
+      () async {
+    final note = Task(
+        kind: 'note',
+        title: 'Reference',
+        priority: 1,
+        notes: 'Opening on Friday at 17:00');
+    await repository.addTask(note);
+    api.loseResponse = true;
+    await repository.sync();
+    api.loseResponse = false;
+    await repository.sync();
+    expect(await database.pending(repository.ownerKey), isEmpty);
+    expect(api.remote, hasLength(1));
+    await (await database.database).delete('tasks',
+        where: 'owner_key = ?', whereArgs: [repository.ownerKey]);
+    await repository.sync();
+    final restored = (await repository.getAllTasks()).single;
+    expect(restored.toApi(), note.toApi());
+    api.remote.single['version'] = 2;
+    api.remote.single['notes'] = 'New remote information';
+    await repository.updateTask(restored.copyWith(notes: 'Unsent reference'));
+    await repository.sync();
+    final both = await repository.getAllTasks();
+    expect(both, hasLength(2));
+    expect(both.every((item) => item.isNote), isTrue);
+    expect(both.map((item) => item.notes),
+        containsAll(['Unsent reference', 'New remote information']));
+  });
+
+  test('an older server cannot silently turn a pending note into a task',
+      () async {
+    await repository
+        .addTask(Task(kind: 'note', title: 'Reference', priority: 1));
+    api.supportsNotes = false;
+    await repository.sync();
+    expect(api.remote, isEmpty);
+    expect(
+        (await database.pending(repository.ownerKey)).single['kind'], 'note');
+    expect(repository.syncError, contains('Update this server'));
+    api.supportsNotes = true;
+    await repository.sync();
+    expect(api.remote.single['kind'], 'note');
+    expect(await database.pending(repository.ownerKey), isEmpty);
+  });
 }
 
 class _Api extends ApiClient {
   _Api() : super(url: 'http://localhost:8088');
   bool offline = false;
   bool loseResponse = false;
+  bool supportsNotes = true;
   final List<Map<String, dynamic>> remote = [];
   Map<String, dynamic>? lastUpload;
 
@@ -306,6 +354,12 @@ class _Api extends ApiClient {
       bool authenticated = true,
       int? accountId}) async {
     if (offline) throw ApiException(0, 'Offline');
+    if (path == 'health/') {
+      return {
+        'status': 'ok',
+        'features': {'notes': supportsNotes}
+      };
+    }
     if (path == 'lists/access/') return {'lists': []};
     if (path.startsWith('attachments/')) return {'results': [], 'next': null};
     if (method == 'GET' && path.startsWith('lists/')) {

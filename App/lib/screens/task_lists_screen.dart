@@ -193,7 +193,7 @@ class TaskListsScreen extends ConsumerWidget {
                                 ? 'Changed on another device · choose details'
                                 : list.archived
                                     ? 'Archived · tasks still available'
-                                    : '${(ref.watch(taskProvider).valueOrNull ?? []).where((task) => task.listId == list.id).length} tasks'),
+                                    : '${(ref.watch(taskProvider).valueOrNull ?? []).where((task) => task.listId == list.id).length} tasks and notes'),
                         onTap: () => list.conflict != null
                             ? _resolve(context, ref, list)
                             : Navigator.push(

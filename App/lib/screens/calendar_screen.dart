@@ -130,7 +130,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             icon: const Icon(Icons.inbox_outlined, size: 18),
                             label: Text(context.l10n.inboxCount(tasks
                                 .where((task) =>
-                                    task.dueDate == null && !task.isCompleted)
+                                    !task.isNote &&
+                                    task.dueDate == null &&
+                                    !task.isCompleted)
                                 .length))),
                         const SizedBox(height: 8),
                       ]))),

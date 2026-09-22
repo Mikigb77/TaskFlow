@@ -31,7 +31,9 @@ class TaskEditor extends ConsumerStatefulWidget {
       this.draft,
       this.calendarDate,
       this.onReview,
+      this.kind = 'task',
       this.initialListId});
+  final String kind;
   final Task? task;
   final TaskDraft? draft;
   final DateTime? calendarDate;
@@ -64,6 +66,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   final _referenceTime = DateTime.now();
   String? _ignoredSuggestion;
   late List<ChecklistItem> _checklist;
+  late bool _isNote;
   DateTime? _deadline;
   bool _deadlineHasTime = false;
   int? _durationMinutes;
@@ -84,6 +87,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   @override
   void initState() {
     super.initState();
+    _isNote =
+        (widget.task?.kind ?? widget.draft?.kind ?? widget.kind) == 'note';
     _detailsExpanded =
         widget.task != null || widget.draft != null || widget.onReview != null;
     final day = widget.calendarDate;
@@ -252,27 +257,34 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     }
     setState(() => _saving = true);
     final task = Task(
+      kind: _isNote ? 'note' : 'task',
       id: widget.task?.id,
       title: _title.text.trim(),
-      dueDate: _dueDate,
-      hasTime: _hasTime,
-      deadline: _deadline,
-      deadlineHasTime: _deadlineHasTime,
-      durationMinutes: _durationMinutes,
-      reminderAnchor: _reminderAnchor,
-      recurrence: _dueDate == null ? 'none' : _recurrence,
-      repeatInterval: _recurrence == 'none' ? 1 : _repeatInterval,
-      repeatWeekdays: _recurrence == 'weekly' ? _repeatWeekdays : [],
-      exceptions: ruleChanged || _recurrence == 'none' ? [] : _exceptions,
-      repeatUntil: _recurrence == 'none' ? null : _repeatUntil,
-      completedDates: _recurrence == 'none' ? [] : widget.task?.completedDates,
-      priority: _priority,
-      reminderMinutes: _reminderMinutes,
-      reminderTime: _reminderTime,
-      isCompleted:
-          _recurrence != 'none' ? false : widget.task?.isCompleted ?? false,
+      dueDate: _isNote ? null : _dueDate,
+      hasTime: !_isNote && _hasTime,
+      deadline: _isNote ? null : _deadline,
+      deadlineHasTime: !_isNote && _deadlineHasTime,
+      durationMinutes: _isNote ? null : _durationMinutes,
+      reminderAnchor: _isNote ? 'planned' : _reminderAnchor,
+      recurrence: _isNote || _dueDate == null ? 'none' : _recurrence,
+      repeatInterval: _isNote || _recurrence == 'none' ? 1 : _repeatInterval,
+      repeatWeekdays:
+          !_isNote && _recurrence == 'weekly' ? _repeatWeekdays : [],
+      exceptions:
+          _isNote || ruleChanged || _recurrence == 'none' ? [] : _exceptions,
+      repeatUntil: _isNote || _recurrence == 'none' ? null : _repeatUntil,
+      completedDates:
+          _isNote || _recurrence == 'none' ? [] : widget.task?.completedDates,
+      priority: _isNote ? 1 : _priority,
+      reminderMinutes: _isNote ? -1 : _reminderMinutes,
+      reminderTime: _isNote ? null : _reminderTime,
+      isCompleted: _isNote || _recurrence != 'none'
+          ? false
+          : widget.task?.isCompleted ?? false,
       notes: _notes.text.trim(),
-      checklist: _checklist,
+      checklist: _isNote
+          ? _checklist.map((item) => item.copyWith(completedDates: [])).toList()
+          : _checklist,
       listId: _listId,
       labels: _labels.text
           .split(',')
@@ -297,9 +309,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(widget.task == null
-              ? _dueDate == null
-                  ? context.l10n.taskSavedInbox
-                  : context.l10n.taskAddedCalendar
+              ? _isNote
+                  ? context.l10n.noteSaved
+                  : _dueDate == null
+                      ? context.l10n.taskSavedInbox
+                      : context.l10n.taskAddedCalendar
               : context.l10n.changesSaved)));
     } catch (_) {
       if (mounted) {
@@ -370,7 +384,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final edit = widget.task != null && widget.onReview == null;
-    final suggestion = widget.task == null &&
+    final suggestion = !_isNote &&
+            widget.task == null &&
             widget.draft == null &&
             widget.onReview == null &&
             _ignoredSuggestion != _title.text
@@ -378,13 +393,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         : null;
     return Scaffold(
       appBar: CustomAppBar(
-          title: edit
-              ? context.l10n.editTask
-              : widget.draft == null
-                  ? widget.onReview != null
-                      ? context.l10n.reviewTask
-                      : context.l10n.newTask
-                  : context.l10n.reviewTask),
+          title: _isNote
+              ? (edit ? context.l10n.editNote : context.l10n.newNote)
+              : edit
+                  ? context.l10n.editTask
+                  : widget.draft == null
+                      ? widget.onReview != null
+                          ? context.l10n.reviewTask
+                          : context.l10n.newTask
+                      : context.l10n.reviewTask),
       body: SafeArea(
           top: false,
           bottom: false,
@@ -400,24 +417,49 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                  edit
-                                      ? context.l10n.fineTunePlan
-                                      : widget.draft == null
-                                          ? context.l10n.onYourMind
-                                          : context.l10n.wordsPlan,
+                                  _isNote
+                                      ? context.l10n.noteTitle
+                                      : edit
+                                          ? context.l10n.fineTunePlan
+                                          : widget.draft == null
+                                              ? context.l10n.onYourMind
+                                              : context.l10n.wordsPlan,
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineMedium),
                               const SizedBox(height: 8),
                               Text(
-                                  widget.task?.isRecurring == true
-                                      ? context.l10n.seriesEdits
-                                      : widget.draft == null
-                                          ? context.l10n.giveName
-                                          : context.l10n.checkBeforeAdd,
+                                  _isNote
+                                      ? context.l10n.notesHelp
+                                      : widget.task?.isRecurring == true
+                                          ? context.l10n.seriesEdits
+                                          : widget.draft == null
+                                              ? context.l10n.giveName
+                                              : context.l10n.checkBeforeAdd,
                                   style: TextStyle(
                                       color: colors.onSurfaceVariant)),
                               const SizedBox(height: 24),
+                              if (widget.task == null &&
+                                  widget.draft == null &&
+                                  widget.onReview == null)
+                                Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: Wrap(spacing: 8, children: [
+                                      ChoiceChip(
+                                          label: Text(context.l10n.newTask),
+                                          selected: !_isNote,
+                                          onSelected: _saving
+                                              ? null
+                                              : (_) => setState(
+                                                  () => _isNote = false)),
+                                      ChoiceChip(
+                                          label: Text(context.l10n.note),
+                                          selected: _isNote,
+                                          onSelected: _saving
+                                              ? null
+                                              : (_) => setState(
+                                                  () => _isNote = true)),
+                                    ])),
                               if (widget.draft != null) ...[
                                 AppSurface(
                                     color: colors.primaryContainer,
@@ -444,15 +486,22 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                               TextFormField(
                                   key: const ValueKey('task-title'),
                                   controller: _title,
-                                  textInputAction: TextInputAction.done,
-                                  onFieldSubmitted: (_) => _save(),
+                                  textInputAction: _isNote
+                                      ? TextInputAction.next
+                                      : TextInputAction.done,
+                                  onFieldSubmitted:
+                                      _isNote ? null : (_) => _save(),
                                   onChanged: (_) => setState(() {}),
                                   maxLength: 160,
                                   textCapitalization:
                                       TextCapitalization.sentences,
                                   decoration: InputDecoration(
-                                      labelText: context.l10n.taskTitle,
-                                      hintText: 'e.g. Doctor appointment',
+                                      labelText: _isNote
+                                          ? context.l10n.noteTitle
+                                          : context.l10n.taskTitle,
+                                      hintText: _isNote
+                                          ? context.l10n.noteHint
+                                          : 'e.g. Doctor appointment',
                                       counterText: ''),
                                   validator: (value) =>
                                       value == null || value.trim().isEmpty
@@ -480,87 +529,106 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                   Text(context.l10n.ambiguousTimeHelp),
                               ],
                               const SizedBox(height: 24),
-                              SectionLabel(context.l10n.plannedFor),
-                              if (_detailsExpanded)
-                                Text(context.l10n.plannedForHelp),
-                              Wrap(spacing: 8, runSpacing: 4, children: [
-                                ActionChip(
-                                    label: Text(context.l10n.today),
-                                    onPressed: () =>
-                                        _quickDate(DateTime.now())),
-                                ActionChip(
-                                    label: Text(context.l10n.tomorrow),
-                                    onPressed: () {
-                                      final now = DateTime.now();
-                                      _quickDate(DateTime(
-                                          now.year, now.month, now.day + 1));
-                                    }),
-                                if (_dueDate != null)
+                              if (_isNote) ...[
+                                TextFormField(
+                                    key: const ValueKey('note-body'),
+                                    controller: _notes,
+                                    minLines: 5,
+                                    maxLines: 12,
+                                    maxLength: 8000,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    decoration: InputDecoration(
+                                        labelText: context.l10n.noteBody,
+                                        hintText: context.l10n.noteHint,
+                                        alignLabelWithHint: true)),
+                                const SizedBox(height: 12),
+                              ],
+                              if (!_isNote) ...[
+                                SectionLabel(context.l10n.plannedFor),
+                                if (_detailsExpanded)
+                                  Text(context.l10n.plannedForHelp),
+                                Wrap(spacing: 8, runSpacing: 4, children: [
                                   ActionChip(
-                                      label: Text(context.l10n.inbox),
-                                      onPressed: () => _quickDate(null)),
-                              ]),
-                              const SizedBox(height: 8),
-                              AppSurface(
-                                  padding: EdgeInsets.zero,
-                                  child: Column(children: [
-                                    ListTile(
-                                        key: const ValueKey('task-date'),
-                                        leading: const Icon(
-                                            Icons.calendar_today_outlined),
-                                        title: Text(_dueDate == null
-                                            ? context.l10n.inboxDate
-                                            : DateFormat.yMMMEd(
-                                                    context.localeName)
-                                                .format(_dueDate!)),
-                                        subtitle: Text(context.l10n.date),
-                                        onTap: _pickDate,
-                                        trailing: _dueDate == null
-                                            ? const Icon(Icons.add_rounded)
-                                            : IconButton(
-                                                tooltip: context.l10n.clearDate,
-                                                onPressed: () => setState(() {
-                                                      _dueDate = null;
-                                                      _hasTime = false;
-                                                      _recurrence = 'none';
-                                                      _repeatUntil = null;
-                                                    }),
-                                                icon: const Icon(
-                                                    Icons.close_rounded))),
-                                    if (_dueDate != null)
+                                      label: Text(context.l10n.today),
+                                      onPressed: () =>
+                                          _quickDate(DateTime.now())),
+                                  ActionChip(
+                                      label: Text(context.l10n.tomorrow),
+                                      onPressed: () {
+                                        final now = DateTime.now();
+                                        _quickDate(DateTime(
+                                            now.year, now.month, now.day + 1));
+                                      }),
+                                  if (_dueDate != null)
+                                    ActionChip(
+                                        label: Text(context.l10n.inbox),
+                                        onPressed: () => _quickDate(null)),
+                                ]),
+                                const SizedBox(height: 8),
+                                AppSurface(
+                                    padding: EdgeInsets.zero,
+                                    child: Column(children: [
                                       ListTile(
-                                          key: const ValueKey('task-time'),
+                                          key: const ValueKey('task-date'),
                                           leading: const Icon(
-                                              Icons.schedule_outlined),
-                                          title: Text(_hasTime
-                                              ? context.clockTime(_dueDate!)
-                                              : context.l10n.anyTime),
-                                          subtitle:
-                                              Text(context.l10n.optionalTime),
-                                          onTap: _pickTime,
-                                          trailing: !_hasTime
+                                              Icons.calendar_today_outlined),
+                                          title: Text(_dueDate == null
+                                              ? context.l10n.inboxDate
+                                              : DateFormat.yMMMEd(
+                                                      context.localeName)
+                                                  .format(_dueDate!)),
+                                          subtitle: Text(context.l10n.date),
+                                          onTap: _pickDate,
+                                          trailing: _dueDate == null
                                               ? const Icon(Icons.add_rounded)
                                               : IconButton(
                                                   tooltip:
-                                                      context.l10n.removeTime,
+                                                      context.l10n.clearDate,
                                                   onPressed: () => setState(() {
+                                                        _dueDate = null;
                                                         _hasTime = false;
-                                                        _dueDate =
-                                                            Task.day(_dueDate!);
+                                                        _recurrence = 'none';
+                                                        _repeatUntil = null;
                                                       }),
                                                   icon: const Icon(
                                                       Icons.close_rounded))),
-                                  ])),
-                              const SizedBox(height: 12),
-                              if (!_detailsExpanded &&
-                                  _planningTask.reminderDate != null)
-                                ReminderChip(
-                                    task: _planningTask,
-                                    onChanged: (task) => setState(() {
-                                          _reminderMinutes =
-                                              task.reminderMinutes;
-                                          _reminderTime = task.reminderTime;
-                                        })),
+                                      if (_dueDate != null)
+                                        ListTile(
+                                            key: const ValueKey('task-time'),
+                                            leading: const Icon(
+                                                Icons.schedule_outlined),
+                                            title: Text(_hasTime
+                                                ? context.clockTime(_dueDate!)
+                                                : context.l10n.anyTime),
+                                            subtitle:
+                                                Text(context.l10n.optionalTime),
+                                            onTap: _pickTime,
+                                            trailing: !_hasTime
+                                                ? const Icon(Icons.add_rounded)
+                                                : IconButton(
+                                                    tooltip:
+                                                        context.l10n.removeTime,
+                                                    onPressed: () =>
+                                                        setState(() {
+                                                          _hasTime = false;
+                                                          _dueDate = Task.day(
+                                                              _dueDate!);
+                                                        }),
+                                                    icon: const Icon(
+                                                        Icons.close_rounded))),
+                                    ])),
+                                const SizedBox(height: 12),
+                                if (!_detailsExpanded &&
+                                    _planningTask.reminderDate != null)
+                                  ReminderChip(
+                                      task: _planningTask,
+                                      onChanged: (task) => setState(() {
+                                            _reminderMinutes =
+                                                task.reminderMinutes;
+                                            _reminderTime = task.reminderTime;
+                                          })),
+                              ],
                               if (!edit &&
                                   widget.draft == null &&
                                   widget.onReview == null)
@@ -575,144 +643,151 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                         ? context.l10n.fewerDetails
                                         : context.l10n.moreDetails)),
                               if (_detailsExpanded) ...[
-                                TaskPlanningControl(
-                                    task: _planningTask,
-                                    onChanged: (task) => setState(() {
-                                          _deadline = task.deadline;
-                                          _deadlineHasTime =
-                                              task.deadlineHasTime;
-                                          _durationMinutes =
-                                              task.durationMinutes;
-                                          _reminderAnchor = task.reminderAnchor;
-                                        })),
-                                if (_dueDate != null) ...[
-                                  const SizedBox(height: 16),
-                                  DropdownButtonFormField<String>(
-                                      isExpanded: true,
-                                      key: ValueKey('repeat-$_recurrence'),
-                                      initialValue: _recurrence,
-                                      decoration: InputDecoration(
-                                          labelText: context.l10n.repeat,
-                                          prefixIcon:
-                                              const Icon(Icons.repeat_rounded)),
-                                      items: Task.repeats.entries
-                                          .map((e) => DropdownMenuItem(
-                                              value: e.key,
-                                              child: Text(
-                                                  context.repeatName(e.key),
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis)))
-                                          .toList(),
-                                      onChanged: (value) => setState(() {
-                                            _recurrence = value!;
-                                            if (value == 'none') {
-                                              _repeatUntil = null;
-                                              _repeatInterval = 1;
-                                            }
-                                            if (value != 'weekly') {
-                                              _repeatWeekdays = [];
-                                            }
+                                if (!_isNote) ...[
+                                  TaskPlanningControl(
+                                      task: _planningTask,
+                                      onChanged: (task) => setState(() {
+                                            _deadline = task.deadline;
+                                            _deadlineHasTime =
+                                                task.deadlineHasTime;
+                                            _durationMinutes =
+                                                task.durationMinutes;
+                                            _reminderAnchor =
+                                                task.reminderAnchor;
                                           })),
-                                  if (_recurrence != 'none')
-                                    RepeatRuleControl(
-                                        recurrence: _recurrence,
-                                        interval: _repeatInterval,
-                                        weekdays: _repeatWeekdays,
-                                        onChanged: (interval, days) =>
-                                            setState(() {
-                                              _repeatInterval = interval;
-                                              _repeatWeekdays = days;
+                                  if (_dueDate != null) ...[
+                                    const SizedBox(height: 16),
+                                    DropdownButtonFormField<String>(
+                                        isExpanded: true,
+                                        key: ValueKey('repeat-$_recurrence'),
+                                        initialValue: _recurrence,
+                                        decoration: InputDecoration(
+                                            labelText: context.l10n.repeat,
+                                            prefixIcon: const Icon(
+                                                Icons.repeat_rounded)),
+                                        items: Task.repeats.entries
+                                            .map((e) => DropdownMenuItem(
+                                                value: e.key,
+                                                child: Text(
+                                                    context.repeatName(e.key),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis)))
+                                            .toList(),
+                                        onChanged: (value) => setState(() {
+                                              _recurrence = value!;
+                                              if (value == 'none') {
+                                                _repeatUntil = null;
+                                                _repeatInterval = 1;
+                                              }
+                                              if (value != 'weekly') {
+                                                _repeatWeekdays = [];
+                                              }
                                             })),
-                                  if (_exceptions.isNotEmpty)
-                                    ExpansionTile(
-                                        tilePadding: EdgeInsets.zero,
-                                        title: Text(
-                                            '${_exceptions.length} individual date changes'),
-                                        subtitle:
-                                            Text(context.l10n.resetDateHelp),
-                                        children: [
-                                          for (final exception in _exceptions)
-                                            ListTile(
-                                                title: Text(
-                                                    exception.originalDate),
-                                                subtitle: Text(exception.skipped
-                                                    ? context.l10n.skipped
-                                                    : 'Moved to ${Task.dateKey(exception.date!)}${exception.hasTime ? ' · ${TimeOfDay.fromDateTime(exception.date!).format(context)}' : ''}'),
-                                                trailing: TextButton(
-                                                    onPressed: () => setState(
-                                                        () => _exceptions
-                                                            .remove(exception)),
-                                                    child: Text(
-                                                        context.l10n.reset)))
-                                        ]),
-                                  if (_recurrence != 'none')
-                                    Row(children: [
-                                      Expanded(
-                                          child: TextButton.icon(
-                                              icon: const Icon(
-                                                  Icons.event_outlined,
-                                                  size: 18),
-                                              label: Text(_repeatUntil == null
-                                                  ? context.l10n.noEndDate
-                                                  : context.l10n.untilDate(
-                                                      context.shortDate(
-                                                          _repeatUntil!))),
-                                              onPressed: () async {
-                                                final date =
-                                                    await showDatePicker(
-                                                        context: context,
-                                                        initialDate:
-                                                            _repeatUntil ??
-                                                                _dueDate!,
-                                                        firstDate:
-                                                            Task.day(_dueDate!),
-                                                        lastDate:
-                                                            pickerLastDate(
-                                                                _repeatUntil ??
-                                                                    _dueDate));
-                                                if (date != null && mounted) {
-                                                  setState(() =>
-                                                      _repeatUntil = date);
-                                                }
+                                    if (_recurrence != 'none')
+                                      RepeatRuleControl(
+                                          recurrence: _recurrence,
+                                          interval: _repeatInterval,
+                                          weekdays: _repeatWeekdays,
+                                          onChanged: (interval, days) =>
+                                              setState(() {
+                                                _repeatInterval = interval;
+                                                _repeatWeekdays = days;
                                               })),
-                                      if (_repeatUntil != null)
-                                        IconButton(
-                                            tooltip: context.l10n.removeEndDate,
-                                            onPressed: () => setState(
-                                                () => _repeatUntil = null),
-                                            icon: const Icon(
-                                                Icons.close_rounded)),
-                                    ]),
+                                    if (_exceptions.isNotEmpty)
+                                      ExpansionTile(
+                                          tilePadding: EdgeInsets.zero,
+                                          title: Text(
+                                              '${_exceptions.length} individual date changes'),
+                                          subtitle:
+                                              Text(context.l10n.resetDateHelp),
+                                          children: [
+                                            for (final exception in _exceptions)
+                                              ListTile(
+                                                  title: Text(
+                                                      exception.originalDate),
+                                                  subtitle: Text(exception
+                                                          .skipped
+                                                      ? context.l10n.skipped
+                                                      : 'Moved to ${Task.dateKey(exception.date!)}${exception.hasTime ? ' · ${TimeOfDay.fromDateTime(exception.date!).format(context)}' : ''}'),
+                                                  trailing: TextButton(
+                                                      onPressed: () => setState(
+                                                          () => _exceptions
+                                                              .remove(
+                                                                  exception)),
+                                                      child: Text(
+                                                          context.l10n.reset)))
+                                          ]),
+                                    if (_recurrence != 'none')
+                                      Row(children: [
+                                        Expanded(
+                                            child: TextButton.icon(
+                                                icon: const Icon(
+                                                    Icons.event_outlined,
+                                                    size: 18),
+                                                label: Text(_repeatUntil == null
+                                                    ? context.l10n.noEndDate
+                                                    : context.l10n.untilDate(
+                                                        context.shortDate(
+                                                            _repeatUntil!))),
+                                                onPressed: () async {
+                                                  final date =
+                                                      await showDatePicker(
+                                                          context: context,
+                                                          initialDate:
+                                                              _repeatUntil ??
+                                                                  _dueDate!,
+                                                          firstDate: Task.day(
+                                                              _dueDate!),
+                                                          lastDate:
+                                                              pickerLastDate(
+                                                                  _repeatUntil ??
+                                                                      _dueDate));
+                                                  if (date != null && mounted) {
+                                                    setState(() =>
+                                                        _repeatUntil = date);
+                                                  }
+                                                })),
+                                        if (_repeatUntil != null)
+                                          IconButton(
+                                              tooltip:
+                                                  context.l10n.removeEndDate,
+                                              onPressed: () => setState(
+                                                  () => _repeatUntil = null),
+                                              icon: const Icon(
+                                                  Icons.close_rounded)),
+                                      ]),
+                                  ],
+                                  const SizedBox(height: 24),
+                                  ReminderControl(
+                                      hasDate:
+                                          _planningTask.reminderDate != null,
+                                      hasTime: _planningTask.reminderHasTime,
+                                      minutes: _reminderMinutes,
+                                      time: _reminderTime,
+                                      onMinutes: (value) => setState(
+                                          () => _reminderMinutes = value),
+                                      onTime: (value) => setState(
+                                          () => _reminderTime = value)),
+                                  const SizedBox(height: 16),
+                                  SectionLabel(context.l10n.priority),
+                                  Wrap(spacing: 8, runSpacing: 8, children: [
+                                    for (final value in [1, 2, 3])
+                                      ChoiceChip(
+                                          showCheckmark: false,
+                                          label:
+                                              Text(context.priorityName(value)),
+                                          avatar: Icon(Icons.flag_outlined,
+                                              size: 17,
+                                              color: AppTheme.priorityColor(
+                                                  context, value)),
+                                          selected: _priority == value,
+                                          onSelected: (_) => setState(
+                                              () => _priority = value)),
+                                  ]),
+                                  const SizedBox(height: 24),
+                                  SectionLabel(context.l10n.theDetails),
                                 ],
-                                const SizedBox(height: 24),
-                                ReminderControl(
-                                    hasDate: _planningTask.reminderDate != null,
-                                    hasTime: _planningTask.reminderHasTime,
-                                    minutes: _reminderMinutes,
-                                    time: _reminderTime,
-                                    onMinutes: (value) => setState(
-                                        () => _reminderMinutes = value),
-                                    onTime: (value) =>
-                                        setState(() => _reminderTime = value)),
-                                const SizedBox(height: 16),
-                                SectionLabel(context.l10n.priority),
-                                Wrap(spacing: 8, runSpacing: 8, children: [
-                                  for (final value in [1, 2, 3])
-                                    ChoiceChip(
-                                        showCheckmark: false,
-                                        label:
-                                            Text(context.priorityName(value)),
-                                        avatar: Icon(Icons.flag_outlined,
-                                            size: 17,
-                                            color: AppTheme.priorityColor(
-                                                context, value)),
-                                        selected: _priority == value,
-                                        onSelected: (_) =>
-                                            setState(() => _priority = value)),
-                                ]),
-                                const SizedBox(height: 24),
-                                SectionLabel(context.l10n.theDetails),
                                 TaskListPicker(
                                     lockShared: widget.task != null,
                                     listId: _listId,
@@ -740,23 +815,26 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 const SizedBox(height: 16),
                                 ChecklistEditor(
                                     items: _checklist,
-                                    recurring: _recurrence != 'none',
+                                    recurring:
+                                        !_isNote && _recurrence != 'none',
                                     onChanged: (items) =>
                                         setState(() => _checklist = items)),
                                 const SizedBox(height: 12),
-                                TextFormField(
-                                    key: const ValueKey('task-notes'),
-                                    controller: _notes,
-                                    maxLength: 8000,
-                                    minLines: 3,
-                                    maxLines: 6,
-                                    textCapitalization:
-                                        TextCapitalization.sentences,
-                                    decoration: InputDecoration(
-                                        labelText: context.l10n.additionalNotes,
-                                        hintText: context.l10n.notesHint,
-                                        alignLabelWithHint: true,
-                                        counterText: '')),
+                                if (!_isNote)
+                                  TextFormField(
+                                      key: const ValueKey('task-notes'),
+                                      controller: _notes,
+                                      maxLength: 8000,
+                                      minLines: 3,
+                                      maxLines: 6,
+                                      textCapitalization:
+                                          TextCapitalization.sentences,
+                                      decoration: InputDecoration(
+                                          labelText:
+                                              context.l10n.additionalNotes,
+                                          hintText: context.l10n.notesHint,
+                                          alignLabelWithHint: true,
+                                          counterText: '')),
                                 const SizedBox(height: 20),
                                 if (_attachments.isNotEmpty) ...[
                                   SectionLabel(context.l10n.attachments),
@@ -849,7 +927,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         ? context.l10n.keepChanges
                         : edit
                             ? context.l10n.saveChangesSentence
-                            : context.l10n.createTask),
+                            : _isNote
+                                ? context.l10n.saveNote
+                                : context.l10n.createTask),
               ))),
     );
   }

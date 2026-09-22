@@ -131,8 +131,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
       final messenger = ScaffoldMessenger.of(context);
       if (remaining == 0) Navigator.pop(context);
       messenger.showSnackBar(SnackBar(
-          content: Text(
-              '${ready.length} ${ready.length == 1 ? 'task' : 'tasks'} saved${remaining > 0 ? ' · $remaining kept for review' : ''}')));
+          content: Text(ready.every((item) => item.task.isNote)
+              ? context.l10n.noteSaved
+              : '${ready.length} ${ready.length == 1 ? 'task' : 'tasks'} saved${remaining > 0 ? ' · $remaining kept for review' : ''}')));
     } catch (_) {
       if (mounted) {
         setState(() => _error =
@@ -152,7 +153,12 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
     final result = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-                title: Text(notes ? 'Task notes' : 'Task title'),
+                scrollable: true,
+                title: Text(notes
+                    ? context.l10n.noteBody
+                    : item.task.isNote
+                        ? context.l10n.noteTitle
+                        : context.l10n.taskTitle),
                 content: TextFormField(
                     key: notes
                         ? const ValueKey('draft-notes')
@@ -282,10 +288,13 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
     final ready = pending.where((d) => d.ready).length;
     final uncertain = pending.length - ready;
     final colors = Theme.of(context).colorScheme;
+    final note = _session?.kind == 'note' ||
+        (_items.isNotEmpty && _items.every((item) => item.task.isNote));
     return PopScope(
         canPop: !_saving,
         child: Scaffold(
-          appBar: CustomAppBar(title: context.l10n.checkTasks),
+          appBar: CustomAppBar(
+              title: note ? context.l10n.reviewNote : context.l10n.checkTasks),
           body: Center(
               child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 640),
@@ -338,76 +347,90 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                           icon: const Icon(Icons.close_rounded,
                                               size: 20))
                                     ]),
-                                    Wrap(spacing: 8, runSpacing: 4, children: [
-                                      ActionChip(
-                                          avatar: const Icon(
-                                              Icons.calendar_today_outlined,
-                                              size: 16),
-                                          label: Text(taskScheduleLabel(
-                                              item.task,
-                                              context: context)),
-                                          onPressed: _saving
-                                              ? null
-                                              : () => _date(item)),
-                                      InputChip(
-                                          avatar: const Icon(
-                                              Icons.schedule_outlined,
-                                              size: 16),
-                                          label: Text(item.task.hasTime
-                                              ? TimeOfDay.fromDateTime(
-                                                      item.task.dueDate!)
-                                                  .format(context)
-                                              : context.l10n.addTime),
-                                          onPressed: _saving
-                                              ? null
-                                              : () => _time(item),
-                                          onDeleted:
-                                              item.task.hasTime && !_saving
-                                                  ? () => _change(item.copyWith(
-                                                      task: item.task.copyWith(
-                                                          hasTime: false)))
-                                                  : null),
-                                      PopupMenuButton<int>(
-                                          enabled: !_saving,
-                                          tooltip: context.l10n.changePriority,
-                                          onSelected: (p) => _change(
-                                              item.copyWith(
-                                                  task: item.task
-                                                      .copyWith(priority: p))),
-                                          itemBuilder: (_) => [
-                                                for (final p in [1, 2, 3])
-                                                  PopupMenuItem(
-                                                      value: p,
-                                                      child: Text(context.l10n
-                                                          .priorityValue(context
-                                                              .priorityName(
-                                                                  p))))
-                                              ],
-                                          child: Chip(
-                                              label: Text(context.l10n
-                                                  .priorityValue(
-                                                      context.priorityName(item
-                                                          .task.priority))))),
-                                      ActionChip(
-                                          tooltip: context.l10n.changeRepeat,
-                                          label: Text(
-                                              context.repeatLabel(item.task)),
-                                          onPressed: _saving ||
-                                                  item.task.dueDate == null
-                                              ? null
-                                              : () =>
-                                                  _measureCorrection(() async {
-                                                    final task =
-                                                        await editTaskRepeat(
-                                                            context, item.task);
-                                                    if (task != null &&
-                                                        mounted) {
-                                                      await _change(
-                                                          item.copyWith(
-                                                              task: task));
-                                                    }
-                                                  })),
-                                    ]),
+                                    if (!item.task.isNote)
+                                      Wrap(
+                                          spacing: 8,
+                                          runSpacing: 4,
+                                          children: [
+                                            ActionChip(
+                                                avatar: const Icon(
+                                                    Icons
+                                                        .calendar_today_outlined,
+                                                    size: 16),
+                                                label: Text(taskScheduleLabel(
+                                                    item.task,
+                                                    context: context)),
+                                                onPressed: _saving
+                                                    ? null
+                                                    : () => _date(item)),
+                                            InputChip(
+                                                avatar: const Icon(
+                                                    Icons.schedule_outlined,
+                                                    size: 16),
+                                                label: Text(item.task.hasTime
+                                                    ? TimeOfDay.fromDateTime(
+                                                            item.task.dueDate!)
+                                                        .format(context)
+                                                    : context.l10n.addTime),
+                                                onPressed: _saving
+                                                    ? null
+                                                    : () => _time(item),
+                                                onDeleted: item.task.hasTime &&
+                                                        !_saving
+                                                    ? () => _change(item.copyWith(
+                                                        task: item.task.copyWith(
+                                                            hasTime: false)))
+                                                    : null),
+                                            PopupMenuButton<int>(
+                                                enabled: !_saving,
+                                                tooltip:
+                                                    context.l10n.changePriority,
+                                                onSelected: (p) => _change(
+                                                    item.copyWith(
+                                                        task: item.task
+                                                            .copyWith(
+                                                                priority: p))),
+                                                itemBuilder: (_) => [
+                                                      for (final p in [1, 2, 3])
+                                                        PopupMenuItem(
+                                                            value: p,
+                                                            child: Text(context
+                                                                .l10n
+                                                                .priorityValue(
+                                                                    context
+                                                                        .priorityName(
+                                                                            p))))
+                                                    ],
+                                                child: Chip(
+                                                    label: Text(context.l10n
+                                                        .priorityValue(context
+                                                            .priorityName(item
+                                                                .task
+                                                                .priority))))),
+                                            ActionChip(
+                                                tooltip:
+                                                    context.l10n.changeRepeat,
+                                                label: Text(context
+                                                    .repeatLabel(item.task)),
+                                                onPressed: _saving ||
+                                                        item.task.dueDate ==
+                                                            null
+                                                    ? null
+                                                    : () => _measureCorrection(
+                                                            () async {
+                                                          final task =
+                                                              await editTaskRepeat(
+                                                                  context,
+                                                                  item.task);
+                                                          if (task != null &&
+                                                              mounted) {
+                                                            await _change(
+                                                                item.copyWith(
+                                                                    task:
+                                                                        task));
+                                                          }
+                                                        })),
+                                          ]),
                                     TextButton.icon(
                                         onPressed: _saving
                                             ? null
@@ -435,20 +458,22 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                             : (items) => _change(item.copyWith(
                                                 task: item.task.copyWith(
                                                     checklist: items)))),
-                                    ExpansionTile(
-                                        tilePadding: EdgeInsets.zero,
-                                        title: Text(context.l10n.planning),
-                                        initiallyExpanded: item.task.deadline !=
-                                                null ||
-                                            item.task.durationMinutes != null,
-                                        children: [
-                                          TaskPlanningControl(
-                                              task: item.task,
-                                              onChanged: _saving
-                                                  ? null
-                                                  : (task) => _change(item
-                                                      .copyWith(task: task)))
-                                        ]),
+                                    if (!item.task.isNote)
+                                      ExpansionTile(
+                                          tilePadding: EdgeInsets.zero,
+                                          title: Text(context.l10n.planning),
+                                          initiallyExpanded:
+                                              item.task.deadline != null ||
+                                                  item.task.durationMinutes !=
+                                                      null,
+                                          children: [
+                                            TaskPlanningControl(
+                                                task: item.task,
+                                                onChanged: _saving
+                                                    ? null
+                                                    : (task) => _change(item
+                                                        .copyWith(task: task)))
+                                          ]),
                                     if (item.task.reminderDate != null)
                                       ReminderChip(
                                           task: item.task,
@@ -507,7 +532,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                           ? context.l10n.saving
                           : ready == 0
                               ? 'Check the details above'
-                              : 'Save $ready ${ready == 1 ? 'task' : 'tasks'}')))),
+                              : note
+                                  ? context.l10n.saveNote
+                                  : 'Save $ready ${ready == 1 ? 'task' : 'tasks'}')))),
         ));
   }
 }

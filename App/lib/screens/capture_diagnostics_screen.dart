@@ -36,7 +36,7 @@ class CaptureDiagnosticsScreen extends ConsumerWidget {
                 ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                        '${row['label']} · ${row['samples']} observations${row['items'] == 0 ? '' : ' · ${row['items']} tasks'}'),
+                        '${row['label']} · ${row['samples']} observations${row['items'] == 0 ? '' : ' · ${row['items']} items'}'),
                     subtitle: row['p50_ms'] == null
                         ? null
                         : Text(

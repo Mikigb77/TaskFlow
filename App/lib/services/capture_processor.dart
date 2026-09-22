@@ -1,5 +1,7 @@
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task_draft.dart';
+import 'package:agenda/models/task.dart';
+import 'package:uuid/uuid.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/capture_store.dart';
@@ -32,6 +34,28 @@ class CaptureProcessor {
     }
     await store.update(existing.copyWith(status: 'processing'));
     try {
+      // Typed and on-device-transcribed notes stay entirely local. Selecting
+      // Note is explicit; dates in reference material never become tasks.
+      if (existing.kind == 'note' && existing.audioPath == null) {
+        if (existing.text.trim().isEmpty || existing.text.length > 8000) {
+          throw StateError('A note needs 1 to 8000 characters.');
+        }
+        final firstLine = existing.text.trim().split('\n').first;
+        final next = existing
+            .copyWith(status: 'ready', transcript: existing.text, drafts: [
+          CaptureDraft(
+              id: const Uuid().v4(),
+              task: Task(
+                  kind: 'note',
+                  title: String.fromCharCodes(firstLine.runes.take(160)),
+                  priority: 1,
+                  notes: existing.text))
+        ]);
+        await store.update(next);
+        await diagnostics.record(CaptureEvent.notePrepared,
+            elapsedMs: watch.elapsedMilliseconds, count: 1);
+        return next;
+      }
       if (existing.audioPath != null) {
         await CaptureStore.recoverWav(existing.audioPath!);
       }
@@ -43,6 +67,7 @@ class CaptureProcessor {
               : int.parse(existing.ownerKey.split('/').last),
           data: {
             'timezone': existing.timezone,
+            'capture_type': existing.kind,
             'reference_time': existing.capturedAt.toUtc().toIso8601String(),
             if (existing.audioPath == null) 'text': existing.text
           });
@@ -55,17 +80,28 @@ class CaptureProcessor {
       if (drafts.isEmpty) {
         throw StateError('No tasks were found. Your capture is kept.');
       }
+      if (drafts.any((draft) => draft.task.kind != existing.kind)) {
+        throw StateError(
+            'This server does not support the selected capture type. Your input is kept.');
+      }
       final next = existing.copyWith(
           status: 'ready', transcript: transcript, drafts: drafts);
       await store.update(next);
-      await diagnostics.record(CaptureEvent.processing,
-          elapsedMs: watch.elapsedMilliseconds, count: drafts.length);
+      await diagnostics.record(
+          existing.kind == 'note'
+              ? CaptureEvent.noteTranscribed
+              : CaptureEvent.processing,
+          elapsedMs: watch.elapsedMilliseconds,
+          count: drafts.length);
       final timings = response['timings'];
       if (timings is Map) {
         for (final entry in {
           CaptureEvent.transcription: 'transcription_ms',
           CaptureEvent.extraction: 'extraction_ms'
         }.entries) {
+          if (existing.kind == 'note' && entry.key == CaptureEvent.extraction) {
+            continue;
+          }
           if (entry.key == CaptureEvent.transcription &&
               existing.audioPath == null) {
             continue;

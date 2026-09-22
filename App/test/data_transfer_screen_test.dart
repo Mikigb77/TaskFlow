@@ -61,7 +61,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(store.receipts.length, 1);
       expect(store.calls, 1);
-      expect(find.textContaining('Added 1 task'), findsWidgets);
+      expect(find.textContaining('Added 1 item'), findsWidgets);
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Choose import file'), -240);

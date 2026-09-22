@@ -9,6 +9,77 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get note => 'Note';
+
+  @override
+  String get noteEmptyBody => 'No text added.';
+
+  @override
+  String get fileNone => 'No attachments.';
+
+  @override
+  String get newNote => 'New note';
+
+  @override
+  String get editNote => 'Edit note';
+
+  @override
+  String get noteTitle => 'Note title';
+
+  @override
+  String get noteBody => 'Your note';
+
+  @override
+  String get notesHelp =>
+      'Keep information, ideas and reference material. Use a task for something you need to do.';
+
+  @override
+  String get notesEmpty => 'A place for your thoughts';
+
+  @override
+  String get notesEmptyHelp =>
+      'Write or dictate a note. Add links or a checklist when useful.';
+
+  @override
+  String get findNote => 'Search notes';
+
+  @override
+  String get reviewNote => 'Review note';
+
+  @override
+  String get saveNote => 'Save note';
+
+  @override
+  String get noteSaved => 'Note saved';
+
+  @override
+  String get recordNote => 'Dictate a note';
+
+  @override
+  String get noteCaptureHelp =>
+      'Keep your words as one note. Typed notes stay on your phone until sync; saved recordings need online transcription.';
+
+  @override
+  String get noteHint => 'Ideas, meeting details, useful links…';
+
+  @override
+  String get deleteNoteQuestion => 'Delete this note?';
+
+  @override
+  String get keepNote => 'Keep note';
+
+  @override
+  String get viewOnlyNote =>
+      'View-only note. The list owner manages editing access.';
+
+  @override
+  String get linkOpenError =>
+      'Could not open this link. You can copy it from the note.';
+
+  @override
+  String get noteLinks => 'Links';
+
+  @override
   String get plannedFor => 'Planned for';
 
   @override
@@ -1286,7 +1357,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.';
 
   @override
-  String get fileEmpty => 'No attachments. Add a file when editing this task.';
+  String get fileEmpty => 'No attachments. Add a file when editing.';
 
   @override
   String get fileLoadError => 'Could not load attachment status. Please retry.';

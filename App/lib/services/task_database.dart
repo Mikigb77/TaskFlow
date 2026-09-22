@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 14;
+  static const schemaVersion = 15;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -35,6 +35,7 @@ class TaskDatabase {
       onCreate: (db, version) async {
         await db.execute('''CREATE TABLE tasks(
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT,
+          kind TEXT NOT NULL DEFAULT 'task',
           priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT,
           imagePaths TEXT, hasTime INTEGER NOT NULL DEFAULT 1,
           recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
@@ -64,6 +65,10 @@ class TaskDatabase {
 
   static Future<void> upgrade(
       Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 15 && newVersion >= 15) {
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'");
+    }
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE tasks ADD COLUMN notes TEXT');
     }
@@ -292,6 +297,9 @@ class TaskDatabase {
         throw StateError('This task is no longer in the current account.');
       }
       await validateList(tx, Task.fromMap(previous.single), ownerKey);
+      if ((previous.single['kind'] ?? 'task') != task.kind) {
+        throw StateError('Create a separate task or note to change its type.');
+      }
       if (previous.single['listId'] != task.listId &&
           previous.single['listId'] != null) {
         final lists = await tx.query('task_lists',

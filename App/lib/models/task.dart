@@ -8,6 +8,8 @@ const _unchanged = Object();
 class Task {
   final int? id;
   final String title;
+  final String kind;
+  bool get isNote => kind == 'note';
 
   /// Planned start / first occurrence. The historical dueDate/API due_date
   /// names remain for compatibility; deadline is an independent commitment.
@@ -55,6 +57,7 @@ class Task {
   Task(
       {this.id,
       required this.title,
+      this.kind = 'task',
       this.dueDate,
       bool hasTime = true,
       this.deadline,
@@ -95,6 +98,28 @@ class Task {
             .where((label) => label.isNotEmpty)
             .toSet()),
         imagePaths = imagePaths ?? [] {
+    if (!['task', 'note'].contains(kind)) {
+      throw ArgumentError('Unsupported content type.');
+    }
+    if (isNote &&
+        (dueDate != null ||
+            deadline != null ||
+            durationMinutes != null ||
+            recurrence != 'none' ||
+            repeatUntil != null ||
+            repeatInterval != 1 ||
+            this.repeatWeekdays.isNotEmpty ||
+            this.exceptions.isNotEmpty ||
+            this.completedDates.isNotEmpty ||
+            priority != 1 ||
+            isCompleted ||
+            reminderTime != null ||
+            (reminderMinutes != null && reminderMinutes != -1) ||
+            reminderAnchor != 'planned' ||
+            this.checklist.any((item) => item.completedDates.isNotEmpty))) {
+      throw ArgumentError(
+          'Notes cannot have task schedules, reminders or completion.');
+    }
     if (repeatInterval < 1 ||
         repeatInterval > 99 ||
         repeatWeekdays.any((day) => day < 1 || day > 7)) {
@@ -172,6 +197,7 @@ class Task {
   /// Day agendas include deadline-only tasks and the tail of overnight blocks.
   /// All entries still carry the original recurrence identity for actions.
   List<Task> calendarOccurrencesOn(DateTime date) {
+    if (isNote) return [];
     final entries = <String, Task>{};
     void include(Task task) => entries[task.occurrenceId ?? 'once'] = task;
     for (final task in [...occurrencesOn(date), ...deadlinesOn(date)]) {
@@ -333,6 +359,7 @@ class Task {
 
   /// Show the next open occurrence from today; past occurrences stay in Calendar.
   Task? nextOpenOccurrence({DateTime? from}) {
+    if (isNote) return null;
     if (!isRecurring) return isCompleted ? null : this;
     final first = day(from ?? DateTime.now());
     final moved = exceptions
@@ -401,6 +428,7 @@ class Task {
       Task(
           id: id ?? this.id,
           title: title ?? this.title,
+          kind: kind,
           dueDate: identical(dueDate, _unchanged)
               ? this.dueDate
               : dueDate as DateTime?,
@@ -449,6 +477,7 @@ class Task {
   Map<String, dynamic> toMap() => {
         'id': id,
         'title': title,
+        'kind': kind,
         'dueDate': dueDate == null
             ? null
             : _hasTime
@@ -486,6 +515,7 @@ class Task {
   static Task fromMap(Map<String, dynamic> map) => Task(
       id: map['id'],
       title: map['title'],
+      kind: map['kind'] ?? 'task',
       dueDate: map['dueDate'] == null
           ? null
           : DateTime.parse(map['dueDate']).toLocal(),
@@ -530,6 +560,7 @@ class Task {
 
   Map<String, dynamic> toApi() => {
         'title': title,
+        'kind': kind,
         'due_date': _hasTime ? dueDate?.toUtc().toIso8601String() : null,
         'scheduled_date':
             !_hasTime && dueDate != null ? dateKey(dueDate!) : null,
@@ -557,6 +588,7 @@ class Task {
 
   static Task fromApi(Map<String, dynamic> data) => Task(
       title: data['title'],
+      kind: data['kind'] ?? 'task',
       dueDate: data['due_date'] != null
           ? DateTime.parse(data['due_date']).toLocal()
           : data['scheduled_date'] != null

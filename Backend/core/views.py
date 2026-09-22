@@ -18,7 +18,7 @@ from .serializers import DraftRequestSerializer
 def health(request):
     with connection.cursor() as cursor:
         cursor.execute("SELECT 1")
-    return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "ok", "features": {"notes": True}})
 
 
 def playground(request):

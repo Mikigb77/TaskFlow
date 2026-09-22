@@ -36,13 +36,20 @@ class CaptureStore {
   }
 
   Future<CaptureSession> create(String ownerKey, String timezone,
-      {String text = '', DateTime? now, bool audio = false}) async {
+      {String text = '',
+      DateTime? now,
+      bool audio = false,
+      String kind = 'task'}) async {
+    if (!['task', 'note'].contains(kind)) {
+      throw ArgumentError('Invalid capture type.');
+    }
     final id = const Uuid().v4();
     final session = CaptureSession(
         id: id,
         ownerKey: ownerKey,
         capturedAt: (now ?? DateTime.now()).toUtc(),
         timezone: timezone,
+        kind: kind,
         text: text,
         audioPath: audio ? p.join((await _directory()).path, '$id.wav') : null);
     await (await database.database).insert('captures', {
@@ -168,6 +175,7 @@ class CaptureStore {
       ownerKey: session.ownerKey,
       capturedAt: session.capturedAt,
       timezone: session.timezone,
+      kind: session.kind,
       audioPath: session.audioPath,
       status: session.status,
       drafts: session.drafts

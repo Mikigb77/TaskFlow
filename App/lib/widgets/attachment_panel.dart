@@ -158,7 +158,10 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
           data: (entries) =>
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 if (entries.isEmpty)
-                  Text(context.l10n.fileEmpty,
+                  Text(
+                      ref.watch(listCanEditProvider(widget.task.listId))
+                          ? context.l10n.fileEmpty
+                          : context.l10n.fileNone,
                       style: TextStyle(color: colors.onSurfaceVariant)),
                 for (final entry in entries)
                   Padding(

@@ -233,9 +233,13 @@ class _Captures extends CaptureStore {
   CaptureSession? session;
   @override
   Future<CaptureSession> create(String ownerKey, String timezone,
-          {String text = '', DateTime? now, bool audio = false}) async =>
+          {String text = '',
+          DateTime? now,
+          bool audio = false,
+          String kind = 'task'}) async =>
       session = CaptureSession(
           id: 'test-capture',
+          kind: kind,
           ownerKey: ownerKey,
           timezone: timezone,
           capturedAt: (now ?? DateTime.now()).toUtc(),

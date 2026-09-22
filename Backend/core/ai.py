@@ -240,7 +240,17 @@ def make_draft(data, batch=False):
         started = clock.monotonic()
         text = transcribe(data["audio"]) if data.get("audio") else data["text"]
         transcribed = clock.monotonic()
-        result = (extract_tasks if batch else extract_task)(text, data["timezone"], data["reference_time"])
+        if data.get("capture_type") == "note":
+            # Retain the actual words. Notes need transcription, not inference
+            # of commitments, dates or priorities from quoted information.
+            if not text.strip() or len(text) > 8000:
+                raise AIUnavailable("The note must contain between 1 and 8000 characters. Your recording is kept on your phone.", 422)
+            note = {"kind": "note", "title": text.strip().splitlines()[0][:160],
+                    "notes": text, "priority": 1, "questions": [], "checklist": [],
+                    "due_date": None, "scheduled_date": None, "recurrence": "none", "transcript": text}
+            result = {"transcript": text, "tasks": [note]} if batch else note
+        else:
+            result = (extract_tasks if batch else extract_task)(text, data["timezone"], data["reference_time"])
         result["timings"] = {
             "transcription_ms": round((transcribed - started) * 1000),
             "extraction_ms": round((clock.monotonic() - transcribed) * 1000),
