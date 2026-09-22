@@ -43,6 +43,12 @@ class AttachmentStore {
       (await database.database).update('task_attachments', values,
           where: 'owner_key = ? AND id = ?', whereArgs: [owner, id]);
 
+  Future<void> cleanRemovedPaths(Iterable<String> paths) async {
+    for (final path in paths.toSet()) {
+      await _removeUnreferenced(path);
+    }
+  }
+
   /// Explicitly back up an older device-only attachment. The original file is
   /// never modified; the private snapshot is the input for every retry.
   Future<void> enqueue(int taskId, String source) async {
@@ -57,6 +63,7 @@ class AttachmentStore {
             whereArgs: [owner, taskId]);
         if (rows.isEmpty) throw StateError('This task is no longer available.');
         final task = Task.fromMap(rows.single);
+        await TaskDatabase.validateList(tx, task, owner);
         if (![...task.filePaths, ...task.imagePaths].contains(source)) {
           throw StateError('This attachment was removed.');
         }
@@ -86,6 +93,11 @@ class AttachmentStore {
         throw StateError('This attachment is no longer available.');
       }
       final item = TaskAttachment.fromMap(rows.single);
+      final tasks = await tx.query('tasks',
+          where: 'owner_key = ? AND sync_id = ?',
+          whereArgs: [owner, item.taskId]);
+      if (tasks.isEmpty) throw StateError('This task is no longer available.');
+      await TaskDatabase.validateList(tx, Task.fromMap(tasks.single), owner);
       await tx.update('task_attachments',
           {'is_deleted': 1, 'delete_pending': 1, 'error': null},
           where: 'owner_key = ? AND id = ?', whereArgs: [owner, id]);
@@ -264,6 +276,11 @@ class AttachmentStore {
       for (final data in result['results'] as List) {
         final remote = TaskAttachment.fromApi(Map<String, dynamic>.from(data));
         await db.transaction((tx) async {
+          final task = await tx.query('tasks',
+              columns: ['id'],
+              where: 'owner_key = ? AND sync_id = ?',
+              whereArgs: [owner, remote.taskId]);
+          if (task.isEmpty) return;
           final rows = await tx.query('task_attachments',
               where: 'owner_key = ? AND id = ?', whereArgs: [owner, remote.id]);
           if (rows.isEmpty) {

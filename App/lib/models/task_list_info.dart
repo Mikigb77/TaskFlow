@@ -7,6 +7,10 @@ class TaskListInfo {
   final String color;
   final bool archived;
   final int version;
+  final String role;
+  final bool shared;
+  bool get canEdit => role == 'owner' || role == 'editor';
+  bool get canManage => role == 'owner';
   final Map<String, dynamic>? conflict;
   TaskListInfo(
       {String? id,
@@ -14,6 +18,8 @@ class TaskListInfo {
       this.color = 'teal',
       this.archived = false,
       this.version = 0,
+      this.role = 'owner',
+      this.shared = false,
       this.conflict})
       : id = id ?? const Uuid().v4();
 
@@ -24,6 +30,8 @@ class TaskListInfo {
           color: color ?? this.color,
           archived: archived ?? this.archived,
           version: version,
+          role: role,
+          shared: shared,
           conflict: conflict);
 
   Map<String, dynamic> toApi() =>
@@ -33,12 +41,16 @@ class TaskListInfo {
       name: json['name'],
       color: json['color'],
       archived: json['archived'] == true,
+      role: json['role'] ?? 'owner',
+      shared: json['shared'] == true,
       version: json['version']);
   factory TaskListInfo.fromRow(Map<String, dynamic> row) => TaskListInfo(
       id: row['id'],
       name: row['name'],
       color: row['color'],
       archived: row['archived'] == 1,
+      role: row['role'] ?? 'owner',
+      shared: row['shared'] == 1,
       version: row['remote_version'],
       conflict: row['conflict'] == null ? null : jsonDecode(row['conflict']));
 }

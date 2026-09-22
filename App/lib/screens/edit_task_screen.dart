@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -16,6 +17,13 @@ class EditTaskScreen extends ConsumerWidget {
         data: (tasks) {
           final task = tasks.firstWhereOrNull((task) => task.id == taskId);
           if (task != null) {
+            if (!ref.watch(listCanEditProvider(task.listId))) {
+              return const Scaffold(
+                  appBar: CustomAppBar(title: 'View-only task'),
+                  body: EmptyState(
+                      title: 'This list is read-only',
+                      message: 'The list owner manages editing access.'));
+            }
             return TaskEditor(key: ValueKey(taskId), task: task);
           }
           return const Scaffold(

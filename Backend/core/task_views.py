@@ -5,7 +5,8 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from .models import Task, TaskEvent
 from .serializers import TaskSerializer
-from .attachment_views import delete_task_attachments
+from .attachment_views import delete_task_attachments, check_list_transfer
+from .list_access import visible_tasks, lock_task
 
 
 class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -14,39 +15,37 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
     lookup_value_regex = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
     def get_queryset(self):
-        query = Task.objects.filter(owner=self.request.user)
+        query = visible_tasks(self.request.user)
         if self.action == "list" and self.request.query_params.get("include_deleted") != "true":
             query = query.filter(is_deleted=False)
         return query
 
     def create(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            task = serializer.save(owner=request.user, version=1)
-            TaskEvent.objects.create(task=task, version=1, action="created")
-        return Response(self.get_serializer(task).data, status=201)
+        import uuid
+        return self.update(request, pk=str(uuid.uuid4()))
 
     def update(self, request, pk=None):
         # Client-generated UUIDs make offline creation idempotent.
         with transaction.atomic():
-            task = Task.objects.select_for_update().filter(pk=pk).first()
-            if task and task.owner_id != request.user.pk:
-                raise NotFound()
+            task, locked = lock_task(pk, request.user, target_list=request.data.get("list_id"))
             serializer = self.get_serializer(task, data=request.data)
             serializer.is_valid(raise_exception=True)
+            destination = serializer.validated_data.get("task_list", task.task_list if task else None)
+            if task and task.task_list_id and locked[task.task_list_id].shared and (destination is None or destination.pk != task.task_list_id):
+                raise ValidationError({"list_id": "Shared tasks stay in their list. Export and import a personal copy if needed."})
             expected = serializer.validated_data.get("version", 0)
             if task and expected != task.version:
                 return Response({"detail": "This task changed on another device.", "current": self.get_serializer(task).data}, status=409)
             if not task and expected != 0:
                 raise ValidationError({"version": "New tasks must start at version 0."})
+            check_list_transfer(task, destination)
             is_new = task is None
             try:
                 with transaction.atomic():
-                    task = serializer.save(id=pk, owner=request.user, version=(task.version + 1 if task else 1))
+                    task = serializer.save(id=pk, owner=task.owner if task else request.user, version=(task.version + 1 if task else 1))
             except IntegrityError:
                 # Concurrent first uploads cannot overwrite another owner's UUID.
-                current = Task.objects.filter(pk=pk, owner=request.user).first()
+                current = visible_tasks(request.user).filter(pk=pk).first()
                 if not current:
                     raise NotFound()
                 return Response({"detail": "Task was already uploaded.", "current": self.get_serializer(current).data}, status=409)
@@ -57,7 +56,7 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
 
     def destroy(self, request, pk=None):
         with transaction.atomic():
-            task = self.get_queryset().select_for_update().filter(pk=pk).first()
+            task, _ = lock_task(pk, request.user)
             if not task:
                 raise NotFound()
             if request.data.get("version") != task.version:

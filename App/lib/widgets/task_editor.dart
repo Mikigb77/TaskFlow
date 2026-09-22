@@ -714,6 +714,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 const SizedBox(height: 24),
                                 SectionLabel(context.l10n.theDetails),
                                 TaskListPicker(
+                                    lockShared: widget.task != null,
                                     listId: _listId,
                                     onChanged: (id) =>
                                         setState(() => _listId = id)),

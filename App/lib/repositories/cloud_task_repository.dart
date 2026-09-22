@@ -101,11 +101,38 @@ class CloudTaskRepository extends TaskRepository {
       for (final row in await database.pending(ownerKey)) {
         final data = _payload(row);
         try {
+          if (row['listId'] != null) {
+            final list = (await lists.all())
+                .where((list) => list.id == row['listId'])
+                .firstOrNull;
+            if (list == null) continue;
+            if (list.role == 'viewer') {
+              // Keep unsent work as a personal copy after an editor becomes a
+              // viewer, then restore the authoritative shared version below.
+              if ((row['remote_version'] as int) > 0) {
+                final remote = Map<String, dynamic>.from(await api.request(
+                    'GET', 'tasks/${row['sync_id']}/',
+                    accountId: accountId));
+                await database.preserveConflict(ownerKey, row, remote);
+              } else {
+                await database.recoverReadOnlyDraft(ownerKey, row['id'] as int);
+              }
+              syncError =
+                  'This list is now read-only. Your unsent task edit was kept as a personal copy.';
+              continue;
+            }
+          }
           final remote = Map<String, dynamic>.from(await api.request(
               'PUT', 'tasks/${row['sync_id']}/',
               data: data, accountId: accountId) as Map);
           await database.acknowledge(ownerKey, row, remote);
         } on ApiException catch (error) {
+          if (error.status == 403 || error.status == 404) {
+            await lists.refreshAccess(api, accountId);
+            syncError =
+                'Shared-list access changed. Refresh to finish syncing permitted edits.';
+            continue;
+          }
           if (error.status != 409 || error.body?['current'] == null) rethrow;
           final remote =
               Map<String, dynamic>.from(error.body!['current'] as Map);

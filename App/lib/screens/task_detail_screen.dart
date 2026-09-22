@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -87,18 +88,21 @@ class TaskDetailScreen extends ConsumerWidget {
                           child: Text(context.l10n.editRepeating)),
                   ])));
             }
+            final canEdit = ref.watch(listCanEditProvider(task.listId));
             return Scaffold(
               appBar: CustomAppBar(title: context.l10n.taskDetails, actions: [
-                IconButton(
-                    tooltip: context.l10n.editTask,
-                    onPressed: () => Navigator.pushNamed(context, '/editTask',
-                        arguments: taskId),
-                    icon: const Icon(Icons.edit_outlined)),
-                IconButton(
-                    tooltip: context.l10n.deleteTask,
-                    onPressed: () => _delete(context, ref, task),
-                    icon: Icon(Icons.delete_outline_rounded,
-                        color: colors.onSurfaceVariant))
+                if (canEdit)
+                  IconButton(
+                      tooltip: context.l10n.editTask,
+                      onPressed: () => Navigator.pushNamed(context, '/editTask',
+                          arguments: taskId),
+                      icon: const Icon(Icons.edit_outlined)),
+                if (canEdit)
+                  IconButton(
+                      tooltip: context.l10n.deleteTask,
+                      onPressed: () => _delete(context, ref, task),
+                      icon: Icon(Icons.delete_outline_rounded,
+                          color: colors.onSurfaceVariant))
               ]),
               body: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -109,9 +113,14 @@ class TaskDetailScreen extends ConsumerWidget {
                     Text(task.title,
                         style: Theme.of(context).textTheme.headlineLarge),
                     const SizedBox(height: 12),
+                    if (!canEdit)
+                      const MessageBanner(
+                          'View-only shared task. The list owner manages editing access.',
+                          icon: Icons.visibility_outlined),
                     Align(
                         alignment: Alignment.centerLeft,
                         child: TaskListPicker(
+                            lockShared: true,
                             listId: task.listId,
                             onChanged: (id) async {
                               try {
@@ -197,23 +206,26 @@ class TaskDetailScreen extends ConsumerWidget {
                           alignment: Alignment.centerLeft,
                           child: ReminderChip(
                               task: task,
-                              onChanged: (updated) async {
-                                try {
-                                  await ref
-                                      .read(taskProvider.notifier)
-                                      .updateTask(series!.copyWith(
-                                          reminderMinutes:
-                                              updated.reminderMinutes,
-                                          reminderTime: updated.reminderTime));
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(context
-                                                .l10n.updateReminderError)));
-                                  }
-                                }
-                              })),
+                              onChanged: !canEdit
+                                  ? null
+                                  : (updated) async {
+                                      try {
+                                        await ref
+                                            .read(taskProvider.notifier)
+                                            .updateTask(series!.copyWith(
+                                                reminderMinutes:
+                                                    updated.reminderMinutes,
+                                                reminderTime:
+                                                    updated.reminderTime));
+                                      } catch (_) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(SnackBar(
+                                                  content: Text(context.l10n
+                                                      .updateReminderError)));
+                                        }
+                                      }
+                                    })),
                     const SizedBox(height: 16),
                     if (task.checklist.isNotEmpty) ...[
                       SectionLabel(
@@ -232,23 +244,26 @@ class TaskDetailScreen extends ConsumerWidget {
                               title: Text(item.title),
                               value: item.done(
                                   occurrence: task.checklistOccurrence),
-                              onChanged: (value) async {
-                                try {
-                                  await ref
-                                      .read(taskProvider.notifier)
-                                      .setChecklistCompleted(
-                                          task, item.id, value == true);
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                'Could not update this step. Please retry.')));
-                                  }
-                                }
-                              }),
-                        const Text(
-                            'Completing the checklist does not complete the task. Use Complete when you are finished.'),
+                              onChanged: !canEdit
+                                  ? null
+                                  : (value) async {
+                                      try {
+                                        await ref
+                                            .read(taskProvider.notifier)
+                                            .setChecklistCompleted(
+                                                task, item.id, value == true);
+                                      } catch (_) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(const SnackBar(
+                                                  content: Text(
+                                                      'Could not update this step. Please retry.')));
+                                        }
+                                      }
+                                    }),
+                        if (canEdit)
+                          const Text(
+                              'Completing the checklist does not complete the task. Use Complete when you are finished.'),
                       ])),
                       const SizedBox(height: 24),
                     ],
@@ -265,30 +280,33 @@ class TaskDetailScreen extends ConsumerWidget {
                                     height: 1.6)))),
                     AttachmentPanel(task: task),
                   ]),
-              bottomNavigationBar: SafeArea(
-                  top: false,
-                  child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                      child: Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            FilledButton.icon(
-                                onPressed: () =>
-                                    TaskInteractions.toggle(context, ref, task),
-                                icon: Icon(task.isCompleted
-                                    ? Icons.undo_rounded
-                                    : Icons.check_rounded),
-                                label: Text(task.isCompleted
-                                    ? context.l10n.reopen
-                                    : context.l10n.complete)),
-                            OutlinedButton.icon(
-                                onPressed: () => TaskInteractions.reschedule(
-                                    context, ref, task),
-                                icon: const Icon(Icons.event_outlined),
-                                label: Text(context.l10n.reschedule)),
-                          ]))),
+              bottomNavigationBar: !canEdit
+                  ? null
+                  : SafeArea(
+                      top: false,
+                      child: Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                          child: Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                FilledButton.icon(
+                                    onPressed: () => TaskInteractions.toggle(
+                                        context, ref, task),
+                                    icon: Icon(task.isCompleted
+                                        ? Icons.undo_rounded
+                                        : Icons.check_rounded),
+                                    label: Text(task.isCompleted
+                                        ? context.l10n.reopen
+                                        : context.l10n.complete)),
+                                OutlinedButton.icon(
+                                    onPressed: () =>
+                                        TaskInteractions.reschedule(
+                                            context, ref, task),
+                                    icon: const Icon(Icons.event_outlined),
+                                    label: Text(context.l10n.reschedule)),
+                              ]))),
             );
           },
           loading: () =>

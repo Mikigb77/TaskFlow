@@ -13,15 +13,21 @@ Color taskListColor(String color) => switch (color) {
     };
 
 class TaskListPicker extends ConsumerWidget {
-  const TaskListPicker({super.key, required this.listId, this.onChanged});
+  const TaskListPicker(
+      {super.key,
+      required this.listId,
+      this.onChanged,
+      this.lockShared = false});
   final String? listId;
   final ValueChanged<String?>? onChanged;
+  final bool lockShared;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lists = ref.watch(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
     final selected = lists.where((list) => list.id == listId).firstOrNull;
     return ActionChip(
+        labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         avatar: Icon(Icons.folder_outlined,
             size: 18,
             color: selected == null ? null : taskListColor(selected.color)),
@@ -33,7 +39,7 @@ class TaskListPicker extends ConsumerWidget {
                         ? context.l10n.noList
                         : context.l10n.listUnavailable),
                 overflow: TextOverflow.ellipsis)),
-        onPressed: onChanged == null
+        onPressed: onChanged == null || (lockShared && selected?.shared == true)
             ? null
             : () async {
                 final chosen = await showModalBottomSheet<String>(
@@ -48,15 +54,19 @@ class TaskListPicker extends ConsumerWidget {
                               title: Text(context.l10n.noList),
                               selected: listId == null,
                               onTap: () => Navigator.pop(context, '')),
-                          for (final list in lists.where(
-                              (list) => !list.archived || list.id == listId))
+                          for (final list in lists.where((list) =>
+                              list.canEdit &&
+                              (!list.archived || list.id == listId)))
                             ListTile(
                                 leading: Icon(Icons.folder_outlined,
                                     color: taskListColor(list.color)),
                                 title: Text(list.name),
-                                subtitle: list.archived
-                                    ? Text(context.l10n.archived)
-                                    : null,
+                                subtitle: list.shared
+                                    ? const Text(
+                                        'Shared · everyone in this list can see tasks, notes and uploaded files')
+                                    : list.archived
+                                        ? Text(context.l10n.archived)
+                                        : null,
                                 selected: listId == list.id,
                                 onTap: () => Navigator.pop(context, list.id)),
                           if (lists.isEmpty)

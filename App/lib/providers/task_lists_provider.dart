@@ -11,3 +11,9 @@ final taskListsProvider = FutureProvider<List<TaskListInfo>>((ref) {
   ref.watch(taskProvider);
   return ref.watch(taskListStoreProvider).all();
 });
+
+// Unknown/revoked lists stay read-only while access metadata is loading.
+final listCanEditProvider = Provider.family<bool, String?>((ref, id) =>
+    id == null ||
+    (ref.watch(taskListsProvider).valueOrNull ?? [])
+        .any((list) => list.id == id && list.canEdit));

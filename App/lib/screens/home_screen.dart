@@ -171,7 +171,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
       bottomNavigationBar: TaskActions(
-          onCreate: () => widget.listId == null
+          onCreate: () => widget.listId == null ||
+                  !ref.read(listCanEditProvider(widget.listId))
               ? Navigator.pushNamed(context, '/createTask')
               : Navigator.push(
                   context,

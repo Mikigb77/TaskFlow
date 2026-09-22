@@ -6,7 +6,7 @@ import uuid
 from django.conf import settings
 from django.core.files.uploadhandler import FileUploadHandler, StopUpload
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import mixins, serializers, viewsets
@@ -16,6 +16,7 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .models import Attachment, Task, User
+from .list_access import visible_tasks, lock_task
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,26 @@ def delete_task_attachments(task):
         transaction.on_commit(lambda file=row.file: _remove_blob(file))
 
 
+def quota_files(user_id):
+    # A list's owner controls its files, even when the uploader has left.
+    # This also avoids charging a former member for files they cannot remove.
+    return Attachment.objects.filter(
+        Q(task__task_list__owner_id=user_id) | Q(task__task_list__isnull=True, owner_id=user_id),
+        is_deleted=False, task__is_deleted=False)
+
+
+def check_list_transfer(task, destination):
+    if task is None or (destination.pk if destination else None) == task.task_list_id:
+        return
+    owner_id = destination.owner_id if destination else task.owner_id
+    list(User.objects.select_for_update().filter(pk__in={owner_id, task.owner_id}).order_by('pk'))
+    moving = task.attachments.filter(is_deleted=False)
+    existing = quota_files(owner_id).exclude(task=task)
+    size = (moving.aggregate(total=Sum('size'))['total'] or 0) + (existing.aggregate(total=Sum('size'))['total'] or 0)
+    if size > settings.ATTACHMENT_ACCOUNT_BYTES or moving.count() + existing.count() > 1000:
+        raise ValidationError({'list_id': 'This destination does not have enough file storage. Remove a backed-up file before moving the task.'})
+
+
 class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = AttachmentSerializer
     parser_classes = [MultiPartParser, JSONParser]
@@ -92,7 +113,7 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
     lookup_value_regex = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
     def get_queryset(self):
-        rows = Attachment.objects.filter(owner=self.request.user).select_related("task")
+        rows = Attachment.objects.filter(task__in=visible_tasks(self.request.user)).select_related("task")
         if self.action != "list" or self.request.query_params.get("include_deleted") != "true":
             rows = rows.filter(is_deleted=False, task__is_deleted=False)
         task_id = self.request.query_params.get("task_id")
@@ -119,10 +140,11 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
         try:
             with transaction.atomic():
                 # Serialize quota checks and uploads across this account.
-                User.objects.select_for_update().get(pk=request.user.pk)
-                task = Task.objects.select_for_update().filter(pk=data["task_id"], owner=request.user, is_deleted=False).first()
-                if task is None:
+                task, _ = lock_task(data["task_id"], request.user)
+                if task is None or task.is_deleted:
                     raise NotFound()
+                quota_owner = task.task_list.owner_id if task.task_list_id else task.owner_id
+                list(User.objects.select_for_update().filter(pk__in={quota_owner, request.user.pk}).order_by('pk'))
                 existing = Attachment.objects.select_for_update().filter(pk=pk).first()
                 if existing is not None:
                     if existing.owner_id != request.user.pk:
@@ -138,11 +160,11 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
                         stored = existing.file
                         existing.save(update_fields=["file", "updated_at"])
                     return Response(self.get_serializer(existing).data)
-                rows = Attachment.objects.filter(owner=request.user, is_deleted=False, task__is_deleted=False)
+                rows = quota_files(quota_owner)
                 used = rows.aggregate(total=Sum("size"))["total"] or 0
                 if used + upload.size > settings.ATTACHMENT_ACCOUNT_BYTES or rows.count() >= 1000:
-                    raise ValidationError({"file": "Your account attachment storage is full. Remove a backed-up file before uploading another."})
-                if rows.filter(task=task).count() >= 20:
+                    raise ValidationError({"file": "The account or list owner's file storage is full. Remove a backed-up file before uploading another."})
+                if Attachment.objects.filter(task=task, is_deleted=False).count() >= 20:
                     raise ValidationError({"file": "Use at most 20 backed-up attachments per task."})
                 item = Attachment(id=pk, owner=request.user, task=task, name=data["name"], size=upload.size, sha256=checksum)
                 item.file.save("upload.blob", upload, save=False)
@@ -174,10 +196,11 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
 
     def destroy(self, request, pk=None):
         with transaction.atomic():
-            User.objects.select_for_update().get(pk=request.user.pk)
-            item = Attachment.objects.select_for_update().filter(pk=pk, owner=request.user).first()
+            item = Attachment.objects.filter(pk=pk).first()
             if item is None:
                 raise NotFound()
+            lock_task(item.task_id, request.user)
+            item = Attachment.objects.select_for_update().get(pk=pk)
             if not item.is_deleted:
                 item.is_deleted = True
                 item.save(update_fields=["is_deleted", "updated_at"])

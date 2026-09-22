@@ -10,6 +10,7 @@ The Django service, Docker Compose configuration, environment files, and backend
 
 - Voice and typed capture with retained unfinished input, editable drafts and partial-batch saving. AI processing needs a connection; provider failures keep the input available for retry.
 - Unscheduled Inbox, date-only and timed tasks, personal lists, labels and checklists.
+- Shared household lists with explicit invitation codes, editor/viewer roles, conflict recovery and membership controls. Files follow list access; cached group content is removed on the next successful access refresh after leaving/removal. See [sharing validation](docs/SHARING_VALIDATION.md).
 - Recurrence intervals, selected weekdays and individual occurrence move/skip controls.
 - Opt-in reminders with explicit lead times, snooze, notification actions and configurable daily check-ins. Scheduling/delivery limitations are documented in [reminder validation](docs/REMINDER_VALIDATION.md).
 - Local task storage with account-isolated sync, conflict preservation and private attachment upload/download. Older device-only files require an explicit Upload.

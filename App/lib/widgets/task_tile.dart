@@ -23,6 +23,9 @@ class TaskTile extends ConsumerWidget {
         .where((list) => list.id == task.listId)
         .firstOrNull;
     return Dismissible(
+        direction: ref.watch(listCanEditProvider(task.listId))
+            ? DismissDirection.horizontal
+            : DismissDirection.none,
         key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
@@ -54,7 +57,9 @@ class TaskTile extends ConsumerWidget {
                         taskId: task.id!,
                         occurrenceDate: task.occurrenceDate,
                         occurrenceKey: task.occurrenceId))),
-            onLongPress: () => TaskInteractions.reschedule(context, ref, task),
+            onLongPress: ref.watch(listCanEditProvider(task.listId))
+                ? () => TaskInteractions.reschedule(context, ref, task)
+                : null,
             child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
                 child: Row(
@@ -67,8 +72,11 @@ class TaskTile extends ConsumerWidget {
                           child: Checkbox(
                               value: task.isCompleted,
                               shape: const CircleBorder(),
-                              onChanged: (_) =>
-                                  TaskInteractions.toggle(context, ref, task))),
+                              onChanged:
+                                  ref.watch(listCanEditProvider(task.listId))
+                                      ? (_) => TaskInteractions.toggle(
+                                          context, ref, task)
+                                      : null)),
                       const SizedBox(width: 4),
                       Expanded(
                           child: Column(

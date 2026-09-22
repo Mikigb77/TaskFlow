@@ -306,6 +306,7 @@ class _Api extends ApiClient {
       bool authenticated = true,
       int? accountId}) async {
     if (offline) throw ApiException(0, 'Offline');
+    if (path == 'lists/access/') return {'lists': []};
     if (path.startsWith('attachments/')) return {'results': [], 'next': null};
     if (method == 'GET' && path.startsWith('lists/')) {
       return {'results': [], 'next': null};

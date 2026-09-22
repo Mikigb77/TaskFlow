@@ -56,11 +56,16 @@ class ZonedDateTimeField(serializers.DateTimeField):
 
 class TaskListSerializer(serializers.ModelSerializer):
     version = serializers.IntegerField(min_value=0, default=0)
+    role = serializers.SerializerMethodField()
+
+    def get_role(self, value):
+        from .list_access import list_role
+        return list_role(value, self.context["request"].user)
 
     class Meta:
         model = TaskList
-        fields = ["id", "name", "color", "archived", "version", "updated_at"]
-        read_only_fields = ["id", "updated_at"]
+        fields = ["id", "name", "color", "archived", "version", "updated_at", "shared", "role"]
+        read_only_fields = ["id", "updated_at", "shared", "role"]
 
 
 class OccurrenceExceptionSerializer(serializers.Serializer):
@@ -129,7 +134,8 @@ class TaskSerializer(serializers.ModelSerializer):
         fields = super().get_fields()
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            fields["list_id"].queryset = TaskList.objects.filter(owner=request.user)
+            from .list_access import visible_lists
+            fields["list_id"].queryset = visible_lists(request.user)
         return fields
 
     def validate_labels(self, value):

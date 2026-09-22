@@ -6,11 +6,11 @@ import uuid
 
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import close_old_connections
+from django.db import close_old_connections, connections
 from django.test import TransactionTestCase, override_settings, skipUnlessDBFeature
 from rest_framework.test import APIClient
 
-from .models import Attachment, Task, User
+from .models import Attachment, Task, User, TaskList, ListMembership
 
 
 @skipUnlessDBFeature("has_select_for_update")
@@ -39,7 +39,7 @@ class AttachmentConcurrencyTests(TransactionTestCase):
                 }, format="multipart")
                 return response.status_code
             finally:
-                close_old_connections()
+                connections.close_all()
         with ThreadPoolExecutor(max_workers=2) as pool:
             return sorted(pool.map(upload, ids))
 
@@ -54,3 +54,29 @@ class AttachmentConcurrencyTests(TransactionTestCase):
         self.assertEqual(self.upload_pair([id, id]), [200, 201])
         self.assertEqual(Attachment.objects.count(), 1)
         self.assertEqual(len(list(Path(self.directory.name).rglob("*.blob"))), 1)
+
+    def test_different_members_and_lists_share_the_list_owners_quota(self):
+        inputs = []
+        for number in range(2):
+            member = User.objects.create_user(f'member-{number}@example.invalid', 'Fixture-passphrase!2026')
+            task_list = TaskList.objects.create(owner=self.owner, name=f'Household {number}', shared=True)
+            ListMembership.objects.create(task_list=task_list, user=member, role='editor')
+            task = Task.objects.create(owner=member, task_list=task_list, title='Recipe')
+            inputs.append((member, task))
+        barrier = Barrier(2)
+        def upload(pair):
+            close_old_connections()
+            try:
+                member, task = pair
+                client = APIClient()
+                client.force_authenticate(member)
+                barrier.wait(timeout=10)
+                return client.put(f'/api/attachments/{uuid.uuid4()}/', {
+                    'task_id': str(task.pk), 'name': 'file.txt',
+                    'file': SimpleUploadedFile('file.txt', b'four'),
+                }, format='multipart').status_code
+            finally:
+                connections.close_all()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(upload, inputs)), [201, 400])
+        self.assertEqual(Attachment.objects.count(), 1)

@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 13;
+  static const schemaVersion = 14;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -129,6 +129,20 @@ class TaskDatabase {
       await db.execute(
           "ALTER TABLE tasks ADD COLUMN reminderAnchor TEXT NOT NULL DEFAULT 'planned'");
     }
+    if (oldVersion < 14 && newVersion >= 14) {
+      // Some older migrations create list tables using the current definition.
+      final columns = (await db.rawQuery('PRAGMA table_info(task_lists)'))
+          .map((row) => row['name'])
+          .toSet();
+      if (!columns.contains('role')) {
+        await db.execute(
+            "ALTER TABLE task_lists ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'");
+      }
+      if (!columns.contains('shared')) {
+        await db.execute(
+            'ALTER TABLE task_lists ADD COLUMN shared INTEGER NOT NULL DEFAULT 0');
+      }
+    }
   }
 
   static Future<void> createAttachmentTables(Database db) async {
@@ -181,6 +195,7 @@ class TaskDatabase {
       id TEXT NOT NULL, owner_key TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'teal',
       archived INTEGER NOT NULL DEFAULT 0, remote_version INTEGER NOT NULL DEFAULT 0,
       revision INTEGER NOT NULL DEFAULT 0, sync_pending INTEGER NOT NULL DEFAULT 0, conflict TEXT,
+      role TEXT NOT NULL DEFAULT 'owner', shared INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY(owner_key, id))''');
     await db.execute('''CREATE TABLE IF NOT EXISTS list_imports(
       owner_key TEXT NOT NULL, source_id TEXT NOT NULL, target_id TEXT NOT NULL,
@@ -191,10 +206,13 @@ class TaskDatabase {
       DatabaseExecutor db, Task task, String owner) async {
     if (task.listId == null) return;
     final rows = await db.query('task_lists',
-        columns: ['id'],
+        columns: ['id', 'role'],
         where: 'id = ? AND owner_key = ?',
         whereArgs: [task.listId, owner]);
     if (rows.isEmpty) throw StateError('Choose a list from this account.');
+    if (rows.single['role'] == 'viewer') {
+      throw StateError('This shared list is read-only.');
+    }
   }
 
   static Future<void> createReminderTables(Database db) async {
@@ -273,6 +291,17 @@ class TaskDatabase {
       if (previous.isEmpty) {
         throw StateError('This task is no longer in the current account.');
       }
+      await validateList(tx, Task.fromMap(previous.single), ownerKey);
+      if (previous.single['listId'] != task.listId &&
+          previous.single['listId'] != null) {
+        final lists = await tx.query('task_lists',
+            where: 'id = ? AND owner_key = ? AND shared = 1',
+            whereArgs: [previous.single['listId'], ownerKey]);
+        if (lists.isNotEmpty) {
+          throw StateError(
+              'Shared tasks stay in their list. Export a personal copy if needed.');
+        }
+      }
       final values = task.toMap()..remove('id');
       final count = await tx.update(
           'tasks', {...values, 'sync_pending': ownerKey == 'local' ? 0 : 1},
@@ -299,14 +328,28 @@ class TaskDatabase {
       return db.delete('tasks',
           where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
     }
-    return db.rawUpdate(
-        'UPDATE tasks SET is_deleted = 1, sync_pending = 1, revision = revision + 1 WHERE id = ? AND owner_key = ?',
-        [id, ownerKey]);
+    return db.transaction((tx) async {
+      final rows = await tx.query('tasks',
+          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      if (rows.isEmpty) return 0;
+      await validateList(tx, Task.fromMap(rows.single), ownerKey);
+      return tx.rawUpdate(
+          'UPDATE tasks SET is_deleted = 1, sync_pending = 1, revision = revision + 1 WHERE id = ? AND owner_key = ?',
+          [id, ownerKey]);
+    });
   }
 
   Future<List<Map<String, dynamic>>> pending(String ownerKey) async =>
       (await database).query('tasks',
           where: 'owner_key = ? AND sync_pending = 1', whereArgs: [ownerKey]);
+
+  Future<void> recoverReadOnlyDraft(String ownerKey, int id) async {
+    await (await database).rawUpdate(
+        '''UPDATE tasks SET listId = NULL, revision = revision + 1
+      WHERE owner_key = ? AND id = ? AND remote_version = 0 AND sync_pending = 1
+      AND listId IN (SELECT id FROM task_lists WHERE owner_key = ? AND role = 'viewer')''',
+        [ownerKey, id, ownerKey]);
+  }
 
   Future<void> acknowledge(String ownerKey, Map<String, dynamic> sent,
       Map<String, dynamic> remote) async {
@@ -330,6 +373,15 @@ class TaskDatabase {
   Future<void> mergeRemote(String ownerKey, Map<String, dynamic> remote) async {
     final db = await database;
     await db.transaction((tx) async {
+      if (remote['list_id'] != null) {
+        final access = await tx.query('task_lists',
+            columns: ['id'],
+            where: 'owner_key = ? AND id = ?',
+            whereArgs: [ownerKey, remote['list_id']]);
+        // A late page from another sync isolate must not reinsert group data
+        // after a newer access snapshot has removed the cached membership.
+        if (access.isEmpty) return;
+      }
       final rows = await tx.query('tasks',
           where: 'owner_key = ? AND sync_id = ?',
           whereArgs: [ownerKey, remote['id']]);
@@ -360,6 +412,14 @@ class TaskDatabase {
       final local = Map<String, dynamic>.from(rows.single);
       // Keep offline edits as a visible copy instead of overwriting another device.
       if (local['is_deleted'] == 0) {
+        final lists = local['listId'] == null
+            ? []
+            : await tx.query('task_lists',
+                where: 'id = ? AND owner_key = ? AND shared = 1',
+                whereArgs: [local['listId'], ownerKey]);
+        // A conflicting group edit becomes a personal copy, not a duplicate
+        // sent back to everyone else's shared list.
+        if (lists.isNotEmpty) local['listId'] = null;
         final title = '${local['title']} (offline copy)';
         local.remove('id');
         await tx.insert('tasks', {

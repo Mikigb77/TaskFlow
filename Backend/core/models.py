@@ -36,11 +36,36 @@ class TaskList(models.Model):
     color = models.CharField(max_length=8, default="teal", choices=[
         (value, value) for value in ("teal", "blue", "violet", "amber", "rose")])
     archived = models.BooleanField(default=False)
+    shared = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["name", "id"]
+
+
+class ListMembership(models.Model):
+    task_list = models.ForeignKey(TaskList, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="list_memberships")
+    role = models.CharField(max_length=8, choices=[("editor", "editor"), ("viewer", "viewer")])
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["task_list", "user"], name="unique_list_member"),
+                       models.CheckConstraint(condition=models.Q(role__in=["editor", "viewer"]), name="valid_list_role")]
+
+
+class ListInvitation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task_list = models.ForeignKey(TaskList, on_delete=models.CASCADE, related_name="invitations")
+    email = models.EmailField()
+    role = models.CharField(max_length=8, choices=[("editor", "editor"), ("viewer", "viewer")])
+    expires_at = models.DateTimeField()
+    code_digest = models.CharField(max_length=64)
+    state = models.CharField(max_length=8, default="pending", choices=[(v, v) for v in ("pending", "accepted", "declined", "revoked")])
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["task_list", "email"], name="unique_list_invitation")]
 
 
 class Task(models.Model):

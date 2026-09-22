@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:agenda/screens/list_sharing_screen.dart';
+import 'package:agenda/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -157,6 +159,15 @@ class TaskListsScreen extends ConsumerWidget {
                     child: const Text('Retry lists'))),
             data: (lists) =>
                 ListView(padding: const EdgeInsets.all(24), children: [
+                  const ListInvitations(),
+                  TextButton.icon(
+                      onPressed: () async {
+                        ref.invalidate(invitationsProvider);
+                        await ref.read(taskProvider.notifier).loadTasks();
+                        ref.invalidate(taskListsProvider);
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Refresh lists and invitations')),
                   const Text(
                       'Keep work, life and everything else in their own lists. Inbox still collects tasks without a date.'),
                   const SizedBox(height: 20),
@@ -171,14 +182,18 @@ class TaskListsScreen extends ConsumerWidget {
                         leading: Icon(
                             list.archived
                                 ? Icons.inventory_2_outlined
-                                : Icons.folder_outlined,
+                                : list.shared
+                                    ? Icons.group_outlined
+                                    : Icons.folder_outlined,
                             color: taskListColor(list.color)),
                         title: Text(list.name),
-                        subtitle: Text(list.conflict != null
-                            ? 'Changed on another device · choose details'
-                            : list.archived
-                                ? 'Archived · tasks still available'
-                                : '${(ref.watch(taskProvider).valueOrNull ?? []).where((task) => task.listId == list.id).length} tasks'),
+                        subtitle: Text(list.shared
+                            ? '${list.role} · shared${list.archived ? ' · archived' : ''}'
+                            : list.conflict != null
+                                ? 'Changed on another device · choose details'
+                                : list.archived
+                                    ? 'Archived · tasks still available'
+                                    : '${(ref.watch(taskProvider).valueOrNull ?? []).where((task) => task.listId == list.id).length} tasks'),
                         onTap: () => list.conflict != null
                             ? _resolve(context, ref, list)
                             : Navigator.push(
@@ -189,14 +204,22 @@ class TaskListsScreen extends ConsumerWidget {
                         trailing: PopupMenuButton<String>(
                             tooltip: 'Manage ${list.name}',
                             itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                      value: 'edit', child: Text('Edit list')),
-                                  PopupMenuItem(
-                                      value: 'archive',
-                                      child: Text(list.archived
-                                          ? 'Restore list'
-                                          : 'Archive list')),
-                                  if (list.conflict != null)
+                                  if (list.canManage)
+                                    const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Text('Edit list')),
+                                  if (list.canManage)
+                                    PopupMenuItem(
+                                        value: 'archive',
+                                        child: Text(list.archived
+                                            ? 'Restore list'
+                                            : 'Archive list')),
+                                  if (ref.read(authProvider).account != null &&
+                                      list.version > 0)
+                                    const PopupMenuItem(
+                                        value: 'sharing',
+                                        child: Text('Sharing and people')),
+                                  if (list.conflict != null && list.canManage)
                                     const PopupMenuItem(
                                         value: 'resolve',
                                         child: Text('Choose details'))
@@ -204,6 +227,11 @@ class TaskListsScreen extends ConsumerWidget {
                             onSelected: (action) => switch (action) {
                                   'edit' => _edit(context, ref, list),
                                   'resolve' => _resolve(context, ref, list),
+                                  'sharing' => Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                          builder: (_) => ListSharingScreen(
+                                              listId: list.id))),
                                   _ => _archive(context, ref, list)
                                 })),
                     const Divider(),

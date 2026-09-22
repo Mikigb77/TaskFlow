@@ -81,11 +81,13 @@ For local recovery, choose Forgot password in the app or browser, enter the acco
 - Existing guest tasks are imported only by choosing **Import local tasks** in Account. The import moves them once into the selected account.
 - Newly attached files in signed-in tasks queue for upload after the task is saved. Task details show local, queued, backed-up, downloadable and removal-pending states. Guest files and older device-only files remain local until explicitly uploaded from task details; importing guest tasks does not upload their files automatically.
 - Each file is limited to 6 MiB, each task to 20 uploaded files, and each account to 64 MiB / 1,000 active files. Transfers use stable UUIDs and SHA-256 checks; interrupted uploads retry without duplicating files. Downloads are explicit and verified before they become available locally. An upload error does not undo the saved task.
-- Files are account-private, stored in the `taskflow_media` Docker volume at `/app/private_media`, and served only through authenticated endpoints. Original filenames are metadata; no public storage URL is exposed. Removing an attachment or task revokes its download and propagates a deletion tombstone. This local volume is persistence across container recreation, not an off-host backup service.
+- Files are private to the task's account or current shared-list members, stored in the `taskflow_media` Docker volume at `/app/private_media`, and served only through authenticated endpoints. Original filenames are metadata; no public storage URL is exposed. Shared-list files use the list owner's storage quota. Removing an attachment/task or revoking membership removes download access. This local volume is persistence across container recreation, not an off-host backup service.
 - Changes are saved locally first. Sync runs after changes, on app launch, when Calendar resumes, and when you press Sync. Offline changes wait in the local queue.
 - UUIDs make retries idempotent. Version checks prevent overwriting another device's updates. Conflicting edits are kept as an **offline copy**, ready for the next sync. Conflicting deletions are cancelled so a newer remote edit is preserved. The Calendar/Account sync message explains conflicts or connection failures.
 - Deletions are stored as server tombstones so other devices also remove the task. Task history records creation, updates, and deletion without copying task contents into logs.
 - Reminder notifications are rebuilt for the current account. Old tasks are no longer silently purged at startup.
+
+Shared lists support owner, editor and viewer roles. Owners issue email-bound invitations with a single-display code that must be shared separately; recipients enter it in Lists to accept within seven days. No invitation email is sent. Owners manage membership and deletion; editors modify tasks/files; viewers read. A complete access snapshot is fetched before queued writes. Downgraded edits and conflicts become personal copies; removal/leave purges group caches and downloaded copies at the next successful refresh. Prior exports and offline devices cannot be remotely erased. See [sharing validation](../App/docs/SHARING_VALIDATION.md) for scope and the real two-account checks.
 
 ## Voice and AI
 
@@ -130,9 +132,13 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | GET, POST | `tasks/` | Paginated list or create task |
 | GET, PUT, DELETE | `tasks/<uuid>/` | Read, idempotent upsert, soft delete |
 | GET | `tasks/<uuid>/history/` | Task event history |
-| GET | `attachments/` | Account-scoped metadata; optional task_id / include_deleted=true |
+| GET | `attachments/` | Accessible task metadata; optional task_id / include_deleted=true |
 | GET, PUT, DELETE | `attachments/<uuid>/` | Metadata, immutable multipart upload (task_id/name/file), removal |
 | GET | `attachments/<uuid>/content/` | Authenticated private download; no public file URL |
+| GET | `lists/access/` | Complete current list membership snapshot |
+| GET | `lists/<uuid>/sharing/` | Roles and owner-only membership/invitation details |
+| POST | `lists/<uuid>/invite/`, `revoke_invite/`, `member/`, `leave/` | Explicit invitation and membership changes |
+| GET, POST | `invitations/`, `invitations/<uuid>/respond/` | Pending invites; accept with code or decline |
 | POST | `ai/draft/` | JSON text or multipart WAV + timezone |
 | POST | `ai/drafts/` | Guest or signed-in text/WAV capture; returns up to 12 reviewed drafts |
 

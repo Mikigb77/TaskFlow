@@ -183,6 +183,9 @@ class _ListApi extends ApiClient {
       bool authenticated = true,
       int? accountId}) async {
     if (offline) throw ApiException(0, 'Offline');
+    if (path == 'lists/access/') {
+      return {'lists': lists.values.map(_clone).toList()};
+    }
     if (path.startsWith('attachments/')) return {'results': [], 'next': null};
     final values = path.startsWith('lists/') ? lists : tasks;
     if (method == 'GET') {

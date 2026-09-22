@@ -4,6 +4,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_attachment.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -196,7 +197,11 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                     icon: const Icon(Icons.open_in_new_rounded,
                                         size: 18),
                                     label: Text(context.l10n.fileOpen)),
-                              if (entry.item == null && entry.exists && !local)
+                              if (entry.item == null &&
+                                  entry.exists &&
+                                  !local &&
+                                  ref.watch(
+                                      listCanEditProvider(widget.task.listId)))
                                 TextButton.icon(
                                     onPressed: _busy
                                         ? null
@@ -249,7 +254,9 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                             .read(taskProvider.notifier)
                                             .loadTasks()),
                                     child: Text(context.l10n.fileRetry)),
-                              if (entry.item?.deleted != true)
+                              if (entry.item?.deleted != true &&
+                                  ref.watch(
+                                      listCanEditProvider(widget.task.listId)))
                                 TextButton(
                                     onPressed:
                                         _busy ? null : () => _remove(entry),
