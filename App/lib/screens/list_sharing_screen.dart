@@ -1,4 +1,5 @@
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/services/api_client.dart';
@@ -66,28 +67,27 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                       dialogRef.watch(authProvider).account?.id == account.id;
                   return AlertDialog(
                       scrollable: true,
-                      title: const Text('Invitation code'),
+                      title: Text(context.l10n.invitationCode),
                       content: sameAccount
                           ? Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                  const Text(
-                                      'Give this code to the intended person through a channel you trust. They need it and the invited TaskFlow account to accept. The code is shown only now; replacing an invitation invalidates its previous code.'),
+                                  Text(context.l10n.invitationCodeHelp),
                                   const SizedBox(height: 16),
                                   SelectableText(code,
                                       key: const ValueKey('invitation-code')),
                                 ])
-                          : const Text('The account changed.'),
+                          : Text(context.l10n.accountChanged),
                       actions: [
                         if (sameAccount)
                           TextButton(
                               onPressed: () =>
                                   Clipboard.setData(ClipboardData(text: code)),
-                              child: const Text('Copy code')),
+                              child: Text(context.l10n.copyCode)),
                         FilledButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Done'))
+                            child: Text(context.l10n.done))
                       ]);
                 }));
       }
@@ -96,7 +96,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
       if (mounted) {
         setState(() => _error = error is ApiException
             ? error.message
-            : 'Could not update sharing. Check the connection and retry.');
+            : context.l10n.sharingUpdateError);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -112,50 +112,51 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
         builder: (context) => StatefulBuilder(
             builder: (context, update) => AlertDialog(
                   scrollable: true,
-                  title: const Text('Invite to this list'),
+                  title: Text(context.l10n.inviteToList),
                   content: Form(
                       key: form,
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Text(
-                            'All tasks, notes and uploaded files in this list will be visible after they accept. The invitation appears in their TaskFlow account; no email is sent. Give them the code shown next. It expires in 7 days.'),
+                        Text(context.l10n.inviteHelp),
                         const SizedBox(height: 16),
                         TextFormField(
                             key: const ValueKey('invite-email'),
                             keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                                labelText: 'Their account email'),
+                            decoration: InputDecoration(
+                                labelText: context.l10n.inviteeEmail,
+                                errorMaxLines: 3),
                             onChanged: (value) => email = value.trim(),
                             validator: (value) => value?.contains('@') == true
                                 ? null
-                                : 'Enter an email address.'),
+                                : context.l10n.enterEmailAddress),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                             initialValue: role,
                             isExpanded: true,
                             decoration:
-                                const InputDecoration(labelText: 'Access'),
-                            items: const [
+                                InputDecoration(labelText: context.l10n.access),
+                            items: [
                               DropdownMenuItem(
-                                  value: 'editor', child: Text('Editor')),
+                                  value: 'editor',
+                                  child: Text(context.l10n.roleEditor)),
                               DropdownMenuItem(
-                                  value: 'viewer', child: Text('Viewer'))
+                                  value: 'viewer',
+                                  child: Text(context.l10n.roleViewer))
                             ],
                             onChanged: (value) => update(() => role = value!)),
                         const SizedBox(height: 12),
-                        const Text(
-                            'Editors can add, change, complete and delete tasks and files. Only the owner manages the list and people. Shared tasks stay in this list; exporting creates a personal copy.'),
+                        Text(context.l10n.sharingRolesHelp),
                       ])),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel')),
+                        child: Text(context.l10n.cancel)),
                     FilledButton(
                         onPressed: () {
                           if (form.currentState!.validate()) {
                             Navigator.pop(context, true);
                           }
                         },
-                        child: const Text('Create invitation'))
+                        child: Text(context.l10n.createInvitation))
                   ],
                 )));
     if (confirmed == true && mounted) {
@@ -173,7 +174,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel')),
+                        child: Text(context.l10n.cancel)),
                     FilledButton(
                         onPressed: () => Navigator.pop(context, true),
                         child: Text(title))
@@ -182,7 +183,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: const CustomAppBar(title: 'List sharing'),
+        appBar: CustomAppBar(title: context.l10n.listSharing),
         body: ref.watch(listSharingProvider(widget.listId)).when(
             skipLoadingOnRefresh: false,
             skipLoadingOnReload: false,
@@ -192,12 +193,12 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   MessageBanner(
                       error is ApiException
                           ? error.message
-                          : 'Could not load sharing.',
+                          : context.l10n.sharingLoadError,
                       isError: true),
                   TextButton(
                       onPressed: () =>
                           ref.invalidate(listSharingProvider(widget.listId)),
-                      child: const Text('Retry'))
+                      child: Text(context.l10n.retry))
                 ]),
             data: (data) {
               final list = data['list'] as Map;
@@ -206,10 +207,10 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                 Text(list['name'] as String,
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 8),
-                Text('Your role: ${list['role']}'),
+                Text(context.l10n
+                    .yourRole(context.listRole(list['role'] as String))),
                 const SizedBox(height: 16),
-                const Text(
-                    'Share shopping and chores. Changes sync when the app connects or you refresh.'),
+                Text(context.l10n.sharingHelp),
                 if (_error != null) MessageBanner(_error!, isError: true),
                 if (_busy) const LinearProgressIndicator(),
                 const SizedBox(height: 20),
@@ -218,34 +219,36 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                       key: const ValueKey('invite-person'),
                       onPressed: _busy ? null : _invite,
                       icon: const Icon(Icons.person_add_outlined),
-                      label: const Text('Invite a person')),
+                      label: Text(context.l10n.invitePerson)),
                   const SizedBox(height: 16),
-                  const SectionLabel('People'),
+                  SectionLabel(context.l10n.people),
                   if ((data['members'] as List).isEmpty)
-                    const Text('Only you have accepted access so far.'),
+                    Text(context.l10n.noOtherMembers),
                   for (final member in data['members'] as List)
                     ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(member['user__email'] as String),
-                        subtitle: Text(member['role'] as String),
+                        subtitle:
+                            Text(context.listRole(member['role'] as String)),
                         trailing: PopupMenuButton<String>(
                             enabled: !_busy,
-                            tooltip: 'Manage ${member['user__email']}',
-                            itemBuilder: (_) => const [
+                            tooltip: context.l10n
+                                .manageItem(member['user__email'] as String),
+                            itemBuilder: (_) => [
                                   PopupMenuItem(
                                       value: 'editor',
-                                      child: Text('Make editor')),
+                                      child: Text(context.l10n.makeEditor)),
                                   PopupMenuItem(
                                       value: 'viewer',
-                                      child: Text('Make viewer')),
+                                      child: Text(context.l10n.makeViewer)),
                                   PopupMenuItem(
                                       value: 'remove',
-                                      child: Text('Remove access'))
+                                      child: Text(context.l10n.removeAccess))
                                 ],
                             onSelected: (role) async {
                               if (role == 'remove' &&
-                                  !await _confirm('Remove access',
-                                      'This person will lose access to this list and its tasks and files. Their unsent shared edits will be removed on the next successful sync.')) {
+                                  !await _confirm(context.l10n.removeAccess,
+                                      context.l10n.removeAccessHelp)) {
                                 return;
                               }
                               if (mounted) {
@@ -255,12 +258,13 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                                 });
                               }
                             })),
-                  const SectionLabel('Pending invitations'),
+                  SectionLabel(context.l10n.pendingInvitations),
                   for (final invitation in data['invitations'] as List)
                     ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(invitation['email'] as String),
-                        subtitle: Text('${invitation['role']} · pending'),
+                        subtitle: Text(context.l10n.pendingRole(
+                            context.listRole(invitation['role'] as String))),
                         onTap: _busy
                             ? null
                             : () => _run('invite/', {
@@ -268,51 +272,49 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                                   'role': invitation['role']
                                 }),
                         trailing: IconButton(
-                            tooltip: 'Revoke invitation',
+                            tooltip: context.l10n.revokeInvitation,
                             onPressed: _busy
                                 ? null
                                 : () => _run('revoke_invite/',
                                     {'invitation_id': invitation['id']}),
                             icon: const Icon(Icons.close))),
                   if ((data['invitations'] as List).isNotEmpty)
-                    const Text('Tap a pending invitation to replace its code.'),
-                  const ExpansionTile(
-                      title: Text('How sharing works'),
+                    Text(context.l10n.replaceInvitationHelp),
+                  ExpansionTile(
+                      title: Text(context.l10n.howSharingWorks),
                       tilePadding: EdgeInsets.zero,
                       children: [
-                        Text(
-                            'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.'),
-                        SizedBox(height: 12),
-                        Text(
-                            'Leaving or losing access removes this phone’s shared tasks, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.'),
+                        Text(context.l10n.sharedDataHelp),
+                        const SizedBox(height: 12),
+                        Text(context.l10n.sharingRemovalHelp),
                       ]),
                   const SizedBox(height: 24),
                   OutlinedButton(
                       onPressed: _busy
                           ? null
                           : () async {
-                              if (await _confirm('Delete list',
-                                  'Delete this list and all its tasks and uploaded files for everyone? This cannot be undone.')) {
+                              if (await _confirm(context.l10n.deleteList,
+                                  context.l10n.deleteListHelp)) {
                                 if (mounted) {
                                   await _run('', {'version': list['version']},
                                       deleting: true);
                                 }
                               }
                             },
-                      child: const Text('Delete list for everyone')),
+                      child: Text(context.l10n.deleteListForEveryone)),
                 ] else
                   OutlinedButton(
                       onPressed: _busy
                           ? null
                           : () async {
-                              if (await _confirm('Leave list',
-                                  'Shared tasks, files and any unsent edits will be removed from this phone. Other members keep the list.')) {
+                              if (await _confirm(context.l10n.leaveList,
+                                  context.l10n.leaveListHelp)) {
                                 if (mounted) {
                                   await _run('leave/', {}, leave: true);
                                 }
                               }
                             },
-                      child: const Text('Leave list')),
+                      child: Text(context.l10n.leaveList)),
               ]);
             }),
       );
@@ -338,36 +340,36 @@ class _ListInvitationsState extends ConsumerState<ListInvitations> {
           context: context,
           builder: (context) => AlertDialog(
                   scrollable: true,
-                  title: const Text('Enter invitation code'),
+                  title: Text(context.l10n.enterInvitationCode),
                   content: Form(
                       key: form,
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Text(
-                            'Ask the list owner for the code they received when inviting you.'),
+                        Text(context.l10n.requestInvitationCodeHelp),
                         const SizedBox(height: 12),
                         TextFormField(
                             key: const ValueKey('accept-invitation-code'),
                             maxLength: 128,
                             autocorrect: false,
                             enableSuggestions: false,
-                            decoration: const InputDecoration(
-                                labelText: 'Invitation code'),
+                            decoration: InputDecoration(
+                                labelText: context.l10n.invitationCode,
+                                errorMaxLines: 3),
                             onChanged: (value) => entered = value.trim(),
                             validator: (_) => entered.length >= 16
                                 ? null
-                                : 'Paste the full invitation code.'),
+                                : context.l10n.invitationCodeRequired),
                       ])),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel')),
+                        child: Text(context.l10n.cancel)),
                     FilledButton(
                         onPressed: () {
                           if (form.currentState!.validate()) {
                             Navigator.pop(context, entered);
                           }
                         },
-                        child: const Text('Join list'))
+                        child: Text(context.l10n.joinList))
                   ]));
       if (code == null ||
           !mounted ||
@@ -392,7 +394,7 @@ class _ListInvitationsState extends ConsumerState<ListInvitations> {
       if (mounted) {
         setState(() => _error = error is ApiException
             ? error.message
-            : 'Could not respond. Retry when connected.');
+            : context.l10n.invitationResponseError);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -406,11 +408,11 @@ class _ListInvitationsState extends ConsumerState<ListInvitations> {
       loading: () => const LinearProgressIndicator(),
       error: (_, __) => TextButton(
           onPressed: () => ref.invalidate(invitationsProvider),
-          child: const Text('Retry invitations')),
+          child: Text(context.l10n.retryInvitations)),
       data: (invitations) =>
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (_error != null) MessageBanner(_error!, isError: true),
-            if (invitations.isNotEmpty) const SectionLabel('Invitations'),
+            if (invitations.isNotEmpty) SectionLabel(context.l10n.invitations),
             for (final invitation in invitations)
               Card(
                   child: Padding(
@@ -420,21 +422,21 @@ class _ListInvitationsState extends ConsumerState<ListInvitations> {
                           children: [
                             Text(invitation['list_name'] as String,
                                 style: Theme.of(context).textTheme.titleMedium),
-                            Text(
-                                'Join as ${invitation['role']}. Shared tasks, notes and uploaded files will sync to your account.'),
+                            Text(context.l10n.joinListHelp(context
+                                .listRole(invitation['role'] as String))),
                             Wrap(spacing: 8, children: [
                               FilledButton(
                                   onPressed: _busy
                                       ? null
                                       : () =>
                                           _respond(invitation['id'], 'accept'),
-                                  child: const Text('Accept invitation')),
+                                  child: Text(context.l10n.acceptInvitation)),
                               TextButton(
                                   onPressed: _busy
                                       ? null
                                       : () =>
                                           _respond(invitation['id'], 'decline'),
-                                  child: const Text('Decline'))
+                                  child: Text(context.l10n.decline))
                             ]),
                           ]))),
           ]));

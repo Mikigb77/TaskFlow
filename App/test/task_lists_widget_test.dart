@@ -1,9 +1,13 @@
 import 'package:agenda/main.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/screens/task_lists_screen.dart';
+import 'package:agenda/screens/list_sharing_screen.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/task_list_store.dart';
@@ -103,6 +107,78 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets(
+      'switching to Spanish preserves an open list name and stored color',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    for (final dark in [false, true]) {
+      final store = _Lists();
+      final container = ProviderContainer(overrides: [
+        apiClientProvider.overrideWith((ref) => OfflineApiClient()),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        taskListStoreProvider.overrideWithValue(store),
+        invitationsProvider.overrideWith((ref) async => []),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ]);
+      Widget app(String language) => UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              theme: dark ? AppTheme.dark : AppTheme.light,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: const TextScaler.linear(2)),
+                  child: child!),
+              home: const TaskListsScreen()));
+      await tester.pumpWidget(app('en'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('new-list')));
+      await tester.pumpAndSettle();
+      final name = find.byKey(const ValueKey('list-name'));
+      await tester.enterText(name, 'My untranslated shopping list');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final blue = find.widgetWithText(ChoiceChip, 'Blue');
+      await tester.ensureVisible(blue);
+      await tester.pumpAndSettle();
+      await tester.tap(blue);
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(app('es'));
+      await tester.pumpAndSettle();
+      expect(find.text('My untranslated shopping list'), findsOneWidget);
+      expect(
+          tester
+              .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Azul'))
+              .selected,
+          isTrue);
+      await tester.tap(find.text('Guardar lista'));
+      await tester.pumpAndSettle();
+      expect(store.lists.single.name, 'My untranslated shopping list');
+      expect(store.lists.single.color, 'blue');
+      final id = store.lists.single.id;
+      final menu = find.byTooltip('Gestionar My untranslated shopping list');
+      await tester.scrollUntilVisible(menu, 180,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archivar lista'));
+      await tester.pumpAndSettle();
+      expect(store.lists.single.id, id);
+      expect(store.lists.single.archived, isTrue);
+      expect(store.lists.single.color, 'blue');
+      final notice = tester.getRect(find.byType(SnackBar));
+      expect(notice.top, greaterThanOrEqualTo(0));
+      expect(notice.bottom, lessThanOrEqualTo(568));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
     }
   });
 }

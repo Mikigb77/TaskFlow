@@ -2576,6 +2576,774 @@ abstract class AppLocalizations {
   /// **'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.'**
   String get fileRemoveHelp;
 
+  /// No description provided for @yourAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account'**
+  String get yourAccount;
+
+  /// No description provided for @accountHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own little space.'**
+  String get accountHeading;
+
+  /// No description provided for @backupHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your plans, kept close.'**
+  String get backupHeading;
+
+  /// No description provided for @accountBackupHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks and notes are saved on this phone and backed up when connected. New attachments upload after saving; check their status in item details. Older device-only files need an explicit Upload.'**
+  String get accountBackupHelp;
+
+  /// No description provided for @accountUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Your tasks and notes are up to date.'**
+  String get accountUpToDate;
+
+  /// No description provided for @syncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncNow;
+
+  /// No description provided for @importLocalItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Import local tasks and notes'**
+  String get importLocalItems;
+
+  /// No description provided for @importLocalItemsQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Import local tasks and notes?'**
+  String get importLocalItemsQuestion;
+
+  /// No description provided for @importLocalItemsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Move 1 item from this phone into your account} other{Move {count} items from this phone into your account}} to back up your tasks and notes. Attachments stay on this phone until you choose Upload in item details.'**
+  String importLocalItemsHelp(int count);
+
+  /// No description provided for @importItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importItems;
+
+  /// No description provided for @noLocalItems.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no local tasks or notes to import.'**
+  String get noLocalItems;
+
+  /// No description provided for @itemsImported.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item imported.} other{{count} items imported.}}'**
+  String itemsImported(int count);
+
+  /// No description provided for @connectionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection details'**
+  String get connectionDetails;
+
+  /// No description provided for @signOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get signOut;
+
+  /// No description provided for @recoveryHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Let’s get you back in.'**
+  String get recoveryHeading;
+
+  /// No description provided for @registerHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'A space for your plans.'**
+  String get registerHeading;
+
+  /// No description provided for @signInHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back.'**
+  String get signInHeading;
+
+  /// No description provided for @recoveryHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Request a recovery email, then use the code to set a new password.'**
+  String get recoveryHelp;
+
+  /// No description provided for @accountSignInHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to back up your tasks and notes and get a larger voice allowance.'**
+  String get accountSignInHelp;
+
+  /// No description provided for @email.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get email;
+
+  /// No description provided for @enterEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email'**
+  String get enterEmail;
+
+  /// No description provided for @recoveryCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery code'**
+  String get recoveryCode;
+
+  /// No description provided for @recoveryCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to request an email.'**
+  String get recoveryCodeHelp;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPassword;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @passwordHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 12 characters'**
+  String get passwordHelp;
+
+  /// No description provided for @passwordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at least 12 characters'**
+  String get passwordTooShort;
+
+  /// No description provided for @showPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get showPassword;
+
+  /// No description provided for @hidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get hidePassword;
+
+  /// No description provided for @continueRecovery.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue recovery'**
+  String get continueRecovery;
+
+  /// No description provided for @createAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get createAccount;
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signIn;
+
+  /// No description provided for @alreadyHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? Sign in'**
+  String get alreadyHaveAccount;
+
+  /// No description provided for @createAnAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an account'**
+  String get createAnAccount;
+
+  /// No description provided for @backToSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to sign in'**
+  String get backToSignIn;
+
+  /// No description provided for @forgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get forgotPassword;
+
+  /// No description provided for @accountGuestHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'You can also use TaskFlow without an account. Your local tasks and notes stay on this phone.'**
+  String get accountGuestHelp;
+
+  /// No description provided for @connectionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection settings'**
+  String get connectionSettings;
+
+  /// No description provided for @backendAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend address'**
+  String get backendAddress;
+
+  /// No description provided for @backendAddressHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.'**
+  String get backendAddressHelp;
+
+  /// No description provided for @recoveryEmailRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'If that account exists, a recovery email has been sent.'**
+  String get recoveryEmailRequested;
+
+  /// No description provided for @passwordResetComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Password updated. Sign in with your new password.'**
+  String get passwordResetComplete;
+
+  /// No description provided for @newList.
+  ///
+  /// In en, this message translates to:
+  /// **'New list'**
+  String get newList;
+
+  /// No description provided for @editList.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit list'**
+  String get editList;
+
+  /// No description provided for @listName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get listName;
+
+  /// No description provided for @listNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Work, Personal, Shopping…'**
+  String get listNameHint;
+
+  /// No description provided for @listNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Name your list.'**
+  String get listNameRequired;
+
+  /// No description provided for @colorTeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Teal'**
+  String get colorTeal;
+
+  /// No description provided for @colorBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get colorBlue;
+
+  /// No description provided for @colorViolet.
+  ///
+  /// In en, this message translates to:
+  /// **'Violet'**
+  String get colorViolet;
+
+  /// No description provided for @colorAmber.
+  ///
+  /// In en, this message translates to:
+  /// **'Amber'**
+  String get colorAmber;
+
+  /// No description provided for @colorRose.
+  ///
+  /// In en, this message translates to:
+  /// **'Rose'**
+  String get colorRose;
+
+  /// No description provided for @saveList.
+  ///
+  /// In en, this message translates to:
+  /// **'Save list'**
+  String get saveList;
+
+  /// No description provided for @listSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save this list. Please retry.'**
+  String get listSaveError;
+
+  /// No description provided for @listRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'List restored'**
+  String get listRestored;
+
+  /// No description provided for @listArchivedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'List archived. Contents kept.'**
+  String get listArchivedHelp;
+
+  /// No description provided for @listUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update this list. Please retry.'**
+  String get listUpdateError;
+
+  /// No description provided for @chooseListDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose list details'**
+  String get chooseListDetails;
+
+  /// No description provided for @listConflictHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone: {local}\n\nOther device: {remote}\n\nTask and note contents will stay the same.'**
+  String listConflictHelp(String local, String remote);
+
+  /// No description provided for @later.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get later;
+
+  /// No description provided for @useOtherDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Use other device'**
+  String get useOtherDevice;
+
+  /// No description provided for @useThisPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this phone'**
+  String get useThisPhone;
+
+  /// No description provided for @listResolveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not resolve this list. Please retry.'**
+  String get listResolveError;
+
+  /// No description provided for @retryLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry lists'**
+  String get retryLists;
+
+  /// No description provided for @refreshLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh lists and invitations'**
+  String get refreshLists;
+
+  /// No description provided for @listsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep work, life and everything else in their own lists. Inbox still collects tasks without a date.'**
+  String get listsHelp;
+
+  /// No description provided for @listsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A place for each part of life'**
+  String get listsEmptyTitle;
+
+  /// No description provided for @listsEmptyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with Work, Personal or Shopping. Tasks can move whenever you like.'**
+  String get listsEmptyHelp;
+
+  /// No description provided for @roleOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get roleOwner;
+
+  /// No description provided for @roleEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor'**
+  String get roleEditor;
+
+  /// No description provided for @roleViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get roleViewer;
+
+  /// No description provided for @sharedListRole.
+  ///
+  /// In en, this message translates to:
+  /// **'{role} · shared'**
+  String sharedListRole(String role);
+
+  /// No description provided for @listConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed on another device · choose details'**
+  String get listConflict;
+
+  /// No description provided for @archivedListHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived · tasks and notes still available'**
+  String get archivedListHelp;
+
+  /// No description provided for @listItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No tasks or notes} =1{1 task or note} other{{count} tasks and notes}}'**
+  String listItemCount(int count);
+
+  /// No description provided for @manageItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage {name}'**
+  String manageItem(String name);
+
+  /// No description provided for @restoreList.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore list'**
+  String get restoreList;
+
+  /// No description provided for @archiveList.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive list'**
+  String get archiveList;
+
+  /// No description provided for @sharingAndPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharing and people'**
+  String get sharingAndPeople;
+
+  /// No description provided for @chooseDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose details'**
+  String get chooseDetails;
+
+  /// No description provided for @sharedListVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared · everyone in this list can see tasks, notes and uploaded files'**
+  String get sharedListVisibility;
+
+  /// No description provided for @invitationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation code'**
+  String get invitationCode;
+
+  /// No description provided for @invitationCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Give this code to the intended person through a channel you trust. They need it and the invited TaskFlow account to accept. The code is shown only now; replacing an invitation invalidates its previous code.'**
+  String get invitationCodeHelp;
+
+  /// No description provided for @accountChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The account changed.'**
+  String get accountChanged;
+
+  /// No description provided for @copyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get copyCode;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @sharingUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update sharing. Check the connection and retry.'**
+  String get sharingUpdateError;
+
+  /// No description provided for @inviteToList.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite to this list'**
+  String get inviteToList;
+
+  /// No description provided for @inviteHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'All tasks, notes and uploaded files in this list will be visible after they accept. The invitation appears in their TaskFlow account; no email is sent. Give them the code shown next. It expires in 7 days.'**
+  String get inviteHelp;
+
+  /// No description provided for @inviteeEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Their account email'**
+  String get inviteeEmail;
+
+  /// No description provided for @enterEmailAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an email address.'**
+  String get enterEmailAddress;
+
+  /// No description provided for @access.
+  ///
+  /// In en, this message translates to:
+  /// **'Access'**
+  String get access;
+
+  /// No description provided for @sharingRolesHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Editors can add, change, complete and delete tasks and files. Only the owner manages the list and people. Shared tasks stay in this list; exporting creates a personal copy.'**
+  String get sharingRolesHelp;
+
+  /// No description provided for @createInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Create invitation'**
+  String get createInvitation;
+
+  /// No description provided for @listSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'List sharing'**
+  String get listSharing;
+
+  /// No description provided for @sharingLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load sharing.'**
+  String get sharingLoadError;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @yourRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Your role: {role}'**
+  String yourRole(String role);
+
+  /// No description provided for @sharingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Share shopping and chores. Changes sync when the app connects or you refresh.'**
+  String get sharingHelp;
+
+  /// No description provided for @invitePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a person'**
+  String get invitePerson;
+
+  /// No description provided for @people.
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get people;
+
+  /// No description provided for @noOtherMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you have accepted access so far.'**
+  String get noOtherMembers;
+
+  /// No description provided for @makeEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Make editor'**
+  String get makeEditor;
+
+  /// No description provided for @makeViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Make viewer'**
+  String get makeViewer;
+
+  /// No description provided for @removeAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove access'**
+  String get removeAccess;
+
+  /// No description provided for @removeAccessHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'This person will lose access to this list and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.'**
+  String get removeAccessHelp;
+
+  /// No description provided for @pendingInvitations.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending invitations'**
+  String get pendingInvitations;
+
+  /// No description provided for @pendingRole.
+  ///
+  /// In en, this message translates to:
+  /// **'{role} · pending'**
+  String pendingRole(String role);
+
+  /// No description provided for @revokeInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke invitation'**
+  String get revokeInvitation;
+
+  /// No description provided for @replaceInvitationHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a pending invitation to replace its code.'**
+  String get replaceInvitationHelp;
+
+  /// No description provided for @howSharingWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How sharing works'**
+  String get howSharingWorks;
+
+  /// No description provided for @sharedDataHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.'**
+  String get sharedDataHelp;
+
+  /// No description provided for @sharingRemovalHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.'**
+  String get sharingRemovalHelp;
+
+  /// No description provided for @deleteList.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete list'**
+  String get deleteList;
+
+  /// No description provided for @deleteListHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this list and all its tasks, notes and uploaded files for everyone? This cannot be undone.'**
+  String get deleteListHelp;
+
+  /// No description provided for @deleteListForEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete list for everyone'**
+  String get deleteListForEveryone;
+
+  /// No description provided for @leaveList.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave list'**
+  String get leaveList;
+
+  /// No description provided for @leaveListHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the list.'**
+  String get leaveListHelp;
+
+  /// No description provided for @enterInvitationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter invitation code'**
+  String get enterInvitationCode;
+
+  /// No description provided for @requestInvitationCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the list owner for the code they received when inviting you.'**
+  String get requestInvitationCodeHelp;
+
+  /// No description provided for @invitationCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the full invitation code.'**
+  String get invitationCodeRequired;
+
+  /// No description provided for @joinList.
+  ///
+  /// In en, this message translates to:
+  /// **'Join list'**
+  String get joinList;
+
+  /// No description provided for @invitationResponseError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not respond. Retry when connected.'**
+  String get invitationResponseError;
+
+  /// No description provided for @retryInvitations.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry invitations'**
+  String get retryInvitations;
+
+  /// No description provided for @invitations.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitations'**
+  String get invitations;
+
+  /// No description provided for @joinListHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Join as {role}. Shared tasks, notes and uploaded files will sync to your account.'**
+  String joinListHelp(String role);
+
+  /// No description provided for @acceptInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept invitation'**
+  String get acceptInvitation;
+
+  /// No description provided for @decline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get decline;
+
   /// No description provided for @fileEmpty.
   ///
   /// In en, this message translates to:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -66,16 +67,21 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       final api = ref.read(apiClientProvider);
       await api.setServer(_server.text);
       if (_recover) {
-        final result = await api.request(
+        final requestingCode = _code.text.trim().isEmpty;
+        await api.request(
             'POST',
-            _code.text.trim().isEmpty
+            requestingCode
                 ? 'auth/password-reset/'
                 : 'auth/password-reset/confirm/',
             authenticated: false,
-            data: _code.text.trim().isEmpty
+            data: requestingCode
                 ? {'email': _email.text.trim()}
                 : {'code': _code.text.trim(), 'password': _password.text});
-        if (mounted) setState(() => _message = result['detail'] as String);
+        if (mounted) {
+          setState(() => _message = requestingCode
+              ? context.l10n.recoveryEmailRequested
+              : context.l10n.passwordResetComplete);
+        }
         return;
       }
       await ref.read(regionalProvider.notifier).ready;
@@ -89,29 +95,29 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final local = await TaskDatabase().getTasks();
     if (!mounted) return;
     if (local.isEmpty) {
-      setState(() => _message = 'There are no local tasks to import.');
+      setState(() => _message = context.l10n.noLocalItems);
       return;
     }
     final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-              title: const Text('Import local tasks?'),
-              content: Text(
-                  'Move ${local.length} tasks from this phone into your account and back up their titles, dates, priorities and notes. Attachments stay on this phone.'),
+              scrollable: true,
+              title: Text(context.l10n.importLocalItemsQuestion),
+              content: Text(context.l10n.importLocalItemsHelp(local.length)),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel')),
+                    child: Text(context.l10n.cancel)),
                 FilledButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Import'))
+                    child: Text(context.l10n.importItems))
               ],
             ));
     if (confirmed != true || !mounted) return;
     await _run(() async {
       final count = await ref.read(taskRepositoryProvider).importLocalTasks();
       await ref.read(taskProvider.notifier).loadTasks();
-      if (mounted) setState(() => _message = '$count tasks imported.');
+      if (mounted) setState(() => _message = context.l10n.itemsImported(count));
     });
   }
 
@@ -122,7 +128,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final colors = Theme.of(context).colorScheme;
     ref.watch(taskProvider);
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Your account'),
+      appBar: CustomAppBar(title: context.l10n.yourAccount),
       body: Center(
           child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -141,7 +147,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                               child: Icon(Icons.person_outline_rounded,
                                   size: 32, color: colors.primary))),
                       const SizedBox(height: 24),
-                      Text('Your own little space.',
+                      Text(context.l10n.accountHeading,
                           style: Theme.of(context).textTheme.headlineMedium),
                       const SizedBox(height: 8),
                       Text(auth.account!.email,
@@ -154,11 +160,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                             Icon(Icons.cloud_done_outlined,
                                 color: colors.primary, size: 28),
                             const SizedBox(height: 12),
-                            Text('Your plans, kept close.',
+                            Text(context.l10n.backupHeading,
                                 style: Theme.of(context).textTheme.titleMedium),
                             const SizedBox(height: 8),
-                            Text(
-                                'Tasks are saved on this phone and backed up when connected. New attachments upload after saving; check their status in task details. Older device-only files need an explicit Upload.',
+                            Text(context.l10n.accountBackupHelp,
                                 style:
                                     TextStyle(color: colors.onSurfaceVariant)),
                             const SizedBox(height: 20),
@@ -176,19 +181,20 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                                         .read(
                                                             taskRepositoryProvider)
                                                         .syncError ??
-                                                    'Your tasks are up to date.');
+                                                    context
+                                                        .l10n.accountUpToDate);
                                               }
                                             }),
                                     icon: const Icon(Icons.sync_rounded,
                                         size: 20),
-                                    label: const Text('Sync now'))),
+                                    label: Text(context.l10n.syncNow))),
                           ])),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                           onPressed: busy ? null : _import,
                           icon:
                               const Icon(Icons.file_upload_outlined, size: 20),
-                          label: const Text('Import local tasks')),
+                          label: Text(context.l10n.importLocalItems)),
                       const SizedBox(height: 12),
                       if (ref.read(taskRepositoryProvider).syncError != null)
                         MessageBanner(
@@ -196,7 +202,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                             isError: true),
                       ExpansionTile(
                           tilePadding: EdgeInsets.zero,
-                          title: const Text('Connection details'),
+                          title: Text(context.l10n.connectionDetails),
                           shape: const Border(),
                           collapsedShape: const Border(),
                           children: [
@@ -211,7 +217,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                               ? null
                               : () => _run(() =>
                                   ref.read(authProvider.notifier).signOut()),
-                          child: Text('Sign out',
+                          child: Text(context.l10n.signOut,
                               style: TextStyle(color: colors.error))),
                     ] else ...[
                       Align(
@@ -231,16 +237,16 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                       const SizedBox(height: 24),
                       Text(
                           _recover
-                              ? 'Let’s get you back in.'
+                              ? context.l10n.recoveryHeading
                               : _register
-                                  ? 'A space for your plans.'
-                                  : 'Welcome back.',
+                                  ? context.l10n.registerHeading
+                                  : context.l10n.signInHeading,
                           style: Theme.of(context).textTheme.headlineLarge),
                       const SizedBox(height: 10),
                       Text(
                           _recover
-                              ? 'Request a recovery email, then use the code to set a new password.'
-                              : 'Sign in to back up your tasks and get a larger voice allowance.',
+                              ? context.l10n.recoveryHelp
+                              : context.l10n.accountSignInHelp,
                           style: TextStyle(color: colors.onSurfaceVariant)),
                       const SizedBox(height: 28),
                       Form(
@@ -253,23 +259,26 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                 keyboardType: TextInputType.emailAddress,
                                 autofillHints: const [AutofillHints.username],
                                 textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                    labelText: 'Email',
-                                    prefixIcon: Icon(
+                                decoration: InputDecoration(
+                                    labelText: context.l10n.email,
+                                    errorMaxLines: 3,
+                                    prefixIcon: const Icon(
                                         Icons.alternate_email_rounded,
                                         size: 20)),
                                 validator: (value) =>
                                     value == null || !value.contains('@')
-                                        ? 'Enter your email'
+                                        ? context.l10n.enterEmail
                                         : null),
                             const SizedBox(height: 16),
                             if (_recover) ...[
                               TextFormField(
+                                  key: const ValueKey('account-recovery-code'),
                                   controller: _code,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Recovery code',
+                                  decoration: InputDecoration(
+                                      labelText: context.l10n.recoveryCode,
+                                      helperMaxLines: 4,
                                       helperText:
-                                          'Leave empty to request an email.')),
+                                          context.l10n.recoveryCodeHelp)),
                               const SizedBox(height: 16),
                             ],
                             TextFormField(
@@ -284,18 +293,21 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                       : AutofillHints.password
                                 ],
                                 decoration: InputDecoration(
-                                    labelText:
-                                        _recover ? 'New password' : 'Password',
+                                    labelText: _recover
+                                        ? context.l10n.newPassword
+                                        : context.l10n.password,
+                                    errorMaxLines: 3,
+                                    helperMaxLines: 3,
                                     helperText: _register || _recover
-                                        ? 'At least 12 characters'
+                                        ? context.l10n.passwordHelp
                                         : null,
                                     prefixIcon: const Icon(
                                         Icons.lock_outline_rounded,
                                         size: 20),
                                     suffixIcon: IconButton(
                                         tooltip: _showPassword
-                                            ? 'Hide password'
-                                            : 'Show password',
+                                            ? context.l10n.hidePassword
+                                            : context.l10n.showPassword,
                                         onPressed: () => setState(() =>
                                             _showPassword = !_showPassword),
                                         icon: Icon(
@@ -307,7 +319,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                     _recover && _code.text.trim().isEmpty
                                         ? null
                                         : value == null || value.length < 12
-                                            ? 'Use at least 12 characters'
+                                            ? context.l10n.passwordTooShort
                                             : null),
                             const SizedBox(height: 24),
                             SizedBox(
@@ -315,10 +327,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                 child: FilledButton(
                                     onPressed: busy ? null : _submit,
                                     child: Text(_recover
-                                        ? 'Continue recovery'
+                                        ? context.l10n.continueRecovery
                                         : _register
-                                            ? 'Create account'
-                                            : 'Sign in'))),
+                                            ? context.l10n.createAccount
+                                            : context.l10n.signIn))),
                           ]))),
                       const SizedBox(height: 8),
                       TextButton(
@@ -330,8 +342,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                     _message = null;
                                   }),
                           child: Text(_register
-                              ? 'Already have an account? Sign in'
-                              : 'Create an account')),
+                              ? context.l10n.alreadyHaveAccount
+                              : context.l10n.createAnAccount)),
                       TextButton(
                           onPressed: busy
                               ? null
@@ -340,17 +352,16 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                                     _message = null;
                                   }),
                           child: Text(_recover
-                              ? 'Back to sign in'
-                              : 'Forgot password?')),
+                              ? context.l10n.backToSignIn
+                              : context.l10n.forgotPassword)),
                       const SizedBox(height: 16),
-                      Text(
-                          'You can also use TaskFlow without an account. Your local tasks stay on this phone.',
+                      Text(context.l10n.accountGuestHelp,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                               color: colors.onSurfaceVariant, fontSize: 12)),
                       const SizedBox(height: 20),
                       ExpansionTile(
-                          title: const Text('Connection settings'),
+                          title: Text(context.l10n.connectionSettings),
                           tilePadding: EdgeInsets.zero,
                           shape: const Border(),
                           collapsedShape: const Border(),
@@ -358,10 +369,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                             TextFormField(
                                 controller: _server,
                                 keyboardType: TextInputType.url,
-                                decoration: const InputDecoration(
-                                    labelText: 'Backend address',
+                                decoration: InputDecoration(
+                                    labelText: context.l10n.backendAddress,
+                                    helperMaxLines: 8,
                                     helperText:
-                                        'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.')),
+                                        context.l10n.backendAddressHelp)),
                           ]),
                     ],
                     if (busy)

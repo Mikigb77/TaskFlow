@@ -62,8 +62,7 @@ class TaskListPicker extends ConsumerWidget {
                                     color: taskListColor(list.color)),
                                 title: Text(list.name),
                                 subtitle: list.shared
-                                    ? const Text(
-                                        'Shared · everyone in this list can see tasks, notes and uploaded files')
+                                    ? Text(context.l10n.sharedListVisibility)
                                     : list.archived
                                         ? Text(context.l10n.archived)
                                         : null,

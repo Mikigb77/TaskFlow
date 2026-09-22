@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,53 +24,55 @@ class TaskListsScreen extends ConsumerWidget {
         context: context,
         builder: (context) => StatefulBuilder(
             builder: (context, setState) => AlertDialog(
-                  title: Text(list == null ? 'New list' : 'Edit list'),
-                  content: SingleChildScrollView(
-                      child: Form(
-                          key: form,
-                          child:
-                              Column(mainAxisSize: MainAxisSize.min, children: [
-                            TextFormField(
-                                key: const ValueKey('list-name'),
-                                initialValue: name,
-                                maxLength: 80,
-                                autofocus: true,
-                                decoration: const InputDecoration(
-                                    labelText: 'Name',
-                                    hintText: 'Work, Personal, Shopping…'),
-                                onChanged: (value) => name = value,
-                                validator: (value) =>
-                                    value?.trim().isNotEmpty == true
-                                        ? null
-                                        : 'Name your list.'),
-                            Wrap(spacing: 8, children: [
-                              for (final choice in [
-                                'teal',
-                                'blue',
-                                'violet',
-                                'amber',
-                                'rose'
-                              ])
-                                ChoiceChip(
-                                    label: Text(choice),
-                                    avatar: Icon(Icons.circle,
-                                        size: 14, color: taskListColor(choice)),
-                                    selected: color == choice,
-                                    onSelected: (_) =>
-                                        setState(() => color = choice))
-                            ]),
-                          ]))),
+                  scrollable: true,
+                  title: Text(list == null
+                      ? context.l10n.newList
+                      : context.l10n.editList),
+                  content: Form(
+                      key: form,
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        TextFormField(
+                            key: const ValueKey('list-name'),
+                            initialValue: name,
+                            maxLength: 80,
+                            autofocus: true,
+                            decoration: InputDecoration(
+                                labelText: context.l10n.listName,
+                                hintText: context.l10n.listNameHint,
+                                errorMaxLines: 3),
+                            onChanged: (value) => name = value,
+                            validator: (value) =>
+                                value?.trim().isNotEmpty == true
+                                    ? null
+                                    : context.l10n.listNameRequired),
+                        Wrap(spacing: 8, children: [
+                          for (final choice in [
+                            'teal',
+                            'blue',
+                            'violet',
+                            'amber',
+                            'rose'
+                          ])
+                            ChoiceChip(
+                                label: Text(context.listColorName(choice)),
+                                avatar: Icon(Icons.circle,
+                                    size: 14, color: taskListColor(choice)),
+                                selected: color == choice,
+                                onSelected: (_) =>
+                                    setState(() => color = choice))
+                        ]),
+                      ])),
                   actions: [
                     TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel')),
+                        child: Text(context.l10n.cancel)),
                     FilledButton(
                         onPressed: () {
                           if (form.currentState!.validate()) {
                             Navigator.pop(context, true);
                           }
                         },
-                        child: const Text('Save list'))
+                        child: Text(context.l10n.saveList))
                   ],
                 )));
     if (accepted != true || !context.mounted) return;
@@ -85,8 +88,9 @@ class TaskListsScreen extends ConsumerWidget {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not save this list. Please retry.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.fixed,
+            content: Text(context.l10n.listSaveError)));
       }
     }
   }
@@ -100,14 +104,16 @@ class TaskListsScreen extends ConsumerWidget {
         ref.invalidate(taskListsProvider);
         ref.read(taskProvider.notifier).loadTasks();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.fixed,
             content: Text(list.archived
-                ? 'List restored'
-                : 'List archived. Its tasks and reminders stay available.')));
+                ? context.l10n.listRestored
+                : context.l10n.listArchivedHelp)));
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not update this list. Please retry.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.fixed,
+            content: Text(context.l10n.listUpdateError)));
       }
     }
   }
@@ -119,19 +125,21 @@ class TaskListsScreen extends ConsumerWidget {
     final local = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-                title: const Text('Choose list details'),
-                content: Text(
-                    'This phone: ${list.name} · ${list.color}${list.archived ? ' · archived' : ''}\n\nOther device: ${remote.name} · ${remote.color}${remote.archived ? ' · archived' : ''}\n\nTask contents will stay the same.'),
+                scrollable: true,
+                title: Text(context.l10n.chooseListDetails),
+                content: Text(context.l10n.listConflictHelp(
+                    '${list.name} · ${context.listColorName(list.color)}${list.archived ? ' · ${context.l10n.archived}' : ''}',
+                    '${remote.name} · ${context.listColorName(remote.color)}${remote.archived ? ' · ${context.l10n.archived}' : ''}')),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Later')),
+                      child: Text(context.l10n.later)),
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Use other device')),
+                      child: Text(context.l10n.useOtherDevice)),
                   FilledButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Use this phone'))
+                      child: Text(context.l10n.useThisPhone))
                 ]));
     if (local == null || !context.mounted) return;
     try {
@@ -142,21 +150,22 @@ class TaskListsScreen extends ConsumerWidget {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not resolve this list. Please retry.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.fixed,
+            content: Text(context.l10n.listResolveError)));
       }
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-        appBar: const CustomAppBar(title: 'Lists'),
+        appBar: CustomAppBar(title: context.l10n.lists),
         body: ref.watch(taskListsProvider).when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => Center(
                 child: TextButton(
                     onPressed: () => ref.invalidate(taskListsProvider),
-                    child: const Text('Retry lists'))),
+                    child: Text(context.l10n.retryLists))),
             data: (lists) =>
                 ListView(padding: const EdgeInsets.all(24), children: [
                   const ListInvitations(),
@@ -167,15 +176,13 @@ class TaskListsScreen extends ConsumerWidget {
                         ref.invalidate(taskListsProvider);
                       },
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Refresh lists and invitations')),
-                  const Text(
-                      'Keep work, life and everything else in their own lists. Inbox still collects tasks without a date.'),
+                      label: Text(context.l10n.refreshLists)),
+                  Text(context.l10n.listsHelp),
                   const SizedBox(height: 20),
                   if (lists.isEmpty)
-                    const EmptyState(
-                        title: 'A place for each part of life',
-                        message:
-                            'Start with Work, Personal or Shopping. Tasks can move whenever you like.'),
+                    EmptyState(
+                        title: context.l10n.listsEmptyTitle,
+                        message: context.l10n.listsEmptyHelp),
                   for (final list in lists) ...[
                     ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -188,12 +195,17 @@ class TaskListsScreen extends ConsumerWidget {
                             color: taskListColor(list.color)),
                         title: Text(list.name),
                         subtitle: Text(list.shared
-                            ? '${list.role} · shared${list.archived ? ' · archived' : ''}'
+                            ? '${context.l10n.sharedListRole(context.listRole(list.role))}${list.archived ? ' · ${context.l10n.archived}' : ''}'
                             : list.conflict != null
-                                ? 'Changed on another device · choose details'
+                                ? context.l10n.listConflict
                                 : list.archived
-                                    ? 'Archived · tasks still available'
-                                    : '${(ref.watch(taskProvider).valueOrNull ?? []).where((task) => task.listId == list.id).length} tasks and notes'),
+                                    ? context.l10n.archivedListHelp
+                                    : context.l10n.listItemCount((ref
+                                                .watch(taskProvider)
+                                                .valueOrNull ??
+                                            [])
+                                        .where((task) => task.listId == list.id)
+                                        .length)),
                         onTap: () => list.conflict != null
                             ? _resolve(context, ref, list)
                             : Navigator.push(
@@ -202,27 +214,28 @@ class TaskListsScreen extends ConsumerWidget {
                                     builder: (_) => HomeScreen(
                                         isRoot: false, listId: list.id))),
                         trailing: PopupMenuButton<String>(
-                            tooltip: 'Manage ${list.name}',
+                            tooltip: context.l10n.manageItem(list.name),
                             itemBuilder: (_) => [
                                   if (list.canManage)
-                                    const PopupMenuItem(
+                                    PopupMenuItem(
                                         value: 'edit',
-                                        child: Text('Edit list')),
+                                        child: Text(context.l10n.editList)),
                                   if (list.canManage)
                                     PopupMenuItem(
                                         value: 'archive',
                                         child: Text(list.archived
-                                            ? 'Restore list'
-                                            : 'Archive list')),
+                                            ? context.l10n.restoreList
+                                            : context.l10n.archiveList)),
                                   if (ref.read(authProvider).account != null &&
                                       list.version > 0)
-                                    const PopupMenuItem(
+                                    PopupMenuItem(
                                         value: 'sharing',
-                                        child: Text('Sharing and people')),
+                                        child: Text(
+                                            context.l10n.sharingAndPeople)),
                                   if (list.conflict != null && list.canManage)
-                                    const PopupMenuItem(
+                                    PopupMenuItem(
                                         value: 'resolve',
-                                        child: Text('Choose details'))
+                                        child: Text(context.l10n.chooseDetails))
                                 ],
                             onSelected: (action) => switch (action) {
                                   'edit' => _edit(context, ref, list),
@@ -245,6 +258,6 @@ class TaskListsScreen extends ConsumerWidget {
                     key: const ValueKey('new-list'),
                     onPressed: () => _edit(context, ref),
                     icon: const Icon(Icons.add_rounded),
-                    label: const Text('New list')))),
+                    label: Text(context.l10n.newList)))),
       );
 }

@@ -1357,6 +1357,450 @@ class AppLocalizationsEn extends AppLocalizations {
       'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.';
 
   @override
+  String get yourAccount => 'Your account';
+
+  @override
+  String get accountHeading => 'Your own little space.';
+
+  @override
+  String get backupHeading => 'Your plans, kept close.';
+
+  @override
+  String get accountBackupHelp =>
+      'Tasks and notes are saved on this phone and backed up when connected. New attachments upload after saving; check their status in item details. Older device-only files need an explicit Upload.';
+
+  @override
+  String get accountUpToDate => 'Your tasks and notes are up to date.';
+
+  @override
+  String get syncNow => 'Sync now';
+
+  @override
+  String get importLocalItems => 'Import local tasks and notes';
+
+  @override
+  String get importLocalItemsQuestion => 'Import local tasks and notes?';
+
+  @override
+  String importLocalItemsHelp(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count items from this phone into your account',
+      one: 'Move 1 item from this phone into your account',
+    );
+    return '$_temp0 to back up your tasks and notes. Attachments stay on this phone until you choose Upload in item details.';
+  }
+
+  @override
+  String get importItems => 'Import';
+
+  @override
+  String get noLocalItems => 'There are no local tasks or notes to import.';
+
+  @override
+  String itemsImported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items imported.',
+      one: '1 item imported.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get connectionDetails => 'Connection details';
+
+  @override
+  String get signOut => 'Sign out';
+
+  @override
+  String get recoveryHeading => 'Let’s get you back in.';
+
+  @override
+  String get registerHeading => 'A space for your plans.';
+
+  @override
+  String get signInHeading => 'Welcome back.';
+
+  @override
+  String get recoveryHelp =>
+      'Request a recovery email, then use the code to set a new password.';
+
+  @override
+  String get accountSignInHelp =>
+      'Sign in to back up your tasks and notes and get a larger voice allowance.';
+
+  @override
+  String get email => 'Email';
+
+  @override
+  String get enterEmail => 'Enter your email';
+
+  @override
+  String get recoveryCode => 'Recovery code';
+
+  @override
+  String get recoveryCodeHelp => 'Leave empty to request an email.';
+
+  @override
+  String get newPassword => 'New password';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get passwordHelp => 'At least 12 characters';
+
+  @override
+  String get passwordTooShort => 'Use at least 12 characters';
+
+  @override
+  String get showPassword => 'Show password';
+
+  @override
+  String get hidePassword => 'Hide password';
+
+  @override
+  String get continueRecovery => 'Continue recovery';
+
+  @override
+  String get createAccount => 'Create account';
+
+  @override
+  String get signIn => 'Sign in';
+
+  @override
+  String get alreadyHaveAccount => 'Already have an account? Sign in';
+
+  @override
+  String get createAnAccount => 'Create an account';
+
+  @override
+  String get backToSignIn => 'Back to sign in';
+
+  @override
+  String get forgotPassword => 'Forgot password?';
+
+  @override
+  String get accountGuestHelp =>
+      'You can also use TaskFlow without an account. Your local tasks and notes stay on this phone.';
+
+  @override
+  String get connectionSettings => 'Connection settings';
+
+  @override
+  String get backendAddress => 'Backend address';
+
+  @override
+  String get backendAddressHelp =>
+      'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.';
+
+  @override
+  String get recoveryEmailRequested =>
+      'If that account exists, a recovery email has been sent.';
+
+  @override
+  String get passwordResetComplete =>
+      'Password updated. Sign in with your new password.';
+
+  @override
+  String get newList => 'New list';
+
+  @override
+  String get editList => 'Edit list';
+
+  @override
+  String get listName => 'Name';
+
+  @override
+  String get listNameHint => 'Work, Personal, Shopping…';
+
+  @override
+  String get listNameRequired => 'Name your list.';
+
+  @override
+  String get colorTeal => 'Teal';
+
+  @override
+  String get colorBlue => 'Blue';
+
+  @override
+  String get colorViolet => 'Violet';
+
+  @override
+  String get colorAmber => 'Amber';
+
+  @override
+  String get colorRose => 'Rose';
+
+  @override
+  String get saveList => 'Save list';
+
+  @override
+  String get listSaveError => 'Could not save this list. Please retry.';
+
+  @override
+  String get listRestored => 'List restored';
+
+  @override
+  String get listArchivedHelp => 'List archived. Contents kept.';
+
+  @override
+  String get listUpdateError => 'Could not update this list. Please retry.';
+
+  @override
+  String get chooseListDetails => 'Choose list details';
+
+  @override
+  String listConflictHelp(String local, String remote) {
+    return 'This phone: $local\n\nOther device: $remote\n\nTask and note contents will stay the same.';
+  }
+
+  @override
+  String get later => 'Later';
+
+  @override
+  String get useOtherDevice => 'Use other device';
+
+  @override
+  String get useThisPhone => 'Use this phone';
+
+  @override
+  String get listResolveError => 'Could not resolve this list. Please retry.';
+
+  @override
+  String get retryLists => 'Retry lists';
+
+  @override
+  String get refreshLists => 'Refresh lists and invitations';
+
+  @override
+  String get listsHelp =>
+      'Keep work, life and everything else in their own lists. Inbox still collects tasks without a date.';
+
+  @override
+  String get listsEmptyTitle => 'A place for each part of life';
+
+  @override
+  String get listsEmptyHelp =>
+      'Start with Work, Personal or Shopping. Tasks can move whenever you like.';
+
+  @override
+  String get roleOwner => 'Owner';
+
+  @override
+  String get roleEditor => 'Editor';
+
+  @override
+  String get roleViewer => 'Viewer';
+
+  @override
+  String sharedListRole(String role) {
+    return '$role · shared';
+  }
+
+  @override
+  String get listConflict => 'Changed on another device · choose details';
+
+  @override
+  String get archivedListHelp => 'Archived · tasks and notes still available';
+
+  @override
+  String listItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks and notes',
+      one: '1 task or note',
+      zero: 'No tasks or notes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String manageItem(String name) {
+    return 'Manage $name';
+  }
+
+  @override
+  String get restoreList => 'Restore list';
+
+  @override
+  String get archiveList => 'Archive list';
+
+  @override
+  String get sharingAndPeople => 'Sharing and people';
+
+  @override
+  String get chooseDetails => 'Choose details';
+
+  @override
+  String get sharedListVisibility =>
+      'Shared · everyone in this list can see tasks, notes and uploaded files';
+
+  @override
+  String get invitationCode => 'Invitation code';
+
+  @override
+  String get invitationCodeHelp =>
+      'Give this code to the intended person through a channel you trust. They need it and the invited TaskFlow account to accept. The code is shown only now; replacing an invitation invalidates its previous code.';
+
+  @override
+  String get accountChanged => 'The account changed.';
+
+  @override
+  String get copyCode => 'Copy code';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get sharingUpdateError =>
+      'Could not update sharing. Check the connection and retry.';
+
+  @override
+  String get inviteToList => 'Invite to this list';
+
+  @override
+  String get inviteHelp =>
+      'All tasks, notes and uploaded files in this list will be visible after they accept. The invitation appears in their TaskFlow account; no email is sent. Give them the code shown next. It expires in 7 days.';
+
+  @override
+  String get inviteeEmail => 'Their account email';
+
+  @override
+  String get enterEmailAddress => 'Enter an email address.';
+
+  @override
+  String get access => 'Access';
+
+  @override
+  String get sharingRolesHelp =>
+      'Editors can add, change, complete and delete tasks and files. Only the owner manages the list and people. Shared tasks stay in this list; exporting creates a personal copy.';
+
+  @override
+  String get createInvitation => 'Create invitation';
+
+  @override
+  String get listSharing => 'List sharing';
+
+  @override
+  String get sharingLoadError => 'Could not load sharing.';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String yourRole(String role) {
+    return 'Your role: $role';
+  }
+
+  @override
+  String get sharingHelp =>
+      'Share shopping and chores. Changes sync when the app connects or you refresh.';
+
+  @override
+  String get invitePerson => 'Invite a person';
+
+  @override
+  String get people => 'People';
+
+  @override
+  String get noOtherMembers => 'Only you have accepted access so far.';
+
+  @override
+  String get makeEditor => 'Make editor';
+
+  @override
+  String get makeViewer => 'Make viewer';
+
+  @override
+  String get removeAccess => 'Remove access';
+
+  @override
+  String get removeAccessHelp =>
+      'This person will lose access to this list and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.';
+
+  @override
+  String get pendingInvitations => 'Pending invitations';
+
+  @override
+  String pendingRole(String role) {
+    return '$role · pending';
+  }
+
+  @override
+  String get revokeInvitation => 'Revoke invitation';
+
+  @override
+  String get replaceInvitationHelp =>
+      'Tap a pending invitation to replace its code.';
+
+  @override
+  String get howSharingWorks => 'How sharing works';
+
+  @override
+  String get sharedDataHelp =>
+      'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.';
+
+  @override
+  String get sharingRemovalHelp =>
+      'Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.';
+
+  @override
+  String get deleteList => 'Delete list';
+
+  @override
+  String get deleteListHelp =>
+      'Delete this list and all its tasks, notes and uploaded files for everyone? This cannot be undone.';
+
+  @override
+  String get deleteListForEveryone => 'Delete list for everyone';
+
+  @override
+  String get leaveList => 'Leave list';
+
+  @override
+  String get leaveListHelp =>
+      'Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the list.';
+
+  @override
+  String get enterInvitationCode => 'Enter invitation code';
+
+  @override
+  String get requestInvitationCodeHelp =>
+      'Ask the list owner for the code they received when inviting you.';
+
+  @override
+  String get invitationCodeRequired => 'Paste the full invitation code.';
+
+  @override
+  String get joinList => 'Join list';
+
+  @override
+  String get invitationResponseError =>
+      'Could not respond. Retry when connected.';
+
+  @override
+  String get retryInvitations => 'Retry invitations';
+
+  @override
+  String get invitations => 'Invitations';
+
+  @override
+  String joinListHelp(String role) {
+    return 'Join as $role. Shared tasks, notes and uploaded files will sync to your account.';
+  }
+
+  @override
+  String get acceptInvitation => 'Accept invitation';
+
+  @override
+  String get decline => 'Decline';
+
+  @override
   String get fileEmpty => 'No attachments. Add a file when editing.';
 
   @override

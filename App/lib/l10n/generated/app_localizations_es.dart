@@ -1373,6 +1373,453 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se eliminará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
 
   @override
+  String get yourAccount => 'Tu cuenta';
+
+  @override
+  String get accountHeading => 'Tu propio espacio.';
+
+  @override
+  String get backupHeading => 'Tus planes, siempre contigo.';
+
+  @override
+  String get accountBackupHelp =>
+      'Las tareas y notas se guardan en este teléfono y se copian a tu cuenta cuando hay conexión. Los archivos nuevos se suben después de guardar; consulta su estado en los detalles. Para subir archivos locales anteriores, pulsa Subir.';
+
+  @override
+  String get accountUpToDate => 'Tus tareas y notas están actualizadas.';
+
+  @override
+  String get syncNow => 'Sincronizar ahora';
+
+  @override
+  String get importLocalItems => 'Importar tareas y notas locales';
+
+  @override
+  String get importLocalItemsQuestion => '¿Importar tareas y notas locales?';
+
+  @override
+  String importLocalItemsHelp(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mueve $count elementos de este teléfono a tu cuenta',
+      one: 'Mueve 1 elemento de este teléfono a tu cuenta',
+    );
+    return '$_temp0 para guardar tus tareas y notas. Los archivos adjuntos permanecen en este teléfono hasta que elijas Subir en los detalles.';
+  }
+
+  @override
+  String get importItems => 'Importar';
+
+  @override
+  String get noLocalItems => 'No hay tareas ni notas locales que importar.';
+
+  @override
+  String itemsImported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos importados.',
+      one: '1 elemento importado.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get connectionDetails => 'Detalles de conexión';
+
+  @override
+  String get signOut => 'Cerrar sesión';
+
+  @override
+  String get recoveryHeading => 'Recupera tu acceso.';
+
+  @override
+  String get registerHeading => 'Un espacio para tus planes.';
+
+  @override
+  String get signInHeading => 'Te damos la bienvenida.';
+
+  @override
+  String get recoveryHelp =>
+      'Solicita un correo de recuperación y usa el código para elegir una nueva contraseña.';
+
+  @override
+  String get accountSignInHelp =>
+      'Inicia sesión para guardar tus tareas y notas en tu cuenta y ampliar tu límite de captura por voz.';
+
+  @override
+  String get email => 'Correo electrónico';
+
+  @override
+  String get enterEmail => 'Introduce tu correo electrónico';
+
+  @override
+  String get recoveryCode => 'Código de recuperación';
+
+  @override
+  String get recoveryCodeHelp => 'Déjalo vacío para solicitar un correo.';
+
+  @override
+  String get newPassword => 'Nueva contraseña';
+
+  @override
+  String get password => 'Contraseña';
+
+  @override
+  String get passwordHelp => 'Al menos 12 caracteres';
+
+  @override
+  String get passwordTooShort => 'Usa al menos 12 caracteres';
+
+  @override
+  String get showPassword => 'Mostrar contraseña';
+
+  @override
+  String get hidePassword => 'Ocultar contraseña';
+
+  @override
+  String get continueRecovery => 'Continuar recuperación';
+
+  @override
+  String get createAccount => 'Crear cuenta';
+
+  @override
+  String get signIn => 'Iniciar sesión';
+
+  @override
+  String get alreadyHaveAccount => '¿Ya tienes cuenta? Inicia sesión';
+
+  @override
+  String get createAnAccount => 'Crear una cuenta';
+
+  @override
+  String get backToSignIn => 'Volver a iniciar sesión';
+
+  @override
+  String get forgotPassword => '¿Has olvidado tu contraseña?';
+
+  @override
+  String get accountGuestHelp =>
+      'También puedes usar TaskFlow sin cuenta. Tus tareas y notas locales permanecen en este teléfono.';
+
+  @override
+  String get connectionSettings => 'Ajustes de conexión';
+
+  @override
+  String get backendAddress => 'Dirección del servidor';
+
+  @override
+  String get backendAddressHelp =>
+      'Emulador: http://10.0.2.2:8088\nTeléfono: la IP local de tu ordenador en la misma red wifi.';
+
+  @override
+  String get recoveryEmailRequested =>
+      'Si la cuenta existe, se ha enviado un correo de recuperación.';
+
+  @override
+  String get passwordResetComplete =>
+      'Contraseña actualizada. Inicia sesión con tu nueva contraseña.';
+
+  @override
+  String get newList => 'Nueva lista';
+
+  @override
+  String get editList => 'Editar lista';
+
+  @override
+  String get listName => 'Nombre';
+
+  @override
+  String get listNameHint => 'Trabajo, Personal, Compras…';
+
+  @override
+  String get listNameRequired => 'Pon un nombre a tu lista.';
+
+  @override
+  String get colorTeal => 'Verde azulado';
+
+  @override
+  String get colorBlue => 'Azul';
+
+  @override
+  String get colorViolet => 'Violeta';
+
+  @override
+  String get colorAmber => 'Ámbar';
+
+  @override
+  String get colorRose => 'Rosa';
+
+  @override
+  String get saveList => 'Guardar lista';
+
+  @override
+  String get listSaveError =>
+      'No se pudo guardar la lista. Vuelve a intentarlo.';
+
+  @override
+  String get listRestored => 'Lista restaurada';
+
+  @override
+  String get listArchivedHelp => 'Lista archivada. Contenido conservado.';
+
+  @override
+  String get listUpdateError =>
+      'No se pudo actualizar la lista. Vuelve a intentarlo.';
+
+  @override
+  String get chooseListDetails => 'Elige los detalles de la lista';
+
+  @override
+  String listConflictHelp(String local, String remote) {
+    return 'Este teléfono: $local\n\nOtro dispositivo: $remote\n\nEl contenido de las tareas y notas no cambiará.';
+  }
+
+  @override
+  String get later => 'Más tarde';
+
+  @override
+  String get useOtherDevice => 'Usar el otro dispositivo';
+
+  @override
+  String get useThisPhone => 'Usar este teléfono';
+
+  @override
+  String get listResolveError =>
+      'No se pudo resolver el conflicto de la lista. Vuelve a intentarlo.';
+
+  @override
+  String get retryLists => 'Reintentar listas';
+
+  @override
+  String get refreshLists => 'Actualizar listas e invitaciones';
+
+  @override
+  String get listsHelp =>
+      'Organiza el trabajo, tu vida personal y lo demás en sus propias listas. La bandeja de entrada sigue reuniendo las tareas sin fecha.';
+
+  @override
+  String get listsEmptyTitle => 'Un lugar para cada parte de tu vida';
+
+  @override
+  String get listsEmptyHelp =>
+      'Empieza con Trabajo, Personal o Compras. Puedes mover las tareas cuando quieras.';
+
+  @override
+  String get roleOwner => 'Propietario';
+
+  @override
+  String get roleEditor => 'Editor';
+
+  @override
+  String get roleViewer => 'Lector';
+
+  @override
+  String sharedListRole(String role) {
+    return '$role · compartida';
+  }
+
+  @override
+  String get listConflict => 'Cambió en otro dispositivo · elige los detalles';
+
+  @override
+  String get archivedListHelp => 'Archivada · tareas y notas disponibles';
+
+  @override
+  String listItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas y notas',
+      one: '1 tarea o nota',
+      zero: 'Sin tareas ni notas',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String manageItem(String name) {
+    return 'Gestionar $name';
+  }
+
+  @override
+  String get restoreList => 'Restaurar lista';
+
+  @override
+  String get archiveList => 'Archivar lista';
+
+  @override
+  String get sharingAndPeople => 'Compartir y gestionar personas';
+
+  @override
+  String get chooseDetails => 'Elegir detalles';
+
+  @override
+  String get sharedListVisibility =>
+      'Compartida · todas las personas de esta lista pueden ver sus tareas, notas y archivos subidos';
+
+  @override
+  String get invitationCode => 'Código de invitación';
+
+  @override
+  String get invitationCodeHelp =>
+      'Entrega este código a la persona invitada por un medio de confianza. Para aceptar, necesita el código y la cuenta de TaskFlow invitada. El código solo se muestra ahora; reemplazar una invitación invalida su código anterior.';
+
+  @override
+  String get accountChanged => 'La cuenta ha cambiado.';
+
+  @override
+  String get copyCode => 'Copiar código';
+
+  @override
+  String get done => 'Listo';
+
+  @override
+  String get sharingUpdateError =>
+      'No se pudo actualizar el acceso compartido. Comprueba la conexión y vuelve a intentarlo.';
+
+  @override
+  String get inviteToList => 'Invitar a esta lista';
+
+  @override
+  String get inviteHelp =>
+      'Tras aceptar, podrán ver todas las tareas, notas y archivos subidos de esta lista. La invitación aparece en su cuenta de TaskFlow; no se envía ningún correo. Entrégales el código que aparece a continuación. Caduca en 7 días.';
+
+  @override
+  String get inviteeEmail => 'Correo de su cuenta';
+
+  @override
+  String get enterEmailAddress => 'Introduce un correo electrónico.';
+
+  @override
+  String get access => 'Acceso';
+
+  @override
+  String get sharingRolesHelp =>
+      'Los editores pueden añadir, cambiar, completar y eliminar tareas y archivos. Solo el propietario gestiona la lista y las personas. Las tareas compartidas permanecen en esta lista; al exportarlas se crea una copia personal.';
+
+  @override
+  String get createInvitation => 'Crear invitación';
+
+  @override
+  String get listSharing => 'Compartir lista';
+
+  @override
+  String get sharingLoadError => 'No se pudo cargar el acceso compartido.';
+
+  @override
+  String get retry => 'Reintentar';
+
+  @override
+  String yourRole(String role) {
+    return 'Tu rol: $role';
+  }
+
+  @override
+  String get sharingHelp =>
+      'Comparte compras y tareas de casa. Los cambios se sincronizan cuando la aplicación se conecta o cuando actualizas.';
+
+  @override
+  String get invitePerson => 'Invitar a una persona';
+
+  @override
+  String get people => 'Personas';
+
+  @override
+  String get noOtherMembers => 'Por ahora, solo tú tienes acceso.';
+
+  @override
+  String get makeEditor => 'Dar permiso de edición';
+
+  @override
+  String get makeViewer => 'Dar permiso de lectura';
+
+  @override
+  String get removeAccess => 'Retirar acceso';
+
+  @override
+  String get removeAccessHelp =>
+      'Esta persona perderá el acceso a la lista y a sus tareas, notas y archivos. Sus cambios compartidos pendientes se eliminarán en la próxima sincronización correcta.';
+
+  @override
+  String get pendingInvitations => 'Invitaciones pendientes';
+
+  @override
+  String pendingRole(String role) {
+    return '$role · pendiente';
+  }
+
+  @override
+  String get revokeInvitation => 'Revocar invitación';
+
+  @override
+  String get replaceInvitationHelp =>
+      'Pulsa una invitación pendiente para reemplazar su código.';
+
+  @override
+  String get howSharingWorks => 'Cómo funciona el acceso compartido';
+
+  @override
+  String get sharedDataHelp =>
+      'Se comparten tareas, notas y archivos subidos. Los editores pueden modificarlos o eliminarlos; los lectores pueden consultarlos. Las opciones de recordatorio se comparten, pero cada teléfono debe activar sus propias notificaciones.';
+
+  @override
+  String get sharingRemovalHelp =>
+      'Al salir o perder el acceso, las tareas y notas compartidas, los cambios pendientes y las copias descargadas se eliminarán de este teléfono en la próxima sincronización correcta. No se pueden borrar a distancia los dispositivos sin conexión ni las copias ya exportadas.';
+
+  @override
+  String get deleteList => 'Eliminar lista';
+
+  @override
+  String get deleteListHelp =>
+      '¿Eliminar esta lista y todas sus tareas, notas y archivos subidos para todas las personas? No se puede deshacer.';
+
+  @override
+  String get deleteListForEveryone => 'Eliminar la lista para todos';
+
+  @override
+  String get leaveList => 'Salir de la lista';
+
+  @override
+  String get leaveListHelp =>
+      'Las tareas, notas y archivos compartidos y los cambios pendientes se eliminarán de este teléfono. Los demás miembros conservan la lista.';
+
+  @override
+  String get enterInvitationCode => 'Introduce el código de invitación';
+
+  @override
+  String get requestInvitationCodeHelp =>
+      'Pide al propietario de la lista el código que recibió al invitarte.';
+
+  @override
+  String get invitationCodeRequired => 'Pega el código de invitación completo.';
+
+  @override
+  String get joinList => 'Unirse a la lista';
+
+  @override
+  String get invitationResponseError =>
+      'No se pudo responder. Vuelve a intentarlo cuando haya conexión.';
+
+  @override
+  String get retryInvitations => 'Reintentar invitaciones';
+
+  @override
+  String get invitations => 'Invitaciones';
+
+  @override
+  String joinListHelp(String role) {
+    return 'Únete con el rol de $role. Las tareas, notas y archivos compartidos se sincronizarán con tu cuenta.';
+  }
+
+  @override
+  String get acceptInvitation => 'Aceptar invitación';
+
+  @override
+  String get decline => 'Rechazar';
+
+  @override
   String get fileEmpty =>
       'No hay archivos adjuntos. Añade un archivo al editar.';
 

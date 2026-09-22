@@ -18,11 +18,17 @@ import 'support/design_fixtures.dart';
 
 void main() {
   testWidgets(
-      'sharing and invitation form remain usable at 2x text in both themes',
+      'English and Spanish invitations preserve API roles at 2x text in both themes',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 568));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    for (final dark in [false, true]) {
+    for (final (language, dark) in [
+      ('en', false),
+      ('en', true),
+      ('es', false),
+      ('es', true)
+    ]) {
+      final spanish = language == 'es';
       final api = _Api();
       final container = ProviderContainer(overrides: [
         apiClientProvider.overrideWithValue(api),
@@ -39,6 +45,7 @@ void main() {
       await tester.pumpWidget(UncontrolledProviderScope(
           container: container,
           child: MaterialApp(
+              locale: Locale(language),
               theme: dark ? AppTheme.dark : AppTheme.light,
               supportedLocales: AppLocalizations.supportedLocales,
               localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -58,18 +65,85 @@ void main() {
       await tester.ensureVisible(field);
       await tester.enterText(field, 'friend@example.invalid');
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Create invitation'));
+      if (spanish) {
+        final role = find.byType(DropdownButtonFormField<String>);
+        await tester.ensureVisible(role);
+        await tester.pumpAndSettle();
+        await tester.tap(role);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Lector').last);
+        await tester.pumpAndSettle();
+      }
+      await tester
+          .tap(find.text(spanish ? 'Crear invitación' : 'Create invitation'));
       await tester.pumpAndSettle();
-      expect(
-          api.payload, {'email': 'friend@example.invalid', 'role': 'editor'});
+      expect(api.payload, {
+        'email': 'friend@example.invalid',
+        'role': spanish ? 'viewer' : 'editor'
+      });
       expect(find.byKey(const ValueKey('invitation-code')), findsOneWidget);
-      await tester.tap(find.text('Done'));
+      await tester.tap(find.text(spanish ? 'Listo' : 'Done'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       container.dispose();
       api.close();
     }
+  });
+
+  testWidgets('Spanish invitation validation keeps the exact accepted code',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _Api();
+    final container = ProviderContainer(overrides: [
+      apiClientProvider.overrideWithValue(api),
+      authProvider.overrideWith((ref) => _Auth(api)),
+      taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+      invitationsProvider.overrideWith((ref) async => [
+            {
+              'id': 'invitation-fixture',
+              'list_name': 'Do not translate my list',
+              'role': 'viewer'
+            }
+          ]),
+    ]);
+    addTearDown(container.dispose);
+    addTearDown(api.close);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: const Locale('es'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!),
+        home: Scaffold(body: ListView(children: const [ListInvitations()])),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Do not translate my list'), findsOneWidget);
+    expect(find.textContaining('rol de Lector'), findsOneWidget);
+    await tester.ensureVisible(find.text('Aceptar invitación'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aceptar invitación'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unirse a la lista'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pega el código de invitación completo.'), findsOneWidget);
+    expect(api.payload, isNull);
+    const code = 'Synthetic-Case-Sensitive-Code_2026';
+    final field = find.byKey(const ValueKey('accept-invitation-code'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, '  $code  ');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Unirse a la lista'));
+    await tester.pumpAndSettle();
+    expect(api.payload, {'decision': 'accept', 'code': code});
+    expect(api.path, 'invitations/invitation-fixture/respond/');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('viewer sees task and checklist with disabled editing controls',
@@ -116,6 +190,7 @@ void main() {
 
 class _Api extends OfflineApiClient {
   Map<String, dynamic>? payload;
+  String? path;
   @override
   Account get account => Account.fromJson(
       {'id': 1, 'email': 'owner@example.invalid', 'timezone': 'UTC'});
@@ -126,6 +201,7 @@ class _Api extends OfflineApiClient {
       bool authenticated = true,
       int? accountId}) async {
     payload = data;
+    this.path = path;
     return {'code': 'synthetic-invitation-code-only'};
   }
 }

@@ -12,6 +12,7 @@ import 'package:agenda/screens/regional_settings_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/task_list_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,13 +64,15 @@ void main() {
       taskRepositoryProvider.overrideWithValue(repository),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
       regionalStoreProvider.overrideWithValue(store),
-      taskListsProvider.overrideWith((ref) async => []),
+      taskListStoreProvider.overrideWithValue(TaskListStore(database, owner)),
       pendingCapturesProvider.overrideWith((ref) async => []),
     ]);
     addTearDown(() async {
       container.dispose();
       await sql.delete('tasks', where: 'owner_key = ?', whereArgs: [owner]);
       await sql.delete('captures', where: 'owner_key = ?', whereArgs: [owner]);
+      await sql
+          .delete('task_lists', where: 'owner_key = ?', whereArgs: [owner]);
       await sql.delete('app_preferences',
           where: 'scope = ?', whereArgs: ['regional']);
       if (priorPreferences.isNotEmpty) {
@@ -117,6 +120,55 @@ void main() {
     expect(MaterialLocalizations.of(calendarContext).timeOfDayFormat(),
         TimeOfDayFormat.h_colon_mm_space_a);
     await binding.takeScreenshot('regional-calendar-dark');
+
+    // Exercise translated list controls against real Android SQLite. Display
+    // labels must never become persisted color keys or rewrite task schedules.
+    navigator.pushNamed('/lists');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('new-list')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')),
+        'Regional fixture · keep my words');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    final blue = find.widgetWithText(ChoiceChip, 'Azul');
+    await tester.ensureVisible(blue);
+    await tester.pumpAndSettle();
+    await tester.tap(blue);
+    await tester.pumpAndSettle();
+    await binding.takeScreenshot('regional-list-editor-spanish');
+    await tester.tap(find.text('Guardar lista'));
+    await tester.pumpAndSettle();
+    final savedList = (await TaskListStore(database, owner).all()).single;
+    expect(savedList.name, 'Regional fixture · keep my words');
+    expect(savedList.color, 'blue');
+    final menu = find.byTooltip('Gestionar ${savedList.name}');
+    await tester.scrollUntilVisible(menu, 120,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Archivar lista'));
+    await tester.pumpAndSettle();
+    final archived = (await TaskListStore(database, owner).all()).single;
+    expect(archived.id, savedList.id);
+    expect(archived.color, 'blue');
+    expect(archived.archived, isTrue);
+    await binding.takeScreenshot('regional-list-archived-spanish');
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    // Guest account UI only: no credentials, recovery emails or network calls.
+    navigator.pushNamed('/account');
+    await tester.pumpAndSettle();
+    expect(find.text('Tu cuenta'), findsOneWidget);
+    for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+      await container.read(themeModeProvider.notifier).setMode(theme);
+      await tester.pumpAndSettle();
+      await binding.takeScreenshot('regional-account-${theme.name}-spanish');
+    }
+    navigator.pop();
+    await tester.pumpAndSettle();
     expect(
         jsonEncode(await sql
             .query('tasks', where: 'owner_key = ?', whereArgs: [owner])),

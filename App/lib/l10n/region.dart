@@ -17,6 +17,20 @@ extension TaskFlowLocale on BuildContext {
       DateFormat.yMMMMEEEEd(localeName).format(date);
   String priorityName(int priority) =>
       switch (priority) { 3 => l10n.high, 2 => l10n.medium, _ => l10n.low };
+  String listRole(String role) => switch (role) {
+        'owner' => l10n.roleOwner,
+        'editor' => l10n.roleEditor,
+        'viewer' => l10n.roleViewer,
+        _ => role,
+      };
+  String listColorName(String color) => switch (color) {
+        'teal' => l10n.colorTeal,
+        'blue' => l10n.colorBlue,
+        'violet' => l10n.colorViolet,
+        'amber' => l10n.colorAmber,
+        'rose' => l10n.colorRose,
+        _ => color,
+      };
   String reminderLead(int? minutes) => switch (minutes) {
         null => l10n.useDefault,
         -1 => l10n.off,

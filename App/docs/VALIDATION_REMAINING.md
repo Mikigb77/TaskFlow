@@ -12,7 +12,7 @@ Implementation and automated checks do not establish every original acceptance c
 | B07 native speech | Capability checks, retained partial transcripts and synthetic interruption tests | Actual installed English/Spanish models and spoken/noisy/paused/corrected input. This emulator reported both models absent. Neither fixtures nor synthetic WAV transcription establish live speech accuracy. |
 | B19/B20/B23 external handoff | File-byte restoration, permissions/provider events, safe links; actual Chrome page and PDF viewer display on Android, with return to TaskFlow | Google Calendar returned without displaying the synthetic provider event. Verify a configured calendar account/app and physical-device/file-type variations. See HANDOFF_VALIDATION.md. |
 | B06/B22/B23 product understanding | Labeled capture/type choices, scoped shared-list workflow, English/Spanish core UI, small-screen/large-text checks | Observe first-time users finding capture, correcting mistakes, choosing task versus note, and collaborating on a household list. Functional tests do not prove preference or retention. |
-| B18 localization/platform scope | English/Spanish core flows and Notes, regional clock/week/timezone preferences | Advanced account/list/sharing copy remains partly English. Other native platforms need their own build/device validation. |
+| B18 localization/platform scope | English/Spanish core flows, Notes, account/list/sharing controls, regional clock/week/timezone preferences; 2× text and real Android list persistence checks | Notification-management/import diagnostics and server-provided errors still include English. Other native platforms need their own build/device validation. See REGIONAL_VALIDATION.md. |
 
 ## Short physical-phone session
 

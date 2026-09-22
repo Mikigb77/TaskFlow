@@ -550,6 +550,200 @@
   "fileRemove": "Remove attachment",
   "fileRemoveQuestion": "Remove this attachment?",
   "fileRemoveHelp": "This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.",
+  "yourAccount": "Your account",
+  "accountHeading": "Your own little space.",
+  "backupHeading": "Your plans, kept close.",
+  "accountBackupHelp": "Tasks and notes are saved on this phone and backed up when connected. New attachments upload after saving; check their status in item details. Older device-only files need an explicit Upload.",
+  "accountUpToDate": "Your tasks and notes are up to date.",
+  "syncNow": "Sync now",
+  "importLocalItems": "Import local tasks and notes",
+  "importLocalItemsQuestion": "Import local tasks and notes?",
+  "importLocalItemsHelp": "{count, plural, =1{Move 1 item from this phone into your account} other{Move {count} items from this phone into your account}} to back up your tasks and notes. Attachments stay on this phone until you choose Upload in item details.",
+  "@importLocalItemsHelp": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importItems": "Import",
+  "noLocalItems": "There are no local tasks or notes to import.",
+  "itemsImported": "{count, plural, =1{1 item imported.} other{{count} items imported.}}",
+  "@itemsImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "connectionDetails": "Connection details",
+  "signOut": "Sign out",
+  "recoveryHeading": "Let’s get you back in.",
+  "registerHeading": "A space for your plans.",
+  "signInHeading": "Welcome back.",
+  "recoveryHelp": "Request a recovery email, then use the code to set a new password.",
+  "accountSignInHelp": "Sign in to back up your tasks and notes and get a larger voice allowance.",
+  "email": "Email",
+  "enterEmail": "Enter your email",
+  "recoveryCode": "Recovery code",
+  "recoveryCodeHelp": "Leave empty to request an email.",
+  "newPassword": "New password",
+  "password": "Password",
+  "passwordHelp": "At least 12 characters",
+  "passwordTooShort": "Use at least 12 characters",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "continueRecovery": "Continue recovery",
+  "createAccount": "Create account",
+  "signIn": "Sign in",
+  "alreadyHaveAccount": "Already have an account? Sign in",
+  "createAnAccount": "Create an account",
+  "backToSignIn": "Back to sign in",
+  "forgotPassword": "Forgot password?",
+  "accountGuestHelp": "You can also use TaskFlow without an account. Your local tasks and notes stay on this phone.",
+  "connectionSettings": "Connection settings",
+  "backendAddress": "Backend address",
+  "backendAddressHelp": "Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.",
+  "recoveryEmailRequested": "If that account exists, a recovery email has been sent.",
+  "passwordResetComplete": "Password updated. Sign in with your new password.",
+  "newList": "New list",
+  "editList": "Edit list",
+  "listName": "Name",
+  "listNameHint": "Work, Personal, Shopping…",
+  "listNameRequired": "Name your list.",
+  "colorTeal": "Teal",
+  "colorBlue": "Blue",
+  "colorViolet": "Violet",
+  "colorAmber": "Amber",
+  "colorRose": "Rose",
+  "saveList": "Save list",
+  "listSaveError": "Could not save this list. Please retry.",
+  "listRestored": "List restored",
+  "listArchivedHelp": "List archived. Contents kept.",
+  "listUpdateError": "Could not update this list. Please retry.",
+  "chooseListDetails": "Choose list details",
+  "listConflictHelp": "This phone: {local}\n\nOther device: {remote}\n\nTask and note contents will stay the same.",
+  "@listConflictHelp": {
+    "placeholders": {
+      "local": {
+        "type": "String"
+      },
+      "remote": {
+        "type": "String"
+      }
+    }
+  },
+  "later": "Later",
+  "useOtherDevice": "Use other device",
+  "useThisPhone": "Use this phone",
+  "listResolveError": "Could not resolve this list. Please retry.",
+  "retryLists": "Retry lists",
+  "refreshLists": "Refresh lists and invitations",
+  "listsHelp": "Keep work, life and everything else in their own lists. Inbox still collects tasks without a date.",
+  "listsEmptyTitle": "A place for each part of life",
+  "listsEmptyHelp": "Start with Work, Personal or Shopping. Tasks can move whenever you like.",
+  "roleOwner": "Owner",
+  "roleEditor": "Editor",
+  "roleViewer": "Viewer",
+  "sharedListRole": "{role} · shared",
+  "@sharedListRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "listConflict": "Changed on another device · choose details",
+  "archivedListHelp": "Archived · tasks and notes still available",
+  "listItemCount": "{count, plural, =0{No tasks or notes} =1{1 task or note} other{{count} tasks and notes}}",
+  "@listItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "manageItem": "Manage {name}",
+  "@manageItem": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "restoreList": "Restore list",
+  "archiveList": "Archive list",
+  "sharingAndPeople": "Sharing and people",
+  "chooseDetails": "Choose details",
+  "sharedListVisibility": "Shared · everyone in this list can see tasks, notes and uploaded files",
+  "invitationCode": "Invitation code",
+  "invitationCodeHelp": "Give this code to the intended person through a channel you trust. They need it and the invited TaskFlow account to accept. The code is shown only now; replacing an invitation invalidates its previous code.",
+  "accountChanged": "The account changed.",
+  "copyCode": "Copy code",
+  "done": "Done",
+  "sharingUpdateError": "Could not update sharing. Check the connection and retry.",
+  "inviteToList": "Invite to this list",
+  "inviteHelp": "All tasks, notes and uploaded files in this list will be visible after they accept. The invitation appears in their TaskFlow account; no email is sent. Give them the code shown next. It expires in 7 days.",
+  "inviteeEmail": "Their account email",
+  "enterEmailAddress": "Enter an email address.",
+  "access": "Access",
+  "sharingRolesHelp": "Editors can add, change, complete and delete tasks and files. Only the owner manages the list and people. Shared tasks stay in this list; exporting creates a personal copy.",
+  "createInvitation": "Create invitation",
+  "listSharing": "List sharing",
+  "sharingLoadError": "Could not load sharing.",
+  "retry": "Retry",
+  "yourRole": "Your role: {role}",
+  "@yourRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "sharingHelp": "Share shopping and chores. Changes sync when the app connects or you refresh.",
+  "invitePerson": "Invite a person",
+  "people": "People",
+  "noOtherMembers": "Only you have accepted access so far.",
+  "makeEditor": "Make editor",
+  "makeViewer": "Make viewer",
+  "removeAccess": "Remove access",
+  "removeAccessHelp": "This person will lose access to this list and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.",
+  "pendingInvitations": "Pending invitations",
+  "pendingRole": "{role} · pending",
+  "@pendingRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "revokeInvitation": "Revoke invitation",
+  "replaceInvitationHelp": "Tap a pending invitation to replace its code.",
+  "howSharingWorks": "How sharing works",
+  "sharedDataHelp": "Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.",
+  "sharingRemovalHelp": "Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.",
+  "deleteList": "Delete list",
+  "deleteListHelp": "Delete this list and all its tasks, notes and uploaded files for everyone? This cannot be undone.",
+  "deleteListForEveryone": "Delete list for everyone",
+  "leaveList": "Leave list",
+  "leaveListHelp": "Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the list.",
+  "enterInvitationCode": "Enter invitation code",
+  "requestInvitationCodeHelp": "Ask the list owner for the code they received when inviting you.",
+  "invitationCodeRequired": "Paste the full invitation code.",
+  "joinList": "Join list",
+  "invitationResponseError": "Could not respond. Retry when connected.",
+  "retryInvitations": "Retry invitations",
+  "invitations": "Invitations",
+  "joinListHelp": "Join as {role}. Shared tasks, notes and uploaded files will sync to your account.",
+  "@joinListHelp": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "acceptInvitation": "Accept invitation",
+  "decline": "Decline",
   "fileEmpty": "No attachments. Add a file when editing.",
   "fileLoadError": "Could not load attachment status. Please retry.",
   "fileActionError": "Could not complete this action. Your task is saved; please retry.",
