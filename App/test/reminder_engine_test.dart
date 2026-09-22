@@ -43,6 +43,55 @@ void main() {
   tearDown(() => database.close());
 
   test(
+      'deadline snooze survives a planned move and completes the original occurrence',
+      () async {
+    await enable();
+    await database.insertTask(Task(
+        title: 'Report',
+        priority: 2,
+        dueDate: DateTime(2026, 9, 22, 10),
+        deadline: DateTime(2026, 9, 22, 17),
+        deadlineHasTime: true,
+        reminderAnchor: 'deadline',
+        reminderMinutes: 60,
+        recurrence: 'daily',
+        repeatUntil: DateTime(2026, 9, 23)));
+    await engine.reconcile('local');
+    final original =
+        (await alerts()).firstWhere((row) => row['occurrence'] == '2026-09-22');
+    final id = original['id'] as int;
+    now = DateTime(2026, 9, 22, 16);
+    expect(await engine.action(id, 'snooze'), isTrue);
+    final snoozed = driver.pending[id]!.when;
+    var task = (await database.getTasks()).single;
+    await database.updateTask(task.copyWith(exceptions: [
+      OccurrenceException(
+          originalDate: '2026-09-22',
+          date: DateTime(2026, 9, 23, 11),
+          hasTime: true)
+    ]));
+    await engine.reconcile('local');
+    expect(driver.pending[id]!.when, snoozed);
+    expect((await engine.taskForAlert(id))!.displayDate,
+        DateTime(2026, 9, 23, 11));
+    expect((await engine.taskForAlert(id))!.displayDeadline,
+        DateTime(2026, 9, 22, 17));
+    expect(await engine.action(id, 'complete'), isTrue);
+    task = (await database.getTasks()).single;
+    expect(task.completedDates, ['2026-09-22']);
+    final remaining = (await alerts()).single;
+    await database
+        .updateTask(task.copyWith(deadline: DateTime(2026, 9, 22, 18)));
+    expect(
+        await engine.action(remaining['id'] as int, 'complete',
+            token: remaining['token'] as String),
+        isFalse);
+    await engine.reconcile('local');
+    expect(driver.pending.values.single.due, DateTime(2026, 9, 23, 18));
+    expect((await alerts()).single['token'], isNot(remaining['token']));
+  });
+
+  test(
       'move collision and skip reconcile only affected identities; notification completes original date',
       () async {
     await enable();

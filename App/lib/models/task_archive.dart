@@ -137,6 +137,21 @@ class TaskArchive {
     if (timed != null && dated != null) {
       throw const FormatException('A task cannot have two schedules.');
     }
+    if (data['deadline_at'] != null) _timed(data['deadline_at']);
+    if (data['deadline_date'] != null) _date(data['deadline_date']);
+    if (data['deadline_at'] != null && data['deadline_date'] != null) {
+      throw const FormatException('Choose a timed or date-only deadline.');
+    }
+    if (data['duration_minutes'] != null) {
+      _integer(data['duration_minutes'], 'duration', 1, 1440);
+    }
+    final anchor = data['reminder_anchor'] ?? 'planned';
+    if (!['planned', 'deadline'].contains(anchor) ||
+        (anchor == 'deadline' &&
+            data['deadline_at'] == null &&
+            data['deadline_date'] == null)) {
+      throw const FormatException('Choose an available reminder date.');
+    }
     final recurrence = data['recurrence'] ?? 'none';
     if (!Task.repeats.containsKey(recurrence)) {
       throw const FormatException('Unsupported repeat rule.');

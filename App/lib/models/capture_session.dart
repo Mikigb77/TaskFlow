@@ -24,6 +24,12 @@ class CaptureDraft {
           title: draft.title,
           dueDate: draft.dueDate,
           hasTime: draft.hasTime,
+          deadline: draft.deadline,
+          deadlineHasTime: draft.deadlineHasTime,
+          durationMinutes: draft.durationMinutes,
+          reminderAnchor: draft.dueDate == null && draft.deadline != null
+              ? 'deadline'
+              : 'planned',
           recurrence: draft.recurrence,
           repeatInterval: draft.repeatInterval,
           repeatWeekdays: draft.repeatWeekdays,

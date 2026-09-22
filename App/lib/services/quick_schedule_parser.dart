@@ -5,8 +5,9 @@ class ScheduleSuggestion {
   final DateTime date;
   final bool hasTime;
   final bool ambiguousTime;
+  final bool isDeadline;
   const ScheduleSuggestion(this.title, this.date, this.hasTime,
-      {this.ambiguousTime = false});
+      {this.ambiguousTime = false, this.isDeadline = false});
 }
 
 class QuickScheduleParser {
@@ -48,6 +49,10 @@ class QuickScheduleParser {
     final dates = _date.allMatches(input).toList();
     if (dates.length != 1) return null;
     final match = dates.single;
+    final deadlineMarker = RegExp(
+            r'\b(?:by|due(?:\s+by)?|deadline(?:\s+is)?|antes\s+de(?:l)?|vence|fecha\s+l[ií]mite(?:\s+es)?)\s*$',
+            caseSensitive: false)
+        .firstMatch(input.substring(0, match.start));
     final phrase = match.group(0)!.toLowerCase();
     final word = phrase.split(RegExp(r'\s+')).last;
     final today = DateTime(reference.year, reference.month, reference.day);
@@ -76,6 +81,11 @@ class QuickScheduleParser {
     }
     final times = _time.allMatches(input).toList();
     if (times.length > 1) return null;
+    if (deadlineMarker != null &&
+        times.isNotEmpty &&
+        times.single.end <= deadlineMarker.start) {
+      return null;
+    }
     var hasTime = false;
     var ambiguous = false;
     RegExpMatch? acceptedTime;
@@ -99,8 +109,11 @@ class QuickScheduleParser {
         .hasMatch(input)) {
       ambiguous = true;
     }
-    final ranges = [match, if (acceptedTime != null) acceptedTime]
-      ..sort((a, b) => b.start.compareTo(a.start));
+    final ranges = [
+      match,
+      if (deadlineMarker != null) deadlineMarker,
+      if (acceptedTime != null) acceptedTime
+    ]..sort((a, b) => b.start.compareTo(a.start));
     var title = input;
     for (final range in ranges) {
       title = title.replaceRange(range.start, range.end, ' ');
@@ -110,6 +123,7 @@ class QuickScheduleParser {
         .replaceAll(RegExp(r'^[\s,.;:]+|[\s,.;:]+$'), '')
         .trim();
     if (title.isEmpty) return null;
-    return ScheduleSuggestion(title, date, hasTime, ambiguousTime: ambiguous);
+    return ScheduleSuggestion(title, date, hasTime,
+        ambiguousTime: ambiguous, isDeadline: deadlineMarker != null);
   }
 }

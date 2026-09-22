@@ -25,6 +25,7 @@ import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/screens/day_timeline_screen.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/screens/regional_settings_screen.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
@@ -226,6 +227,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         '/notifications': (_) => const NotificationSettingsScreen(),
       },
       onGenerateRoute: (settings) {
+        if (settings.name == '/timeline') {
+          return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => DayTimelineScreen(
+                  day: settings.arguments as DateTime? ?? DateTime.now()));
+        }
         if (settings.name == '/taskDetails') {
           return MaterialPageRoute(
               settings: settings,

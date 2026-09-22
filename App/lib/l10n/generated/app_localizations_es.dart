@@ -9,6 +9,115 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get plannedFor => 'Planificado para';
+
+  @override
+  String get plannedForHelp =>
+      'Cuándo quieres hacer esta tarea. Puedes añadir una fecha límite en Más detalles.';
+
+  @override
+  String get planning => 'Duración y fecha límite';
+
+  @override
+  String get duration => 'Duración';
+
+  @override
+  String get durationUnset => 'Sin duración';
+
+  @override
+  String get durationEstimateHelp =>
+      'Una estimación hasta que elijas una hora de inicio.';
+
+  @override
+  String durationMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get durationInput => 'Minutos (1–1440)';
+
+  @override
+  String get durationInvalid => 'Introduce un número entero de 1 a 1440.';
+
+  @override
+  String get removeDuration => 'Quitar duración';
+
+  @override
+  String get deadline => 'Fecha límite';
+
+  @override
+  String get deadlineUnset => 'Sin fecha límite';
+
+  @override
+  String get deadlineHelp =>
+      'Debe estar terminada para esta fecha. Cambiar el inicio previsto mantiene esta fecha límite.';
+
+  @override
+  String get deadlineTime => 'Hora límite';
+
+  @override
+  String get deadlineEndDay => 'Antes de que termine el día';
+
+  @override
+  String get removeDeadline => 'Quitar fecha límite';
+
+  @override
+  String get deadlineRecurringHelp =>
+      'La fecha límite se repite con cada instancia original. Mover una instancia mantiene su fecha límite; cambiar el inicio de la serie mantiene la primera fecha límite y cambia el margen de las siguientes.';
+
+  @override
+  String get deadlineLatePlan =>
+      'El plan termina después de la fecha límite. Revisa el inicio o la duración.';
+
+  @override
+  String get deadlineOverdue => 'Fecha límite vencida';
+
+  @override
+  String deadlineLabel(String date) {
+    return 'Vence $date';
+  }
+
+  @override
+  String get reminderAnchor => 'Recordar con respecto a';
+
+  @override
+  String get reminderAnchorHelp =>
+      'Un recordatorio por instancia, según la fecha elegida aquí.';
+
+  @override
+  String get dayTimeline => 'Horario del día';
+
+  @override
+  String get timelineFirstPlan => 'Ir al primer elemento con hora';
+
+  @override
+  String get timelineLimit =>
+      'Se muestran los primeros 200 elementos con hora. Usa la agenda para ver todas las tareas.';
+
+  @override
+  String get timelineHelp =>
+      'Trabajo planificado y eventos del teléfono. Las fechas límite indican cuándo debe estar terminado algo.';
+
+  @override
+  String get timelineUnblocked => 'Sin bloque de tiempo';
+
+  @override
+  String get timelineNoBlocks =>
+      'No hay planes con hora para este día. Añade hora de inicio y duración para reservar un bloque.';
+
+  @override
+  String get timelinePoint => 'Sin duración · solo hora';
+
+  @override
+  String get timelineShortBlocks =>
+      'Los eventos cortos tienen una zona táctil más grande; la barra de color muestra su duración real.';
+
+  @override
+  String timelineHours(int hours) {
+    return '$hours horas en este día';
+  }
+
+  @override
   String get deviceCalendars => 'Calendarios del teléfono';
 
   @override

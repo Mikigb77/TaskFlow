@@ -1,4 +1,5 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
@@ -139,11 +140,7 @@ class TaskDetailScreen extends ConsumerWidget {
                           _detail(
                               context,
                               Icons.calendar_today_outlined,
-                              task.occurrenceDate != null
-                                  ? context.l10n.occurrence
-                                  : task.isRecurring
-                                      ? context.l10n.starts
-                                      : context.l10n.date,
+                              context.l10n.plannedFor,
                               task.displayDate == null
                                   ? context.l10n.inboxDate
                                   : context.fullDate(task.displayDate!)),
@@ -155,6 +152,28 @@ class TaskDetailScreen extends ConsumerWidget {
                               task.hasTime
                                   ? context.clockTime(task.displayDate!)
                                   : context.l10n.anyTime),
+                          if (task.durationMinutes != null) ...[
+                            const Divider(),
+                            _detail(
+                                context,
+                                Icons.timelapse_outlined,
+                                context.l10n.duration,
+                                '${context.l10n.durationMinutes(task.durationMinutes!)}${task.plannedEnd == null ? '' : ' · ${context.clockTime(task.displayDate!)} – ${context.shortDate(task.plannedEnd!)} ${context.clockTime(task.plannedEnd!)}'}'),
+                          ],
+                          if (task.deadline != null) ...[
+                            const Divider(),
+                            _detail(
+                                context,
+                                Icons.flag_outlined,
+                                context.l10n.deadline,
+                                '${taskDeadlineLabel(context, task)}${task.deadlineHasTime ? '' : '\n${context.l10n.deadlineEndDay}'}',
+                                color: task.deadlinePassed(DateTime.now())
+                                    ? colors.error
+                                    : null),
+                            if (task.plannedAfterDeadline)
+                              MessageBanner(context.l10n.deadlineLatePlan,
+                                  icon: Icons.info_outline),
+                          ],
                           if (task.isRecurring) ...[
                             const Divider(),
                             _detail(
@@ -173,7 +192,7 @@ class TaskDetailScreen extends ConsumerWidget {
                                   context, task.priority)),
                         ])),
                     const SizedBox(height: 28),
-                    if (task.dueDate != null)
+                    if (task.reminderDate != null)
                       Align(
                           alignment: Alignment.centerLeft,
                           child: ReminderChip(

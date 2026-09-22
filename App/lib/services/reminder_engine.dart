@@ -100,19 +100,23 @@ class ReminderEngine {
     for (final task in tasks) {
       if (task.isRecurring) {
         for (var offset = 0; offset <= days; offset++) {
-          for (final occurrence in task
-              .occurrencesOn(DateTime(now.year, now.month, now.day + offset))) {
+          final day = DateTime(now.year, now.month, now.day + offset);
+          for (final occurrence in task.reminderAnchor == 'deadline'
+              ? task.deadlinesOn(day)
+              : task.occurrencesOn(day)) {
             if (!occurrence.isCompleted &&
-                (!occurrence.hasTime || occurrence.displayDate!.isAfter(now))) {
+                occurrence.reminderDate != null &&
+                (!occurrence.reminderHasTime ||
+                    occurrence.reminderDate!.isAfter(now))) {
               result.add(occurrence);
             }
           }
         }
       } else if (!task.isCompleted &&
-          task.dueDate != null &&
-          (task.hasTime
-              ? task.dueDate!.isAfter(now)
-              : !Task.day(task.dueDate!).isBefore(Task.day(now)))) {
+          task.reminderDate != null &&
+          (task.reminderHasTime
+              ? task.reminderDate!.isAfter(now)
+              : !Task.day(task.reminderDate!).isBefore(Task.day(now)))) {
         result.add(task);
       }
     }
@@ -125,11 +129,11 @@ class ReminderEngine {
     final result = <PlannedReminder>[];
     for (final task in upcoming(tasks, now)) {
       if (task.id == null || task.reminderMinutes == -1) continue;
-      final date = task.displayDate!;
+      final date = task.reminderDate!;
       final lead = task.reminderMinutes ?? preferences.leadMinutes;
       final minute = task.reminderTime ?? preferences.dateOnlyTime;
-      if (task.hasTime ? lead < 0 : minute == null) continue;
-      final when = task.hasTime
+      if (task.reminderHasTime ? lead < 0 : minute == null) continue;
+      final when = task.reminderHasTime
           ? date.subtract(Duration(minutes: lead))
           : DateTime(
               date.year, date.month, date.day, minute! ~/ 60, minute % 60);
@@ -141,11 +145,13 @@ class ReminderEngine {
           due: date,
           when: when,
           title: task.title,
-          body: task.hasTime
-              ? (lead == 0
-                  ? 'It’s time for your task.'
-                  : 'Scheduled in $lead minutes.')
-              : 'On your list for today.'));
+          body: task.reminderAnchor == 'deadline'
+              ? 'Your task deadline is approaching.'
+              : task.reminderHasTime
+                  ? (lead == 0
+                      ? 'It’s time for your task.'
+                      : 'Scheduled in $lead minutes.')
+                  : 'On your list for today.'));
     }
     for (final entry in {
       'morning': preferences.morning,
@@ -224,7 +230,7 @@ class ReminderEngine {
             identity: row['identity'] as String,
             taskId: task.id,
             occurrence: row['occurrence'] as String?,
-            due: task.displayDate,
+            due: task.reminderDate,
             when: when,
             title: task.title,
             body: 'Your snoozed task.'));
@@ -356,8 +362,8 @@ class ReminderEngine {
     }
     if (task == null ||
         task.isCompleted ||
-        task.displayDate == null ||
-        task.displayDate!.toIso8601String() != row['due_at']) {
+        task.reminderDate == null ||
+        task.reminderDate!.toIso8601String() != row['due_at']) {
       return null;
     }
     return task;

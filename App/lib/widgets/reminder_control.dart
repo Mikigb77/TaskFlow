@@ -16,51 +16,63 @@ class ReminderChip extends ConsumerWidget {
     final minute = task.reminderTime ?? preferences.dateOnlyTime;
     final label = task.reminderMinutes == -1
         ? context.l10n.off
-        : task.hasTime
+        : task.reminderHasTime
             ? context
                 .reminderLead(task.reminderMinutes ?? preferences.leadMinutes)
             : minute == null
                 ? context.l10n.off
                 : TimeOfDay(hour: minute ~/ 60, minute: minute % 60)
                     .format(context);
-    return ActionChip(
-        avatar: const Icon(Icons.notifications_outlined, size: 16),
-        label: Text(context.l10n.reminderValue(
-            '$label${preferences.enabled ? '' : ' · ${context.l10n.deviceOff}'}')),
-        onPressed: onChanged == null
-            ? null
-            : () async {
-                var edited = task;
-                final result = await showModalBottomSheet<Task>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (context) => StatefulBuilder(
-                        builder: (context, update) => SafeArea(
-                            child: SingleChildScrollView(
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ReminderControl(
-                                          hasDate: edited.dueDate != null,
-                                          hasTime: edited.hasTime,
-                                          minutes: edited.reminderMinutes,
-                                          time: edited.reminderTime,
-                                          onMinutes: (value) => update(() =>
-                                              edited = edited.copyWith(
-                                                  reminderMinutes: value)),
-                                          onTime: (value) => update(() =>
-                                              edited = edited.copyWith(
-                                                  reminderTime: value))),
-                                      const SizedBox(height: 12),
-                                      FilledButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, edited),
-                                          child:
-                                              Text(context.l10n.useReminder)),
-                                    ])))));
-                if (result != null) onChanged?.call(result);
-              });
+    return LayoutBuilder(
+        builder: (context, constraints) => ActionChip(
+            avatar: const Icon(Icons.notifications_outlined, size: 16),
+            label: ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxWidth: ((constraints.maxWidth.isFinite
+                                ? constraints.maxWidth
+                                : MediaQuery.sizeOf(context).width) -
+                            80)
+                        .clamp(0, double.infinity)),
+                child: Text(
+                    context.l10n.reminderValue(
+                        '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label${preferences.enabled ? '' : ' · ${context.l10n.deviceOff}'}'),
+                    softWrap: true,
+                    maxLines: 10)),
+            onPressed: onChanged == null
+                ? null
+                : () async {
+                    var edited = task;
+                    final result = await showModalBottomSheet<Task>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (context) => StatefulBuilder(
+                            builder: (context, update) => SafeArea(
+                                child: SingleChildScrollView(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ReminderControl(
+                                              hasDate:
+                                                  edited.reminderDate != null,
+                                              hasTime: edited.reminderHasTime,
+                                              minutes: edited.reminderMinutes,
+                                              time: edited.reminderTime,
+                                              onMinutes: (value) => update(() =>
+                                                  edited = edited.copyWith(
+                                                      reminderMinutes: value)),
+                                              onTime: (value) => update(() =>
+                                                  edited = edited.copyWith(
+                                                      reminderTime: value))),
+                                          const SizedBox(height: 12),
+                                          FilledButton(
+                                              onPressed: () => Navigator.pop(
+                                                  context, edited),
+                                              child: Text(
+                                                  context.l10n.useReminder)),
+                                        ])))));
+                    if (result != null) onChanged?.call(result);
+                  }));
   }
 }
 

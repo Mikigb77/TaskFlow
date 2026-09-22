@@ -53,6 +53,14 @@ class CloudTaskRepository extends TaskRepository {
       sent['is_completed'] == remote['is_completed'] &&
       sent['is_deleted'] == remote['is_deleted'] &&
       sent['scheduled_date'] == remote['scheduled_date'] &&
+      sent['deadline_date'] == remote['deadline_date'] &&
+      sent['duration_minutes'] == remote['duration_minutes'] &&
+      sent['reminder_anchor'] == (remote['reminder_anchor'] ?? 'planned') &&
+      (sent['deadline_at'] == null
+          ? remote['deadline_at'] == null
+          : remote['deadline_at'] != null &&
+              DateTime.parse(sent['deadline_at'])
+                  .isAtSameMomentAs(DateTime.parse(remote['deadline_at']))) &&
       sent['recurrence'] == (remote['recurrence'] ?? 'none') &&
       sent['repeat_interval'] == (remote['repeat_interval'] ?? 1) &&
       const DeepCollectionEquality()

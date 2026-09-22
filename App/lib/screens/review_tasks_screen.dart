@@ -1,4 +1,5 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:agenda/widgets/reminder_control.dart';
@@ -434,7 +435,21 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                             : (items) => _change(item.copyWith(
                                                 task: item.task.copyWith(
                                                     checklist: items)))),
-                                    if (item.task.dueDate != null)
+                                    ExpansionTile(
+                                        tilePadding: EdgeInsets.zero,
+                                        title: Text(context.l10n.planning),
+                                        initiallyExpanded: item.task.deadline !=
+                                                null ||
+                                            item.task.durationMinutes != null,
+                                        children: [
+                                          TaskPlanningControl(
+                                              task: item.task,
+                                              onChanged: _saving
+                                                  ? null
+                                                  : (task) => _change(item
+                                                      .copyWith(task: task)))
+                                        ]),
+                                    if (item.task.reminderDate != null)
                                       ReminderChip(
                                           task: item.task,
                                           onChanged: _saving

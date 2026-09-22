@@ -1,4 +1,5 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
 import 'dart:io';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -63,6 +64,22 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   final _referenceTime = DateTime.now();
   String? _ignoredSuggestion;
   late List<ChecklistItem> _checklist;
+  DateTime? _deadline;
+  bool _deadlineHasTime = false;
+  int? _durationMinutes;
+  String _reminderAnchor = 'planned';
+  Task get _planningTask => Task(
+      title: _title.text,
+      priority: _priority,
+      dueDate: _dueDate,
+      hasTime: _hasTime,
+      deadline: _deadline,
+      deadlineHasTime: _deadlineHasTime,
+      durationMinutes: _durationMinutes,
+      recurrence: _dueDate == null ? 'none' : _recurrence,
+      reminderAnchor: _reminderAnchor,
+      reminderMinutes: _reminderMinutes,
+      reminderTime: _reminderTime);
 
   @override
   void initState() {
@@ -80,6 +97,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _labels = TextEditingController(text: widget.task?.labels.join(', ') ?? '');
     _listId = widget.task?.listId ?? widget.initialListId;
     _hasTime = widget.task?.hasTime ?? widget.draft?.hasTime ?? false;
+    _deadline = widget.task?.deadline ?? widget.draft?.deadline;
+    _deadlineHasTime =
+        widget.task?.deadlineHasTime ?? widget.draft?.deadlineHasTime ?? false;
+    _durationMinutes =
+        widget.task?.durationMinutes ?? widget.draft?.durationMinutes;
+    _reminderAnchor = widget.task?.reminderAnchor ??
+        (_dueDate == null && _deadline != null ? 'deadline' : 'planned');
     _recurrence = widget.task?.recurrence ?? widget.draft?.recurrence ?? 'none';
     _repeatInterval =
         widget.task?.repeatInterval ?? widget.draft?.repeatInterval ?? 1;
@@ -158,13 +182,24 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     final previousDate = _dueDate;
     final previousHasTime = _hasTime;
     final previousRepeatUntil = _repeatUntil;
+    final previousDeadline = _deadline;
+    final previousDeadlineHasTime = _deadlineHasTime;
+    final previousAnchor = _reminderAnchor;
+    final previousExpanded = _detailsExpanded;
     setState(() {
       _title.text = suggestion.title;
-      _dueDate = suggestion.date;
-      _hasTime = suggestion.hasTime;
-      if (_repeatUntil != null &&
-          _repeatUntil!.isBefore(Task.day(suggestion.date))) {
-        _repeatUntil = null;
+      if (suggestion.isDeadline) {
+        _deadline = suggestion.date;
+        _deadlineHasTime = suggestion.hasTime;
+        _detailsExpanded = true;
+        if (_dueDate == null) _reminderAnchor = 'deadline';
+      } else {
+        _dueDate = suggestion.date;
+        _hasTime = suggestion.hasTime;
+        if (_repeatUntil != null &&
+            _repeatUntil!.isBefore(Task.day(suggestion.date))) {
+          _repeatUntil = null;
+        }
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -178,6 +213,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                   _dueDate = previousDate;
                   _hasTime = previousHasTime;
                   _repeatUntil = previousRepeatUntil;
+                  _deadline = previousDeadline;
+                  _deadlineHasTime = previousDeadlineHasTime;
+                  _reminderAnchor = previousAnchor;
+                  _detailsExpanded = previousExpanded;
                 });
               }
             })));
@@ -217,6 +256,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       title: _title.text.trim(),
       dueDate: _dueDate,
       hasTime: _hasTime,
+      deadline: _deadline,
+      deadlineHasTime: _deadlineHasTime,
+      durationMinutes: _durationMinutes,
+      reminderAnchor: _reminderAnchor,
       recurrence: _dueDate == null ? 'none' : _recurrence,
       repeatInterval: _recurrence == 'none' ? 1 : _repeatInterval,
       repeatWeekdays: _recurrence == 'weekly' ? _repeatWeekdays : [],
@@ -425,7 +468,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                           Icons.auto_awesome_outlined,
                                           size: 16),
                                       label: Text(context.l10n.useSchedule(
-                                          '${DateFormat.MMMEd(context.localeName).format(suggestion.date)} · ${suggestion.hasTime ? context.clockTime(suggestion.date) : context.l10n.anyTime}')),
+                                          '${suggestion.isDeadline ? '${context.l10n.deadline}: ' : ''}${DateFormat.MMMEd(context.localeName).format(suggestion.date)} · ${suggestion.hasTime ? context.clockTime(suggestion.date) : suggestion.isDeadline ? context.l10n.deadlineEndDay : context.l10n.anyTime}')),
                                       onPressed: () =>
                                           _acceptSchedule(suggestion)),
                                   TextButton(
@@ -437,7 +480,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                   Text(context.l10n.ambiguousTimeHelp),
                               ],
                               const SizedBox(height: 24),
-                              SectionLabel(context.l10n.schedule),
+                              SectionLabel(context.l10n.plannedFor),
+                              if (_detailsExpanded)
+                                Text(context.l10n.plannedForHelp),
                               Wrap(spacing: 8, runSpacing: 4, children: [
                                 ActionChip(
                                     label: Text(context.l10n.today),
@@ -507,15 +552,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                                       Icons.close_rounded))),
                                   ])),
                               const SizedBox(height: 12),
-                              if (!_detailsExpanded && _dueDate != null)
+                              if (!_detailsExpanded &&
+                                  _planningTask.reminderDate != null)
                                 ReminderChip(
-                                    task: Task(
-                                        title: _title.text,
-                                        dueDate: _dueDate,
-                                        hasTime: _hasTime,
-                                        priority: _priority,
-                                        reminderMinutes: _reminderMinutes,
-                                        reminderTime: _reminderTime),
+                                    task: _planningTask,
                                     onChanged: (task) => setState(() {
                                           _reminderMinutes =
                                               task.reminderMinutes;
@@ -535,6 +575,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                         ? context.l10n.fewerDetails
                                         : context.l10n.moreDetails)),
                               if (_detailsExpanded) ...[
+                                TaskPlanningControl(
+                                    task: _planningTask,
+                                    onChanged: (task) => setState(() {
+                                          _deadline = task.deadline;
+                                          _deadlineHasTime =
+                                              task.deadlineHasTime;
+                                          _durationMinutes =
+                                              task.durationMinutes;
+                                          _reminderAnchor = task.reminderAnchor;
+                                        })),
                                 if (_dueDate != null) ...[
                                   const SizedBox(height: 16),
                                   DropdownButtonFormField<String>(
@@ -637,8 +687,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 ],
                                 const SizedBox(height: 24),
                                 ReminderControl(
-                                    hasDate: _dueDate != null,
-                                    hasTime: _hasTime,
+                                    hasDate: _planningTask.reminderDate != null,
+                                    hasTime: _planningTask.reminderHasTime,
                                     minutes: _reminderMinutes,
                                     time: _reminderTime,
                                     onMinutes: (value) => setState(

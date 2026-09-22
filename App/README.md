@@ -16,6 +16,7 @@ The Django service, Docker Compose configuration, environment files, and backend
 - TaskFlow export/import, Todoist CSV preview, English/Spanish core UI and regional clock/week preferences.
 - Light, dark, and device-following appearance, with a one-tap sun/moon switch.
 - Calendar and week agenda, visible task times, search, priority filters, and completion undo.
+- Independent planned start, deadline and duration, explicit reminder anchor and an hourly day view with overlapping task blocks. See [planning validation](docs/PLANNING_VALIDATION.md).
 - Optional read-only display of selected Android phone calendars, with explicit permission and separate event rows. Events stay on the device and do not become tasks or TaskFlow reminders. See [calendar validation](docs/DEVICE_CALENDAR_VALIDATION.md).
 - Consistent task editor, voice capture, account screens, and bottom navigation.
 

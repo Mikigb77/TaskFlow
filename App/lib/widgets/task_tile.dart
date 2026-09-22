@@ -1,4 +1,5 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
@@ -128,6 +129,21 @@ class TaskTile extends ConsumerWidget {
                                                       color: colors
                                                           .onSurfaceVariant))),
                                         ]),
+                                  if (task.durationMinutes != null)
+                                    Text(
+                                        context.l10n.durationMinutes(
+                                            task.durationMinutes!),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: colors.onSurfaceVariant)),
+                                  if (task.deadline != null)
+                                    Text(taskDeadlineLabel(context, task),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: task.deadlinePassed(
+                                                    DateTime.now())
+                                                ? colors.error
+                                                : colors.onSurfaceVariant)),
                                   if (list != null)
                                     ConstrainedBox(
                                         constraints:

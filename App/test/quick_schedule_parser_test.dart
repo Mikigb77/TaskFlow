@@ -3,6 +3,26 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final reference = DateTime(2026, 9, 22, 23, 58);
+  test('explicit deadline phrases do not invent a planned start', () {
+    final timed = QuickScheduleParser.parse(
+        'Submit report by Friday at 5 pm', reference)!;
+    expect(timed.isDeadline, isTrue);
+    expect(timed.title, 'Submit report');
+    expect(timed.date, DateTime(2026, 9, 25, 17));
+    expect(timed.hasTime, isTrue);
+    final civil = QuickScheduleParser.parse(
+        'Entregar factura antes del viernes', reference)!;
+    expect(civil.isDeadline, isTrue);
+    expect(civil.title, 'Entregar factura');
+    expect(civil.date, DateTime(2026, 9, 25));
+    expect(civil.hasTime, isFalse);
+    expect(
+        QuickScheduleParser.parse('Appointment Friday', reference)!.isDeadline,
+        isFalse);
+    expect(
+        QuickScheduleParser.parse('Work at 9:00, deadline Friday', reference),
+        isNull);
+  });
   test(
       'English and Spanish phrases suggest independent dates and explicit times',
       () {

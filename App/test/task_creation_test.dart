@@ -12,6 +12,34 @@ import 'package:agenda/providers/regional_provider.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
+  testWidgets(
+      'accepting a deadline suggestion saves only the deadline and can be undone',
+      (tester) async {
+    final repository = await _pumpApp(tester);
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .pushNamed('/createTask');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('task-title')),
+        'Submit report by tomorrow at 17:00');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('schedule-suggestion')));
+    await tester.pumpAndSettle();
+    expect(find.text('Submit report'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Submit report by tomorrow at 17:00'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('schedule-suggestion')));
+    await tester.pumpAndSettle();
+    await _saveTask(tester);
+    final task = (await repository.getAllTasks()).single;
+    final now = DateTime.now();
+    expect(task.title, 'Submit report');
+    expect(task.dueDate, isNull);
+    expect(task.deadline, DateTime(now.year, now.month, now.day + 1, 17));
+    expect(task.deadlineHasTime, isTrue);
+    expect(task.reminderAnchor, 'deadline');
+  });
   testWidgets('calendar task saves the chosen date and time after form changes',
       (tester) async {
     final repository = await _pumpApp(tester);

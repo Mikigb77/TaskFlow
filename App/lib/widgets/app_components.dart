@@ -100,9 +100,11 @@ class EmptyState extends StatelessWidget {
 }
 
 class MessageBanner extends StatelessWidget {
-  const MessageBanner(this.message, {super.key, this.isError = false});
+  const MessageBanner(this.message,
+      {super.key, this.isError = false, this.icon});
   final String message;
   final bool isError;
+  final IconData? icon;
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -110,7 +112,9 @@ class MessageBanner extends StatelessWidget {
         color: isError ? colors.errorContainer : colors.primaryContainer,
         padding: const EdgeInsets.all(16),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(isError ? Icons.info_outline : Icons.check_circle_outline,
+          Icon(
+              icon ??
+                  (isError ? Icons.info_outline : Icons.check_circle_outline),
               size: 20,
               color: isError
                   ? colors.onErrorContainer

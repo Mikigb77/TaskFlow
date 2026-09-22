@@ -391,4 +391,19 @@
       }
     ]
   }
+,
+  {
+    "id": "en-plan-and-deadline", "language": "en", "timezone": "Europe/Madrid",
+    "reference_time": "2026-09-22T10:00:00+02:00",
+    "text": "Work on the report this Thursday at 9 a.m. for one hour. It must be finished by this Friday at 5 p.m.",
+    "expected": [{"title_any": ["report"], "date": "2026-09-24", "time": "09:00",
+      "deadline_date": "2026-09-25", "deadline_time": "17:00", "duration_minutes": 60, "questions": false}]
+  },
+  {
+    "id": "es-deadline-only", "language": "es", "timezone": "Europe/Madrid",
+    "reference_time": "2026-09-22T10:00:00+02:00",
+    "text": "La fecha límite para entregar la factura es este viernes. Todavía no sé cuándo voy a hacerla.",
+    "expected": [{"title_any": ["factura"], "date": null, "time": null,
+      "deadline_date": "2026-09-25", "deadline_time": null, "duration_minutes": null, "questions": false}]
+  }
 ]

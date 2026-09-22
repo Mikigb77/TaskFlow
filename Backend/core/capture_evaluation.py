@@ -37,9 +37,14 @@ def score_output(case, output):
         task = actual[selected]
         due = task.get("due_date")
         local = datetime.fromisoformat(due.replace("Z", "+00:00")).astimezone(ZoneInfo(case["timezone"])) if due else None
+        deadline = task.get("deadline_at")
+        deadline_local = datetime.fromisoformat(deadline.replace("Z", "+00:00")).astimezone(ZoneInfo(case["timezone"])) if deadline else None
         values = {
             "date": local.date().isoformat() if local else task.get("scheduled_date"),
             "time": local.strftime("%H:%M") if local else None,
+            "deadline_date": deadline_local.date().isoformat() if deadline_local else task.get("deadline_date"),
+            "deadline_time": deadline_local.strftime("%H:%M") if deadline_local else None,
+            "duration_minutes": task.get("duration_minutes"),
             "priority": task.get("priority"),
             "recurrence": task.get("recurrence", "none"),
             "repeat_interval": task.get("repeat_interval", 1),

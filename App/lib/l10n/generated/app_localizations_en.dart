@@ -9,6 +9,115 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get plannedFor => 'Planned for';
+
+  @override
+  String get plannedForHelp =>
+      'When you intend to do this task. A deadline can be set separately in More details.';
+
+  @override
+  String get planning => 'Duration & deadline';
+
+  @override
+  String get duration => 'Duration';
+
+  @override
+  String get durationUnset => 'No duration set';
+
+  @override
+  String get durationEstimateHelp =>
+      'An estimate until you choose a planned start time.';
+
+  @override
+  String durationMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get durationInput => 'Minutes (1–1440)';
+
+  @override
+  String get durationInvalid => 'Enter a whole number from 1 to 1440.';
+
+  @override
+  String get removeDuration => 'Remove duration';
+
+  @override
+  String get deadline => 'Deadline';
+
+  @override
+  String get deadlineUnset => 'No deadline';
+
+  @override
+  String get deadlineHelp =>
+      'Must be finished by this date. Moving the planned start keeps this deadline.';
+
+  @override
+  String get deadlineTime => 'Deadline time';
+
+  @override
+  String get deadlineEndDay => 'By the end of the day';
+
+  @override
+  String get removeDeadline => 'Remove deadline';
+
+  @override
+  String get deadlineRecurringHelp =>
+      'This deadline repeats with each original occurrence. Moving one planned occurrence keeps its deadline; changing the series start keeps the first deadline and changes the gap for later ones.';
+
+  @override
+  String get deadlineLatePlan =>
+      'This plan finishes after the deadline. Check the start or duration.';
+
+  @override
+  String get deadlineOverdue => 'Deadline passed';
+
+  @override
+  String deadlineLabel(String date) {
+    return 'Due $date';
+  }
+
+  @override
+  String get reminderAnchor => 'Remind me relative to';
+
+  @override
+  String get reminderAnchorHelp =>
+      'One reminder per occurrence, using the date selected here.';
+
+  @override
+  String get dayTimeline => 'Day timeline';
+
+  @override
+  String get timelineFirstPlan => 'Jump to first timed item';
+
+  @override
+  String get timelineLimit =>
+      'Showing the first 200 timed items. Use the agenda to see every task.';
+
+  @override
+  String get timelineHelp =>
+      'Planned work and phone events. Deadlines mark when something must be finished.';
+
+  @override
+  String get timelineUnblocked => 'Without a time block';
+
+  @override
+  String get timelineNoBlocks =>
+      'No timed plans for this day. Add a start time and duration to reserve a block.';
+
+  @override
+  String get timelinePoint => 'No duration · time only';
+
+  @override
+  String get timelineShortBlocks =>
+      'Short events have larger tap targets; the accent bar shows their actual duration.';
+
+  @override
+  String timelineHours(int hours) {
+    return '$hours hours in this day';
+  }
+
+  @override
   String get deviceCalendars => 'Phone calendars';
 
   @override

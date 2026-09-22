@@ -30,6 +30,10 @@ void main() {
           ..remove('repeatUntil')
           ..remove('completedDates')
           ..remove('reminderMinutes')
+          ..remove('deadline')
+          ..remove('deadlineHasTime')
+          ..remove('durationMinutes')
+          ..remove('reminderAnchor')
           ..remove('checklist')
           ..remove('listId')
           ..remove('labels')
@@ -227,6 +231,42 @@ void main() {
     expect(await database.pending(repository.ownerKey), isEmpty);
     expect((await repository.getAllTasks()).length, 1);
     expect(api.remote.length, 1);
+  });
+
+  test(
+      'planning fields survive lost responses, empty-cache restore and deadline-only conflicts',
+      () async {
+    final planned = task.copyWith(
+        deadline: DateTime(2026, 9, 28, 17),
+        deadlineHasTime: true,
+        durationMinutes: 75,
+        reminderAnchor: 'deadline');
+    await repository.addTask(planned);
+    api.loseResponse = true;
+    await repository.sync();
+    api.loseResponse = false;
+    await repository.sync();
+    expect(await database.pending(repository.ownerKey), isEmpty);
+    expect(api.remote, hasLength(1));
+    final sql = await database.database;
+    await sql.delete('tasks',
+        where: 'owner_key = ?', whereArgs: [repository.ownerKey]);
+    await repository.sync();
+    final restored = (await repository.getAllTasks()).single;
+    expect(restored.toApi(), planned.toApi());
+    api.remote.single['version'] = 2;
+    api.remote.single['deadline_at'] =
+        DateTime(2026, 9, 29, 17).toUtc().toIso8601String();
+    await repository.updateTask(restored.copyWith(durationMinutes: 90));
+    await repository.sync();
+    final tasks = await repository.getAllTasks();
+    expect(tasks, hasLength(2));
+    final offline =
+        tasks.singleWhere((task) => task.title.endsWith('(offline copy)'));
+    expect(offline.deadline, planned.deadline);
+    expect(offline.durationMinutes, 90);
+    expect(tasks.singleWhere((task) => task.title == planned.title).deadline,
+        DateTime(2026, 9, 29, 17));
   });
 
   test(

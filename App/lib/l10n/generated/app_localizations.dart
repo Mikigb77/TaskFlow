@@ -98,6 +98,192 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// No description provided for @plannedFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned for'**
+  String get plannedFor;
+
+  /// No description provided for @plannedForHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'When you intend to do this task. A deadline can be set separately in More details.'**
+  String get plannedForHelp;
+
+  /// No description provided for @planning.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration & deadline'**
+  String get planning;
+
+  /// No description provided for @duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get duration;
+
+  /// No description provided for @durationUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'No duration set'**
+  String get durationUnset;
+
+  /// No description provided for @durationEstimateHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'An estimate until you choose a planned start time.'**
+  String get durationEstimateHelp;
+
+  /// No description provided for @durationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String durationMinutes(int minutes);
+
+  /// No description provided for @durationInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes (1–1440)'**
+  String get durationInput;
+
+  /// No description provided for @durationInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number from 1 to 1440.'**
+  String get durationInvalid;
+
+  /// No description provided for @removeDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove duration'**
+  String get removeDuration;
+
+  /// No description provided for @deadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline'**
+  String get deadline;
+
+  /// No description provided for @deadlineUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'No deadline'**
+  String get deadlineUnset;
+
+  /// No description provided for @deadlineHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be finished by this date. Moving the planned start keeps this deadline.'**
+  String get deadlineHelp;
+
+  /// No description provided for @deadlineTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline time'**
+  String get deadlineTime;
+
+  /// No description provided for @deadlineEndDay.
+  ///
+  /// In en, this message translates to:
+  /// **'By the end of the day'**
+  String get deadlineEndDay;
+
+  /// No description provided for @removeDeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove deadline'**
+  String get removeDeadline;
+
+  /// No description provided for @deadlineRecurringHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'This deadline repeats with each original occurrence. Moving one planned occurrence keeps its deadline; changing the series start keeps the first deadline and changes the gap for later ones.'**
+  String get deadlineRecurringHelp;
+
+  /// No description provided for @deadlineLatePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'This plan finishes after the deadline. Check the start or duration.'**
+  String get deadlineLatePlan;
+
+  /// No description provided for @deadlineOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline passed'**
+  String get deadlineOverdue;
+
+  /// No description provided for @deadlineLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Due {date}'**
+  String deadlineLabel(String date);
+
+  /// No description provided for @reminderAnchor.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me relative to'**
+  String get reminderAnchor;
+
+  /// No description provided for @reminderAnchorHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'One reminder per occurrence, using the date selected here.'**
+  String get reminderAnchorHelp;
+
+  /// No description provided for @dayTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Day timeline'**
+  String get dayTimeline;
+
+  /// No description provided for @timelineFirstPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to first timed item'**
+  String get timelineFirstPlan;
+
+  /// No description provided for @timelineLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the first 200 timed items. Use the agenda to see every task.'**
+  String get timelineLimit;
+
+  /// No description provided for @timelineHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned work and phone events. Deadlines mark when something must be finished.'**
+  String get timelineHelp;
+
+  /// No description provided for @timelineUnblocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Without a time block'**
+  String get timelineUnblocked;
+
+  /// No description provided for @timelineNoBlocks.
+  ///
+  /// In en, this message translates to:
+  /// **'No timed plans for this day. Add a start time and duration to reserve a block.'**
+  String get timelineNoBlocks;
+
+  /// No description provided for @timelinePoint.
+  ///
+  /// In en, this message translates to:
+  /// **'No duration · time only'**
+  String get timelinePoint;
+
+  /// No description provided for @timelineShortBlocks.
+  ///
+  /// In en, this message translates to:
+  /// **'Short events have larger tap targets; the accent bar shows their actual duration.'**
+  String get timelineShortBlocks;
+
+  /// No description provided for @timelineHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hours in this day'**
+  String timelineHours(int hours);
+
   /// No description provided for @deviceCalendars.
   ///
   /// In en, this message translates to:

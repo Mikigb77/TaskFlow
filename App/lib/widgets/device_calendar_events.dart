@@ -7,6 +7,14 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+Future<void> showDeviceCalendarEvent(
+        BuildContext context, DateTime day, DeviceCalendarEvent event) =>
+    showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _CalendarSheet(day: day, eventKey: event.identity));
+
 class DeviceCalendarEvents extends ConsumerWidget {
   const DeviceCalendarEvents({super.key, required this.day});
   final DateTime day;

@@ -49,6 +49,11 @@ class Task(models.Model):
     title = models.CharField(max_length=160)
     due_date = models.DateTimeField(null=True, blank=True)
     scheduled_date = models.DateField(null=True, blank=True)
+    # due_date/scheduled_date are the legacy API names for the planned start.
+    deadline_at = models.DateTimeField(null=True, blank=True)
+    deadline_date = models.DateField(null=True, blank=True)
+    duration_minutes = models.PositiveSmallIntegerField(null=True, blank=True)
+    reminder_anchor = models.CharField(max_length=8, default="planned", choices=[("planned", "planned"), ("deadline", "deadline")])
     recurrence = models.CharField(max_length=8, default="none", choices=[
         (value, value) for value in ("none", "daily", "weekly", "monthly", "yearly")])
     repeat_until = models.DateField(null=True, blank=True)
@@ -72,7 +77,12 @@ class Task(models.Model):
     class Meta:
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["owner", "updated_at"])]
-        constraints = [models.CheckConstraint(condition=models.Q(priority__gte=1, priority__lte=3), name="valid_priority")]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(priority__gte=1, priority__lte=3), name="valid_priority"),
+            models.CheckConstraint(condition=models.Q(deadline_at__isnull=True) | models.Q(deadline_date__isnull=True), name="one_task_deadline"),
+            models.CheckConstraint(condition=models.Q(duration_minutes__isnull=True) | models.Q(duration_minutes__gte=1, duration_minutes__lte=1440), name="valid_task_duration"),
+            models.CheckConstraint(condition=models.Q(reminder_anchor="planned") | (models.Q(reminder_anchor="deadline") & (models.Q(deadline_at__isnull=False) | models.Q(deadline_date__isnull=False))), name="valid_reminder_anchor"),
+        ]
 
 
 class TaskEvent(models.Model):

@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 12;
+  static const schemaVersion = 13;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -40,6 +40,8 @@ class TaskDatabase {
           recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
           completedDates TEXT NOT NULL DEFAULT '[]',
           reminderMinutes INTEGER, reminderTime INTEGER,
+          deadline TEXT, deadlineHasTime INTEGER NOT NULL DEFAULT 0,
+          durationMinutes INTEGER, reminderAnchor TEXT NOT NULL DEFAULT 'planned',
           checklist TEXT NOT NULL DEFAULT '[]',
           listId TEXT, labels TEXT NOT NULL DEFAULT '[]',
           repeatInterval INTEGER NOT NULL DEFAULT 1,
@@ -119,6 +121,14 @@ class TaskDatabase {
     }
     if (oldVersion < 11 && newVersion >= 11) await createImportTables(db);
     if (oldVersion < 12 && newVersion >= 12) await createAttachmentTables(db);
+    if (oldVersion < 13 && newVersion >= 13) {
+      await db.execute('ALTER TABLE tasks ADD COLUMN deadline TEXT');
+      await db.execute(
+          'ALTER TABLE tasks ADD COLUMN deadlineHasTime INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE tasks ADD COLUMN durationMinutes INTEGER');
+      await db.execute(
+          "ALTER TABLE tasks ADD COLUMN reminderAnchor TEXT NOT NULL DEFAULT 'planned'");
+    }
   }
 
   static Future<void> createAttachmentTables(Database db) async {

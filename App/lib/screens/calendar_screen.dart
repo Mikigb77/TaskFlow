@@ -71,12 +71,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
     final tasks = tasksState.valueOrNull ?? <Task>[];
-    final events =
-        tasks.expand((task) => task.occurrencesOn(_selectedDay)).toList()
-          ..sort((a, b) {
-            if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-            return Task.compareBySchedule(a, b);
-          });
+    final events = tasks
+        .expand((task) => task.calendarOccurrencesOn(_selectedDay))
+        .toList()
+      ..sort((a, b) {
+        if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
+        return Task.compareBySchedule(a, b);
+      });
     final completed = events.where((task) => task.isCompleted).length;
     final signedIn = ref.watch(authProvider).account != null;
     final syncError = ref.read(taskRepositoryProvider).syncError;
@@ -190,7 +191,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             onPageChanged: (focused) =>
                                 setState(() => _focusedDay = focused),
                             eventLoader: (day) => tasks
-                                .expand((task) => task.occurrencesOn(day))
+                                .expand(
+                                    (task) => task.calendarOccurrencesOn(day))
                                 .toList(),
                             calendarStyle: CalendarStyle(
                               outsideDaysVisible: false,
@@ -281,6 +283,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                             _format == CalendarFormat.month
                                                 ? context.l10n.weekView
                                                 : context.l10n.monthView)),
+                                    TextButton.icon(
+                                        key:
+                                            const ValueKey('calendar-timeline'),
+                                        onPressed: () => Navigator.pushNamed(
+                                            context, '/timeline',
+                                            arguments: _selectedDay),
+                                        icon: const Icon(
+                                            Icons.view_timeline_outlined,
+                                            size: 17),
+                                        label: Text(context.l10n.dayTimeline)),
                                   ])),
                         ])),
                   )),
@@ -353,7 +365,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         itemCount: events.length,
                         itemBuilder: (context, index) => Padding(
                             padding: const EdgeInsets.only(bottom: 10),
-                            child: TaskTile(task: events[index])))),
+                            child: TaskTile(
+                                task: events[index],
+                                showDate: events[index].displayDate != null &&
+                                    Task.dateKey(events[index].displayDate!) !=
+                                        Task.dateKey(_selectedDay))))),
               const SliverToBoxAdapter(child: SizedBox(height: 20)),
             ],
           )),

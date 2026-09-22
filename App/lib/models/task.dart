@@ -9,11 +9,16 @@ class Task {
   final int? id;
   final String title;
 
-  /// First occurrence. Null means Inbox; hasTime=false is a calendar date.
+  /// Planned start / first occurrence. The historical dueDate/API due_date
+  /// names remain for compatibility; deadline is an independent commitment.
   final DateTime? dueDate;
   final bool _hasTime;
   bool get hasTime => occurrenceHasTime ?? _hasTime;
   bool get seriesHasTime => _hasTime;
+  final DateTime? deadline;
+  final bool deadlineHasTime;
+  final int? durationMinutes;
+  final String reminderAnchor;
   final String recurrence;
   final int repeatInterval;
   final List<int> repeatWeekdays;
@@ -52,6 +57,10 @@ class Task {
       required this.title,
       this.dueDate,
       bool hasTime = true,
+      this.deadline,
+      bool deadlineHasTime = false,
+      this.durationMinutes,
+      this.reminderAnchor = 'planned',
       this.recurrence = 'none',
       this.repeatInterval = 1,
       List<int> repeatWeekdays = const [],
@@ -72,6 +81,7 @@ class Task {
       this.listId,
       List<String>? labels})
       : _hasTime = dueDate != null && hasTime,
+        deadlineHasTime = deadline != null && deadlineHasTime,
         repeatWeekdays =
             List.unmodifiable(repeatWeekdays.toSet().toList()..sort()),
         exceptions = List.unmodifiable([...exceptions]
@@ -90,6 +100,13 @@ class Task {
         repeatWeekdays.any((day) => day < 1 || day > 7)) {
       throw ArgumentError('Invalid repeat interval or weekdays.');
     }
+    if (durationMinutes != null &&
+        (durationMinutes! < 1 || durationMinutes! > 1440)) {
+      throw ArgumentError('Duration must be between 1 and 1440 minutes.');
+    }
+    if (!['planned', 'deadline'].contains(reminderAnchor)) {
+      throw ArgumentError('Invalid reminder anchor.');
+    }
   }
 
   static const repeats = {
@@ -101,6 +118,78 @@ class Task {
   };
   bool get isRecurring => recurrence != 'none' && dueDate != null;
   DateTime? get displayDate => occurrenceDate ?? dueDate;
+
+  /// Repeating deadlines retain their civil-day offset from the ORIGINAL
+  /// occurrence. Moving a single planned slot must not move its deadline.
+  DateTime? get displayDeadline {
+    if (deadline == null || !isRecurring || occurrenceId == null) {
+      return deadline;
+    }
+    final original = DateTime.parse(occurrenceId!);
+    return DateTime(
+        original.year,
+        original.month,
+        original.day + _deadlineDayOffset,
+        deadlineHasTime ? deadline!.hour : 0,
+        deadlineHasTime ? deadline!.minute : 0,
+        deadlineHasTime ? deadline!.second : 0);
+  }
+
+  int get _deadlineDayOffset =>
+      DateTime.utc(deadline!.year, deadline!.month, deadline!.day)
+          .difference(DateTime.utc(dueDate!.year, dueDate!.month, dueDate!.day))
+          .inDays;
+  DateTime? get plannedEnd =>
+      hasTime && displayDate != null && durationMinutes != null
+          ? displayDate!.add(Duration(minutes: durationMinutes!))
+          : null;
+  DateTime? get reminderDate =>
+      reminderAnchor == 'deadline' ? displayDeadline : displayDate;
+  bool get reminderHasTime =>
+      reminderAnchor == 'deadline' ? deadlineHasTime : hasTime;
+  DateTime? get deadlineCutoff {
+    final value = displayDeadline;
+    return value == null || deadlineHasTime
+        ? value
+        : DateTime(value.year, value.month, value.day + 1);
+  }
+
+  bool deadlinePassed(DateTime now) =>
+      !isCompleted && deadlineCutoff != null && !now.isBefore(deadlineCutoff!);
+  bool get plannedAfterDeadline =>
+      deadlineCutoff != null &&
+      (plannedEnd ?? displayDate)?.isAfter(deadlineCutoff!) == true;
+
+  List<Task> deadlinesOn(DateTime date) {
+    if (deadline == null) return [];
+    if (!isRecurring) return dateKey(deadline!) == dateKey(date) ? [this] : [];
+    final original =
+        DateTime(date.year, date.month, date.day - _deadlineDayOffset);
+    final instance = occurrenceByKey(dateKey(original));
+    return instance == null ? [] : [instance];
+  }
+
+  /// Day agendas include deadline-only tasks and the tail of overnight blocks.
+  /// All entries still carry the original recurrence identity for actions.
+  List<Task> calendarOccurrencesOn(DateTime date) {
+    final entries = <String, Task>{};
+    void include(Task task) => entries[task.occurrenceId ?? 'once'] = task;
+    for (final task in [...occurrencesOn(date), ...deadlinesOn(date)]) {
+      include(task);
+    }
+    if (durationMinutes != null) {
+      final start = day(date);
+      // A 24-hour block can cross two civil midnights at a DST transition.
+      for (var offset = 1; offset <= 2; offset++) {
+        for (final task in occurrencesOn(
+            DateTime(date.year, date.month, date.day - offset))) {
+          if (task.plannedEnd?.isAfter(start) == true) include(task);
+        }
+      }
+    }
+    return entries.values.toList()..sort(compareBySchedule);
+  }
+
   bool get isCompleted => isRecurring && occurrenceDate != null
       ? completedDates.contains(occurrenceId)
       : _isCompleted;
@@ -286,6 +375,10 @@ class Task {
           String? title,
           Object? dueDate = _unchanged,
           bool? hasTime,
+          Object? deadline = _unchanged,
+          bool? deadlineHasTime,
+          Object? durationMinutes = _unchanged,
+          String? reminderAnchor,
           String? recurrence,
           int? repeatInterval,
           List<int>? repeatWeekdays,
@@ -312,6 +405,14 @@ class Task {
               ? this.dueDate
               : dueDate as DateTime?,
           hasTime: hasTime ?? _hasTime,
+          deadline: identical(deadline, _unchanged)
+              ? this.deadline
+              : deadline as DateTime?,
+          deadlineHasTime: deadlineHasTime ?? this.deadlineHasTime,
+          durationMinutes: identical(durationMinutes, _unchanged)
+              ? this.durationMinutes
+              : durationMinutes as int?,
+          reminderAnchor: reminderAnchor ?? this.reminderAnchor,
           recurrence: recurrence ?? this.recurrence,
           repeatInterval: repeatInterval ?? this.repeatInterval,
           repeatWeekdays: repeatWeekdays ?? this.repeatWeekdays,
@@ -354,6 +455,14 @@ class Task {
                 ? dueDate!.toIso8601String()
                 : dateKey(dueDate!),
         'hasTime': _hasTime ? 1 : 0,
+        'deadline': deadline == null
+            ? null
+            : deadlineHasTime
+                ? deadline!.toIso8601String()
+                : dateKey(deadline!),
+        'deadlineHasTime': deadlineHasTime ? 1 : 0,
+        'durationMinutes': durationMinutes,
+        'reminderAnchor': reminderAnchor,
         'recurrence': recurrence,
         'repeatInterval': repeatInterval,
         'repeatWeekdays': jsonEncode(repeatWeekdays),
@@ -381,6 +490,12 @@ class Task {
           ? null
           : DateTime.parse(map['dueDate']).toLocal(),
       hasTime: (map['hasTime'] ?? 1) == 1,
+      deadline: map['deadline'] == null
+          ? null
+          : DateTime.parse(map['deadline']).toLocal(),
+      deadlineHasTime: map['deadlineHasTime'] == 1,
+      durationMinutes: map['durationMinutes'],
+      reminderAnchor: map['reminderAnchor'] ?? 'planned',
       recurrence: map['recurrence'] ?? 'none',
       repeatInterval: map['repeatInterval'] ?? 1,
       repeatWeekdays: List<int>.from(jsonDecode(map['repeatWeekdays'] ?? '[]')),
@@ -418,6 +533,12 @@ class Task {
         'due_date': _hasTime ? dueDate?.toUtc().toIso8601String() : null,
         'scheduled_date':
             !_hasTime && dueDate != null ? dateKey(dueDate!) : null,
+        'deadline_at':
+            deadlineHasTime ? deadline?.toUtc().toIso8601String() : null,
+        'deadline_date':
+            !deadlineHasTime && deadline != null ? dateKey(deadline!) : null,
+        'duration_minutes': durationMinutes,
+        'reminder_anchor': reminderAnchor,
         'recurrence': recurrence,
         'repeat_interval': repeatInterval,
         'repeat_weekdays': repeatWeekdays,
@@ -442,6 +563,14 @@ class Task {
               ? DateTime.parse(data['scheduled_date'])
               : null,
       hasTime: data['due_date'] != null,
+      deadline: data['deadline_at'] != null
+          ? DateTime.parse(data['deadline_at']).toLocal()
+          : data['deadline_date'] != null
+              ? DateTime.parse(data['deadline_date'])
+              : null,
+      deadlineHasTime: data['deadline_at'] != null,
+      durationMinutes: data['duration_minutes'],
+      reminderAnchor: data['reminder_anchor'] ?? 'planned',
       recurrence: data['recurrence'] ?? 'none',
       repeatInterval: data['repeat_interval'] ?? 1,
       repeatWeekdays: List<int>.from(data['repeat_weekdays'] ?? []),
