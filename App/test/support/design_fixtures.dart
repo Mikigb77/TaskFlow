@@ -7,6 +7,7 @@ import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/capture_store.dart';
 
 // Isolated UI fixtures: no real accounts, persistence, reminders or AI calls.
 class MemoryThemeStore extends ThemePreferenceStore {
@@ -101,6 +102,7 @@ class DesignTaskNotifier extends TaskNotifier {
 
 ProviderContainer designContainer({MemoryThemeStore? store}) =>
     ProviderContainer(overrides: [
+      pendingCapturesProvider.overrideWith((ref) async => []),
       apiClientProvider.overrideWith((ref) {
         final api = OfflineApiClient();
         ref.onDispose(api.close);

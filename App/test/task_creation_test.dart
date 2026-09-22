@@ -170,7 +170,7 @@ Future<void> _selectCalendarDay(WidgetTester tester, int day) async {
 
 Future<void> _openCalendarTask(WidgetTester tester) async {
   await _selectCalendarDay(tester, 15);
-  await tester.tap(find.byIcon(Icons.add));
+  await tester.tap(find.byTooltip('Create task'));
   await tester.pumpAndSettle();
   expect(find.byType(CreateTaskScreen), findsOneWidget);
 }

@@ -195,8 +195,15 @@ def extract_task(text, zone, reference):
 
 def make_draft(data, batch=False):
     try:
+        started = clock.monotonic()
         text = transcribe(data["audio"]) if data.get("audio") else data["text"]
-        return (extract_tasks if batch else extract_task)(text, data["timezone"], data["reference_time"])
+        transcribed = clock.monotonic()
+        result = (extract_tasks if batch else extract_task)(text, data["timezone"], data["reference_time"])
+        result["timings"] = {
+            "transcription_ms": round((transcribed - started) * 1000),
+            "extraction_ms": round((clock.monotonic() - transcribed) * 1000),
+        }
+        return result
     except AIUnavailable:
         raise
     except errors.APIError as error:

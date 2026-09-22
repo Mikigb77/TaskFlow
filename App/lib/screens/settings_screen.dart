@@ -145,6 +145,14 @@ class SettingsScreen extends ConsumerWidget {
                           Navigator.pushNamed(context, '/completedTasks')),
                 ])),
             const SizedBox(height: 16),
+            ListTile(
+                leading: const Icon(Icons.speed_rounded),
+                title: const Text('Capture diagnostics'),
+                subtitle:
+                    const Text('Local timing and counters, without your words'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () =>
+                    Navigator.pushNamed(context, '/captureDiagnostics')),
             TextButton(
                 onPressed: () => showLicensePage(
                     context: context, applicationName: 'TaskFlow'),

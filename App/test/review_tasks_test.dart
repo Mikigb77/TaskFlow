@@ -38,7 +38,7 @@ Future<ProviderContainer> openReview(
 
 void main() {
   testWidgets(
-      'review and schedule editor fit small screens with large text in both themes',
+      'inline review controls fit small screens with large text in both themes',
       (tester) async {
     final container = await openReview(tester, [
       draft('Pay invoice'),
@@ -56,12 +56,18 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(edit);
       await tester.pumpAndSettle();
-      final repeat = find.byType(DropdownButtonFormField<String>);
-      await tester.ensureVisible(repeat);
+      await tester.ensureVisible(find.byKey(const ValueKey('task-title')));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
+      final repeat = find.byTooltip('Change repeat').first;
+      await tester.ensureVisible(repeat);
+      await tester.tap(repeat);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Weekly').last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     }
   });
 
@@ -88,17 +94,62 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('ambiguity requires review and removed drafts are not saved',
+  testWidgets('ready tasks save while uncertain drafts remain for review',
+      (tester) async {
+    final container = await openReview(
+        tester, [draft('Call', ambiguous: true), draft('Coffee')]);
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    expect(container.read(taskProvider).requireValue.length, 5);
+    expect(container.read(taskProvider).requireValue.last.title, 'Coffee');
+    expect(find.text('Call'), findsOneWidget);
+    expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
+            .onPressed,
+        isNull);
+    final confirm = find.text('Use the details shown');
+    await tester.ensureVisible(confirm);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    expect(container.read(taskProvider).requireValue.length, 6);
+    expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .where((t) => t.title == 'Coffee')
+            .length,
+        1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'removing drafts and changing a title never confirms unrelated ambiguity',
       (tester) async {
     final container = await openReview(
         tester, [draft('Call', ambiguous: true), draft('Remove me')]);
-    await tester.tap(find.byKey(const ValueKey('save-drafts')));
-    await tester.pumpAndSettle();
-    expect(container.read(taskProvider).requireValue.length, 4);
     final remove = find.byTooltip('Remove Remove me');
     await tester.scrollUntilVisible(remove, 200);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -200));
+    await tester.pumpAndSettle();
     await tester.tap(remove);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Edit Call'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Edit Call'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Call Mum');
+    await tester.tap(find.text('Keep changes'));
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
+            .onPressed,
+        isNull);
     final confirm = find.text('Use the details shown');
     await tester.scrollUntilVisible(confirm, -200);
     await tester.tap(confirm);
@@ -106,7 +157,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('save-drafts')));
     await tester.pumpAndSettle();
     expect(container.read(taskProvider).requireValue.length, 5);
-    expect(container.read(taskProvider).requireValue.last.title, 'Call');
+    expect(container.read(taskProvider).requireValue.last.title, 'Call Mum');
     expect(tester.takeException(), isNull);
   });
 }

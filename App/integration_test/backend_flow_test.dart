@@ -7,6 +7,8 @@ import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,6 +50,30 @@ void main() {
         '$guestTitle sometime. Pay my electricity bill on Friday.');
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
+    // Leave the route and resume from the real Android SQLite capture store.
+    final captureStore = container.read(captureStoreProvider);
+    final persisted = Stopwatch()..start();
+    while (!(await captureStore.pending('local')).any((s) =>
+        s.text == '$guestTitle sometime. Pay my electricity bill on Friday.')) {
+      if (persisted.elapsed > const Duration(seconds: 10)) {
+        fail('The typed capture was not durably saved.');
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final unfinished = (await captureStore.pending('local'))
+        .firstWhere((s) => s.text.startsWith(guestTitle));
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    tester.state<NavigatorState>(find.byType(Navigator)).push(
+        MaterialPageRoute<void>(
+            builder: (_) => VoiceTaskScreen(captureId: unfinished.id)));
+    await tester.pumpAndSettle();
+    await waitFor(
+        tester,
+        () => find
+            .text('$guestTitle sometime. Pay my electricity bill on Friday.')
+            .evaluate()
+            .isNotEmpty);
     final guestGenerate = find.text('Review tasks from text');
     await tester.ensureVisible(guestGenerate);
     await tester.tap(guestGenerate);
@@ -55,8 +81,12 @@ void main() {
         tester, () => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
         timeout: const Duration(seconds: 120));
     await tester.pumpAndSettle();
-    final guestDrafts =
-        tester.widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen)).drafts;
+    final guestDrafts = tester
+        .widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen))
+        .session!
+        .remaining
+        .map((d) => d.task)
+        .toList();
     expect(guestDrafts.length, 2);
     expect(guestDrafts.where((draft) => draft.dueDate == null).length, 1);
     expect(guestDrafts.every((draft) => !draft.hasTime), isTrue);
@@ -112,7 +142,7 @@ void main() {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
     final generate =
-        find.widgetWithText(OutlinedButton, 'Review tasks from text');
+        find.widgetWithText(FilledButton, 'Review tasks from text');
     await tester.ensureVisible(generate);
     await tester.tap(generate);
     await waitFor(
@@ -121,16 +151,17 @@ void main() {
     await tester.pumpAndSettle();
     final screen =
         tester.widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen));
-    expect(screen.drafts.length, 3);
-    final draft = screen.drafts
-        .firstWhere((d) => d.title.toLowerCase().contains('doctor'));
-    expect(screen.drafts.any((d) => d.dueDate == null), isTrue);
-    expect(screen.drafts.any((d) => d.recurrence == 'weekly'), isTrue);
+    final drafts = screen.session!.remaining.map((d) => d.task).toList();
+    expect(drafts.length, 3);
+    final draft =
+        drafts.firstWhere((d) => d.title.toLowerCase().contains('doctor'));
+    expect(drafts.any((d) => d.dueDate == null), isTrue);
+    expect(drafts.any((d) => d.recurrence == 'weekly'), isTrue);
     expect(draft.title.toLowerCase(), contains('doctor'));
     expect(draft.dueDate!.weekday, DateTime.friday);
     expect(draft.dueDate!.hour, 17);
     expect(draft.priority, 3);
-    expect(draft.notes.toLowerCase(), contains('blood'));
+    expect(draft.notes!.toLowerCase(), contains('blood'));
     await binding.takeScreenshot('flexible-batch-review');
     expect(
         (await container
@@ -175,7 +206,11 @@ void main() {
     await waitFor(tester, () => container.read(authProvider).account == null);
     await tester.pumpAndSettle();
     expect(find.byType(CalendarScreen), findsOneWidget);
-    expect(container.read(taskProvider).valueOrNull ?? [], isEmpty);
+    expect(
+        (container.read(taskProvider).valueOrNull ?? <Task>[])
+            .map((task) => task.id)
+            .toSet(),
+        beforeGuest);
 
     await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();

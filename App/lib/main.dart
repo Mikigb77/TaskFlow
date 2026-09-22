@@ -18,6 +18,8 @@ import 'package:agenda/screens/edit_task_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
+import 'package:agenda/screens/captures_screen.dart';
+import 'package:agenda/screens/capture_diagnostics_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,6 +76,8 @@ class MyApp extends ConsumerWidget {
         '/createTask': (_) => const CreateTaskScreen(),
         '/account': (_) => const AccountScreen(),
         '/voiceTask': (_) => const VoiceTaskScreen(),
+        '/captures': (_) => const CapturesScreen(),
+        '/captureDiagnostics': (_) => const CaptureDiagnosticsScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/taskDetails') {

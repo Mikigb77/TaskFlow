@@ -152,6 +152,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                          'Attachments currently stay on this phone. Signing in restores your tasks, but these files will not appear on another device.')),
                   ListTile(
                       leading: const Icon(Icons.photo_outlined),
                       title: const Text('Choose a photo'),

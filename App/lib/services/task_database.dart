@@ -13,7 +13,7 @@ class TaskDatabase {
   Future<Database> get database async {
     return _database ??= await openDatabase(
       join(await getDatabasesPath(), 'task_database.db'),
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await db.execute('''CREATE TABLE tasks(
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT,
@@ -27,6 +27,7 @@ class TaskDatabase {
         )''');
         await db.execute(
             'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)');
+        await createCaptureTables(db);
       },
       onUpgrade: upgrade,
     );
@@ -65,6 +66,18 @@ class TaskDatabase {
       await db.execute(
           "ALTER TABLE tasks ADD COLUMN completedDates TEXT NOT NULL DEFAULT '[]'");
     }
+    if (oldVersion < 6 && newVersion >= 6) await createCaptureTables(db);
+  }
+
+  static Future<void> createCaptureTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS captures(
+      id TEXT PRIMARY KEY, owner_key TEXT NOT NULL, status TEXT NOT NULL,
+      captured_at TEXT NOT NULL, data TEXT NOT NULL)''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS capture_owner ON captures(owner_key, status)');
+    await db.execute('''CREATE TABLE IF NOT EXISTS diagnostics(
+      id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL,
+      elapsed_ms INTEGER, count INTEGER, created_at TEXT NOT NULL)''');
   }
 
   Future<int> insertTask(Task task, {String ownerKey = 'local'}) async {
