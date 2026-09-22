@@ -149,6 +149,16 @@ class SettingsScreen extends ConsumerWidget {
                       }),
                   const Divider(indent: 20, endIndent: 20),
                   ListTile(
+                      leading: Icon(Icons.import_export_rounded,
+                          color: colors.primary),
+                      title: const Text('Export & import'),
+                      subtitle: const Text(
+                          'TaskFlow backups and Todoist CSV migration'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () =>
+                          Navigator.pushNamed(context, '/dataTransfer')),
+                  const Divider(indent: 20, endIndent: 20),
+                  ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 8),
                       leading: Icon(Icons.notifications_outlined,

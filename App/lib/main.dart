@@ -20,6 +20,7 @@ import 'package:agenda/screens/captures_screen.dart';
 import 'package:agenda/screens/capture_diagnostics_screen.dart';
 import 'package:agenda/screens/notification_settings_screen.dart';
 import 'package:agenda/screens/task_lists_screen.dart';
+import 'package:agenda/screens/data_transfer_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -170,6 +171,7 @@ class _MyAppState extends ConsumerState<MyApp> {
         '/home': (_) => const MainShell(initialIndex: 1),
         '/inbox': (_) => const HomeScreen(initialFilter: 3, isRoot: false),
         '/lists': (_) => const TaskListsScreen(),
+        '/dataTransfer': (_) => const DataTransferScreen(),
         '/calendar': (_) => const MainShell(),
         '/settings': (_) => const MainShell(initialIndex: 2),
         '/completedTasks': (_) => const CompletedTasksScreen(),

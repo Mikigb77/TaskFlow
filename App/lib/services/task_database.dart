@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 10;
+  static const schemaVersion = 11;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -53,6 +53,7 @@ class TaskDatabase {
         await createCaptureTables(db);
         await createReminderTables(db);
         await createListTables(db);
+        await createImportTables(db);
       },
       onUpgrade: upgrade,
     );
@@ -115,6 +116,14 @@ class TaskDatabase {
       await db.execute(
           "ALTER TABLE tasks ADD COLUMN exceptions TEXT NOT NULL DEFAULT '[]'");
     }
+    if (oldVersion < 11 && newVersion >= 11) await createImportTables(db);
+  }
+
+  static Future<void> createImportTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS archive_imports(
+      owner_key TEXT NOT NULL, archive_id TEXT NOT NULL, source_id TEXT NOT NULL,
+      kind TEXT NOT NULL, target_id TEXT NOT NULL,
+      PRIMARY KEY(owner_key, archive_id, kind, source_id))''');
   }
 
   static Future<void> createListTables(Database db) async {
