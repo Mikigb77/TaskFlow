@@ -8,6 +8,46 @@ import 'package:sqflite/sqflite.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('Android WAL returns accurate mutation results', (tester) async {
+    final path = p.join(await getDatabasesPath(),
+        'taskflow_results_${DateTime.now().microsecondsSinceEpoch}.db');
+    final factory = AndroidDatabaseFactory();
+    final db = await factory.openDatabase(path,
+        options: OpenDatabaseOptions(singleInstance: false));
+    addTearDown(() async {
+      await db.close();
+      await factory.deleteDatabase(path);
+    });
+    expect((await db.rawQuery('PRAGMA journal_mode')).single.values.single,
+        'wal');
+    await db.execute('CREATE TABLE marker '
+        '(id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT)');
+    final first = await db.insert('marker', {'value': 'first'});
+    final second = await db.insert('marker', {'value': 'second'});
+    expect([first, second], [1, 2]);
+    expect(await db.update('marker', {'value': 'changed'},
+        where: 'id = ?', whereArgs: [first]), 1);
+    expect(await db.update('marker', {'value': 'missing'},
+        where: 'id = ?', whereArgs: [999]), 0);
+    expect(await db.update('marker', {'value': 'both'}), 2);
+    expect(await db.delete('marker', where: 'id = ?', whereArgs: [second]), 1);
+    expect(await db.delete('marker', where: 'id = ?', whereArgs: [second]), 0);
+    await db.transaction((tx) async {
+      expect(await tx.insert('marker', {'value': 'third'}), 3);
+      expect(await tx.update('marker', {'value': 'transaction'}), 2);
+      expect(await tx.delete('marker', where: 'id = ?', whereArgs: [first]), 1);
+    });
+    final batch = db.batch();
+    batch.insert('marker', {'value': 'fourth'});
+    batch.update('marker', {'value': 'batch'}, where: 'id = ?', whereArgs: [3]);
+    batch.delete('marker', where: 'id = ?', whereArgs: [999]);
+    expect(await batch.commit(), [4, 1, 0]);
+    expect(await db.query('marker', orderBy: 'id'), [
+      {'id': 3, 'value': 'batch'},
+      {'id': 4, 'value': 'fourth'}
+    ]);
+  });
+
   testWidgets('Android foreground read does not block a reminder transaction',
       (tester) async {
     final path = p.join(await getDatabasesPath(),

@@ -26,7 +26,7 @@ The visual system, references, and Android preview workflow are documented in [D
 
 ## Getting Started
 
-This project is built using **Flutter**. To compile the app, follow these steps:
+This project requires **Flutter 3.44 or newer** and **Dart 3.12 or newer**. The SQLite dependency includes the Android WAL mutation-result fix. Run `flutter pub get` before building; on Windows, Developer Mode enables Flutter's generated plugin links.
 
 The Android build uses **Gradle 9.7.1**, **Android Gradle Plugin 9.4.1**, **Kotlin 2.4.20**, and **JDK 26**. Install a JDK 26 distribution and set `JAVA_HOME` to its installation directory. The checked-in `android/gradle/gradle-daemon-jvm.properties` selects Java 26 for the build, including when Flutter starts Gradle through Android Studio's bundled Java. Gradle's distribution is pinned with its SHA-256 checksum.
 

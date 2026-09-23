@@ -1088,5 +1088,99 @@
         "type": "String"
       }
     }
-  }
+  },
+  "captureGone": "This capture is no longer available.",
+  "captureNoteLength": "A note needs 1 to 8000 characters.",
+  "captureNoTasks": "No tasks were found. Your capture is kept.",
+  "captureUnsupportedKind": "This server does not support the selected capture type. Your input is kept.",
+  "captureOffline": "Cannot reach the server. Check your connection and server address, then retry.",
+  "captureTimeout": "The server took too long to respond. You can retry this capture.",
+  "captureUnavailable": "The processing service is unavailable. Retry this capture later.",
+  "captureAllowance": "The service request limit was reached. Retry later.",
+  "captureSignIn": "Sign in again to process this account’s capture.",
+  "captureForbidden": "This account cannot process the capture. Check your access and try again.",
+  "captureTooLarge": "This recording exceeds the service limit. Keep it for later or use a shorter typed description.",
+  "captureTypedFirst": "Save or discard this typed capture before starting a recording.",
+  "captureMicrophone": "Allow microphone access to record, or type below.",
+  "captureRecordingFirst": "Retry this recording or discard it before recording another.",
+  "captureEmptyInput": "Say or type what you need to do first.",
+  "captureSpeechStopped": "Speech stopped. Your retained words are safe; record audio or type to continue.",
+  "captureNoSpeech": "No clear speech was detected. Retained words are still available.",
+  "captureSpeechLanguage": "On-device speech is not installed for this language. Choose another language, record audio, or type.",
+  "captureSpeechUnavailable": "On-device speech is unavailable. Record audio or type instead.",
+  "captureSpeechBusy": "A microphone request is already open. Finish it before trying again.",
+  "captureIncompleteAudio": "The retained audio is incomplete and cannot be processed. It is still kept on this phone.",
+  "captureWriteFailed": "Could not keep this draft on your phone. Try again before leaving.",
+  "captureStopFailed": "Could not finish recording. Previously retained input is kept.",
+  "captureDiscardFailed": "Could not discard this capture. It is still kept.",
+  "captureReviewWriteFailed": "Could not keep these changes. Please try again before leaving.",
+  "captureSaveFailed": "Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.",
+  "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
+  "captureSetupUnavailable": "Speech setup is unavailable here. Use saved audio or type.",
+  "captureKept": "Your capture is kept on this phone.",
+  "captureDiscardHelp": "The recording and unsaved drafts will be removed. Tasks already saved will stay.",
+  "voiceRecording": "Voice recording",
+  "retryCaptures": "Retry loading captures",
+  "capturesCaughtUp": "All caught up",
+  "capturesEmptyHelp": "Recordings and drafts you leave unfinished will be kept here.",
+  "captureResumeHelp": "Kept on this phone · Tap to resume",
+  "captureDraftSummary": "{count, plural, one {1 draft} other {{count} drafts}} · {ready, plural, one {1 ready} other {{ready} ready}}",
+  "@captureDraftSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "ready": {
+        "type": "int"
+      }
+    }
+  },
+  "editCaptureItem": "Edit {title}",
+  "@editCaptureItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "removeCaptureItem": "Remove {title}",
+  "@removeCaptureItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "captureTasksSaved": "{count, plural, one {1 task saved} other {{count} tasks saved}}",
+  "@captureTasksSaved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureKeptForReview": "{count} kept for review",
+  "@captureKeptForReview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureConfirmDetails": "Use the details shown",
+  "captureNothingToReview": "Nothing left to review",
+  "captureRemovedDraftsHelp": "Removed drafts will not become tasks.",
+  "captureFinish": "Finish",
+  "captureYourWords": "Your words",
+  "captureReviewRetainedHelp": "Unfinished drafts are kept on this phone. You can return from Unfinished captures.",
+  "captureCheckDetails": "Check the details above",
+  "captureSaveTasks": "{count, plural, one {Save 1 task} other {Save {count} tasks}}",
+  "@captureSaveTasks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "labelsExample": "home, errands, calls"
 }

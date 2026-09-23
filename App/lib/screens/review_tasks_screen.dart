@@ -1,4 +1,6 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/services/capture_problem.dart';
 import 'package:agenda/widgets/task_planning_control.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -87,8 +89,7 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
       if (mounted) ref.invalidate(pendingCapturesProvider);
     } catch (_) {
       if (mounted) {
-        setState(() => _error =
-            'Could not keep these changes. Please try again before leaving.');
+        setState(() => _error = CaptureProblem.reviewWriteFailed);
       }
     }
   }
@@ -129,15 +130,14 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
       final remaining = _items.where((d) => d.pending).length;
       _finished = remaining == 0;
       final messenger = ScaffoldMessenger.of(context);
+      final message = ready.every((item) => item.task.isNote)
+          ? context.l10n.noteSaved
+          : '${context.l10n.captureTasksSaved(ready.length)}${remaining > 0 ? ' · ${context.l10n.captureKeptForReview(remaining)}' : ''}';
       if (remaining == 0) Navigator.pop(context);
-      messenger.showSnackBar(SnackBar(
-          content: Text(ready.every((item) => item.task.isNote)
-              ? context.l10n.noteSaved
-              : '${ready.length} ${ready.length == 1 ? 'task' : 'tasks'} saved${remaining > 0 ? ' · $remaining kept for review' : ''}')));
+      messenger.showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (mounted) {
-        setState(() => _error =
-            'Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.');
+        setState(() => _error = CaptureProblem.saveFailed);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -170,7 +170,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                     maxLines: notes ? 6 : 2,
                     maxLength: notes ? 8000 : 160,
                     decoration: InputDecoration(
-                        labelText: notes ? context.l10n.notes : 'Title')),
+                        labelText: notes
+                            ? context.l10n.notes
+                            : context.l10n.taskTitle)),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -315,7 +317,9 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                         if (_error != null)
                           Padding(
                               padding: const EdgeInsets.only(top: 12),
-                              child: MessageBanner(_error!, isError: true)),
+                              child: MessageBanner(
+                                  captureProblemText(context.l10n, _error!),
+                                  isError: true)),
                         const SizedBox(height: 16),
                         for (final item in pending)
                           Padding(
@@ -332,14 +336,17 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                                   .textTheme
                                                   .titleMedium)),
                                       IconButton(
-                                          tooltip: 'Edit ${item.task.title}',
+                                          tooltip: context.l10n
+                                              .editCaptureItem(item.task.title),
                                           onPressed: _saving
                                               ? null
                                               : () => _editWords(item),
                                           icon: const Icon(Icons.edit_outlined,
                                               size: 20)),
                                       IconButton(
-                                          tooltip: 'Remove ${item.task.title}',
+                                          tooltip: context.l10n
+                                              .removeCaptureItem(
+                                                  item.task.title),
                                           onPressed: _saving
                                               ? null
                                               : () => _change(
@@ -486,8 +493,8 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                       MessageBanner(item.questions.join('\n')),
                                       CheckboxListTile(
                                           contentPadding: EdgeInsets.zero,
-                                          title: const Text(
-                                              'Use the details shown'),
+                                          title: Text(context
+                                              .l10n.captureConfirmDetails),
                                           value: item.confirmed,
                                           onChanged: _saving
                                               ? null
@@ -496,21 +503,20 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                                     ],
                                   ]))),
                         if (pending.isEmpty) ...[
-                          const EmptyState(
-                              title: 'Nothing left to review',
-                              message: 'Removed drafts will not become tasks.'),
+                          EmptyState(
+                              title: context.l10n.captureNothingToReview,
+                              message: context.l10n.captureRemovedDraftsHelp),
                           TextButton(
                               onPressed: _finishEmpty,
-                              child: const Text('Finish'))
+                              child: Text(context.l10n.captureFinish))
                         ],
                         ExpansionTile(
-                            title: const Text('Your words'),
+                            title: Text(context.l10n.captureYourWords),
                             children: [
                               Text(_session?.transcript ?? widget.transcript)
                             ]),
                         if (_session != null)
-                          Text(
-                              'Unfinished drafts are kept on this phone. You can return from Unfinished captures.',
+                          Text(context.l10n.captureReviewRetainedHelp,
                               style: TextStyle(
                                   color: colors.onSurfaceVariant,
                                   fontSize: 12)),
@@ -531,10 +537,10 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
                       label: Text(_saving
                           ? context.l10n.saving
                           : ready == 0
-                              ? 'Check the details above'
+                              ? context.l10n.captureCheckDetails
                               : note
                                   ? context.l10n.saveNote
-                                  : 'Save $ready ${ready == 1 ? 'task' : 'tasks'}')))),
+                                  : context.l10n.captureSaveTasks(ready))))),
         ));
   }
 }

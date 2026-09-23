@@ -2377,36 +2377,33 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String archiveField(String field) {
-    String _temp0 = intl.Intl.selectLogic(
-      field,
-      {
-        'export_id': 'identificador de exportación',
-        'tasks': 'tareas',
-        'lists': 'listas',
-        'list_id': 'identificador de lista',
-        'list_name': 'nombre de lista',
-        'task_identifier': 'identificador de tarea',
-        'title': 'título',
-        'notes': 'notas',
-        'priority': 'prioridad',
-        'duration': 'duración',
-        'repeat_interval': 'intervalo de repetición',
-        'repeat_weekdays': 'días de repetición',
-        'weekday': 'día de la semana',
-        'completed_dates': 'fechas completadas',
-        'individual_date_changes': 'cambios de fecha individuales',
-        'list_identifier': 'identificador de lista',
-        'labels': 'etiquetas',
-        'label': 'etiqueta',
-        'checklist': 'lista de pasos',
-        'checklist_identifier': 'identificador de paso',
-        'checklist_title': 'título de paso',
-        'checklist_dates': 'fechas de pasos',
-        'reminder_lead': 'antelación del recordatorio',
-        'reminder_time': 'hora del recordatorio',
-        'other': 'campo',
-      },
-    );
+    String _temp0 = intl.Intl.selectLogic(field, {
+      'export_id': 'identificador de exportación',
+      'tasks': 'tareas',
+      'lists': 'listas',
+      'list_id': 'identificador de lista',
+      'list_name': 'nombre de lista',
+      'task_identifier': 'identificador de tarea',
+      'title': 'título',
+      'notes': 'notas',
+      'priority': 'prioridad',
+      'duration': 'duración',
+      'repeat_interval': 'intervalo de repetición',
+      'repeat_weekdays': 'días de repetición',
+      'weekday': 'día de la semana',
+      'completed_dates': 'fechas completadas',
+      'individual_date_changes': 'cambios de fecha individuales',
+      'list_identifier': 'identificador de lista',
+      'labels': 'etiquetas',
+      'label': 'etiqueta',
+      'checklist': 'lista de pasos',
+      'checklist_identifier': 'identificador de paso',
+      'checklist_title': 'título de paso',
+      'checklist_dates': 'fechas de pasos',
+      'reminder_lead': 'antelación del recordatorio',
+      'reminder_time': 'hora del recordatorio',
+      'other': 'campo',
+    });
     return '$_temp0';
   }
 
@@ -2451,4 +2448,225 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get notificationSnoozed => 'Tu tarea pospuesta.';
+
+  @override
+  String get captureGone => 'Esta captura ya no está disponible.';
+
+  @override
+  String get captureNoteLength =>
+      'La nota debe tener entre 1 y 8000 caracteres.';
+
+  @override
+  String get captureNoTasks =>
+      'No se encontraron tareas. Tu captura se conserva.';
+
+  @override
+  String get captureUnsupportedKind =>
+      'Este servidor no admite el tipo de captura seleccionado. Tu contenido se conserva.';
+
+  @override
+  String get captureOffline =>
+      'No se puede conectar con el servidor. Comprueba la conexión y la dirección del servidor e inténtalo de nuevo.';
+
+  @override
+  String get captureTimeout =>
+      'El servidor ha tardado demasiado en responder. Puedes reintentar esta captura.';
+
+  @override
+  String get captureUnavailable =>
+      'El servicio de procesamiento no está disponible. Reintenta esta captura más tarde.';
+
+  @override
+  String get captureAllowance =>
+      'Se ha alcanzado el límite de solicitudes del servicio. Inténtalo más tarde.';
+
+  @override
+  String get captureSignIn =>
+      'Vuelve a iniciar sesión para procesar la captura de esta cuenta.';
+
+  @override
+  String get captureForbidden =>
+      'Esta cuenta no puede procesar la captura. Comprueba tu acceso e inténtalo de nuevo.';
+
+  @override
+  String get captureTooLarge =>
+      'Esta grabación supera el límite del servicio. Consérvala para más tarde o escribe una descripción más breve.';
+
+  @override
+  String get captureTypedFirst =>
+      'Guarda o descarta esta captura escrita antes de iniciar una grabación.';
+
+  @override
+  String get captureMicrophone =>
+      'Permite el acceso al micrófono para grabar o escribe abajo.';
+
+  @override
+  String get captureRecordingFirst =>
+      'Reintenta esta grabación o descártala antes de grabar otra.';
+
+  @override
+  String get captureEmptyInput =>
+      'Primero di o escribe lo que necesitas hacer.';
+
+  @override
+  String get captureSpeechStopped =>
+      'El reconocimiento se ha detenido. Las palabras guardadas se conservan; graba audio o escribe para continuar.';
+
+  @override
+  String get captureNoSpeech =>
+      'No se ha detectado voz clara. Las palabras guardadas siguen disponibles.';
+
+  @override
+  String get captureSpeechLanguage =>
+      'El reconocimiento local no está instalado para este idioma. Elige otro idioma, graba audio o escribe.';
+
+  @override
+  String get captureSpeechUnavailable =>
+      'El reconocimiento local no está disponible. Graba audio o escribe.';
+
+  @override
+  String get captureSpeechBusy =>
+      'Ya hay una solicitud del micrófono abierta. Termínala antes de volver a intentarlo.';
+
+  @override
+  String get captureIncompleteAudio =>
+      'El audio guardado está incompleto y no se puede procesar. Sigue conservado en este teléfono.';
+
+  @override
+  String get captureWriteFailed =>
+      'No se ha podido guardar este borrador en el teléfono. Inténtalo de nuevo antes de salir.';
+
+  @override
+  String get captureStopFailed =>
+      'No se ha podido finalizar la grabación. El contenido guardado anteriormente se conserva.';
+
+  @override
+  String get captureDiscardFailed =>
+      'No se ha podido descartar esta captura. Sigue conservada.';
+
+  @override
+  String get captureReviewWriteFailed =>
+      'No se han podido guardar estos cambios. Inténtalo de nuevo antes de salir.';
+
+  @override
+  String get captureSaveFailed =>
+      'No se ha podido terminar de guardar. Tu captura se conserva; al reintentar no se duplicarán las tareas guardadas.';
+
+  @override
+  String get captureSetupRequested =>
+      'Se ha solicitado configurar el reconocimiento. Sigue las indicaciones de Android y pulsa Comprobar de nuevo. Mientras tanto, puedes seguir escribiendo.';
+
+  @override
+  String get captureSetupUnavailable =>
+      'La configuración del reconocimiento no está disponible aquí. Usa audio guardado o escribe.';
+
+  @override
+  String get captureKept => 'Tu captura se conserva en este teléfono.';
+
+  @override
+  String get captureDiscardHelp =>
+      'Se eliminarán la grabación y los borradores sin guardar. Se conservarán las tareas ya guardadas.';
+
+  @override
+  String get voiceRecording => 'Grabación de voz';
+
+  @override
+  String get retryCaptures => 'Volver a cargar las capturas';
+
+  @override
+  String get capturesCaughtUp => 'Todo al día';
+
+  @override
+  String get capturesEmptyHelp =>
+      'Aquí se guardarán las grabaciones y los borradores que dejes pendientes.';
+
+  @override
+  String get captureResumeHelp =>
+      'Guardado en este teléfono · Toca para continuar';
+
+  @override
+  String captureDraftSummary(int count, int ready) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count borradores',
+      one: '1 borrador',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      ready,
+      locale: localeName,
+      other: '$ready listos',
+      one: '1 listo',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String editCaptureItem(String title) {
+    return 'Editar $title';
+  }
+
+  @override
+  String removeCaptureItem(String title) {
+    return 'Quitar $title';
+  }
+
+  @override
+  String captureTasksSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas guardadas',
+      one: '1 tarea guardada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String captureKeptForReview(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pendientes de revisar',
+      one: '1 pendiente de revisar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get captureConfirmDetails => 'Usar los datos mostrados';
+
+  @override
+  String get captureNothingToReview => 'No queda nada por revisar';
+
+  @override
+  String get captureRemovedDraftsHelp =>
+      'Los borradores eliminados no se convertirán en tareas.';
+
+  @override
+  String get captureFinish => 'Terminar';
+
+  @override
+  String get captureYourWords => 'Tus palabras';
+
+  @override
+  String get captureReviewRetainedHelp =>
+      'Los borradores pendientes se conservan en este teléfono. Puedes retomarlos desde Capturas pendientes.';
+
+  @override
+  String get captureCheckDetails => 'Revisa los datos de arriba';
+
+  @override
+  String captureSaveTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Guardar $count tareas',
+      one: 'Guardar 1 tarea',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get labelsExample => 'casa, recados, llamadas';
 }

@@ -1,6 +1,7 @@
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,6 +38,63 @@ Future<ProviderContainer> openReview(
 }
 
 void main() {
+  testWidgets('Spanish batch review keeps corrections through language changes',
+      (tester) async {
+    final container = await openReview(
+        tester, [draft('Coffee'), draft('Call', ambiguous: true)]);
+    await container
+        .read(regionalProvider.notifier)
+        .set(const RegionalPreferences(language: 'es'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Editar Coffee'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Café de José');
+    await container
+        .read(regionalProvider.notifier)
+        .set(const RegionalPreferences(language: 'en'));
+    await tester.pumpAndSettle();
+    expect(find.text('Café de José'), findsOneWidget);
+    await tester.tap(find.text('Keep changes'));
+    await tester.pumpAndSettle();
+    await container
+        .read(regionalProvider.notifier)
+        .set(const RegionalPreferences(language: 'es'));
+    tester.view.physicalSize = const Size(320, 568);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
+    expect(find.text('Guardar 1 tarea'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .where((t) => t.title == 'Café de José'),
+        hasLength(1));
+    expect(find.text('Revisa los datos de arriba'), findsOneWidget);
+    expect(
+        find.text('1 tarea guardada · 1 pendiente de revisar'), findsOneWidget);
+    // Let the save notice finish before scrolling the review behind it.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    final confirm = find.text('Usar los datos mostrados');
+    await tester.scrollUntilVisible(confirm, 180,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .where((t) => t.title == 'Call'),
+        hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
       'AI checklist stays within one saved task and can be corrected in review',
       (tester) async {

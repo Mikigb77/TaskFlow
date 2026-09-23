@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/capture_problem.dart';
 
 class CaptureProcessor {
   static final Map<String, Future<CaptureSession>> _active = {};
@@ -117,8 +118,8 @@ class CaptureProcessor {
     } catch (error) {
       final latest = await store.read(existing.id, existing.ownerKey);
       if (latest != null && !latest.terminal) {
-        await store
-            .update(latest.copyWith(status: 'failed', error: error.toString()));
+        await store.update(latest.copyWith(
+            status: 'failed', error: CaptureProblem.from(error)));
       }
       await diagnostics.record(CaptureEvent.failed,
           elapsedMs: watch.elapsedMilliseconds);

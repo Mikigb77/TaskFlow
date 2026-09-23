@@ -14,7 +14,7 @@ import open_file_mac
 import package_info_plus
 import path_provider_foundation
 import record_macos
-import sqflite
+import sqflite_darwin
 import url_launcher_macos
 import workmanager_apple
 

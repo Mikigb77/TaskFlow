@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/services/capture_problem.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -58,6 +60,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   int _seconds = 0;
   double _level = 0;
   String? _error;
+  bool _errorRetained = false;
   late final NativeSpeech _speech;
   SpeechCapability _capability = const SpeechCapability();
   StreamSubscription<SpeechEvent>? _speechEvents;
@@ -78,6 +81,14 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
   bool _typedStarted = false;
   bool _movedToReview = false;
   bool _discarded = false;
+
+  void _showProblem(Object problem, {bool retained = false}) {
+    if (!mounted) return;
+    setState(() {
+      _error = CaptureProblem.from(problem);
+      _errorRetained = retained && _error != CaptureProblem.gone;
+    });
+  }
 
   @override
   void initState() {
@@ -127,9 +138,10 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
           return;
         }
         _error = _session!.error;
+        _errorRetained = _error != null;
       }
     } catch (error) {
-      _error = error.toString();
+      _error = CaptureProblem.from(error);
     }
     if (!mounted) return;
     setState(() {
@@ -180,10 +192,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       await _store.update(_session!);
     });
     unawaited(_writes.catchError((Object error) {
-      if (mounted) {
-        setState(() => _error =
-            'Could not keep this draft on your phone. ${error.toString()}');
-      }
+      _showProblem(CaptureProblem.writeFailed);
     }));
   }
 
@@ -197,7 +206,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
       }
     });
     unawaited(_writes.catchError((Object error) {
-      if (mounted) setState(() => _error = error.toString());
+      _showProblem(error);
     }));
   }
 
@@ -240,7 +249,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     if (event.level != null && mounted && _recording) {
       setState(() => _level = event.level!.clamp(0, 1));
     }
-    if (event.error != null && mounted) setState(() => _error = event.error);
+    if (event.error != null) _showProblem(event.error!);
     if (event.terminal) {
       if (_speechEnded?.isCompleted == false) _speechEnded!.complete();
       // Automatic endpointing retains editable words. Only an explicit stop /
@@ -266,6 +275,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
     setState(() {
       _busy = true;
       _error = null;
+      _errorRetained = false;
     });
     try {
       await _writes;
@@ -298,7 +308,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         _speechEvents ??=
             _speech.events.listen(_receiveSpeech, onError: (Object _) {
           _receiveSpeech(SpeechEvent(_nativeRun, 'error',
-              error: 'Speech stopped. Your retained words are safe.'));
+              error: CaptureProblem.speechStopped));
         });
         _recording = true;
         _firstWords = false;
@@ -330,7 +340,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
           .onStateChanged()
           .listen(_receiveRecorderState, onError: (Object error) {
         if (mounted && _recording && !_usingNative) {
-          setState(() => _error = error.toString());
+          _showProblem(error);
           unawaited(_finishRecording(submit: false));
         }
       });
@@ -373,7 +383,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
           await _speech.cancel(_nativeRun);
         } catch (_) {/* Preserve the transcript. */}
       }
-      if (mounted) setState(() => _error = error.toString());
+      _showProblem(error);
     } finally {
       await _stopping;
       if (mounted) setState(() => _busy = false);
@@ -434,10 +444,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         await _process();
       }
     } catch (error) {
-      if (mounted) {
-        setState(
-            () => _error = 'Your retained input is kept. ${error.toString()}');
-      }
+      _showProblem(CaptureProblem.stopFailed);
     } finally {
       _acceptSpeech = false;
       if (mounted) {
@@ -456,9 +463,11 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
 
   Future<void> _process() async {
     final api = ref.read(apiClientProvider);
+    var inputKept = false;
     setState(() {
       _busy = true;
       _error = null;
+      _errorRetained = false;
     });
     try {
       await _writes;
@@ -466,6 +475,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         throw StateError('Say or type what you need to do first.');
       }
       await _ensureSession(text: _words.text);
+      inputKept = true;
       final session = await CaptureProcessor(_store, api).process(_session!);
       _session = session;
       if (mounted) {
@@ -473,10 +483,9 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         _review(session);
       }
     } catch (error) {
-      if (mounted) {
-        setState(() => _error =
-            '${error.toString()}\nYour capture is kept on this phone.');
-      }
+      _showProblem(
+          !inputKept && _session != null ? CaptureProblem.writeFailed : error,
+          retained: inputKept);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -495,8 +504,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         context: context,
         builder: (context) => AlertDialog(
                 title: Text(context.l10n.discardCaptureQuestion),
-                content: const Text(
-                    'The recording and unsaved drafts will be removed. Tasks already saved will stay.'),
+                content: Text(context.l10n.captureDiscardHelp),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -517,10 +525,7 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
         Navigator.pop(context);
       }
     } catch (_) {
-      if (mounted) {
-        setState(
-            () => _error = 'Could not discard this capture. It is still kept.');
-      }
+      _showProblem(CaptureProblem.discardFailed);
     }
   }
 
@@ -733,16 +738,13 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                                           final opened =
                                               await _speech.prepareLanguage(
                                                   _capability.language);
-                                          if (mounted) {
-                                            setState(() => _error = opened
-                                                ? 'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.'
-                                                : 'Speech setup is unavailable here. Use saved audio or type.');
-                                          }
+                                          _showProblem(opened
+                                              ? CaptureProblem.setupRequested
+                                              : CaptureProblem
+                                                  .setupUnavailable);
                                         } catch (_) {
-                                          if (mounted) {
-                                            setState(() => _error =
-                                                'Could not open speech setup. Use saved audio or type.');
-                                          }
+                                          _showProblem(
+                                              CaptureProblem.setupUnavailable);
                                         }
                                       },
                                       child: Text(context.l10n.setUpSpeech)),
@@ -796,7 +798,10 @@ class _VoiceTaskScreenState extends ConsumerState<VoiceTaskScreen>
                       if (_error != null)
                         Padding(
                             padding: const EdgeInsets.only(top: 16),
-                            child: MessageBanner(_error!, isError: true)),
+                            child: MessageBanner(
+                                '${captureProblemText(context.l10n, _error!)}${_errorRetained ? '\n${context.l10n.captureKept}' : ''}',
+                                isError:
+                                    _error != CaptureProblem.setupRequested)),
                       if (_session != null)
                         TextButton(
                             onPressed: _busy || _recording ? null : _discard,

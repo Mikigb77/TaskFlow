@@ -19,7 +19,8 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+4002
 
 environment:
-  sdk: ^3.5.1
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -39,7 +40,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
-  sqflite: ^2.3.3+1
+  sqflite: ^2.4.4
   path: ^1.9.0
   flutter_riverpod: ^2.5.1
   table_calendar: ^3.2.1

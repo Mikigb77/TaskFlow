@@ -2331,36 +2331,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String archiveField(String field) {
-    String _temp0 = intl.Intl.selectLogic(
-      field,
-      {
-        'export_id': 'export_id',
-        'tasks': 'tasks',
-        'lists': 'lists',
-        'list_id': 'list id',
-        'list_name': 'list name',
-        'task_identifier': 'task identifier',
-        'title': 'title',
-        'notes': 'notes',
-        'priority': 'priority',
-        'duration': 'duration',
-        'repeat_interval': 'repeat interval',
-        'repeat_weekdays': 'repeat weekdays',
-        'weekday': 'weekday',
-        'completed_dates': 'completed dates',
-        'individual_date_changes': 'individual date changes',
-        'list_identifier': 'list identifier',
-        'labels': 'labels',
-        'label': 'label',
-        'checklist': 'checklist',
-        'checklist_identifier': 'checklist identifier',
-        'checklist_title': 'checklist title',
-        'checklist_dates': 'checklist dates',
-        'reminder_lead': 'reminder lead',
-        'reminder_time': 'reminder time',
-        'other': 'field',
-      },
-    );
+    String _temp0 = intl.Intl.selectLogic(field, {
+      'export_id': 'export_id',
+      'tasks': 'tasks',
+      'lists': 'lists',
+      'list_id': 'list id',
+      'list_name': 'list name',
+      'task_identifier': 'task identifier',
+      'title': 'title',
+      'notes': 'notes',
+      'priority': 'priority',
+      'duration': 'duration',
+      'repeat_interval': 'repeat interval',
+      'repeat_weekdays': 'repeat weekdays',
+      'weekday': 'weekday',
+      'completed_dates': 'completed dates',
+      'individual_date_changes': 'individual date changes',
+      'list_identifier': 'list identifier',
+      'labels': 'labels',
+      'label': 'label',
+      'checklist': 'checklist',
+      'checklist_identifier': 'checklist identifier',
+      'checklist_title': 'checklist title',
+      'checklist_dates': 'checklist dates',
+      'reminder_lead': 'reminder lead',
+      'reminder_time': 'reminder time',
+      'other': 'field',
+    });
     return '$_temp0';
   }
 
@@ -2405,4 +2402,215 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationSnoozed => 'Your snoozed task.';
+
+  @override
+  String get captureGone => 'This capture is no longer available.';
+
+  @override
+  String get captureNoteLength => 'A note needs 1 to 8000 characters.';
+
+  @override
+  String get captureNoTasks => 'No tasks were found. Your capture is kept.';
+
+  @override
+  String get captureUnsupportedKind =>
+      'This server does not support the selected capture type. Your input is kept.';
+
+  @override
+  String get captureOffline =>
+      'Cannot reach the server. Check your connection and server address, then retry.';
+
+  @override
+  String get captureTimeout =>
+      'The server took too long to respond. You can retry this capture.';
+
+  @override
+  String get captureUnavailable =>
+      'The processing service is unavailable. Retry this capture later.';
+
+  @override
+  String get captureAllowance =>
+      'The service request limit was reached. Retry later.';
+
+  @override
+  String get captureSignIn =>
+      'Sign in again to process this account’s capture.';
+
+  @override
+  String get captureForbidden =>
+      'This account cannot process the capture. Check your access and try again.';
+
+  @override
+  String get captureTooLarge =>
+      'This recording exceeds the service limit. Keep it for later or use a shorter typed description.';
+
+  @override
+  String get captureTypedFirst =>
+      'Save or discard this typed capture before starting a recording.';
+
+  @override
+  String get captureMicrophone =>
+      'Allow microphone access to record, or type below.';
+
+  @override
+  String get captureRecordingFirst =>
+      'Retry this recording or discard it before recording another.';
+
+  @override
+  String get captureEmptyInput => 'Say or type what you need to do first.';
+
+  @override
+  String get captureSpeechStopped =>
+      'Speech stopped. Your retained words are safe; record audio or type to continue.';
+
+  @override
+  String get captureNoSpeech =>
+      'No clear speech was detected. Retained words are still available.';
+
+  @override
+  String get captureSpeechLanguage =>
+      'On-device speech is not installed for this language. Choose another language, record audio, or type.';
+
+  @override
+  String get captureSpeechUnavailable =>
+      'On-device speech is unavailable. Record audio or type instead.';
+
+  @override
+  String get captureSpeechBusy =>
+      'A microphone request is already open. Finish it before trying again.';
+
+  @override
+  String get captureIncompleteAudio =>
+      'The retained audio is incomplete and cannot be processed. It is still kept on this phone.';
+
+  @override
+  String get captureWriteFailed =>
+      'Could not keep this draft on your phone. Try again before leaving.';
+
+  @override
+  String get captureStopFailed =>
+      'Could not finish recording. Previously retained input is kept.';
+
+  @override
+  String get captureDiscardFailed =>
+      'Could not discard this capture. It is still kept.';
+
+  @override
+  String get captureReviewWriteFailed =>
+      'Could not keep these changes. Please try again before leaving.';
+
+  @override
+  String get captureSaveFailed =>
+      'Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.';
+
+  @override
+  String get captureSetupRequested =>
+      'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.';
+
+  @override
+  String get captureSetupUnavailable =>
+      'Speech setup is unavailable here. Use saved audio or type.';
+
+  @override
+  String get captureKept => 'Your capture is kept on this phone.';
+
+  @override
+  String get captureDiscardHelp =>
+      'The recording and unsaved drafts will be removed. Tasks already saved will stay.';
+
+  @override
+  String get voiceRecording => 'Voice recording';
+
+  @override
+  String get retryCaptures => 'Retry loading captures';
+
+  @override
+  String get capturesCaughtUp => 'All caught up';
+
+  @override
+  String get capturesEmptyHelp =>
+      'Recordings and drafts you leave unfinished will be kept here.';
+
+  @override
+  String get captureResumeHelp => 'Kept on this phone · Tap to resume';
+
+  @override
+  String captureDraftSummary(int count, int ready) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count drafts',
+      one: '1 draft',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      ready,
+      locale: localeName,
+      other: '$ready ready',
+      one: '1 ready',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String editCaptureItem(String title) {
+    return 'Edit $title';
+  }
+
+  @override
+  String removeCaptureItem(String title) {
+    return 'Remove $title';
+  }
+
+  @override
+  String captureTasksSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks saved',
+      one: '1 task saved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String captureKeptForReview(int count) {
+    return '$count kept for review';
+  }
+
+  @override
+  String get captureConfirmDetails => 'Use the details shown';
+
+  @override
+  String get captureNothingToReview => 'Nothing left to review';
+
+  @override
+  String get captureRemovedDraftsHelp =>
+      'Removed drafts will not become tasks.';
+
+  @override
+  String get captureFinish => 'Finish';
+
+  @override
+  String get captureYourWords => 'Your words';
+
+  @override
+  String get captureReviewRetainedHelp =>
+      'Unfinished drafts are kept on this phone. You can return from Unfinished captures.';
+
+  @override
+  String get captureCheckDetails => 'Check the details above';
+
+  @override
+  String captureSaveTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Save $count tasks',
+      one: 'Save 1 task',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get labelsExample => 'home, errands, calls';
 }

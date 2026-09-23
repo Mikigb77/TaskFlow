@@ -1,0 +1,35 @@
+import 'generated/app_localizations.dart';
+import '../services/capture_problem.dart';
+
+String captureProblemText(AppLocalizations l, String value) =>
+    switch (CaptureProblem.from(value)) {
+      CaptureProblem.gone => l.captureGone,
+      CaptureProblem.noteLength => l.captureNoteLength,
+      CaptureProblem.noTasks => l.captureNoTasks,
+      CaptureProblem.unsupportedKind => l.captureUnsupportedKind,
+      CaptureProblem.offline => l.captureOffline,
+      CaptureProblem.timeout => l.captureTimeout,
+      CaptureProblem.unavailable => l.captureUnavailable,
+      CaptureProblem.allowance => l.captureAllowance,
+      CaptureProblem.signIn => l.captureSignIn,
+      CaptureProblem.forbidden => l.captureForbidden,
+      CaptureProblem.tooLarge => l.captureTooLarge,
+      CaptureProblem.typedFirst => l.captureTypedFirst,
+      CaptureProblem.microphone => l.captureMicrophone,
+      CaptureProblem.recordingFirst => l.captureRecordingFirst,
+      CaptureProblem.empty => l.captureEmptyInput,
+      CaptureProblem.speechStopped => l.captureSpeechStopped,
+      CaptureProblem.noSpeech => l.captureNoSpeech,
+      CaptureProblem.speechLanguage => l.captureSpeechLanguage,
+      CaptureProblem.speechUnavailable => l.captureSpeechUnavailable,
+      CaptureProblem.speechBusy => l.captureSpeechBusy,
+      CaptureProblem.incompleteAudio => l.captureIncompleteAudio,
+      CaptureProblem.writeFailed => l.captureWriteFailed,
+      CaptureProblem.stopFailed => l.captureStopFailed,
+      CaptureProblem.discardFailed => l.captureDiscardFailed,
+      CaptureProblem.reviewWriteFailed => l.captureReviewWriteFailed,
+      CaptureProblem.saveFailed => l.captureSaveFailed,
+      CaptureProblem.setupRequested => l.captureSetupRequested,
+      CaptureProblem.setupUnavailable => l.captureSetupUnavailable,
+      _ => value,
+    };

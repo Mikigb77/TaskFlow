@@ -63,7 +63,7 @@ import 'app_localizations_es.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class AppLocalizations {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// No description provided for @note.
@@ -4237,6 +4237,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your snoozed task.'**
   String get notificationSnoozed;
+
+  /// No description provided for @captureGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This capture is no longer available.'**
+  String get captureGone;
+
+  /// No description provided for @captureNoteLength.
+  ///
+  /// In en, this message translates to:
+  /// **'A note needs 1 to 8000 characters.'**
+  String get captureNoteLength;
+
+  /// No description provided for @captureNoTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'No tasks were found. Your capture is kept.'**
+  String get captureNoTasks;
+
+  /// No description provided for @captureUnsupportedKind.
+  ///
+  /// In en, this message translates to:
+  /// **'This server does not support the selected capture type. Your input is kept.'**
+  String get captureUnsupportedKind;
+
+  /// No description provided for @captureOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot reach the server. Check your connection and server address, then retry.'**
+  String get captureOffline;
+
+  /// No description provided for @captureTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The server took too long to respond. You can retry this capture.'**
+  String get captureTimeout;
+
+  /// No description provided for @captureUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The processing service is unavailable. Retry this capture later.'**
+  String get captureUnavailable;
+
+  /// No description provided for @captureAllowance.
+  ///
+  /// In en, this message translates to:
+  /// **'The service request limit was reached. Retry later.'**
+  String get captureAllowance;
+
+  /// No description provided for @captureSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in again to process this account’s capture.'**
+  String get captureSignIn;
+
+  /// No description provided for @captureForbidden.
+  ///
+  /// In en, this message translates to:
+  /// **'This account cannot process the capture. Check your access and try again.'**
+  String get captureForbidden;
+
+  /// No description provided for @captureTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This recording exceeds the service limit. Keep it for later or use a shorter typed description.'**
+  String get captureTooLarge;
+
+  /// No description provided for @captureTypedFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Save or discard this typed capture before starting a recording.'**
+  String get captureTypedFirst;
+
+  /// No description provided for @captureMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow microphone access to record, or type below.'**
+  String get captureMicrophone;
+
+  /// No description provided for @captureRecordingFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry this recording or discard it before recording another.'**
+  String get captureRecordingFirst;
+
+  /// No description provided for @captureEmptyInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Say or type what you need to do first.'**
+  String get captureEmptyInput;
+
+  /// No description provided for @captureSpeechStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech stopped. Your retained words are safe; record audio or type to continue.'**
+  String get captureSpeechStopped;
+
+  /// No description provided for @captureNoSpeech.
+  ///
+  /// In en, this message translates to:
+  /// **'No clear speech was detected. Retained words are still available.'**
+  String get captureNoSpeech;
+
+  /// No description provided for @captureSpeechLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device speech is not installed for this language. Choose another language, record audio, or type.'**
+  String get captureSpeechLanguage;
+
+  /// No description provided for @captureSpeechUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device speech is unavailable. Record audio or type instead.'**
+  String get captureSpeechUnavailable;
+
+  /// No description provided for @captureSpeechBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'A microphone request is already open. Finish it before trying again.'**
+  String get captureSpeechBusy;
+
+  /// No description provided for @captureIncompleteAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'The retained audio is incomplete and cannot be processed. It is still kept on this phone.'**
+  String get captureIncompleteAudio;
+
+  /// No description provided for @captureWriteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not keep this draft on your phone. Try again before leaving.'**
+  String get captureWriteFailed;
+
+  /// No description provided for @captureStopFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not finish recording. Previously retained input is kept.'**
+  String get captureStopFailed;
+
+  /// No description provided for @captureDiscardFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not discard this capture. It is still kept.'**
+  String get captureDiscardFailed;
+
+  /// No description provided for @captureReviewWriteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not keep these changes. Please try again before leaving.'**
+  String get captureReviewWriteFailed;
+
+  /// No description provided for @captureSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.'**
+  String get captureSaveFailed;
+
+  /// No description provided for @captureSetupRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.'**
+  String get captureSetupRequested;
+
+  /// No description provided for @captureSetupUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech setup is unavailable here. Use saved audio or type.'**
+  String get captureSetupUnavailable;
+
+  /// No description provided for @captureKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Your capture is kept on this phone.'**
+  String get captureKept;
+
+  /// No description provided for @captureDiscardHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording and unsaved drafts will be removed. Tasks already saved will stay.'**
+  String get captureDiscardHelp;
+
+  /// No description provided for @voiceRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice recording'**
+  String get voiceRecording;
+
+  /// No description provided for @retryCaptures.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry loading captures'**
+  String get retryCaptures;
+
+  /// No description provided for @capturesCaughtUp.
+  ///
+  /// In en, this message translates to:
+  /// **'All caught up'**
+  String get capturesCaughtUp;
+
+  /// No description provided for @capturesEmptyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Recordings and drafts you leave unfinished will be kept here.'**
+  String get capturesEmptyHelp;
+
+  /// No description provided for @captureResumeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept on this phone · Tap to resume'**
+  String get captureResumeHelp;
+
+  /// No description provided for @captureDraftSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {1 draft} other {{count} drafts}} · {ready, plural, one {1 ready} other {{ready} ready}}'**
+  String captureDraftSummary(int count, int ready);
+
+  /// No description provided for @editCaptureItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {title}'**
+  String editCaptureItem(String title);
+
+  /// No description provided for @removeCaptureItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {title}'**
+  String removeCaptureItem(String title);
+
+  /// No description provided for @captureTasksSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {1 task saved} other {{count} tasks saved}}'**
+  String captureTasksSaved(int count);
+
+  /// No description provided for @captureKeptForReview.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} kept for review'**
+  String captureKeptForReview(int count);
+
+  /// No description provided for @captureConfirmDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the details shown'**
+  String get captureConfirmDetails;
+
+  /// No description provided for @captureNothingToReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing left to review'**
+  String get captureNothingToReview;
+
+  /// No description provided for @captureRemovedDraftsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed drafts will not become tasks.'**
+  String get captureRemovedDraftsHelp;
+
+  /// No description provided for @captureFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get captureFinish;
+
+  /// No description provided for @captureYourWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Your words'**
+  String get captureYourWords;
+
+  /// No description provided for @captureReviewRetainedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfinished drafts are kept on this phone. You can return from Unfinished captures.'**
+  String get captureReviewRetainedHelp;
+
+  /// No description provided for @captureCheckDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the details above'**
+  String get captureCheckDetails;
+
+  /// No description provided for @captureSaveTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {Save 1 task} other {Save {count} tasks}}'**
+  String captureSaveTasks(int count);
+
+  /// No description provided for @labelsExample.
+  ///
+  /// In en, this message translates to:
+  /// **'home, errands, calls'**
+  String get labelsExample;
 }
 
 class _AppLocalizationsDelegate
@@ -4266,8 +4560,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

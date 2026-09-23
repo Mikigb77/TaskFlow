@@ -10,22 +10,22 @@ import 'package:agenda/l10n/region.dart';
 class CapturesScreen extends ConsumerWidget {
   const CapturesScreen({super.key});
 
-  String _title(CaptureSession session) {
+  String _title(BuildContext context, CaptureSession session) {
     if (session.remaining.isNotEmpty) return session.remaining.first.task.title;
     if (session.text.trim().isNotEmpty) return session.text.trim();
     if (session.transcript.trim().isNotEmpty) return session.transcript.trim();
-    return 'Voice recording';
+    return context.l10n.voiceRecording;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-      appBar: const CustomAppBar(title: 'Unfinished captures'),
+      appBar: CustomAppBar(title: context.l10n.unfinishedCaptures),
       body: ref.watch(pendingCapturesProvider).when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => Center(
                 child: FilledButton(
                     onPressed: () => ref.invalidate(pendingCapturesProvider),
-                    child: const Text('Retry loading captures'))),
+                    child: Text(context.l10n.retryCaptures))),
             data: (sessions) => RefreshIndicator(
                 onRefresh: () async {
                   ref.invalidate(pendingCapturesProvider);
@@ -36,10 +36,9 @@ class CapturesScreen extends ConsumerWidget {
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
                       if (sessions.isEmpty)
-                        const EmptyState(
-                            title: 'All caught up',
-                            message:
-                                'Recordings and drafts you leave unfinished will be kept here.'),
+                        EmptyState(
+                            title: context.l10n.capturesCaughtUp,
+                            message: context.l10n.capturesEmptyHelp),
                       for (final session in sessions)
                         Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -49,11 +48,11 @@ class CapturesScreen extends ConsumerWidget {
                                   leading: Icon(session.audioPath == null
                                       ? Icons.notes_rounded
                                       : Icons.mic_none_rounded),
-                                  title: Text(_title(session),
+                                  title: Text(_title(context, session),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
                                   subtitle: Text(
-                                      '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${session.remaining.isNotEmpty ? '${session.remaining.length} drafts · ${session.ready.length} ready' : 'Kept on this phone · Tap to resume'}'),
+                                      '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${session.remaining.isNotEmpty ? context.l10n.captureDraftSummary(session.remaining.length, session.ready.length) : context.l10n.captureResumeHelp}'),
                                   trailing:
                                       const Icon(Icons.chevron_right_rounded),
                                   onTap: () => Navigator.push(

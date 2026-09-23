@@ -4,6 +4,11 @@ import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/services/capture_problem.dart';
+import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/l10n/generated/app_localizations_en.dart';
+import 'package:agenda/l10n/generated/app_localizations_es.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
@@ -22,6 +27,122 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
             const MethodChannel('flutter_timezone'), (_) async => 'UTC');
+  });
+
+  test(
+      'capture failures keep unknown details and translate recognized failures',
+      () {
+    final en = AppLocalizationsEn();
+    final es = AppLocalizationsEs();
+    final problem =
+        CaptureProblem.from(ApiException(503, 'Service unavailable'));
+    expect(captureProblemText(en, problem), contains('unavailable'));
+    expect(captureProblemText(es, problem), contains('no está disponible'));
+    expect(
+        CaptureProblem.from(ApiException(0,
+            'The server took too long to respond. Your local tasks are safe.')),
+        CaptureProblem.timeout);
+    expect(
+        captureProblemText(
+            es, 'Bad state: No tasks were found. Your capture is kept.'),
+        es.captureNoTasks);
+    final custom =
+        ApiException(400, 'Original server detail: "Trabajo de José"');
+    expect(captureProblemText(es, CaptureProblem.from(custom)), custom.message);
+    expect(CaptureProblem.from(PlatformException(code: 'permission')),
+        CaptureProblem.microphone);
+  });
+
+  testWidgets('capture error changes language without changing retained words',
+      (tester) async {
+    final store = _Captures();
+    final api = _OfflineExtraction();
+    final container = await _open(tester, _Speech(), store, api);
+    const original = 'Doctor Friday at 17:00 · bring José’s report';
+    await tester.enterText(
+        find.byKey(const ValueKey('capture-words')), original);
+    await tester.pumpAndSettle();
+    final request = find.widgetWithText(FilledButton, 'Review tasks from text');
+    await tester.ensureVisible(request);
+    await tester.pumpAndSettle();
+    await tester.tap(request);
+    await tester.pumpAndSettle();
+    expect(store.session!.error, CaptureProblem.offline);
+    final retained = store.session!.toJson().toString();
+    tester.view.physicalSize = const Size(320, 568);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    Future<void> show(Finder finder, double step) async {
+      // Drag in the page padding: a centered gesture can land inside the
+      // multiline input's own scroll view at 2x text size.
+      for (var attempt = 0;
+          finder.evaluate().isEmpty && attempt < 30;
+          attempt++) {
+        await tester.dragFrom(const Offset(12, 280), Offset(0, -step));
+        await tester.pumpAndSettle();
+      }
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+    }
+
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      await container.read(themeModeProvider.notifier).setMode(mode);
+      for (final language in ['es', 'en']) {
+        await container
+            .read(regionalProvider.notifier)
+            .set(RegionalPreferences(language: language));
+        await tester.pumpAndSettle();
+        final expected = language == 'es'
+            ? AppLocalizationsEs().captureOffline
+            : AppLocalizationsEn().captureOffline;
+        final error = find.textContaining(expected);
+        await show(error, 180);
+        expect(error, findsOneWidget);
+        expect(store.session!.toJson().toString(), retained);
+        await show(find.byKey(const ValueKey('capture-words')), -180);
+        expect(
+            tester
+                .widget<TextField>(find.byKey(const ValueKey('capture-words')))
+                .controller!
+                .text,
+            original);
+        expect(api.requests, 1);
+        expect(tester.takeException(), isNull);
+      }
+    }
+  });
+
+  testWidgets('failed local write never claims the current words were kept',
+      (tester) async {
+    final store = _Captures();
+    final api = _OfflineExtraction();
+    final container = await _open(tester, _Speech(), store, api);
+    final words = find.byKey(const ValueKey('capture-words'));
+    await tester.enterText(words, 'Already kept');
+    await tester.pumpAndSettle();
+    store.failWrites = true;
+    await tester.enterText(words, 'New words that could not be kept');
+    await tester.pumpAndSettle();
+    final request = find.widgetWithText(FilledButton, 'Review tasks from text');
+    await tester.ensureVisible(request);
+    await tester.pumpAndSettle();
+    await tester.tap(request);
+    await tester.pumpAndSettle();
+    for (final language in ['en', 'es']) {
+      await container
+          .read(regionalProvider.notifier)
+          .set(RegionalPreferences(language: language));
+      await tester.pumpAndSettle();
+      final l = language == 'es' ? AppLocalizationsEs() : AppLocalizationsEn();
+      final message = find.text(l.captureWriteFailed);
+      await tester.ensureVisible(message);
+      await tester.pumpAndSettle();
+      expect(message, findsOneWidget);
+      expect(find.textContaining(l.captureKept), findsNothing);
+    }
+    expect(store.session!.text, 'Already kept');
+    expect(api.requests, 0);
+    expect(tester.takeException(), isNull);
   });
 
   for (final interruption in [
@@ -225,8 +346,8 @@ void main() {
   });
 }
 
-Future<void> _open(WidgetTester tester, _Speech speech, _Captures store,
-    _OfflineExtraction api,
+Future<ProviderContainer> _open(WidgetTester tester, _Speech speech,
+    _Captures store, _OfflineExtraction api,
     {_Recorder? recorder}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -243,6 +364,7 @@ Future<void> _open(WidgetTester tester, _Speech speech, _Captures store,
     taskRepositoryProvider.overrideWithValue(MemoryTasks()),
     taskProvider.overrideWith((ref) => DesignTaskNotifier()),
     themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+    regionalStoreProvider.overrideWithValue(MemoryRegionalStore()),
   ]);
   addTearDown(() {
     container.dispose();
@@ -253,6 +375,7 @@ Future<void> _open(WidgetTester tester, _Speech speech, _Captures store,
   await tester.pumpAndSettle();
   tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/voiceTask');
   await tester.pumpAndSettle();
+  return container;
 }
 
 class _Speech extends NativeSpeech {
@@ -296,6 +419,7 @@ class _Speech extends NativeSpeech {
 class _Captures extends CaptureStore {
   _Captures() : super(TaskDatabase());
   CaptureSession? session;
+  bool failWrites = false;
   @override
   Future<CaptureSession> create(String ownerKey, String timezone,
           {String text = '',
@@ -312,6 +436,7 @@ class _Captures extends CaptureStore {
           text: text);
   @override
   Future<void> update(CaptureSession value) async {
+    if (failWrites) throw StateError('Synthetic storage failure');
     session = value;
   }
 

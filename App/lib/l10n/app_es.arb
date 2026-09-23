@@ -881,5 +881,99 @@
         "type": "String"
       }
     }
-  }
+  },
+  "captureGone": "Esta captura ya no está disponible.",
+  "captureNoteLength": "La nota debe tener entre 1 y 8000 caracteres.",
+  "captureNoTasks": "No se encontraron tareas. Tu captura se conserva.",
+  "captureUnsupportedKind": "Este servidor no admite el tipo de captura seleccionado. Tu contenido se conserva.",
+  "captureOffline": "No se puede conectar con el servidor. Comprueba la conexión y la dirección del servidor e inténtalo de nuevo.",
+  "captureTimeout": "El servidor ha tardado demasiado en responder. Puedes reintentar esta captura.",
+  "captureUnavailable": "El servicio de procesamiento no está disponible. Reintenta esta captura más tarde.",
+  "captureAllowance": "Se ha alcanzado el límite de solicitudes del servicio. Inténtalo más tarde.",
+  "captureSignIn": "Vuelve a iniciar sesión para procesar la captura de esta cuenta.",
+  "captureForbidden": "Esta cuenta no puede procesar la captura. Comprueba tu acceso e inténtalo de nuevo.",
+  "captureTooLarge": "Esta grabación supera el límite del servicio. Consérvala para más tarde o escribe una descripción más breve.",
+  "captureTypedFirst": "Guarda o descarta esta captura escrita antes de iniciar una grabación.",
+  "captureMicrophone": "Permite el acceso al micrófono para grabar o escribe abajo.",
+  "captureRecordingFirst": "Reintenta esta grabación o descártala antes de grabar otra.",
+  "captureEmptyInput": "Primero di o escribe lo que necesitas hacer.",
+  "captureSpeechStopped": "El reconocimiento se ha detenido. Las palabras guardadas se conservan; graba audio o escribe para continuar.",
+  "captureNoSpeech": "No se ha detectado voz clara. Las palabras guardadas siguen disponibles.",
+  "captureSpeechLanguage": "El reconocimiento local no está instalado para este idioma. Elige otro idioma, graba audio o escribe.",
+  "captureSpeechUnavailable": "El reconocimiento local no está disponible. Graba audio o escribe.",
+  "captureSpeechBusy": "Ya hay una solicitud del micrófono abierta. Termínala antes de volver a intentarlo.",
+  "captureIncompleteAudio": "El audio guardado está incompleto y no se puede procesar. Sigue conservado en este teléfono.",
+  "captureWriteFailed": "No se ha podido guardar este borrador en el teléfono. Inténtalo de nuevo antes de salir.",
+  "captureStopFailed": "No se ha podido finalizar la grabación. El contenido guardado anteriormente se conserva.",
+  "captureDiscardFailed": "No se ha podido descartar esta captura. Sigue conservada.",
+  "captureReviewWriteFailed": "No se han podido guardar estos cambios. Inténtalo de nuevo antes de salir.",
+  "captureSaveFailed": "No se ha podido terminar de guardar. Tu captura se conserva; al reintentar no se duplicarán las tareas guardadas.",
+  "captureSetupRequested": "Se ha solicitado configurar el reconocimiento. Sigue las indicaciones de Android y pulsa Comprobar de nuevo. Mientras tanto, puedes seguir escribiendo.",
+  "captureSetupUnavailable": "La configuración del reconocimiento no está disponible aquí. Usa audio guardado o escribe.",
+  "captureKept": "Tu captura se conserva en este teléfono.",
+  "captureDiscardHelp": "Se eliminarán la grabación y los borradores sin guardar. Se conservarán las tareas ya guardadas.",
+  "voiceRecording": "Grabación de voz",
+  "retryCaptures": "Volver a cargar las capturas",
+  "capturesCaughtUp": "Todo al día",
+  "capturesEmptyHelp": "Aquí se guardarán las grabaciones y los borradores que dejes pendientes.",
+  "captureResumeHelp": "Guardado en este teléfono · Toca para continuar",
+  "captureDraftSummary": "{count, plural, one {1 borrador} other {{count} borradores}} · {ready, plural, one {1 listo} other {{ready} listos}}",
+  "@captureDraftSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "ready": {
+        "type": "int"
+      }
+    }
+  },
+  "editCaptureItem": "Editar {title}",
+  "@editCaptureItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "removeCaptureItem": "Quitar {title}",
+  "@removeCaptureItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "captureTasksSaved": "{count, plural, one {1 tarea guardada} other {{count} tareas guardadas}}",
+  "@captureTasksSaved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureKeptForReview": "{count, plural, one {1 pendiente de revisar} other {{count} pendientes de revisar}}",
+  "@captureKeptForReview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureConfirmDetails": "Usar los datos mostrados",
+  "captureNothingToReview": "No queda nada por revisar",
+  "captureRemovedDraftsHelp": "Los borradores eliminados no se convertirán en tareas.",
+  "captureFinish": "Terminar",
+  "captureYourWords": "Tus palabras",
+  "captureReviewRetainedHelp": "Los borradores pendientes se conservan en este teléfono. Puedes retomarlos desde Capturas pendientes.",
+  "captureCheckDetails": "Revisa los datos de arriba",
+  "captureSaveTasks": "{count, plural, one {Guardar 1 tarea} other {Guardar {count} tareas}}",
+  "@captureSaveTasks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "labelsExample": "casa, recados, llamadas"
 }

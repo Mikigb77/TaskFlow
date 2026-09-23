@@ -7,6 +7,10 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/capture_processor.dart';
+import 'package:agenda/services/capture_problem.dart';
+import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/l10n/generated/app_localizations_en.dart';
+import 'package:agenda/l10n/generated/app_localizations_es.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,9 +108,21 @@ void main() {
     final processor = CaptureProcessor(store, api);
     await expectLater(processor.process(session), throwsA(isA<ApiException>()));
     expect((await store.read(session.id, 'local'))!.status, 'failed');
+    expect((await store.read(session.id, 'local'))!.error,
+        CaptureProblem.unavailable);
     expect(await File(session.audioPath!).exists(), isTrue);
+    await database.close();
+    await reopen();
+    final failed = (await store.read(session.id, 'local'))!;
+    final beforeLanguage = jsonEncode(failed.toJson());
+    expect(captureProblemText(AppLocalizationsEn(), failed.error!),
+        contains('unavailable'));
+    expect(captureProblemText(AppLocalizationsEs(), failed.error!),
+        contains('no está disponible'));
+    expect(jsonEncode((await store.read(session.id, 'local'))!.toJson()),
+        beforeLanguage);
     api.failure = null;
-    final result = await processor.process(session);
+    final result = await CaptureProcessor(store, api).process(failed);
     expect(result.remaining.length, 2);
     expect(result.transcript, 'Coffee. Call tomorrow.');
     expect(api.requests.map((r) => r['reference_time']).toSet(),

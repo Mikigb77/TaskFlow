@@ -799,7 +799,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                     controller: _labels,
                                     decoration: InputDecoration(
                                         labelText: context.l10n.labels,
-                                        hintText: 'home, errands, calls'),
+                                        hintText: context.l10n.labelsExample),
                                     validator: (text) {
                                       final labels = (text ?? '')
                                           .split(',')
