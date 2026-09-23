@@ -1,5 +1,7 @@
 **TaskFlow: critique evaluation and proposed improvement backlog**
 
+**Historical review.** The assessment below describes commit `50afe7a`, before the subsequent backlog implementation. Its missing-feature statements are not a description of today's `dev` branch. See [the current assessment and remaining priorities](CRITIQUE_CURRENT_ASSESSMENT.md), [implementation status](IMPLEMENTATION_STATUS.md) and [remaining validation](VALIDATION_REMAINING.md) for the present state.
+
 Reviewed 22 September 2026 against the current dev checkout, app version 1.0.0+4002, based on commit 50afe7a. The existing uncommitted build-tool changes do not affect the product findings below. This is a proposal, not an implementation or a commitment to build every feature.
 
 Source: [the supplied critique](C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/CRITIQUE.md). I checked the relevant Flutter screens, models, persistence/sync code, notification scheduler, Django extraction code, existing tests, and the separate website's source. This was a source review; I did not conduct a new phone usability study, latency benchmark, or notification delivery test. Existing test cases support particular behaviors, not an overall claim of production reliability.
