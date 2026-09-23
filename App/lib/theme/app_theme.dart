@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Shared palette, type and controls for every screen and native picker.
 abstract final class AppTheme {
@@ -54,6 +55,12 @@ abstract final class AppTheme {
       appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
           foregroundColor: scheme.onSurface,
+          // A transparent app bar cannot infer the surface behind it.
+          systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarBrightness: brightness,
+              statusBarIconBrightness:
+                  dark ? Brightness.light : Brightness.dark),
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: false,
