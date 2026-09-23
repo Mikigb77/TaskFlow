@@ -1064,6 +1064,24 @@
     }
   },
   "archiveField": "{field, select, export_id{export_id} tasks{tasks} lists{lists} list_id{list id} list_name{list name} task_identifier{task identifier} title{title} notes{notes} priority{priority} duration{duration} repeat_interval{repeat interval} repeat_weekdays{repeat weekdays} weekday{weekday} completed_dates{completed dates} individual_date_changes{individual date changes} list_identifier{list identifier} labels{labels} label{label} checklist{checklist} checklist_identifier{checklist identifier} checklist_title{checklist title} checklist_dates{checklist dates} reminder_lead{reminder lead} reminder_time{reminder time} other{field}}",
+  "notificationChannel": "Task reminders",
+  "notificationComplete": "Complete",
+  "notificationSnooze": "Snooze 10 min",
+  "notificationDeadline": "Your task deadline is approaching.",
+  "notificationDue": "It’s time for your task.",
+  "notificationInMinutes": "{minutes, plural, one{Scheduled in 1 minute.} other{Scheduled in {minutes} minutes.}}",
+  "notificationToday": "On your list for today.",
+  "notificationMorning": "Make room for today",
+  "notificationEvening": "A moment to check in",
+  "notificationCheckIn": "Open TaskFlow to see your current tasks and plan your next step.",
+  "notificationSnoozed": "Your snoozed task.",
+  "@notificationInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "@archiveField": {
     "placeholders": {
       "field": {

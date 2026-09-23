@@ -16,6 +16,9 @@
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true">
 
+        <!-- Foreground reads must not block a notification worker's transaction. -->
+        <meta-data android:name="com.tekartik.sqflite.wal_enabled" android:value="true" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

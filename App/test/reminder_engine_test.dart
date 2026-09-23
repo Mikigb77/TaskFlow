@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
+import 'package:agenda/services/reminder_copy.dart';
+import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -41,6 +45,232 @@ void main() {
     await engine.activate('local');
   });
   tearDown(() => database.close());
+
+  test('a competing refresh includes edits made after the first snapshot',
+      () async {
+    await enable();
+    await database.insertTask(Task(
+        title: 'First task',
+        priority: 1,
+        dueDate: now.add(const Duration(hours: 1))));
+    final snapshotRead = Completer<void>();
+    final release = Completer<void>();
+    driver.beforeCapability = () async {
+      driver.beforeCapability = null;
+      snapshotRead.complete();
+      await release.future;
+    };
+    final first = engine.reconcile('local');
+    await snapshotRead.future;
+    await database.insertTask(Task(
+        title: 'New task',
+        priority: 1,
+        dueDate: now.add(const Duration(hours: 2))));
+    final other = ReminderEngine(database, driver, clock: () => now);
+    final second = other.reconcile('local');
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    release.complete();
+    await Future.wait([first, second]).timeout(const Duration(seconds: 3));
+    expect(driver.pending.values.map((notice) => notice.title).toSet(),
+        {'First task', 'New task'});
+    expect(
+        await (await database.database)
+            .query('reminder_meta', where: 'key = ?', whereArgs: ['lease']),
+        isEmpty);
+  });
+
+  test('a busy reminder lease reports retryable failure without stealing it',
+      () async {
+    await (await database.database).insert('reminder_meta', {
+      'key': 'lease',
+      'value': jsonEncode({
+        'token': 'other-worker',
+        'until': now.toUtc().add(const Duration(minutes: 1)).toIso8601String()
+      })
+    });
+    final waiting = ReminderEngine(database, driver,
+        clock: () => now, leaseWait: const Duration(milliseconds: 20));
+    await expectLater(
+        waiting.reconcile('local'), throwsA(isA<TimeoutException>()));
+    final lease = await (await database.database)
+        .query('reminder_meta', where: 'key = ?', whereArgs: ['lease']);
+    expect(
+        jsonDecode(lease.single['value'] as String)['token'], 'other-worker');
+    expect(driver.pending, isEmpty);
+  });
+
+  test('pending copy changes language without changing tasks, IDs or times',
+      () async {
+    final regional = RegionalPreferenceStore(database);
+    await regional.write(const RegionalPreferences(language: 'en'));
+    await enable(dateOnly: 600, morning: 540, evening: 1080);
+    await database.insertTasks([
+      Task(
+          title: 'Original appointment',
+          priority: 1,
+          dueDate: now.add(const Duration(hours: 2)),
+          reminderMinutes: 0,
+          notes: 'Keep my words unchanged'),
+      Task(
+          title: 'Original report',
+          priority: 2,
+          deadline: now.add(const Duration(hours: 4)),
+          deadlineHasTime: true,
+          reminderAnchor: 'deadline',
+          reminderMinutes: 60),
+      Task(
+          title: 'Original date-only',
+          priority: 1,
+          dueDate: Task.day(now),
+          hasTime: false),
+      Task(
+          title: 'Original single minute',
+          priority: 1,
+          dueDate: now.add(const Duration(hours: 1)),
+          reminderMinutes: 1),
+    ]);
+    final originalTasks = await (await database.database).query('tasks');
+    await engine.reconcile('local');
+    expect(driver.pending.length, 6);
+    expect(
+        driver.pending.values
+            .singleWhere((p) => p.title == 'Original single minute')
+            .body,
+        'Scheduled in 1 minute.');
+    final times = {
+      for (final entry in driver.pending.entries) entry.key: entry.value.when
+    };
+    final originalRows = await alerts();
+    await regional.write(const RegionalPreferences(language: 'es'));
+    await engine.reconcile('local');
+    expect({
+      for (final entry in driver.pending.entries) entry.key: entry.value.when
+    }, times);
+    expect(driver.pending.values.every((p) => p.languageCode == 'es'), isTrue);
+    expect(driver.pending.values.map((p) => p.body).toSet(), {
+      'Es hora de tu tarea.',
+      'Se acerca la fecha límite de tu tarea.',
+      'En tu lista para hoy.',
+      'Programada dentro de 1 minuto.',
+      'Abre TaskFlow para ver tus tareas actuales y decidir tu próximo paso.',
+    });
+    expect(
+        driver.pending.values.where((p) => p.daily).map((p) => p.title).toSet(),
+        {'Organiza tu día', 'Un momento para revisar'});
+    expect(await (await database.database).query('tasks'), originalTasks);
+    final translatedRows = await alerts();
+    for (final row in translatedRows) {
+      final old = originalRows.singleWhere((old) => old['id'] == row['id']);
+      expect(row['identity'], old['identity']);
+      expect(row['fire_at'], old['fire_at']);
+      expect(row['due_at'], old['due_at']);
+      expect(row['token'], isNot(old['token']));
+    }
+    final schedules = driver.schedules;
+    await engine.reconcile('local');
+    expect(driver.schedules, schedules,
+        reason: 'Do not reschedule unchanged translated alerts.');
+    expect(await alerts(), translatedRows);
+  });
+
+  test('a recreated background engine localizes a snooze without moving it',
+      () async {
+    final regional = RegionalPreferenceStore(database);
+    await regional.write(const RegionalPreferences(language: 'en'));
+    await enable();
+    await database.insertTask(Task(
+        title: 'My own title',
+        priority: 1,
+        dueDate: now.add(const Duration(hours: 1))));
+    await engine.reconcile('local');
+    var alert = (await alerts()).single;
+    final id = alert['id'] as int;
+    now = now.add(const Duration(minutes: 50));
+    expect(await engine.action(id, 'snooze', token: alert['token'] as String),
+        isTrue);
+    final snoozedAt = driver.pending[id]!.when;
+    expect(driver.pending[id]!.body, 'Your snoozed task.');
+    alert = (await alerts()).single;
+    await regional.write(const RegionalPreferences(language: 'es'));
+    engine = ReminderEngine(database, driver, clock: () => now);
+    await engine.reconcile('local');
+    expect(driver.pending[id]!.when, snoozedAt);
+    expect(driver.pending[id]!.body, 'Tu tarea pospuesta.');
+    expect(driver.pending[id]!.title, 'My own title');
+    expect(await engine.action(id, 'complete', token: alert['token'] as String),
+        isFalse);
+    final current = (await alerts()).single;
+    expect(
+        await engine.action(id, 'complete', token: current['token'] as String),
+        isTrue);
+    expect((await database.getTasks()).single.isCompleted, isTrue);
+    expect(await (await database.database).query('reminder_snoozes'), isEmpty);
+  });
+
+  test('an already delivered action remains valid after a language change',
+      () async {
+    final regional = RegionalPreferenceStore(database);
+    await regional.write(const RegionalPreferences(language: 'en'));
+    await enable();
+    await database.insertTask(Task(
+        title: 'Recurring original',
+        priority: 1,
+        dueDate: now.add(const Duration(hours: 1)),
+        recurrence: 'daily',
+        repeatUntil: now.add(const Duration(days: 1))));
+    await engine.reconcile('local');
+    final delivered = (await alerts())
+        .singleWhere((row) => row['occurrence'] == '2026-09-22');
+    final id = delivered['id'] as int;
+    driver.pending.remove(id); // OS has delivered this occurrence.
+    now = now.add(const Duration(hours: 1, seconds: 1));
+    await regional.write(const RegionalPreferences(language: 'es'));
+    await engine.reconcile('local');
+    final retained = (await alerts()).singleWhere((row) => row['id'] == id);
+    expect(retained['token'], delivered['token']);
+    expect(retained['status'], 'elapsed');
+    expect(
+        await engine.action(id, 'complete',
+            token: delivered['token'] as String),
+        isTrue);
+    final task = (await database.getTasks()).single;
+    expect(task.completedDates, ['2026-09-22']);
+    expect(task.occurrenceByKey('2026-09-23')!.isCompleted, isFalse);
+    expect(driver.pending.values.single.languageCode, 'es');
+  });
+
+  test(
+      'background language resolution follows the UI preference and device fallback',
+      () async {
+    final regional = RegionalPreferenceStore(database);
+    await regional.write(const RegionalPreferences());
+    expect(
+        (await readReminderStrings(database, deviceLocales: [
+          const Locale('fr', 'FR'),
+          const Locale('es', 'ES')
+        ]))
+            .localeName,
+        'es');
+    expect(
+        (await readReminderStrings(database,
+                deviceLocales: [const Locale('de', 'DE')]))
+            .localeName,
+        'en');
+    await regional.write(const RegionalPreferences(language: 'en'));
+    expect(
+        (await readReminderStrings(database,
+                deviceLocales: [const Locale('es', 'ES')]))
+            .localeName,
+        'en');
+    await (await database.database).update(
+        'app_preferences', {'data': 'invalid json'},
+        where: 'scope = ?', whereArgs: ['regional']);
+    expect(
+        (await readReminderStrings(database,
+                deviceLocales: [const Locale('es', 'ES')]))
+            .localeName,
+        'es');
+  });
 
   test(
       'deadline snooze survives a planned move and completes the original occurrence',
@@ -350,14 +580,18 @@ void main() {
 }
 
 class _Driver implements ReminderDriver {
+  Future<void> Function()? beforeCapability;
   bool allowed = true;
   bool exact = true;
   bool fail = false;
   int schedules = 0;
   final Map<int, PlannedReminder> pending = {};
   @override
-  Future<ReminderCapability> capability() async =>
-      ReminderCapability(allowed: allowed, exact: exact);
+  Future<ReminderCapability> capability() async {
+    await beforeCapability?.call();
+    return ReminderCapability(allowed: allowed, exact: exact);
+  }
+
   @override
   Future<Set<int>> pendingIds() async => pending.keys.toSet();
   @override

@@ -12,6 +12,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/reminder_engine.dart';
+import 'package:agenda/services/reminder_copy.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 
 @pragma('vm:entry-point')
 void notificationActionBackground(NotificationResponse response) async {
@@ -65,6 +67,7 @@ class _NotificationDriver implements ReminderDriver {
   @override
   Future<void> schedule(int id, PlannedReminder reminder,
       {required bool exact, required String token}) async {
+    final l = lookupAppLocalizations(Locale(reminder.languageCode));
     await plugin.zonedSchedule(
         id,
         reminder.title,
@@ -72,18 +75,22 @@ class _NotificationDriver implements ReminderDriver {
         tz.TZDateTime.from(reminder.when, tz.local),
         NotificationDetails(
             android: AndroidNotificationDetails(
-                'taskflow_reminders', 'Task reminders',
+                'taskflow_reminders', l.notificationChannel,
                 importance: Importance.high,
                 priority: Priority.high,
                 icon: 'app_notifications_icon',
                 actions: reminder.taskId == null
                     ? null
-                    : const [
-                        AndroidNotificationAction('complete', 'Complete'),
-                        AndroidNotificationAction('snooze', 'Snooze 10 min'),
+                    : [
+                        AndroidNotificationAction(
+                            'complete', l.notificationComplete),
+                        AndroidNotificationAction(
+                            'snooze', l.notificationSnooze),
                       ]),
             iOS: DarwinNotificationDetails(
-                categoryIdentifier: reminder.taskId == null ? null : 'task')),
+                categoryIdentifier: reminder.taskId == null
+                    ? null
+                    : 'task_${reminder.languageCode}')),
         payload: jsonEncode({'id': id, 'token': token}),
         androidScheduleMode: exact
             ? AndroidScheduleMode.exactAllowWhileIdle
@@ -138,6 +145,7 @@ class TaskReminders {
     await _refreshTimezone();
     // Finish schema creation before registering work that can start immediately.
     await TaskDatabase().database;
+    final strings = await readReminderStrings(TaskDatabase());
     await plugin.initialize(
         InitializationSettings(
             android: const AndroidInitializationSettings('app_icon'),
@@ -146,14 +154,16 @@ class TaskReminders {
                 requestBadgePermission: false,
                 requestSoundPermission: false,
                 notificationCategories: [
-                  DarwinNotificationCategory('task', actions: [
-                    DarwinNotificationAction.plain('complete', 'Complete'),
-                    DarwinNotificationAction.plain('snooze', 'Snooze 10 min'),
-                  ])
+                  // Retain the legacy category for already delivered alerts.
+                  _category('task', strings),
+                  for (final locale in AppLocalizations.supportedLocales)
+                    _category('task_${locale.languageCode}',
+                        lookupAppLocalizations(locale)),
                 ])),
         onDidReceiveNotificationResponse: respond,
         onDidReceiveBackgroundNotificationResponse:
             notificationActionBackground);
+    await _updateChannel(strings);
     if (!background) {
       final launch = await plugin.getNotificationAppLaunchDetails();
       if (launch?.didNotificationLaunchApp == true &&
@@ -172,6 +182,42 @@ class TaskReminders {
         await recordError('background_unavailable');
       }
     }
+  }
+
+  static DarwinNotificationCategory _category(String id, AppLocalizations l) =>
+      DarwinNotificationCategory(id, actions: [
+        DarwinNotificationAction.plain('complete', l.notificationComplete),
+        DarwinNotificationAction.plain('snooze', l.notificationSnooze),
+      ]);
+
+  static Future<void> _updateChannel(AppLocalizations strings) async {
+    if (!Platform.isAndroid) return;
+    // Keep the same channel ID. Android preserves the user's sound/importance
+    // choices while allowing its visible name to follow the app language.
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()!
+        .createNotificationChannel(AndroidNotificationChannel(
+            'taskflow_reminders', strings.notificationChannel,
+            importance: Importance.high));
+  }
+
+  /// Called after a saved preference, a system language change, or app resume.
+  /// This also works without an open widget tree in a notification worker.
+  static Future<void> refreshLanguage() {
+    if (!supported) return Future.value();
+    return _queue = _queue.catchError((_) {}).then((_) async {
+      try {
+        await initialize();
+        await _refreshTimezone();
+        await _updateChannel(await readReminderStrings(TaskDatabase()));
+        final owner = await engine.activeOwner();
+        if (owner != null) await engine.reconcile(owner);
+        changes.add(null);
+      } catch (_) {
+        await recordError('refresh_failed');
+      }
+    });
   }
 
   static NotificationResponse? _launchResponse;

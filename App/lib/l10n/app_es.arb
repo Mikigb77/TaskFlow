@@ -857,6 +857,24 @@
     }
   },
   "archiveField": "{field, select, export_id{identificador de exportación} tasks{tareas} lists{listas} list_id{identificador de lista} list_name{nombre de lista} task_identifier{identificador de tarea} title{título} notes{notas} priority{prioridad} duration{duración} repeat_interval{intervalo de repetición} repeat_weekdays{días de repetición} weekday{día de la semana} completed_dates{fechas completadas} individual_date_changes{cambios de fecha individuales} list_identifier{identificador de lista} labels{etiquetas} label{etiqueta} checklist{lista de pasos} checklist_identifier{identificador de paso} checklist_title{título de paso} checklist_dates{fechas de pasos} reminder_lead{antelación del recordatorio} reminder_time{hora del recordatorio} other{campo}}",
+  "notificationChannel": "Recordatorios de tareas",
+  "notificationComplete": "Completar",
+  "notificationSnooze": "Posponer 10 min",
+  "notificationDeadline": "Se acerca la fecha límite de tu tarea.",
+  "notificationDue": "Es hora de tu tarea.",
+  "notificationInMinutes": "{minutes, plural, one{Programada dentro de 1 minuto.} other{Programada dentro de {minutes} minutos.}}",
+  "notificationToday": "En tu lista para hoy.",
+  "notificationMorning": "Organiza tu día",
+  "notificationEvening": "Un momento para revisar",
+  "notificationCheckIn": "Abre TaskFlow para ver tus tareas actuales y decidir tu próximo paso.",
+  "notificationSnoozed": "Tu tarea pospuesta.",
+  "@notificationInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "@archiveField": {
     "placeholders": {
       "field": {

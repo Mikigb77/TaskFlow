@@ -4171,6 +4171,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{field, select, export_id{export_id} tasks{tasks} lists{lists} list_id{list id} list_name{list name} task_identifier{task identifier} title{title} notes{notes} priority{priority} duration{duration} repeat_interval{repeat interval} repeat_weekdays{repeat weekdays} weekday{weekday} completed_dates{completed dates} individual_date_changes{individual date changes} list_identifier{list identifier} labels{labels} label{label} checklist{checklist} checklist_identifier{checklist identifier} checklist_title{checklist title} checklist_dates{checklist dates} reminder_lead{reminder lead} reminder_time{reminder time} other{field}}'**
   String archiveField(String field);
+
+  /// No description provided for @notificationChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Task reminders'**
+  String get notificationChannel;
+
+  /// No description provided for @notificationComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get notificationComplete;
+
+  /// No description provided for @notificationSnooze.
+  ///
+  /// In en, this message translates to:
+  /// **'Snooze 10 min'**
+  String get notificationSnooze;
+
+  /// No description provided for @notificationDeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Your task deadline is approaching.'**
+  String get notificationDeadline;
+
+  /// No description provided for @notificationDue.
+  ///
+  /// In en, this message translates to:
+  /// **'It’s time for your task.'**
+  String get notificationDue;
+
+  /// No description provided for @notificationInMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, one{Scheduled in 1 minute.} other{Scheduled in {minutes} minutes.}}'**
+  String notificationInMinutes(int minutes);
+
+  /// No description provided for @notificationToday.
+  ///
+  /// In en, this message translates to:
+  /// **'On your list for today.'**
+  String get notificationToday;
+
+  /// No description provided for @notificationMorning.
+  ///
+  /// In en, this message translates to:
+  /// **'Make room for today'**
+  String get notificationMorning;
+
+  /// No description provided for @notificationEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'A moment to check in'**
+  String get notificationEvening;
+
+  /// No description provided for @notificationCheckIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Open TaskFlow to see your current tasks and plan your next step.'**
+  String get notificationCheckIn;
+
+  /// No description provided for @notificationSnoozed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your snoozed task.'**
+  String get notificationSnoozed;
 }
 
 class _AppLocalizationsDelegate

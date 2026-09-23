@@ -5,6 +5,7 @@ import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/services/notification_service.dart';
 
 final _timezoneProvider = FutureProvider.autoDispose<CaptureTimezone>((ref) {
   final zone = ref.watch(regionalProvider.select((p) => p.captureTimezone));
@@ -20,6 +21,7 @@ class RegionalSettingsScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, RegionalPreferences value) async {
     try {
       await ref.read(regionalProvider.notifier).set(value);
+      await TaskReminders.refreshLanguage();
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

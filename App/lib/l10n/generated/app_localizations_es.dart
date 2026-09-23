@@ -2409,4 +2409,46 @@ class AppLocalizationsEs extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get notificationChannel => 'Recordatorios de tareas';
+
+  @override
+  String get notificationComplete => 'Completar';
+
+  @override
+  String get notificationSnooze => 'Posponer 10 min';
+
+  @override
+  String get notificationDeadline => 'Se acerca la fecha límite de tu tarea.';
+
+  @override
+  String get notificationDue => 'Es hora de tu tarea.';
+
+  @override
+  String notificationInMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Programada dentro de $minutes minutos.',
+      one: 'Programada dentro de 1 minuto.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationToday => 'En tu lista para hoy.';
+
+  @override
+  String get notificationMorning => 'Organiza tu día';
+
+  @override
+  String get notificationEvening => 'Un momento para revisar';
+
+  @override
+  String get notificationCheckIn =>
+      'Abre TaskFlow para ver tus tareas actuales y decidir tu próximo paso.';
+
+  @override
+  String get notificationSnoozed => 'Tu tarea pospuesta.';
 }

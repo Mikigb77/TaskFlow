@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/l10n/generated/app_localizations_en.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/services/reminder_copy.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:sqflite/sqflite.dart';
@@ -19,6 +23,7 @@ class PlannedReminder {
   final DateTime when;
   final String title;
   final String body;
+  final String languageCode;
   final bool daily;
   const PlannedReminder(
       {required this.identity,
@@ -28,11 +33,13 @@ class PlannedReminder {
       required this.when,
       required this.title,
       required this.body,
+      this.languageCode = 'en',
       this.daily = false});
   String signature(bool exact) => jsonEncode([
         when.toUtc().toIso8601String(),
         title,
         body,
+        languageCode,
         daily,
         exact,
         due?.toUtc().toIso8601String()
@@ -66,9 +73,15 @@ class ReminderEngine {
   final ReminderDriver driver;
   final DateTime Function() clock;
   final int capacity;
+  final Duration leaseWait;
+  final Future<AppLocalizations> Function() readStrings;
   ReminderEngine(this.database, this.driver,
-      {DateTime Function()? clock, this.capacity = 400})
-      : clock = clock ?? DateTime.now;
+      {DateTime Function()? clock,
+      this.capacity = 400,
+      this.leaseWait = const Duration(seconds: 10),
+      Future<AppLocalizations> Function()? readStrings})
+      : clock = clock ?? DateTime.now,
+        readStrings = readStrings ?? (() => readReminderStrings(database));
 
   Future<String?> activeOwner() async {
     final rows = await (await database.database)
@@ -124,8 +137,10 @@ class ReminderEngine {
   }
 
   static List<PlannedReminder> plan(String owner, List<Task> tasks,
-      ReminderPreferences preferences, DateTime now) {
+      ReminderPreferences preferences, DateTime now,
+      {AppLocalizations? strings}) {
     if (!preferences.enabled) return [];
+    final l = strings ?? AppLocalizationsEn();
     final result = <PlannedReminder>[];
     for (final task in upcoming(tasks, now)) {
       if (task.id == null || task.reminderMinutes == -1) continue;
@@ -145,13 +160,14 @@ class ReminderEngine {
           due: date,
           when: when,
           title: task.title,
+          languageCode: l.localeName,
           body: task.reminderAnchor == 'deadline'
-              ? 'Your task deadline is approaching.'
+              ? l.notificationDeadline
               : task.reminderHasTime
                   ? (lead == 0
-                      ? 'It’s time for your task.'
-                      : 'Scheduled in $lead minutes.')
-                  : 'On your list for today.'));
+                      ? l.notificationDue
+                      : l.notificationInMinutes(lead))
+                  : l.notificationToday));
     }
     for (final entry in {
       'morning': preferences.morning,
@@ -168,11 +184,11 @@ class ReminderEngine {
       result.add(PlannedReminder(
           identity: '$owner/${entry.key}',
           when: when,
+          languageCode: l.localeName,
           title: entry.key == 'morning'
-              ? 'Make room for today'
-              : 'A moment to check in',
-          body:
-              'Open TaskFlow to see your current tasks and plan your next step.',
+              ? l.notificationMorning
+              : l.notificationEvening,
+          body: l.notificationCheckIn,
           daily: true));
     }
     return result..sort((a, b) => a.when.compareTo(b.when));
@@ -202,15 +218,26 @@ class ReminderEngine {
   }
 
   Future<void> reconcile(String owner) async {
-    final now = clock();
     final token = const Uuid().v4();
-    if (await activeOwner() != owner || !await _lease(token, now)) return;
+    final waiting = Stopwatch()..start();
+    while (true) {
+      if (await activeOwner() != owner) return;
+      if (await _lease(token, clock())) break;
+      // Another worker may have read its task snapshot before our latest edit.
+      // Do not silently drop this refresh: acquire the lease, then read again.
+      if (waiting.elapsed >= leaseWait) {
+        throw TimeoutException('Another reminder refresh is still running.');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    final now = clock();
     try {
       final tasks = await database.getTasks(ownerKey: owner);
       final preferences = await ReminderPreferenceStore(database).read(owner);
+      final strings = await readStrings();
       final capabilities = await driver.capability();
       final pending = await driver.pendingIds();
-      final planned = plan(owner, tasks, preferences, now);
+      final planned = plan(owner, tasks, preferences, now, strings: strings);
       final db = await database.database;
       // A snooze is a separate durable choice. Unrelated edits must not reset it.
       final snoozes = await db.rawQuery('''SELECT s.fire_at AS snooze_at, r.*
@@ -233,7 +260,8 @@ class ReminderEngine {
             due: task.reminderDate,
             when: when,
             title: task.title,
-            body: 'Your snoozed task.'));
+            languageCode: strings.localeName,
+            body: strings.notificationSnoozed));
       }
       planned.sort((a, b) => a.when.compareTo(b.when));
       // Reserve room for continuing check-ins even when the task window is full.

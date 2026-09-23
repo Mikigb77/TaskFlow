@@ -91,12 +91,16 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeLocales(List<Locale>? locales) {
     if (mounted) setState(() {});
+    unawaited(TaskReminders.refreshLanguage());
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Refresh the device clock choice after returning from system settings.
-    if (state == AppLifecycleState.resumed && mounted) setState(() {});
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+      unawaited(TaskReminders.refreshLanguage());
+    }
   }
 
   Future<void> _openEntries() async {

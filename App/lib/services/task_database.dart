@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/services/android_database_factory.dart';
 
 class TaskDatabase {
   static const schemaVersion = 15;
@@ -23,17 +25,24 @@ class TaskDatabase {
   }
 
   Future<Database> _open() async {
-    return openDatabase(
+    final factory =
+        Platform.isAndroid ? AndroidDatabaseFactory() : databaseFactory;
+    return factory.openDatabase(
       join(await getDatabasesPath(), 'task_database.db'),
       // Each background engine owns its connection; transactions must never
       // share an Android connection with a different Dart isolate.
-      singleInstance: false,
-      version: schemaVersion,
-      onConfigure: (db) async {
-        await db.rawQuery('PRAGMA busy_timeout = 5000');
-      },
-      onCreate: (db, version) async {
-        await db.execute('''CREATE TABLE tasks(
+      options: OpenDatabaseOptions(
+          singleInstance: false,
+          version: schemaVersion,
+          onConfigure: (db) async {
+            // Android's worker is shared by foreground/background connections.
+            // Return a contended write to Dart so the lock owner can commit;
+            // AndroidDatabaseFactory yields and retries the rejected statement.
+            await db.rawQuery(
+                'PRAGMA busy_timeout = ${Platform.isAndroid ? 0 : 5000}');
+          },
+          onCreate: (db, version) async {
+            await db.execute('''CREATE TABLE tasks(
           id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT,
           kind TEXT NOT NULL DEFAULT 'task',
           priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT,
@@ -51,15 +60,15 @@ class TaskDatabase {
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
           sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
         )''');
-        await db.execute(
-            'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)');
-        await createCaptureTables(db);
-        await createReminderTables(db);
-        await createListTables(db);
-        await createImportTables(db);
-        await createAttachmentTables(db);
-      },
-      onUpgrade: upgrade,
+            await db.execute(
+                'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)');
+            await createCaptureTables(db);
+            await createReminderTables(db);
+            await createListTables(db);
+            await createImportTables(db);
+            await createAttachmentTables(db);
+          },
+          onUpgrade: upgrade),
     );
   }
 

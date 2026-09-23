@@ -2363,4 +2363,46 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get notificationChannel => 'Task reminders';
+
+  @override
+  String get notificationComplete => 'Complete';
+
+  @override
+  String get notificationSnooze => 'Snooze 10 min';
+
+  @override
+  String get notificationDeadline => 'Your task deadline is approaching.';
+
+  @override
+  String get notificationDue => 'It’s time for your task.';
+
+  @override
+  String notificationInMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Scheduled in $minutes minutes.',
+      one: 'Scheduled in 1 minute.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationToday => 'On your list for today.';
+
+  @override
+  String get notificationMorning => 'Make room for today';
+
+  @override
+  String get notificationEvening => 'A moment to check in';
+
+  @override
+  String get notificationCheckIn =>
+      'Open TaskFlow to see your current tasks and plan your next step.';
+
+  @override
+  String get notificationSnoozed => 'Your snoozed task.';
 }
