@@ -478,8 +478,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 const SizedBox(height: 16),
                                 if (widget.draft!.questions.isNotEmpty) ...[
                                   MessageBanner(
-                                      widget.draft!.questions.join('\n'),
-                                      isError: true),
+                                      widget.draft!.questions.join('\n')),
                                   const SizedBox(height: 16)
                                 ],
                               ],
@@ -501,7 +500,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                           : context.l10n.taskTitle,
                                       hintText: _isNote
                                           ? context.l10n.noteHint
-                                          : 'e.g. Doctor appointment',
+                                          : context.l10n.taskTitleHint,
                                       counterText: ''),
                                   validator: (value) =>
                                       value == null || value.trim().isEmpty
@@ -697,19 +696,20 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                     if (_exceptions.isNotEmpty)
                                       ExpansionTile(
                                           tilePadding: EdgeInsets.zero,
-                                          title: Text(
-                                              '${_exceptions.length} individual date changes'),
+                                          title: Text(context.l10n
+                                              .individualDateChanges(
+                                                  _exceptions.length)),
                                           subtitle:
                                               Text(context.l10n.resetDateHelp),
                                           children: [
                                             for (final exception in _exceptions)
                                               ListTile(
-                                                  title: Text(
-                                                      exception.originalDate),
-                                                  subtitle: Text(exception
-                                                          .skipped
+                                                  title: Text(context.fullDate(
+                                                      DateTime.parse(exception
+                                                          .originalDate))),
+                                                  subtitle: Text(exception.skipped
                                                       ? context.l10n.skipped
-                                                      : 'Moved to ${Task.dateKey(exception.date!)}${exception.hasTime ? ' · ${TimeOfDay.fromDateTime(exception.date!).format(context)}' : ''}'),
+                                                      : '${context.l10n.movedOccurrenceDate(context.fullDate(exception.date!))}${exception.hasTime ? ' · ${context.clockTime(exception.date!)}' : ''}'),
                                                   trailing: TextButton(
                                                       onPressed: () => setState(
                                                           () => _exceptions

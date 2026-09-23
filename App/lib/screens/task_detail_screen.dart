@@ -33,8 +33,8 @@ class TaskDetailScreen extends ConsumerWidget {
                     ? context.l10n.deleteNoteQuestion
                     : context.l10n.deleteTaskQuestion),
                 content: Text(task.isRecurring
-                    ? '“${task.title}” and all its occurrences will be removed.'
-                    : '“${task.title}” will be removed.'),
+                    ? context.l10n.deleteSeriesHelp(task.title)
+                    : context.l10n.deleteItemHelp(task.title)),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -133,7 +133,7 @@ class TaskDetailScreen extends ConsumerWidget {
                       MessageBanner(
                           task.isNote
                               ? context.l10n.viewOnlyNote
-                              : 'View-only shared task. The list owner manages editing access.',
+                              : context.l10n.viewOnlyTask,
                           icon: Icons.visibility_outlined),
                     Align(
                         alignment: Alignment.centerLeft,
@@ -251,14 +251,14 @@ class TaskDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
                     ],
                     if (task.checklist.isNotEmpty) ...[
-                      SectionLabel(
-                          'Checklist · ${task.checklistDone}/${task.checklist.length}'),
+                      SectionLabel(context.l10n.checklistCount(
+                          task.checklistDone, task.checklist.length)),
                       AppSurface(
                           child: Column(children: [
                         LinearProgressIndicator(
                             value: task.checklistDone / task.checklist.length,
-                            semanticsLabel:
-                                'Checklist, ${task.checklistDone} of ${task.checklist.length} steps completed'),
+                            semanticsLabel: context.l10n.checklistSemantics(
+                                task.checklistDone, task.checklist.length)),
                         for (final item in task.checklist)
                           CheckboxListTile(
                               contentPadding: EdgeInsets.zero,
@@ -278,15 +278,14 @@ class TaskDetailScreen extends ConsumerWidget {
                                       } catch (_) {
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(context)
-                                              .showSnackBar(const SnackBar(
-                                                  content: Text(
-                                                      'Could not update this step. Please retry.')));
+                                              .showSnackBar(SnackBar(
+                                                  content: Text(context
+                                                      .l10n.stepUpdateError)));
                                         }
                                       }
                                     }),
                         if (canEdit && !task.isNote)
-                          const Text(
-                              'Completing the checklist does not complete the task. Use Complete when you are finished.'),
+                          Text(context.l10n.checklistCompletionHelp),
                       ])),
                       const SizedBox(height: 24),
                     ],
@@ -327,7 +326,7 @@ class TaskDetailScreen extends ConsumerWidget {
           error: (_, __) => Scaffold(
               appBar: CustomAppBar(title: context.l10n.taskDetails),
               body: EmptyState(
-                  title: 'Couldn’t load this task',
+                  title: context.l10n.loadTaskError,
                   message: context.l10n.tryLater)),
         );
   }

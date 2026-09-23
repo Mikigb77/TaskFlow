@@ -2669,4 +2669,167 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get labelsExample => 'casa, recados, llamadas';
+
+  @override
+  String get account => 'Cuenta';
+
+  @override
+  String completedTaskSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas completadas. Pulsa una casilla para reabrir una.',
+      one: '1 tarea completada. Pulsa su casilla para reabrirla.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get taskTitleHint => 'p. ej., Cita médica';
+
+  @override
+  String individualDateChanges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cambios de fecha individuales',
+      one: '1 cambio de fecha individual',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String movedOccurrenceDate(String date) {
+    return 'Movida al $date';
+  }
+
+  @override
+  String reopenNamedTask(String title) {
+    return 'Reabrir $title';
+  }
+
+  @override
+  String completeNamedTask(String title) {
+    return 'Completar $title';
+  }
+
+  @override
+  String get viewOnlyTaskTitle => 'Tarea de solo lectura';
+
+  @override
+  String get readOnlyList => 'Esta lista es de solo lectura';
+
+  @override
+  String get listEditingAccessHelp =>
+      'El propietario de la lista gestiona los permisos de edición.';
+
+  @override
+  String get loadTaskError => 'No se ha podido cargar esta tarea';
+
+  @override
+  String deleteSeriesHelp(String title) {
+    return 'Se eliminarán «$title» y todas sus repeticiones.';
+  }
+
+  @override
+  String deleteItemHelp(String title) {
+    return 'Se eliminará «$title».';
+  }
+
+  @override
+  String get viewOnlyTask =>
+      'Tarea compartida de solo lectura. El propietario de la lista gestiona los permisos de edición.';
+
+  @override
+  String get stepUpdateError =>
+      'No se ha podido actualizar este paso. Inténtalo de nuevo.';
+
+  @override
+  String get checklistCompletionHelp =>
+      'Marcar todos los pasos no completa la tarea. Pulsa Completar cuando hayas terminado.';
+
+  @override
+  String get diagnosticsPrivacy =>
+      'Recuentos y tiempos locales de los últimos 1000 eventos. No incluyen títulos de tareas, palabras, grabaciones ni identificadores de cuentas. Estos datos no se envían al servidor.';
+
+  @override
+  String get diagnosticsPercentiles =>
+      'La mediana es la observación central. P95 es el tiempo en el que finaliza el 95 % de las observaciones. Las solicitudes fallidas se cuentan por separado.';
+
+  @override
+  String get diagnosticsMeasurementHelp =>
+      'Guardar una captura para más tarde no es un fallo. Los recuentos pueden incluir varias visitas al mismo borrador; no son una tasa de conversión de usuarios. El tiempo de corrección incluye los diálogos de edición abiertos, incluso los cancelados. El tiempo de guardado local excluye la sincronización en la nube. La transcripción de audio excluye el texto escrito y el reconocido en el dispositivo.';
+
+  @override
+  String diagnosticsObservations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count observaciones',
+      one: '1 observación',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diagnosticsItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos',
+      one: '1 elemento',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diagnosticsTiming(String median, String p95, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count observaciones cronometradas',
+      one: '1 observación cronometrada',
+    );
+    return 'Mediana $median s · P95 $p95 s · $_temp0';
+  }
+
+  @override
+  String get diagnosticsClearError =>
+      'No se han podido borrar los diagnósticos. Inténtalo de nuevo.';
+
+  @override
+  String get clearDiagnostics => 'Borrar diagnósticos locales';
+
+  @override
+  String diagnosticsEvent(String event) {
+    String _temp0 = intl.Intl.selectLogic(event, {
+      'opened': 'Captura abierta',
+      'ready': 'Captura lista para usar',
+      'started': 'Nuevas capturas guardadas',
+      'typedStarted': 'Entrada de texto iniciada',
+      'permissionDenied': 'Permiso del micrófono denegado',
+      'nativeStarted': 'Escucha en el dispositivo iniciada',
+      'firstPartial': 'Primeras palabras en el dispositivo',
+      'nativeListening': 'Duración de la escucha en el dispositivo',
+      'recordingStopped': 'Duración del audio guardado',
+      'transcription': 'Transcripción de audio en línea',
+      'extraction': 'Extracción de tareas en línea',
+      'processing': 'Solicitud y borradores guardados',
+      'notePrepared': 'Nota local preparada',
+      'noteTranscribed': 'Nota de voz preparada',
+      'failed': 'Solicitudes fallidas',
+      'retried': 'Solicitudes reintentadas',
+      'edited': 'Cambios en borradores',
+      'reviewOpened': 'Revisión abierta',
+      'reviewTime': 'Tiempo de revisión',
+      'correction': 'Tiempo en el diálogo de corrección',
+      'saved': 'De confirmar a guardar en el dispositivo',
+      'discarded': 'Capturas descartadas explícitamente',
+      'resumed': 'Capturas reanudadas',
+      'leftCapturePending': 'Captura guardada para más tarde',
+      'leftReviewPending': 'Revisión guardada para más tarde',
+      'other': 'Otro evento de captura',
+    });
+    return '$_temp0';
+  }
 }

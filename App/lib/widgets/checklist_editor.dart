@@ -102,7 +102,7 @@ class ChecklistEditor extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         child: Text(items[index].title))),
                 PopupMenuButton<String>(
-                    tooltip: 'Edit ${items[index].title}',
+                    tooltip: context.l10n.editCaptureItem(items[index].title),
                     enabled: onChanged != null,
                     itemBuilder: (_) => [
                           PopupMenuItem(

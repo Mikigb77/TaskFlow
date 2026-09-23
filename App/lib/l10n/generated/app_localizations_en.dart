@@ -2613,4 +2613,164 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get labelsExample => 'home, errands, calls';
+
+  @override
+  String get account => 'Account';
+
+  @override
+  String completedTaskSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks completed. Tap a check to reopen one.',
+      one: '1 task completed. Tap its check to reopen it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get taskTitleHint => 'e.g. Doctor appointment';
+
+  @override
+  String individualDateChanges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count individual date changes',
+      one: '1 individual date change',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String movedOccurrenceDate(String date) {
+    return 'Moved to $date';
+  }
+
+  @override
+  String reopenNamedTask(String title) {
+    return 'Reopen $title';
+  }
+
+  @override
+  String completeNamedTask(String title) {
+    return 'Complete $title';
+  }
+
+  @override
+  String get viewOnlyTaskTitle => 'View-only task';
+
+  @override
+  String get readOnlyList => 'This list is read-only';
+
+  @override
+  String get listEditingAccessHelp => 'The list owner manages editing access.';
+
+  @override
+  String get loadTaskError => 'Couldn’t load this task';
+
+  @override
+  String deleteSeriesHelp(String title) {
+    return '“$title” and all its occurrences will be removed.';
+  }
+
+  @override
+  String deleteItemHelp(String title) {
+    return '“$title” will be removed.';
+  }
+
+  @override
+  String get viewOnlyTask =>
+      'View-only shared task. The list owner manages editing access.';
+
+  @override
+  String get stepUpdateError => 'Could not update this step. Please retry.';
+
+  @override
+  String get checklistCompletionHelp =>
+      'Completing the checklist does not complete the task. Use Complete when you are finished.';
+
+  @override
+  String get diagnosticsPrivacy =>
+      'Local counts and timing from the last 1,000 events. No task titles, words, recordings or account identifiers are included. Nothing here is uploaded.';
+
+  @override
+  String get diagnosticsPercentiles =>
+      'Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.';
+
+  @override
+  String get diagnosticsMeasurementHelp =>
+      'Keeping a capture for later is not a failure. Counts can include several visits to the same draft; they are not a user conversion rate. Correction time covers open editing dialogs, including cancelled ones. Local save timing excludes cloud sync. Audio transcription excludes typed and on-device input.';
+
+  @override
+  String diagnosticsObservations(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count observations',
+      one: '1 observation',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diagnosticsItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String diagnosticsTiming(String median, String p95, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count timed observations',
+      one: '1 timed observation',
+    );
+    return 'Median $median s · P95 $p95 s · $_temp0';
+  }
+
+  @override
+  String get diagnosticsClearError => 'Could not clear diagnostics. Try again.';
+
+  @override
+  String get clearDiagnostics => 'Clear local diagnostics';
+
+  @override
+  String diagnosticsEvent(String event) {
+    String _temp0 = intl.Intl.selectLogic(event, {
+      'opened': 'Capture opened',
+      'ready': 'Capture ready to use',
+      'started': 'New durable captures',
+      'typedStarted': 'Typed input started',
+      'permissionDenied': 'Microphone permission denied',
+      'nativeStarted': 'On-device listening started',
+      'firstPartial': 'First on-device words',
+      'nativeListening': 'On-device listening duration',
+      'recordingStopped': 'Saved audio duration',
+      'transcription': 'Online audio transcription',
+      'extraction': 'Online task extraction',
+      'processing': 'Request and retained drafts',
+      'notePrepared': 'Local note prepared',
+      'noteTranscribed': 'Recorded note ready',
+      'failed': 'Failed requests',
+      'retried': 'Retried requests',
+      'edited': 'Draft changes',
+      'reviewOpened': 'Review opened',
+      'reviewTime': 'Time in review',
+      'correction': 'Correction dialog time',
+      'saved': 'Confirmed to local save',
+      'discarded': 'Explicitly discarded captures',
+      'resumed': 'Resumed captures',
+      'leftCapturePending': 'Capture kept for later',
+      'leftReviewPending': 'Review kept for later',
+      'other': 'Other capture event',
+    });
+    return '$_temp0';
+  }
 }

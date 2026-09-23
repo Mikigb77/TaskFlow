@@ -43,8 +43,8 @@ class CompletedTasksScreen extends ConsumerWidget {
                                         .textTheme
                                         .headlineSmall),
                                 const SizedBox(height: 8),
-                                Text(
-                                    '${completed.length} tasks completed. Tap a check to reopen one.'),
+                                Text(context.l10n
+                                    .completedTaskSummary(completed.length)),
                               ])),
                       Expanded(child: TaskList(tasks: completed)),
                     ]);

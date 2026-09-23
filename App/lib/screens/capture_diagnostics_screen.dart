@@ -1,64 +1,82 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
-final _summaryProvider = FutureProvider.autoDispose((ref) =>
-    CaptureDiagnostics(ref.watch(captureStoreProvider).database).summary());
+final _summaryProvider = FutureProvider.autoDispose(
+  (ref) =>
+      CaptureDiagnostics(ref.watch(captureStoreProvider).database).summary(),
+);
 
 class CaptureDiagnosticsScreen extends ConsumerWidget {
   const CaptureDiagnosticsScreen({super.key});
-  String _seconds(Object? value) =>
-      value is int ? '${(value / 1000).toStringAsFixed(2)}s' : '—';
+  String _seconds(BuildContext context, Object? value) => value is int
+      ? NumberFormat('0.00', context.localeName).format(value / 1000)
+      : '—';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-      appBar: const CustomAppBar(title: 'Capture diagnostics'),
-      body: ref.watch(_summaryProvider).when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => Center(
-                child: FilledButton(
-                    onPressed: () => ref.invalidate(_summaryProvider),
-                    child: const Text('Retry'))),
-            data: (rows) =>
-                ListView(padding: const EdgeInsets.all(24), children: [
-              const Text(
-                  'Local counts and timing from the last 1,000 events. No task titles, words, recordings or account identifiers are included. Nothing here is uploaded.'),
+    appBar: CustomAppBar(title: context.l10n.captureDiagnostics),
+    body: ref
+        .watch(_summaryProvider)
+        .when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => Center(
+            child: FilledButton(
+              onPressed: () => ref.invalidate(_summaryProvider),
+              child: Text(context.l10n.retry),
+            ),
+          ),
+          data: (rows) => ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(context.l10n.diagnosticsPrivacy),
               const SizedBox(height: 16),
-              const Text(
-                  'Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.'),
+              Text(context.l10n.diagnosticsPercentiles),
               const SizedBox(height: 8),
-              const Text(
-                  'Keeping a capture for later is not a failure. Counts can include several visits to the same draft; they are not a user conversion rate. Correction time covers open editing dialogs, including cancelled ones. Local save timing excludes cloud sync. Audio transcription excludes typed and on-device input.'),
+              Text(context.l10n.diagnosticsMeasurementHelp),
               const SizedBox(height: 16),
               for (final row in rows)
                 ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                        '${row['label']} · ${row['samples']} observations${row['items'] == 0 ? '' : ' · ${row['items']} items'}'),
-                    subtitle: row['p50_ms'] == null
-                        ? null
-                        : Text(
-                            'Median ${_seconds(row['p50_ms'])} · P95 ${_seconds(row['p95_ms'])} · ${row['timed_samples']} timed')),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    '${context.l10n.diagnosticsEvent(row['event'] as String)} · ${context.l10n.diagnosticsObservations(row['samples'] as int)}${row['items'] == 0 ? '' : ' · ${context.l10n.diagnosticsItems(row['items'] as int)}'}',
+                  ),
+                  subtitle: row['p50_ms'] == null
+                      ? null
+                      : Text(
+                          context.l10n.diagnosticsTiming(
+                            _seconds(context, row['p50_ms']),
+                            _seconds(context, row['p95_ms']),
+                            row['timed_samples'] as int,
+                          ),
+                        ),
+                ),
               const SizedBox(height: 12),
               OutlinedButton(
-                  onPressed: () async {
-                    try {
-                      await CaptureDiagnostics(
-                              ref.read(captureStoreProvider).database)
-                          .clear();
-                      if (context.mounted) ref.invalidate(_summaryProvider);
-                    } catch (_) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Could not clear diagnostics. Try again.')));
-                      }
+                onPressed: () async {
+                  try {
+                    await CaptureDiagnostics(
+                      ref.read(captureStoreProvider).database,
+                    ).clear();
+                    if (context.mounted) ref.invalidate(_summaryProvider);
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(context.l10n.diagnosticsClearError),
+                        ),
+                      );
                     }
-                  },
-                  child: const Text('Clear local diagnostics')),
-            ]),
-          ));
+                  }
+                },
+                child: Text(context.l10n.clearDiagnostics),
+              ),
+            ],
+          ),
+        ),
+  );
 }

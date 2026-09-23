@@ -67,8 +67,8 @@ class TaskTile extends ConsumerWidget {
                     children: [
                       Semantics(
                           label: task.isCompleted
-                              ? 'Reopen ${task.title}'
-                              : 'Complete ${task.title}',
+                              ? context.l10n.reopenNamedTask(task.title)
+                              : context.l10n.completeNamedTask(task.title),
                           child: Checkbox(
                               value: task.isCompleted,
                               shape: const CircleBorder(),

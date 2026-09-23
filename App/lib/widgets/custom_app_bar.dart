@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:agenda/widgets/app_components.dart';
 
@@ -37,7 +38,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           const ThemeToggle(),
           if (isRoot)
             IconButton(
-                tooltip: 'Account',
+                tooltip: context.l10n.account,
                 icon: const Icon(Icons.person_outline_rounded, size: 23),
                 onPressed: () => Navigator.pushNamed(context, '/account')),
           const SizedBox(width: 8),

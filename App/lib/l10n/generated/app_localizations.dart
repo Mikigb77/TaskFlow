@@ -4531,6 +4531,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'home, errands, calls'**
   String get labelsExample;
+
+  /// No description provided for @account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get account;
+
+  /// No description provided for @completedTaskSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {1 task completed. Tap its check to reopen it.} other {{count} tasks completed. Tap a check to reopen one.}}'**
+  String completedTaskSummary(int count);
+
+  /// No description provided for @taskTitleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Doctor appointment'**
+  String get taskTitleHint;
+
+  /// No description provided for @individualDateChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {1 individual date change} other {{count} individual date changes}}'**
+  String individualDateChanges(int count);
+
+  /// No description provided for @movedOccurrenceDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to {date}'**
+  String movedOccurrenceDate(String date);
+
+  /// No description provided for @reopenNamedTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen {title}'**
+  String reopenNamedTask(String title);
+
+  /// No description provided for @completeNamedTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete {title}'**
+  String completeNamedTask(String title);
+
+  /// No description provided for @viewOnlyTaskTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View-only task'**
+  String get viewOnlyTaskTitle;
+
+  /// No description provided for @readOnlyList.
+  ///
+  /// In en, this message translates to:
+  /// **'This list is read-only'**
+  String get readOnlyList;
+
+  /// No description provided for @listEditingAccessHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'The list owner manages editing access.'**
+  String get listEditingAccessHelp;
+
+  /// No description provided for @loadTaskError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load this task'**
+  String get loadTaskError;
+
+  /// No description provided for @deleteSeriesHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” and all its occurrences will be removed.'**
+  String deleteSeriesHelp(String title);
+
+  /// No description provided for @deleteItemHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” will be removed.'**
+  String deleteItemHelp(String title);
+
+  /// No description provided for @viewOnlyTask.
+  ///
+  /// In en, this message translates to:
+  /// **'View-only shared task. The list owner manages editing access.'**
+  String get viewOnlyTask;
+
+  /// No description provided for @stepUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update this step. Please retry.'**
+  String get stepUpdateError;
+
+  /// No description provided for @checklistCompletionHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Completing the checklist does not complete the task. Use Complete when you are finished.'**
+  String get checklistCompletionHelp;
+
+  /// No description provided for @diagnosticsPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Local counts and timing from the last 1,000 events. No task titles, words, recordings or account identifiers are included. Nothing here is uploaded.'**
+  String get diagnosticsPrivacy;
+
+  /// No description provided for @diagnosticsPercentiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.'**
+  String get diagnosticsPercentiles;
+
+  /// No description provided for @diagnosticsMeasurementHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping a capture for later is not a failure. Counts can include several visits to the same draft; they are not a user conversion rate. Correction time covers open editing dialogs, including cancelled ones. Local save timing excludes cloud sync. Audio transcription excludes typed and on-device input.'**
+  String get diagnosticsMeasurementHelp;
+
+  /// No description provided for @diagnosticsObservations.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {1 observation} other {{count} observations}}'**
+  String diagnosticsObservations(int count);
+
+  /// No description provided for @diagnosticsItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {1 item} other {{count} items}}'**
+  String diagnosticsItems(int count);
+
+  /// No description provided for @diagnosticsTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'Median {median} s · P95 {p95} s · {count, plural, one {1 timed observation} other {{count} timed observations}}'**
+  String diagnosticsTiming(String median, String p95, int count);
+
+  /// No description provided for @diagnosticsClearError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not clear diagnostics. Try again.'**
+  String get diagnosticsClearError;
+
+  /// No description provided for @clearDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear local diagnostics'**
+  String get clearDiagnostics;
+
+  /// No description provided for @diagnosticsEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'{event, select, opened{Capture opened} ready{Capture ready to use} started{New durable captures} typedStarted{Typed input started} permissionDenied{Microphone permission denied} nativeStarted{On-device listening started} firstPartial{First on-device words} nativeListening{On-device listening duration} recordingStopped{Saved audio duration} transcription{Online audio transcription} extraction{Online task extraction} processing{Request and retained drafts} notePrepared{Local note prepared} noteTranscribed{Recorded note ready} failed{Failed requests} retried{Retried requests} edited{Draft changes} reviewOpened{Review opened} reviewTime{Time in review} correction{Correction dialog time} saved{Confirmed to local save} discarded{Explicitly discarded captures} resumed{Resumed captures} leftCapturePending{Capture kept for later} leftReviewPending{Review kept for later} other{Other capture event}}'**
+  String diagnosticsEvent(String event);
 }
 
 class _AppLocalizationsDelegate
