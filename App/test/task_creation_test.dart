@@ -277,11 +277,16 @@ void main() {
     final repository = await _pumpApp(tester);
     await _openCalendarTask(tester);
     await _showDetails(tester);
-    await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
+    // Repetir opens the same repeat sheet as the capture result.
+    await tester.ensureVisible(find.byKey(const ValueKey('task-repeat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('task-repeat')));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Weekly').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Done').last);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('task-title')),
@@ -296,6 +301,37 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets(
+    'UX-212: TaskEditor has no repeat dropdown; Repetir opens the repeat sheet',
+    (tester) async {
+      await _pumpApp(tester);
+      final l = lookupAppLocalizations(const Locale('en'));
+      await _openCalendarTask(tester);
+      await _showDetails(tester);
+      expect(find.byType(BottomSheet), findsNothing);
+      // The editor itself offers no repeat dropdown.
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      final repeat = find.byKey(const ValueKey('task-repeat'));
+      await tester.ensureVisible(repeat);
+      await tester.pumpAndSettle();
+      await tester.tap(repeat);
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(sheet, findsOneWidget);
+      expect(
+        find.descendant(of: sheet, matching: find.text(l.repeat)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: sheet,
+          matching: find.byType(DropdownButtonFormField<String>),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'UX-101: saving right after accepting a date suggestion shows the save message at once',

@@ -13,6 +13,30 @@ class CaptureProcessor {
   final ApiClient api;
   CaptureProcessor(this.store, this.api);
 
+  /// About how long a note title may be before it is cut at a word.
+  static const noteTitleLength = 60;
+
+  /// A note's title is its first line's first sentence, or about
+  /// [noteTitleLength] characters cut at a word. Speech has no line breaks,
+  /// so without this the whole transcript would become the title. The full
+  /// text stays in the note's body.
+  static String noteTitle(String text) {
+    var title = text.trim().split('\n').first.trim();
+    final sentence = RegExp(r'^(.+?[.!?…])(?=\s|$)').firstMatch(title);
+    if (sentence != null) title = sentence.group(1)!;
+    if (title.endsWith('.') && !title.endsWith('..')) {
+      title = title.substring(0, title.length - 1);
+    }
+    final runes = title.runes.toList();
+    if (runes.length <= noteTitleLength) return title;
+    final cut = String.fromCharCodes(runes.take(noteTitleLength + 1));
+    final space = cut.lastIndexOf(RegExp(r'\s'));
+    final words = space > noteTitleLength ~/ 3
+        ? cut.substring(0, space)
+        : String.fromCharCodes(runes.take(noteTitleLength));
+    return words.replaceFirst(RegExp(r'[\s,;:]+$'), '');
+  }
+
   Future<CaptureSession> process(CaptureSession session) {
     final key = '${session.ownerKey}:${session.id}';
     return _active.putIfAbsent(
@@ -42,7 +66,6 @@ class CaptureProcessor {
         if (existing.text.trim().isEmpty || existing.text.length > 8000) {
           throw StateError('A note needs 1 to 8000 characters.');
         }
-        final firstLine = existing.text.trim().split('\n').first;
         final next = existing.copyWith(
           status: 'ready',
           transcript: existing.text,
@@ -52,7 +75,7 @@ class CaptureProcessor {
               task: Task(
                 kind: 'note',
                 listId: existing.projectId,
-                title: String.fromCharCodes(firstLine.runes.take(160)),
+                title: noteTitle(existing.text),
                 priority: 1,
                 notes: existing.text,
               ),

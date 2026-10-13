@@ -57,11 +57,11 @@ void main() {
           scrollable: find.byType(Scrollable).last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Tue'));
-      await tester.scrollUntilVisible(find.text('Keep repeat'), 160,
+      await tester.scrollUntilVisible(find.widgetWithText(FilledButton, 'Done'), 160,
           scrollable: find.byType(Scrollable).last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.tap(find.text('Keep repeat'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Done'));
       await tester.pumpAndSettle();
       expect(result!.repeatInterval, 2);
       expect(result!.repeatWeekdays, [1, 2, 3, 5]);

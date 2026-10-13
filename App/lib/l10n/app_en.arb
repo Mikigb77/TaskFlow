@@ -1,23 +1,22 @@
 {
   "reviewSchedule": "Date and time",
   "reviewChooseDate": "Choose a date before adding a time.",
+  "chooseAmPm": "Choose AM or PM.",
   "reviewInvalidTime": "Check this value",
-  "reviewReady": "Ready when you are",
   "reviewOptions": "More options",
   "reviewOriginal": "See what I said",
-  "reviewKeepDraft": "Your draft is kept until you save it.",
+  "reviewOriginalText": "Original text",
   "reviewRemove": "Remove from this capture",
   "reviewRemoved": "Draft removed",
   "reviewUndoSaved": "Tasks returned to your drafts.",
   "reviewUndoChanged": "This task has changed. Your saved tasks were kept.",
   "reviewRepair": "Repair text",
   "reviewRepairHelp": "This text may have been saved with damaged accents. Review the correction before saving.",
-  "reviewShortTitle": "Use a short title; keep the details in notes.",
-  "reviewConfirmDetail": "Keep this detail as shown",
+  "reviewConfirmDetail": "That’s right",
+  "reviewNoTime": "No time",
   "reviewEditDetail": "Change this detail",
   "reviewResolved": "Reviewed",
   "reviewResolve": "Check this detail",
-  "reviewSaveOne": "Save task",
   "languageNativeName": "English",
   "sharingProblem": "{reason, select, alreadyMember{This person already has access. Manage their role in People.} memberLimit{This project supports up to 20 members and 20 pending invitations. Remove someone or revoke an invitation first.} accepted{This invitation was already accepted. Manage the person’s access in People.} owner{The owner cannot leave. You can delete the project if it is no longer needed.} expired{This invitation is no longer available. Ask the owner for a new one.} code{Ask the project owner for the current invitation code.} refresh{This project changed. Refresh before deleting it.} ownerOnly{Only the project owner can manage sharing and project details.} other{This project is read-only for your account. Ask the owner for editing access.}}",
   "@sharingProblem": {
@@ -74,11 +73,21 @@
   "notesEmpty": "A place for your thoughts",
   "notesEmptyHelp": "Write or dictate a note. Add links or a checklist when useful.",
   "findNote": "Search notes",
-  "reviewNote": "Review note",
   "saveNote": "Save note",
   "noteSaved": "Note saved",
   "recordNote": "Dictate a note",
   "noteHint": "Ideas, meeting details, useful links…",
+  "noteTitleHint": "e.g. Wi-Fi password",
+  "@noteTitleHint": {
+    "description": "Example placeholder in the note title field."
+  },
+  "noteTitleRequired": "Give your note a title",
+  "noteNoMatches": "No matching notes",
+  "notesSavedOnDevice": "Your notes are still on this phone.",
+  "allNotes": "All notes",
+  "@allNotes": {
+    "description": "Option of the Notes project filter that shows the notes of every project."
+  },
   "deleteNoteQuestion": "Delete this note?",
   "keepNote": "Keep note",
   "viewOnlyNote": "View-only note. The project owner manages editing access.",
@@ -195,10 +204,7 @@
   "noDate": "No date",
   "anyTime": "Any time",
   "addTime": "Add time",
-  "chooseDate": "Choose date",
-  "chooseTime": "Choose time",
   "removeDate": "Remove date",
-  "removeTime": "Remove time",
   "newTask": "New task",
   "editTask": "Edit task",
   "taskDetails": "Task details",
@@ -237,7 +243,7 @@
   "keepChanges": "Keep changes",
   "createTask": "Create Task",
   "saveChanges": "Save Changes",
-  "taskTitle": "Task Title",
+  "taskTitle": "Task title",
   "additionalNotes": "Additional Notes",
   "moreDetails": "More details",
   "fewerDetails": "Fewer details",
@@ -345,7 +351,6 @@
   "repeatUsesStart": "Uses the weekday of the start date.",
   "intervalRange": "Choose a number from 1 to 99.",
   "removeEndDate": "Remove end date",
-  "keepRepeat": "Keep repeat",
   "days": "days",
   "weeks": "weeks",
   "months": "months",
@@ -372,7 +377,6 @@
   "skipOccurrence": "Skip this occurrence",
   "resetOccurrence": "Reset this occurrence",
   "reset": "Reset",
-  "puttingPlanTogether": "Putting your plan together…",
   "recordingKept": "Recording kept on this phone",
   "onDeviceTranscript": "On-device live transcript",
   "onlineAudio": "Saved audio · online transcription",
@@ -384,7 +388,6 @@
   "discard": "Discard",
   "keep": "Keep",
   "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.",
-  "checkTasks": "Check your tasks",
   "lookRight": "Look right?",
   "finalSay": "Tap a detail to change it. You have the final say.",
   "changePriority": "Change priority",
@@ -453,22 +456,6 @@
       }
     }
   },
-  "readyCount": "{count} ready to save",
-  "@readyCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "needsCheckCount": "{count, plural, =1{1 task needs} other{{count} tasks need}} a quick check. Save the ready ones whenever you like.",
-  "@needsCheckCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "priorityValue": "{priority} priority",
   "@priorityValue": {
     "placeholders": {
@@ -500,14 +487,12 @@
   "occurrenceSkippedNotice": "Occurrence skipped",
   "originalRestored": "Original date restored",
   "movedInbox": "Moved to Inbox",
-  "scheduleUpdated": "Schedule updated",
   "scheduleChangedAgain": "The schedule changed again. Open the task to review it.",
   "scheduleError": "Could not change the schedule. Please try again.",
   "rescheduleRepeating": "Reschedule repeating task",
   "rescheduleTask": "Reschedule task",
-  "seriesRescheduleHelp": "Changes the start of the series and resets individual moves or skips. Inbox stops the repeat.",
+  "seriesRescheduleHelp": "Changes the start of the series and resets moved or skipped dates. No date stops the repeat.",
   "occurrenceRescheduleHelp": "Other dates in the series stay the same.",
-  "saveSchedule": "Save schedule",
   "restoreOriginal": "Restore original date",
   "progressSmall": "Progress starts small",
   "completedEmpty": "Every task you finish will find a home here.",
@@ -1244,8 +1229,8 @@
       }
     }
   },
-  "captureTasksSaved": "{count, plural, one {1 task saved} other {{count} tasks saved}}",
-  "@captureTasksSaved": {
+  "captureTasksAdded": "{count, plural, one{1 task added} other{{count} tasks added}}",
+  "@captureTasksAdded": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -1263,18 +1248,30 @@
   "captureConfirmDetails": "Use the details shown",
   "captureNothingToReview": "Nothing left to review",
   "captureRemovedDraftsHelp": "Removed drafts will not become tasks.",
-  "captureFinish": "Finish",
+  "captureFinish": "Done",
   "captureYourWords": "Your words",
   "captureReviewRetainedHelp": "Unfinished drafts are kept on this phone. You can return from Unfinished captures.",
   "captureCheckDetails": "Check the details above",
-  "captureSaveTasks": "{count, plural, one {Save 1 task} other {Save {count} tasks}}",
-  "@captureSaveTasks": {
+  "captureUnderstanding": "Understanding…",
+  "captureThingsToAdd": "{count, plural, one{1 thing to add} other{{count} things to add}}",
+  "@captureThingsToAdd": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
+  "captureAddToCalendar": "Add to calendar",
+  "captureAddTask": "Add task",
+  "captureAddTasks": "{count, plural, one{Add 1 task} other{Add {count} tasks}}",
+  "@captureAddTasks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureSayAgain": "Say it again",
   "labelsExample": "home, errands, calls",
   "account": "Account",
   "completedTaskSummary": "{count, plural, one {1 task completed. Tap its check to reopen it.} other {{count} tasks completed. Tap a check to reopen one.}}",

@@ -5,6 +5,9 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/occurrence_exception.dart';
+import 'package:agenda/repositories/task_repository.dart';
+import 'package:agenda/services/task_database.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
@@ -492,26 +495,460 @@ void main() {
       await tester.pumpAndSettle();
       await tester.longPress(row);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ActionChip, l.tomorrow));
-      await tester.pumpAndSettle();
-      final save = find.text(l.saveSchedule);
-      await tester.ensureVisible(save);
-      await tester.tap(save);
+      final moved = l.movedOccurrenceDate(
+        tester
+            .element(find.byType(CalendarScreen))
+            .weekdayDate(DateTime(now.year, now.month, now.day + 1)),
+      );
+      // Moving, Tomorrow applies at once.
+      await tester.tap(find.widgetWithText(ChoiceChip, l.tomorrow));
       await tester.pumpAndSettle();
       expect(
         Task.day(container.read(taskProvider).requireValue.single.dueDate!),
         DateTime(now.year, now.month, now.day + 1),
       );
-      expect(find.text(l.scheduleUpdated), findsOneWidget);
+      expect(find.text(moved), findsOneWidget);
       final bar = tester.widget<SnackBar>(find.byType(SnackBar));
       expect(bar.duration, const Duration(seconds: 10));
       expect(bar.behavior, SnackBarBehavior.floating);
       expect(find.text(l.undo), findsOneWidget);
       await tester.pump(const Duration(seconds: 9));
-      expect(find.text(l.scheduleUpdated), findsOneWidget);
+      expect(find.text(moved), findsOneWidget);
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P9: one date sheet; a moved task names its day ----
+
+  testWidgets(
+    'UX-206 / UX-212: swipe left → Mañana closes the sheet at once, keeps the time, says Movida al <weekday> with Deshacer, and Deshacer restores the date',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final today10 = DateTime(now.year, now.month, now.day, 10);
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      final container = await openCalendar(tester, [
+        Task(
+          id: 1,
+          title: 'Revisar el informe',
+          priority: 1,
+          dueDate: today10,
+          hasTime: true,
+        ),
+      ]);
+      final calendar = tester.element(find.byType(CalendarScreen));
+      final l = calendar.l10n;
+      final row = find.widgetWithText(TaskTile, 'Revisar el informe');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      // Swipe left: the one date sheet, titled for a move.
+      await tester.drag(row, const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      // Known and older than this round (reported separately, not part of
+      // UX-206): while dragging, the swipe background's icon-and-label Column
+      // (task_tile.dart, _gestureBackground) overflows a one-line row by 8 px.
+      final swipe = tester.takeException();
+      expect(
+        swipe == null || '$swipe'.contains('RenderFlex overflowed'),
+        isTrue,
+        reason: '$swipe',
+      );
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.text(l.rescheduleTask), findsOneWidget);
+      expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, l.tomorrow));
+      await tester.pumpAndSettle();
+      // One tap after the swipe: the sheet is gone.
+      expect(find.byType(BottomSheet), findsNothing);
+      final moved = container.read(taskProvider).requireValue.single;
+      expect(
+        moved.dueDate,
+        DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10),
+      );
+      expect(moved.hasTime, isTrue);
+      final message = l.movedOccurrenceDate(calendar.weekdayDate(tomorrow));
+      expect(
+        message,
+        startsWith('Movida al ${DateFormat.E('es').format(tomorrow)}'),
+      );
+      expect(message, isNot(contains(l.tomorrow)));
+      expect(find.text(message), findsOneWidget);
+      expect(find.text(l.undo), findsOneWidget);
+      await tester.tap(find.text(l.undo));
+      await tester.pumpAndSettle();
+      final restored = container.read(taskProvider).requireValue.single;
+      expect(restored.dueDate, today10);
+      expect(restored.hasTime, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  /// Calendar on a repeating task kept in memory, with the real notifier, so
+  /// occurrence changes go through the app's own rules.
+  Future<(ProviderContainer, _OneTask)> openRepeating(
+    WidgetTester tester,
+    Task task,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repository = _OneTask(task);
+    final container = designContainer(
+      regionalStore: MemoryRegionalStore(
+        const RegionalPreferences(language: 'es'),
+      ),
+      tasks: () => TaskNotifier(repository),
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await tester.pumpAndSettle();
+    return (container, repository);
+  }
+
+  testWidgets(
+    'UX-212: a repeating task’s move offers this occurrence or the whole series; an occurrence can’t go to Sin fecha; skipping and its Deshacer work as before',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final (_, repository) = await openRepeating(
+        tester,
+        Task(
+          id: 1,
+          title: 'Regar las plantas',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day, 9),
+          hasTime: true,
+          recurrence: 'daily',
+        ),
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final row = find.widgetWithText(TaskTile, 'Regar las plantas');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.longPress(row);
+      await tester.pumpAndSettle();
+      expect(find.text(l.rescheduleRepeating), findsOneWidget);
+      ChoiceChip chip(String label) =>
+          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
+      // This occurrence first: it can be moved or skipped, not undated.
+      expect(chip(l.thisOccurrence).selected, isTrue);
+      expect(chip(l.wholeSeries).selected, isFalse);
+      expect(find.text(l.occurrenceRescheduleHelp), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, l.noDate), findsNothing);
+      expect(find.byKey(const ValueKey('schedule-skip')), findsOneWidget);
+      // The whole series can go to Sin fecha.
+      await tester.tap(find.widgetWithText(ChoiceChip, l.wholeSeries));
+      await tester.pumpAndSettle();
+      expect(find.text(l.seriesRescheduleHelp), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, l.noDate), findsOneWidget);
+      expect(find.byKey(const ValueKey('schedule-skip')), findsNothing);
+      await tester.tap(find.widgetWithText(ChoiceChip, l.thisOccurrence));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-skip')));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text(l.occurrenceSkippedNotice), findsOneWidget);
+      final skipped = repository.task.exceptions.single;
+      expect(skipped.skipped, isTrue);
+      expect(skipped.originalDate, Task.dateKey(today));
+      expect(
+        repository.task.dueDate,
+        DateTime(now.year, now.month, now.day, 9),
+      );
+      await tester.tap(find.text(l.undo));
+      await tester.pumpAndSettle();
+      expect(repository.task.exceptions, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-212: a moved occurrence can be restored to its original date, with Deshacer',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final (_, repository) = await openRepeating(
+        tester,
+        Task(
+          id: 1,
+          title: 'Regar las plantas',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day, 9),
+          hasTime: true,
+          recurrence: 'daily',
+          exceptions: [
+            OccurrenceException(
+              originalDate: Task.dateKey(today),
+              date: DateTime(now.year, now.month, now.day, 18),
+              hasTime: true,
+            ),
+          ],
+        ),
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final row = find.widgetWithText(TaskTile, 'Regar las plantas');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.longPress(row);
+      await tester.pumpAndSettle();
+      final restore = find.byKey(const ValueKey('schedule-restore'));
+      expect(restore, findsOneWidget);
+      expect(find.text(l.restoreOriginal), findsOneWidget);
+      await tester.ensureVisible(restore);
+      await tester.tap(restore);
+      await tester.pumpAndSettle();
+      expect(find.text(l.originalRestored), findsOneWidget);
+      expect(repository.task.exceptions, isEmpty);
+      await tester.tap(find.text(l.undo));
+      await tester.pumpAndSettle();
+      expect(
+        repository.task.exceptions.single.date,
+        DateTime(now.year, now.month, now.day, 18),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-212: moving the whole series to Mañana moves its start and says Movida al <weekday>',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      final (_, repository) = await openRepeating(
+        tester,
+        Task(
+          id: 1,
+          title: 'Regar las plantas',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day, 9),
+          hasTime: true,
+          recurrence: 'weekly',
+        ),
+      );
+      final calendar = tester.element(find.byType(CalendarScreen));
+      final l = calendar.l10n;
+      final row = find.widgetWithText(TaskTile, 'Regar las plantas');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.longPress(row);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, l.wholeSeries));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, l.tomorrow));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(
+        repository.task.dueDate,
+        DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9),
+      );
+      expect(
+        find.text(l.movedOccurrenceDate(calendar.weekdayDate(tomorrow))),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P61 (UX-453, UX-454): Sin fecha moves at once; honest help ----
+
+  testWidgets(
+    'UX-453: swiping a dated task that doesn’t repeat and tapping Sin fecha moves it at once, says Movida a la bandeja de entrada, and Deshacer restores the date',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final due = DateTime(now.year, now.month, now.day, 9);
+      final (_, repository) = await openRepeating(
+        tester,
+        Task(
+          id: 1,
+          title: 'Llamar al banco',
+          priority: 1,
+          dueDate: due,
+          hasTime: true,
+        ),
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(l.tasks),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.drag(
+        find.widgetWithText(TaskTile, 'Llamar al banco'),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+      // Known and older than this round (see UX-206 above): the swipe
+      // background's Column overflows a one-line row by 8 px while dragging.
+      final swipe = tester.takeException();
+      expect(
+        swipe == null || '$swipe'.contains('RenderFlex overflowed'),
+        isTrue,
+        reason: '$swipe',
+      );
+      expect(find.byType(BottomSheet), findsOneWidget);
+      await tester.tap(find.widgetWithText(ChoiceChip, l.noDate));
+      await tester.pumpAndSettle();
+      // No Listo needed.
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
+      expect(repository.task.dueDate, isNull);
+      expect(l.movedInbox, 'Movida a la bandeja de entrada');
+      expect(find.text(l.movedInbox), findsOneWidget);
+      expect(find.text(l.undo), findsOneWidget);
+      await tester.tap(find.text(l.undo));
+      await tester.pumpAndSettle();
+      expect(repository.task.dueDate, due);
+      expect(repository.task.hasTime, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-454: a repeating task’s move with Toda la serie explains «Sin fecha» detiene la repetición and offers Sin fecha, which applies at once',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final (_, repository) = await openRepeating(
+        tester,
+        Task(
+          id: 1,
+          title: 'Regar las plantas',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day, 9),
+          hasTime: true,
+          recurrence: 'daily',
+        ),
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final row = find.widgetWithText(TaskTile, 'Regar las plantas');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.longPress(row);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, l.wholeSeries));
+      await tester.pumpAndSettle();
+      final help = find.textContaining('«Sin fecha» detiene la repetición');
+      expect(help, findsOneWidget);
+      expect(find.text(l.seriesRescheduleHelp), findsOneWidget);
+      expect(find.textContaining('bandeja de entrada detiene'), findsNothing);
+      final noDate = find.widgetWithText(ChoiceChip, l.noDate);
+      expect(noDate, findsOneWidget);
+      await tester.tap(noDate);
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(repository.task.dueDate, isNull);
+      expect(find.text(l.undo), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P64 (UX-463): Sin fecha closes the move sheet even with an empty
+  // hour ----
+
+  /// Tasks tab, a task dated today with no time swiped to `Cambiar fecha`,
+  /// `Añadir hora` turned on and the hour left empty.
+  Future<(_OneTask, AppLocalizations)> moveWithEmptyHour(
+    WidgetTester tester,
+  ) async {
+    platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+    final now = DateTime.now();
+    final (_, repository) = await openRepeating(
+      tester,
+      Task(
+        id: 1,
+        title: 'Llamar al banco',
+        priority: 1,
+        dueDate: DateTime(now.year, now.month, now.day),
+        hasTime: false,
+      ),
+    );
+    final l = tester.element(find.byType(CalendarScreen)).l10n;
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text(l.tasks),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.widgetWithText(TaskTile, 'Llamar al banco'),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    // Known and older than this round (see UX-206 above).
+    final swipe = tester.takeException();
+    expect(
+      swipe == null || '$swipe'.contains('RenderFlex overflowed'),
+      isTrue,
+      reason: '$swipe',
+    );
+    expect(find.byType(BottomSheet), findsOneWidget);
+    // The move sheet (swipe's `Cambiar fecha`), titled for moving a task.
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text(l.rescheduleTask),
+      ),
+      findsOneWidget,
+    );
+    expect(l.addTime, 'Añadir hora');
+    await tester.tap(find.byKey(const ValueKey('schedule-has-time')));
+    await tester.pumpAndSettle();
+    final hour = find.byKey(const ValueKey('schedule-hour'));
+    expect(hour, findsOneWidget);
+    expect(tester.widget<TextFormField>(hour).controller!.text, isEmpty);
+    return (repository, l);
+  }
+
+  testWidgets(
+    'UX-463: in Cambiar fecha with Añadir hora on and the hour empty, one tap on Sin fecha closes the sheet, says Movida a la bandeja de entrada and leaves the task undated',
+    (tester) async {
+      final (repository, l) = await moveWithEmptyHour(tester);
+      await tester.tap(find.widgetWithText(ChoiceChip, l.noDate));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
+      expect(find.text(l.movedInbox), findsOneWidget);
+      expect(repository.task.dueDate, isNull);
+      expect(repository.task.hasTime, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-463: in Cambiar fecha with Añadir hora on and the hour empty, Hoy keeps the sheet open and the hour shows its error',
+    (tester) async {
+      final (repository, l) = await moveWithEmptyHour(tester);
+      final before = repository.task.dueDate;
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(ChoiceChip, l.today),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('schedule-hour')),
+          matching: find.text(l.reviewInvalidTime),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l.movedInbox), findsNothing);
+      expect(repository.task.dueDate, before);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1747,6 +2184,64 @@ void main() {
       );
     }
 
+    for (final calendars in [true, false]) {
+      final what = calendars ? 'the phone calendars' : 'the day’s events';
+      testWidgets(
+        'UX-450: while $what retry runs, the events line is a button that is not enabled; idle, it is enabled',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final bridge = failing(calendars: calendars);
+          addTearDown(bridge.close);
+          await openCalendar(tester, [
+            inboxTask,
+          ], overrides: phoneCalendar(bridge));
+          await scrollAgendaToEnd(tester);
+          expect(
+            tester.getSemantics(line),
+            isSemantics(
+              isButton: true,
+              hasEnabledState: true,
+              isEnabled: true,
+              hasTapAction: true,
+            ),
+          );
+          final idle = tester.getRect(line);
+          final gate = bridge.gate = Completer<void>();
+          await tester.tap(line);
+          for (var i = 0; i < 3; i++) {
+            await tester.pump();
+          }
+          expect(spinner(), findsOneWidget);
+          expect(
+            tester.getSemantics(line),
+            isSemantics(
+              isButton: true,
+              hasEnabledState: true,
+              isEnabled: false,
+              hasTapAction: false,
+            ),
+          );
+          // Nothing moves.
+          expect(tester.getRect(line), idle);
+          bridge.gate = null;
+          gate.complete();
+          await tester.pumpAndSettle();
+          expect(spinner(), findsNothing);
+          expect(
+            tester.getSemantics(line),
+            isSemantics(
+              isButton: true,
+              hasEnabledState: true,
+              isEnabled: true,
+              hasTapAction: true,
+            ),
+          );
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
+
     testWidgets(
       'UX-447: on the first load, while access is still being checked, there is no events line and no spinner',
       (tester) async {
@@ -1832,5 +2327,18 @@ class _GivenTasks extends DesignTaskNotifier {
   @override
   Future<void> loadTasks() async {
     if (!state.hasValue) state = AsyncData(initial);
+  }
+}
+
+/// One task in memory behind the real notifier.
+class _OneTask extends TaskRepository {
+  _OneTask(this.task) : super(TaskDatabase());
+  Task task;
+  @override
+  Future<List<Task>> getAllTasks() async => [task];
+  @override
+  Future<int> updateTask(Task value) async {
+    task = value;
+    return 1;
   }
 }

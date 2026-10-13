@@ -6,10 +6,13 @@ import 'package:agenda/services/feedback_timeout.dart';
 
 /// Every brief message goes through here: it replaces the one on screen,
 /// floats above the bottom bar and goes away by itself, after Android's
-/// accessibility timeout when that is longer.
+/// accessibility timeout when that is longer. A [margin] lifts it above a
+/// button it would otherwise cover.
 Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>
     showFeedback(ScaffoldMessengerState messenger, String text,
-        {String? actionLabel, VoidCallback? onAction}) async {
+        {String? actionLabel,
+        VoidCallback? onAction,
+        EdgeInsetsGeometry? margin}) async {
   messenger.hideCurrentSnackBar();
   final duration = await FeedbackTimeout.forAction();
   if (!messenger.mounted) return null;
@@ -18,6 +21,7 @@ Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>
     persist: false,
     duration: duration,
     behavior: SnackBarBehavior.floating,
+    margin: margin,
     content: Text(text),
     action: actionLabel == null
         ? null

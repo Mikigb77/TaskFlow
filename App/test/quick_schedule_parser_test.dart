@@ -101,4 +101,26 @@ void main() {
     expect(QuickScheduleParser.parse('Errand tomorrow', reference)!.date,
         DateTime(2026, 9, 23));
   });
+
+  test('UX-221: `a las 17` is 17:00 with no ambiguity; `a las 5` stays ambiguous',
+      () {
+    final evening =
+        QuickScheduleParser.parse('Llamar al médico mañana a las 17', reference)!;
+    expect(evening.date, DateTime(2026, 9, 23, 17));
+    expect(evening.hasTime, isTrue);
+    expect(evening.ambiguousTime, isFalse);
+    expect(evening.title, 'Llamar al médico');
+    for (final hour in [0, 13, 23]) {
+      final parsed =
+          QuickScheduleParser.parse('Cena mañana a las $hour', reference)!;
+      expect(parsed.date, DateTime(2026, 9, 23, hour), reason: '$hour');
+      expect(parsed.hasTime, isTrue, reason: '$hour');
+      expect(parsed.ambiguousTime, isFalse, reason: '$hour');
+    }
+    final five =
+        QuickScheduleParser.parse('Llamar al médico mañana a las 5', reference)!;
+    expect(five.date, DateTime(2026, 9, 23));
+    expect(five.hasTime, isFalse);
+    expect(five.ambiguousTime, isTrue);
+  });
 }

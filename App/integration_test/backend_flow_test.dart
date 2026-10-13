@@ -7,7 +7,6 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/login_screen.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
@@ -131,13 +130,13 @@ void main() {
       await tester.tap(captureGenerate);
       await waitFor(
         tester,
-        () => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+        () => find.byType(CaptureResult).evaluate().isNotEmpty,
         timeout: const Duration(seconds: 120),
       );
       await tester.pumpAndSettle();
       final captureDrafts = tester
-          .widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen))
-          .session!
+          .widget<CaptureResult>(find.byType(CaptureResult))
+          .session
           .remaining
           .map((d) => d.task)
           .toList();
@@ -152,7 +151,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await waitFor(
         tester,
-        () => find.byType(ReviewTasksScreen).evaluate().isEmpty,
+        () => find.byType(CaptureResult).evaluate().isEmpty,
       );
       await container.read(taskProvider.notifier).loadTasks();
       final addedCapture = container
@@ -187,14 +186,14 @@ void main() {
       await tester.tap(generate);
       await waitFor(
         tester,
-        () => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+        () => find.byType(CaptureResult).evaluate().isNotEmpty,
         timeout: const Duration(seconds: 120),
       );
       await tester.pumpAndSettle();
-      final screen = tester.widget<ReviewTasksScreen>(
-        find.byType(ReviewTasksScreen),
+      final screen = tester.widget<CaptureResult>(
+        find.byType(CaptureResult),
       );
-      final drafts = screen.session!.remaining.map((d) => d.task).toList();
+      final drafts = screen.session.remaining.map((d) => d.task).toList();
       expect(drafts.length, 3);
       final draft = drafts.firstWhere(
         (d) => d.title.toLowerCase().contains('doctor'),
@@ -218,7 +217,7 @@ void main() {
       await tester.tap(save);
       await waitFor(
         tester,
-        () => find.byType(ReviewTasksScreen).evaluate().isEmpty,
+        () => find.byType(CaptureResult).evaluate().isEmpty,
       );
       await container.read(taskProvider.notifier).loadTasks();
       expect(container.read(taskRepositoryProvider).syncError, isNull);

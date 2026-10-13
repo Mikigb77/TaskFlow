@@ -102,4 +102,21 @@ void main() {
       expect(foldForSearch('Tarea 😀 日本 ß'), 'tarea 😀 日本 ß');
     });
   });
+
+  group('UX-434: the straight and curly apostrophes match each other', () {
+    test("UX-434: `l’escola` finds `Portar l'Anna a l'escola`", () {
+      expect(matchesSearch("Portar l'Anna a l'escola", 'l’escola'), isTrue);
+    });
+    test("UX-434: `l'escola` finds `Portar l’Anna a l’escola`", () {
+      expect(matchesSearch('Portar l’Anna a l’escola', "l'escola"), isTrue);
+    });
+    test('UX-434: each apostrophe still finds its own kind', () {
+      expect(matchesSearch("Portar l'Anna a l'escola", "l'escola"), isTrue);
+      expect(matchesSearch('Portar l’Anna a l’escola', 'l’escola'), isTrue);
+    });
+    test('UX-434: an apostrophe is not a wildcard', () {
+      expect(matchesSearch('Portar l’Anna a l’escola', "d'escola"), isFalse);
+      expect(matchesSearch('lescola', "l'escola"), isFalse);
+    });
+  });
 }

@@ -208,6 +208,42 @@ void main() {
         capture.id, 'local', ready.ready.map((draft) => draft.id).toSet());
     expect(await File(capture.audioPath!).exists(), isFalse);
   });
+
+  test(
+      'UX-113: a 160-character spoken note gets a title of about 60 characters that ends at a word; the words stay in the body',
+      () async {
+    const said =
+        'Apunta que la clave del wifi de la casa de la playa es la que viene '
+        'en la pegatina del router del salón y que el vecino del tercero guarda '
+        'una copia de la llave';
+    expect(said.length, 160);
+    expect(said, isNot(contains('.')));
+    final store = CaptureStore(database, directory: directory);
+    final session = await store.create('local', 'Europe/Madrid',
+        kind: 'note', text: said, source: 'speech');
+    final api = _NoNetwork();
+    addTearDown(api.close);
+    final ready = await CaptureProcessor(store, api).process(session);
+    final note = ready.ready.single.task;
+    expect(note.isNote, isTrue);
+    expect(note.notes, said);
+    expect(note.title.length, lessThanOrEqualTo(64));
+    expect(note.title.length, greaterThanOrEqualTo(30));
+    expect(said, startsWith(note.title));
+    // Cut at a word: the next character in the words is a space.
+    expect(said[note.title.length], ' ');
+    expect(note.title, isNot(endsWith(' ')));
+    expect(api.calls, 0);
+  });
+
+  test('UX-113: a spoken note with sentences is titled by its first sentence',
+      () {
+    expect(
+        CaptureProcessor.noteTitle(
+            'La clave del wifi es TaskFlow2026. Está en la pegatina del router.'),
+        'La clave del wifi es TaskFlow2026');
+    expect(CaptureProcessor.noteTitle('Comprar pan'), 'Comprar pan');
+  });
 }
 
 class _NoNetwork extends ApiClient {

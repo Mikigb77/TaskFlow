@@ -37,6 +37,8 @@ class QuickScheduleParser {
   static final _time = RegExp(
       r'\b(?:(?:at|a las)\s+)?(?:(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)?|(\d{1,2})\s*(a\.?m\.?|p\.?m\.?))\b',
       caseSensitive: false);
+  static final _bareHour =
+      RegExp(r'\b(?:at|a las)\s+(\d{1,2})\b', caseSensitive: false);
 
   static ScheduleSuggestion? parse(String input, DateTime reference) {
     if (input.length > 4000) return null;
@@ -105,9 +107,20 @@ class QuickScheduleParser {
       } else {
         ambiguous = true;
       }
-    } else if (RegExp(r'\b(?:at|a las)\s+\d{1,2}\b', caseSensitive: false)
-        .hasMatch(input)) {
-      ambiguous = true;
+    } else {
+      final bare = _bareHour.allMatches(input).toList();
+      final hour = bare.length == 1 ? int.parse(bare.single.group(1)!) : null;
+      // 0 and 13–23 can only be a 24-hour time; 1–12 could be either.
+      if (hour != null && (hour == 0 || (hour >= 13 && hour <= 23))) {
+        if (deadlineMarker != null && bare.single.end <= deadlineMarker.start) {
+          return null;
+        }
+        date = DateTime(date.year, date.month, date.day, hour);
+        hasTime = true;
+        acceptedTime = bare.single;
+      } else if (bare.isNotEmpty) {
+        ambiguous = true;
+      }
     }
     final ranges = [
       match,

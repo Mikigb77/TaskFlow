@@ -56,8 +56,8 @@ void main() {
 
   test('Catalan plurals, diagnostics and billing are translated', () {
     final strings = lookupAppLocalizations(const Locale('ca'));
-    expect(strings.captureSaveTasks(1), 'Desa 1 tasca');
-    expect(strings.captureSaveTasks(3), 'Desa 3 tasques');
+    expect(strings.captureAddTasks(1), 'Afegeix 1 tasca');
+    expect(strings.captureAddTasks(3), 'Afegeix 3 tasques');
     expect(strings.notificationSnooze, 'Ajorna 10 min');
     expect(strings.billingStatus('active'), 'Pro està actiu');
     expect(

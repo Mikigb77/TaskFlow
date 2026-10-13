@@ -2,7 +2,6 @@ import 'package:agenda/main.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +19,11 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:record/record.dart';
 import 'dart:async';
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/models/capture_clarification.dart';
+import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/widgets/capture_review_editor.dart';
+import 'package:intl/intl.dart';
 
 TaskDraft draft(String title, {bool ambiguous = false}) => TaskDraft.fromJson({
   'title': title,
@@ -31,6 +35,7 @@ TaskDraft draft(String title, {bool ambiguous = false}) => TaskDraft.fromJson({
   'questions': ambiguous ? ['Morning or afternoon?'] : [],
 });
 
+/// Opens the capture sheet on a spoken capture's result, as resuming one does.
 Future<ProviderContainer> openReview(
   WidgetTester tester,
   List<TaskDraft> drafts, {
@@ -40,7 +45,15 @@ Future<ProviderContainer> openReview(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  final container = designContainer();
+  final store = _SavingStore();
+  final container = designContainer(
+    overrides: [
+      captureStoreProvider.overrideWithValue(store),
+      nativeSpeechProvider.overrideWithValue(_PreviewSpeech()),
+      captureRecorderFactoryProvider.overrideWithValue(_SilentRecorder.new),
+    ],
+  );
+  store.tasks = container;
   addTearDown(container.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -49,18 +62,115 @@ Future<ProviderContainer> openReview(
     ),
   );
   await tester.pumpAndSettle();
-  tester
-      .state<NavigatorState>(find.byType(Navigator))
-      .push(
-        MaterialPageRoute<void>(
-          builder: (_) => ReviewTasksScreen(
-            drafts: drafts,
-            transcript: 'Buy coffee. Pay invoice Friday.',
-          ),
-        ),
-      );
-  await tester.pumpAndSettle();
+  await _openResult(
+    tester,
+    store,
+    CaptureSession(
+      id: 'review',
+      ownerKey: container.read(captureOwnerProvider),
+      timezone: 'Europe/Madrid',
+      capturedAt: DateTime.now().toUtc(),
+      status: 'ready',
+      source: 'speech',
+      transcript: 'Buy coffee. Pay invoice Friday.',
+      drafts: drafts.map(CaptureDraft.fromAI).toList(),
+    ),
+  );
   return container;
+}
+
+/// Opens the capture sheet on a result of [drafts] in [language], with a
+/// 24-hour clock, as resuming a capture does. [source] is `speech` for words
+/// that were said, `typed` or `shared` otherwise.
+Future<(ProviderContainer, _SavingStore)> openResultIn(
+  WidgetTester tester,
+  List<CaptureDraft> drafts, {
+  String language = 'es',
+  String source = 'speech',
+  String transcript = 'Lo que dije',
+  List<TaskListInfo>? projects,
+  Size size = const Size(390, 844),
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final store = _SavingStore();
+  final container = designContainer(
+    regionalStore: MemoryRegionalStore(
+      RegionalPreferences(
+        language: language,
+        clock: ClockFormat.twentyFour,
+        weekStart: 1,
+      ),
+    ),
+    projects: projects,
+    overrides: [
+      captureStoreProvider.overrideWithValue(store),
+      nativeSpeechProvider.overrideWithValue(_PreviewSpeech()),
+      captureRecorderFactoryProvider.overrideWithValue(_SilentRecorder.new),
+    ],
+  );
+  store.tasks = container;
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(container: container, child: const MyApp()),
+  );
+  await tester.pumpAndSettle();
+  await _openResult(
+    tester,
+    store,
+    CaptureSession(
+      id: 'result',
+      ownerKey: container.read(captureOwnerProvider),
+      timezone: 'Europe/Madrid',
+      capturedAt: DateTime.now().toUtc(),
+      status: 'ready',
+      source: source,
+      text: source == 'speech' ? '' : transcript,
+      transcript: transcript,
+      drafts: drafts,
+    ),
+  );
+  return (container, store);
+}
+
+/// The first day at least two days away that falls on [weekday], so its
+/// label is never `Hoy` or `Mañana`.
+DateTime nextWeekday(int weekday) {
+  final now = DateTime.now();
+  var day = DateTime(now.year, now.month, now.day + 2);
+  while (day.weekday != weekday) {
+    day = DateTime(day.year, day.month, day.day + 1);
+  }
+  return day;
+}
+
+/// Opens the capture sheet straight on [session]'s result.
+Future<void> _openResult(
+  WidgetTester tester,
+  _SavingStore store,
+  CaptureSession session,
+) async {
+  store.current = session;
+  final messenger = tester.binding.defaultBinaryMessenger;
+  const timezone = MethodChannel('flutter_timezone');
+  messenger.setMockMethodCallHandler(timezone, (_) async => 'Europe/Madrid');
+  addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
+  // Messages read the phone's timeout; none is set here.
+  const timeout = MethodChannel('taskflow/accessibility');
+  if (messenger.checkMockMessageHandler(timeout.name, null)) {
+    messenger.setMockMethodCallHandler(timeout, (_) async => null);
+    addTearDown(() => messenger.setMockMethodCallHandler(timeout, null));
+  }
+  unawaited(
+    showCaptureSheet(
+      tester.element(find.byType(Scaffold).first),
+      captureId: session.id,
+      startListening: false,
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -156,7 +266,7 @@ void main() {
         draft('Pay invoice'),
       ]);
       expect(find.byKey(const ValueKey('task-title')), findsNothing);
-      await tester.tap(find.byTooltip('Edit Buy coffee'));
+      await tester.tap(find.text('Buy coffee'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('task-title')),
@@ -209,8 +319,8 @@ void main() {
           .onPressed,
       isNull,
     );
-    await tester.ensureVisible(find.text('Keep this detail as shown'));
-    await tester.tap(find.text('Keep this detail as shown'));
+    await tester.ensureVisible(find.text('That’s right'));
+    await tester.tap(find.text('That’s right'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('save-drafts')));
     await tester.pumpAndSettle();
@@ -247,8 +357,8 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.ensureVisible(find.text('Keep this detail as shown'));
-      await tester.tap(find.text('Keep this detail as shown'));
+      await tester.ensureVisible(find.text('That’s right'));
+      await tester.tap(find.text('That’s right'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
@@ -270,16 +380,16 @@ void main() {
       draft('First'),
       draft('Second'),
     ]);
-    await tester.tap(find.byTooltip('Edit Second'));
+    await tester.tap(find.text('Second'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('Remove Second'));
     await tester.tap(find.byTooltip('Remove Second'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Edit Second'), findsOneWidget);
-    await tester.ensureVisible(find.byTooltip('Edit First'));
-    await tester.tap(find.byTooltip('Edit First'));
+    expect(find.byTooltip('Remove Second'), findsOneWidget);
+    await tester.ensureVisible(find.text('First'));
+    await tester.tap(find.text('First'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('task-title')), '   ');
     await tester.pumpAndSettle();
@@ -301,7 +411,7 @@ void main() {
         draft('Coffee'),
         draft('Call', ambiguous: true),
       ]);
-      await tester.tap(find.byTooltip('Edit Coffee'));
+      await tester.tap(find.text('Coffee'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('task-title')),
@@ -366,7 +476,6 @@ void main() {
       expect(saved.checklist.first.title, 'Renewed passport');
     },
   );
-
 
   // P35 / UX-105: the listening sheet in Spanish at 2x text on a 360x740
   // phone. Asserted always; written as a preview with WRITE_REVIEW_PREVIEWS.
@@ -493,7 +602,11 @@ void main() {
         regionalStore: MemoryRegionalStore(
           const RegionalPreferences(language: 'es'),
         ),
-        overrides: [captureStoreProvider.overrideWithValue(store)],
+        overrides: [
+          captureStoreProvider.overrideWithValue(store),
+          nativeSpeechProvider.overrideWithValue(_PreviewSpeech()),
+          captureRecorderFactoryProvider.overrideWithValue(_SilentRecorder.new),
+        ],
       );
       addTearDown(container.dispose);
       await tester.pumpWidget(
@@ -514,15 +627,7 @@ void main() {
           ),
         ],
       );
-      store.current = session;
-      tester
-          .state<NavigatorState>(find.byType(Navigator))
-          .push(
-            MaterialPageRoute<void>(
-              builder: (_) => ReviewTasksScreen(session: session),
-            ),
-          );
-      await tester.pumpAndSettle();
+      await _openResult(tester, store, session);
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
       return (container, store);
@@ -533,9 +638,9 @@ void main() {
     ) async {
       await saveVoiceCapture(tester);
       final l = lookupAppLocalizations(const Locale('es'));
-      expect(find.byType(ReviewTasksScreen), findsNothing);
+      expect(find.byType(CaptureResult), findsNothing);
       expect(find.text(l.undo), findsOneWidget);
-      expect(find.textContaining(l.captureTasksSaved(1)), findsOneWidget);
+      expect(find.text(l.taskSavedInbox), findsOneWidget);
       final bar = tester.widget<SnackBar>(find.byType(SnackBar));
       expect(bar.duration, const Duration(seconds: 10));
       expect(bar.behavior, SnackBarBehavior.floating);
@@ -551,21 +656,23 @@ void main() {
     testWidgets('UX-101: a second review opened after a save shows none', (
       tester,
     ) async {
-      final (_, store) = await saveVoiceCapture(tester);
+      final (container, store) = await saveVoiceCapture(tester);
       final l = lookupAppLocalizations(const Locale('es'));
       expect(find.text(l.undo), findsOneWidget);
-      tester
-          .state<NavigatorState>(find.byType(Navigator))
-          .push(
-            MaterialPageRoute<void>(
-              builder: (_) => ReviewTasksScreen(
-                drafts: [draft('Llamar a mamá')],
-                transcript: 'Llamar a mamá',
-              ),
-            ),
-          );
-      await tester.pumpAndSettle();
-      expect(find.byType(ReviewTasksScreen), findsOneWidget);
+      await _openResult(
+        tester,
+        store,
+        CaptureSession(
+          id: 'voice-2',
+          ownerKey: container.read(captureOwnerProvider),
+          timezone: 'Europe/Madrid',
+          capturedAt: DateTime.now().toUtc(),
+          status: 'ready',
+          transcript: 'Llamar a mamá',
+          drafts: [CaptureDraft.fromAI(draft('Llamar a mamá'))],
+        ),
+      );
+      expect(find.byType(CaptureResult), findsOneWidget);
       expect(find.text(l.undo), findsNothing);
       expect(find.byType(SnackBar), findsNothing);
       expect(
@@ -577,12 +684,593 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // ---- P19: voice review, fewer and clearer choices ----
+
+  final es = lookupAppLocalizations(const Locale('es'));
+  Finder button() => find.byKey(const ValueKey('save-drafts'));
+  FilledButton saveButton(WidgetTester tester) =>
+      tester.widget<FilledButton>(button());
+  Finder inQuestion(String question, Finder finder) => find.descendant(
+    of: find
+        .ancestor(of: find.text(question), matching: find.byType(DecoratedBox))
+        .first,
+    matching: finder,
+  );
+
+  testWidgets(
+    'UX-110 / U4: an AM/PM question shows only 5:00, 17:00 and Sin hora, right under the date line, with no Cambiar este dato and no confirm',
+    (tester) async {
+      final day = nextWeekday(DateTime.friday);
+      const question = '¿A las 5 de la mañana o de la tarde?';
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(title: 'Médico', priority: 1, dueDate: day),
+          confirmed: false,
+          clarifications: const [
+            CaptureClarification(
+              question: question,
+              field: 'schedule',
+              times: ['05:00', '17:00'],
+            ),
+          ],
+        ),
+      ]);
+      expect(find.text(question), findsOneWidget);
+      final chips = tester
+          .widgetList<ActionChip>(inQuestion(question, find.byType(ActionChip)))
+          .map((chip) => (chip.label as Text).data)
+          .toList();
+      // The times read as every other time in the app does with a 24-hour
+      // clock (`05:00`), the way the plan's `5:00` means.
+      final sheet = tester.element(find.byType(CaptureResult));
+      expect(chips, [
+        sheet.clockTime(DateTime(2026, 1, 1, 5)),
+        sheet.clockTime(DateTime(2026, 1, 1, 17)),
+        es.reviewNoTime,
+      ]);
+      expect(chips.first, anyOf('5:00', '05:00'));
+      expect(es.reviewNoTime, 'Sin hora');
+      // Nothing else to press inside the question.
+      expect(inQuestion(question, find.byType(TextButton)), findsNothing);
+      expect(find.text(es.reviewEditDetail), findsNothing);
+      expect(find.text(es.reviewConfirmDetail), findsNothing);
+      // Right under the date line, above the notes.
+      final dateLine = tester.getRect(
+        find.byKey(const ValueKey('draft-schedule-doctor')),
+      );
+      final chip = tester.getRect(find.widgetWithText(ActionChip, '17:00'));
+      expect(chip.top, greaterThanOrEqualTo(dateLine.bottom));
+      expect(
+        chip.bottom,
+        lessThanOrEqualTo(
+          tester.getRect(find.byKey(const ValueKey('draft-notes'))).top,
+        ),
+      );
+      // Until a time is picked, nothing can be saved without it.
+      expect(saveButton(tester).onPressed, isNull);
+      expect(find.text(es.captureCheckDetails), findsOneWidget);
+      await tester.tap(find.widgetWithText(ActionChip, '17:00'));
+      await tester.pumpAndSettle();
+      expect(find.text(question), findsNothing);
+      expect(saveButton(tester).onPressed, isNotNull);
+      final line = find.byKey(const ValueKey('draft-schedule-doctor'));
+      expect(
+        find.descendant(of: line, matching: find.textContaining('17:00')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-110: Sin hora answers the question and keeps the day without a time',
+    (tester) async {
+      final day = nextWeekday(DateTime.friday);
+      const question = '¿A las 5 de la mañana o de la tarde?';
+      final (container, _) = await openResultIn(tester, [
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(title: 'Médico', priority: 1, dueDate: day),
+          confirmed: false,
+          clarifications: const [
+            CaptureClarification(
+              question: question,
+              field: 'schedule',
+              times: ['05:00', '17:00'],
+            ),
+          ],
+        ),
+      ]);
+      await tester.tap(find.widgetWithText(ActionChip, es.reviewNoTime));
+      await tester.pumpAndSettle();
+      expect(find.text(question), findsNothing);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      final saved = container
+          .read(taskProvider)
+          .requireValue
+          .singleWhere((task) => task.title == 'Médico');
+      expect(saved.dueDate, day);
+      expect(saved.hasTime, isFalse);
+    },
+  );
+
+  for (final language in ['es', 'ca', 'en']) {
+    testWidgets(
+      'UX-110: a question without times confirms with That’s right / Así está bien / Així està bé ($language)',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        expect(
+          l.reviewConfirmDetail,
+          {
+            'es': 'Así está bien',
+            'ca': 'Així està bé',
+            'en': 'That’s right',
+          }[language],
+        );
+        const question = 'Is this the right person?';
+        await openResultIn(language: language, tester, [
+          CaptureDraft(
+            id: 'call',
+            task: Task(title: 'Call Ana', priority: 1),
+            confirmed: false,
+            questions: const [question],
+          ),
+        ]);
+        final confirm = inQuestion(question, find.text(l.reviewConfirmDetail));
+        expect(confirm, findsOneWidget);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(find.text(question), findsNothing);
+        expect(saveButton(tester).onPressed, isNotNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-116: a title question shows on its collapsed card; every collapsed card has ✕ and no pencil',
+    (tester) async {
+      const question = '¿Cómo se llama la tienda?';
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'shop',
+          task: Task(title: 'Comprar en la tienda', priority: 1),
+          confirmed: false,
+          clarifications: const [
+            CaptureClarification(question: question, field: 'title'),
+          ],
+        ),
+        CaptureDraft(
+          id: 'bread',
+          task: Task(title: 'Comprar pan', priority: 1),
+        ),
+        CaptureDraft(
+          id: 'call',
+          task: Task(title: 'Llamar a mamá', priority: 1),
+        ),
+      ]);
+      // Collapsed: no editor is open.
+      expect(find.byKey(const ValueKey('task-title')), findsNothing);
+      final card = find.byKey(const ValueKey('shop'));
+      expect(
+        find.descendant(of: card, matching: find.text(question)),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text(question));
+      await tester.pumpAndSettle();
+      expect(find.text(question).hitTestable(), findsOneWidget);
+      for (final title in [
+        'Comprar en la tienda',
+        'Comprar pan',
+        'Llamar a mamá',
+      ]) {
+        expect(find.byTooltip(es.removeCaptureItem(title)), findsOneWidget);
+      }
+      for (final pencil in [
+        Icons.edit,
+        Icons.edit_outlined,
+        Icons.edit_rounded,
+        Icons.edit_note_rounded,
+      ]) {
+        expect(
+          find.descendant(
+            of: find.byType(CaptureReviewEditor),
+            matching: find.byIcon(pencil),
+          ),
+          findsNothing,
+        );
+      }
+      expect(
+        find.descendant(
+          of: find.byType(CaptureReviewEditor),
+          matching: find.byTooltip(es.editTask),
+        ),
+        findsNothing,
+      );
+      // Tapping the title expands the card in place.
+      await tester.tap(find.text('Comprar pan'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('task-title')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-117: removing every draft leaves an enabled Terminar bottom button and no link',
+    (tester) async {
+      final (_, store) = await openResultIn(tester, [
+        CaptureDraft(
+          id: 'a',
+          task: Task(title: 'Comprar pan', priority: 1),
+        ),
+        CaptureDraft(
+          id: 'b',
+          task: Task(title: 'Llamar a mamá', priority: 1),
+        ),
+      ]);
+      void hideMessage() => ScaffoldMessenger.of(
+        tester.element(find.byType(CaptureResult)),
+      ).removeCurrentSnackBar();
+      await tester.tap(find.byTooltip(es.removeCaptureItem('Comprar pan')));
+      await tester.pumpAndSettle();
+      hideMessage();
+      await tester.pumpAndSettle();
+      // The last one is a single result: it is removed from Más opciones.
+      final options = find.byKey(const ValueKey('draft-options-b'));
+      await tester.ensureVisible(options);
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      final remove = find.text(es.reviewRemove);
+      await tester.ensureVisible(remove);
+      await tester.tap(remove);
+      await tester.pumpAndSettle();
+      hideMessage();
+      await tester.pumpAndSettle();
+      expect(es.captureFinish, 'Terminar');
+      expect(
+        find.descendant(of: button(), matching: find.text(es.captureFinish)),
+        findsOneWidget,
+      );
+      expect(saveButton(tester).onPressed, isNotNull);
+      // The only Terminar is the button: no small link.
+      expect(find.text(es.captureFinish), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.text(es.captureFinish),
+          matching: find.byType(TextButton),
+        ),
+        findsNothing,
+      );
+      expect(button().hitTestable(), findsOneWidget);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(store.current!.status, 'discarded');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (source, spoken) in [
+    ('speech', true),
+    ('typed', false),
+    ('shared', false),
+  ]) {
+    testWidgets(
+      'UX-124: $source words show ${spoken ? 'Ver lo que dije' : 'Texto original'}${spoken ? ' and Volver a decirlo' : ', not Volver a decirlo'}',
+      (tester) async {
+        await openResultIn(tester, source: source, [
+          CaptureDraft(
+            id: 'a',
+            task: Task(title: 'Comprar pan', priority: 1),
+          ),
+        ]);
+        expect(es.reviewOriginalText, 'Texto original');
+        expect(
+          find.text(es.reviewOriginal),
+          spoken ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text(es.reviewOriginalText),
+          spoken ? findsNothing : findsOneWidget,
+        );
+        expect(
+          find.text(es.captureSayAgain),
+          spoken ? findsOneWidget : findsNothing,
+        );
+      },
+    );
+  }
+
+  testWidgets('UX-124: the English title field reads Task title', (
+    tester,
+  ) async {
+    final en = lookupAppLocalizations(const Locale('en'));
+    expect(en.taskTitle, 'Task title');
+    await openResultIn(tester, language: 'en', [
+      CaptureDraft(
+        id: 'a',
+        task: Task(title: 'Buy bread', priority: 1),
+      ),
+    ]);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('task-title')),
+        matching: find.text('Task title'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Task Title'), findsNothing);
+  });
+
+  testWidgets(
+    'UX-127: Más opciones has no summary at the defaults and lists only what differs',
+    (tester) async {
+      final day = nextWeekday(DateTime.friday);
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'plain',
+          task: Task(title: 'Comprar pan', priority: 1, dueDate: day),
+        ),
+        CaptureDraft(
+          id: 'set',
+          task: Task(
+            title: 'Regar las plantas',
+            priority: 3,
+            dueDate: day,
+            recurrence: 'weekly',
+          ),
+        ),
+      ]);
+      Future<ListTile> options(String id, String title) async {
+        await tester.ensureVisible(find.text(title));
+        await tester.tap(find.text(title));
+        await tester.pumpAndSettle();
+        final tile = find.byKey(ValueKey('draft-options-$id'));
+        await tester.ensureVisible(tile);
+        await tester.pumpAndSettle();
+        return tester.widget<ListTile>(tile);
+      }
+
+      final plain = await options('plain', 'Comprar pan');
+      expect((plain.title as Text).data, es.reviewOptions);
+      expect(plain.subtitle, isNull);
+      expect(
+        find.text('${es.priorityValue(es.low)} · ${es.neverRepeat}'),
+        findsNothing,
+      );
+      final set = await options('set', 'Regar las plantas');
+      final summary = (set.subtitle! as Text).data!;
+      expect(summary, contains(es.priorityValue(es.high)));
+      expect(summary, contains(es.weekly));
+      expect(summary, isNot(contains(es.low)));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('UX-113: a voice note offers no “Usa un título breve” hint', (
+    tester,
+  ) async {
+    await openResultIn(tester, [
+      CaptureDraft(
+        id: 'note',
+        task: Task(
+          kind: 'note',
+          title: 'La clave del wifi de casa',
+          priority: 1,
+          notes: 'La clave del wifi de casa es la de la caja del router',
+        ),
+      ),
+    ]);
+    expect(find.textContaining('título breve'), findsNothing);
+    expect(find.text(es.saveNote), findsOneWidget);
+  });
+
+  // ---- P36 / U4: the result in the sheet, with the date first ----
+
+  testWidgets(
+    'U4: one task dated Friday at 17:00 shows its title, then the date as the largest line, and Añadir al calendario; no Bandeja personal, Prioridad or Lista para cuando tú quieras',
+    (tester) async {
+      final friday = nextWeekday(DateTime.friday);
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'car',
+          task: Task(
+            title: 'Llevar el coche al taller',
+            priority: 1,
+            dueDate: DateTime(friday.year, friday.month, friday.day, 17),
+            hasTime: true,
+          ),
+        ),
+      ]);
+      final context = tester.element(find.byType(CaptureResult));
+      final date = '${context.weekdayDate(friday)} · 17:00';
+      expect(date, startsWith(DateFormat.E('es').format(friday)));
+      final title = find.byKey(const ValueKey('task-title'));
+      expect(
+        tester.widget<TextFormField>(title).controller!.text,
+        'Llevar el coche al taller',
+      );
+      final line = find.descendant(
+        of: find.byKey(const ValueKey('draft-schedule-car')),
+        matching: find.text(date),
+      );
+      expect(line, findsOneWidget);
+      expect(
+        tester.getRect(line).top,
+        greaterThanOrEqualTo(tester.getRect(title).bottom),
+      );
+      // The largest text after the title.
+      double size(Finder text) => tester
+          .renderObject<RenderParagraph>(
+            find.descendant(of: text, matching: find.byType(RichText)),
+          )
+          .text
+          .style!
+          .fontSize!;
+      final dateSize = size(line);
+      final below = tester.getRect(line).bottom;
+      for (final element
+          in find
+              .descendant(
+                of: find.byType(CaptureResult),
+                matching: find.byType(RichText),
+              )
+              .evaluate()) {
+        final paragraph = element.renderObject! as RenderParagraph;
+        final style = paragraph.text.style;
+        if (style?.fontFamily == 'MaterialIcons') continue;
+        if (!paragraph.attached || !paragraph.hasSize) continue;
+        final top = paragraph.localToGlobal(Offset.zero).dy;
+        if (top < below) continue;
+        expect(
+          style?.fontSize ?? 14,
+          lessThanOrEqualTo(dateSize),
+          reason: paragraph.text.toPlainText(),
+        );
+      }
+      expect(
+        find.descendant(
+          of: button(),
+          matching: find.text(es.captureAddToCalendar),
+        ),
+        findsOneWidget,
+      );
+      expect(es.captureAddToCalendar, 'Añadir al calendario');
+      Finder inSheet(Finder finder) =>
+          find.descendant(of: find.byType(CaptureResult), matching: finder);
+      expect(inSheet(find.text(es.noList)), findsNothing);
+      expect(inSheet(find.textContaining(es.priority)), findsNothing);
+      expect(find.text('Lista para cuando tú quieras'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('U4: one task without a date says Añadir tarea', (tester) async {
+    await openResultIn(tester, [
+      CaptureDraft(
+        id: 'a',
+        task: Task(title: 'Comprar pan', priority: 1),
+      ),
+    ]);
+    expect(
+      find.descendant(of: button(), matching: find.text(es.captureAddTask)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('draft-schedule-a')),
+        matching: find.text(es.noDate),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'U4: a batch of three shows 3 cosas para añadir, three rows with ✕, and Añadir 3 tareas',
+    (tester) async {
+      final titles = ['Comprar pan', 'Llamar a mamá', 'Pagar la luz'];
+      await openResultIn(tester, [
+        for (final (i, title) in titles.indexed)
+          CaptureDraft(
+            id: 'd$i',
+            task: Task(title: title, priority: 1),
+          ),
+      ]);
+      expect(es.captureThingsToAdd(3), '3 cosas para añadir');
+      expect(find.text(es.captureThingsToAdd(3)), findsOneWidget);
+      expect(find.byType(CaptureReviewEditor), findsNWidgets(3));
+      for (final title in titles) {
+        expect(find.byTooltip(es.removeCaptureItem(title)), findsOneWidget);
+      }
+      expect(
+        find.descendant(
+          of: button(),
+          matching: find.text(es.captureAddTasks(3)),
+        ),
+        findsOneWidget,
+      );
+      expect(es.captureAddTasks(3), 'Añadir 3 tareas');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('U4: a capture into a shared project shows the audience line', (
+    tester,
+  ) async {
+    final family = TaskListInfo(
+      id: 'family',
+      name: 'Casa',
+      shared: true,
+      role: 'owner',
+    );
+    await openResultIn(
+      tester,
+      [
+        CaptureDraft(
+          id: 'a',
+          task: Task(
+            title: 'Comprar pan',
+            priority: 1,
+            listId: 'family',
+            assignment: 'group',
+          ),
+        ),
+      ],
+      projects: [family],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(es.audienceShared('Casa')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(CaptureResult),
+        matching: find.text(es.noList),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'U4: Deshacer after a save restores the drafts and reopens the sheet on the result',
+    (tester) async {
+      final (container, store) = await openResultIn(tester, [
+        CaptureDraft(
+          id: 'a',
+          task: Task(title: 'Comprar pan', priority: 1),
+        ),
+      ]);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(
+        container.read(taskProvider).requireValue.map((t) => t.title),
+        contains('Comprar pan'),
+      );
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(store.undos, 1);
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('task-title')))
+            .controller!
+            .text,
+        'Comprar pan',
+      );
+      expect(saveButton(tester).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
-/// A capture store in memory: saving marks drafts saved, Undo restores them.
+/// A capture store in memory: saving marks drafts saved and, given [tasks],
+/// adds them to its task list the way the real store's table does; Undo
+/// restores them.
 class _SavingStore extends CaptureStore {
   _SavingStore() : super(TaskDatabase());
   CaptureSession? current;
+  ProviderContainer? tasks;
   int undos = 0;
   @override
   Future<void> update(CaptureSession value) async => current = value;
@@ -592,11 +1280,22 @@ class _SavingStore extends CaptureStore {
   @override
   Future<List<CaptureSession>> pending(String ownerKey) async => [];
   @override
+  Future<void> cleanFinished(String ownerKey) async {}
+  @override
+  Future<void> discard(String id, String ownerKey) async {
+    if (current?.id == id) current = current!.copyWith(status: 'discarded');
+  }
+
+  @override
   Future<CaptureSession> saveReady(
     String id,
     String ownerKey,
     Set<String> draftIds,
   ) async {
+    await tasks?.read(taskProvider.notifier).addTasks([
+      for (final draft in current!.drafts)
+        if (draftIds.contains(draft.id)) draft.task,
+    ]);
     var next = 100;
     return current = current!.copyWith(
       status: 'saved',

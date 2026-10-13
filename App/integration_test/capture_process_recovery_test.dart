@@ -15,7 +15,6 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/native_speech.dart';
@@ -223,7 +222,7 @@ void main() {
     await tester.tap(retry);
     await _until(
       tester,
-      () async => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+      () async => find.byType(CaptureResult).evaluate().isNotEmpty,
     );
     final ready = (await store.read(id, _owner))!;
     expect(ready.ready, hasLength(1));

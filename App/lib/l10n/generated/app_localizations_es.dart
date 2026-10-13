@@ -15,10 +15,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reviewChooseDate => 'Elige una fecha antes de añadir una hora.';
 
   @override
-  String get reviewInvalidTime => 'Revisa este valor';
+  String get chooseAmPm => 'Elige a. m. o p. m.';
 
   @override
-  String get reviewReady => 'Lista para cuando tú quieras';
+  String get reviewInvalidTime => 'Revisa este valor';
 
   @override
   String get reviewOptions => 'Más opciones';
@@ -27,7 +27,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reviewOriginal => 'Ver lo que dije';
 
   @override
-  String get reviewKeepDraft => 'El borrador se conserva hasta que lo guardes.';
+  String get reviewOriginalText => 'Texto original';
 
   @override
   String get reviewRemove => 'Quitar de esta captura';
@@ -50,11 +50,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Este texto puede tener acentos dañados. Revisa la corrección antes de guardar.';
 
   @override
-  String get reviewShortTitle =>
-      'Usa un título breve y deja los detalles en las notas.';
+  String get reviewConfirmDetail => 'Así está bien';
 
   @override
-  String get reviewConfirmDetail => 'Mantener este dato tal como está';
+  String get reviewNoTime => 'Sin hora';
 
   @override
   String get reviewEditDetail => 'Cambiar este dato';
@@ -64,9 +63,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get reviewResolve => 'Revisa este dato';
-
-  @override
-  String get reviewSaveOne => 'Guardar tarea';
 
   @override
   String get languageNativeName => 'Español';
@@ -216,9 +212,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get findNote => 'Buscar notas';
 
   @override
-  String get reviewNote => 'Revisar nota';
-
-  @override
   String get saveNote => 'Guardar nota';
 
   @override
@@ -229,6 +222,21 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get noteHint => 'Ideas, detalles de reuniones, enlaces útiles…';
+
+  @override
+  String get noteTitleHint => 'p. ej., Clave del wifi';
+
+  @override
+  String get noteTitleRequired => 'Ponle un título a la nota';
+
+  @override
+  String get noteNoMatches => 'No hay notas que coincidan';
+
+  @override
+  String get notesSavedOnDevice => 'Tus notas siguen en este teléfono.';
+
+  @override
+  String get allNotes => 'Todas las notas';
 
   @override
   String get deleteNoteQuestion => '¿Eliminar esta nota?';
@@ -511,16 +519,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get addTime => 'Añadir hora';
 
   @override
-  String get chooseDate => 'Elegir fecha';
-
-  @override
-  String get chooseTime => 'Elegir hora';
-
-  @override
   String get removeDate => 'Quitar fecha';
-
-  @override
-  String get removeTime => 'Quitar hora';
 
   @override
   String get newTask => 'Nueva tarea';
@@ -962,9 +961,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get removeEndDate => 'Quitar la fecha de fin';
 
   @override
-  String get keepRepeat => 'Guardar repetición';
-
-  @override
   String get days => 'días';
 
   @override
@@ -1047,9 +1043,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reset => 'Restablecer';
 
   @override
-  String get puttingPlanTogether => 'Preparando tu plan…';
-
-  @override
   String get recordingKept => 'Grabación guardada en este teléfono';
 
   @override
@@ -1084,9 +1077,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get capturePrivacy =>
       'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. La extracción de tareas con IA necesita internet y envía tus palabras a Google. El audio guardado se transcribe en línea. Las capturas pendientes permanecen en este teléfono hasta que las guardes o descartes.';
-
-  @override
-  String get checkTasks => 'Revisa tus tareas';
 
   @override
   String get lookRight => '¿Está bien así?';
@@ -1142,22 +1132,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String untilDate(String date) {
     return 'Hasta el $date';
-  }
-
-  @override
-  String readyCount(int count) {
-    return '$count tareas listas para guardar';
-  }
-
-  @override
-  String needsCheckCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count tareas necesitan',
-      one: '1 tarea necesita',
-    );
-    return '$_temp0 una revisión. Guarda las que estén listas cuando quieras.';
   }
 
   @override
@@ -1237,9 +1211,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get movedInbox => 'Movida a la bandeja de entrada';
 
   @override
-  String get scheduleUpdated => 'Programación actualizada';
-
-  @override
   String get scheduleChangedAgain =>
       'La programación ha vuelto a cambiar. Abre la tarea para revisarla.';
 
@@ -1255,14 +1226,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get seriesRescheduleHelp =>
-      'Cambia el inicio de la serie y restablece las fechas modificadas u omitidas. Mover a la bandeja de entrada detiene la repetición.';
+      'Cambia el inicio de la serie y restablece las fechas movidas u omitidas. «Sin fecha» detiene la repetición.';
 
   @override
   String get occurrenceRescheduleHelp =>
       'Las otras fechas de la serie no cambian.';
-
-  @override
-  String get saveSchedule => 'Guardar programación';
 
   @override
   String get restoreOriginal => 'Restaurar la fecha original';
@@ -2740,12 +2708,12 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String captureTasksSaved(int count) {
+  String captureTasksAdded(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count tareas guardadas',
-      one: '1 tarea guardada',
+      other: '$count tareas añadidas',
+      one: '1 tarea añadida',
     );
     return '$_temp0';
   }
@@ -2785,15 +2753,38 @@ class AppLocalizationsEs extends AppLocalizations {
   String get captureCheckDetails => 'Revisa los datos de arriba';
 
   @override
-  String captureSaveTasks(int count) {
+  String get captureUnderstanding => 'Entendiendo…';
+
+  @override
+  String captureThingsToAdd(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Guardar $count tareas',
-      one: 'Guardar 1 tarea',
+      other: '$count cosas para añadir',
+      one: '1 cosa para añadir',
     );
     return '$_temp0';
   }
+
+  @override
+  String get captureAddToCalendar => 'Añadir al calendario';
+
+  @override
+  String get captureAddTask => 'Añadir tarea';
+
+  @override
+  String captureAddTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Añadir $count tareas',
+      one: 'Añadir 1 tarea',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get captureSayAgain => 'Volver a decirlo';
 
   @override
   String get labelsExample => 'casa, recados, llamadas';

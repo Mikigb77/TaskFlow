@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/services/text_search.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
@@ -34,18 +37,219 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _query = '';
+  final _search = TextEditingController();
   late int _filter = widget.initialFilter;
   String? _label;
+  final _page = GlobalKey();
+  final _nested = GlobalKey<NestedScrollViewState>();
+  // Tasks just saved from capture opened here: waiting to appear, then shown
+  // and highlighted.
+  Set<int> _landingIds = {};
+  Set<int> _landedIds = {};
+  bool _highlight = false;
+  Timer? _highlightTimer;
+  final _landedRow = GlobalKey();
+
+  @override
+  void dispose() {
+    _highlightTimer?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// The open tasks this page lists with the given search and filters.
+  List<Task> _visible(
+    List<Task> all, {
+    required int filter,
+    required String query,
+    required String? label,
+  }) {
+    final globalScope = ref.read(projectScopeProvider);
+    final scope = ProjectScope(
+      projectId: widget.listId ?? globalScope.projectId,
+      team: globalScope.team,
+    );
+    final projects = ref.read(taskListsProvider).valueOrNull ?? [];
+    final accountId = ref.read(authProvider).account?.id;
+    final now = DateTime.now();
+    final overdue = filter == 1
+        ? all.map((task) => task.overdueOn(now)).whereType<Task>().toSet()
+        : <Task>{};
+    return all
+        .map((task) => task.nextOpenOccurrence())
+        .whereType<Task>()
+        // A one-off overdue task is already its own next occurrence.
+        .followedBy(overdue.where((task) => task.isRecurring))
+        .where(
+          (task) =>
+              !task.isCompleted &&
+              taskInProjectScope(task, scope, accountId, projects) &&
+              (label == null || task.labels.contains(label)) &&
+              (filter == 0 ||
+                  (filter == 3 && task.dueDate == null) ||
+                  (filter == 4 && task.listId == null) ||
+                  (filter == 2 && task.priority == 3) ||
+                  (filter == 1 &&
+                      (overdue.contains(task) ||
+                          DateUtils.isSameDay(task.displayDate, now)))) &&
+              matchesSearch(
+                '${task.title} ${task.notes ?? ''} ${task.labels.join(' ')} ${task.checklist.map((item) => item.title).join(' ')}',
+                query,
+              ),
+        )
+        .toList();
+  }
+
+  /// Capture opened here saved [focus]'s tasks. If the search or a filter
+  /// would hide them, clear it, so they are on screen every time.
+  void _land(CalendarFocus focus) {
+    final all = ref.read(taskProvider).valueOrNull ?? [];
+    bool lists(List<Task> tasks) =>
+        tasks.any((task) => focus.taskIds.contains(task.id));
+    setState(() {
+      if (!lists(
+            _visible(all, filter: _filter, query: _query, label: _label),
+          ) &&
+          lists(
+            _visible(
+              all,
+              filter: widget.isRoot ? 0 : _filter,
+              query: '',
+              label: null,
+            ),
+          )) {
+        _search.clear();
+        _query = '';
+        _label = null;
+        if (widget.isRoot) _filter = 0;
+      }
+      _landingIds = focus.taskIds;
+      _landedIds = {};
+      _highlight = false;
+      _highlightTimer?.cancel();
+    });
+  }
+
+  /// Brings the first new row into view, clear of the save message, then
+  /// lets its highlight fade.
+  Future<void> _reveal() async {
+    final instant = MediaQuery.disableAnimationsOf(context);
+    for (var i = 0; i < 20 && mounted; i++) {
+      final need = _shortfall();
+      if (need != null) {
+        if (need != 0) {
+          await _scrollBy(need, instant);
+          await WidgetsBinding.instance.endOfFrame;
+          // Correct once if the move fell short, as when rows reflow.
+          final left = mounted ? _shortfall() : null;
+          if (left != null && left.abs() >= 1) await _scrollBy(left, instant);
+        }
+        break;
+      }
+      // Rows out of view are only built once scrolled near: start from the
+      // top, then move down a screen at a time.
+      final inner = _nested.currentState?.innerController;
+      if (inner == null || !inner.hasClients) break;
+      final position = inner.position;
+      if (i > 0 && position.pixels >= position.maxScrollExtent) break;
+      inner.jumpTo(
+        i == 0
+            ? 0
+            : math.min(
+                position.pixels + position.viewportDimension,
+                position.maxScrollExtent,
+              ),
+      );
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    if (!mounted) return;
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _highlight = false);
+    });
+  }
+
+  /// How far the page must scroll for the new row to show whole, clear of
+  /// the save message under it: 0 when it already does, null while it isn't
+  /// laid out. Measured on screen, as the list sits under the header.
+  double? _shortfall() {
+    final row = _landedRow.currentContext?.findRenderObject();
+    final page = _nested.currentContext?.findRenderObject();
+    if (row is! RenderBox || !row.hasSize || !row.attached) return null;
+    if (page is! RenderBox || !page.hasSize) return null;
+    final visible = page.localToGlobal(Offset.zero) & page.size;
+    final rowRect = row.localToGlobal(Offset.zero) & row.size;
+    if (rowRect.top < visible.top) return rowRect.top - visible.top;
+    final need =
+        rowRect.bottom -
+        math.min(visible.bottom - 88, _messageTop() ?? double.infinity);
+    // Never past the row's top, so its top always shows.
+    return need <= 0 ? 0 : math.min(need, rowRect.top - visible.top);
+  }
+
+  /// Where the save message shown over this page starts, once laid out: it
+  /// can be taller than the usual clearance, as with long text or large type.
+  double? _messageTop() {
+    RenderBox? message;
+    void visit(Element element) {
+      // The list can't hold the message, so skip its rows.
+      if (message != null || element.widget.key == _nested) return;
+      if (element.widget is SnackBar) {
+        final box = element.findRenderObject();
+        if (box is RenderBox && box.hasSize) message = box;
+        return;
+      }
+      element.visitChildren(visit);
+    }
+
+    _page.currentContext?.visitChildElements(visit);
+    final box = message;
+    if (box == null || box.size.height == 0) return null;
+    return box.localToGlobal(Offset.zero).dy;
+  }
+
+  /// Scrolls the header first, then the list, by [need] pixels in all.
+  Future<void> _scrollBy(double need, bool instant) async {
+    final nested = _nested.currentState;
+    if (nested == null) return;
+    final outer = nested.outerController;
+    final inner = nested.innerController;
+    if (!outer.hasClients || !inner.hasClients) return;
+    final header = outer.position;
+    final total = header.pixels + inner.position.pixels + need;
+    final (controller, target) = total <= header.maxScrollExtent
+        ? (outer, total)
+        : (inner, total - header.maxScrollExtent);
+    final position = controller.position;
+    final offset = target.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (offset == position.pixels) return;
+    if (instant) {
+      controller.jumpTo(offset);
+    } else {
+      await controller.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
+      if (focus != null && identical(focus.page, this)) _land(focus);
+    });
     final tasks = ref.watch(taskProvider);
     final globalScope = ref.watch(projectScopeProvider);
     final scope = ProjectScope(
       projectId: widget.listId ?? globalScope.projectId,
       team: globalScope.team,
     );
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
-    final accountId = ref.watch(authProvider).account?.id;
+    // The list below filters by the account; watching it keeps it current.
+    ref.watch(authProvider);
     final colors = Theme.of(context).colorScheme;
     final list = (ref.watch(taskListsProvider).valueOrNull ?? [])
         .where((list) => list.id == widget.listId)
@@ -59,8 +263,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         (tasks.valueOrNull ?? []).expand((task) => task.labels).toSet().toList()
           ..sort();
     return Scaffold(
+      key: _page,
       appBar: CustomAppBar(title: title, isRoot: widget.isRoot),
       body: NestedScrollView(
+        key: _nested,
         headerSliverBuilder: (context, innerScrolled) => [
           SliverToBoxAdapter(
             child: Padding(
@@ -144,8 +350,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                   TextField(
-                    onChanged: (value) =>
-                        setState(() => _query = value.trim()),
+                    controller: _search,
+                    onChanged: (value) => setState(() => _query = value.trim()),
                     decoration: InputDecoration(
                       hintText: context.l10n.findTask,
                       prefixIcon: const Icon(Icons.search_rounded),
@@ -199,37 +405,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
         body: tasks.when(
           data: (all) {
-            final now = DateTime.now();
-            final overdue = _filter == 1
-                ? all.map((task) => task.overdueOn(now)).whereType<Task>()
-                      .toSet()
-                : <Task>{};
-            final filtered = all
-                .map((task) => task.nextOpenOccurrence())
-                .whereType<Task>()
-                // A one-off overdue task is already its own next occurrence.
-                .followedBy(overdue.where((task) => task.isRecurring))
-                .where(
-                  (task) =>
-                      !task.isCompleted &&
-                      taskInProjectScope(task, scope, accountId, projects) &&
-                      (_label == null || task.labels.contains(_label)) &&
-                      (_filter == 0 ||
-                          (_filter == 3 && task.dueDate == null) ||
-                          (_filter == 4 && task.listId == null) ||
-                          (_filter == 2 && task.priority == 3) ||
-                          (_filter == 1 &&
-                              (overdue.contains(task) ||
-                                  DateUtils.isSameDay(
-                                    task.displayDate,
-                                    now,
-                                  )))) &&
-                      matchesSearch(
-                        '${task.title} ${task.notes ?? ''} ${task.labels.join(' ')} ${task.checklist.map((item) => item.title).join(' ')}',
-                        _query,
-                      ),
-                )
-                .toList();
+            final filtered = _visible(
+              all,
+              filter: _filter,
+              query: _query,
+              label: _label,
+            );
+            if (_landingIds.isNotEmpty &&
+                filtered.any((task) => _landingIds.contains(task.id))) {
+              _landedIds = _landingIds;
+              _landingIds = {};
+              _highlight = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+            }
             if (filtered.isEmpty) {
               return ListView(
                 children: [
@@ -251,7 +439,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             }
             return RefreshIndicator(
               onRefresh: () => ref.read(taskProvider.notifier).loadTasks(),
-              child: TaskList(tasks: filtered),
+              child: TaskList(
+                tasks: filtered,
+                landedIds: _landedIds,
+                lit: _highlight,
+                landedRow: _landedRow,
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -270,6 +463,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       bottomNavigationBar: TaskActions(
         projectId: scope.projectId,
+        page: this,
         onCreate: () =>
             scope.projectId == null ||
                 !ref.read(listCanEditProvider(scope.projectId))

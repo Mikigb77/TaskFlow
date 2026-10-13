@@ -15,10 +15,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewChooseDate => 'Choose a date before adding a time.';
 
   @override
-  String get reviewInvalidTime => 'Check this value';
+  String get chooseAmPm => 'Choose AM or PM.';
 
   @override
-  String get reviewReady => 'Ready when you are';
+  String get reviewInvalidTime => 'Check this value';
 
   @override
   String get reviewOptions => 'More options';
@@ -27,7 +27,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewOriginal => 'See what I said';
 
   @override
-  String get reviewKeepDraft => 'Your draft is kept until you save it.';
+  String get reviewOriginalText => 'Original text';
 
   @override
   String get reviewRemove => 'Remove from this capture';
@@ -50,11 +50,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This text may have been saved with damaged accents. Review the correction before saving.';
 
   @override
-  String get reviewShortTitle =>
-      'Use a short title; keep the details in notes.';
+  String get reviewConfirmDetail => 'That’s right';
 
   @override
-  String get reviewConfirmDetail => 'Keep this detail as shown';
+  String get reviewNoTime => 'No time';
 
   @override
   String get reviewEditDetail => 'Change this detail';
@@ -64,9 +63,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reviewResolve => 'Check this detail';
-
-  @override
-  String get reviewSaveOne => 'Save task';
 
   @override
   String get languageNativeName => 'English';
@@ -212,9 +208,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get findNote => 'Search notes';
 
   @override
-  String get reviewNote => 'Review note';
-
-  @override
   String get saveNote => 'Save note';
 
   @override
@@ -225,6 +218,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteHint => 'Ideas, meeting details, useful links…';
+
+  @override
+  String get noteTitleHint => 'e.g. Wi-Fi password';
+
+  @override
+  String get noteTitleRequired => 'Give your note a title';
+
+  @override
+  String get noteNoMatches => 'No matching notes';
+
+  @override
+  String get notesSavedOnDevice => 'Your notes are still on this phone.';
+
+  @override
+  String get allNotes => 'All notes';
 
   @override
   String get deleteNoteQuestion => 'Delete this note?';
@@ -505,16 +513,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addTime => 'Add time';
 
   @override
-  String get chooseDate => 'Choose date';
-
-  @override
-  String get chooseTime => 'Choose time';
-
-  @override
   String get removeDate => 'Remove date';
-
-  @override
-  String get removeTime => 'Remove time';
 
   @override
   String get newTask => 'New task';
@@ -631,7 +630,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveChanges => 'Save Changes';
 
   @override
-  String get taskTitle => 'Task Title';
+  String get taskTitle => 'Task title';
 
   @override
   String get additionalNotes => 'Additional Notes';
@@ -950,9 +949,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeEndDate => 'Remove end date';
 
   @override
-  String get keepRepeat => 'Keep repeat';
-
-  @override
   String get days => 'days';
 
   @override
@@ -1034,9 +1030,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reset => 'Reset';
 
   @override
-  String get puttingPlanTogether => 'Putting your plan together…';
-
-  @override
   String get recordingKept => 'Recording kept on this phone';
 
   @override
@@ -1071,9 +1064,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get capturePrivacy =>
       'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.';
-
-  @override
-  String get checkTasks => 'Check your tasks';
 
   @override
   String get lookRight => 'Look right?';
@@ -1128,22 +1118,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String untilDate(String date) {
     return 'Until $date';
-  }
-
-  @override
-  String readyCount(int count) {
-    return '$count ready to save';
-  }
-
-  @override
-  String needsCheckCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count tasks need',
-      one: '1 task needs',
-    );
-    return '$_temp0 a quick check. Save the ready ones whenever you like.';
   }
 
   @override
@@ -1222,9 +1196,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get movedInbox => 'Moved to Inbox';
 
   @override
-  String get scheduleUpdated => 'Schedule updated';
-
-  @override
   String get scheduleChangedAgain =>
       'The schedule changed again. Open the task to review it.';
 
@@ -1240,14 +1211,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get seriesRescheduleHelp =>
-      'Changes the start of the series and resets individual moves or skips. Inbox stops the repeat.';
+      'Changes the start of the series and resets moved or skipped dates. No date stops the repeat.';
 
   @override
   String get occurrenceRescheduleHelp =>
       'Other dates in the series stay the same.';
-
-  @override
-  String get saveSchedule => 'Save schedule';
 
   @override
   String get restoreOriginal => 'Restore original date';
@@ -2687,12 +2655,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String captureTasksSaved(int count) {
+  String captureTasksAdded(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count tasks saved',
-      one: '1 task saved',
+      other: '$count tasks added',
+      one: '1 task added',
     );
     return '$_temp0';
   }
@@ -2713,7 +2681,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Removed drafts will not become tasks.';
 
   @override
-  String get captureFinish => 'Finish';
+  String get captureFinish => 'Done';
 
   @override
   String get captureYourWords => 'Your words';
@@ -2726,15 +2694,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureCheckDetails => 'Check the details above';
 
   @override
-  String captureSaveTasks(int count) {
+  String get captureUnderstanding => 'Understanding…';
+
+  @override
+  String captureThingsToAdd(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Save $count tasks',
-      one: 'Save 1 task',
+      other: '$count things to add',
+      one: '1 thing to add',
     );
     return '$_temp0';
   }
+
+  @override
+  String get captureAddToCalendar => 'Add to calendar';
+
+  @override
+  String get captureAddTask => 'Add task';
+
+  @override
+  String captureAddTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count tasks',
+      one: 'Add 1 task',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get captureSayAgain => 'Say it again';
 
   @override
   String get labelsExample => 'home, errands, calls';

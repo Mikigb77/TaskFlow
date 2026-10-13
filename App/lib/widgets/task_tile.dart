@@ -304,3 +304,30 @@ class TaskTile extends ConsumerWidget {
     ),
   );
 }
+
+/// A just-saved task: its tile lights up, then fades back when [lit] turns
+/// off. With animations off it changes at once.
+class LandedTaskTile extends StatelessWidget {
+  const LandedTaskTile({
+    super.key,
+    required this.task,
+    required this.lit,
+    this.showDate = false,
+  });
+  final Task task;
+  final bool lit;
+  final bool showDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(end: lit ? colors.primaryContainer : colors.surface),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 600),
+      builder: (context, color, _) =>
+          TaskTile(task: task, showDate: showDate, color: color),
+    );
+  }
+}

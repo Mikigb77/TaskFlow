@@ -6,8 +6,16 @@ import 'package:agenda/screens/voice_task_screen.dart';
 
 /// Reserve space for capture controls so they never cover the agenda.
 class TaskActions extends ConsumerWidget {
-  const TaskActions({super.key, required this.onCreate, this.projectId});
+  const TaskActions({
+    super.key,
+    required this.onCreate,
+    this.projectId,
+    this.page,
+  });
   final String? projectId;
+
+  /// A task page that shows what capture saves, instead of Calendar.
+  final Object? page;
   final VoidCallback onCreate;
   @override
   Widget build(BuildContext context, WidgetRef ref) => Padding(
@@ -37,7 +45,8 @@ class TaskActions extends ConsumerWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             final voice = FilledButton.icon(
-              onPressed: () => showCaptureSheet(context, projectId: projectId),
+              onPressed: () =>
+                  showCaptureSheet(context, projectId: projectId, page: page),
               icon: const Icon(Icons.mic_none_rounded),
               label: Text(context.l10n.sayTask),
             );

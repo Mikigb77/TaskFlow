@@ -230,10 +230,7 @@ void main() {
     );
     expect(find.text('Undo').hitTestable(), findsOneWidget);
     expect(find.byTooltip('Create task').hitTestable(), findsOneWidget);
-    expect(
-      find.text('Say a task').hitTestable(),
-      findsOneWidget,
-    );
+    expect(find.text('Say a task').hitTestable(), findsOneWidget);
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
     expect(
@@ -273,8 +270,8 @@ void main() {
       const Offset(-500, 0),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ActionChip, 'Inbox'));
-    await tester.tap(find.text('Save schedule'));
+    // Moving: No date applies at once, like Today and Tomorrow.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'No date'));
     await tester.pumpAndSettle();
     final moved = container
         .read(taskProvider)
@@ -337,41 +334,42 @@ void main() {
     },
   );
 
-  testWidgets('UX-303: Tasks search finds accented tasks typed without accents', (
-    tester,
-  ) async {
-    final l10n = lookupAppLocalizations(const Locale('en'));
-    final container = await _pump(tester);
-    final now = DateTime.now();
-    await container.read(taskProvider.notifier).addTasks([
-      Task(
-        title: 'Llamar al Médico',
-        dueDate: DateTime(now.year, now.month, now.day, 16),
-        priority: 1,
-      ),
-      Task(
-        title: 'Reunión con José',
-        dueDate: DateTime(now.year, now.month, now.day, 17),
-        priority: 1,
-      ),
-    ]);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(l10n.tasks));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'medico');
-    await tester.pumpAndSettle();
-    expect(find.text('Llamar al Médico'), findsOneWidget);
-    expect(find.text('Reunión con José'), findsNothing);
-    expect(find.text('Doctor appointment'), findsNothing);
-    expect(find.text(l10n.noMatches), findsNothing);
-    await tester.enterText(find.byType(TextField), 'reunion con jose');
-    await tester.pumpAndSettle();
-    expect(find.text('Reunión con José'), findsOneWidget);
-    expect(find.text('Llamar al Médico'), findsNothing);
-    await tester.enterText(find.byType(TextField), 'dentista');
-    await tester.pumpAndSettle();
-    expect(find.text(l10n.noMatches), findsOneWidget);
-  });
+  testWidgets(
+    'UX-303: Tasks search finds accented tasks typed without accents',
+    (tester) async {
+      final l10n = lookupAppLocalizations(const Locale('en'));
+      final container = await _pump(tester);
+      final now = DateTime.now();
+      await container.read(taskProvider.notifier).addTasks([
+        Task(
+          title: 'Llamar al Médico',
+          dueDate: DateTime(now.year, now.month, now.day, 16),
+          priority: 1,
+        ),
+        Task(
+          title: 'Reunión con José',
+          dueDate: DateTime(now.year, now.month, now.day, 17),
+          priority: 1,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.tasks));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'medico');
+      await tester.pumpAndSettle();
+      expect(find.text('Llamar al Médico'), findsOneWidget);
+      expect(find.text('Reunión con José'), findsNothing);
+      expect(find.text('Doctor appointment'), findsNothing);
+      expect(find.text(l10n.noMatches), findsNothing);
+      await tester.enterText(find.byType(TextField), 'reunion con jose');
+      await tester.pumpAndSettle();
+      expect(find.text('Reunión con José'), findsOneWidget);
+      expect(find.text('Llamar al Médico'), findsNothing);
+      await tester.enterText(find.byType(TextField), 'dentista');
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.noMatches), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'UX-412: text-field outlines reach 3:1 against the field and the page in both themes',
@@ -431,7 +429,9 @@ void main() {
           ('Calendar', 'Tasks'),
           ('Tasks', 'Calendar'),
         ]) {
-          await tester.tap(find.descendant(of: bar, matching: find.text(selected)));
+          await tester.tap(
+            find.descendant(of: bar, matching: find.text(selected)),
+          );
           await tester.pumpAndSettle();
           final on = label(selected);
           final off = label(other);
@@ -454,49 +454,51 @@ void main() {
     },
   );
 
-  testWidgets(
-    'UX-413: every tab swaps to a different icon when selected',
-    (tester) async {
-      await _pump(tester);
-      final bar = find.byType(NavigationBar);
-      final destinations = tester
-          .widgetList<NavigationDestination>(
-            find.descendant(of: bar, matching: find.byType(NavigationDestination)),
-          )
-          .toList();
-      expect(destinations, hasLength(4));
-      for (final destination in destinations) {
-        final icon = (destination.icon as Icon).icon;
-        final selectedIcon = (destination.selectedIcon as Icon).icon;
-        expect(selectedIcon, isNot(icon), reason: destination.label);
-        await tester.tap(
-          find.descendant(of: bar, matching: find.text(destination.label)),
-        );
-        await tester.pumpAndSettle();
+  testWidgets('UX-413: every tab swaps to a different icon when selected', (
+    tester,
+  ) async {
+    await _pump(tester);
+    final bar = find.byType(NavigationBar);
+    final destinations = tester
+        .widgetList<NavigationDestination>(
+          find.descendant(
+            of: bar,
+            matching: find.byType(NavigationDestination),
+          ),
+        )
+        .toList();
+    expect(destinations, hasLength(4));
+    for (final destination in destinations) {
+      final icon = (destination.icon as Icon).icon;
+      final selectedIcon = (destination.selectedIcon as Icon).icon;
+      expect(selectedIcon, isNot(icon), reason: destination.label);
+      await tester.tap(
+        find.descendant(of: bar, matching: find.text(destination.label)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.widgetWithText(NavigationDestination, destination.label),
+          matching: find.byIcon(selectedIcon!),
+        ),
+        findsOneWidget,
+        reason: '${destination.label} selected',
+      );
+      for (final other in destinations.where((d) => d != destination)) {
         expect(
           find.descendant(
-            of: find.widgetWithText(NavigationDestination, destination.label),
-            matching: find.byIcon(selectedIcon!),
+            of: find.widgetWithText(NavigationDestination, other.label),
+            matching: find.byIcon((other.selectedIcon as Icon).icon!),
           ),
-          findsOneWidget,
-          reason: '${destination.label} selected',
+          findsNothing,
+          reason: '${other.label} while ${destination.label} is selected',
         );
-        for (final other in destinations.where((d) => d != destination)) {
-          expect(
-            find.descendant(
-              of: find.widgetWithText(NavigationDestination, other.label),
-              matching: find.byIcon((other.selectedIcon as Icon).icon!),
-            ),
-            findsNothing,
-            reason: '${other.label} while ${destination.label} is selected',
-          );
-        }
       }
-      await tester.tap(find.descendant(of: bar, matching: find.text('Calendar')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    },
-  );
+    }
+    await tester.tap(find.descendant(of: bar, matching: find.text('Calendar')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 
   for (final size in [
     const Size(360, 800),

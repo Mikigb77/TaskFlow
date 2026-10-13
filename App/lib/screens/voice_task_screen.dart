@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
@@ -14,13 +16,15 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/capture_review_editor.dart';
+import 'package:agenda/widgets/reminder_ask_sheet.dart';
 
 // Each capture screen owns and releases its recorder. A factory also lets the
 // interruption contract be exercised without recording from a test machine.
@@ -32,12 +36,18 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 /// the creation button, Notes, the widget, shortcuts, sharing and the pending
 /// list — comes through here. [kind] is `note` from Notes, `task` elsewhere; a
 /// resumed [captureId] keeps its own.
+///
+/// Saved tasks land on Calendar. A task page that opens capture passes itself
+/// as [page] to show them there instead; [showCalendar] first goes back to
+/// the Calendar tab.
 Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
   String? projectId,
   String? captureId,
   bool startListening = true,
+  Object? page,
+  bool showCalendar = false,
 }) {
   final navigator = Navigator.of(context);
   final localizations = MaterialLocalizations.of(context);
@@ -53,15 +63,34 @@ Future<void> showCaptureSheet(
       ),
       modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
       builder: (_) => _SheetFrame(
-        child: VoiceTaskScreen(
-          kind: kind,
-          projectId: projectId,
-          captureId: captureId,
-          startListening: startListening,
+        child: _CaptureOrigin(
+          page: page,
+          showCalendar: showCalendar,
+          child: VoiceTaskScreen(
+            kind: kind,
+            projectId: projectId,
+            captureId: captureId,
+            startListening: startListening,
+          ),
         ),
       ),
     ),
   );
+}
+
+/// Where the sheet was opened from, so a save can land there.
+class _CaptureOrigin extends InheritedWidget {
+  const _CaptureOrigin({
+    required this.page,
+    required this.showCalendar,
+    required super.child,
+  });
+  final Object? page;
+  final bool showCalendar;
+
+  @override
+  bool updateShouldNotify(_CaptureOrigin old) =>
+      page != old.page || showCalendar != old.showCalendar;
 }
 
 /// A modal bottom sheet whose scrim can't close it while capture is listening
@@ -91,6 +120,37 @@ class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
     _holdScrim = hold;
     changedInternalState();
   }
+
+  /// Messages about the sheet's own content (a removed draft, a partial save)
+  /// show over the sheet instead of under it. The page's transparent scaffold
+  /// takes the taps above the sheet, so it closes the way the scrim does.
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) => ScaffoldMessenger(
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      // The sheet makes room for the keyboard itself.
+      resizeToAvoidBottomInset: false,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              excludeFromSemantics: true,
+              onTap: () {
+                if (barrierDismissible) unawaited(navigator?.maybePop());
+              },
+            ),
+          ),
+          super.buildPage(context, animation, secondaryAnimation),
+        ],
+      ),
+    ),
+  );
 }
 
 /// The sheet's handle, safe area and keyboard room. A swipe down asks to close
@@ -282,6 +342,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool _typedStarted = false;
   bool _movedToReview = false;
   bool _discarded = false;
+  // The result, shown in this sheet once the words are understood.
+  CaptureSession? _result;
+  // `Volver a decirlo` starts a new capture for the same project.
+  String? _projectId;
+  // The result `Volver a decirlo` left: kept until new words are understood,
+  // so Cancel can bring it back.
+  CaptureSession? _previousResult;
+  // Counts going back to the previous result, so an understanding step
+  // already running knows its words were cancelled.
+  int _returns = 0;
 
   void _showProblem(Object problem, {bool retained = false}) {
     if (!mounted) return;
@@ -307,8 +377,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // The sheet shows the words and the controls that fit them.
     _words.addListener(_wordsChanged);
     // An earlier save's Undo must not follow the user into a new capture.
+    // It lives on the app's messenger, not the sheet's own.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+      if (!mounted) return;
+      final app = Navigator.maybeOf(context)?.context ?? context;
+      ScaffoldMessenger.maybeOf(app)?.hideCurrentSnackBar();
     });
     unawaited(_load());
   }
@@ -407,7 +480,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       text: text,
       audio: audio,
       kind: _kind,
-      projectId: widget.projectId ?? ref.read(projectScopeProvider).projectId,
+      projectId:
+          _projectId ??
+          widget.projectId ??
+          ref.read(projectScopeProvider).projectId,
       source: source,
     );
     await CaptureDiagnostics(_store.database).record(CaptureEvent.started);
@@ -725,6 +801,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   Future<void> _stopRecording(bool submit, bool interrupted, bool quiet) async {
     if (!_recording) return;
+    // Cancel can go back to the result these words were said again for
+    // while listening ends: then they are dropped, not understood.
+    final returns = _returns;
+    final replacing = _previousResult;
+    final started = _session;
+    bool wentBack() => replacing != null && _returns != returns;
     _recording = false;
     _listeningWatch?.stop();
     _timer?.cancel();
@@ -766,13 +848,19 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           elapsedMs: _listeningWatch?.elapsedMilliseconds,
         );
       }
-      if (mounted &&
+      if (wentBack()) {
+        await _dropSaidAgain(started, replacing!);
+      } else if (mounted &&
           submit &&
           (!_usingNative || _session!.text.trim().isNotEmpty)) {
         await _process();
       }
     } catch (error) {
-      _showProblem(CaptureProblem.stopFailed);
+      if (wentBack()) {
+        await _dropSaidAgain(started, replacing!);
+      } else {
+        _showProblem(CaptureProblem.stopFailed);
+      }
     } finally {
       _acceptSpeech = false;
       if (mounted) {
@@ -808,6 +896,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   Future<void> _process() async {
     final api = ref.read(apiClientProvider);
+    // Cancel can go back to the result these words were said again for
+    // while they are understood: then they are dropped, not shown.
+    final returns = _returns;
+    final replacing = _previousResult;
+    bool wentBack() => replacing != null && _returns != returns;
+    var attempt = _session;
     var inputKept = false;
     setState(() {
       _phase = _CapturePhase.processing;
@@ -816,18 +910,35 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     });
     try {
       await _writes;
+      if (wentBack()) {
+        await _dropSaidAgain(_session ?? attempt, replacing!);
+        return;
+      }
       if (_session == null && _words.text.trim().isEmpty) {
         throw StateError('Say or type what you need to do first.');
       }
       await _ensureSession(text: _words.text);
+      attempt = _session;
+      if (wentBack()) {
+        await _dropSaidAgain(attempt, replacing!);
+        return;
+      }
       inputKept = true;
-      final session = await CaptureProcessor(_store, api).process(_session!);
+      final session = await CaptureProcessor(_store, api).process(attempt!);
+      if (wentBack()) {
+        await _dropSaidAgain(session, replacing!);
+        return;
+      }
       _session = session;
       if (mounted) {
         ref.invalidate(pendingCapturesProvider);
         _review(session);
       }
     } catch (error) {
+      if (wentBack()) {
+        await _dropSaidAgain(attempt, replacing!);
+        return;
+      }
       _showProblem(
         !inputKept && _session != null ? CaptureProblem.writeFailed : error,
         retained: inputKept,
@@ -839,14 +950,60 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
   }
 
+  /// The result replaces the words in this same sheet.
   void _review(CaptureSession session) {
     _movedToReview = true;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => ReviewTasksScreen(session: session),
-      ),
-    );
+    final previous = _previousResult;
+    _previousResult = null;
+    setState(() => _result = session);
+    // The new words replace the result they were said again for.
+    if (previous != null && previous.id != session.id) {
+      unawaited(_dropPrevious(previous));
+    }
+  }
+
+  Future<void> _dropPrevious(CaptureSession previous) async {
+    try {
+      await _store.discard(previous.id, _owner);
+    } catch (_) {
+      /* Kept in the pending list. */
+    }
+    _container?.invalidate(pendingCapturesProvider);
+  }
+
+  /// Cancel went back to [replacing] while the words said again for it were
+  /// still being understood: drop their capture, and the result's session is
+  /// the screen's again.
+  Future<void> _dropSaidAgain(
+    CaptureSession? attempt,
+    CaptureSession replacing,
+  ) async {
+    if (attempt == null || attempt.id == replacing.id) return;
+    if (_session?.id == attempt.id) _session = replacing;
+    await _dropPrevious(attempt);
+  }
+
+  /// `Volver a decirlo`: keep the result aside, clear the words, and listen
+  /// again. Cancel brings the result back until new words are understood.
+  void _sayAgain(CaptureSession previous) {
+    if (_result == null || !mounted) return;
+    _previousResult = previous;
+    _projectId = previous.projectId;
+    _words.clear();
+    _nativePrefix = '';
+    _typedStarted = false;
+    setState(() {
+      _result = null;
+      _movedToReview = false;
+      _session = null;
+      _typing = false;
+      _error = null;
+      _errorRetained = false;
+      _phase = _CapturePhase.idle;
+      _initialized = true;
+    });
+    // With TalkBack, listening waits for `Empezar a hablar`, as on opening.
+    if (!MediaQuery.accessibleNavigationOf(context)) _beginRecording();
   }
 
   bool get _hasInput =>
@@ -870,10 +1027,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   }
 
   /// Cancel, Back and a swipe down: close at once when nothing was said;
-  /// otherwise ask once whether to keep it.
+  /// otherwise ask once whether to keep it. After `Volver a decirlo`, the
+  /// result comes back instead.
   Future<void> _cancel() async {
     if (_asking || !mounted) return;
-    if (_phase == _CapturePhase.processing || !_hasInput) {
+    final previous = _previousResult;
+    if (previous != null) {
+      await _backToResult(previous);
+      return;
+    }
+    if (_phase == _CapturePhase.processing) {
+      Navigator.pop(context);
+      return;
+    }
+    if (!_hasInput) {
       Navigator.pop(context);
       return;
     }
@@ -911,6 +1078,55 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     } else {
       await _discard();
     }
+  }
+
+  /// Stop listening, drop the words said again, and show the result they
+  /// were for, with its edits.
+  Future<void> _backToResult(CaptureSession previous) async {
+    // While they are understood, go back at once: the running step owns
+    // their capture and drops it when it ends.
+    if (_phase == _CapturePhase.processing) {
+      _returns++;
+      _words.clear();
+      ref.invalidate(pendingCapturesProvider);
+      setState(() {
+        _result = previous;
+        _previousResult = null;
+        _movedToReview = true;
+        _typing = false;
+        _error = null;
+        _errorRetained = false;
+        _phase = _CapturePhase.idle;
+      });
+      return;
+    }
+    _asking = true;
+    try {
+      await _starting;
+      await _finishRecording(submit: false, interrupted: true, quiet: true);
+      await _writes;
+      final started = _session;
+      if (started != null && started.id != previous.id) {
+        await _store.discard(started.id, _owner);
+      }
+    } catch (_) {
+      /* The new words stay in the pending list. */
+    } finally {
+      _asking = false;
+    }
+    if (!mounted || _previousResult != previous) return;
+    _words.clear();
+    ref.invalidate(pendingCapturesProvider);
+    _returns++;
+    setState(() {
+      _result = _previousResult;
+      _previousResult = null;
+      _movedToReview = true;
+      _session = previous;
+      _typing = false;
+      _error = null;
+      _errorRetained = false;
+    });
   }
 
   Future<void> _discard() async {
@@ -993,6 +1209,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   @override
   Widget build(BuildContext context) {
+    final result = _result;
+    if (result != null) {
+      _holdScrim(false);
+      return CaptureResult(
+        key: ValueKey(result.id),
+        session: result,
+        onSayAgain: _sayAgain,
+      );
+    }
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -1009,7 +1234,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         '00:${_seconds.toString().padLeft(2, '0')}',
       ),
       _CapturePhase.starting => l10n.captureStarting,
-      _CapturePhase.processing => l10n.puttingPlanTogether,
+      _CapturePhase.processing => l10n.captureUnderstanding,
       _ when recorded => l10n.recordingKept,
       _CapturePhase.paused => l10n.capturePaused,
       _CapturePhase.idle => null,
@@ -1262,6 +1487,493 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ],
         );
       },
+    );
+  }
+}
+
+/// The capture's result, inside the capture sheet: each thing to add with its
+/// date as the main line, and one button that adds them. Saving closes the
+/// sheet; an Undo after that reopens it on the restored result.
+class CaptureResult extends ConsumerStatefulWidget {
+  const CaptureResult({super.key, required this.session, this.onSayAgain});
+  final CaptureSession session;
+
+  /// Spoken captures: listen again. It gets the result as it is now, with
+  /// its edits written, so Cancel can bring it back.
+  final ValueChanged<CaptureSession>? onSayAgain;
+  @override
+  ConsumerState<CaptureResult> createState() => _CaptureResultState();
+}
+
+class _CaptureResultState extends ConsumerState<CaptureResult> {
+  late CaptureSession _session = widget.session;
+  late List<CaptureDraft> _items = _session.drafts;
+  late final CaptureStore _store;
+  Future<void> _writes = Future.value();
+  bool _saving = false;
+  String? _expandedId;
+  String? _error;
+  final _reviewWatch = Stopwatch()..start();
+  bool _finished = false;
+  final _actions = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _store = ref.read(captureStoreProvider);
+    unawaited(
+      CaptureDiagnostics(_store.database).record(CaptureEvent.reviewOpened),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (!_finished && _items.any((d) => d.pending)) {
+      unawaited(
+        CaptureDiagnostics(
+          _store.database,
+        ).record(CaptureEvent.leftReviewPending),
+      );
+      unawaited(
+        CaptureDiagnostics(_store.database).record(
+          CaptureEvent.reviewTime,
+          elapsedMs: _reviewWatch.elapsedMilliseconds,
+        ),
+      );
+    }
+    super.dispose();
+  }
+
+  /// Messages shown while the sheet is open float just above its button,
+  /// instead of covering it.
+  EdgeInsets? _aboveActions() {
+    if (!mounted) return null;
+    final box = _actions.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return null;
+    final top = box.localToGlobal(Offset.zero).dy;
+    final app = MediaQuery.of(Navigator.of(context).context);
+    final bottom = app.size.height - app.padding.bottom - top + 4;
+    return EdgeInsets.fromLTRB(15, 5, 15, bottom.clamp(10, double.infinity));
+  }
+
+  Future<void> _change(CaptureDraft draft) async {
+    setState(() {
+      _items = _items.map((d) => d.id == draft.id ? draft : d).toList();
+      _error = null;
+    });
+    final snapshot = _session.copyWith(drafts: _items, status: 'ready');
+    _session = snapshot;
+    _writes = _writes
+        .catchError((Object _) {})
+        .then((_) => _store.update(snapshot));
+    try {
+      await _writes;
+      await CaptureDiagnostics(_store.database).record(CaptureEvent.edited);
+      if (mounted) ref.invalidate(pendingCapturesProvider);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = CaptureProblem.reviewWriteFailed);
+      }
+    }
+  }
+
+  Future<void> _save() async {
+    final ready = _items.where((d) => d.ready).toList();
+    if (_saving || ready.isEmpty) return;
+    final saveWatch = Stopwatch()..start();
+    unawaited(
+      CaptureDiagnostics(_store.database).record(
+        CaptureEvent.reviewTime,
+        elapsedMs: _reviewWatch.elapsedMilliseconds,
+      ),
+    );
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final notifier = ref.read(taskProvider.notifier);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final navigator = Navigator.of(context);
+    final strings = context.l10n;
+    // Messages while the sheet stays open show over it; once it has closed,
+    // on the screen underneath.
+    final sheetMessages = ScaffoldMessenger.of(context);
+    final appMessages = ScaffoldMessenger.of(navigator.context);
+    final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
+    final before = _session;
+    final undoIds = <String, int>{};
+    try {
+      await _writes;
+      final result = await _store.saveReady(
+        _session.id,
+        _session.ownerKey,
+        ready.map((d) => d.id).toSet(),
+      );
+      _session = result;
+      _items = result.drafts;
+      for (final draft in result.drafts) {
+        if (ready.any((d) => d.id == draft.id) && draft.savedTaskId != null) {
+          undoIds[draft.id] = draft.savedTaskId!;
+        }
+      }
+      await CaptureDiagnostics(_store.database).record(
+        CaptureEvent.saved,
+        elapsedMs: saveWatch.elapsedMilliseconds,
+        count: ready.length,
+      );
+      _reviewWatch.reset();
+      _finished = !_items.any((d) => d.pending);
+      await notifier.loadTasks();
+      if (!mounted) return;
+      ref.invalidate(pendingCapturesProvider);
+      final remaining = _items.where((d) => d.pending).length;
+      _finished = remaining == 0;
+      final messenger = remaining == 0 ? appMessages : sheetMessages;
+      EdgeInsets? margin() =>
+          messenger == sheetMessages ? _aboveActions() : null;
+      final tasks = ready.where((item) => !item.task.isNote).toList();
+      final day = ready.length == 1 ? ready.single.task.dueDate : null;
+      final added = ready.length > 1
+          ? strings.captureTasksAdded(ready.length)
+          : day == null
+          ? strings.taskSavedInbox
+          : strings.taskAddedOn(context.weekdayDate(day));
+      final message = tasks.isEmpty
+          ? strings.noteSaved
+          : remaining > 0
+          ? '$added · ${strings.captureKeptForReview(remaining)}'
+          : added;
+      if (remaining == 0) {
+        // From the pending list, back to Calendar, where the tasks land.
+        if (origin?.showCalendar == true) {
+          navigator.popUntil((route) => route.isFirst);
+        } else {
+          Navigator.pop(context);
+        }
+        // Calendar shows the earliest saved day (the no-date row when none
+        // has a date); a task page that opened capture shows them itself.
+        final ids = {
+          for (final item in tasks)
+            if (undoIds[item.id] != null) undoIds[item.id]!,
+        };
+        final days =
+            tasks
+                .map((item) => item.task.dueDate)
+                .whereType<DateTime>()
+                .map(Task.day)
+                .toList()
+              ..sort();
+        if (ids.isNotEmpty) {
+          container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+            days.firstOrNull,
+            ids,
+            page: origin?.page,
+            showCalendar: origin?.showCalendar ?? false,
+          );
+        }
+      }
+      final feedback = showFeedback(
+        messenger,
+        message,
+        margin: margin(),
+        actionLabel: strings.undo,
+        onAction: () async {
+          if (mounted && _saving) return;
+          if (mounted) setState(() => _saving = true);
+          try {
+            if (container.read(captureOwnerProvider) != before.ownerKey) {
+              return;
+            }
+            // Finish edits to other rows before restoring this save.
+            await _writes;
+            final restored = await _store.undoSave(before, undoIds);
+            if (restored == null) {
+              if (messenger.mounted) {
+                unawaited(
+                  showFeedback(
+                    messenger,
+                    strings.reviewUndoChanged,
+                    margin: margin(),
+                  ),
+                );
+              }
+              return;
+            }
+            await container.read(taskProvider.notifier).loadTasks();
+            container.invalidate(pendingCapturesProvider);
+            if (mounted) {
+              setState(() {
+                _session = restored;
+                _items = restored.drafts;
+                _finished = false;
+              });
+              if (messenger.mounted) {
+                unawaited(
+                  showFeedback(
+                    messenger,
+                    strings.reviewUndoSaved,
+                    margin: margin(),
+                  ),
+                );
+              }
+            } else if (navigator.mounted &&
+                container.read(captureOwnerProvider) == before.ownerKey) {
+              // The sheet opens again on the restored result. That is the
+              // confirmation: a message would only hide under the sheet.
+              unawaited(
+                showCaptureSheet(
+                  navigator.context,
+                  captureId: restored.id,
+                  startListening: false,
+                  page: origin?.page,
+                ),
+              );
+            }
+          } catch (_) {
+            if (messenger.mounted) {
+              unawaited(
+                showFeedback(messenger, strings.undoError, margin: margin()),
+              );
+            }
+          } finally {
+            if (mounted) setState(() => _saving = false);
+          }
+        },
+      );
+      unawaited(feedback);
+      if (remaining == 0) {
+        askAboutRemindersAfterSave(
+          context,
+          ready.map((d) => d.task),
+          feedback: feedback,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = CaptureProblem.saveFailed);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _remove(CaptureDraft item) {
+    unawaited(_change(item.copyWith(removed: true)));
+    unawaited(
+      showFeedback(
+        ScaffoldMessenger.of(context),
+        context.l10n.reviewRemoved,
+        margin: _aboveActions(),
+        actionLabel: context.l10n.undo,
+        onAction: () {
+          if (mounted && !_saving) {
+            unawaited(_change(item.copyWith(removed: false)));
+          }
+        },
+      ),
+    );
+  }
+
+  /// `Volver a decirlo`: the edits are written first, so the result can come
+  /// back as it was.
+  Future<void> _sayAgain() async {
+    // Said again, so not left pending.
+    _finished = true;
+    try {
+      await _writes;
+    } catch (_) {
+      /* The edit's own error already shows. */
+    }
+    if (mounted) widget.onSayAgain?.call(_session);
+  }
+
+  /// `Cancelar` closes the sheet as Back does: the result stays pending.
+  /// `Volver a decirlo` (spoken words only) sits at the other end. They
+  /// share a row, and stack at large text.
+  Widget _exits(BuildContext context, {required bool spoken}) {
+    final l = context.l10n;
+    final cancel = TextButton(
+      onPressed: _saving ? null : () => unawaited(Navigator.maybePop(context)),
+      child: Text(l.cancel),
+    );
+    if (!spoken || widget.onSayAgain == null) {
+      return Align(alignment: AlignmentDirectional.centerStart, child: cancel);
+    }
+    final sayAgain = TextButton(
+      onPressed: _saving ? null : () => unawaited(_sayAgain()),
+      child: Text(l.captureSayAgain),
+    );
+    if (MediaQuery.textScalerOf(context).scale(14) > 18) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [cancel, sayAgain],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(child: cancel),
+        const SizedBox(width: 8),
+        Flexible(child: sayAgain),
+      ],
+    );
+  }
+
+  Future<void> _finishEmpty() async {
+    await _writes;
+    await _store.discard(_session.id, _session.ownerKey);
+    _finished = true;
+    if (mounted) {
+      ref.invalidate(pendingCapturesProvider);
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = _items.where((d) => d.pending).toList();
+    final ready = pending.where((d) => d.ready).length;
+    final compact = pending.length > 1;
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final note =
+        _session.kind == 'note' ||
+        (_items.isNotEmpty && _items.every((d) => d.task.isNote));
+    // "See what I said" and "Say it again" only fit words that were spoken.
+    final spoken = _session.source == 'speech' || _session.audioPath != null;
+    // With the keyboard up, only the button stays under the result.
+    final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final label = _saving
+        ? l.saving
+        : pending.isEmpty
+        ? l.captureFinish
+        : ready == 0
+        ? l.captureCheckDetails
+        : note
+        ? l.saveNote
+        : compact
+        ? l.captureAddTasks(ready)
+        : pending.single.task.dueDate != null
+        ? l.captureAddToCalendar
+        : l.captureAddTask;
+    return PopScope(
+      canPop: !_saving,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (compact)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Text(
+                  l.captureThingsToAdd(pending.length),
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: MessageBanner(
+                  captureProblemText(l, _error!),
+                  isError: true,
+                ),
+              ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final item in pending)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: compact ? 12 : 0),
+                        child: CaptureReviewEditor(
+                          key: ValueKey(item.id),
+                          draft: item,
+                          compact: compact,
+                          expanded: _expandedId == item.id,
+                          enabled: !_saving,
+                          onExpand: () => setState(
+                            () => _expandedId = _expandedId == item.id
+                                ? null
+                                : item.id,
+                          ),
+                          onChanged: (draft) => unawaited(_change(draft)),
+                          onRemove: () => _remove(item),
+                        ),
+                      ),
+                    if (pending.isEmpty)
+                      EmptyState(
+                        title: l.captureNothingToReview,
+                        message: l.captureRemovedDraftsHelp,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              key: _actions,
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    key: const ValueKey('save-drafts'),
+                    // With every draft removed, the button finishes instead.
+                    onPressed: _saving
+                        ? null
+                        : pending.isEmpty
+                        ? _finishEmpty
+                        : ready == 0
+                        ? null
+                        : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.done_all_rounded),
+                    label: Text(label),
+                  ),
+                  if (!typing) ...[
+                    const SizedBox(height: 12),
+                    _exits(context, spoken: spoken),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      leading: Icon(
+                        spoken
+                            ? Icons.graphic_eq_rounded
+                            : Icons.short_text_rounded,
+                        size: 20,
+                      ),
+                      title: Text(
+                        spoken ? l.reviewOriginal : l.reviewOriginalText,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      childrenPadding: const EdgeInsets.only(bottom: 8),
+                      expandedAlignment: Alignment.centerLeft,
+                      children: [
+                        // Long words scroll here, so the button stays in view.
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 160),
+                          child: SingleChildScrollView(
+                            child: SelectableText(_session.transcript),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

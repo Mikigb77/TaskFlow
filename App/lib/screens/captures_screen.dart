@@ -55,9 +55,11 @@ class CapturesScreen extends ConsumerWidget {
                                       '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${session.remaining.isNotEmpty ? context.l10n.captureDraftSummary(session.remaining.length, session.ready.length) : context.l10n.captureResumeHelp}'),
                                   trailing:
                                       const Icon(Icons.chevron_right_rounded),
+                                  // Saved tasks land back on Calendar.
                                   onTap: () => showCaptureSheet(context,
                                       captureId: session.id,
-                                      startListening: false),
+                                      startListening: false,
+                                      showCalendar: true),
                                 ))),
                     ])),
           ));

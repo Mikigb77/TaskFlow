@@ -17,7 +17,6 @@ import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/login_screen.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/api_client.dart';
@@ -157,11 +156,11 @@ void main() {
         tester,
         () =>
             problem.evaluate().isNotEmpty ||
-            find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+            find.byType(CaptureResult).evaluate().isNotEmpty,
         seconds: 100,
       );
       expect(
-        find.byType(ReviewTasksScreen),
+        find.byType(CaptureResult),
         findsNothing,
         reason: 'The provider recovered. Run the normal live AI check.',
       );
@@ -346,7 +345,7 @@ void main() {
       await waitFor(
         tester,
         () =>
-            find.byType(ReviewTasksScreen).evaluate().isNotEmpty ||
+            find.byType(CaptureResult).evaluate().isNotEmpty ||
             find
                 .textContaining('The processing service is unavailable.')
                 .evaluate()
@@ -354,14 +353,14 @@ void main() {
         seconds: 100,
       );
       expect(
-        find.byType(ReviewTasksScreen),
+        find.byType(CaptureResult),
         findsOneWidget,
         reason: 'The live provider did not return reviewable task drafts.',
       );
       await tester.pumpAndSettle();
       final draftItems = tester
-          .widget<ReviewTasksScreen>(find.byType(ReviewTasksScreen))
-          .session!
+          .widget<CaptureResult>(find.byType(CaptureResult))
+          .session
           .remaining
           .toList();
       expect(draftItems, hasLength(2));
@@ -388,7 +387,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await waitFor(
         tester,
-        () => find.byType(ReviewTasksScreen).evaluate().isEmpty,
+        () => find.byType(CaptureResult).evaluate().isEmpty,
       );
       await container.read(taskProvider.notifier).loadTasks();
       final added = container

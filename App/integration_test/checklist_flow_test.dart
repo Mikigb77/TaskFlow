@@ -9,7 +9,8 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
@@ -48,6 +49,8 @@ void main() {
     await lists.create(work);
     await lists.create(personal);
     final container = ProviderContainer(overrides: [
+      // The result opens in the capture sheet, which needs Pro.
+      hasProProvider.overrideWithValue(true),
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(repository),
@@ -102,9 +105,8 @@ void main() {
     await tester.pumpWidget(
         UncontrolledProviderScope(container: container, child: const MyApp()));
     await tester.pumpAndSettle();
-    tester.state<NavigatorState>(find.byType(Navigator)).push(
-        MaterialPageRoute<void>(
-            builder: (_) => ReviewTasksScreen(session: session)));
+    showCaptureSheet(tester.element(find.byType(Scaffold).first),
+        captureId: session.id, startListening: false);
     await tester.pumpAndSettle();
     final edit = find.byTooltip('Edit Passport');
     await tester.scrollUntilVisible(edit, 200);
@@ -122,7 +124,7 @@ void main() {
         tester,
         () async =>
             (await repository.getAllTasks()).length == 1 &&
-            find.byType(ReviewTasksScreen).evaluate().isEmpty);
+            find.byType(CaptureResult).evaluate().isEmpty);
     await container.read(taskProvider.notifier).loadTasks();
     var task = (await repository.getAllTasks()).single;
     expect(task.checklist.first.title, 'Renewed passport');

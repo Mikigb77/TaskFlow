@@ -127,6 +127,8 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               )
               .toList();
     final l = context.l10n;
+    final timed = field == 'schedule' || field == 'deadline';
+    final day = field == 'deadline' ? task.deadline : task.dueDate;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -151,63 +153,79 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        if (field == 'schedule' || field == 'deadline') ...[
+                        // A question that offers times is answered by picking
+                        // one of them or saying there is no time.
+                        if (timed &&
+                            day != null &&
+                            question.times.isNotEmpty) ...[
                           for (final clock in question.times)
-                            if ((field == 'deadline'
-                                    ? task.deadline
-                                    : task.dueDate) !=
-                                null)
-                              ActionChip(
-                                label: Text(
-                                  TimeOfDay(
-                                    hour: int.parse(clock.split(':')[0]),
-                                    minute: int.parse(clock.split(':')[1]),
-                                  ).format(context),
-                                ),
-                                onPressed: !widget.enabled
-                                    ? null
-                                    : () {
-                                        final day = (field == 'deadline'
-                                            ? task.deadline
-                                            : task.dueDate)!;
-                                        final date = DateTime(
-                                          day.year,
-                                          day.month,
-                                          day.day,
-                                          int.parse(clock.split(':')[0]),
-                                          int.parse(clock.split(':')[1]),
-                                        );
-                                        _resolve(
-                                          question,
-                                          value: field == 'deadline'
-                                              ? task.copyWith(
-                                                  deadline: date,
-                                                  deadlineHasTime: true,
-                                                )
-                                              : task.copyWith(
-                                                  dueDate: date,
-                                                  hasTime: true,
-                                                ),
-                                        );
-                                      },
+                            ActionChip(
+                              label: Text(
+                                TimeOfDay(
+                                  hour: int.parse(clock.split(':')[0]),
+                                  minute: int.parse(clock.split(':')[1]),
+                                ).format(context),
                               ),
-                          TextButton(
+                              onPressed: !widget.enabled
+                                  ? null
+                                  : () {
+                                      final date = DateTime(
+                                        day.year,
+                                        day.month,
+                                        day.day,
+                                        int.parse(clock.split(':')[0]),
+                                        int.parse(clock.split(':')[1]),
+                                      );
+                                      _resolve(
+                                        question,
+                                        value: field == 'deadline'
+                                            ? task.copyWith(
+                                                deadline: date,
+                                                deadlineHasTime: true,
+                                              )
+                                            : task.copyWith(
+                                                dueDate: date,
+                                                hasTime: true,
+                                              ),
+                                      );
+                                    },
+                            ),
+                          ActionChip(
+                            label: Text(l.reviewNoTime),
                             onPressed: !widget.enabled
                                 ? null
-                                : () => _schedule(
-                                    question: question,
-                                    deadline: field == 'deadline',
+                                : () => _resolve(
+                                    question,
+                                    value: field == 'deadline'
+                                        ? task.copyWith(
+                                            deadline: Task.day(day),
+                                            deadlineHasTime: false,
+                                          )
+                                        : task.copyWith(
+                                            dueDate: Task.day(day),
+                                            hasTime: false,
+                                          ),
                                   ),
-                            child: Text(l.reviewEditDetail),
+                          ),
+                        ] else ...[
+                          if (timed)
+                            TextButton(
+                              onPressed: !widget.enabled
+                                  ? null
+                                  : () => _schedule(
+                                      question: question,
+                                      deadline: field == 'deadline',
+                                    ),
+                              child: Text(l.reviewEditDetail),
+                            ),
+                          TextButton.icon(
+                            onPressed: !widget.enabled
+                                ? null
+                                : () => _resolve(question),
+                            icon: const Icon(Icons.check_rounded, size: 18),
+                            label: Text(l.reviewConfirmDetail),
                           ),
                         ],
-                        TextButton.icon(
-                          onPressed: !widget.enabled
-                              ? null
-                              : () => _resolve(question),
-                          icon: const Icon(Icons.check_rounded, size: 18),
-                          label: Text(l.reviewConfirmDetail),
-                        ),
                       ],
                     ),
                   ],
@@ -237,6 +255,40 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     onTap: widget.enabled ? onTap : null,
   );
 
+  /// The date is the result's main line; a collapsed row shows it smaller.
+  /// Tapping it opens the date sheet. TalkBack says what the line is:
+  /// `Fecha y hora: Hoy`.
+  Widget _dateLine({required bool main}) {
+    final text = Theme.of(context).textTheme;
+    final day = taskDayLine(context, task);
+    return Semantics(
+      label: '${context.l10n.reviewSchedule}: $day',
+      button: true,
+      enabled: widget.enabled,
+      excludeSemantics: true,
+      onTap: widget.enabled ? _schedule : null,
+      child: ListTile(
+        key: ValueKey('draft-schedule-${widget.draft.id}'),
+        contentPadding: EdgeInsets.zero,
+        dense: !main,
+        visualDensity: main ? null : VisualDensity.compact,
+        horizontalTitleGap: main ? 12 : 8,
+        minLeadingWidth: 0,
+        leading: Icon(
+          Icons.calendar_today_outlined,
+          color: Theme.of(context).colorScheme.primary,
+          size: main ? 24 : 18,
+        ),
+        title: Text(day),
+        titleTextStyle: main ? text.titleLarge : text.bodyMedium,
+        trailing: main
+            ? const Icon(Icons.chevron_right_rounded, size: 20)
+            : null,
+        onTap: widget.enabled ? _schedule : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -250,6 +302,47 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             widget.draft.reviewQuestions.any(
               (q) => ['deadline', 'duration'].contains(q.field),
             ));
+    // The project and the person show only when they are set: by the
+    // assistant, or because capture opened inside a project. The personal
+    // inbox is the default, so it stays behind `Más opciones`.
+    final showAssignment =
+        task.listId != null || !widget.draft.assignmentReviewed;
+    TaskAssignmentPicker assignment({bool asRow = false}) =>
+        TaskAssignmentPicker(
+          task: task,
+          compact: true,
+          asRow: asRow,
+          needsReview: !widget.draft.assignmentReviewed,
+          hints: widget.draft.assignmentHints,
+          onChanged: widget.enabled ? _change : null,
+          onReviewed: !widget.enabled
+              ? null
+              : () => widget.onChanged(
+                  widget.draft.copyWith(assignmentReviewed: true),
+                ),
+        );
+    final optionsSummary = [
+      if (task.priority > 1)
+        l.priorityValue(context.priorityName(task.priority)),
+      if (task.isRecurring) context.repeatLabel(task),
+    ];
+    final repair = [
+      if (repairTitle != null || repairNotes != null) ...[
+        Text(l.reviewRepairHelp, style: Theme.of(context).textTheme.bodySmall),
+        TextButton.icon(
+          onPressed: !widget.enabled
+              ? null
+              : () => _change(
+                  task.copyWith(
+                    title: repairTitle ?? task.title,
+                    notes: repairNotes ?? task.notes,
+                  ),
+                ),
+          icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
+          label: Text(l.reviewRepair),
+        ),
+      ],
+    ];
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -272,19 +365,10 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 ),
               ),
               IconButton(
-                tooltip: l.editCaptureItem(task.title),
-                onPressed: widget.enabled ? widget.onExpand : null,
-                icon: Icon(
-                  expanded ? Icons.expand_less_rounded : Icons.edit_outlined,
-                  size: 20,
-                ),
+                tooltip: l.removeCaptureItem(task.title),
+                onPressed: widget.enabled ? widget.onRemove : null,
+                icon: const Icon(Icons.close_rounded, size: 18),
               ),
-              if (expanded)
-                IconButton(
-                  tooltip: l.removeCaptureItem(task.title),
-                  onPressed: widget.enabled ? widget.onRemove : null,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                ),
             ],
           ),
         if (expanded) ...[
@@ -313,13 +397,10 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             ),
             onChanged: (value) => _change(task.copyWith(title: value)),
           ),
-          if (task.title.length > 80)
-            Text(
-              l.reviewShortTitle,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
           _questions('title'),
-          const SizedBox(height: 14),
+          // The date is the main line, with an open time question under it.
+          if (!task.isNote) ...[_dateLine(main: true), _questions('schedule')],
+          const SizedBox(height: 8),
           TextFormField(
             key: const ValueKey('draft-notes'),
             controller: _notes,
@@ -339,139 +420,74 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             ),
             onChanged: (value) => _change(task.copyWith(notes: value)),
           ),
-          const SizedBox(height: 16),
-        ] else if (task.notes?.isNotEmpty == true)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              task.notes!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.onSurfaceVariant),
+          const SizedBox(height: 8),
+          ...repair,
+          if (showAssignment) assignment(),
+          if (showPlanning && !task.isNote) ...[
+            if (task.deadline != null)
+              _row(
+                Icons.flag_outlined,
+                taskDeadlineLabel(context, task),
+                onTap: () => _schedule(deadline: true),
+              ),
+            _questions('deadline'),
+            if (task.durationMinutes != null)
+              Text(
+                l.durationMinutes(task.durationMinutes!),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            _questions('duration'),
+          ],
+          if (task.checklist.isNotEmpty)
+            ChecklistEditor(
+              items: task.checklist,
+              recurring: task.isRecurring,
+              onChanged: !widget.enabled
+                  ? null
+                  : (items) => _change(task.copyWith(checklist: items)),
             ),
-          ),
-        if (repairTitle != null || repairNotes != null) ...[
-          Text(
-            l.reviewRepairHelp,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          TextButton.icon(
-            onPressed: !widget.enabled
-                ? null
-                : () => _change(
-                    task.copyWith(
-                      title: repairTitle ?? task.title,
-                      notes: repairNotes ?? task.notes,
+          if (task.priority > 1 || task.isRecurring)
+            Wrap(
+              spacing: 8,
+              children: [
+                if (task.priority > 1)
+                  Chip(
+                    label: Text(
+                      l.priorityValue(context.priorityName(task.priority)),
                     ),
                   ),
-            icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
-            label: Text(l.reviewRepair),
-          ),
-        ],
-        if (!task.isNote) ...[
-          if (expanded) const Divider(height: 1),
-          if (expanded)
-            _row(
-              Icons.calendar_today_outlined,
-              l.reviewSchedule,
-              subtitle: taskScheduleLabel(task, context: context),
-              onTap: _schedule,
-              key: ValueKey('draft-schedule-${widget.draft.id}'),
-            )
-          else
-            ActionChip(
-              key: ValueKey('draft-schedule-${widget.draft.id}'),
-              avatar: const Icon(Icons.calendar_today_outlined, size: 18),
-              label: Text(taskScheduleLabel(task, context: context)),
-              onPressed: widget.enabled ? _schedule : null,
-            ),
-          _questions('schedule'),
-        ],
-        if (expanded) const Divider(height: 1),
-        TaskAssignmentPicker(
-          task: task,
-          compact: true,
-          asRow: expanded,
-          needsReview: !widget.draft.assignmentReviewed,
-          hints: widget.draft.assignmentHints,
-          onChanged: widget.enabled ? _change : null,
-          onReviewed: !widget.enabled
-              ? null
-              : () => widget.onChanged(
-                  widget.draft.copyWith(assignmentReviewed: true),
-                ),
-        ),
-        if (showPlanning && !task.isNote) ...[
-          if (task.deadline != null)
-            _row(
-              Icons.flag_outlined,
-              taskDeadlineLabel(context, task),
-              onTap: () => _schedule(deadline: true),
-            ),
-          _questions('deadline'),
-          if (task.durationMinutes != null)
-            Text(
-              l.durationMinutes(task.durationMinutes!),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          _questions('duration'),
-        ],
-        if (task.checklist.isNotEmpty && expanded)
-          ChecklistEditor(
-            items: task.checklist,
-            recurring: task.isRecurring,
-            onChanged: !widget.enabled
-                ? null
-                : (items) => _change(task.copyWith(checklist: items)),
-          ),
-        if (task.checklist.isNotEmpty && !expanded)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              l.checklistCount(task.checklistDone, task.checklist.length),
-            ),
-          ),
-        if (task.priority > 1 || task.isRecurring)
-          Wrap(
-            spacing: 8,
-            children: [
-              if (task.priority > 1)
-                Chip(
-                  label: Text(
-                    l.priorityValue(context.priorityName(task.priority)),
+                if (task.isRecurring)
+                  ActionChip(
+                    label: Text(context.repeatLabel(task)),
+                    tooltip: l.changeRepeat,
+                    onPressed: !widget.enabled
+                        ? null
+                        : () async {
+                            final result = await editTaskRepeat(context, task);
+                            if (result != null && mounted) _change(result);
+                          },
                   ),
-                ),
-              if (task.isRecurring)
-                ActionChip(
-                  label: Text(context.repeatLabel(task)),
-                  tooltip: l.changeRepeat,
-                  onPressed: !widget.enabled
-                      ? null
-                      : () async {
-                          final result = await editTaskRepeat(context, task);
-                          if (result != null && mounted) _change(result);
-                        },
-                ),
-            ],
-          ),
-        _questions('recurrence'),
-        _questions('details'),
-        if (expanded) ...[
+              ],
+            ),
+          _questions('recurrence'),
+          _questions('details'),
           const Divider(height: 1),
           ListTile(
             contentPadding: EdgeInsets.zero,
             key: ValueKey('draft-options-${widget.draft.id}'),
             leading: const Icon(Icons.tune_rounded, size: 22),
             title: Text(l.reviewOptions),
-            subtitle: Text(
-              '${l.priorityValue(context.priorityName(task.priority))} · ${context.repeatLabel(task)}',
-            ),
+            // Only what differs from the defaults; nothing when all are.
+            subtitle: optionsSummary.isEmpty
+                ? null
+                : Text(optionsSummary.join(' · ')),
             trailing: Icon(
               _options ? Icons.expand_less_rounded : Icons.expand_more_rounded,
             ),
             onTap: () => setState(() => _options = !_options),
           ),
           if (_options) ...[
+            if (!showAssignment) assignment(asRow: true),
             if (!task.isNote) ...[
               DropdownButtonFormField<int>(
                 initialValue: task.priority,
@@ -533,6 +549,17 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               label: Text(l.reviewRemove),
             ),
           ],
+        ] else ...[
+          // A collapsed row: its title, its date line and ✕, with every open
+          // question in view, so `Revisa los datos de arriba` always points
+          // at something.
+          _questions('title'),
+          if (!task.isNote) ...[_dateLine(main: false), _questions('schedule')],
+          ...repair,
+          if (!widget.draft.assignmentReviewed) assignment(),
+          if (!task.isNote) ...[_questions('deadline'), _questions('duration')],
+          _questions('recurrence'),
+          _questions('details'),
         ],
       ],
     );
@@ -544,7 +571,10 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               borderRadius: BorderRadius.circular(22),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Padding(padding: const EdgeInsets.all(18), child: body),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 8, 12),
+              child: body,
+            ),
           )
         : body;
   }

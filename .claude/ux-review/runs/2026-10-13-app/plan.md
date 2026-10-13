@@ -471,3 +471,72 @@ None.
 ### Noted, not planned
 - UX-202, UX-308, UX-439 to UX-446 were found fixed in code. Their lines move at close, with their phone checks.
 - From the D verify note, not counted: with a long Android "Time to take action" the question comes late (accepted in P55). A stray tap on the scrim as the question appears counts as asked. Watch for it on the phone check.
+
+## Round 2 (b3)
+
+Round 1 of batch 3 ran P58, P19, P36, P37, P9 and P16. The round check failed on one test: on Tareas the new task is highlighted but never scrolled into view (U5, partly fixed, first failure). The reviewers also found eight regressions, now UX-452 to UX-459.
+Round 2 has four packages: P59 (S3), P60 (S3), P61 (S2) and P62 (S1). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b3-r2.json`.
+
+### Packages, in run order
+
+#### P59 · Tareas scrolls the new task into view · A · M
+- **U5** (S3 package; partly, failed once) Calendar, the two-day batch and the pending list land correctly. On Tareas the filter switches to `Todas` and the row is highlighted, but it stays below the visible list (y 676–799 against 650). Last attempt called `showOnScreen` inside the NestedScrollView, which moved nothing. Now `_reveal` measures the row against the visible list and moves the header and the list itself, as Calendar does.
+
+#### P60 · Capture result: a visible Cancelar, and a safe Volver a decirlo · A · M
+- **UX-456** (S3; R1A-1, regression from P36) `Volver a decirlo` sat flush under `Añadir…` and threw the result away at once. Now the old result is kept until the new words are understood, `Cancelar` while listening again brings it back with its edits, and there is a 12 dp gap.
+- **UX-457** (S2; R1A-2, regression from P36) The result had no visible way out. A `Cancelar` button joins `Volver a decirlo` in one row; it closes the sheet and keeps the capture in the pending list.
+- **UX-458** (S1; R1A-3, regression from P36) TalkBack read the date line as just `Hoy`. It now reads `Fecha y hora: Hoy`, with no visible change.
+
+#### P61 · Date sheet: Listo shows why it waits; Sin fecha moves at once; honest labels · B · M
+- **UX-452** (S2; R1B-1, regression from P9; needs a phone) With the keyboard up, Listo with no a. m./p. m. seemed to do nothing, because the error was off-screen. Now Listo drops the keyboard, scrolls to the chips and the error, and TalkBack reads the error.
+- **UX-453** (S2; R1B-2, regression from P9) When moving a task, Hoy and Mañana applied at once but Sin fecha needed Listo. Now Sin fecha applies at once too, with Deshacer.
+- **UX-454** (S1; R1B-3, regression from P9) The series help line named an Inbox button that no longer exists. It now names `«Sin fecha»` / `No date` / `«Sense data»`.
+- **UX-455** (S1; R1B-4, regression from P9) The repeat sheet confirmed `No se repite` with `Guardar repetición`. It now says `Listo`, like the date sheet, and `keepRepeat` is removed.
+
+#### P62 · Notes: a new note that isn't in view doesn't move the list · C · S
+- **UX-459** (S1; R1C-1, regression from P16) When the search or a view-only project hides the new note, the list jumped to the top and showed nothing. Now it stays put. The brief corrects the reviewer's suggested check (whether the row's widget exists), which would also have stopped the normal landing after scrolling down; it decides from the filtered list instead.
+
+### Escalated
+None: U5 has failed once.
+
+### Skipped
+None.
+
+### Noted, not planned
+- UX-450, UX-110, UX-116, UX-117, UX-113, UX-124, UX-127, U4, UX-304, UX-313, UX-312, UX-323, UX-337, UX-434, UX-206, UX-212 and UX-221 (P9's part; its typed-time chips are P38's) were found fixed in code. Their lines move at close, with their phone checks (U4: UX_REVIEW §7 task 1; UX-434: an iPhone apostrophe).
+- From the A verify note, not regressions: the title shows twice on an expanded batch card, and `Borrador retirado` / `borradores` is jargon. Both predate this round.
+- From P19's implementer: with every draft removed, `reviewKeepDraft` still shows under `Terminar`, and the header still reads `Lista para cuando tú quieras` over `No queda nada por revisar`. The header is U11/D6; not planned this round.
+- From the B verify note: tapping the chip for the day a task is already on closes the sheet with "Movida al <same day>"; harmless and undoable.
+
+## Round 3 (b3)
+
+Round 2 of batch 3 ran P59, P60, P61 and P62. The reviewers found UX-452 to UX-459 fixed (UX-452 and UX-456 to UX-458 still need phone checks). U5 is only partly fixed and has now failed twice, so it is escalated. The round check failed on one test, U5's animations-off case. No existing test broke. The reviewers found four regressions, now UX-460 to UX-463. UX-460 is U5's remaining part and is escalated with it.
+Round 3 has two small packages: P63 (S2) and P64 (S1). One question goes to the owner: whether to allow a third attempt at U5.
+
+The briefs are in `plan-b3-r3.json`.
+
+### Decision for the owner
+- **U5 + UX-460: may the loop try U5 a third time?** On Tareas the new task now scrolls into view: with animations on, at 2× text, and when it's already showing. With Android's "Remove animations" on, it ends with 47 of its 123 px under the `Añadida…` message. Recommendation: allow one narrow attempt in `home_screen.dart` only. The space kept free for the message would be the message's final height (its box height minus 8), not where it sits mid-slide, with still one correction at most. The failing test `U5: with animations off…` stays the acceptance, unchanged. This is a technical fix, not a product change. Until it lands, the round check keeps failing on that one test.
+
+### Packages, in run order
+
+#### P63 · Cancel while understanding said-again words brings the result back · A · M
+- **UX-461** (S2; R2A-2, regression from P60) After `Volver a decirlo`, Cancelar or Back during `Entendiendo…` closed the sheet and kept both the old and the new capture pending. Now it brings the previous result back with its edits, as it already does while listening. The new words still being understood are thrown away when that step finishes. Last attempt (P60) checked for the previous result only after the processing branch. The brief also warns that awaiting the stop would wait for the new result.
+- **UX-462** (S1; R2A-3, regression from P60) While saving, TalkBack didn't say the date line is disabled. The line's Semantics now carries `enabled`. Nothing changes on screen.
+
+#### P64 · Moving: Sin fecha closes the sheet even with an empty hour · B · S
+- **UX-463** (S1; R2B-1, regression from P61) With `Añadir hora` on and the hour empty, `Sin fecha` in `Cambiar fecha` needed two taps, and nothing on screen said why. Now the hour is checked only when a time is kept.
+
+### Escalated
+- **U5** (with **UX-460**): failed in P37 (`showOnScreen` moved nothing) and in P59 (measured landing works, except with animations off). See the decision above. Calendar, the two-day batch and the pending list landings are verified.
+
+### Skipped
+None.
+
+### Noted, not planned
+- UX-452 to UX-459 were found fixed in code. Their lines move at close, with their phone checks (UX-452: the keyboard drops and TalkBack reads the error; UX-456: a one-handed mis-tap; UX-458: real TalkBack speech).
+- From the C verify note: on Notas filtered to a view-only project, `Nueva nota` saves to Personal and says only `Nota guardada`. It belongs with P38's `Añadir nota` and UX-314, not this round.
+- From P59's implementer: when the row isn't built yet, the build-out loop's first `innerController.jumpTo(0)` collapses the header completely. It goes to the owner with U5.
+- From P60's implementer: at 320 dp, with text up to 1.28×, Spanish `Volver a decirlo` may wrap inside its row. The reviewer saw no overflow at 2×.

@@ -10,7 +10,8 @@ import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/notification_service.dart';
@@ -42,6 +43,8 @@ void main() {
     final owner = repository.ownerKey;
     final store = CaptureStore(database);
     final container = ProviderContainer(overrides: [
+      // The result opens in the capture sheet, which needs Pro.
+      hasProProvider.overrideWithValue(true),
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(repository),
@@ -99,12 +102,12 @@ void main() {
         UncontrolledProviderScope(container: container, child: const MyApp()));
     await tester.pumpAndSettle();
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
-    navigator.push(MaterialPageRoute<void>(
-        builder: (_) => ReviewTasksScreen(session: session)));
+    showCaptureSheet(tester.element(find.byType(Scaffold).first),
+        captureId: session.id, startListening: false);
     await tester.pumpAndSettle();
     final reviewScroll = find
         .descendant(
-            of: find.byType(ReviewTasksScreen),
+            of: find.byType(CaptureResult),
             matching: find.byType(Scrollable))
         .first;
     await tester.scrollUntilVisible(
@@ -128,7 +131,7 @@ void main() {
         tester,
         () async =>
             (await repository.getAllTasks()).length == 2 &&
-            find.byType(ReviewTasksScreen).evaluate().isEmpty);
+            find.byType(CaptureResult).evaluate().isEmpty);
     await container.read(taskProvider.notifier).loadTasks();
     var report = (await repository.getAllTasks())
         .singleWhere((task) => task.title == 'Prepare the report');

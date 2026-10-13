@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/shell_tab_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
@@ -19,17 +20,23 @@ const _narrowLabelScaleCap = 1.2;
 // The theme's tab label size (app_theme.dart).
 const _labelFontSize = 12.0;
 
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key, this.initialIndex = 0});
   final int initialIndex;
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> {
   late int _index = widget.initialIndex;
   @override
   Widget build(BuildContext context) {
+    // Tasks saved from the pending list land on Calendar.
+    ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
+      if (focus?.showCalendar == true && _index != 0) {
+        setState(() => _index = 0);
+      }
+    });
     // Below 360 dp four tabs are too narrow for long words such as
     // "Calendario" at Flutter's 1.3x label cap, so only the label stops at
     // 1.2x: its font size shrinks so that Flutter's own cap lands on 1.2x. The

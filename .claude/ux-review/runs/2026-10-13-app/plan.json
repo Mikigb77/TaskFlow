@@ -868,6 +868,60 @@
    ]
   },
   {
+   "id": "P65",
+   "title": "Tareas: the new task clears the save message, animations on or off",
+   "area": "A",
+   "size": "S",
+   "severity": 4,
+   "findings": [
+    "U5",
+    "UX-460"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/home_screen.dart",
+    "App/test/capture_landing_test.dart"
+   ],
+   "brief": [
+    "Third, narrow attempt, approved by the main session (the reviewer's recommendation in b3). P37 and P59 already scroll a just-saved task into view on Tareas. With Android's 'Remove animations' on, the row ends at y 427-550 while the 'Añadida…' message starts at 503, so 47 px of the row are covered. Likely cause, from the code: _messageTop reads the snackbar before it settles.",
+    "In App/lib/screens/home_screen.dart only: compute the clearance from the message's final height (its size.height + 8), not from a mid-animation position. Keep at most one scroll correction. Don't change Calendar, which already passes.",
+    "Remove the skip from the test 'U5: with animations off…' in App/test/capture_landing_test.dart (skipped after b3) and make it pass unchanged."
+   ],
+   "acceptance": [
+    "capture_landing_test.dart 'U5: with animations off…' passes unchanged (skip removed).",
+    "The other U5 landing tests (animations on, 2x text, row already visible, Calendar) still pass.",
+    "With animations off, the saved row is fully above the 'Añadida…' message on Tareas."
+   ],
+   "deviceChecks": [
+    "UX_REVIEW §7 task 2 with Android's 'Remove animations' on: after saving from capture on Tareas, the new row shows in full."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P66",
+   "title": "Cancelling while it's understanding never freezes the sheet",
+   "area": "A",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-464"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/voice_task_screen.dart"
+   ],
+   "brief": [
+    "UX-464 (S2 regression R3A-1 from P63, b3 round 3): after Cancelar during 'Entendiendo…', the sheet stays busy until the abandoned understanding step answers (10 s or more), so 'Volver a decirlo', 'Empezar a hablar', 'Escribir' and 'Cancelar' do nothing. See verify-b3-r3-A.md.",
+    "The reviewer's proposed fix: don't await the abandoned step; use unawaited(_process()) in _stopRecording, and make sure a late answer from a cancelled step is ignored and doesn't overwrite the sheet. No new strings."
+   ],
+   "acceptance": [
+    "A widget test with a slow fake processor: Cancelar during 'Entendiendo…' makes 'Volver a decirlo', 'Empezar a hablar', 'Escribir' and 'Cancelar' respond at once.",
+    "When the cancelled step answers late, the sheet doesn't change."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
    "id": "P38",
    "title": "One Añadir tarea button, with typing in the same sheet",
    "area": "A",

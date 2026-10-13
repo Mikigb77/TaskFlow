@@ -659,7 +659,7 @@ void main() {
         beforeCapture: () async {
           await showFeedback(
             ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first)),
-            es.captureTasksSaved(1),
+            es.captureTasksAdded(1),
             actionLabel: es.undo,
             onAction: () => undone = true,
           );

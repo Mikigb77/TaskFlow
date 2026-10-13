@@ -112,17 +112,17 @@ abstract class AppLocalizations {
   /// **'Choose a date before adding a time.'**
   String get reviewChooseDate;
 
+  /// No description provided for @chooseAmPm.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose AM or PM.'**
+  String get chooseAmPm;
+
   /// No description provided for @reviewInvalidTime.
   ///
   /// In en, this message translates to:
   /// **'Check this value'**
   String get reviewInvalidTime;
-
-  /// No description provided for @reviewReady.
-  ///
-  /// In en, this message translates to:
-  /// **'Ready when you are'**
-  String get reviewReady;
 
   /// No description provided for @reviewOptions.
   ///
@@ -136,11 +136,11 @@ abstract class AppLocalizations {
   /// **'See what I said'**
   String get reviewOriginal;
 
-  /// No description provided for @reviewKeepDraft.
+  /// No description provided for @reviewOriginalText.
   ///
   /// In en, this message translates to:
-  /// **'Your draft is kept until you save it.'**
-  String get reviewKeepDraft;
+  /// **'Original text'**
+  String get reviewOriginalText;
 
   /// No description provided for @reviewRemove.
   ///
@@ -178,17 +178,17 @@ abstract class AppLocalizations {
   /// **'This text may have been saved with damaged accents. Review the correction before saving.'**
   String get reviewRepairHelp;
 
-  /// No description provided for @reviewShortTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Use a short title; keep the details in notes.'**
-  String get reviewShortTitle;
-
   /// No description provided for @reviewConfirmDetail.
   ///
   /// In en, this message translates to:
-  /// **'Keep this detail as shown'**
+  /// **'That’s right'**
   String get reviewConfirmDetail;
+
+  /// No description provided for @reviewNoTime.
+  ///
+  /// In en, this message translates to:
+  /// **'No time'**
+  String get reviewNoTime;
 
   /// No description provided for @reviewEditDetail.
   ///
@@ -207,12 +207,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check this detail'**
   String get reviewResolve;
-
-  /// No description provided for @reviewSaveOne.
-  ///
-  /// In en, this message translates to:
-  /// **'Save task'**
-  String get reviewSaveOne;
 
   /// This language's name in its own language, used in the language selector.
   ///
@@ -340,12 +334,6 @@ abstract class AppLocalizations {
   /// **'Search notes'**
   String get findNote;
 
-  /// No description provided for @reviewNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Review note'**
-  String get reviewNote;
-
   /// No description provided for @saveNote.
   ///
   /// In en, this message translates to:
@@ -369,6 +357,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ideas, meeting details, useful links…'**
   String get noteHint;
+
+  /// Example placeholder in the note title field.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Wi-Fi password'**
+  String get noteTitleHint;
+
+  /// No description provided for @noteTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Give your note a title'**
+  String get noteTitleRequired;
+
+  /// No description provided for @noteNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching notes'**
+  String get noteNoMatches;
+
+  /// No description provided for @notesSavedOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Your notes are still on this phone.'**
+  String get notesSavedOnDevice;
+
+  /// Option of the Notes project filter that shows the notes of every project.
+  ///
+  /// In en, this message translates to:
+  /// **'All notes'**
+  String get allNotes;
 
   /// No description provided for @deleteNoteQuestion.
   ///
@@ -844,29 +862,11 @@ abstract class AppLocalizations {
   /// **'Add time'**
   String get addTime;
 
-  /// No description provided for @chooseDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose date'**
-  String get chooseDate;
-
-  /// No description provided for @chooseTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose time'**
-  String get chooseTime;
-
   /// No description provided for @removeDate.
   ///
   /// In en, this message translates to:
   /// **'Remove date'**
   String get removeDate;
-
-  /// No description provided for @removeTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove time'**
-  String get removeTime;
 
   /// No description provided for @newTask.
   ///
@@ -1099,7 +1099,7 @@ abstract class AppLocalizations {
   /// No description provided for @taskTitle.
   ///
   /// In en, this message translates to:
-  /// **'Task Title'**
+  /// **'Task title'**
   String get taskTitle;
 
   /// No description provided for @additionalNotes.
@@ -1702,12 +1702,6 @@ abstract class AppLocalizations {
   /// **'Remove end date'**
   String get removeEndDate;
 
-  /// No description provided for @keepRepeat.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep repeat'**
-  String get keepRepeat;
-
   /// No description provided for @days.
   ///
   /// In en, this message translates to:
@@ -1864,12 +1858,6 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get reset;
 
-  /// No description provided for @puttingPlanTogether.
-  ///
-  /// In en, this message translates to:
-  /// **'Putting your plan together…'**
-  String get puttingPlanTogether;
-
   /// No description provided for @recordingKept.
   ///
   /// In en, this message translates to:
@@ -1935,12 +1923,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.'**
   String get capturePrivacy;
-
-  /// No description provided for @checkTasks.
-  ///
-  /// In en, this message translates to:
-  /// **'Check your tasks'**
-  String get checkTasks;
 
   /// No description provided for @lookRight.
   ///
@@ -2013,18 +1995,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Until {date}'**
   String untilDate(String date);
-
-  /// No description provided for @readyCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} ready to save'**
-  String readyCount(int count);
-
-  /// No description provided for @needsCheckCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 task needs} other{{count} tasks need}} a quick check. Save the ready ones whenever you like.'**
-  String needsCheckCount(int count);
 
   /// No description provided for @priorityValue.
   ///
@@ -2170,12 +2140,6 @@ abstract class AppLocalizations {
   /// **'Moved to Inbox'**
   String get movedInbox;
 
-  /// No description provided for @scheduleUpdated.
-  ///
-  /// In en, this message translates to:
-  /// **'Schedule updated'**
-  String get scheduleUpdated;
-
   /// No description provided for @scheduleChangedAgain.
   ///
   /// In en, this message translates to:
@@ -2203,7 +2167,7 @@ abstract class AppLocalizations {
   /// No description provided for @seriesRescheduleHelp.
   ///
   /// In en, this message translates to:
-  /// **'Changes the start of the series and resets individual moves or skips. Inbox stops the repeat.'**
+  /// **'Changes the start of the series and resets moved or skipped dates. No date stops the repeat.'**
   String get seriesRescheduleHelp;
 
   /// No description provided for @occurrenceRescheduleHelp.
@@ -2211,12 +2175,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other dates in the series stay the same.'**
   String get occurrenceRescheduleHelp;
-
-  /// No description provided for @saveSchedule.
-  ///
-  /// In en, this message translates to:
-  /// **'Save schedule'**
-  String get saveSchedule;
 
   /// No description provided for @restoreOriginal.
   ///
@@ -4540,11 +4498,11 @@ abstract class AppLocalizations {
   /// **'Remove {title}'**
   String removeCaptureItem(String title);
 
-  /// No description provided for @captureTasksSaved.
+  /// No description provided for @captureTasksAdded.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one {1 task saved} other {{count} tasks saved}}'**
-  String captureTasksSaved(int count);
+  /// **'{count, plural, one{1 task added} other{{count} tasks added}}'**
+  String captureTasksAdded(int count);
 
   /// No description provided for @captureKeptForReview.
   ///
@@ -4573,7 +4531,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureFinish.
   ///
   /// In en, this message translates to:
-  /// **'Finish'**
+  /// **'Done'**
   String get captureFinish;
 
   /// No description provided for @captureYourWords.
@@ -4594,11 +4552,41 @@ abstract class AppLocalizations {
   /// **'Check the details above'**
   String get captureCheckDetails;
 
-  /// No description provided for @captureSaveTasks.
+  /// No description provided for @captureUnderstanding.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one {Save 1 task} other {Save {count} tasks}}'**
-  String captureSaveTasks(int count);
+  /// **'Understanding…'**
+  String get captureUnderstanding;
+
+  /// No description provided for @captureThingsToAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 thing to add} other{{count} things to add}}'**
+  String captureThingsToAdd(int count);
+
+  /// No description provided for @captureAddToCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to calendar'**
+  String get captureAddToCalendar;
+
+  /// No description provided for @captureAddTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Add task'**
+  String get captureAddTask;
+
+  /// No description provided for @captureAddTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Add 1 task} other{Add {count} tasks}}'**
+  String captureAddTasks(int count);
+
+  /// No description provided for @captureSayAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Say it again'**
+  String get captureSayAgain;
 
   /// No description provided for @labelsExample.
   ///

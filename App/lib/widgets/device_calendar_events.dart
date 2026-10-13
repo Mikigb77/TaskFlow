@@ -125,6 +125,7 @@ class _EventsLine extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Semantics(
             button: true,
+            enabled: onTap != null,
             child: InkWell(
                 key: const ValueKey('calendar-events-line'),
                 onTap: onTap,

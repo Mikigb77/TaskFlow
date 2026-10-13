@@ -11,7 +11,6 @@ import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/archive_store.dart';
@@ -133,7 +132,7 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Done'));
       await _until(
         tester,
-        () async => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+        () async => find.byType(CaptureResult).evaluate().isNotEmpty,
       );
       await tester.pumpAndSettle();
       expect(find.text('Planning'), findsNothing);
@@ -144,7 +143,7 @@ void main() {
         tester,
         () async =>
             (await repository.getAllTasks()).length == 1 &&
-            find.byType(ReviewTasksScreen).evaluate().isEmpty,
+            find.byType(CaptureResult).evaluate().isEmpty,
       );
       await store.saveReady(
         capture.id,

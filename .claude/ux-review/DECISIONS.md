@@ -2,6 +2,30 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-13 (late) — The product bar, the login wall, and the free tier
+
+- **The selling point is speed, and it's the bar for every capture review.**
+  - Creating a task must be super quick: as little interaction as possible beyond the time spent speaking.
+  - About 5 seconds is a guide, not a hard number. The owner: "it does not specifically need to be 5s, but the idea is to make it super quick."
+  - Creating several tasks in a row (2, 3, 4, 5) must stay just as fast.
+  - Owner: "you create tasks super quick… that's where we have the advantage."
+  - Capture must feel clearly faster than typing.
+- **The login stays a hard wall** (U14 option 2 rejected).
+  - No use of the app before signing in.
+  - Owner's reasons: anonymous free use costs money, many such users never register, and it makes it harder to track who does what. Google sign-in makes the wall nearly effortless.
+  - Option 1 (Google first, one line saying what TaskFlow does) stands.
+- **Free tier** (replaces "D4b: not decided"):
+  - **Voice:** users without Pro get **10 free voice captures a month**.
+    - Counted per dictation, not per task (main session's default; the owner said "10 tasks a month with voice"). One dictation that yields several tasks counts once, because one dictation is one AI call. It also lets newcomers feel the several-tasks-at-once speed.
+    - After the 10, they type, and typing is never capped.
+  - **Attachments:** free users get a **total** attachment storage cap; Pro has none.
+    - The owner was unsure of the size ("2 MB or 500 MB").
+    - Main session's default: **100 MB in total**, a single backend setting so it's easy to change.
+    - 2 MB would block even one phone photo.
+  - Enforcement must be on the server; the app shows what's left.
+  - This needs backend work, so it's built outside the front-end-only UX loop, then reviewed with `/ux`.
+- **Two tabs** (U13): wait until the UX loop has finished. Then the owner tests with his father and other testers (family and friends), and decides after that.
+
 ## 2026-10-13 — Answers to the whole-app plan (D1–D15 in `runs/2026-10-13-app/plan.md`)
 
 The owner said: "from D1 to D15 go with your recommendations". In more detail:
@@ -80,6 +104,4 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - archived groups drop out of the daily view, capture and reminders.
 
 ## Open — not decided; anything that depends on these is a decision, not a fix
-- **Free voice captures** for users without Pro (D4b), a pricing call.
-- **Timing of the two-tab layout** (U13, D7a): after the capture fixes and the §7 test.
-- **Using the app before signing in** (U14 option 2, D8): revisit after the §7 test.
+- **The two-tab layout** (U13, D7a): after the UX loop and the owner's tests with his father, family and friends.

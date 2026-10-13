@@ -2,10 +2,10 @@ import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/schedule_editor.dart';
 
 /// Shared by Calendar, Tasks and details, including keyboard/accessible buttons.
 class TaskInteractions {
@@ -46,16 +46,24 @@ class TaskInteractions {
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.l10n;
-    final result = await showModalBottomSheet<
-            ({DateTime? date, bool hasTime, String scope})>(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => _ScheduleSheet(task: task));
+    final result = await editSchedule(context,
+        date: task.displayDate,
+        hasTime: task.hasTime,
+        title: task.isRecurring
+            ? strings.rescheduleRepeating
+            : strings.rescheduleTask,
+        moving: task);
     if (result == null ||
         !messenger.mounted ||
         !identical(container.read(taskProvider.notifier), notifier)) {
       return;
     }
+    // The row may have left the screen; the messenger's context still has
+    // the app's locale.
+    final day = result.date == null
+        ? null
+        : (context.mounted ? context : messenger.context)
+            .weekdayDate(result.date!);
     try {
       final seriesChange = result.scope == 'series'
           ? await notifier.rescheduleTask(task.id!, result.date, result.hasTime)
@@ -71,9 +79,9 @@ class TaskInteractions {
               ? strings.occurrenceSkippedNotice
               : result.scope == 'reset'
                   ? strings.originalRestored
-                  : result.date == null
+                  : day == null
                       ? strings.movedInbox
-                      : strings.scheduleUpdated,
+                      : strings.movedOccurrenceDate(day),
           actionLabel: strings.undo, onAction: () async {
         if (!messenger.mounted ||
             !identical(container.read(taskProvider.notifier), notifier)) {
@@ -98,151 +106,4 @@ class TaskInteractions {
   static void _error(ScaffoldMessengerState messenger, String text) {
     if (messenger.mounted) showFeedback(messenger, text);
   }
-}
-
-class _ScheduleSheet extends StatefulWidget {
-  final Task task;
-  const _ScheduleSheet({required this.task});
-  @override
-  State<_ScheduleSheet> createState() => _ScheduleSheetState();
-}
-
-class _ScheduleSheetState extends State<_ScheduleSheet> {
-  late String _scope = widget.task.isRecurring ? 'occurrence' : 'series';
-  late DateTime? _date = widget.task.displayDate;
-  late bool _hasTime = widget.task.hasTime;
-  void _setDay(DateTime? day) => setState(() {
-        _date = day == null
-            ? null
-            : DateTime(day.year, day.month, day.day, _hasTime ? _date!.hour : 0,
-                _hasTime ? _date!.minute : 0);
-        if (day == null) _hasTime = false;
-      });
-
-  Future<void> _pickDay() async {
-    final date = await showDatePicker(
-        context: context,
-        initialDate: _date ?? DateTime.now(),
-        firstDate: pickerFirstDate(_date),
-        lastDate: pickerLastDate(_date));
-    if (date != null && mounted) _setDay(date);
-  }
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-      child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                    widget.task.isRecurring
-                        ? context.l10n.rescheduleRepeating
-                        : context.l10n.rescheduleTask,
-                    style: Theme.of(context).textTheme.titleLarge),
-                if (widget.task.isRecurring)
-                  Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(spacing: 8, children: [
-                              for (final scope in ['occurrence', 'series'])
-                                ChoiceChip(
-                                    label: Text(scope == 'occurrence'
-                                        ? context.l10n.thisOccurrence
-                                        : context.l10n.wholeSeries),
-                                    selected: _scope == scope,
-                                    onSelected: (_) => setState(() {
-                                          _scope = scope;
-                                          _date = scope == 'series'
-                                              ? widget.task.dueDate
-                                              : widget.task.displayDate;
-                                          _hasTime = scope == 'series'
-                                              ? widget.task.seriesHasTime
-                                              : widget.task.hasTime;
-                                        }))
-                            ]),
-                            const SizedBox(height: 8),
-                            Text(_scope == 'series'
-                                ? context.l10n.seriesRescheduleHelp
-                                : context.l10n.occurrenceRescheduleHelp),
-                          ])),
-                const SizedBox(height: 16),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  ActionChip(
-                      label: Text(context.l10n.today),
-                      onPressed: () => _setDay(DateTime.now())),
-                  ActionChip(
-                      label: Text(context.l10n.tomorrow),
-                      onPressed: () {
-                        final now = DateTime.now();
-                        _setDay(DateTime(now.year, now.month, now.day + 1));
-                      }),
-                  if (_scope == 'series')
-                    ActionChip(
-                        label: Text(context.l10n.inbox),
-                        onPressed: () => _setDay(null)),
-                ]),
-                ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today_outlined),
-                    title: Text(_date == null
-                        ? context.l10n.inboxDate
-                        : DateFormat.yMMMEd(context.localeName).format(_date!)),
-                    subtitle: Text(context.l10n.chooseDate),
-                    onTap: _pickDay),
-                if (_date != null)
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.schedule_rounded),
-                      title: Text(_hasTime
-                          ? TimeOfDay.fromDateTime(_date!).format(context)
-                          : context.l10n.anyTime),
-                      subtitle: Text(context.l10n.chooseTime),
-                      trailing: _hasTime
-                          ? IconButton(
-                              tooltip: context.l10n.removeTime,
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () => setState(() {
-                                    _hasTime = false;
-                                    _date = Task.day(_date!);
-                                  }))
-                          : null,
-                      onTap: () async {
-                        final time = await showTimePicker(
-                            context: context,
-                            initialTime: _hasTime
-                                ? TimeOfDay.fromDateTime(_date!)
-                                : const TimeOfDay(hour: 9, minute: 0));
-                        if (time != null && mounted) {
-                          setState(() {
-                            _date = DateTime(_date!.year, _date!.month,
-                                _date!.day, time.hour, time.minute);
-                            _hasTime = true;
-                          });
-                        }
-                      }),
-                const SizedBox(height: 16),
-                SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                        onPressed: () => Navigator.pop(context,
-                            (date: _date, hasTime: _hasTime, scope: _scope)),
-                        child: Text(context.l10n.saveSchedule))),
-                if (widget.task.isRecurring && _scope == 'occurrence') ...[
-                  TextButton.icon(
-                      onPressed: () => Navigator.pop(
-                          context, (date: null, hasTime: false, scope: 'skip')),
-                      icon: const Icon(Icons.event_busy_outlined),
-                      label: Text(context.l10n.skipOccurrence)),
-                  if (widget.task.exceptions.any((change) =>
-                      change.originalDate == widget.task.occurrenceId))
-                    TextButton(
-                        onPressed: () => Navigator.pop(context,
-                            (date: null, hasTime: false, scope: 'reset')),
-                        child: Text(context.l10n.restoreOriginal)),
-                ],
-              ])));
 }

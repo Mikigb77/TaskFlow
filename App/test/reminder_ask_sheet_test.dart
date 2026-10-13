@@ -9,7 +9,7 @@ import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/create_task_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
-import 'package:agenda/screens/review_tasks_screen.dart';
+import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/feedback_timeout.dart';
 import 'package:agenda/services/task_database.dart';
@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'support/reminder_fixtures.dart';
 
@@ -244,7 +245,10 @@ void main() {
         tester,
         store,
         access,
-        overrides: [captureStoreProvider.overrideWithValue(captures)],
+        overrides: [
+          captureStoreProvider.overrideWithValue(captures),
+          ...captureSheetOverrides(),
+        ],
       );
       final l = strings(tester);
       final now = DateTime.now();
@@ -268,14 +272,7 @@ void main() {
           ],
         );
         captures.current = session;
-        tester
-            .state<NavigatorState>(find.byType(Navigator))
-            .push(
-              MaterialPageRoute<void>(
-                builder: (_) => ReviewTasksScreen(session: session),
-              ),
-            );
-        await tester.pumpAndSettle();
+        await openCaptureResult(tester, session.id);
         // Not on top of the review that is still open.
         expect(question(l), findsNothing);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -283,8 +280,17 @@ void main() {
       }
 
       await review('voice-1', 'Comprar pan');
-      expect(find.byType(ReviewTasksScreen), findsNothing);
-      expect(find.textContaining(l.captureTasksSaved(1)), findsOneWidget);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(
+        find.text(
+          l.taskAddedOn(
+            tester
+                .element(find.byType(CalendarScreen))
+                .weekdayDate(DateTime(now.year, now.month, now.day + 1)),
+          ),
+        ),
+        findsOneWidget,
+      );
       await letSaveMessageClose(tester);
       expect(question(l), findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, l.reminderAskNotNow));
@@ -292,7 +298,7 @@ void main() {
       expect(store.value.asked, isTrue);
 
       await review('voice-2', 'Llamar a mamá');
-      expect(find.byType(ReviewTasksScreen), findsNothing);
+      expect(find.byType(CaptureResult), findsNothing);
       expect(question(l), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -561,7 +567,10 @@ void main() {
           tester,
           store,
           access,
-          overrides: [captureStoreProvider.overrideWithValue(captures)],
+          overrides: [
+            captureStoreProvider.overrideWithValue(captures),
+            ...captureSheetOverrides(),
+          ],
         );
         final l = strings(tester);
         final now = DateTime.now();
@@ -584,18 +593,17 @@ void main() {
           ],
         );
         captures.current = session;
-        tester
-            .state<NavigatorState>(find.byType(Navigator))
-            .push(
-              MaterialPageRoute<void>(
-                builder: (_) => ReviewTasksScreen(session: session),
-              ),
-            );
-        await tester.pumpAndSettle();
+        await openCaptureResult(tester, session.id);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
-        expect(find.byType(ReviewTasksScreen), findsNothing);
-        final message = find.textContaining(l.captureTasksSaved(1));
+        expect(find.byType(CaptureResult), findsNothing);
+        final message = find.text(
+          l.taskAddedOn(
+            tester
+                .element(find.byType(CalendarScreen))
+                .weekdayDate(DateTime(now.year, now.month, now.day + 1)),
+          ),
+        );
         expect(message.hitTestable(), findsOneWidget);
         expect(sheet(), findsNothing);
         await tester.pump(
@@ -697,14 +705,16 @@ void main() {
         await tester.ensureVisible(title);
         await tester.longPress(title);
         await tester.pumpAndSettle();
-        expect(find.text(l.saveSchedule), findsOneWidget);
-        await tester.tap(find.widgetWithText(ActionChip, l.tomorrow));
+        expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+        final now = DateTime.now();
+        final moved = l.movedOccurrenceDate(
+          tester
+              .element(title)
+              .weekdayDate(DateTime(now.year, now.month, now.day + 1)),
+        );
+        await tester.tap(find.widgetWithText(ChoiceChip, l.tomorrow));
         await tester.pumpAndSettle();
-        final save = find.text(l.saveSchedule);
-        await tester.ensureVisible(save);
-        await tester.tap(save);
-        await tester.pumpAndSettle();
-        expect(find.text(l.scheduleUpdated).hitTestable(), findsOneWidget);
+        expect(find.text(moved).hitTestable(), findsOneWidget);
         expect(find.text(l.undo).hitTestable(), findsOneWidget);
         expect(sheet(), findsNothing);
         expect(question(l), findsNothing);
@@ -822,6 +832,8 @@ class _SavingCaptures extends CaptureStore {
       current?.id == id ? current : null;
   @override
   Future<List<CaptureSession>> pending(String ownerKey) async => [];
+  @override
+  Future<void> cleanFinished(String ownerKey) async {}
   @override
   Future<CaptureSession> saveReady(
     String id,

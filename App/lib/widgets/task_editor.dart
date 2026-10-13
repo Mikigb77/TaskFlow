@@ -119,6 +119,24 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     reminderTime: _reminderTime,
   );
 
+  Task get _repeatTask => _planningTask.copyWith(
+    repeatInterval: _repeatInterval,
+    repeatWeekdays: _repeatWeekdays,
+    repeatUntil: _repeatUntil,
+  );
+
+  /// The same repeat sheet as the capture result.
+  Future<void> _editRepeat() async {
+    final result = await editTaskRepeat(context, _repeatTask);
+    if (result == null || !mounted) return;
+    setState(() {
+      _recurrence = result.recurrence;
+      _repeatInterval = result.repeatInterval;
+      _repeatWeekdays = [...result.repeatWeekdays];
+      _repeatUntil = result.repeatUntil;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -389,7 +407,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       _suggestionBar = null;
       // Opened from Calendar or the day timeline: show where the task went.
       if (undoable && day != null && widget.calendarDate != null) {
-        focus.state = CalendarFocus(Task.day(day), created);
+        focus.state = CalendarFocus(Task.day(day), {created});
       }
       final feedback = showFeedback(
         messenger,
@@ -641,13 +659,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             ? context.l10n.noteTitle
                             : context.l10n.taskTitle,
                         hintText: _isNote
-                            ? context.l10n.noteHint
+                            ? context.l10n.noteTitleHint
                             : context.l10n.taskTitleHint,
                         counterText: '',
                       ),
                       validator: (value) =>
                           value == null || value.trim().isEmpty
-                          ? context.l10n.titleRequiredField
+                          ? _isNote
+                                ? context.l10n.noteTitleRequired
+                                : context.l10n.titleRequiredField
                           : null,
                     ),
                     if (suggestion != null) ...[
@@ -816,47 +836,26 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         ),
                         if (_dueDate != null) ...[
                           const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            key: ValueKey('repeat-$_recurrence'),
-                            initialValue: _recurrence,
-                            decoration: InputDecoration(
-                              labelText: context.l10n.repeat,
-                              prefixIcon: const Icon(Icons.repeat_rounded),
-                            ),
-                            items: Task.repeats.entries
-                                .map(
-                                  (e) => DropdownMenuItem(
-                                    value: e.key,
-                                    child: Text(
-                                      context.repeatName(e.key),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                          ListTile(
+                            key: const ValueKey('task-repeat'),
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.repeat_rounded),
+                            title: Text(context.l10n.repeat),
+                            subtitle: Text(
+                              [
+                                _recurrence == 'none'
+                                    ? context.repeatName(_recurrence)
+                                    : context.repeatLabel(_repeatTask),
+                                if (_recurrence != 'none' &&
+                                    _repeatUntil != null)
+                                  context.l10n.untilDate(
+                                    context.shortDate(_repeatUntil!),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (value) => setState(() {
-                              _recurrence = value!;
-                              if (value == 'none') {
-                                _repeatUntil = null;
-                                _repeatInterval = 1;
-                              }
-                              if (value != 'weekly') {
-                                _repeatWeekdays = [];
-                              }
-                            }),
-                          ),
-                          if (_recurrence != 'none')
-                            RepeatRuleControl(
-                              recurrence: _recurrence,
-                              interval: _repeatInterval,
-                              weekdays: _repeatWeekdays,
-                              onChanged: (interval, days) => setState(() {
-                                _repeatInterval = interval;
-                                _repeatWeekdays = days;
-                              }),
+                              ].join(' · '),
                             ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: _editRepeat,
+                          ),
                           if (_exceptions.isNotEmpty)
                             ExpansionTile(
                               tilePadding: EdgeInsets.zero,
@@ -885,46 +884,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       ),
                                       child: Text(context.l10n.reset),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          if (_recurrence != 'none')
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextButton.icon(
-                                    icon: const Icon(
-                                      Icons.event_outlined,
-                                      size: 18,
-                                    ),
-                                    label: Text(
-                                      _repeatUntil == null
-                                          ? context.l10n.noEndDate
-                                          : context.l10n.untilDate(
-                                              context.shortDate(_repeatUntil!),
-                                            ),
-                                    ),
-                                    onPressed: () async {
-                                      final date = await showDatePicker(
-                                        context: context,
-                                        initialDate: _repeatUntil ?? _dueDate!,
-                                        firstDate: Task.day(_dueDate!),
-                                        lastDate: pickerLastDate(
-                                          _repeatUntil ?? _dueDate,
-                                        ),
-                                      );
-                                      if (date != null && mounted) {
-                                        setState(() => _repeatUntil = date);
-                                      }
-                                    },
-                                  ),
-                                ),
-                                if (_repeatUntil != null)
-                                  IconButton(
-                                    tooltip: context.l10n.removeEndDate,
-                                    onPressed: () =>
-                                        setState(() => _repeatUntil = null),
-                                    icon: const Icon(Icons.close_rounded),
                                   ),
                               ],
                             ),

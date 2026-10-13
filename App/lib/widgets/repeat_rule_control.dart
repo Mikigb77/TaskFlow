@@ -177,6 +177,6 @@ class _RepeatSheetState extends State<_RepeatSheet> {
                 const SizedBox(height: 16),
                 FilledButton(
                     onPressed: () => Navigator.pop(context, _task),
-                    child: Text(context.l10n.keepRepeat)),
+                    child: Text(context.l10n.done)),
               ])));
 }

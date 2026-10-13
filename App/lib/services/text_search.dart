@@ -54,6 +54,8 @@ const _plain = {
   'ç': 'c',
   '·': '',
   'ŀ': 'l',
+  // iPhone keyboards type the curly apostrophe, Android ones the straight.
+  '’': "'",
 };
 
 final _plainByCodeUnit = {

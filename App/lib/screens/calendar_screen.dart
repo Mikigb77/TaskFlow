@@ -41,9 +41,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   // Tasks seen open on the selected day. Completing one keeps its place
   // until the day changes or Calendar is covered.
   final _openOnDay = <String>{};
-  // A just-saved task: waiting to appear, then shown and highlighted.
-  int? _landingId;
-  int? _landedId;
+  // Just-saved tasks: waiting to appear, then shown and highlighted. Saved
+  // without a date, the no-date row is highlighted instead.
+  Set<int> _landingIds = {};
+  Set<int> _landedIds = {};
+  bool _landingInbox = false;
+  bool _landedInbox = false;
   bool _highlight = false;
   Timer? _highlightTimer;
   final _landedRow = GlobalKey();
@@ -72,8 +75,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   void _select(DateTime day, [DateTime? focused]) {
     if (!isSameDay(day, _selectedDay)) {
       _openOnDay.clear();
-      _landingId = null;
-      _landedId = null;
+      _landingIds = {};
+      _landedIds = {};
+      _landingInbox = false;
+      _landedInbox = false;
     }
     _selectedDay = day;
     _focusedDay = focused ?? day;
@@ -99,14 +104,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   }
 
   void _land(CalendarFocus focus) => setState(() {
-    _select(focus.day);
-    _landingId = focus.taskId;
-    _landedId = null;
+    final day = focus.day;
+    if (day != null) _select(day);
+    _landingIds = day == null ? {} : focus.taskIds;
+    _landingInbox = day == null;
+    _landedIds = {};
+    _landedInbox = false;
     _highlight = false;
     _highlightTimer?.cancel();
   });
 
-  /// Brings the new task's row into view, clear of the save message, then
+  /// Brings the new task's row (the first, for several) into view, clear of the save message, then
   /// lets its highlight fade.
   Future<void> _reveal() async {
     for (var i = 0; i < 20 && mounted && _scroll.hasClients; i++) {
@@ -198,7 +206,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
-      if (focus != null) _land(focus);
+      // A task page that opened capture shows the tasks itself.
+      if (focus != null && focus.page == null) _land(focus);
     });
     _followToday();
     // Calendar is covered by another screen: the user has left it.
@@ -225,17 +234,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       if (settled(a) != settled(b)) return settled(a) ? 1 : -1;
       return Task.compareBySchedule(a, b);
     });
-    if (_landingId != null &&
+    if (_landingIds.isNotEmpty &&
         shown &&
-        events.any((task) => task.id == _landingId)) {
-      _landedId = _landingId;
-      _landingId = null;
+        events.any((task) => _landingIds.contains(task.id))) {
+      _landedIds = _landingIds;
+      _landingIds = {};
       _highlight = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
     }
-    final landedIndex = _landedId == null
-        ? -1
-        : events.indexWhere((task) => task.id == _landedId);
+    final landedIndex = events.indexWhere(
+      (task) => _landedIds.contains(task.id),
+    );
     final instant = MediaQuery.disableAnimationsOf(context);
     final now = _now();
     final today = isSameDay(_selectedDay, now);
@@ -260,6 +269,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           (task) => !task.isNote && task.dueDate == null && !task.isCompleted,
         )
         .length;
+    if (_landingInbox && shown && inbox > 0) {
+      _landingInbox = false;
+      _landedInbox = true;
+      _highlight = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
     final phoneCalendars = ref
         .watch(deviceCalendarProvider)
         .preferences
@@ -628,26 +643,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         task.displayDate != null &&
                         Task.dateKey(task.displayDate!) !=
                             Task.dateKey(_selectedDay);
-                    final landed = index == landedIndex;
                     return Padding(
-                      key: landed ? _landedRow : null,
+                      key: index == landedIndex ? _landedRow : null,
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: landed
-                          // The new task lights up, then fades back.
-                          ? TweenAnimationBuilder<Color?>(
-                              tween: ColorTween(
-                                end: _highlight
-                                    ? colors.primaryContainer
-                                    : colors.surface,
-                              ),
-                              duration: instant
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 600),
-                              builder: (context, color, _) => TaskTile(
-                                task: task,
-                                showDate: showDate,
-                                color: color,
-                              ),
+                      child: _landedIds.contains(task.id)
+                          ? LandedTaskTile(
+                              task: task,
+                              showDate: showDate,
+                              lit: _highlight,
                             )
                           : TaskTile(task: task, showDate: showDate),
                     );
@@ -661,12 +664,31 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverToBoxAdapter(
                   child: Align(
+                    key: _landedInbox ? _landedRow : null,
                     alignment: AlignmentDirectional.centerStart,
-                    child: TextButton.icon(
-                      key: const ValueKey('calendar-inbox'),
-                      onPressed: () => Navigator.pushNamed(context, '/inbox'),
-                      icon: const Icon(Icons.inbox_outlined, size: 18),
-                      label: Text(context.l10n.inboxCount(inbox)),
+                    // A task saved without a date lights this row up.
+                    child: TweenAnimationBuilder<Color?>(
+                      tween: ColorTween(
+                        end: _landedInbox && _highlight
+                            ? colors.primaryContainer
+                            : colors.primaryContainer.withValues(alpha: 0),
+                      ),
+                      duration: instant
+                          ? Duration.zero
+                          : const Duration(milliseconds: 600),
+                      builder: (context, color, child) => DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: child,
+                      ),
+                      child: TextButton.icon(
+                        key: const ValueKey('calendar-inbox'),
+                        onPressed: () => Navigator.pushNamed(context, '/inbox'),
+                        icon: const Icon(Icons.inbox_outlined, size: 18),
+                        label: Text(context.l10n.inboxCount(inbox)),
+                      ),
                     ),
                   ),
                 ),
