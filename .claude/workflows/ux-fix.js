@@ -27,6 +27,16 @@ const only = Array.isArray(a.only) && a.only.length ? new Set(a.only) : null
 const batch = typeof a.batch === 'string' && a.batch ? a.batch : ''
 const tag = batch ? `${batch}-` : ''
 const reportName = batch ? `report-${batch}.md` : 'report.md'
+const recordMemory = a.recordMemory !== false
+
+// Reading discipline for the checking steps. Whole files are what made the trial expensive:
+// every big read is written to cache once, then re-read on every later turn.
+const PKG = `python -I -X utf8 .claude/ux-review/pkg.py ${a.runDir}`
+const LEAN = [
+  `Read packages with: ${PKG} <ids> --conventions. Never open plan.json or plan-*.json directly; they are large.`,
+  `Read a finding with: grep -n -A 30 "<ID>" ${a.runDir}/review-*.md. Never read a whole review report.`,
+  'Read source files in the parts you need (search first, then read with offset and limit), and only the previews of screens that changed.',
+].join('\n')
 
 const HEADER = {
   type: 'object',
@@ -195,7 +205,8 @@ function testPrompt(round, impl, files) {
     'Packages implemented this round:',
     ...impl.map(packageLine),
     `Files changed this round: ${files.length ? files.join(', ') : 'none reported'}.`,
-    `Acceptance checks are in each package's plan file; the findings are in the review reports in ${a.runDir}/; the top-level "conventions" in ${a.runDir}/plan.json apply too.`,
+    LEAN,
+    'Run the whole suite with --reporter failures-only so only failures print.',
     'Parts of a package marked "waits on D#" were left out on purpose; do not test them.',
     files.some(f => /[\\/]android[\\/]/.test(f))
       ? 'Android files changed this round: include the compile check, flutter build apk --debug --no-pub --target-platform android-x64 (build only, never install). A broken native build fails the round.'
@@ -214,9 +225,9 @@ function verifyPrompt(round, area, items, tested) {
     `Mode: verify. UX loop run ${a.runId}, round ${round}, area ${area}. Today is ${a.date}.`,
     'Check only these work packages and their findings:',
     ...items.map(packageLine),
-    `Each package's acceptance checks are in its plan file; the findings are in the review reports in ${a.runDir}/.`,
+    LEAN,
     'Parts of a package marked "waits on D#" were left out on purpose (an owner decision is pending); do not count them as not fixed.',
-    `Files changed in this run: ${files.length ? files.join(', ') : 'none reported'}. See them with: git diff HEAD -- <file>.`,
+    `Files changed in this run: ${files.length ? files.join(', ') : 'none reported'}. See only what changed with: git diff HEAD -- <file>.`,
     'What ux-tester proved for these findings (a failing test means the acceptance check is not met):',
     ...(testLines.length ? testLines : ['- nothing reported']),
     'Judge every listed finding as fixed, partly or not_fixed, with evidence. Then look for regressions, only in these files and the flows they touch.',
@@ -245,6 +256,10 @@ function replanPrompt(round, failing, regressions, unchecked, tested, impl, fail
     ...impl.map(r => `- ${r.id}: ${r.status}${r.notes ? `. ${r.notes}` : ''}`),
   )
   if (twice.length) lines.push(`Failed twice, so escalate instead of re-planning: ${twice.join(', ')}`)
+  lines.push(
+    LEAN,
+    `Read only this round's verify notes (${a.runDir}/verify-${tag}r${round}-*.md) and the packages involved. In ISSUES.md, edit only the lines you change.`,
+  )
   lines.push(`Write the new packages to ${a.runDir}/plan-${tag}r${round + 1}.json (same structure as plan.json), append them to plan.md under "Round ${round + 1}${batch ? ` (${batch})` : ''}", add regressions to ISSUES.md with final IDs, then return the structured result.`)
   return lines.join('\n')
 }
@@ -267,6 +282,7 @@ function closePrompt(rounds, escalated, files) {
     `Escalated: ${escalated.length ? escalated.map(e => `${e.id} (${e.reason})`).join('; ') : 'none'}.`,
     `Files changed: ${ids(files)}.`,
     'A finding counts as verified only if the last round that checked it said "fixed" and no test for it failed. Note which verified findings are locked by a test. Phone checks stay listed for the owner.',
+    `Work from the round summaries above and this batch's verify notes (${a.runDir}/verify-${tag}*.md); don't re-read the plan or the review reports. In ISSUES.md, find each finding's line with grep and edit only those lines.`,
     `Update .claude/ux-review/ISSUES.md, then return the structured result with the full report in "report". Don't write a report file yourself; the main session saves it as ${a.runDir}/${reportName}${batch ? ` (this batch: ${batch})` : ''}.`,
   ].join('\n')
 }
@@ -336,6 +352,7 @@ for (let round = 1; ; round++) {
       label: `verify ${area} · round ${round}`,
       phase: 'Verify',
       schema: VERIFIED,
+      effort: 'high',
     })
   ))).filter(Boolean)
   const results = checked.flatMap(v => v.results)
@@ -377,6 +394,7 @@ for (let round = 1; ; round++) {
     label: `re-plan after round ${round}`,
     phase: 'Re-plan',
     schema: REPLANNED,
+    effort: 'high',
   })
   if (!next) break
   escalated.push(...next.escalated)
@@ -391,16 +409,20 @@ const close = await agent(closePrompt(rounds, escalated, [...changedAll]), {
   label: 'record ledger and report',
   phase: 'Record',
   schema: CLOSED,
+  effort: 'high',
 })
-await agent(
-  [
-    `Mode: memory. UX loop run ${a.runId} just finished.`,
-    `Read the verify-${tag}*.md files in ${a.runDir} and the run summary below, and update your memory with what is worth keeping: patterns the app now follows, changes to the screen map, recurring problem types.`,
-    `Run summary: ${close ? close.verdict : 'not available'}`,
-    'Issue statuses and owner decisions already live in .claude/ux-review/; do not copy them.',
-  ].join('\n'),
-  { agentType: 'frontend-ux-reviewer', label: 'record reviewer memory', phase: 'Record', effort: 'medium' },
-)
+// For a plan run in batches, the skill sets recordMemory false on every batch but the last.
+if (recordMemory) {
+  await agent(
+    [
+      `Mode: memory. UX loop run ${a.runId} just finished.`,
+      `Read the verify-*.md files in ${a.runDir} (search them; read only what you need) and the run summary below, and update your memory with what is worth keeping: patterns the app now follows, changes to the screen map, recurring problem types.`,
+      `Run summary: ${close ? close.verdict : 'not available'}`,
+      'Issue statuses and owner decisions already live in .claude/ux-review/; do not copy them.',
+    ].join('\n'),
+    { agentType: 'frontend-ux-reviewer', label: 'record reviewer memory', phase: 'Record', effort: 'medium' },
+  )
+}
 
 return {
   runId: a.runId,

@@ -122,6 +122,7 @@ Never push. Never commit on `main`. Never skip hooks.
 
 A plan with more than about 6 packages runs in batches of about 5, in plan order.
 - Each batch is one `ux-fix` run, with `only` set to the batch's packages and `batch` set to `b1`, `b2`, and so on.
+- Set `recordMemory: false` on every batch except the last, so the reviewer updates its memory once per plan.
 - After each batch: save its report, commit, run `ux.sh save`, then start the next batch.
 - Don't wait for the owner between batches.
 - Stop and tell the owner if a batch's tests fail, or if it escalates more than two findings.
