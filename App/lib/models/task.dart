@@ -445,6 +445,62 @@ class Task {
     return best;
   }
 
+  /// The occurrence Today lists as overdue, or null. A repeating task looks
+  /// only at its most recent occurrence before [today]: once that one is
+  /// completed or skipped, older misses stay in the past.
+  Task? overdueOn(DateTime today) {
+    if (isNote) return null;
+    final first = day(today);
+    if (!isRecurring) {
+      final date = dueDate ?? deadline;
+      return !isCompleted && date != null && day(date).isBefore(first)
+          ? this
+          : null;
+    }
+    DateTime? latestDate;
+    Task? latest;
+    void consider(DateTime date, Task? occurrence) {
+      if (day(date).isBefore(first) &&
+          (latestDate == null || date.isAfter(latestDate!))) {
+        latestDate = date;
+        latest = occurrence;
+      }
+    }
+
+    // A moved occurrence counts on its new day; a skipped one settles its day.
+    for (final change in exceptions) {
+      final original = DateTime.tryParse(change.originalDate);
+      if (original == null || !isBaseOccurrence(original)) continue;
+      final occurrence = change.skipped
+          ? null
+          : occurrenceByKey(change.originalDate);
+      consider(occurrence?.displayDate ?? original, occurrence);
+    }
+    final limit = repeatUntil != null && day(repeatUntil!).isBefore(first)
+        ? DateTime(repeatUntil!.year, repeatUntil!.month, repeatUntil!.day + 1)
+        : first;
+    final width = recurrence == 'weekly' && repeatWeekdays.isNotEmpty
+        ? repeatWeekdays.length
+        : 1;
+    // Walk back from the slot nearest today; only exceptions can be passed over.
+    var index = _indexNear(limit) + width;
+    for (
+      var attempts = 0;
+      index >= 0 && attempts <= exceptions.length + 2 * width + 2;
+      attempts++, index--
+    ) {
+      final date = _dateAt(index);
+      if (!day(date).isBefore(limit)) continue;
+      if (day(date).isBefore(day(dueDate!))) break;
+      final key = dateKey(date);
+      if (exceptions.any((change) => change.originalDate == key)) continue;
+      consider(date, occurrenceByKey(key));
+      break;
+    }
+    final occurrence = latest;
+    return occurrence == null || occurrence.isCompleted ? null : occurrence;
+  }
+
   Task copyWith({
     int? id,
     String? title,

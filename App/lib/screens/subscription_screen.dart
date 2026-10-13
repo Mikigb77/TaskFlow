@@ -25,8 +25,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   Future<void> _run(Future<BillingResult> Function() action) async {
     final result = await action();
     if (!mounted || result == BillingResult.cancelled) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.l10n.billingResult(result.name))),
+    showFeedback(
+      ScaffoldMessenger.of(context),
+      context.l10n.billingResult(result.name),
     );
   }
 
@@ -39,8 +40,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.billingStoreOpenError)),
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.billingStoreOpenError,
         );
       }
     }

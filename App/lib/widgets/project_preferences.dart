@@ -1,3 +1,4 @@
+import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
@@ -48,9 +49,7 @@ Future<void> showProjectPreferences(
     await ref.read(taskProvider.notifier).loadTasks();
   } catch (_) {
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.listUpdateError)));
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.listUpdateError);
     }
   }
 }

@@ -8,6 +8,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/capture_messages.dart';
 import 'package:agenda/services/capture_problem.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -92,6 +93,11 @@ class VoiceTaskScreen extends ConsumerWidget {
   }
 }
 
+/// Where a capture is. `starting` covers opening the screen and the moment
+/// before the recognizer is ready; `paused` follows leaving the app or an
+/// interruption that kept the words.
+enum _CapturePhase { starting, idle, listening, paused, processing }
+
 class _VoiceCaptureScreen extends ConsumerStatefulWidget {
   const _VoiceCaptureScreen({
     this.captureId,
@@ -124,7 +130,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   Future<void>? _starting;
   Future<void>? _stopping;
   bool _recording = false;
-  bool _busy = true;
+  _CapturePhase _phase = _CapturePhase.starting;
+  bool get _busy =>
+      _stopping != null ||
+      _phase == _CapturePhase.processing ||
+      (_phase == _CapturePhase.starting && !_recording);
+  bool _micBlocked = false;
   bool _initialized = false;
   bool _autoStart = false;
   bool _autoStarted = false;
@@ -172,6 +183,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _zone = ref.read(authProvider).account?.timezone ?? 'UTC';
     WidgetsBinding.instance.addObserver(this);
     CaptureInterruption.active = _interruptCapture;
+    // An earlier save's Undo must not follow the user into a new capture.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    });
     unawaited(_load());
   }
 
@@ -219,7 +234,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
     if (!mounted) return;
     setState(() {
-      _busy = false;
+      _phase = _CapturePhase.idle;
       _initialized = true;
     });
     unawaited(
@@ -320,7 +335,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   void _receiveSpeech(SpeechEvent event) {
     if (!_acceptSpeech || event.run != _nativeRun) return;
-    if (event.text?.trim().isNotEmpty == true) {
+    final text = event.text?.trim() ?? '';
+    if (event.kind == 'ready' || text.isNotEmpty) _listening();
+    if (event.kind == 'ready') {
+      // A new recognizer attempt is starting: keep what the field shows, even
+      // words the last attempt heard but never finalized.
+      final shown = _words.text.trim();
+      _nativePrefix = shown.length > 4000 ? shown.substring(0, 4000) : shown;
+    }
+    if (text.isNotEmpty) {
       if (!_firstWords) {
         _firstWords = true;
         unawaited(
@@ -330,27 +353,38 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ),
         );
       }
-      final words = [
-        _nativePrefix,
-        event.text!.trim(),
-      ].where((s) => s.isNotEmpty).join(' ');
+      // Committed segments append; the segment in progress shows after them
+      // and is replaced as it changes.
+      final words = [_nativePrefix, text].where((s) => s.isNotEmpty).join(' ');
       final bounded = words.length > 4000 ? words.substring(0, 4000) : words;
+      if (event.kind == 'segment') _nativePrefix = bounded;
       if (mounted) {
         _words.text = bounded;
         _words.selection = TextSelection.collapsed(offset: bounded.length);
       }
       _changedText(bounded);
     }
-    if (event.level != null && mounted && _recording) {
+    if (event.level != null && mounted && _phase == _CapturePhase.listening) {
       setState(() => _level = event.level!.clamp(0, 1));
     }
     if (event.error != null) _showProblem(event.error!);
     if (event.terminal) {
       if (_speechEnded?.isCompleted == false) _speechEnded!.complete();
-      // Automatic endpointing retains editable words. Only an explicit stop /
-      // review action sends them for online extraction.
-      if (_recording) unawaited(_finishRecording(submit: false));
+      // Pauses never end listening. A run that ends while still listening was
+      // interrupted (leaving the app) or failed: keep the words, don't send.
+      if (_recording) {
+        unawaited(
+          _finishRecording(submit: false, interrupted: event.kind == 'ended'),
+        );
+      }
     }
+  }
+
+  /// The microphone is really listening: show it and start the clock.
+  void _listening() {
+    if (!mounted || !_recording || _phase != _CapturePhase.starting) return;
+    setState(() => _phase = _CapturePhase.listening);
+    _armTimer();
   }
 
   void _armTimer() {
@@ -361,14 +395,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       setState(() => _seconds = timer.tick);
-      if (timer.tick >= 59) unawaited(_finishRecording(submit: false));
+      // The time cap acts as if the user had stopped.
+      if (timer.tick >= 60) unawaited(_finishRecording());
     });
   }
+
+  static bool _leaving(AppLifecycleState? state) =>
+      state == AppLifecycleState.hidden ||
+      state == AppLifecycleState.paused ||
+      state == AppLifecycleState.detached;
 
   Future<void> _startRecording() async {
     _holdSession = _holding;
     setState(() {
-      _busy = true;
+      _phase = _CapturePhase.starting;
       _error = null;
       _errorRetained = false;
     });
@@ -380,15 +420,23 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           'Save or discard this typed capture before starting a recording.',
         );
       }
-      if (!await (_usingNative
-          ? _speech.permission()
-          : _recorder.hasPermission())) {
+      final access = _usingNative
+          ? await _speech.permission()
+          : await _recorder.hasPermission()
+          ? SpeechPermission.granted
+          : SpeechPermission.denied;
+      if (access != SpeechPermission.granted) {
         await CaptureDiagnostics(
           _store.database,
         ).record(CaptureEvent.permissionDenied);
+        if (access == SpeechPermission.blocked) {
+          if (mounted) setState(() => _micBlocked = true);
+          return;
+        }
         throw StateError('Allow microphone access to record, or type below.');
       }
       if (!mounted) return;
+      if (_micBlocked) setState(() => _micBlocked = false);
       if (_session?.audioPath != null) {
         throw StateError(
           'Retry this recording or discard it before recording another.',
@@ -423,12 +471,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             _store.database,
           ).record(CaptureEvent.nativeStarted),
         );
+        // Listening shows, and its clock runs, from the recognizer's `ready`.
         await _speech.start(_nativeRun, _capability.language);
-        if (_recording) _armTimer();
-        if (!mounted ||
-            WidgetsBinding.instance.lifecycleState !=
-                AppLifecycleState.resumed ||
-            (_holdSession && !_holding)) {
+        if (!mounted || _leaving(WidgetsBinding.instance.lifecycleState)) {
+          await _finishRecording(submit: false, interrupted: true);
+        } else if (_holdSession && !_holding) {
           await _finishRecording(submit: false);
         }
         return;
@@ -468,21 +515,23 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       // A call can take audio focus while start() is still awaiting the native
       // reply, before the state listener can see _recording=true.
       if (await _recorder.isPaused() || !await _recorder.isRecording()) {
-        await _finishRecording(submit: false);
+        await _finishRecording(submit: false, interrupted: true);
         return;
       }
       if (!_recording) return;
-      _armTimer();
-      if (!mounted ||
-          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
-          (_holdSession && !_holding)) {
+      if (!mounted || _leaving(WidgetsBinding.instance.lifecycleState)) {
+        await _finishRecording(submit: false, interrupted: true);
+        return;
+      }
+      if (_holdSession && !_holding) {
         await _finishRecording(submit: false);
         return;
       }
+      _listening();
       _amplitude = _recorder
           .onAmplitudeChanged(const Duration(milliseconds: 120))
           .listen((value) {
-            if (mounted && _recording) {
+            if (mounted && _phase == _CapturePhase.listening) {
               setState(() => _level = ((value.current + 60) / 60).clamp(0, 1));
             }
           });
@@ -500,12 +549,25 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _showProblem(error);
     } finally {
       await _stopping;
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          if (_phase == _CapturePhase.starting && !_recording) {
+            _phase = _CapturePhase.idle;
+          }
+        });
+      }
     }
   }
 
-  Future<void> _finishRecording({bool submit = true}) =>
-      _stopping ??= _stopRecording(submit).whenComplete(() => _stopping = null);
+  /// Ends listening. Only the user stopping, or the time cap, [submit]s;
+  /// leaving the app or an interruption keeps the words: [interrupted].
+  Future<void> _finishRecording({
+    bool submit = true,
+    bool interrupted = false,
+  }) => _stopping ??= _stopRecording(submit, interrupted).whenComplete(() {
+    _stopping = null;
+    if (mounted) setState(() {});
+  });
 
   void _receiveRecorderState(RecordState state) {
     if (!mounted ||
@@ -517,26 +579,33 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // Audio focus can be lost with TaskFlow still in the foreground. Finalize
     // the partial file without submitting it or leaving a paused mic labelled
     // "Listening" until the ordinary recording timer expires.
-    unawaited(_finishRecording(submit: false));
+    unawaited(_finishRecording(submit: false, interrupted: true));
   }
 
-  Future<void> _stopRecording(bool submit) async {
+  _CapturePhase _restingPhase(bool interrupted) =>
+      interrupted &&
+          (_words.text.trim().isNotEmpty || _session?.audioPath != null)
+      ? _CapturePhase.paused
+      : _CapturePhase.idle;
+
+  Future<void> _stopRecording(bool submit, bool interrupted) async {
     if (!_recording) return;
     _recording = false;
     _listeningWatch?.stop();
     _timer?.cancel();
-    await _amplitude?.cancel();
     if (mounted) {
       setState(() {
-        _busy = true;
+        _phase = submit ? _CapturePhase.processing : _restingPhase(interrupted);
         _level = 0;
       });
     }
+    await _amplitude?.cancel();
     try {
       if (_usingNative) {
+        // The recognizer still has the last words: give it time to send them.
         await _speech.stop(_nativeRun);
         await _speechEnded?.future.timeout(
-          const Duration(seconds: 2),
+          const Duration(seconds: 4),
           onTimeout: () {},
         );
         _acceptSpeech = false;
@@ -566,23 +635,40 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _acceptSpeech = false;
       if (mounted) {
         ref.invalidate(pendingCapturesProvider);
-        setState(() => _busy = false);
+        setState(() => _phase = _restingPhase(interrupted));
       }
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_recording && state != AppLifecycleState.resumed) {
-      unawaited(_finishRecording(submit: false));
+    // `inactive` only means something covers the window (the notification
+    // shade, a system dialog, the permission prompt): listening goes on.
+    if (_recording && _leaving(state)) {
+      unawaited(_finishRecording(submit: false, interrupted: true));
     }
+    if (state == AppLifecycleState.resumed && _micBlocked) {
+      unawaited(_checkMicrophone());
+    }
+  }
+
+  /// Back from Settings: listen if the microphone is on now.
+  Future<void> _checkMicrophone() async {
+    try {
+      if (!await Permission.microphone.isGranted) return;
+    } catch (_) {
+      return;
+    }
+    if (!mounted || !_micBlocked) return;
+    setState(() => _micBlocked = false);
+    _beginRecording();
   }
 
   Future<void> _process() async {
     final api = ref.read(apiClientProvider);
     var inputKept = false;
     setState(() {
-      _busy = true;
+      _phase = _CapturePhase.processing;
       _error = null;
       _errorRetained = false;
     });
@@ -605,7 +691,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         retained: inputKept,
       );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && _phase == _CapturePhase.processing) {
+        setState(() => _phase = _CapturePhase.idle);
+      }
     }
   }
 
@@ -669,7 +757,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   Future<void> _interruptCapture() async {
     await _writes;
     await _starting;
-    await _finishRecording(submit: false);
+    await _finishRecording(submit: false, interrupted: true);
   }
 
   Future<void> _release() async {
@@ -699,7 +787,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final colors = Theme.of(context).colorScheme;
     final recorded = _session?.audioPath != null;
     return Scaffold(
-      appBar: CustomAppBar(title: context.l10n.captureThought, showAppearance: false),
+      appBar: CustomAppBar(
+        title: context.l10n.captureThought,
+        showAppearance: false,
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
@@ -793,25 +884,25 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      _recording
-                          ? context.l10n.listeningSeconds(
-                              '00:${_seconds.toString().padLeft(2, '0')}',
-                            )
-                          : _busy
-                          ? context.l10n.puttingPlanTogether
-                          : recorded
-                          ? context.l10n.recordingKept
-                          : context.l10n.tapSpeak,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                    Text(switch (_phase) {
+                      _CapturePhase.listening => context.l10n.listeningSeconds(
+                        '00:${_seconds.toString().padLeft(2, '0')}',
+                      ),
+                      _CapturePhase.starting => context.l10n.captureStarting,
+                      _CapturePhase.processing =>
+                        context.l10n.puttingPlanTogether,
+                      _ when recorded => context.l10n.recordingKept,
+                      _CapturePhase.paused => context.l10n.capturePaused,
+                      _CapturePhase.idle => context.l10n.tapSpeak,
+                    }, style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 12),
-                    if (_recording)
+                    if (_phase == _CapturePhase.listening)
                       LinearProgressIndicator(
                         value: _level,
                         semanticsLabel: context.l10n.inputLevel,
                       ),
-                    if (_busy) const LinearProgressIndicator(),
+                    if (_phase == _CapturePhase.processing)
+                      const LinearProgressIndicator(),
                     const SizedBox(height: 12),
                     Text(
                       _recording
@@ -825,6 +916,21 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                   ],
                 ),
               ),
+              if (_micBlocked) ...[
+                const SizedBox(height: 12),
+                MessageBanner(
+                  context.l10n.captureMicrophoneBlocked,
+                  isError: true,
+                  icon: Icons.mic_off_outlined,
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    onPressed: openAppSettings,
+                    child: Text(context.l10n.captureOpenSettings),
+                  ),
+                ),
+              ],
               if (!recorded && !_recording && !_busy) ...[
                 const SizedBox(height: 12),
                 ExpansionTile(

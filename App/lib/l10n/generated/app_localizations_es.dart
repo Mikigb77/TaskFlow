@@ -925,16 +925,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get nameTask => '¿Qué te gustaría hacer?';
 
   @override
-  String get chooseReminder => 'Elegir recordatorio';
-
-  @override
   String get reminder => 'Recordatorio';
 
   @override
   String get off => 'Desactivado';
-
-  @override
-  String get useReminder => 'Usar recordatorio';
 
   @override
   String get dateForReminder => 'Añade una fecha para usar un recordatorio';
@@ -943,18 +937,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chooseAlertTime => 'Elegir hora del aviso';
 
   @override
-  String get defaultTime => 'Usar la hora predeterminada';
-
-  @override
   String get reminderDefaultsError =>
       'No se pudieron cargar los valores predeterminados. Revisa los ajustes de notificaciones.';
 
   @override
   String get loadingReminders => 'Cargando los ajustes de recordatorios…';
-
-  @override
-  String get remindersDisabled =>
-      'Los recordatorios están desactivados en este dispositivo';
 
   @override
   String get repeatInterval => 'Intervalo de repetición';
@@ -1184,6 +1171,17 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String agendaCounts(int remaining, int done) {
     return '$remaining pendientes · $done completadas';
+  }
+
+  @override
+  String overdueCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Atrasadas · $count',
+      one: 'Atrasada · 1',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -1485,9 +1483,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get dayBefore => '1 día antes';
-
-  @override
-  String get deviceOff => 'desactivado en el dispositivo';
 
   @override
   String get defaultChoice => 'predeterminado';
@@ -2032,15 +2027,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get enableReminders => 'Activar recordatorios';
 
   @override
-  String get deviceReminderScope =>
-      'Para esta cuenta en este dispositivo. Las opciones de cada tarea se sincronizan; los ajustes del dispositivo se quedan aquí.';
+  String get noReminderTurnOn => 'Sin recordatorio · Activar';
+
+  @override
+  String get exactAlarmsNeeded =>
+      'Para que el aviso llegue a su hora, permite «Alarmas y recordatorios».';
+
+  @override
+  String get remindersOnConfirmation => 'Listo. Recordatorios activados.';
+
+  @override
+  String get reminderAskQuestion => '¿Quieres un recordatorio antes?';
+
+  @override
+  String get reminderAskQuestionTasks =>
+      '¿Quieres recordatorios antes de tus tareas?';
+
+  @override
+  String get reminderAskYes => 'Sí, recuérdamelo';
+
+  @override
+  String get reminderAskNotNow => 'Ahora no';
+
+  @override
+  String get details => 'Detalles';
 
   @override
   String get mobileNotificationsOnly =>
       'Notificaciones solo en dispositivos móviles';
-
-  @override
-  String get notificationPermissionOn => 'Permiso del sistema activado';
 
   @override
   String get notificationPermissionOff => 'Permiso del sistema desactivado';
@@ -2056,7 +2070,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get openSystemSettings => 'Abrir ajustes del sistema';
 
   @override
-  String get allowPreciseAlarms => 'Permitir alarmas exactas';
+  String get allowPreciseAlarms => 'Permitir «Alarmas y recordatorios»';
 
   @override
   String get taskDefaults => 'Opciones predeterminadas';
@@ -2074,10 +2088,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dailyCheckInsHelp => 'Un aviso para revisar tus tareas actuales.';
 
   @override
-  String get morningCheckIn => 'Mañana';
+  String get morningCheckIn => 'Por la mañana';
 
   @override
-  String get eveningCheckIn => 'Tarde';
+  String get eveningCheckIn => 'Por la tarde';
 
   @override
   String get upcomingAlerts => 'Próximos avisos';
@@ -2668,6 +2682,19 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get captureMicrophone =>
       'Permite el acceso al micrófono para grabar o escribe abajo.';
+
+  @override
+  String get captureMicrophoneBlocked =>
+      'El micrófono está desactivado para TaskFlow. Actívalo en Ajustes o escribe.';
+
+  @override
+  String get captureOpenSettings => 'Abrir Ajustes';
+
+  @override
+  String get captureStarting => 'Un momento…';
+
+  @override
+  String get capturePaused => 'En pausa';
 
   @override
   String get captureRecordingFirst =>

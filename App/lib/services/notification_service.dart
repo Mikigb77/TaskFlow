@@ -323,3 +323,25 @@ class TaskReminders {
     await initialize();
   }
 }
+
+/// The phone's side of reminders: support, permission and exact alarms.
+/// Screens go through this so widget tests can stand in for the phone.
+class ReminderAccess {
+  const ReminderAccess();
+  bool get supported => TaskReminders.supported;
+
+  /// Off the phone there is nothing to allow, so nothing is reported missing.
+  Future<ReminderCapability> capability() async {
+    if (!supported) return const ReminderCapability(allowed: true, exact: true);
+    await TaskReminders.initialize();
+    return TaskReminders.engine.driver.capability();
+  }
+
+  Future<bool> requestPermission() => TaskReminders.requestPermission();
+  Future<void> requestExactAccess() => TaskReminders.requestExactAccess();
+  Future<void> reconcile(String owner) async {
+    if (!supported) return;
+    await TaskReminders.initialize();
+    await TaskReminders.engine.reconcile(owner);
+  }
+}

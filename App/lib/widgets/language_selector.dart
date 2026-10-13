@@ -1,3 +1,4 @@
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/l10n/app_languages.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -61,9 +62,10 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
       if (mounted) Navigator.pop(context);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.preferenceError)));
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.preferenceError,
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);

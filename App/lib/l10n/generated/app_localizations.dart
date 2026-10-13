@@ -1654,12 +1654,6 @@ abstract class AppLocalizations {
   /// **'What would you like to do?'**
   String get nameTask;
 
-  /// No description provided for @chooseReminder.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose reminder'**
-  String get chooseReminder;
-
   /// No description provided for @reminder.
   ///
   /// In en, this message translates to:
@@ -1671,12 +1665,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get off;
-
-  /// No description provided for @useReminder.
-  ///
-  /// In en, this message translates to:
-  /// **'Use reminder'**
-  String get useReminder;
 
   /// No description provided for @dateForReminder.
   ///
@@ -1690,12 +1678,6 @@ abstract class AppLocalizations {
   /// **'Choose alert time'**
   String get chooseAlertTime;
 
-  /// No description provided for @defaultTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Use default time'**
-  String get defaultTime;
-
   /// No description provided for @reminderDefaultsError.
   ///
   /// In en, this message translates to:
@@ -1707,12 +1689,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading reminder settings…'**
   String get loadingReminders;
-
-  /// No description provided for @remindersDisabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Reminders are off on this device'**
-  String get remindersDisabled;
 
   /// No description provided for @repeatInterval.
   ///
@@ -2145,6 +2121,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{remaining} to do · {done} completed'**
   String agendaCounts(int remaining, int done);
+
+  /// Header above unfinished tasks from earlier days, shown first on Today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Overdue · {count}}}'**
+  String overdueCount(int count);
 
   /// No description provided for @completionCount.
   ///
@@ -2649,12 +2631,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'1 day before'**
   String get dayBefore;
-
-  /// No description provided for @deviceOff.
-  ///
-  /// In en, this message translates to:
-  /// **'device off'**
-  String get deviceOff;
 
   /// No description provided for @defaultChoice.
   ///
@@ -3586,23 +3562,59 @@ abstract class AppLocalizations {
   /// **'Enable reminders'**
   String get enableReminders;
 
-  /// No description provided for @deviceReminderScope.
+  /// No description provided for @noReminderTurnOn.
   ///
   /// In en, this message translates to:
-  /// **'For this account on this device. Task choices sync; device preferences stay here.'**
-  String get deviceReminderScope;
+  /// **'No reminder · Turn on'**
+  String get noReminderTurnOn;
+
+  /// No description provided for @exactAlarmsNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'To get reminders on time, allow “Alarms & reminders”.'**
+  String get exactAlarmsNeeded;
+
+  /// No description provided for @remindersOnConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Done. Reminders are on.'**
+  String get remindersOnConfirmation;
+
+  /// Asked once, on a card below the tasks, when a task with a date was saved in this session; "it" is that task.
+  ///
+  /// In en, this message translates to:
+  /// **'Want a reminder before it?'**
+  String get reminderAskQuestion;
+
+  /// The same question when the account already had dated tasks at launch and none was saved in this session.
+  ///
+  /// In en, this message translates to:
+  /// **'Want reminders before your tasks?'**
+  String get reminderAskQuestionTasks;
+
+  /// No description provided for @reminderAskYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, remind me'**
+  String get reminderAskYes;
+
+  /// No description provided for @reminderAskNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get reminderAskNotNow;
+
+  /// No description provided for @details.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get details;
 
   /// No description provided for @mobileNotificationsOnly.
   ///
   /// In en, this message translates to:
   /// **'Mobile notifications only'**
   String get mobileNotificationsOnly;
-
-  /// No description provided for @notificationPermissionOn.
-  ///
-  /// In en, this message translates to:
-  /// **'System permission is on'**
-  String get notificationPermissionOn;
 
   /// No description provided for @notificationPermissionOff.
   ///
@@ -3631,7 +3643,7 @@ abstract class AppLocalizations {
   /// No description provided for @allowPreciseAlarms.
   ///
   /// In en, this message translates to:
-  /// **'Allow precise alarms'**
+  /// **'Allow “Alarms & reminders”'**
   String get allowPreciseAlarms;
 
   /// No description provided for @taskDefaults.
@@ -4491,6 +4503,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow microphone access to record, or type below.'**
   String get captureMicrophone;
+
+  /// Shown by the microphone when Android will no longer ask for microphone access.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone is off for TaskFlow. Turn it on in Settings, or type instead.'**
+  String get captureMicrophoneBlocked;
+
+  /// Opens the phone’s settings for TaskFlow, to turn the microphone on.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings'**
+  String get captureOpenSettings;
+
+  /// Capture status while the microphone starts, before it is listening.
+  ///
+  /// In en, this message translates to:
+  /// **'One moment…'**
+  String get captureStarting;
+
+  /// Capture status after leaving the app or an interruption ended listening; the words are kept.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get capturePaused;
 
   /// No description provided for @captureRecordingFirst.
   ///

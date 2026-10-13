@@ -175,8 +175,11 @@ ProviderContainer designContainer({
   RegionalPreferenceStore? regionalStore,
   TaskNotifier Function()? tasks,
   List<TaskListInfo>? projects,
+  // Extra stand-ins a test needs, e.g. reminder storage or the phone's side.
+  List<Override> overrides = const [],
 }) => ProviderContainer(
   overrides: [
+    ...overrides,
     invitationLinkProvider.overrideWith(
       (ref) => InvitationLinks(listen: false),
     ),

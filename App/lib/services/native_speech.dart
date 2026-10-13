@@ -12,6 +12,13 @@ class SpeechCapability {
   bool get usable => onDevice && languageInstalled != false;
 }
 
+/// The microphone permission answer. `blocked`: Android won't ask again, so
+/// only the phone's Settings can turn the microphone on.
+enum SpeechPermission { granted, denied, blocked }
+
+/// One event of a listening run: `ready`, `partial` (the words of the segment
+/// in progress), `segment` (committed words), `level`, `ended` (only after
+/// stop, cancel or leaving the app) and `error` (only what can't recover).
 class SpeechEvent {
   final int run;
   final String kind;
@@ -24,8 +31,7 @@ class SpeechEvent {
           text: map['text'] as String?,
           level: (map['level'] as num?)?.toDouble(),
           error: map['error'] as String?);
-  bool get terminal =>
-      kind == 'final' || kind == 'error' || kind == 'interrupted';
+  bool get terminal => kind == 'ended' || kind == 'error';
 }
 
 /// Only the explicit Android on-device recognizer is used. Audio fallback goes
@@ -56,8 +62,12 @@ class NativeSpeech {
     }
   }
 
-  Future<bool> permission() async =>
-      await channel.invokeMethod<bool>('permission') ?? false;
+  Future<SpeechPermission> permission() async =>
+      switch (await channel.invokeMethod<Object>('permission')) {
+        'granted' || true => SpeechPermission.granted,
+        'blocked' => SpeechPermission.blocked,
+        _ => SpeechPermission.denied,
+      };
   Future<bool> prepareLanguage(String language) async =>
       await channel
           .invokeMethod<bool>('prepareLanguage', {'language': language}) ??

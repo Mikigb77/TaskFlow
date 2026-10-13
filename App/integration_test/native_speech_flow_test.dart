@@ -74,7 +74,7 @@ void main() {
     await binding.convertFlutterSurfaceToImage();
     await tester.pump();
     await binding.takeScreenshot('speech-live-transcript');
-    speech.emit('interrupted', null);
+    speech.emit('ended', null);
     await _wait(
       tester,
       () async =>
@@ -131,7 +131,7 @@ class _SpeechFixture extends NativeSpeech {
   @override
   Stream<SpeechEvent> get events => controller.stream;
   @override
-  Future<bool> permission() async => true;
+  Future<SpeechPermission> permission() async => SpeechPermission.granted;
   @override
   Future<void> start(int id, String language) async {
     run = id;
@@ -141,7 +141,7 @@ class _SpeechFixture extends NativeSpeech {
       controller.add(SpeechEvent(run!, kind, text: text));
   @override
   Future<void> stop(int id) async {
-    emit('final', null);
+    emit('ended', null);
   }
 
   @override

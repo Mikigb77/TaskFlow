@@ -17,6 +17,45 @@
  ],
  "packages": [
   {
+   "id": "P51",
+   "title": "Ask once about reminders, in a sheet after the first dated task",
+   "area": "D",
+   "size": "M",
+   "severity": 4,
+   "findings": [
+    "UX-401"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/widgets/reminder_ask_card.dart (replace with a sheet, or delete)",
+    "the place where a saved task is shown after saving (calendar_screen.dart, task_editor.dart, review_tasks_screen.dart: search for where P32/P48 show the card)",
+    "App/lib/services/reminder_preferences.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb"
+   ],
+   "brief": [
+    "Why: D2a says ask once, at the first saved task with a date. P32 put the question in a card in the bottom bar (it squeezed the agenda to 16 px at 320x568 with 2x text), and P48 moved it to the end of the lists, where it is below the fold, so a newcomer never sees it. It failed twice (UX-401, escalated in batch b1). See plan.md 'Round 3 (b1)' and the Escalated line in ISSUES.md.",
+    "Replace the in-list card with a modal bottom sheet. Show it exactly once per account and device: right after the user's first task with a date is saved and shown (typed or spoken), after the save confirmation, never on top of an unsaved form.",
+    "Copy, exactly (reuse the keys P32 added if they match; otherwise add them in all three ARB files): question ES '¿Quieres un recordatorio antes?' / EN 'Want a reminder before it?' / CA 'Vols un recordatori abans?'. Primary button ES 'Sí, recuérdamelo' / EN 'Yes, remind me' / CA 'Sí, recorda-m'ho'. Secondary ES 'Ahora no' / EN 'Not now' / CA 'Ara no'.",
+    "'Sí, recuérdamelo' turns the reminders switch on and asks Android for the notification permission in the same tap (and exact alarms only if P8's one-sentence ask applies). 'Ahora no' closes the sheet. Either answer, or dismissing the sheet, records that the question was asked, so it never appears again.",
+    "Delete the in-list card from the Calendar list, the Tareas list and the empty state, and remove ARB keys that become unused. Don't add a setting or a screen.",
+    "Layout: at 2x text on 320x568 in Spanish and Catalan, the question and both buttons are visible without scrolling. TalkBack announces the question when the sheet opens. Follow Material 3 bottom-sheet conventions (drag handle, Back closes it)."
+   ],
+   "acceptance": [
+    "After saving the first task with a date (typed, and through voice review), the sheet appears once; saving a second dated task does not show it again.",
+    "Tapping 'Sí, recuérdamelo' turns reminders on and requests the notification permission; 'Ahora no' leaves them off; both close the sheet and the question never returns.",
+    "Saving a task without a date never shows the sheet.",
+    "At 2x text on 320x568, in Spanish and Catalan, the question and both buttons are visible without scrolling.",
+    "No reminder card remains in the Calendar list, the Tareas list or the empty state.",
+    "The two failing tests in App/test/reminder_ask_card_test.dart (skipped after batch b1) are replaced by tests of the sheet."
+   ],
+   "deviceChecks": [
+    "On Android 13+, a fresh install: save the first dated task, tap 'Sí, recuérdamelo', and allow notifications; the reminder then arrives on time."
+   ],
+   "dependsOn": []
+  },
+  {
    "id": "P31",
    "title": "Overdue tasks show on Today",
    "area": "B",

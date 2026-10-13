@@ -5,12 +5,21 @@ import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/services/revenuecat_service.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/billing_fixtures.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const timeoutChannel = MethodChannel('taskflow/accessibility');
+  final platform =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  setUp(
+    () => platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+  );
+  tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
   for (final language in ['en', 'es', 'ca']) {
     testWidgets('complimentary Pro hides checkout and restore in $language', (
       tester,

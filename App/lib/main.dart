@@ -1,3 +1,4 @@
+import 'package:agenda/widgets/app_components.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -184,13 +185,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       }
     } catch (_) {
       if (mounted && _navigator.currentContext != null) {
-        ScaffoldMessenger.maybeOf(_navigator.currentContext!)?.showSnackBar(
-          SnackBar(
-            content: Text(
+        final messenger = ScaffoldMessenger.maybeOf(_navigator.currentContext!);
+        if (messenger != null) {
+          unawaited(
+            showFeedback(
+              messenger,
               _navigator.currentContext!.l10n.sharedCaptureRetained,
             ),
-          ),
-        );
+          );
+        }
       }
     } finally {
       _openingEntry = false;

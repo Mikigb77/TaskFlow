@@ -2,6 +2,28 @@ import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/services/feedback_timeout.dart';
+
+/// Every brief message goes through here: it replaces the one on screen,
+/// floats above the bottom bar and goes away by itself, after Android's
+/// accessibility timeout when that is longer.
+Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>
+    showFeedback(ScaffoldMessengerState messenger, String text,
+        {String? actionLabel, VoidCallback? onAction}) async {
+  messenger.hideCurrentSnackBar();
+  final duration = await FeedbackTimeout.forAction();
+  if (!messenger.mounted) return null;
+  return messenger.showSnackBar(SnackBar(
+    // Snackbars with an action persist by default in the current SDK.
+    persist: false,
+    duration: duration,
+    behavior: SnackBarBehavior.floating,
+    content: Text(text),
+    action: actionLabel == null
+        ? null
+        : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
+  ));
+}
 
 class ThemeToggle extends ConsumerWidget {
   const ThemeToggle({super.key});
@@ -18,8 +40,8 @@ class ThemeToggle extends ConsumerWidget {
                 .setMode(dark ? ThemeMode.light : ThemeMode.dark);
           } catch (_) {
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.l10n.appearanceChangedError)));
+              showFeedback(ScaffoldMessenger.of(context),
+                  context.l10n.appearanceChangedError);
             }
           }
         },

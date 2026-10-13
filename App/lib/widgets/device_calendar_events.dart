@@ -176,8 +176,8 @@ class _CalendarSheet extends ConsumerWidget {
                           await ref.read(deviceCalendarsProvider).open(event);
                         } catch (_) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(l.calendarOpenError)));
+                            showFeedback(ScaffoldMessenger.of(context),
+                                l.calendarOpenError);
                           }
                         }
                       })

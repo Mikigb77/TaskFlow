@@ -61,9 +61,10 @@ class TaskDetailScreen extends ConsumerWidget {
       if (context.mounted) Navigator.pop(context);
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.deleteTaskError)));
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.deleteTaskError,
+        );
       }
     }
   }
@@ -182,10 +183,9 @@ class TaskDetailScreen extends ConsumerWidget {
                                     .updateTask(changed);
                               } catch (_) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(context.l10n.moveError),
-                                    ),
+                                  showFeedback(
+                                    ScaffoldMessenger.of(context),
+                                    context.l10n.moveError,
                                   );
                                 }
                               }
@@ -298,12 +298,9 @@ class TaskDetailScreen extends ConsumerWidget {
                                       );
                                 } catch (_) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          context.l10n.updateReminderError,
-                                        ),
-                                      ),
+                                    showFeedback(
+                                      ScaffoldMessenger.of(context),
+                                      context.l10n.updateReminderError,
                                     );
                                   }
                                 }
@@ -354,14 +351,9 @@ class TaskDetailScreen extends ConsumerWidget {
                                             );
                                       } catch (_) {
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                context.l10n.stepUpdateError,
-                                              ),
-                                            ),
+                                          showFeedback(
+                                            ScaffoldMessenger.of(context),
+                                            context.l10n.stepUpdateError,
                                           );
                                         }
                                       }

@@ -8,19 +8,25 @@ class ReminderPreferences {
   final int? dateOnlyTime;
   final int? morning;
   final int? evening;
+
+  /// Whether this account on this phone has answered the one-time
+  /// ‘Want a reminder before it?’ question, either way.
+  final bool asked;
   const ReminderPreferences(
       {this.enabled = false,
       this.leadMinutes = 10,
       this.dateOnlyTime,
       this.morning,
-      this.evening});
+      this.evening,
+      this.asked = false});
 
   Map<String, dynamic> toJson() => {
         'enabled': enabled,
         'lead': leadMinutes,
         'date_only': dateOnlyTime,
         'morning': morning,
-        'evening': evening
+        'evening': evening,
+        'asked': asked
       };
   factory ReminderPreferences.fromJson(Map<String, dynamic> json) =>
       ReminderPreferences(
@@ -28,7 +34,8 @@ class ReminderPreferences {
           leadMinutes: (json['lead'] as int? ?? 10).clamp(-1, 10080),
           dateOnlyTime: _minute(json['date_only']),
           morning: _minute(json['morning']),
-          evening: _minute(json['evening']));
+          evening: _minute(json['evening']),
+          asked: json['asked'] == true);
   static int? _minute(Object? value) =>
       value is int && value >= 0 && value < 1440 ? value : null;
 }

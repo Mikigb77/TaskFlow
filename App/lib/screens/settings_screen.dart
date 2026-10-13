@@ -89,14 +89,9 @@ class SettingsScreen extends ConsumerWidget {
                                         .setMode(option.$1);
                                   } catch (_) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            context.l10n.appearanceError,
-                                          ),
-                                        ),
+                                      showFeedback(
+                                        ScaffoldMessenger.of(context),
+                                        context.l10n.appearanceError,
                                       );
                                     }
                                   }
@@ -182,19 +177,14 @@ class SettingsScreen extends ConsumerWidget {
                       final opened =
                           await ref.read(captureEntriesProvider).pinWidget();
                       if (!opened && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(context.l10n.homeCaptureInstructions),
-                          ),
+                        _showWidgetHelp(
+                          context,
+                          context.l10n.homeCaptureInstructions,
                         );
                       }
                     } catch (_) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(context.l10n.widgetPickerHelp),
-                          ),
-                        );
+                        _showWidgetHelp(context, context.l10n.widgetPickerHelp);
                       }
                     }
                   },
@@ -290,3 +280,28 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 }
+
+/// Instructions are too long to read before a snackbar times out, so they
+/// stay until the user closes them.
+void _showWidgetHelp(BuildContext context, String text) =>
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(text, style: Theme.of(context).textTheme.bodyLarge),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(context.l10n.done),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );

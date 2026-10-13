@@ -13,6 +13,7 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/widgets/reminder_ask_card.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_editor.dart';
@@ -196,9 +197,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         body: tasks.when(
           data: (all) {
             final now = DateTime.now();
+            final overdue = _filter == 1
+                ? all.map((task) => task.overdueOn(now)).whereType<Task>()
+                      .toSet()
+                : <Task>{};
             final filtered = all
                 .map((task) => task.nextOpenOccurrence())
                 .whereType<Task>()
+                // A one-off overdue task is already its own next occurrence.
+                .followedBy(overdue.where((task) => task.isRecurring))
                 .where(
                   (task) =>
                       !task.isCompleted &&
@@ -209,7 +216,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           (_filter == 4 && task.listId == null) ||
                           (_filter == 2 && task.priority == 3) ||
                           (_filter == 1 &&
-                              DateUtils.isSameDay(task.displayDate, now))) &&
+                              (overdue.contains(task) ||
+                                  DateUtils.isSameDay(
+                                    task.displayDate,
+                                    now,
+                                  )))) &&
                       matchesSearch(
                         '${task.title} ${task.notes ?? ''} ${task.labels.join(' ')} ${task.checklist.map((item) => item.title).join(' ')}',
                         _query,
@@ -232,12 +243,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : context.l10n.inboxEmpty,
                     icon: Icons.check_box_outlined,
                   ),
+                  // Other pages may hold the dated tasks it asks about.
+                  if (_query.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: ReminderAskCard(),
+                    ),
                 ],
               );
             }
             return RefreshIndicator(
               onRefresh: () => ref.read(taskProvider.notifier).loadTasks(),
-              child: TaskList(tasks: filtered),
+              child: TaskList(
+                tasks: filtered,
+                footer: _query.isEmpty ? const ReminderAskCard() : null,
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

@@ -12,6 +12,7 @@ import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/reminder_control.dart';
 
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -59,13 +60,10 @@ class _NotificationSettingsScreenState
     });
     try {
       final store = ref.read(reminderPreferenceStoreProvider);
+      final access = ref.read(reminderAccessProvider);
       final settings = await store.read(_owner);
-      var capability = _capability;
-      if (TaskReminders.supported) {
-        await TaskReminders.initialize();
-        await TaskReminders.engine.reconcile(_owner);
-        capability = await TaskReminders.engine.driver.capability();
-      }
+      await access.reconcile(_owner);
+      final capability = await access.capability();
       final alerts = await store.upcomingAlerts(_owner);
       final meta = await store.schedulingInfo();
       int deferred = 0;
@@ -101,9 +99,6 @@ class _NotificationSettingsScreenState
     var saved = false;
     try {
       final store = ref.read(reminderPreferenceStoreProvider);
-      if (settings.enabled && _settings?.enabled != true) {
-        await TaskReminders.requestPermission();
-      }
       await store.write(_owner, settings);
       saved = true;
       if (mounted) ref.invalidate(reminderPreferencesProvider);
@@ -115,6 +110,17 @@ class _NotificationSettingsScreenState
       if (mounted) setState(() => _busy = false);
     }
     if (mounted && saved) await _load();
+  }
+
+  Future<void> _turnOn() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await turnOnReminders(context);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (mounted) await _load();
   }
 
   ReminderPreferences _changed(
@@ -132,7 +138,8 @@ class _NotificationSettingsScreenState
           morning:
               identical(morning, _same) ? _settings!.morning : morning as int?,
           evening:
-              identical(evening, _same) ? _settings!.evening : evening as int?);
+              identical(evening, _same) ? _settings!.evening : evening as int?,
+          asked: _settings!.asked);
   static const _same = Object();
   String _time(int? minute) => minute == null
       ? context.l10n.off
@@ -148,6 +155,26 @@ class _NotificationSettingsScreenState
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
+    final access = ref.read(reminderAccessProvider);
+    final supported = access.supported;
+    // The status and its fixes show only when something stops reminders.
+    final problem = !supported ||
+        !_capability.allowed ||
+        !_capability.exact ||
+        _schedulerError != null ||
+        _deferred > 0;
+    final retry = OutlinedButton(
+        onPressed: _busy
+            ? null
+            : () async {
+                try {
+                  await TaskReminders.retrySetup();
+                } catch (_) {
+                  await TaskReminders.recordError('setup_failed');
+                }
+                if (mounted) _load();
+              },
+        child: Text(context.l10n.retryScheduling));
     return Scaffold(
         appBar: CustomAppBar(title: context.l10n.notifications),
         body: RefreshIndicator(
@@ -166,39 +193,40 @@ class _NotificationSettingsScreenState
                 SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     title: Text(context.l10n.enableReminders),
-                    subtitle: Text(context.l10n.deviceReminderScope),
                     value: settings.enabled,
-                    onChanged: _busy || !TaskReminders.supported
+                    onChanged: _busy || !supported
                         ? null
-                        : (value) => _save(_changed(enabled: value))),
-                ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(_capability.allowed
-                        ? Icons.notifications_active_outlined
-                        : Icons.notifications_off_outlined),
-                    title: Text(!TaskReminders.supported
-                        ? context.l10n.mobileNotificationsOnly
-                        : _capability.allowed
-                            ? context.l10n.notificationPermissionOn
-                            : context.l10n.notificationPermissionOff),
-                    subtitle: Text(_capability.exact
-                        ? context.l10n.preciseAlarmsAvailable
-                        : context.l10n.approximateAlarmsHelp)),
-                Wrap(spacing: 8, children: [
-                  OutlinedButton(
-                      onPressed:
-                          TaskReminders.supported ? openAppSettings : null,
-                      child: Text(context.l10n.openSystemSettings)),
-                  if (Platform.isAndroid && !_capability.exact)
-                    TextButton(
-                        onPressed: _busy
-                            ? null
-                            : () async {
-                                await TaskReminders.requestExactAccess();
-                                if (mounted) _load();
-                              },
-                        child: Text(context.l10n.allowPreciseAlarms)),
-                ]),
+                        : (value) => value
+                            ? _turnOn()
+                            : _save(_changed(enabled: false))),
+                if (problem) ...[
+                  if (!supported || !_capability.allowed || !_capability.exact)
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.notifications_off_outlined),
+                        title: Text(!supported
+                            ? context.l10n.mobileNotificationsOnly
+                            : !_capability.allowed
+                                ? context.l10n.notificationPermissionOff
+                                : context.l10n.exactAlarmsNeeded)),
+                  if (_deferred > 0)
+                    MessageBanner(context.l10n.deferredAlerts(_deferred)),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    OutlinedButton(
+                        onPressed: supported ? openAppSettings : null,
+                        child: Text(context.l10n.openSystemSettings)),
+                    if (supported && !_capability.exact)
+                      TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  await access.requestExactAccess();
+                                  if (mounted) _load();
+                                },
+                          child: Text(context.l10n.allowPreciseAlarms)),
+                    retry,
+                  ]),
+                ],
                 const SizedBox(height: 24),
                 SectionLabel(context.l10n.taskDefaults),
                 DropdownButtonFormField<int>(
@@ -216,50 +244,52 @@ class _NotificationSettingsScreenState
                         _busy ? null : (value) => _save(_changed(lead: value))),
                 _timeRow(context.l10n.dateOnlyTasks, settings.dateOnlyTime,
                     (value) => _save(_changed(dateOnly: value))),
-                const SizedBox(height: 24),
-                SectionLabel(context.l10n.dailyCheckIns),
-                Text(context.l10n.dailyCheckInsHelp),
-                _timeRow(context.l10n.morningCheckIn, settings.morning,
-                    (value) => _save(_changed(morning: value))),
-                _timeRow(context.l10n.eveningCheckIn, settings.evening,
-                    (value) => _save(_changed(evening: value))),
-                const SizedBox(height: 24),
-                SectionLabel(context.l10n.upcomingAlerts),
-                Text(context.l10n.scheduledAlertHelp),
-                if (_deferred > 0)
-                  MessageBanner(context.l10n.deferredAlerts(_deferred)),
                 const SizedBox(height: 8),
-                Text(Platform.isAndroid
-                    ? context.l10n.androidAlertRefreshHelp
-                    : context.l10n.backgroundAlertRefreshHelp),
-                if (_alerts.isEmpty)
-                  Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Text(context.l10n.noUpcomingAlerts)),
-                for (final alert in _alerts)
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(alert['daily'] == 1
-                          ? ((alert['identity'] as String).endsWith('/morning')
-                              ? context.l10n.morningCheckIn
-                              : context.l10n.eveningCheckIn)
-                          : alert['title'] as String),
-                      subtitle: Text(
-                          '${_alertDate(alert)} · ${context.reminderStatus(alert['status'] as String)}${alert['daily'] == 1 ? ' · ${context.l10n.repeatsDaily}' : ''}${alert['error'] == null ? '' : '\n${context.reminderDiagnostic(alert['error'] as String)}'}'),
-                      isThreeLine: alert['error'] != null),
+                ExpansionTile(
+                    key: const ValueKey('reminder-details'),
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: EdgeInsets.zero,
+                    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                    shape: const Border(),
+                    collapsedShape: const Border(),
+                    title: Text(context.l10n.details),
+                    children: [
+                      SectionLabel(context.l10n.dailyCheckIns),
+                      Text(context.l10n.dailyCheckInsHelp),
+                      _timeRow(context.l10n.morningCheckIn, settings.morning,
+                          (value) => _save(_changed(morning: value))),
+                      _timeRow(context.l10n.eveningCheckIn, settings.evening,
+                          (value) => _save(_changed(evening: value))),
+                      const SizedBox(height: 24),
+                      SectionLabel(context.l10n.upcomingAlerts),
+                      Text(context.l10n.scheduledAlertHelp),
+                      const SizedBox(height: 8),
+                      Text(_capability.exact
+                          ? context.l10n.preciseAlarmsAvailable
+                          : context.l10n.approximateAlarmsHelp),
+                      const SizedBox(height: 8),
+                      Text(Platform.isAndroid
+                          ? context.l10n.androidAlertRefreshHelp
+                          : context.l10n.backgroundAlertRefreshHelp),
+                      if (_alerts.isEmpty)
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Text(context.l10n.noUpcomingAlerts)),
+                      for (final alert in _alerts)
+                        ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(alert['daily'] == 1
+                                ? ((alert['identity'] as String)
+                                        .endsWith('/morning')
+                                    ? context.l10n.morningCheckIn
+                                    : context.l10n.eveningCheckIn)
+                                : alert['title'] as String),
+                            subtitle: Text(
+                                '${_alertDate(alert)} · ${context.reminderStatus(alert['status'] as String)}${alert['daily'] == 1 ? ' · ${context.l10n.repeatsDaily}' : ''}${alert['error'] == null ? '' : '\n${context.reminderDiagnostic(alert['error'] as String)}'}'),
+                            isThreeLine: alert['error'] != null),
+                    ]),
               ],
-              OutlinedButton(
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          try {
-                            await TaskReminders.retrySetup();
-                          } catch (_) {
-                            await TaskReminders.recordError('setup_failed');
-                          }
-                          if (mounted) _load();
-                        },
-                  child: Text(context.l10n.retryScheduling)),
+              if (settings == null && _error != null) retry,
             ])));
   }
 

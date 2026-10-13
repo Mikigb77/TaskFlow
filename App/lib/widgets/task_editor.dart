@@ -3,6 +3,7 @@ import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:agenda/services/text_encoding_repair.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/widgets/task_planning_control.dart';
+import 'dart:async';
 import 'dart:io';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
@@ -50,6 +51,12 @@ class TaskEditor extends ConsumerStatefulWidget {
 
 class _TaskEditorState extends ConsumerState<TaskEditor> {
   final _form = GlobalKey<FormState>();
+  // The date suggestion's Undo only changes this form, so it closes with it.
+  ({
+    ScaffoldMessengerState messenger,
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason> bar,
+  })?
+  _suggestionBar;
   late final TextEditingController _title;
   late final TextEditingController _notes;
   late final TextEditingController _labels;
@@ -159,6 +166,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
 
   @override
   void dispose() {
+    final suggestion = _suggestionBar;
+    if (suggestion != null) {
+      // The tree is locked while the form is disposed.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (suggestion.messenger.mounted) suggestion.messenger.clearSnackBars();
+      });
+    }
     _title.dispose();
     _notes.dispose();
     _labels.dispose();
@@ -214,7 +228,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     }
   });
 
-  void _acceptSchedule(ScheduleSuggestion suggestion) {
+  Future<void> _acceptSchedule(ScheduleSuggestion suggestion) async {
     final previousTitle = _title.text;
     final previousDate = _dueDate;
     final previousHasTime = _hasTime;
@@ -239,27 +253,32 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         }
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.suggestionApplied),
-        action: SnackBarAction(
-          label: context.l10n.undo,
-          onPressed: () {
-            if (mounted) {
-              setState(() {
-                _title.text = previousTitle;
-                _dueDate = previousDate;
-                _hasTime = previousHasTime;
-                _repeatUntil = previousRepeatUntil;
-                _deadline = previousDeadline;
-                _deadlineHasTime = previousDeadlineHasTime;
-                _reminderAnchor = previousAnchor;
-                _detailsExpanded = previousExpanded;
-              });
-            }
-          },
-        ),
-      ),
+    final messenger = ScaffoldMessenger.of(context);
+    final bar = await showFeedback(
+      messenger,
+      context.l10n.suggestionApplied,
+      actionLabel: context.l10n.undo,
+      onAction: () {
+        if (mounted) {
+          setState(() {
+            _title.text = previousTitle;
+            _dueDate = previousDate;
+            _hasTime = previousHasTime;
+            _repeatUntil = previousRepeatUntil;
+            _deadline = previousDeadline;
+            _deadlineHasTime = previousDeadlineHasTime;
+            _reminderAnchor = previousAnchor;
+            _detailsExpanded = previousExpanded;
+          });
+        }
+      },
+    );
+    if (bar == null || !mounted) return;
+    _suggestionBar = (messenger: messenger, bar: bar);
+    unawaited(
+      bar.closed.then((_) {
+        if (identical(_suggestionBar?.bar, bar)) _suggestionBar = null;
+      }),
     );
   }
 
@@ -357,24 +376,28 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       }
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.task == null
-                ? _isNote
-                      ? context.l10n.noteSaved
-                      : _dueDate == null
-                      ? context.l10n.taskSavedInbox
-                      : context.l10n.taskAddedCalendar
-                : context.l10n.changesSaved,
-          ),
+      // The save message replaces the suggestion's Undo.
+      _suggestionBar = null;
+      unawaited(
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          widget.task == null
+              ? _isNote
+                    ? context.l10n.noteSaved
+                    : _dueDate == null
+                    ? context.l10n.taskSavedInbox
+                    : context.l10n.taskAddedCalendar
+              : context.l10n.changesSaved,
         ),
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.taskSaveError)));
+        unawaited(
+          showFeedback(
+            ScaffoldMessenger.of(context),
+            context.l10n.taskSaveError,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -384,9 +407,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   Future<void> _attach() async {
     if (_pickingFile || _saving) return;
     if (_attachments.length >= 20) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.fileLimit)));
+      unawaited(
+        showFeedback(ScaffoldMessenger.of(context), context.l10n.fileLimit),
+      );
       return;
     }
     final local = ref.read(taskRepositoryProvider).ownerKey == 'local';
@@ -440,13 +463,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is FormatException
-                  ? context.l10n.fileLimit
-                  : context.l10n.attachError,
-            ),
+        unawaited(
+          showFeedback(
+            ScaffoldMessenger.of(context),
+            error is FormatException
+                ? context.l10n.fileLimit
+                : context.l10n.attachError,
           ),
         );
       }

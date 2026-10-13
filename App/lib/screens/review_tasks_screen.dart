@@ -48,6 +48,10 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
     unawaited(
       CaptureDiagnostics(_store.database).record(CaptureEvent.reviewOpened),
     );
+    // An earlier save's Undo must not float above this review's Save.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    });
   }
 
   @override
@@ -150,71 +154,68 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
           ? context.l10n.noteSaved
           : '${context.l10n.captureTasksSaved(ready.length)}${remaining > 0 ? ' · ${context.l10n.captureKeptForReview(remaining)}' : ''}';
       if (remaining == 0) Navigator.pop(context);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 8),
-          action: undoBefore == null
+      unawaited(
+        showFeedback(
+          messenger,
+          message,
+          actionLabel: undoBefore == null ? null : strings.undo,
+          onAction: undoBefore == null
               ? null
-              : SnackBarAction(
-                  label: strings.undo,
-                  onPressed: () async {
-                    if (mounted && _saving) return;
-                    if (mounted) setState(() => _saving = true);
-                    try {
-                      final before = undoBefore!;
-                      if (container.read(captureOwnerProvider) !=
-                          before.ownerKey) {
-                        return;
-                      }
-                      // Finish edits to other cards before restoring this save.
-                      await _writes;
-                      final restored = await _store.undoSave(before, undoIds);
-                      if (restored == null) {
-                        if (messenger.mounted) {
-                          messenger.showSnackBar(
-                            SnackBar(content: Text(strings.reviewUndoChanged)),
-                          );
-                        }
-                        return;
-                      }
-                      await container.read(taskProvider.notifier).loadTasks();
-                      container.invalidate(pendingCapturesProvider);
-                      if (mounted) {
-                        setState(() {
-                          _session = restored;
-                          _items = restored.drafts;
-                          _finished = false;
-                        });
-                      } else if (navigator.mounted &&
-                          container.read(captureOwnerProvider) ==
-                              before.ownerKey) {
-                        unawaited(
-                          navigator.push(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  ReviewTasksScreen(session: restored),
-                            ),
-                          ),
-                        );
-                      }
-                      if (messenger.mounted) {
-                        messenger.showSnackBar(
-                          SnackBar(content: Text(strings.reviewUndoSaved)),
-                        );
-                      }
-                    } catch (_) {
-                      if (messenger.mounted) {
-                        messenger.showSnackBar(
-                          SnackBar(content: Text(strings.undoError)),
-                        );
-                      }
-                    } finally {
-                      if (mounted) setState(() => _saving = false);
+              : () async {
+                  if (mounted && _saving) return;
+                  if (mounted) setState(() => _saving = true);
+                  try {
+                    final before = undoBefore!;
+                    if (container.read(captureOwnerProvider) !=
+                        before.ownerKey) {
+                      return;
                     }
-                  },
-                ),
+                    // Finish edits to other cards before restoring this save.
+                    await _writes;
+                    final restored = await _store.undoSave(before, undoIds);
+                    if (restored == null) {
+                      if (messenger.mounted) {
+                        unawaited(
+                          showFeedback(messenger, strings.reviewUndoChanged),
+                        );
+                      }
+                      return;
+                    }
+                    await container.read(taskProvider.notifier).loadTasks();
+                    container.invalidate(pendingCapturesProvider);
+                    if (mounted) {
+                      setState(() {
+                        _session = restored;
+                        _items = restored.drafts;
+                        _finished = false;
+                      });
+                    } else if (navigator.mounted &&
+                        container.read(captureOwnerProvider) ==
+                            before.ownerKey) {
+                      unawaited(
+                        navigator.push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                ReviewTasksScreen(session: restored),
+                          ),
+                        ),
+                      );
+                      // The reopened review clears old messages as it opens.
+                      await WidgetsBinding.instance.endOfFrame;
+                    }
+                    if (messenger.mounted) {
+                      unawaited(
+                        showFeedback(messenger, strings.reviewUndoSaved),
+                      );
+                    }
+                  } catch (_) {
+                    if (messenger.mounted) {
+                      unawaited(showFeedback(messenger, strings.undoError));
+                    }
+                  } finally {
+                    if (mounted) setState(() => _saving = false);
+                  }
+                },
         ),
       );
     } catch (_) {
@@ -228,19 +229,16 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
 
   void _remove(CaptureDraft item) {
     unawaited(_change(item.copyWith(removed: true)));
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.reviewRemoved),
-        action: SnackBarAction(
-          label: context.l10n.undo,
-          onPressed: () {
-            if (mounted && !_saving) {
-              unawaited(_change(item.copyWith(removed: false)));
-            }
-          },
-        ),
+    unawaited(
+      showFeedback(
+        ScaffoldMessenger.of(context),
+        context.l10n.reviewRemoved,
+        actionLabel: context.l10n.undo,
+        onAction: () {
+          if (mounted && !_saving) {
+            unawaited(_change(item.copyWith(removed: false)));
+          }
+        },
       ),
     );
   }

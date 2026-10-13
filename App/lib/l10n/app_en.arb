@@ -329,16 +329,12 @@
   "checkBeforeAdd": "Check the details before adding it to your calendar.",
   "titleRequired": "Please enter a task title.",
   "nameTask": "What would you like to do?",
-  "chooseReminder": "Choose reminder",
   "reminder": "Reminder",
   "off": "Off",
-  "useReminder": "Use reminder",
   "dateForReminder": "Add a date to use a reminder",
   "chooseAlertTime": "Choose alert time",
-  "defaultTime": "Use default time",
   "reminderDefaultsError": "Reminder defaults could not load. Check notification settings.",
   "loadingReminders": "Loading reminder settings…",
-  "remindersDisabled": "Reminders are off on this device",
   "repeatInterval": "Repeat interval",
   "repeatOn": "Repeat on",
   "repeatUsesStart": "Uses the weekday of the start date.",
@@ -417,6 +413,15 @@
         "type": "int"
       },
       "done": {
+        "type": "int"
+      }
+    }
+  },
+  "overdueCount": "{count, plural, other{Overdue · {count}}}",
+  "@overdueCount": {
+    "description": "Header above unfinished tasks from earlier days, shown first on Today.",
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }
@@ -608,7 +613,6 @@
   "atScheduledTime": "At the scheduled time",
   "hourBefore": "1 hour before",
   "dayBefore": "1 day before",
-  "deviceOff": "device off",
   "defaultChoice": "default",
   "minutesBefore": "{minutes} minutes before",
   "@minutesBefore": {
@@ -844,14 +848,26 @@
   "notificationLoadError": "Could not load notification settings. Please retry.",
   "notificationSaveError": "Could not save reminder settings. Please retry.",
   "enableReminders": "Enable reminders",
-  "deviceReminderScope": "For this account on this device. Task choices sync; device preferences stay here.",
+  "noReminderTurnOn": "No reminder · Turn on",
+  "exactAlarmsNeeded": "To get reminders on time, allow “Alarms & reminders”.",
+  "remindersOnConfirmation": "Done. Reminders are on.",
+  "reminderAskQuestion": "Want a reminder before it?",
+  "@reminderAskQuestion": {
+    "description": "Asked once, on a card below the tasks, when a task with a date was saved in this session; \"it\" is that task."
+  },
+  "reminderAskQuestionTasks": "Want reminders before your tasks?",
+  "@reminderAskQuestionTasks": {
+    "description": "The same question when the account already had dated tasks at launch and none was saved in this session."
+  },
+  "reminderAskYes": "Yes, remind me",
+  "reminderAskNotNow": "Not now",
+  "details": "Details",
   "mobileNotificationsOnly": "Mobile notifications only",
-  "notificationPermissionOn": "System permission is on",
   "notificationPermissionOff": "System permission is off",
   "preciseAlarmsAvailable": "Precise alarm access available",
   "approximateAlarmsHelp": "Alerts are approximate until precise alarm access is enabled",
   "openSystemSettings": "Open system settings",
-  "allowPreciseAlarms": "Allow precise alarms",
+  "allowPreciseAlarms": "Allow “Alarms & reminders”",
   "taskDefaults": "Task defaults",
   "timedTasks": "Timed tasks",
   "dateOnlyTasks": "Date-only tasks",
@@ -1166,6 +1182,22 @@
   "captureTooLarge": "This recording exceeds the service limit. Keep it for later or use a shorter typed description.",
   "captureTypedFirst": "Save or discard this typed capture before starting a recording.",
   "captureMicrophone": "Allow microphone access to record, or type below.",
+  "captureMicrophoneBlocked": "Microphone is off for TaskFlow. Turn it on in Settings, or type instead.",
+  "@captureMicrophoneBlocked": {
+    "description": "Shown by the microphone when Android will no longer ask for microphone access."
+  },
+  "captureOpenSettings": "Open Settings",
+  "@captureOpenSettings": {
+    "description": "Opens the phone’s settings for TaskFlow, to turn the microphone on."
+  },
+  "captureStarting": "One moment…",
+  "@captureStarting": {
+    "description": "Capture status while the microphone starts, before it is listening."
+  },
+  "capturePaused": "Paused",
+  "@capturePaused": {
+    "description": "Capture status after leaving the app or an interruption ended listening; the words are kept."
+  },
   "captureRecordingFirst": "Retry this recording or discard it before recording another.",
   "captureEmptyInput": "Say or type what you need to do first.",
   "captureSpeechStopped": "Speech stopped. Your retained words are safe; record audio or type to continue.",

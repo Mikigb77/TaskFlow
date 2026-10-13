@@ -9,70 +9,632 @@ import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/main.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/services/reminder_engine.dart';
+import 'package:agenda/widgets/reminder_control.dart';
+import 'package:flutter/services.dart';
+import 'support/design_fixtures.dart';
+import 'support/reminder_fixtures.dart';
 
 void main() {
   for (final lang in ['en', 'es']) {
     testWidgets(
-        '$lang notification defaults and diagnostics fit large text in both themes',
-        (tester) async {
-      final database = TaskDatabase();
-      final store = _Preferences(database);
-      tester.view.physicalSize = const Size(320, 568);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      for (final theme in [AppTheme.light, AppTheme.dark]) {
-        await tester.pumpWidget(ProviderScope(
-            overrides: [
-              reminderPreferenceStoreProvider.overrideWithValue(store),
-              taskRepositoryProvider
-                  .overrideWithValue(TaskRepository(database)),
-            ],
-            child: MaterialApp(
+      '$lang notification defaults and diagnostics fit large text in both themes',
+      (tester) async {
+        final database = TaskDatabase();
+        final store = _Preferences(database);
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        for (final theme in [AppTheme.light, AppTheme.dark]) {
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                reminderPreferenceStoreProvider.overrideWithValue(store),
+                taskRepositoryProvider.overrideWithValue(
+                  TaskRepository(database),
+                ),
+              ],
+              child: MaterialApp(
                 locale: Locale(lang),
                 localizationsDelegates: AppLocalizations.localizationsDelegates,
                 supportedLocales: AppLocalizations.supportedLocales,
                 theme: theme,
                 builder: (_, child) => MediaQuery(
-                    data: const MediaQueryData(
-                        size: Size(320, 568), textScaler: TextScaler.linear(2)),
-                    child: child!),
-                home: const NotificationSettingsScreen())));
-        await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-            find.byType(DropdownButtonFormField<int>), 160);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byType(DropdownButtonFormField<int>));
-        await tester.pumpAndSettle();
-        await tester.tap(find
-            .text(lang == 'es' ? '30 minutos antes' : '30 minutes before')
-            .last);
-        await tester.pumpAndSettle();
-        expect((await store.read('local')).leadMinutes, 30);
-        await tester.scrollUntilVisible(find.text('Original task title'), 180);
-        await tester.pumpAndSettle();
-        expect(
+                  data: const MediaQueryData(
+                    size: Size(320, 568),
+                    textScaler: TextScaler.linear(2),
+                  ),
+                  child: child!,
+                ),
+                home: const NotificationSettingsScreen(),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.byType(DropdownButtonFormField<int>),
+            160,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(DropdownButtonFormField<int>));
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find
+                .text(lang == 'es' ? '30 minutos antes' : '30 minutes before')
+                .last,
+          );
+          await tester.pumpAndSettle();
+          expect((await store.read('local')).leadMinutes, 30);
+          // Check-ins, upcoming alerts and explanations start folded away.
+          expect(find.text('Original task title'), findsNothing);
+          final details = find.text(lang == 'es' ? 'Detalles' : 'Details');
+          await tester.scrollUntilVisible(details, 160);
+          await tester.pumpAndSettle();
+          await tester.tap(details);
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text('Original task title'),
+            180,
+          );
+          await tester.pumpAndSettle();
+          expect(
             find.textContaining(lang == 'es' ? ' · bloqueado' : ' · blocked'),
-            findsOneWidget);
-        expect(
-            find.textContaining(lang == 'es'
-                ? 'Las notificaciones están desactivadas'
-                : 'Notifications are disabled'),
-            findsOneWidget);
-        expect(store.alerts.single['status'], 'blocked');
-        expect(store.alerts.single['error'],
-            'Notifications are disabled in system settings.');
-        await tester.scrollUntilVisible(
-            find.text(lang == 'es'
-                ? 'Actualizar y reintentar'
-                : 'Refresh and retry scheduling'),
-            180);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
-      }
-    });
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining(
+              lang == 'es'
+                  ? 'Las notificaciones están desactivadas'
+                  : 'Notifications are disabled',
+            ),
+            findsOneWidget,
+          );
+          expect(store.alerts.single['status'], 'blocked');
+          expect(
+            store.alerts.single['error'],
+            'Notifications are disabled in system settings.',
+          );
+          await tester.scrollUntilVisible(
+            find.text(
+              lang == 'es'
+                  ? 'Actualizar y reintentar'
+                  : 'Refresh and retry scheduling',
+            ),
+            -180,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      },
+    );
   }
+
+  group('P8 / P32: turning reminders on', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final timed = Task(
+      id: 1,
+      title: 'Médico',
+      priority: 1,
+      dueDate: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10),
+    );
+
+    Widget app(
+      MemoryReminderStore store,
+      FakeReminderAccess access,
+      Widget home, {
+      String language = 'es',
+    }) => ProviderScope(
+      overrides: [
+        ...reminderOverrides(store, access),
+        taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+      ],
+      child: MaterialApp(
+        locale: Locale(language),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        theme: AppTheme.light,
+        home: home,
+      ),
+    );
+
+    Future<ValueNotifier<Task>> pumpChip(
+      WidgetTester tester,
+      MemoryReminderStore store,
+      FakeReminderAccess access,
+    ) async {
+      final task = ValueNotifier(timed);
+      addTearDown(task.dispose);
+      await tester.pumpWidget(
+        app(
+          store,
+          access,
+          Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ValueListenableBuilder<Task>(
+                valueListenable: task,
+                builder: (context, value, _) => ReminderChip(
+                  task: value,
+                  onChanged: (changed) => task.value = changed,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return task;
+    }
+
+    Finder chipText(String text) => find.descendant(
+      of: find.byType(ReminderChip),
+      matching: find.text(text),
+    );
+    String lead(WidgetTester tester, int minutes) =>
+        tester.element(find.byType(ReminderChip)).reminderLead(minutes);
+
+    for (final (name, settings, allowed) in [
+      ('the switch is off', const ReminderPreferences(), true),
+      (
+        'the switch is on but the permission is denied',
+        const ReminderPreferences(enabled: true),
+        false,
+      ),
+    ]) {
+      testWidgets(
+        'UX-209: when $name the chip reads Sin recordatorio · Activar; granting it reads normally',
+        (tester) async {
+          final store = MemoryReminderStore(settings);
+          final access = FakeReminderAccess(allowed: allowed);
+          await pumpChip(tester, store, access);
+          expect(chipText(es.noReminderTurnOn), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(ReminderChip),
+              matching: find.byIcon(Icons.notifications_off_outlined),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(find.byType(ReminderChip));
+          await tester.pumpAndSettle();
+          expect(access.permissionRequests, 1);
+          expect(store.value.enabled, isTrue);
+          expect(chipText(es.noReminderTurnOn), findsNothing);
+          expect(chipText(es.reminderValue(lead(tester, 10))), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(ReminderChip),
+              matching: find.byIcon(Icons.notifications_outlined),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-209: a refused permission leaves reminders off and offers the phone’s settings',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(grant: false);
+        await pumpChip(tester, store, access);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, isFalse);
+        expect(chipText(es.noReminderTurnOn), findsOneWidget);
+        expect(find.text(es.notificationPermissionOff), findsOneWidget);
+        expect(
+          find.widgetWithText(SnackBarAction, es.openSystemSettings),
+          findsOneWidget,
+        );
+        expect(find.text(es.remindersOnConfirmation), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'UX-405: without exact alarms the action asks once for Alarmas y recordatorios',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(exact: false);
+        await pumpChip(tester, store, access);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.exactAlarmsNeeded)),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.descendant(
+            of: sheet,
+            matching: find.widgetWithText(FilledButton, es.allowPreciseAlarms),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(access.exactRequests, 1);
+        expect(store.value.enabled, isTrue);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'UX-435 / UX-436: the sheet’s button names «Alarmas y recordatorios»; closing it without allowing asks again instead of saying Listo',
+      (tester) async {
+        expect(es.allowPreciseAlarms, 'Permitir «Alarmas y recordatorios»');
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(exact: false);
+        await pumpChip(tester, store, access);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.widgetWithText(FilledButton, es.allowPreciseAlarms),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Permitir alarmas exactas'), findsNothing);
+        // Closed without allowing: tap above the sheet.
+        await tester.tapAt(const Offset(20, 20));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(access.exactRequests, 0);
+        final snack = find.byType(SnackBar);
+        expect(snack, findsOneWidget);
+        expect(
+          find.descendant(of: snack, matching: find.text(es.exactAlarmsNeeded)),
+          findsOneWidget,
+        );
+        expect(
+          es.exactAlarmsNeeded,
+          'Para que el aviso llegue a su hora, permite «Alarmas y recordatorios».',
+        );
+        expect(
+          find.descendant(of: snack, matching: find.byType(SnackBarAction)),
+          findsNothing,
+        );
+        expect(find.text(es.remindersOnConfirmation), findsNothing);
+        expect(find.text('Listo. Recordatorios activados.'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-436: with exact alarms on, the chip turns reminders on and says Listo. Recordatorios activados.',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(exact: true);
+        await pumpChip(tester, store, access);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(store.value.enabled, isTrue);
+        expect(es.remindersOnConfirmation, 'Listo. Recordatorios activados.');
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(es.remindersOnConfirmation),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Listo. Te avisaremos antes de cada tarea con hora.'),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'UX-435: Notificaciones with exact alarms off offers Permitir «Alarmas y recordatorios»',
+      (tester) async {
+        final store = MemoryReminderStore(
+          const ReminderPreferences(enabled: true, asked: true),
+        );
+        final access = FakeReminderAccess(allowed: true, exact: false);
+        await tester.pumpWidget(
+          app(store, access, const NotificationSettingsScreen()),
+        );
+        await tester.pumpAndSettle();
+        final button = find.text('Permitir «Alarmas y recordatorios»');
+        expect(button, findsOneWidget);
+        expect(find.text(es.allowPreciseAlarms), findsOneWidget);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(access.exactRequests, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    test(
+      'UX-435 / UX-436 / UX-438: the new copy in English and Catalan',
+      () {
+        final en = lookupAppLocalizations(const Locale('en'));
+        final ca = lookupAppLocalizations(const Locale('ca'));
+        expect(en.allowPreciseAlarms, 'Allow “Alarms & reminders”');
+        expect(en.remindersOnConfirmation, 'Done. Reminders are on.');
+        expect(ca.allowPreciseAlarms, 'Permet «Alarmes i recordatoris»');
+        expect(ca.remindersOnConfirmation, 'Fet. Recordatoris activats.');
+        expect(en.reminderAskQuestionTasks, 'Want reminders before your tasks?');
+        expect(
+          ca.reminderAskQuestionTasks,
+          'Vols recordatoris abans de les teves tasques?',
+        );
+        expect(
+          es.reminderAskQuestionTasks,
+          '¿Quieres recordatorios antes de tus tareas?',
+        );
+      },
+    );
+
+    testWidgets(
+      'UX-210: chip → 1 hora antes applies, closes the list and the chip reads it',
+      (tester) async {
+        final store = MemoryReminderStore(
+          const ReminderPreferences(enabled: true, asked: true),
+        );
+        final access = FakeReminderAccess(allowed: true);
+        final task = await pumpChip(tester, store, access);
+        expect(find.byType(PopupMenuButton<int>), findsNothing);
+        expect(chipText(es.reminderValue(lead(tester, 10))), findsOneWidget);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        final hour = lead(tester, 60);
+        await tester.tap(find.descendant(of: sheet, matching: find.text(hour)));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(task.value.reminderMinutes, 60);
+        expect(chipText(es.reminderValue(hour)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-210: in the task form, tapping Recordatorio opens the list',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = designContainer(
+          regionalStore: MemoryRegionalStore(
+            const RegionalPreferences(language: 'es'),
+          ),
+          overrides: reminderOverrides(
+            MemoryReminderStore(
+              const ReminderPreferences(enabled: true, asked: true),
+            ),
+            FakeReminderAccess(allowed: true),
+          ),
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(container: container, child: const MyApp()),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip(es.createTaskTooltip));
+        await tester.pumpAndSettle();
+        final more = find.byKey(const ValueKey('task-more-details'));
+        await tester.ensureVisible(more);
+        await tester.pumpAndSettle();
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        final row = find.widgetWithText(ListTile, es.reminder);
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        // A date-only task: the default, off, or a time of its own.
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.chooseAlertTime)),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.descendant(of: sheet, matching: find.text(es.off)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(
+          find.descendant(of: row, matching: find.text(es.off)),
+          findsOneWidget,
+        );
+      },
+    );
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-405: with everything allowed Notificaciones shows the switch and defaults, with the rest folded under Detalles ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final store = MemoryReminderStore(
+            const ReminderPreferences(enabled: true, asked: true),
+          );
+          final access = FakeReminderAccess(allowed: true, exact: true);
+          await tester.pumpWidget(
+            app(
+              store,
+              access,
+              const NotificationSettingsScreen(),
+              language: language,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.widgetWithText(SwitchListTile, l.enableReminders),
+            findsOneWidget,
+          );
+          expect(
+            tester.widget<SwitchListTile>(find.byType(SwitchListTile)).subtitle,
+            isNull,
+          );
+          expect(find.text(l.timedTasks), findsOneWidget);
+          expect(find.text(l.dateOnlyTasks), findsOneWidget);
+          expect(find.text(l.details), findsOneWidget);
+          // Section labels show in capitals.
+          for (final folded in [
+            l.dailyCheckIns.toUpperCase(),
+            l.morningCheckIn,
+            l.eveningCheckIn,
+            l.upcomingAlerts.toUpperCase(),
+            l.dailyCheckInsHelp,
+            l.scheduledAlertHelp,
+            l.noUpcomingAlerts,
+          ]) {
+            expect(find.text(folded), findsNothing, reason: folded);
+          }
+          for (final problem in [
+            l.retryScheduling,
+            l.openSystemSettings,
+            l.allowPreciseAlarms,
+            l.notificationPermissionOff,
+          ]) {
+            expect(find.text(problem), findsNothing, reason: problem);
+          }
+          await tester.tap(find.text(l.details));
+          await tester.pumpAndSettle();
+          final alerts = find.text(l.noUpcomingAlerts);
+          await tester.scrollUntilVisible(alerts, 160);
+          await tester.pumpAndSettle();
+          expect(alerts, findsOneWidget);
+          expect(find.text(l.upcomingAlerts.toUpperCase()), findsOneWidget);
+          expect(find.text(l.dailyCheckIns.toUpperCase()), findsOneWidget);
+          expect(find.text(l.morningCheckIn), findsOneWidget);
+          expect(find.text(l.eveningCheckIn), findsOneWidget);
+          // Spanish ‘Mañana’ read as ‘tomorrow’: the check-ins say when.
+          if (language == 'es') {
+            expect(find.text('Por la mañana'), findsOneWidget);
+            expect(find.text('Por la tarde'), findsOneWidget);
+          } else {
+            expect(find.text('Al matí'), findsOneWidget);
+            expect(find.text('Al vespre'), findsOneWidget);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final (problem, access) in [
+      ('the permission is off', FakeReminderAccess(allowed: false)),
+      ('exact alarms are off', FakeReminderAccess(allowed: true, exact: false)),
+    ]) {
+      testWidgets(
+        'UX-405: when $problem Notificaciones shows the status line and its fixes',
+        (tester) async {
+          final store = MemoryReminderStore(
+            const ReminderPreferences(enabled: true, asked: true),
+          );
+          await tester.pumpWidget(
+            app(store, access, const NotificationSettingsScreen()),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              access.allowed
+                  ? es.exactAlarmsNeeded
+                  : es.notificationPermissionOff,
+            ),
+            findsOneWidget,
+          );
+          expect(find.text(es.openSystemSettings), findsOneWidget);
+          expect(find.text(es.retryScheduling), findsOneWidget);
+          expect(
+            find.text(es.allowPreciseAlarms),
+            access.exact ? findsNothing : findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-405 / UX-401: the switch turns reminders on through the shared action, with 9:00 for tasks without a time',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess();
+        await tester.pumpWidget(
+          app(store, access, const NotificationSettingsScreen()),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pumpAndSettle();
+        expect(access.permissionRequests, 1);
+        expect(store.value.enabled, isTrue);
+        expect(store.value.dateOnlyTime, 540);
+        expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+        expect(
+          tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+          isTrue,
+        );
+      },
+    );
+
+    testWidgets(
+      'UX-401: a time already chosen for tasks without a time survives turning reminders on',
+      (tester) async {
+        final store = MemoryReminderStore(
+          const ReminderPreferences(dateOnlyTime: 480),
+        );
+        final access = FakeReminderAccess();
+        await tester.pumpWidget(
+          app(store, access, const NotificationSettingsScreen()),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, isTrue);
+        expect(store.value.dateOnlyTime, 480);
+      },
+    );
+
+    testWidgets(
+      'UX-401: after consent a fresh account’s task for tomorrow without a time is reminded at 9:00',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess();
+        await pumpChip(tester, store, access);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final now = DateTime(2026, 10, 13, 12);
+        final planned = ReminderEngine.plan(
+          'local',
+          [
+            Task(
+              id: 3,
+              title: 'Comprar pan',
+              priority: 1,
+              dueDate: DateTime(2026, 10, 14),
+              hasTime: false,
+            ),
+          ],
+          store.value,
+          now,
+        );
+        expect(planned, hasLength(1));
+        expect(planned.single.when, DateTime(2026, 10, 14, 9));
+      },
+    );
+  });
 }
 
 class _Preferences extends ReminderPreferenceStore {
@@ -86,7 +648,7 @@ class _Preferences extends ReminderPreferenceStore {
       'status': 'blocked',
       'daily': 0,
       'error': 'Notifications are disabled in system settings.',
-    }
+    },
   ];
   @override
   Future<ReminderPreferences> read(String owner) async => value;
@@ -100,7 +662,7 @@ class _Preferences extends ReminderPreferenceStore {
       alerts;
   @override
   Future<List<Map<String, Object?>>> schedulingInfo() async => [
-        {'key': 'error', 'value': 'background_failed'},
-        {'key': 'window', 'value': '{"owner":"local","deferred":2}'},
-      ];
+    {'key': 'error', 'value': 'background_failed'},
+    {'key': 'window', 'value': '{"owner":"local","deferred":2}'},
+  ];
 }

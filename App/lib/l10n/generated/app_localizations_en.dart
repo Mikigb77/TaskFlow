@@ -916,16 +916,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nameTask => 'What would you like to do?';
 
   @override
-  String get chooseReminder => 'Choose reminder';
-
-  @override
   String get reminder => 'Reminder';
 
   @override
   String get off => 'Off';
-
-  @override
-  String get useReminder => 'Use reminder';
 
   @override
   String get dateForReminder => 'Add a date to use a reminder';
@@ -934,17 +928,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chooseAlertTime => 'Choose alert time';
 
   @override
-  String get defaultTime => 'Use default time';
-
-  @override
   String get reminderDefaultsError =>
       'Reminder defaults could not load. Check notification settings.';
 
   @override
   String get loadingReminders => 'Loading reminder settings…';
-
-  @override
-  String get remindersDisabled => 'Reminders are off on this device';
 
   @override
   String get repeatInterval => 'Repeat interval';
@@ -1171,6 +1159,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String agendaCounts(int remaining, int done) {
     return '$remaining to do · $done completed';
+  }
+
+  @override
+  String overdueCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Overdue · $count',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -1465,9 +1463,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dayBefore => '1 day before';
-
-  @override
-  String get deviceOff => 'device off';
 
   @override
   String get defaultChoice => 'default';
@@ -2007,14 +2002,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enableReminders => 'Enable reminders';
 
   @override
-  String get deviceReminderScope =>
-      'For this account on this device. Task choices sync; device preferences stay here.';
+  String get noReminderTurnOn => 'No reminder · Turn on';
+
+  @override
+  String get exactAlarmsNeeded =>
+      'To get reminders on time, allow “Alarms & reminders”.';
+
+  @override
+  String get remindersOnConfirmation => 'Done. Reminders are on.';
+
+  @override
+  String get reminderAskQuestion => 'Want a reminder before it?';
+
+  @override
+  String get reminderAskQuestionTasks => 'Want reminders before your tasks?';
+
+  @override
+  String get reminderAskYes => 'Yes, remind me';
+
+  @override
+  String get reminderAskNotNow => 'Not now';
+
+  @override
+  String get details => 'Details';
 
   @override
   String get mobileNotificationsOnly => 'Mobile notifications only';
-
-  @override
-  String get notificationPermissionOn => 'System permission is on';
 
   @override
   String get notificationPermissionOff => 'System permission is off';
@@ -2030,7 +2043,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSystemSettings => 'Open system settings';
 
   @override
-  String get allowPreciseAlarms => 'Allow precise alarms';
+  String get allowPreciseAlarms => 'Allow “Alarms & reminders”';
 
   @override
   String get taskDefaults => 'Task defaults';
@@ -2617,6 +2630,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get captureMicrophone =>
       'Allow microphone access to record, or type below.';
+
+  @override
+  String get captureMicrophoneBlocked =>
+      'Microphone is off for TaskFlow. Turn it on in Settings, or type instead.';
+
+  @override
+  String get captureOpenSettings => 'Open Settings';
+
+  @override
+  String get captureStarting => 'One moment…';
+
+  @override
+  String get capturePaused => 'Paused';
 
   @override
   String get captureRecordingFirst =>

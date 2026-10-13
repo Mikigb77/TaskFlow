@@ -50,8 +50,8 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
       await operation();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.l10n.calendarPreferenceError)));
+        showFeedback(ScaffoldMessenger.of(context),
+            context.l10n.calendarPreferenceError);
       }
     } finally {
       if (mounted) setState(() => _busy = false);

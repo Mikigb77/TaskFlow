@@ -15,6 +15,7 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/widgets/reminder_ask_card.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/widgets/device_calendar_events.dart';
 
@@ -88,10 +89,29 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
             if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
             return Task.compareBySchedule(a, b);
           });
+    final now = DateTime.now();
+    final today = isSameDay(_selectedDay, now);
+    final listed = {
+      for (final task in events) '${task.id}:${task.occurrenceId}',
+    };
+    final overdue = today
+        ? (tasks
+              .map((task) => task.overdueOn(now))
+              .whereType<Task>()
+              .where(
+                (task) => !listed.contains('${task.id}:${task.occurrenceId}'),
+              )
+              .toList()
+            ..sort(
+              (a, b) => (a.displayDate ?? a.displayDeadline!).compareTo(
+                b.displayDate ?? b.displayDeadline!,
+              ),
+            ))
+        : <Task>[];
     final completed = events.where((task) => task.isCompleted).length;
+    final total = events.length + overdue.length;
     final signedIn = ref.watch(authProvider).account != null;
     final syncError = ref.read(taskRepositoryProvider).syncError;
-    final today = isSameDay(_selectedDay, DateTime.now());
     final phoneCalendars = ref
         .watch(deviceCalendarProvider)
         .preferences
@@ -392,12 +412,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            events.isEmpty
+                            total == 0
                                 ? phoneCalendars
                                       ? context.l10n.noScheduledTasks
                                       : context.l10n.breathingRoom
                                 : context.l10n.agendaCounts(
-                                    events.length - completed,
+                                    total - completed,
                                     completed,
                                   ),
                             style: TextStyle(
@@ -408,17 +428,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         ],
                       ),
                     ),
-                    if (events.isNotEmpty)
+                    if (total > 0)
                       SizedBox(
                         width: 34,
                         height: 34,
                         child: CircularProgressIndicator(
-                          value: completed / events.length,
+                          value: completed / total,
                           strokeWidth: 3,
                           backgroundColor: colors.outlineVariant,
                           semanticsLabel: context.l10n.completionCount(
                             completed,
-                            events.length,
+                            total,
                           ),
                         ),
                       ),
@@ -445,7 +465,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   ),
                 ),
               )
-            else if (events.isEmpty)
+            else if (total == 0)
               SliverToBoxAdapter(
                 child: EmptyState(
                   title: context.l10n.rememberPrompt,
@@ -456,7 +476,39 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   ),
                 ),
               )
-            else
+            else ...[
+              if (overdue.isNotEmpty)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverList.builder(
+                    itemCount: overdue.length + 1,
+                    itemBuilder: (context, index) => index == 0
+                        ? Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                context.l10n.overdueCount(overdue.length),
+                                style: text.titleSmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: TaskTile(
+                              task: overdue[index - 1],
+                              showDate: true,
+                            ),
+                          ),
+                  ),
+                ),
+              if (overdue.isNotEmpty && events.isNotEmpty)
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 10),
+                  sliver: SliverToBoxAdapter(child: Divider()),
+                ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverList.builder(
@@ -473,6 +525,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   ),
                 ),
               ),
+            ],
+            const SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(child: ReminderAskCard()),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
         ),

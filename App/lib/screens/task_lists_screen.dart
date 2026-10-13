@@ -55,9 +55,8 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
         .toList();
     var group = groups.where((g) => g.id == widget.groupId).firstOrNull;
     if (list == null && widget.groupId != null && group == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(context.l10n.groupActionError)));
+      showFeedback(ScaffoldMessenger.of(context),
+          context.l10n.groupActionError);
       return;
     }
     final form = GlobalKey<FormState>();
@@ -181,12 +180,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.fixed,
-            content: Text(context.l10n.listSaveError),
-          ),
-        );
+        showFeedback(ScaffoldMessenger.of(context), context.l10n.listSaveError);
       }
     }
   }
@@ -202,25 +196,15 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       if (context.mounted) {
         ref.invalidate(taskListsProvider);
         ref.read(taskProvider.notifier).loadTasks();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.fixed,
-            content: Text(
-              list.archived
-                  ? context.l10n.listRestored
-                  : context.l10n.listArchivedHelp,
-            ),
-          ),
-        );
+        showFeedback(ScaffoldMessenger.of(context),
+            list.archived
+                ? context.l10n.listRestored
+                : context.l10n.listArchivedHelp);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.fixed,
-            content: Text(context.l10n.listUpdateError),
-          ),
-        );
+        showFeedback(ScaffoldMessenger.of(context),
+            context.l10n.listUpdateError);
       }
     }
   }
@@ -268,12 +252,8 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.fixed,
-            content: Text(context.l10n.listResolveError),
-          ),
-        );
+        showFeedback(ScaffoldMessenger.of(context),
+            context.l10n.listResolveError);
       }
     }
   }
@@ -287,9 +267,8 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       await ref.read(taskProvider.notifier).loadTasks();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.listUpdateError)));
+        showFeedback(ScaffoldMessenger.of(context),
+            context.l10n.listUpdateError);
       }
     }
   }

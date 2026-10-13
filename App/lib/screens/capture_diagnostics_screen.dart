@@ -1,3 +1,4 @@
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,10 +66,9 @@ class CaptureDiagnosticsScreen extends ConsumerWidget {
                     if (context.mounted) ref.invalidate(_summaryProvider);
                   } catch (_) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(context.l10n.diagnosticsClearError),
-                        ),
+                      showFeedback(
+                        ScaffoldMessenger.of(context),
+                        context.l10n.diagnosticsClearError,
                       );
                     }
                   }

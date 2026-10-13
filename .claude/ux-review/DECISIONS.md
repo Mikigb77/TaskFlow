@@ -15,6 +15,7 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
     - "Ahora no" leaves them off.
   - (b) Once reminders are on, date-only tasks remind at 9:00. This is an editable default.
   - (c) No `USE_EXACT_ALARM` for now: store policy is a production concern. P8's one-sentence ask covers it.
+  - How "ask once" is shown (main session's reading of D2a, 2026-10-13): a one-time bottom sheet, right after the first dated task is saved. An in-list card failed twice (UX-401, batch b1), so P51 replaces it. The owner said to decide without asking; tell them if they'd prefer no interruption.
 - **D3 — the capture direction in UX_REVIEW §3 is approved** (U1–U5, U7, U9). This also unblocks U8 and U12.
   - Listening ends only on Done.
   - Capture opens as a sheet with one mic.

@@ -48,11 +48,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
       if (mounted && identical(store, ref.read(archiveStoreProvider))) {
         setState(() => _message = message);
         if (message != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              behavior: SnackBarBehavior.fixed,
-              content: Builder(
-                  builder: (context) => Text(message(context),
-                      maxLines: 3, overflow: TextOverflow.ellipsis))));
+          showFeedback(ScaffoldMessenger.of(context), message(context));
         }
       }
     } on FormatException catch (error) {

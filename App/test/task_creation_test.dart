@@ -7,12 +7,22 @@ import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/create_task_screen.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'support/design_fixtures.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const timeoutChannel = MethodChannel('taskflow/accessibility');
+  final platform =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  setUp(
+    () => platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+  );
+  tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
   testWidgets(
     'accepting a deadline suggestion saves only the deadline and can be undone',
     (tester) async {
@@ -285,6 +295,70 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets(
+    'UX-101: saving right after accepting a date suggestion shows the save message at once',
+    (tester) async {
+      final repository = await _pumpApp(tester);
+      final l = lookupAppLocalizations(const Locale('en'));
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/createTask');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Call tomorrow at 5 pm',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-suggestion')));
+      await tester.pumpAndSettle();
+      expect(find.text(l.suggestionApplied), findsOneWidget);
+      final button = find.widgetWithText(ElevatedButton, 'Create Task');
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      // Well inside the suggestion bar's own 4 seconds.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byType(CreateTaskScreen), findsNothing);
+      expect(find.text(l.taskAddedCalendar), findsOneWidget);
+      expect(find.text(l.suggestionApplied), findsNothing);
+      expect(find.text(l.undo), findsNothing);
+      expect((await repository.getAllTasks()).single.title, 'Call');
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'UX-101: closing the form takes the date suggestion’s Undo with it',
+    (tester) async {
+      await _pumpApp(tester);
+      final l = lookupAppLocalizations(const Locale('en'));
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/createTask');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Call tomorrow at 5 pm',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-suggestion')));
+      await tester.pumpAndSettle();
+      expect(find.text(l.undo), findsOneWidget);
+      // System Back.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final discard = find.text(l.discard);
+      if (discard.evaluate().isNotEmpty) {
+        await tester.tap(discard.last);
+        await tester.pumpAndSettle();
+      }
+      expect(find.byType(CreateTaskScreen), findsNothing);
+      expect(find.text(l.suggestionApplied), findsNothing);
+      expect(find.text(l.undo), findsNothing);
+    },
+  );
 }
 
 Future<void> _showDetails(WidgetTester tester) async {

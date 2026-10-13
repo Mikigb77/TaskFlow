@@ -374,3 +374,37 @@ The reviewers noted two older problems that round 2 didn't cause. Each is now in
 
 ### Escalated
 None: no finding has failed twice.
+
+## Round 2 (b1)
+
+Round 1 of batch 1 ran P31, P1, P8, P32 and P33. The round check failed on one test: the reminder question takes nearly the whole screen on a small phone with large text (UX-401, partly fixed, first failure). The reviewers also found four regressions, now UX-435 to UX-438.
+Round 2 has three packages: P48 (S4), P49 (S3) and P50 (S1). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b1-r2.json`.
+
+### Packages, in run order
+
+#### P48 · Reminder question moves into the list, with copy for cold start · D · M · after P32
+- **UX-401** (S4; partly, failed once) At 320×568 with 2× text, the card in the fixed bottom bar left Calendar's agenda 16 px, and the new task was never on screen. Last attempt: a half-screen cap with scrolling inside the card. Now the card leaves the bottom bar and becomes the last item of the Calendar, Tareas and project lists, below the tasks, so it never takes room from them. Everything else P32 did stays.
+- **UX-438** (S2; R1D-1) At launch, an account that already had dated tasks sees "¿Quieres un recordatorio antes?" with nothing to refer to. Now the owner's sentence shows only when a dated task was saved in this session. Otherwise the card reads "¿Quieres recordatorios antes de tus tareas?". This keeps D2a as decided: the general sentence covers only the existing-account case that the plan added.
+
+#### P49 · Words heard before a speech restart stay in the field · A · S · after P33
+- **UX-437** (S3; R1A-1; inferred from code, needs a phone) Since P33, when the recognizer restarts after a pause, words it never finalized are dropped ("comprar pan", pause, "y leche" ends as "y leche"). Now the words on screen are kept as soon as the new attempt is ready. The fix is in Dart only, with no native change and no APK build.
+
+#### P50 · One name for exact alarms; an honest turn-on confirmation · B · S · after P8
+- **UX-435** (S1; R1B-1) The exact-alarm sheet asks for «Alarmas y recordatorios», but its button says "Permitir alarmas exactas". The button becomes "Permitir «Alarmas y recordatorios»", in the sheet and on Notificaciones.
+- **UX-436** (S1; R1B-2) "Listo. Te avisaremos antes de cada tarea con hora." showed even when alarms could arrive late, and it is wrong for tasks without a time. If exact alarms are still off, the last message is now the «Alarmas y recordatorios» sentence. Otherwise it reads "Listo. Recordatorios activados.".
+
+### Escalated
+None: no finding has failed twice.
+
+## Round 3 (b1)
+No new packages. P49 and P50 passed; the only failure is UX-401, which has now failed twice and goes to the owner.
+
+### Escalated
+- **UX-401** (S4, D) Reminders off by default; nothing asks to turn them on. Tried: round 1 (P32) put the one-time question in the bottom bar, which left the agenda 16 px at 320×568 with 2× text. Round 2 (P48) put it as the last item of Calendar, the Tareas list and the empty state. At 390×844 with 1× text it ends under the bottom bar (card y 663–759, bar from y 698), and at 1.3–2× text or with several tasks it is fully below the fold, so a newcomer never sees it. Two tests fail (`reminder_ask_card_test.dart` ~150 and ~347).
+  - **Recommendation:** ask once in a modal bottom sheet right after the first dated task is saved and shown, then delete the in-list card. Replace the literal :139–180 test with the tester's looser one (the task can be tapped at launch; both answers can be tapped). This is only a new way to show the D2a question, not a new setting, but it is an interruption, so it needs your approval.
+  - Round 1 device checks are still pending.
+
+### Regressions
+None.

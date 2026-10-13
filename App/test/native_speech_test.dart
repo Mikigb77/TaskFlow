@@ -22,6 +22,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:record/record.dart';
 import 'support/design_fixtures.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/widgets/app_components.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -278,12 +280,24 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(store.session!.text, 'Call the doctor Friday at five');
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
       await tester.pumpAndSettle();
       expect(store.session!.status, 'editing');
       expect(speech.cancelled, isTrue);
       expect(api.requests, 0);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
       final id = store.session!.id;
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();
@@ -320,7 +334,7 @@ void main() {
   );
 
   testWidgets(
-    'automatic endpointing retains final text without sending it; another utterance appends',
+    'a pause commits a segment and listening goes on; the next one appends',
     (tester) async {
       final speech = _Speech();
       final store = _Captures();
@@ -329,15 +343,18 @@ void main() {
       await tester.tap(find.byTooltip('Record tasks'));
       await tester.pumpAndSettle();
       speech.emit('partial', text: 'Buy');
-      speech.emit('final', text: 'Buy coffee');
+      speech.emit('segment', text: 'Buy coffee');
       await tester.pumpAndSettle();
       expect(store.session!.text, 'Buy coffee');
+      expect(store.session!.status, 'recording');
       expect(api.requests, 0);
-      await tester.tap(find.byTooltip('Record tasks'));
+      speech.emit('partial', text: 'Pay the');
       await tester.pumpAndSettle();
-      speech.emit('final', text: 'Pay the bill tomorrow');
+      expect(store.session!.text, 'Buy coffee Pay the');
+      speech.emit('segment', text: 'Pay the bill tomorrow');
       await tester.pumpAndSettle();
       expect(store.session!.text, 'Buy coffee Pay the bill tomorrow');
+      expect(store.session!.status, 'recording');
       expect(api.requests, 0);
       expect(tester.takeException(), isNull);
     },
@@ -399,14 +416,451 @@ void main() {
       expect(store.session!.status, 'failed');
     },
   );
+
+  group('P33: listening stops only when you say so', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    Finder inCapture(Finder finder) =>
+        find.descendant(of: find.byType(VoiceTaskScreen), matching: finder);
+
+    testWidgets(
+      'U1: segment, pause, segment keep listening; stopping sends both in order',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        final store = _Captures();
+        final api = _OfflineExtraction();
+        await _open(tester, bridge.speech, store, api, language: 'es');
+        await tester.tap(find.byTooltip(es.recordTasks));
+        await tester.pumpAndSettle();
+        expect(bridge.starts, 1);
+        bridge.send('ready');
+        bridge.send('partial', text: 'Comprar');
+        bridge.send('segment', text: 'Comprar pan');
+        await tester.pump();
+        // A long silent pause: nothing ends, parks or sends the words.
+        for (var second = 0; second < 10; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(store.session!.text, 'Comprar pan');
+        expect(store.session!.status, 'recording');
+        expect(find.textContaining(es.listeningSeconds('')), findsOneWidget);
+        bridge.send('partial', text: 'y llamar');
+        await tester.pump();
+        expect(store.session!.text, 'Comprar pan y llamar');
+        bridge.send('segment', text: 'y llamar a mamá');
+        for (var second = 0; second < 5; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(store.session!.text, 'Comprar pan y llamar a mamá');
+        expect(store.session!.status, 'recording');
+        expect(bridge.stops, 0);
+        expect(bridge.cancels, 0);
+        expect(api.requests, 0);
+
+        await tester.tap(find.byTooltip(es.stopRecording));
+        await tester.pumpAndSettle();
+        expect(bridge.stops, 1);
+        expect(api.requests, 1);
+        expect(store.session!.text, 'Comprar pan y llamar a mamá');
+        expect(find.textContaining(es.listeningSeconds('')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-108: the status reads Un momento… until ready, then Escuchando · 00:00',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        await tester.tap(find.byTooltip(es.recordTasks));
+        await tester.pump();
+        await tester.pump();
+        expect(bridge.starts, 1);
+        expect(inCapture(find.text(es.captureStarting)), findsOneWidget);
+        expect(inCapture(find.byType(LinearProgressIndicator)), findsNothing);
+        // The clock doesn't run before the recognizer is ready.
+        await tester.pump(const Duration(seconds: 3));
+        expect(inCapture(find.text(es.captureStarting)), findsOneWidget);
+        expect(find.textContaining(es.listeningSeconds('')), findsNothing);
+        bridge.send('ready');
+        // A platform event reaches the screen on the next frame.
+        await tester.pump();
+        await tester.pump();
+        expect(
+          inCapture(find.text(es.listeningSeconds('00:00'))),
+          findsOneWidget,
+        );
+        expect(inCapture(find.text(es.captureStarting)), findsNothing);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump(const Duration(seconds: 1));
+        expect(
+          inCapture(find.text(es.listeningSeconds('00:02'))),
+          findsOneWidget,
+        );
+        await tester.tap(find.byTooltip(es.stopRecording));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'U1: reaching 60 seconds continues to processing instead of parking the words',
+      (tester) async {
+        final speech = _Speech();
+        final store = _Captures();
+        final api = _OfflineExtraction();
+        await _open(tester, speech, store, api, language: 'es');
+        await tester.tap(find.byTooltip(es.recordTasks));
+        await tester.pumpAndSettle();
+        speech.emit('ready');
+        speech.emit('segment', text: 'Comprar pan mañana');
+        await tester.pump();
+        for (var second = 0; second < 59; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(store.session!.status, 'recording');
+        expect(api.requests, 0);
+        expect(
+          inCapture(find.text(es.listeningSeconds('00:59'))),
+          findsOneWidget,
+        );
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(speech.stops, 1);
+        expect(api.requests, 1);
+        // Processed (and here failed offline), never parked for editing.
+        expect(store.session!.status, isNot('editing'));
+        expect(store.session!.text, 'Comprar pan mañana');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-104: inactive while starting and while listening keeps listening; paused keeps the words and shows En pausa',
+      (tester) async {
+        final speech = _Speech()..permissionGate = Completer<void>();
+        final store = _Captures();
+        final api = _OfflineExtraction();
+        await _open(tester, speech, store, api, language: 'es');
+        await tester.tap(find.byTooltip(es.recordTasks));
+        await tester.pump();
+        // The permission dialog covers the app: inactive, then resumed.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump();
+        speech.permissionGate!.complete();
+        await tester.pump();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(speech.starts, 1);
+        expect(speech.cancelled, isFalse);
+        expect(inCapture(find.text(es.captureStarting)), findsOneWidget);
+        // Inactive again while starting: still starting, not stopped.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        await tester.pump(const Duration(seconds: 1));
+        expect(speech.stops, 0);
+        expect(speech.cancelled, isFalse);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        speech.emit('ready');
+        speech.emit('segment', text: 'Comprar pan');
+        await tester.pump();
+        // The notification shade, mid-sentence.
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        for (var second = 0; second < 3; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(speech.stops, 0);
+        expect(speech.cancelled, isFalse);
+        expect(store.session!.status, 'recording');
+        expect(
+          inCapture(find.textContaining(es.listeningSeconds(''))),
+          findsOneWidget,
+        );
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        speech.emit('partial', text: 'y leche');
+        await tester.pump();
+        // Leaving the app ends listening but keeps every word.
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(store.session!.status, 'editing');
+        expect(store.session!.text, 'Comprar pan y leche');
+        expect(api.requests, 0);
+        expect(inCapture(find.text(es.capturePaused)), findsOneWidget);
+        expect(
+          inCapture(find.textContaining(es.listeningSeconds(''))),
+          findsNothing,
+        );
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(store.session!.text, 'Comprar pan y leche');
+        expect(api.requests, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-107: a blocked microphone shows the Settings banner; back from Settings it listens',
+      (tester) async {
+        const permissions = MethodChannel(
+          'flutter.baseflow.com/permissions/methods',
+        );
+        final messenger = tester.binding.defaultBinaryMessenger;
+        var settingsOpened = 0;
+        var micGranted = false;
+        messenger.setMockMethodCallHandler(permissions, (call) async {
+          if (call.method == 'openAppSettings') {
+            settingsOpened++;
+            return true;
+          }
+          if (call.method == 'checkPermissionStatus') {
+            return micGranted ? 1 : 4;
+          }
+          return null;
+        });
+        addTearDown(
+          () => messenger.setMockMethodCallHandler(permissions, null),
+        );
+        final bridge = _Bridge(tester)..permission = 'blocked';
+        final store = _Captures();
+        await _open(
+          tester,
+          bridge.speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        await tester.tap(find.byTooltip(es.recordTasks));
+        await tester.pumpAndSettle();
+        expect(bridge.starts, 0);
+        final banner = find.text(es.captureMicrophoneBlocked);
+        await tester.ensureVisible(banner);
+        await tester.pumpAndSettle();
+        expect(banner, findsOneWidget);
+        expect(find.textContaining(es.captureMicrophone), findsNothing);
+        final open = find.widgetWithText(TextButton, es.captureOpenSettings);
+        await tester.ensureVisible(open);
+        await tester.pumpAndSettle();
+        expect(open.hitTestable(), findsOneWidget);
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        expect(settingsOpened, 1);
+
+        // Turned on in Settings: coming back starts listening.
+        micGranted = true;
+        bridge.permission = 'granted';
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(bridge.starts, 1);
+        expect(find.text(es.captureMicrophoneBlocked), findsNothing);
+        expect(find.byTooltip(es.stopRecording), findsOneWidget);
+        await tester.ensureVisible(find.byTooltip(es.stopRecording));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip(es.stopRecording));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-107: a first, ordinary denial keeps the usual microphone message',
+      (tester) async {
+        final bridge = _Bridge(tester)..permission = 'denied';
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        await tester.tap(find.byTooltip(es.recordTasks));
+        await tester.pumpAndSettle();
+        expect(bridge.starts, 0);
+        expect(find.text(es.captureMicrophoneBlocked), findsNothing);
+        expect(find.text(es.captureOpenSettings), findsNothing);
+        final message = find.textContaining(es.captureMicrophone);
+        await tester.scrollUntilVisible(
+          message,
+          180,
+          scrollable: inCapture(find.byType(Scrollable)).first,
+        );
+        expect(message, findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-101: opening a capture hides an earlier save’s Deshacer', (
+      tester,
+    ) async {
+      const timeout = MethodChannel('taskflow/accessibility');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(timeout, (_) async => 10000);
+      addTearDown(() => messenger.setMockMethodCallHandler(timeout, null));
+      var undone = false;
+      await _open(
+        tester,
+        _Speech(),
+        _Captures(),
+        _OfflineExtraction(),
+        language: 'es',
+        beforeCapture: () async {
+          await showFeedback(
+            ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first)),
+            es.captureTasksSaved(1),
+            actionLabel: es.undo,
+            onAction: () => undone = true,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text(es.undo), findsOneWidget);
+        },
+      );
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      expect(find.text(es.undo), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(undone, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  // P49: a recognizer restart (a new `ready`) keeps words the last attempt
+  // heard but never finalized.
+  group('P49: words heard before a speech restart stay in the field', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    String field(WidgetTester tester) => tester
+        .widget<TextField>(
+          find
+              .descendant(
+                of: find.byType(VoiceTaskScreen),
+                matching: find.byType(TextField),
+              )
+              .first,
+        )
+        .controller!
+        .text;
+
+    Future<_Bridge> listen(WidgetTester tester) async {
+      final bridge = _Bridge(tester);
+      await _open(
+        tester,
+        bridge.speech,
+        _Captures(),
+        _OfflineExtraction(),
+        language: 'es',
+      );
+      await tester.tap(find.byTooltip(es.recordTasks));
+      await tester.pumpAndSettle();
+      expect(bridge.starts, 1);
+      return bridge;
+    }
+
+    Future<void> deliver(WidgetTester tester) async {
+      // A platform event reaches the screen on the next frame.
+      await tester.pump();
+      await tester.pump();
+    }
+
+    testWidgets(
+      'UX-437: partial, restart, partial, ended keeps comprar pan y leche',
+      (tester) async {
+        final bridge = await listen(tester);
+        bridge.send('ready');
+        bridge.send('partial', text: 'comprar pan');
+        await deliver(tester);
+        expect(field(tester), 'comprar pan');
+        // The attempt ends without a segment and a new one starts.
+        bridge.send('ready');
+        await deliver(tester);
+        bridge.send('partial', text: 'y leche');
+        await deliver(tester);
+        expect(field(tester), 'comprar pan y leche');
+        bridge.send('ended');
+        await tester.pumpAndSettle();
+        expect(field(tester), 'comprar pan y leche');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-437: after a segment, a restart does not repeat the committed words',
+      (tester) async {
+        final bridge = await listen(tester);
+        bridge.send('ready');
+        bridge.send('partial', text: 'comprar pan');
+        bridge.send('segment', text: 'comprar pan');
+        await deliver(tester);
+        bridge.send('ready');
+        await deliver(tester);
+        bridge.send('partial', text: 'y leche');
+        await deliver(tester);
+        expect(field(tester), 'comprar pan y leche');
+        await tester.tap(find.byTooltip(es.stopRecording));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-437: a first ready on an empty field adds no leading space', (
+      tester,
+    ) async {
+      final bridge = await listen(tester);
+      expect(field(tester), isEmpty);
+      bridge.send('ready');
+      await deliver(tester);
+      bridge.send('partial', text: 'hola');
+      await deliver(tester);
+      expect(field(tester), 'hola');
+      await tester.tap(find.byTooltip(es.stopRecording));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
 
 Future<ProviderContainer> _open(
   WidgetTester tester,
-  _Speech speech,
+  NativeSpeech speech,
   _Captures store,
   _OfflineExtraction api, {
   _Recorder? recorder,
+  String language = 'en',
+  Future<void> Function()? beforeCapture,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -429,7 +883,15 @@ Future<ProviderContainer> _open(
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
       taskProvider.overrideWith((ref) => DesignTaskNotifier()),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
-      regionalStoreProvider.overrideWithValue(MemoryRegionalStore()),
+      regionalStoreProvider.overrideWithValue(
+        MemoryRegionalStore(
+          RegionalPreferences(
+            language: language,
+            clock: ClockFormat.twentyFour,
+            weekStart: 1,
+          ),
+        ),
+      ),
     ],
   );
   addTearDown(() {
@@ -440,6 +902,7 @@ Future<ProviderContainer> _open(
     UncontrolledProviderScope(container: container, child: const MyApp()),
   );
   await tester.pumpAndSettle();
+  await beforeCapture?.call();
   tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/voiceTask');
   await tester.pumpAndSettle();
   return container;
@@ -452,6 +915,14 @@ class _Speech extends NativeSpeech {
   bool installed = true;
   bool cancelled = false;
   String? text;
+
+  /// The microphone answer, when it isn't simply [allowed].
+  SpeechPermission? answer;
+
+  /// Holds the permission answer back, like the system dialog does.
+  Completer<void>? permissionGate;
+  int starts = 0;
+  int stops = 0;
   @override
   Future<SpeechCapability> capability({String? language}) async =>
       SpeechCapability(
@@ -462,9 +933,15 @@ class _Speech extends NativeSpeech {
   @override
   Stream<SpeechEvent> get events => controller.stream;
   @override
-  Future<bool> permission() async => allowed;
+  Future<SpeechPermission> permission() async {
+    await permissionGate?.future;
+    return answer ??
+        (allowed ? SpeechPermission.granted : SpeechPermission.denied);
+  }
+
   @override
   Future<void> start(int id, String language) async {
+    starts++;
     run = id;
     text = null;
     cancelled = false;
@@ -477,7 +954,8 @@ class _Speech extends NativeSpeech {
 
   @override
   Future<void> stop(int id) async {
-    emit('final', text: text);
+    stops++;
+    emit('ended');
   }
 
   @override
@@ -575,4 +1053,70 @@ class _Recorder extends Fake implements AudioRecorder {
     await amplitudes.close();
     await states.close();
   }
+}
+
+/// The real [NativeSpeech] over mocked platform channels: the method channel
+/// answers like the Android bridge, and events arrive through the event
+/// channel as maps, exactly as NativeSpeechBridge.kt sends them.
+class _Bridge {
+  _Bridge(WidgetTester tester) {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(_methods, (call) async {
+      final arguments = call.arguments;
+      switch (call.method) {
+        case 'capability':
+          return {
+            'onDevice': true,
+            'language': 'es-ES',
+            'languageInstalled': true,
+          };
+        case 'permission':
+          return permission;
+        case 'start':
+          run = (arguments as Map)['run'] as int;
+          starts++;
+          return null;
+        case 'stop':
+          stops++;
+          send('ended');
+          return null;
+        case 'cancel':
+          cancels++;
+          send('ended');
+          return null;
+      }
+      return null;
+    });
+    messenger.setMockStreamHandler(
+      _events,
+      MockStreamHandler.inline(
+        onListen: (arguments, sink) {
+          _sink = sink;
+        },
+        onCancel: (arguments) {
+          _sink = null;
+        },
+      ),
+    );
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(_methods, null);
+      messenger.setMockStreamHandler(_events, null);
+    });
+  }
+
+  static const _methods = MethodChannel('taskflow/speech-test-bridge');
+  static const _events = EventChannel('taskflow/speech-test-bridge/events');
+  final speech = NativeSpeech(channel: _methods, eventChannel: _events);
+  MockStreamHandlerEventSink? _sink;
+  Object permission = 'granted';
+  int? run;
+  int starts = 0;
+  int stops = 0;
+  int cancels = 0;
+
+  void send(String kind, {String? text}) => _sink?.success({
+    'run': run,
+    'kind': kind,
+    if (text != null) 'text': text,
+  });
 }

@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -229,5 +230,261 @@ void main() {
         }
       },
     );
+  }
+
+  Future<ProviderContainer> openCalendar(
+    WidgetTester tester,
+    List<Task> tasks, {
+    String language = 'es',
+  }) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = designContainer(
+      regionalStore: MemoryRegionalStore(
+        RegionalPreferences(language: language),
+      ),
+      tasks: () => _GivenTasks(tasks),
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await tester.pumpAndSettle();
+    return container;
+  }
+
+  // The agenda sits below the calendar: scroll the page, not the week strip.
+  Finder agenda() => find
+      .descendant(
+        of: find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.byType(CustomScrollView),
+        ),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  Future<void> reveal(WidgetTester tester, Finder finder) async {
+    await tester.scrollUntilVisible(finder, 120, scrollable: agenda());
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> scrollAgendaToEnd(WidgetTester tester) async {
+    for (var i = 0; i < 3; i++) {
+      final position = tester.state<ScrollableState>(agenda()).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+    }
+  }
+
+  testWidgets(
+    'UX-201: yesterday’s open task shows under Atrasada above today’s, counts as pending and completes with Deshacer',
+    (tester) async {
+      final now = DateTime.now();
+      final yesterday = DateTime(now.year, now.month, now.day - 1, 10);
+      final container = await openCalendar(tester, [
+        Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: yesterday),
+        Task(
+          id: 2,
+          title: 'Llamar a mamá',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day, 18),
+        ),
+      ]);
+      final context = tester.element(find.byType(CalendarScreen));
+      final l = context.l10n;
+      expect(l.localeName, 'es');
+      final header = find.text(l.overdueCount(1));
+      final overdueRow = find.widgetWithText(TaskTile, 'Comprar pan');
+      final todayRow = find.widgetWithText(TaskTile, 'Llamar a mamá');
+      expect(header, findsOneWidget);
+      expect(overdueRow, findsOneWidget);
+      await reveal(tester, todayRow);
+      expect(todayRow, findsOneWidget);
+      expect(
+        tester.getTopLeft(header).dy,
+        lessThan(tester.getTopLeft(overdueRow).dy),
+      );
+      expect(
+        tester.getTopLeft(overdueRow).dy,
+        lessThan(tester.getTopLeft(todayRow).dy),
+      );
+      // The overdue row shows its own (yesterday's) date.
+      expect(
+        find.descendant(
+          of: overdueRow,
+          matching: find.textContaining(context.shortDate(yesterday)),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l.agendaCounts(2, 0)), findsOneWidget);
+
+      final checkbox = find.descendant(
+        of: overdueRow,
+        matching: find.byType(Checkbox),
+      );
+      await tester.ensureVisible(checkbox);
+      await tester.pumpAndSettle();
+      await tester.tap(checkbox);
+      await tester.pumpAndSettle();
+      expect(find.text(l.taskCompleted), findsOneWidget);
+      expect(find.text(l.undo), findsOneWidget);
+      expect(header, findsNothing);
+      expect(overdueRow, findsNothing);
+      expect(
+        container
+            .read(taskProvider)
+            .requireValue
+            .firstWhere((task) => task.id == 1)
+            .isCompleted,
+        isTrue,
+      );
+      await tester.tap(find.text(l.undo));
+      await tester.pumpAndSettle();
+      expect(header, findsOneWidget);
+      expect(find.widgetWithText(TaskTile, 'Comprar pan'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-201: with only overdue tasks Today shows the overdue section, not the empty state',
+    (tester) async {
+      final now = DateTime.now();
+      await openCalendar(tester, [
+        Task(
+          id: 1,
+          title: 'Comprar pan',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day - 1, 10),
+        ),
+      ]);
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(find.text(l.overdueCount(1)), findsOneWidget);
+      expect(find.widgetWithText(TaskTile, 'Comprar pan'), findsOneWidget);
+      expect(find.text(l.rememberPrompt), findsNothing);
+      expect(find.text(l.agendaCounts(1, 0)), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'UX-201: a daily task missed for days shows once, as yesterday’s occurrence',
+    (tester) async {
+      final now = DateTime.now();
+      final yesterday = DateTime(now.year, now.month, now.day - 1, 8);
+      await openCalendar(tester, [
+        Task(
+          id: 1,
+          title: 'Tomar la pastilla',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day - 6, 8),
+          recurrence: 'daily',
+          completedDates: [Task.dateKey(now)],
+        ),
+      ]);
+      final context = tester.element(find.byType(CalendarScreen));
+      final l = context.l10n;
+      expect(find.text(l.overdueCount(1)), findsOneWidget);
+      final rows = find.widgetWithText(TaskTile, 'Tomar la pastilla');
+      await scrollAgendaToEnd(tester);
+      // One overdue row and today's own (completed) occurrence.
+      expect(rows, findsNWidgets(2));
+      expect(
+        find.descendant(
+          of: rows.first,
+          matching: find.textContaining(context.shortDate(yesterday)),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('UX-201: with another day selected there is no overdue section', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    await openCalendar(tester, [
+      Task(
+        id: 1,
+        title: 'Comprar pan',
+        priority: 1,
+        dueDate: DateTime(now.year, now.month, now.day - 1, 10),
+      ),
+    ]);
+    final l = tester.element(find.byType(CalendarScreen)).l10n;
+    expect(find.text(l.overdueCount(1)), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('calendar-format')));
+    await tester.pumpAndSettle();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final other = tomorrow.month == now.month
+        ? tomorrow
+        : DateTime(now.year, now.month, now.day - 1);
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(TableCalendar<Task>),
+            matching: find.text('${other.day}'),
+          )
+          .hitTestable(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(l.overdueCount(1)), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, l.today));
+    await tester.pumpAndSettle();
+    // A drag on the month grid would page the month: jump the page instead.
+    await scrollAgendaToEnd(tester);
+    expect(find.text(l.overdueCount(1)), findsOneWidget);
+  });
+
+  testWidgets(
+    'UX-101: a move’s snackbar floats and goes after the accessibility timeout',
+    (tester) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      final now = DateTime.now();
+      final container = await openCalendar(tester, [
+        Task(
+          id: 1,
+          title: 'Revisar el informe',
+          priority: 1,
+          dueDate: DateTime(now.year, now.month, now.day, 10),
+        ),
+      ]);
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final row = find.widgetWithText(TaskTile, 'Revisar el informe');
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.longPress(row);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, l.tomorrow));
+      await tester.pumpAndSettle();
+      final save = find.text(l.saveSchedule);
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+        Task.day(container.read(taskProvider).requireValue.single.dueDate!),
+        DateTime(now.year, now.month, now.day + 1),
+      );
+      expect(find.text(l.scheduleUpdated), findsOneWidget);
+      final bar = tester.widget<SnackBar>(find.byType(SnackBar));
+      expect(bar.duration, const Duration(seconds: 10));
+      expect(bar.behavior, SnackBarBehavior.floating);
+      expect(find.text(l.undo), findsOneWidget);
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.text(l.scheduleUpdated), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+class _GivenTasks extends DesignTaskNotifier {
+  _GivenTasks(this.initial);
+  final List<Task> initial;
+  @override
+  Future<void> loadTasks() async {
+    if (!state.hasValue) state = AsyncData(initial);
   }
 }

@@ -145,9 +145,10 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.groupActionError)));
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.groupActionError,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -701,9 +702,10 @@ class _GroupInvitationsState extends ConsumerState<GroupInvitations> {
       await ref.read(taskProvider.notifier).loadTasks();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.groupActionError)));
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.groupActionError,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

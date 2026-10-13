@@ -31,9 +31,8 @@ class RegionalSettingsScreen extends ConsumerWidget {
       await TaskReminders.refreshLanguage();
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(context.l10n.preferenceError)));
+        showFeedback(ScaffoldMessenger.of(context),
+            context.l10n.preferenceError);
       }
     }
   }

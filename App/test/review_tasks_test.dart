@@ -11,6 +11,11 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/models/capture_session.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/task_database.dart';
 
 TaskDraft draft(String title, {bool ambiguous = false}) => TaskDraft.fromJson({
   'title': title,
@@ -357,4 +362,150 @@ void main() {
       expect(saved.checklist.first.title, 'Renewed passport');
     },
   );
+
+  group('UX-101: the voice save’s Deshacer', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+
+    Future<(ProviderContainer, _SavingStore)> saveVoiceCapture(
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final store = _SavingStore();
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(language: 'es'),
+        ),
+        overrides: [captureStoreProvider.overrideWithValue(store)],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      final session = CaptureSession(
+        id: 'voice-1',
+        ownerKey: container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: DateTime.now().toUtc(),
+        status: 'ready',
+        transcript: 'Comprar pan',
+        drafts: [
+          CaptureDraft(
+            id: 'a',
+            task: Task(title: 'Comprar pan', priority: 1),
+          ),
+        ],
+      );
+      store.current = session;
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => ReviewTasksScreen(session: session),
+            ),
+          );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      return (container, store);
+    }
+
+    testWidgets('UX-101: it is gone after the accessibility timeout', (
+      tester,
+    ) async {
+      await saveVoiceCapture(tester);
+      final l = lookupAppLocalizations(const Locale('es'));
+      expect(find.byType(ReviewTasksScreen), findsNothing);
+      expect(find.text(l.undo), findsOneWidget);
+      expect(find.textContaining(l.captureTasksSaved(1)), findsOneWidget);
+      final bar = tester.widget<SnackBar>(find.byType(SnackBar));
+      expect(bar.duration, const Duration(seconds: 10));
+      expect(bar.behavior, SnackBarBehavior.floating);
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.text(l.undo), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text(l.undo), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-101: a second review opened after a save shows none', (
+      tester,
+    ) async {
+      final (_, store) = await saveVoiceCapture(tester);
+      final l = lookupAppLocalizations(const Locale('es'));
+      expect(find.text(l.undo), findsOneWidget);
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => ReviewTasksScreen(
+                drafts: [draft('Llamar a mamá')],
+                transcript: 'Llamar a mamá',
+              ),
+            ),
+          );
+      await tester.pumpAndSettle();
+      expect(find.byType(ReviewTasksScreen), findsOneWidget);
+      expect(find.text(l.undo), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(
+        find.byKey(const ValueKey('save-drafts')).hitTestable(),
+        findsOneWidget,
+      );
+      // Nothing can undo the earlier save from here any more.
+      expect(store.undos, 0);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+/// A capture store in memory: saving marks drafts saved, Undo restores them.
+class _SavingStore extends CaptureStore {
+  _SavingStore() : super(TaskDatabase());
+  CaptureSession? current;
+  int undos = 0;
+  @override
+  Future<void> update(CaptureSession value) async => current = value;
+  @override
+  Future<CaptureSession?> read(String id, String ownerKey) async =>
+      current?.id == id ? current : null;
+  @override
+  Future<List<CaptureSession>> pending(String ownerKey) async => [];
+  @override
+  Future<CaptureSession> saveReady(
+    String id,
+    String ownerKey,
+    Set<String> draftIds,
+  ) async {
+    var next = 100;
+    return current = current!.copyWith(
+      status: 'saved',
+      drafts: [
+        for (final draft in current!.drafts)
+          draftIds.contains(draft.id)
+              ? draft.copyWith(savedTaskId: next++)
+              : draft,
+      ],
+    );
+  }
+
+  @override
+  Future<CaptureSession?> undoSave(
+    CaptureSession before,
+    Map<String, int> savedIds,
+  ) async {
+    undos++;
+    return current = before;
+  }
 }

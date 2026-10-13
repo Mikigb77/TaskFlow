@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
-import 'package:agenda/services/feedback_timeout.dart';
+import 'package:agenda/widgets/app_components.dart';
 
 /// Shared by Calendar, Tasks and details, including keyboard/accessible buttons.
 class TaskInteractions {
@@ -16,35 +16,25 @@ class TaskInteractions {
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.l10n;
     try {
-      final timeout = FeedbackTimeout.forAction();
       await notifier.setCompleted(task, !task.isCompleted);
-      final duration = await timeout;
       if (!messenger.mounted ||
           !identical(container.read(taskProvider.notifier), notifier)) {
         return;
       }
       HapticFeedback.selectionClick();
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(
-        // Snackbars with an action persist by default in the current SDK.
-        persist: false,
-        duration: duration,
-        content: Text(
-            task.isCompleted ? strings.taskReopened : strings.taskCompleted),
-        action: SnackBarAction(
-            label: strings.undo,
-            onPressed: () async {
-              if (!messenger.mounted ||
-                  !identical(container.read(taskProvider.notifier), notifier)) {
-                return;
-              }
-              try {
-                await notifier.setCompleted(task, task.isCompleted);
-              } catch (_) {
-                _error(messenger, strings.undoError);
-              }
-            }),
-      ));
+      await showFeedback(messenger,
+          task.isCompleted ? strings.taskReopened : strings.taskCompleted,
+          actionLabel: strings.undo, onAction: () async {
+        if (!messenger.mounted ||
+            !identical(container.read(taskProvider.notifier), notifier)) {
+          return;
+        }
+        try {
+          await notifier.setCompleted(task, task.isCompleted);
+        } catch (_) {
+          _error(messenger, strings.undoError);
+        }
+      });
     } catch (_) {
       _error(messenger, strings.taskUpdateError);
     }
@@ -75,43 +65,38 @@ class TaskInteractions {
               skip: result.scope == 'skip', reset: result.scope == 'reset')
           : null;
       if (!messenger.mounted) return;
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(
-          content: Text(result.scope == 'skip'
+      await showFeedback(
+          messenger,
+          result.scope == 'skip'
               ? strings.occurrenceSkippedNotice
               : result.scope == 'reset'
                   ? strings.originalRestored
                   : result.date == null
                       ? strings.movedInbox
-                      : strings.scheduleUpdated),
-          action: SnackBarAction(
-              label: strings.undo,
-              onPressed: () async {
-                if (!messenger.mounted ||
-                    !identical(
-                        container.read(taskProvider.notifier), notifier)) {
-                  return;
-                }
-                try {
-                  final restored = seriesChange != null
-                      ? await notifier.undoSchedule(seriesChange)
-                      : await notifier.undoOccurrence(occurrenceChange!);
-                  if (!restored) {
-                    _error(messenger, strings.scheduleChangedAgain);
-                  }
-                } catch (_) {
-                  _error(messenger, strings.undoError);
-                }
-              })));
+                      : strings.scheduleUpdated,
+          actionLabel: strings.undo, onAction: () async {
+        if (!messenger.mounted ||
+            !identical(container.read(taskProvider.notifier), notifier)) {
+          return;
+        }
+        try {
+          final restored = seriesChange != null
+              ? await notifier.undoSchedule(seriesChange)
+              : await notifier.undoOccurrence(occurrenceChange!);
+          if (!restored) {
+            _error(messenger, strings.scheduleChangedAgain);
+          }
+        } catch (_) {
+          _error(messenger, strings.undoError);
+        }
+      });
     } catch (_) {
       _error(messenger, strings.scheduleError);
     }
   }
 
   static void _error(ScaffoldMessengerState messenger, String text) {
-    if (messenger.mounted) {
-      messenger.showSnackBar(SnackBar(content: Text(text)));
-    }
+    if (messenger.mounted) showFeedback(messenger, text);
   }
 }
 

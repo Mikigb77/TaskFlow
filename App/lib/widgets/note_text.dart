@@ -1,3 +1,4 @@
+import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:agenda/l10n/region.dart';
@@ -47,8 +48,8 @@ class NoteText extends StatelessWidget {
                   }
                 } catch (_) {/* Keep the original selectable text available. */}
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(context.l10n.linkOpenError)));
+                  showFeedback(ScaffoldMessenger.of(context),
+                      context.l10n.linkOpenError);
                 }
               }),
       ],
