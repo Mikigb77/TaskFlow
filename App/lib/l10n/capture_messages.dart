@@ -11,6 +11,7 @@ String captureProblemText(AppLocalizations l, String value) =>
       CaptureProblem.timeout => l.captureTimeout,
       CaptureProblem.unavailable => l.captureUnavailable,
       CaptureProblem.allowance => l.captureAllowance,
+      CaptureProblem.proRequired => l.voiceProRequired,
       CaptureProblem.signIn => l.captureSignIn,
       CaptureProblem.forbidden => l.captureForbidden,
       CaptureProblem.tooLarge => l.captureTooLarge,

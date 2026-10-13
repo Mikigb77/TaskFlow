@@ -7,19 +7,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 TaskDraft draft(String title, {bool ambiguous = false}) => TaskDraft.fromJson({
-      'title': title,
-      'due_date': null,
-      'scheduled_date': title == 'Pay invoice' ? '2026-09-25' : null,
-      'priority': 1,
-      'notes': '',
-      'transcript': 'Buy coffee. Pay invoice Friday.',
-      'questions': ambiguous ? ['Morning or afternoon?'] : [],
-    });
+  'title': title,
+  'due_date': null,
+  'scheduled_date': title == 'Pay invoice' ? '2026-09-25' : null,
+  'priority': 1,
+  'notes': '',
+  'transcript': 'Buy coffee. Pay invoice Friday.',
+  'questions': ambiguous ? ['Morning or afternoon?'] : [],
+});
 
 Future<ProviderContainer> openReview(
-    WidgetTester tester, List<TaskDraft> drafts) async {
+  WidgetTester tester,
+  List<TaskDraft> drafts, {
+  GlobalKey? preview,
+}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -27,243 +34,327 @@ Future<ProviderContainer> openReview(
   final container = designContainer();
   addTearDown(container.dispose);
   await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyApp()));
+    UncontrolledProviderScope(
+      container: container,
+      child: RepaintBoundary(key: preview, child: const MyApp()),
+    ),
+  );
   await tester.pumpAndSettle();
-  tester.state<NavigatorState>(find.byType(Navigator)).push(
-      MaterialPageRoute<void>(
+  tester
+      .state<NavigatorState>(find.byType(Navigator))
+      .push(
+        MaterialPageRoute<void>(
           builder: (_) => ReviewTasksScreen(
-              drafts: drafts, transcript: 'Buy coffee. Pay invoice Friday.')));
+            drafts: drafts,
+            transcript: 'Buy coffee. Pay invoice Friday.',
+          ),
+        ),
+      );
   await tester.pumpAndSettle();
   return container;
 }
 
 void main() {
-  testWidgets('Spanish batch review keeps corrections through language changes',
-      (tester) async {
-    final container = await openReview(
-        tester, [draft('Coffee'), draft('Call', ambiguous: true)]);
-    await container
-        .read(regionalProvider.notifier)
-        .set(const RegionalPreferences(language: 'es'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Editar Coffee'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-        find.byKey(const ValueKey('task-title')), 'Café de José');
-    await container
-        .read(regionalProvider.notifier)
-        .set(const RegionalPreferences(language: 'en'));
-    await tester.pumpAndSettle();
-    expect(find.text('Café de José'), findsOneWidget);
-    await tester.tap(find.text('Keep changes'));
-    await tester.pumpAndSettle();
-    await container
-        .read(regionalProvider.notifier)
-        .set(const RegionalPreferences(language: 'es'));
-    tester.view.physicalSize = const Size(320, 568);
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await tester.pumpAndSettle();
-    expect(find.text('Guardar 1 tarea'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('save-drafts')));
-    await tester.pumpAndSettle();
-    expect(
-        container
-            .read(taskProvider)
-            .requireValue
-            .where((t) => t.title == 'Café de José'),
-        hasLength(1));
-    expect(find.text('Revisa los datos de arriba'), findsOneWidget);
-    expect(
-        find.text('1 tarea guardada · 1 pendiente de revisar'), findsOneWidget);
-    // Let the save notice finish before scrolling the review behind it.
-    await tester.pump(const Duration(seconds: 5));
-    await tester.pumpAndSettle();
-    final confirm = find.text('Usar los datos mostrados');
-    await tester.scrollUntilVisible(confirm, 180,
-        scrollable: find.byType(Scrollable).first);
-    await tester.pumpAndSettle();
-    await tester.tap(confirm);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('save-drafts')));
-    await tester.pumpAndSettle();
-    expect(
-        container
-            .read(taskProvider)
-            .requireValue
-            .where((t) => t.title == 'Call'),
-        hasLength(1));
-    expect(tester.takeException(), isNull);
+  setUpAll(() async {
+    final font = FontLoader('Manrope')
+      ..addFont(rootBundle.load('assets/fonts/Manrope.ttf'));
+    await font.load();
+    final icons = FontLoader('MaterialIcons')
+      ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+    await icons.load();
   });
+
   testWidgets(
-      'AI checklist stays within one saved task and can be corrected in review',
-      (tester) async {
+    'single and batch review keep the save action visible in both appearances',
+    (tester) async {
+      for (final batch in [false, true]) {
+        final preview = GlobalKey();
+        final container = await openReview(tester, [
+          TaskDraft.fromJson({
+            'title': 'Comprobar el funcionamiento de la app',
+            'scheduled_date': '2026-10-13',
+            'notes':
+                'Verificar que funciona con las funcionalidades actuales, sin añadir funciones nuevas.',
+            'priority': 1,
+            'questions': [],
+            'transcript': 'Necesito comprobar que la app funcione.',
+          }),
+          if (batch) draft('Enviar los resultados a José'),
+        ], preview: preview);
+        await container
+            .read(regionalProvider.notifier)
+            .set(const RegionalPreferences(language: 'es'));
+        for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+          await setAppearance(container, mode);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('save-drafts')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          if (const bool.fromEnvironment('WRITE_REVIEW_PREVIEWS')) {
+            final boundary =
+                preview.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary;
+            await tester.runAsync(() async {
+              final image = await boundary.toImage(pixelRatio: 2);
+              final bytes = (await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              ))!;
+              await File(
+                'build/review-${batch ? 'batch' : 'direct'}-${mode.name}.png',
+              ).writeAsBytes(bytes.buffer.asUint8List());
+              image.dispose();
+            });
+          }
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+  testWidgets(
+    'one task has editable title and notes with optional controls folded away',
+    (tester) async {
+      final container = await openReview(tester, [
+        draft('Revisar la aplicación'),
+      ]);
+      expect(find.byKey(const ValueKey('task-title')), findsOneWidget);
+      expect(find.byKey(const ValueKey('draft-notes')), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Comprobar la aplicación',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('draft-notes')),
+        'Probar con José · demà 🗓️',
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      final saved = container.read(taskProvider).requireValue.last;
+      expect(saved.title, 'Comprobar la aplicación');
+      expect(saved.notes, 'Probar con José · demà 🗓️');
+      expect(saved.dueDate, isNull);
+    },
+  );
+
+  testWidgets(
+    'batch cards expand one editor and save title edits without extra dialogs',
+    (tester) async {
+      final container = await openReview(tester, [
+        draft('Buy coffee'),
+        draft('Pay invoice'),
+      ]);
+      expect(find.byKey(const ValueKey('task-title')), findsNothing);
+      await tester.tap(find.byTooltip('Edit Buy coffee'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Buy decaf',
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      final tasks = container.read(taskProvider).requireValue;
+      expect(tasks.length, 6);
+      expect(tasks.singleWhere((t) => t.title == 'Buy decaf').dueDate, isNull);
+      expect(
+        tasks.singleWhere((t) => t.title == 'Pay invoice').hasTime,
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets('identical questions resolve only the chosen field', (
+    tester,
+  ) async {
     final container = await openReview(tester, [
       TaskDraft.fromJson({
-        'title': 'Pack',
-        'due_date': null,
-        'priority': 1,
-        'notes': '',
-        'transcript': 'Pack passport and charger',
-        'questions': [],
-        'checklist': [
-          {'id': '7dd965fb-212f-4b37-a5dc-9339e2575447', 'title': 'Passport'},
-          {'id': '57bb8ccf-0c13-4a06-928c-f4f0587a4f70', 'title': 'Charger'}
+        'title': 'Doctor',
+        'scheduled_date': '2026-10-13',
+        'priority': 3,
+        'notes': 'Bring test results',
+        'transcript': 'Doctor tomorrow at five',
+        'questions': ['Please check this detail'],
+        'clarifications': [
+          {
+            'field': 'schedule',
+            'question': 'Please check this detail',
+            'times': ['05:00', '17:00'],
+          },
+          {
+            'field': 'duration',
+            'question': 'Please check this detail',
+            'times': [],
+          },
         ],
-      })
+      }),
     ]);
-    final edit = find.byTooltip('Edit Passport');
-    await tester.scrollUntilVisible(edit, 180);
+    await tester.ensureVisible(find.text('17:00'));
+    await tester.tap(find.text('17:00'));
     await tester.pumpAndSettle();
-    await tester.tap(edit);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit step'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-        find.byKey(const ValueKey('checklist-title')), 'Renewed passport');
-    await tester.tap(find.text('Keep step'));
+    expect(find.text('Please check this detail'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
+          .onPressed,
+      isNull,
+    );
+    await tester.ensureVisible(find.text('Keep this detail as shown'));
+    await tester.tap(find.text('Keep this detail as shown'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('save-drafts')));
     await tester.pumpAndSettle();
-    final saved = container
-        .read(taskProvider)
-        .requireValue
-        .singleWhere((task) => task.title == 'Pack');
-    expect(saved.checklist.map((item) => item.title),
-        ['Renewed passport', 'Charger']);
-    expect(saved.checklist.first.id, '7dd965fb-212f-4b37-a5dc-9339e2575447');
-    expect(saved.isCompleted, isFalse);
-    expect(tester.takeException(), isNull);
+    final saved = container.read(taskProvider).requireValue.last;
+    expect(saved.dueDate, DateTime(2026, 10, 13, 17));
+    expect(saved.hasTime, true);
+    expect(saved.notes, 'Bring test results');
   });
 
   testWidgets(
-      'inline review controls fit small screens with large text in both themes',
-      (tester) async {
-    final container = await openReview(tester, [
-      draft('Pay invoice'),
-      draft('A longer task title that needs room to wrap safely')
-    ]);
-    tester.view.physicalSize = const Size(320, 568);
-    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
-      await setAppearance(container, mode);
+    'ready tasks save while uncertain drafts stay without duplicating saved tasks',
+    (tester) async {
+      final container = await openReview(tester, [
+        draft('Call', ambiguous: true),
+        draft('Coffee'),
+      ]);
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      final edit = find.byTooltip('Edit Pay invoice');
-      await tester.scrollUntilVisible(edit, 160);
-      await tester.pumpAndSettle();
-      await tester.tap(edit);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const ValueKey('task-title')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      final repeat = find.byTooltip('Change repeat').first;
-      await tester.ensureVisible(repeat);
-      await tester.tap(repeat);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Weekly').last);
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Keep repeat'), 120,
-          scrollable: find.byType(Scrollable).last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Keep repeat'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    }
-  });
-
-  testWidgets('guest reviews, edits and saves several tasks together',
-      (tester) async {
-    final container =
-        await openReview(tester, [draft('Buy coffee'), draft('Pay invoice')]);
-    expect(find.text('Inbox · No date'), findsOneWidget);
-    expect(find.text('Sep 25 · Any time'), findsOneWidget);
-    expect(container.read(taskProvider).requireValue.length, 4);
-    await tester.tap(find.byTooltip('Edit Buy coffee'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-        find.byKey(const ValueKey('task-title')), 'Buy decaf');
-    await tester.tap(find.text('Keep changes'));
-    await tester.pumpAndSettle();
-    expect(container.read(taskProvider).requireValue.length, 4);
-    await tester.tap(find.byKey(const ValueKey('save-drafts')));
-    await tester.pumpAndSettle();
-    final tasks = container.read(taskProvider).requireValue;
-    expect(tasks.length, 6);
-    expect(tasks.firstWhere((t) => t.title == 'Buy decaf').dueDate, isNull);
-    expect(tasks.firstWhere((t) => t.title == 'Pay invoice').hasTime, isFalse);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('ready tasks save while uncertain drafts remain for review',
-      (tester) async {
-    final container = await openReview(
-        tester, [draft('Call', ambiguous: true), draft('Coffee')]);
-    await tester.tap(find.byKey(const ValueKey('save-drafts')));
-    await tester.pumpAndSettle();
-    expect(container.read(taskProvider).requireValue.length, 5);
-    expect(container.read(taskProvider).requireValue.last.title, 'Coffee');
-    expect(find.text('Call'), findsOneWidget);
-    expect(
+      expect(container.read(taskProvider).requireValue.length, 5);
+      expect(
         tester
             .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
             .onPressed,
-        isNull);
-    final confirm = find.text('Use the details shown');
-    await tester.ensureVisible(confirm);
-    await tester.pumpAndSettle();
-    await tester.tap(confirm);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('save-drafts')));
-    await tester.pumpAndSettle();
-    expect(container.read(taskProvider).requireValue.length, 6);
-    expect(
+        isNull,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Call Mum',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
+            .onPressed,
+        isNull,
+      );
+      await tester.ensureVisible(find.text('Keep this detail as shown'));
+      await tester.tap(find.text('Keep this detail as shown'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(container.read(taskProvider).requireValue.length, 6);
+      expect(
         container
             .read(taskProvider)
             .requireValue
-            .where((t) => t.title == 'Coffee')
-            .length,
-        1);
-    expect(tester.takeException(), isNull);
-  });
+            .where((t) => t.title == 'Coffee'),
+        hasLength(1),
+      );
+    },
+  );
 
-  testWidgets(
-      'removing drafts and changing a title never confirms unrelated ambiguity',
-      (tester) async {
-    final container = await openReview(
-        tester, [draft('Call', ambiguous: true), draft('Remove me')]);
-    final remove = find.byTooltip('Remove Remove me');
-    await tester.scrollUntilVisible(remove, 200);
-    await tester.drag(find.byType(ListView).last, const Offset(0, -200));
+  testWidgets('empty titles cannot save and removing a card offers Undo', (
+    tester,
+  ) async {
+    final container = await openReview(tester, [
+      draft('First'),
+      draft('Second'),
+    ]);
+    await tester.tap(find.byTooltip('Edit Second'));
     await tester.pumpAndSettle();
-    await tester.tap(remove);
+    await tester.ensureVisible(find.byTooltip('Remove Second'));
+    await tester.tap(find.byTooltip('Remove Second'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byTooltip('Edit Call'));
+    await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Edit Call'));
+    expect(find.byTooltip('Edit Second'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('Edit First'));
+    await tester.tap(find.byTooltip('Edit First'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-        find.byKey(const ValueKey('task-title')), 'Call Mum');
-    await tester.tap(find.text('Keep changes'));
-    await tester.pumpAndSettle();
-    expect(
-        tester
-            .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
-            .onPressed,
-        isNull);
-    final confirm = find.text('Use the details shown');
-    await tester.scrollUntilVisible(confirm, -200);
-    await tester.tap(confirm);
+    await tester.enterText(find.byKey(const ValueKey('task-title')), '   ');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('save-drafts')));
     await tester.pumpAndSettle();
-    expect(container.read(taskProvider).requireValue.length, 5);
-    expect(container.read(taskProvider).requireValue.last.title, 'Call Mum');
-    expect(tester.takeException(), isNull);
+    expect(container.read(taskProvider).requireValue.last.title, 'Second');
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('save-drafts')))
+          .onPressed,
+      isNull,
+    );
   });
+
+  testWidgets(
+    'Spanish and Catalan retain inline edits, large text and theme changes',
+    (tester) async {
+      final container = await openReview(tester, [
+        draft('Coffee'),
+        draft('Call', ambiguous: true),
+      ]);
+      await tester.tap(find.byTooltip('Edit Coffee'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Café de José',
+      );
+      tester.view.physicalSize = const Size(320, 568);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      for (final language in ['es', 'ca', 'en']) {
+        await container
+            .read(regionalProvider.notifier)
+            .set(RegionalPreferences(language: language));
+        for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+          await setAppearance(container, theme);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.byKey(const ValueKey('draft-notes')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(
+            tester
+                .widget<TextFormField>(find.byKey(const ValueKey('task-title')))
+                .controller!
+                .text,
+            'Café de José',
+          );
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'existing checklists stay visible in direct review and preserve identity',
+    (tester) async {
+      final container = await openReview(tester, [
+        TaskDraft.fromJson({
+          'title': 'Pack',
+          'priority': 1,
+          'notes': '',
+          'transcript': 'Passport and charger',
+          'questions': [],
+          'checklist': [
+            {'id': 'passport', 'title': 'Passport'},
+            {'id': 'charger', 'title': 'Charger'},
+          ],
+        }),
+      ]);
+      await tester.ensureVisible(find.byTooltip('Edit Passport'));
+      await tester.tap(find.byTooltip('Edit Passport'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit step'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('checklist-title')),
+        'Renewed passport',
+      );
+      await tester.tap(find.text('Keep step'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      final saved = container.read(taskProvider).requireValue.last;
+      expect(saved.checklist.first.id, 'passport');
+      expect(saved.checklist.first.title, 'Renewed passport');
+    },
+  );
 }

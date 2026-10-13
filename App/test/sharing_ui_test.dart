@@ -18,7 +18,7 @@ import 'support/design_fixtures.dart';
 
 void main() {
   testWidgets(
-      'English and Spanish invitations preserve API roles at 2x text in both themes',
+      'All languages preserve invitation API roles at 2x text in both themes',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 568));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -26,9 +26,12 @@ void main() {
       ('en', false),
       ('en', true),
       ('es', false),
-      ('es', true)
+      ('es', true),
+      ('ca', false),
+      ('ca', true)
     ]) {
       final spanish = language == 'es';
+      final strings = lookupAppLocalizations(Locale(language));
       final api = _Api();
       final container = ProviderContainer(overrides: [
         apiClientProvider.overrideWithValue(api),
@@ -75,14 +78,14 @@ void main() {
         await tester.pumpAndSettle();
       }
       await tester
-          .tap(find.text(spanish ? 'Crear invitación' : 'Create invitation'));
+          .tap(find.text(strings.createInvitation));
       await tester.pumpAndSettle();
       expect(api.payload, {
         'email': 'friend@example.invalid',
         'role': spanish ? 'viewer' : 'editor'
       });
       expect(find.byKey(const ValueKey('invitation-code')), findsOneWidget);
-      await tester.tap(find.text(spanish ? 'Listo' : 'Done'));
+      await tester.tap(find.text(strings.done));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -130,7 +133,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Aceptar invitación'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Unirse a la lista'));
+    await tester.tap(find.text('Unirse al proyecto'));
     await tester.pumpAndSettle();
     expect(find.text('Pega el código de invitación completo.'), findsOneWidget);
     expect(api.payload, isNull);
@@ -139,7 +142,7 @@ void main() {
     await tester.ensureVisible(field);
     await tester.enterText(field, '  $code  ');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Unirse a la lista'));
+    await tester.tap(find.text('Unirse al proyecto'));
     await tester.pumpAndSettle();
     expect(api.payload, {'decision': 'accept', 'code': code});
     expect(api.path, 'invitations/invitation-fixture/respond/');

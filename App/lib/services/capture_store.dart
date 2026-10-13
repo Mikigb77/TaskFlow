@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:collection/collection.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -18,8 +19,10 @@ final captureOwnerProvider = Provider<String>((ref) {
       : '${ref.watch(apiClientProvider).baseUrl}/users/${account.id}';
 });
 final captureStoreProvider = Provider((ref) => CaptureStore(TaskDatabase()));
-final pendingCapturesProvider = FutureProvider<List<CaptureSession>>((ref) =>
-    ref.watch(captureStoreProvider).pending(ref.watch(captureOwnerProvider)));
+final pendingCapturesProvider = FutureProvider<List<CaptureSession>>(
+  (ref) =>
+      ref.watch(captureStoreProvider).pending(ref.watch(captureOwnerProvider)),
+);
 
 /// Capture metadata and task insertion share a database transaction. Audio stays
 /// in app-private durable storage until a successful save or explicit discard.
@@ -29,35 +32,43 @@ class CaptureStore {
   CaptureStore(this.database, {this.directory});
 
   Future<Directory> _directory() async {
-    final root = directory ??
+    final root =
+        directory ??
         Directory(
-            p.join((await getApplicationSupportDirectory()).path, 'captures'));
+          p.join((await getApplicationSupportDirectory()).path, 'captures'),
+        );
     return root.create(recursive: true);
   }
 
-  Future<CaptureSession> create(String ownerKey, String timezone,
-      {String text = '',
-      DateTime? now,
-      bool audio = false,
-      String kind = 'task'}) async {
+  Future<CaptureSession> create(
+    String ownerKey,
+    String timezone, {
+    String text = '',
+    DateTime? now,
+    bool audio = false,
+    String kind = 'task',
+    String? projectId,
+  }) async {
     if (!['task', 'note'].contains(kind)) {
       throw ArgumentError('Invalid capture type.');
     }
     final id = const Uuid().v4();
     final session = CaptureSession(
-        id: id,
-        ownerKey: ownerKey,
-        capturedAt: (now ?? DateTime.now()).toUtc(),
-        timezone: timezone,
-        kind: kind,
-        text: text,
-        audioPath: audio ? p.join((await _directory()).path, '$id.wav') : null);
+      id: id,
+      ownerKey: ownerKey,
+      capturedAt: (now ?? DateTime.now()).toUtc(),
+      timezone: timezone,
+      kind: kind,
+      projectId: projectId,
+      text: text,
+      audioPath: audio ? p.join((await _directory()).path, '$id.wav') : null,
+    );
     await (await database.database).insert('captures', {
       'id': id,
       'owner_key': ownerKey,
       'status': session.status,
       'captured_at': session.capturedAt.toIso8601String(),
-      'data': jsonEncode(session.toJson())
+      'data': jsonEncode(session.toJson()),
     });
     return session;
   }
@@ -68,37 +79,45 @@ class CaptureStore {
   /// Android acknowledges a share only after this idempotent write. A lost
   /// acknowledgement cannot duplicate a capture or move it to another account.
   Future<CaptureSession?> acceptEntry(
-      String id, String ownerKey, String timezone,
-      {required String text, required DateTime capturedAt}) async {
+    String id,
+    String ownerKey,
+    String timezone, {
+    required String text,
+    required DateTime capturedAt,
+  }) async {
     if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id) || text.length > 4000) {
       throw ArgumentError('Invalid external capture');
     }
     final session = CaptureSession(
-        id: id,
-        ownerKey: ownerKey,
-        timezone: timezone,
-        text: text,
-        capturedAt: capturedAt.toUtc());
+      id: id,
+      ownerKey: ownerKey,
+      timezone: timezone,
+      text: text,
+      capturedAt: capturedAt.toUtc(),
+    );
     return (await database.database).transaction((tx) async {
-      await tx.insert(
-          'captures',
-          {
-            'id': id,
-            'owner_key': ownerKey,
-            'status': session.status,
-            'captured_at': session.capturedAt.toIso8601String(),
-            'data': jsonEncode(session.toJson())
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore);
-      final rows = await tx.query('captures',
-          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      await tx.insert('captures', {
+        'id': id,
+        'owner_key': ownerKey,
+        'status': session.status,
+        'captured_at': session.capturedAt.toIso8601String(),
+        'data': jsonEncode(session.toJson()),
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      final rows = await tx.query(
+        'captures',
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [id, ownerKey],
+      );
       return rows.isEmpty ? null : _decode(rows.single);
     });
   }
 
   Future<CaptureSession?> read(String id, String ownerKey) async {
-    final rows = await (await database.database).query('captures',
-        where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+    final rows = await (await database.database).query(
+      'captures',
+      where: 'id = ? AND owner_key = ?',
+      whereArgs: [id, ownerKey],
+    );
     return rows.isEmpty ? null : _decode(rows.single);
   }
 
@@ -106,10 +125,12 @@ class CaptureStore {
       CaptureSession.fromJson(jsonDecode(row['data'] as String));
 
   Future<List<CaptureSession>> pending(String ownerKey) async {
-    final rows = await (await database.database).query('captures',
-        where: "owner_key = ? AND status NOT IN ('saved','discarded')",
-        whereArgs: [ownerKey],
-        orderBy: 'captured_at DESC');
+    final rows = await (await database.database).query(
+      'captures',
+      where: "owner_key = ? AND status NOT IN ('saved','discarded')",
+      whereArgs: [ownerKey],
+      orderBy: 'captured_at DESC',
+    );
     return rows.map(_decode).toList();
   }
 
@@ -117,21 +138,28 @@ class CaptureStore {
     if (session.terminal) {
       throw StateError('Use save or discard to finish a capture.');
     }
-    final changed = await (await database.database).update('captures',
-        {'data': jsonEncode(session.toJson()), 'status': session.status},
-        where:
-            "id = ? AND owner_key = ? AND status NOT IN ('saved','discarded')",
-        whereArgs: [session.id, session.ownerKey]);
+    final changed = await (await database.database).update(
+      'captures',
+      {'data': jsonEncode(session.toJson()), 'status': session.status},
+      where: "id = ? AND owner_key = ? AND status NOT IN ('saved','discarded')",
+      whereArgs: [session.id, session.ownerKey],
+    );
     if (changed != 1) throw StateError('This capture is no longer available.');
   }
 
   /// Saved draft IDs remain in the journal even if a task is later deleted.
   /// Repeating Save after a lost response cannot insert the tasks again.
   Future<CaptureSession> saveReady(
-      String id, String ownerKey, Set<String> draftIds) async {
+    String id,
+    String ownerKey,
+    Set<String> draftIds,
+  ) async {
     final result = await (await database.database).transaction((tx) async {
-      final rows = await tx.query('captures',
-          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      final rows = await tx.query(
+        'captures',
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [id, ownerKey],
+      );
       if (rows.isEmpty) throw StateError('Capture not found in this account.');
       final session = _decode(rows.single);
       if (session.terminal) return session;
@@ -141,29 +169,38 @@ class CaptureStore {
           updated.add(draft);
           continue;
         }
-        if (!draft.confirmed) {
+        if (!draft.ready) {
           throw StateError('Confirm the uncertain details first.');
         }
-        await TaskDatabase.validateList(tx, draft.task, ownerKey);
-        final values = draft.task.toMap()..remove('id');
+        final task = await TaskDatabase.normalizeResponsibility(
+          tx,
+          draft.task,
+          ownerKey,
+        );
+        final values = task.toMap()..remove('id');
         final syncId = const Uuid().v4();
         final taskId = await tx.insert('tasks', {
           ...values,
           'owner_key': ownerKey,
           'sync_id': syncId,
-          'sync_pending': ownerKey == 'local' ? 0 : 1
+          'sync_pending': ownerKey == 'local' ? 0 : 1,
         });
-        await TaskDatabase.stageAttachments(tx, ownerKey, syncId, draft.task);
-        updated.add(draft.copyWith(savedTaskId: taskId));
+        await TaskDatabase.stageAttachments(tx, ownerKey, syncId, task);
+        updated.add(draft.copyWith(task: task, savedTaskId: taskId));
       }
       final completed = updated.isNotEmpty && updated.every((d) => !d.pending);
       final next = session.copyWith(
-          drafts: updated, status: completed ? 'saved' : 'ready');
+        drafts: updated,
+        status: completed ? 'saved' : 'ready',
+      );
       // Keep only task identities after completion, not sensitive source words.
       final retained = completed ? _withoutInput(next) : next;
-      await tx.update('captures',
-          {'data': jsonEncode(retained.toJson()), 'status': retained.status},
-          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      await tx.update(
+        'captures',
+        {'data': jsonEncode(retained.toJson()), 'status': retained.status},
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [id, ownerKey],
+      );
       return retained;
     });
     if (result.terminal) await _removeAudio(result);
@@ -171,34 +208,132 @@ class CaptureStore {
   }
 
   CaptureSession _withoutInput(CaptureSession session) => CaptureSession(
-      id: session.id,
-      ownerKey: session.ownerKey,
-      capturedAt: session.capturedAt,
-      timezone: session.timezone,
-      kind: session.kind,
-      audioPath: session.audioPath,
-      audioFormat: session.audioFormat,
-      status: session.status,
-      drafts: session.drafts
-          .map((d) => CaptureDraft(
-              id: d.id,
-              task: Task(title: '', priority: 1),
-              savedTaskId: d.savedTaskId,
-              removed: d.removed))
-          .toList());
+    id: session.id,
+    ownerKey: session.ownerKey,
+    capturedAt: session.capturedAt,
+    timezone: session.timezone,
+    kind: session.kind,
+    audioPath: session.audioPath,
+    audioFormat: session.audioFormat,
+    status: session.status,
+    drafts: session.drafts
+        .map(
+          (d) => CaptureDraft(
+            id: d.id,
+            task: Task(title: '', priority: 1),
+            savedTaskId: d.savedTaskId,
+            removed: d.removed,
+          ),
+        )
+        .toList(),
+  );
+
+  /// Undo only this save, atomically, without deleting a task changed since it
+  /// was created. Cloud deletions remain queued for the ordinary sync protocol.
+  Future<CaptureSession?> undoSave(
+    CaptureSession before,
+    Map<String, int> savedIds,
+  ) async => (await database.database).transaction((tx) async {
+    final rows = await tx.query(
+      'captures',
+      where: 'id = ? AND owner_key = ?',
+      whereArgs: [before.id, before.ownerKey],
+    );
+    if (rows.isEmpty || savedIds.isEmpty) return null;
+    final current = _decode(rows.single);
+    for (final entry in savedIds.entries) {
+      if (!current.drafts.any(
+        (d) => d.id == entry.key && d.savedTaskId == entry.value,
+      )) {
+        return null;
+      }
+      final tasks = await tx.query(
+        'tasks',
+        where: 'id = ? AND owner_key = ? AND is_deleted = 0',
+        whereArgs: [entry.value, before.ownerKey],
+      );
+      if (tasks.length != 1 || tasks.single['revision'] != 0) return null;
+      final prior = before.drafts.firstWhere((d) => d.id == entry.key);
+      final expected =
+          (await TaskDatabase.normalizeResponsibility(
+              tx,
+              prior.task,
+              before.ownerKey,
+            )).toMap()
+            ..remove('id')
+            ..remove('createdBy');
+      final actual = Task.fromMap(tasks.single).toMap()
+        ..remove('id')
+        ..remove('createdBy');
+      if (!const DeepCollectionEquality().equals(expected, actual)) return null;
+      await TaskDatabase.validateList(
+        tx,
+        Task.fromMap(tasks.single),
+        before.ownerKey,
+      );
+    }
+    for (final id in savedIds.values) {
+      if (before.ownerKey == 'local') {
+        await tx.delete(
+          'tasks',
+          where: 'id = ? AND owner_key = ?',
+          whereArgs: [id, before.ownerKey],
+        );
+      } else {
+        await tx.rawUpdate(
+          'UPDATE tasks SET is_deleted = 1, sync_pending = 1, revision = revision + 1 WHERE id = ? AND owner_key = ?',
+          [id, before.ownerKey],
+        );
+      }
+    }
+    final restored = CaptureSession(
+      id: before.id,
+      ownerKey: before.ownerKey,
+      capturedAt: before.capturedAt,
+      timezone: before.timezone,
+      projectId: before.projectId,
+      kind: before.kind,
+      text: before.text,
+      transcript: before.transcript,
+      status: 'ready',
+      drafts: [
+        for (final draft in current.drafts)
+          if (savedIds.containsKey(draft.id))
+            before.drafts
+                .firstWhere((d) => d.id == draft.id)
+                .copyWith(clearSavedTaskId: true)
+          else
+            draft,
+      ],
+    );
+    await tx.update(
+      'captures',
+      {'data': jsonEncode(restored.toJson()), 'status': restored.status},
+      where: 'id = ? AND owner_key = ?',
+      whereArgs: [before.id, before.ownerKey],
+    );
+    return restored;
+  });
 
   Future<void> discard(String id, String ownerKey) async {
     final discarded = await (await database.database).transaction((tx) async {
-      final rows = await tx.query('captures',
-          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      final rows = await tx.query(
+        'captures',
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [id, ownerKey],
+      );
       if (rows.isEmpty) throw StateError('Capture not found in this account.');
       final session = _decode(rows.single);
       if (session.terminal) return session;
-      final next =
-          _withoutInput(session.copyWith(status: 'discarded', drafts: []));
-      await tx.update('captures',
-          {'status': 'discarded', 'data': jsonEncode(next.toJson())},
-          where: 'id = ? AND owner_key = ?', whereArgs: [id, ownerKey]);
+      final next = _withoutInput(
+        session.copyWith(status: 'discarded', drafts: []),
+      );
+      await tx.update(
+        'captures',
+        {'status': 'discarded', 'data': jsonEncode(next.toJson())},
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [id, ownerKey],
+      );
       return next;
     });
     await _removeAudio(discarded);
@@ -211,13 +346,17 @@ class CaptureStore {
     try {
       final file = File(expected);
       if (await file.exists()) await file.delete();
-    } on FileSystemException {/* Retried during the next recovery sweep. */}
+    } on FileSystemException {
+      /* Retried during the next recovery sweep. */
+    }
   }
 
   Future<void> cleanFinished(String ownerKey) async {
-    final rows = await (await database.database).query('captures',
-        where: "owner_key = ? AND status IN ('saved','discarded')",
-        whereArgs: [ownerKey]);
+    final rows = await (await database.database).query(
+      'captures',
+      where: "owner_key = ? AND status IN ('saved','discarded')",
+      whereArgs: [ownerKey],
+    );
     for (final row in rows) {
       await _removeAudio(_decode(row));
     }
@@ -267,8 +406,10 @@ class CaptureStore {
       var offset = 12;
       var pcm = false;
       while (offset + 8 <= bytes.length) {
-        final chunk =
-            ascii.decode(bytes.sublist(offset, offset + 4), allowInvalid: true);
+        final chunk = ascii.decode(
+          bytes.sublist(offset, offset + 4),
+          allowInvalid: true,
+        );
         final size = data.getUint32(offset + 4, Endian.little);
         if (chunk == 'fmt ' && offset + 24 <= bytes.length) {
           pcm = data.getUint16(offset + 8, Endian.little) == 1;

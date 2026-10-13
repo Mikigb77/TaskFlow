@@ -2,11 +2,54 @@
 import uuid
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
-from .models import TaskList, Task
+from .models import TaskList, Task, TaskGroup
+
+
+def visible_groups(user):
+    return TaskGroup.objects.filter(Q(owner=user) | Q(memberships__user=user), is_deleted=False).distinct()
+
+
+def group_role(group, user):
+    if group.is_deleted:
+        return None
+    if group.owner_id == user.pk:
+        return "owner"
+    return group.memberships.filter(user=user).values_list("role", flat=True).first()
+
+
+def require_group(group, user, *, manage=False, owner=False):
+    role = group_role(group, user)
+    if role is None:
+        raise NotFound()
+    if (owner and role != "owner") or (manage and role not in ("owner", "admin")):
+        raise PermissionDenied("Only group administrators can manage this group.")
+    return role
+
+
+def display_name(user):
+    return user.get_full_name().strip() or user.email.split("@")[0]
+
+
+def group_people(group):
+    people = [{"user_id": group.owner_id, "name": display_name(group.owner), "role": "owner", "voice_name": ""}]
+    people.extend({"user_id": row.user_id, "name": display_name(row.user), "role": row.role,
+                   "voice_name": row.voice_name} for row in group.memberships.select_related("user").order_by("user_id"))
+    return people
+
+
+def project_people(project):
+    if project.group_id:
+        return group_people(project.group)
+    people = [{"user_id": project.owner_id, "name": display_name(project.owner), "role": "owner", "voice_name": ""}]
+    people.extend({"user_id": row.user_id, "name": display_name(row.user), "role": row.role,
+                   "voice_name": ""} for row in project.memberships.select_related("user").order_by("user_id"))
+    return people
 
 
 def visible_lists(user):
-    return TaskList.objects.filter(Q(owner=user) | Q(memberships__user=user), is_deleted=False).distinct()
+    return TaskList.objects.filter(
+        Q(group__isnull=True) & (Q(owner=user) | Q(memberships__user=user)) |
+        Q(group__in=visible_groups(user)), is_deleted=False).select_related("group").distinct()
 
 
 def visible_tasks(user):
@@ -17,6 +60,8 @@ def visible_tasks(user):
 def list_role(task_list, user):
     if task_list.is_deleted:
         return None
+    if task_list.group_id:
+        return group_role(task_list.group, user)
     if task_list.owner_id == user.pk:
         return "owner"
     return task_list.memberships.filter(user=user).values_list("role", flat=True).first()
@@ -26,7 +71,8 @@ def require_list(task_list, user, *, write=False, owner=False):
     role = list_role(task_list, user)
     if role is None:
         raise NotFound()
-    if (owner and role != "owner") or (write and role == "viewer"):
+    managers = ("owner", "admin") if task_list.group_id else ("owner",)
+    if (owner and role not in managers) or (write and role == "viewer"):
         raise PermissionDenied("This list is read-only for your account." if role == "viewer" else "Only the list owner can manage sharing and list details.")
     return role
 

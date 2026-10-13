@@ -60,6 +60,7 @@ void main() {
     await store.write(const RegionalPreferences(
         language: 'en', clock: ClockFormat.twentyFour, weekStart: 1));
     final container = ProviderContainer(overrides: [
+      authProvider.overrideWith((ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
       apiClientProvider.overrideWith((ref) {
         final api = OfflineApiClient();
         ref.onDispose(api.close);

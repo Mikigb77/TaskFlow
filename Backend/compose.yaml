@@ -4,6 +4,7 @@ services:
     build: .
     env_file: .env
     environment:
+      RUN_LOCAL_BOOTSTRAP: "1"
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://cache:6379/0
       EMAIL_HOST: mailpit

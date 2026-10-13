@@ -14,8 +14,8 @@ class CloudTaskRepository extends TaskRepository {
   Future<void>? _syncing;
 
   CloudTaskRepository(this.database, this.api, this.accountId)
-      : ownerKey = '${api.baseUrl}/users/$accountId',
-        super(database);
+    : ownerKey = '${api.baseUrl}/users/$accountId',
+      super(database);
 
   @override
   Future<int> addTask(Task task) =>
@@ -34,20 +34,26 @@ class CloudTaskRepository extends TaskRepository {
   Future<int> importLocalTasks() => database.importLocalTasks(ownerKey);
 
   Map<String, dynamic> _payload(Map<String, dynamic> row) => {
-        ...Task.fromMap(row).toApi(),
-        'is_deleted': row['is_deleted'] == 1,
-        'version': row['remote_version'],
-      };
+    ...Task.fromMap(row).toApi(),
+    'is_deleted': row['is_deleted'] == 1,
+    'version': row['remote_version'],
+  };
 
   bool _sameContent(Map<String, dynamic> sent, Map<String, dynamic> remote) =>
       sent['title'] == remote['title'] &&
       sent['kind'] == (remote['kind'] ?? 'task') &&
       sent['notes'] == remote['notes'] &&
       sent['list_id'] == remote['list_id'] &&
-      const DeepCollectionEquality()
-          .equals(sent['labels'], remote['labels'] ?? []) &&
-      const DeepCollectionEquality()
-          .equals(sent['checklist'], remote['checklist'] ?? []) &&
+      sent['assignment'] == (remote['assignment'] ?? 'personal') &&
+      sent['assignee_id'] == remote['assignee_id'] &&
+      const DeepCollectionEquality().equals(
+        sent['labels'],
+        remote['labels'] ?? [],
+      ) &&
+      const DeepCollectionEquality().equals(
+        sent['checklist'],
+        remote['checklist'] ?? [],
+      ) &&
       sent['priority'] == remote['priority'] &&
       sent['reminder_minutes'] == remote['reminder_minutes'] &&
       sent['reminder_time'] == remote['reminder_time'] &&
@@ -60,28 +66,29 @@ class CloudTaskRepository extends TaskRepository {
       (sent['deadline_at'] == null
           ? remote['deadline_at'] == null
           : remote['deadline_at'] != null &&
-              DateTime.parse(sent['deadline_at'])
-                  .isAtSameMomentAs(DateTime.parse(remote['deadline_at']))) &&
+                DateTime.parse(
+                  sent['deadline_at'],
+                ).isAtSameMomentAs(DateTime.parse(remote['deadline_at']))) &&
       sent['recurrence'] == (remote['recurrence'] ?? 'none') &&
       sent['repeat_interval'] == (remote['repeat_interval'] ?? 1) &&
-      const DeepCollectionEquality()
-          .equals(sent['repeat_weekdays'], remote['repeat_weekdays'] ?? []) &&
       const DeepCollectionEquality().equals(
-          Task.fromApi(sent)
-              .exceptions
-              .map((change) => change.toJson())
-              .toList(),
-          Task.fromApi(remote)
-              .exceptions
-              .map((change) => change.toJson())
-              .toList()) &&
+        sent['repeat_weekdays'],
+        remote['repeat_weekdays'] ?? [],
+      ) &&
+      const DeepCollectionEquality().equals(
+        Task.fromApi(sent).exceptions.map((change) => change.toJson()).toList(),
+        Task.fromApi(
+          remote,
+        ).exceptions.map((change) => change.toJson()).toList(),
+      ) &&
       sent['repeat_until'] == remote['repeat_until'] &&
       _sameDates(sent['completed_dates'], remote['completed_dates'] ?? []) &&
       (sent['due_date'] == null
           ? remote['due_date'] == null
           : remote['due_date'] != null &&
-              DateTime.parse(sent['due_date'] as String).isAtSameMomentAs(
-                  DateTime.parse(remote['due_date'] as String)));
+                DateTime.parse(sent['due_date'] as String).isAtSameMomentAs(
+                  DateTime.parse(remote['due_date'] as String),
+                ));
 
   bool _sameDates(List<dynamic> a, List<dynamic> b) =>
       a.length == b.length && a.toSet().containsAll(b);
@@ -101,13 +108,18 @@ class CloudTaskRepository extends TaskRepository {
       }
       final pending = await database.pending(ownerKey);
       if (pending.any((row) => row['kind'] == 'note')) {
-        final health =
-            await api.request('GET', 'health/', accountId: accountId);
+        final health = await api.request(
+          'GET',
+          'health/',
+          accountId: accountId,
+        );
         if (health is! Map ||
             health['features'] is! Map ||
             health['features']['notes'] != true) {
-          throw ApiException(0,
-              'Update this server before syncing notes. Your notes are kept on this phone.');
+          throw ApiException(
+            0,
+            'Update this server before syncing notes. Your notes are kept on this phone.',
+          );
         }
       }
       for (final row in pending) {
@@ -122,9 +134,13 @@ class CloudTaskRepository extends TaskRepository {
               // Keep unsent work as a personal copy after an editor becomes a
               // viewer, then restore the authoritative shared version below.
               if ((row['remote_version'] as int) > 0) {
-                final remote = Map<String, dynamic>.from(await api.request(
-                    'GET', 'tasks/${row['sync_id']}/',
-                    accountId: accountId));
+                final remote = Map<String, dynamic>.from(
+                  await api.request(
+                    'GET',
+                    'tasks/${row['sync_id']}/',
+                    accountId: accountId,
+                  ),
+                );
                 await database.preserveConflict(ownerKey, row, remote);
               } else {
                 await database.recoverReadOnlyDraft(ownerKey, row['id'] as int);
@@ -134,15 +150,50 @@ class CloudTaskRepository extends TaskRepository {
               continue;
             }
           }
-          final remote = Map<String, dynamic>.from(await api.request(
-              'PUT', 'tasks/${row['sync_id']}/',
-              data: data, accountId: accountId) as Map);
+          final remote = Map<String, dynamic>.from(
+            await api.request(
+                  'PUT',
+                  'tasks/${row['sync_id']}/',
+                  data: data,
+                  accountId: accountId,
+                )
+                as Map,
+          );
           if ((remote['kind'] ?? 'task') != data['kind']) {
-            throw ApiException(0,
-                'The server did not preserve this content type. Your local copy is kept.');
+            throw ApiException(
+              0,
+              'The server did not preserve this content type. Your local copy is kept.',
+            );
           }
           await database.acknowledge(ownerKey, row, remote);
         } on ApiException catch (error) {
+          if (error.status == 400 &&
+              (error.body?.containsKey('assignee_id') == true ||
+                  error.body?.containsKey('assignment') == true)) {
+            // A member may leave after an offline edit. Keep the user's work
+            // privately, then apply the server's shared task and continue sync.
+            await lists.refreshAccess(api, accountId);
+            if ((row['remote_version'] as int) > 0) {
+              final remote = Map<String, dynamic>.from(
+                await api.request(
+                  'GET',
+                  'tasks/${row['sync_id']}/',
+                  accountId: accountId,
+                ),
+              );
+              await database.preserveConflict(ownerKey, row, remote);
+            } else {
+              await database.recoverReadOnlyDraft(
+                ownerKey,
+                row['id'] as int,
+                assignmentChanged: true,
+                revision: row['revision'] as int,
+              );
+            }
+            syncError =
+                'Task responsibility changed. Your unsent edit was kept as a personal copy.';
+            continue;
+          }
           if (error.status == 403 || error.status == 404) {
             await lists.refreshAccess(api, accountId);
             syncError =
@@ -150,8 +201,9 @@ class CloudTaskRepository extends TaskRepository {
             continue;
           }
           if (error.status != 409 || error.body?['current'] == null) rethrow;
-          final remote =
-              Map<String, dynamic>.from(error.body!['current'] as Map);
+          final remote = Map<String, dynamic>.from(
+            error.body!['current'] as Map,
+          );
           if (_sameContent(data, remote)) {
             await database.acknowledge(ownerKey, row, remote);
           } else {
@@ -163,12 +215,19 @@ class CloudTaskRepository extends TaskRepository {
       }
       int page = 1;
       while (true) {
-        final result = Map<String, dynamic>.from(await api.request(
-            'GET', 'tasks/?include_deleted=true&page=$page',
-            accountId: accountId) as Map);
+        final result = Map<String, dynamic>.from(
+          await api.request(
+                'GET',
+                'tasks/?include_deleted=true&page=$page',
+                accountId: accountId,
+              )
+              as Map,
+        );
         for (final remote in result['results'] as List) {
           await database.mergeRemote(
-              ownerKey, Map<String, dynamic>.from(remote as Map));
+            ownerKey,
+            Map<String, dynamic>.from(remote as Map),
+          );
         }
         if (result['next'] == null) break;
         page++;

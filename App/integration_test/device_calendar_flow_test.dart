@@ -49,6 +49,7 @@ void main() {
         await sql.query('tasks', where: 'owner_key = ?', whereArgs: [owner]));
     final store = CalendarPreferenceStore(owner, database);
     final container = ProviderContainer(overrides: [
+      authProvider.overrideWith((ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
       apiClientProvider.overrideWith((ref) {
         final api = OfflineApiClient();
         ref.onDispose(api.close);

@@ -2,7 +2,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.password_validation import validate_password
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
-from .models import User, Task, TaskList
+from .models import User, Task, TaskList, TaskGroup, ProjectPreference
+from .billing import complimentary_pro
 
 
 def validate_timezone(value):
@@ -14,9 +15,19 @@ def validate_timezone(value):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    google_linked = serializers.SerializerMethodField()
+    complimentary_pro = serializers.SerializerMethodField()
+
+    def get_complimentary_pro(self, user):
+        return complimentary_pro(user)
+
+    def get_google_linked(self, user):
+        return hasattr(user, "google_identity")
+
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "timezone"]
+        fields = ["id", "email", "first_name", "timezone", "billing_id", "google_linked", "complimentary_pro"]
+        read_only_fields = ["billing_id"]
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -57,6 +68,41 @@ class ZonedDateTimeField(serializers.DateTimeField):
 class TaskListSerializer(serializers.ModelSerializer):
     version = serializers.IntegerField(min_value=0, default=0)
     role = serializers.SerializerMethodField()
+    group_id = serializers.PrimaryKeyRelatedField(source="group", queryset=TaskGroup.objects.none(), allow_null=True, required=False)
+    group_name = serializers.CharField(source="group.name", read_only=True, default=None)
+    group_archived = serializers.BooleanField(source="group.archived", read_only=True, default=False)
+    people = serializers.SerializerMethodField()
+    pinned = serializers.SerializerMethodField()
+    notifications = serializers.SerializerMethodField()
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            from .list_access import visible_groups
+            fields["group_id"].queryset = visible_groups(request.user)
+        return fields
+
+    def get_people(self, value):
+        from .list_access import project_people
+        if value.group_id:
+            cache = self.context.setdefault("group_people", {})
+            if value.group_id not in cache:
+                cache[value.group_id] = project_people(value)
+            return cache[value.group_id]
+        return project_people(value)
+
+    def _preference(self, value):
+        key = "project_preferences"
+        if key not in self.context:
+            self.context[key] = {row.task_list_id: row for row in ProjectPreference.objects.filter(user=self.context["request"].user)}
+        return self.context[key].get(value.pk)
+
+    def get_pinned(self, value):
+        return getattr(self._preference(value), "pinned", False)
+
+    def get_notifications(self, value):
+        return getattr(self._preference(value), "notifications", "assigned")
 
     def get_role(self, value):
         from .list_access import list_role
@@ -64,8 +110,8 @@ class TaskListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TaskList
-        fields = ["id", "name", "color", "archived", "version", "updated_at", "shared", "role"]
-        read_only_fields = ["id", "updated_at", "shared", "role"]
+        fields = ["id", "name", "color", "archived", "version", "updated_at", "shared", "role", "group_id", "group_name", "group_archived", "owner_id", "people", "pinned", "notifications"]
+        read_only_fields = ["id", "updated_at", "shared", "role", "owner_id"]
 
 
 class OccurrenceExceptionSerializer(serializers.Serializer):
@@ -120,6 +166,39 @@ class TaskSerializer(serializers.ModelSerializer):
     repeat_interval = serializers.IntegerField(min_value=1, max_value=99, required=False)
     repeat_weekdays = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=7), max_length=7, required=False)
     exceptions = OccurrenceExceptionSerializer(many=True, required=False)
+    assignment = serializers.ChoiceField(choices=["personal", "member", "group", "unassigned"], required=False)
+    assignee_id = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+    assignee_name = serializers.SerializerMethodField()
+    created_by = serializers.IntegerField(source="owner_id", read_only=True)
+
+    def get_assignee_name(self, task):
+        from .list_access import display_name
+        return display_name(task.assignee) if task.assignee_id else None
+
+    def validate_assignment_context(self, attrs, kind):
+        from .list_access import project_people
+        project = attrs.get("task_list", getattr(self.instance, "task_list", None))
+        shared = bool(project and (project.shared or project.group_id))
+        assignment = attrs.get("assignment", getattr(self.instance, "assignment", "group" if shared else "personal"))
+        assignee_id = attrs.get("assignee_id", getattr(self.instance, "assignee_id", None))
+        if kind == "note":
+            if assignment not in ("personal", "group") or assignee_id is not None:
+                raise serializers.ValidationError({"assignment": "Notes do not have a responsible person."})
+            attrs.update(assignment="personal", assignee_id=None)
+            return
+        if not shared:
+            if assignment != "personal" or assignee_id is not None:
+                raise serializers.ValidationError({"assignment": "Choose a shared project before assigning a task."})
+        elif assignment == "personal":
+            # Older clients and personal-to-shared moves have no assignment field.
+            assignment = "group"
+        if assignment == "member":
+            eligible = {person["user_id"] for person in project_people(project) if person["role"] != "viewer"}
+            if assignee_id not in eligible:
+                raise serializers.ValidationError({"assignee_id": "Choose a current project member who can edit tasks."})
+        elif assignee_id is not None:
+            raise serializers.ValidationError({"assignee_id": "Only a member assignment can have a responsible person."})
+        attrs.update(assignment=assignment, assignee_id=assignee_id)
 
     def validate_repeat_weekdays(self, value):
         return sorted(set(value))
@@ -151,12 +230,13 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
         due, day = attrs.get("due_date"), attrs.get("scheduled_date")
         kind = attrs.get("kind", getattr(self.instance, "kind", "task"))
+        self.validate_assignment_context(attrs, kind)
         if self.instance and kind != self.instance.kind:
             raise serializers.ValidationError({"kind": "Keep the original type. Create a separate task or note instead."})
         if kind == "note":
@@ -199,6 +279,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class DraftRequestSerializer(serializers.Serializer):
+    project_id = serializers.UUIDField(allow_null=True, required=False)
     capture_type = serializers.ChoiceField(choices=["task", "note"], required=False, default="task")
     text = serializers.CharField(min_length=3, max_length=4000, required=False)
     timezone = serializers.CharField(max_length=64, validators=[validate_timezone])

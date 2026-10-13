@@ -27,6 +27,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final store = _Lists();
     final container = ProviderContainer(overrides: [
+      authProvider.overrideWith(
+          (ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
       pendingCapturesProvider.overrideWith((ref) async => []),
       apiClientProvider.overrideWith((ref) => OfflineApiClient()),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -43,15 +45,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('new-list')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('list-name')), 'Shopping');
-    await tester.tap(find.text('Save list'));
+    await tester.tap(find.text('Save project'));
     await tester.pumpAndSettle();
     final id = store.lists.single.id;
     await tester.tap(find.byTooltip('Manage Shopping'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit list'));
+    await tester.tap(find.text('Edit project'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('list-name')), 'Weekend');
-    await tester.tap(find.text('Save list'));
+    await tester.tap(find.text('Save project'));
     await tester.pumpAndSettle();
     expect(store.lists.single.id, id);
     await tester.tap(find.text('Weekend'));
@@ -86,7 +88,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Manage Weekend'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Archive list'));
+    await tester.tap(find.text('Archive project'));
     await tester.pumpAndSettle();
     expect(store.lists.single.archived, isTrue);
     expect(
@@ -97,7 +99,7 @@ void main() {
         isTrue);
     await tester.tap(find.byTooltip('Manage Weekend'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Restore list'));
+    await tester.tap(find.text('Restore project'));
     await tester.pumpAndSettle();
     expect(store.lists.single.archived, isFalse);
     for (final mode in [ThemeMode.light, ThemeMode.dark]) {
@@ -157,7 +159,7 @@ void main() {
               .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Azul'))
               .selected,
           isTrue);
-      await tester.tap(find.text('Guardar lista'));
+      await tester.tap(find.text('Guardar proyecto'));
       await tester.pumpAndSettle();
       expect(store.lists.single.name, 'My untranslated shopping list');
       expect(store.lists.single.color, 'blue');
@@ -168,7 +170,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(menu);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Archivar lista'));
+      await tester.tap(find.text('Archivar proyecto'));
       await tester.pumpAndSettle();
       expect(store.lists.single.id, id);
       expect(store.lists.single.archived, isTrue);

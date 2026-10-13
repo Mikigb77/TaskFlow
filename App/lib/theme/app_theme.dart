@@ -131,8 +131,15 @@ abstract final class AppTheme {
           shape: shape),
       snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          backgroundColor: scheme.surfaceContainerHighest,
+          contentTextStyle: base.textTheme.bodyMedium!
+              .copyWith(color: scheme.onSurface),
+          actionTextColor: scheme.primary,
+          closeIconColor: scheme.onSurfaceVariant,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: scheme.outlineVariant))),
       bottomSheetTheme: BottomSheetThemeData(
           backgroundColor: scheme.surface,
           showDragHandle: true,

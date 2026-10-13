@@ -6,15 +6,17 @@ import 'package:sqflite/sqflite.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/l10n/app_languages.dart';
 
 enum ClockFormat { system, twelve, twentyFour }
 
 class RegionalPreferences {
-  const RegionalPreferences(
-      {this.language = 'system',
-      this.clock = ClockFormat.system,
-      this.weekStart,
-      this.captureTimezone});
+  const RegionalPreferences({
+    this.language = 'system',
+    this.clock = ClockFormat.system,
+    this.weekStart,
+    this.captureTimezone,
+  });
   final String language;
   final ClockFormat clock;
 
@@ -25,54 +27,52 @@ class RegionalPreferences {
         'language': language,
         'clock': clock.name,
         'weekStart': weekStart,
-        'captureTimezone': captureTimezone
+        'captureTimezone': captureTimezone,
       };
   factory RegionalPreferences.fromJson(Map<String, dynamic> json) =>
       RegionalPreferences(
-          language: ['system', 'en', 'es'].contains(json['language'])
-              ? json['language'] as String
-              : 'system',
-          clock: ClockFormat.values
-                  .where((v) => v.name == json['clock'])
-                  .firstOrNull ??
-              ClockFormat.system,
-          weekStart: [0, 1, 6].contains(json['weekStart'])
-              ? json['weekStart'] as int
-              : null,
-          captureTimezone: CaptureTimezone.valid(json['captureTimezone'])
-              ? json['captureTimezone'] as String
-              : null);
+        language: json['language'] == AppLanguages.system ||
+                (json['language'] is String &&
+                    AppLanguages.supports(json['language'] as String))
+            ? json['language'] as String
+            : 'system',
+        clock: ClockFormat.values
+                .where((v) => v.name == json['clock'])
+                .firstOrNull ??
+            ClockFormat.system,
+        weekStart: [0, 1, 6].contains(json['weekStart'])
+            ? json['weekStart'] as int
+            : null,
+        captureTimezone: CaptureTimezone.valid(json['captureTimezone'])
+            ? json['captureTimezone'] as String
+            : null,
+      );
   RegionalPreferences withLanguage(String value) => RegionalPreferences(
-      language: value,
-      clock: clock,
-      weekStart: weekStart,
-      captureTimezone: captureTimezone);
+        language: value,
+        clock: clock,
+        weekStart: weekStart,
+        captureTimezone: captureTimezone,
+      );
   RegionalPreferences withClock(ClockFormat value) => RegionalPreferences(
-      language: language,
-      clock: value,
-      weekStart: weekStart,
-      captureTimezone: captureTimezone);
+        language: language,
+        clock: value,
+        weekStart: weekStart,
+        captureTimezone: captureTimezone,
+      );
   RegionalPreferences withWeekStart(int? value) => RegionalPreferences(
-      language: language,
-      clock: clock,
-      weekStart: value,
-      captureTimezone: captureTimezone);
+        language: language,
+        clock: clock,
+        weekStart: value,
+        captureTimezone: captureTimezone,
+      );
   RegionalPreferences withTimezone(String? value) => RegionalPreferences(
-      language: language,
-      clock: clock,
-      weekStart: weekStart,
-      captureTimezone: value);
-  Locale localeFor(List<Locale>? devices) {
-    final device = devices?.firstOrNull ?? const Locale('en');
-    final languageCode = language == 'system'
-        ? devices
-                ?.where((l) => ['en', 'es'].contains(l.languageCode))
-                .firstOrNull
-                ?.languageCode ??
-            'en'
-        : language;
-    return Locale(languageCode, device.countryCode);
-  }
+        language: language,
+        clock: clock,
+        weekStart: weekStart,
+        captureTimezone: value,
+      );
+  Locale localeFor(List<Locale>? devices) =>
+      AppLanguages.resolve(language, devices);
 }
 
 class RegionalPreferenceStore {
@@ -80,17 +80,25 @@ class RegionalPreferenceStore {
       : database = database ?? TaskDatabase();
   final TaskDatabase database;
   Future<RegionalPreferences> read() async {
-    final rows = await (await database.database)
-        .query('app_preferences', where: 'scope = ?', whereArgs: ['regional']);
+    final rows = await (await database.database).query(
+      'app_preferences',
+      where: 'scope = ?',
+      whereArgs: ['regional'],
+    );
     return rows.isEmpty
         ? const RegionalPreferences()
         : RegionalPreferences.fromJson(
-            jsonDecode(rows.single['data'] as String) as Map<String, dynamic>);
+            jsonDecode(rows.single['data'] as String) as Map<String, dynamic>,
+          );
   }
 
   Future<void> write(RegionalPreferences value) async {
-    await (await database.database).insert('app_preferences',
-        {'scope': 'regional', 'data': jsonEncode(value.toJson())},
+    await (await database.database).insert(
+        'app_preferences',
+        {
+          'scope': 'regional',
+          'data': jsonEncode(value.toJson()),
+        },
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }
@@ -98,7 +106,8 @@ class RegionalPreferenceStore {
 final regionalStoreProvider = Provider((ref) => RegionalPreferenceStore());
 final regionalProvider =
     StateNotifierProvider<RegionalController, RegionalPreferences>(
-        (ref) => RegionalController(ref.read(regionalStoreProvider)));
+  (ref) => RegionalController(ref.read(regionalStoreProvider)),
+);
 
 class RegionalController extends StateNotifier<RegionalPreferences> {
   RegionalController(this.store) : super(const RegionalPreferences()) {
@@ -159,8 +168,11 @@ class CaptureTimezone {
     return tz.timeZoneDatabase.locations.keys.toList()..sort();
   }
 
-  static Future<CaptureTimezone> resolve(RegionalPreferences preferences,
-      {String? accountTimezone, Future<String> Function()? readDevice}) async {
+  static Future<CaptureTimezone> resolve(
+    RegionalPreferences preferences, {
+    String? accountTimezone,
+    Future<String> Function()? readDevice,
+  }) async {
     if (valid(preferences.captureTimezone)) {
       return CaptureTimezone(preferences.captureTimezone!);
     }
@@ -172,7 +184,9 @@ class CaptureTimezone {
     } catch (_) {
       /* An explicit fallback is shown in the capture/settings UI. */
     }
-    return CaptureTimezone(valid(accountTimezone) ? accountTimezone! : 'UTC',
-        fallback: true);
+    return CaptureTimezone(
+      valid(accountTimezone) ? accountTimezone! : 'UTC',
+      fallback: true,
+    );
   }
 }

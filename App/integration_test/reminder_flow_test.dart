@@ -156,7 +156,9 @@ class _Auth extends AuthNotifier {
   _Auth(super.api);
   @override
   Future<void> restore() async {
-    state = const AuthState();
+    state = AuthState(account: Account.fromJson({
+      'id': 1, 'email': 'reminder@example.invalid', 'timezone': 'Europe/Madrid',
+    }));
   }
 }
 

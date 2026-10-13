@@ -1,6 +1,10 @@
-# TaskFlow local backend
+# TaskFlow backend
 
-All development is on `dev`. The Flutter app opens on Calendar. Manual tasks and a limited voice trial work without an account; an account adds task backup and a larger AI allowance.
+Private Cloud Run + Neon staging is deployed. See [staging access, rebuild,
+email, secrets and cost boundaries](docs/STAGING.md). Local Docker remains
+available for development as described below.
+
+All development is on `dev`. The Flutter app requires an account and opens on Calendar. Manual tasks and notes remain available without Pro; voice and AI capture require a verified `taskflow_pro` entitlement. Projects can be personal or shared through reusable groups. See the [implementation and validation record](../App/docs/PROJECTS_IMPLEMENTATION.md).
 
 The repository has two project directories: `App/` contains Flutter, and `Backend/` contains Django, Docker Compose, environment files, and this guide. Git metadata remains at the repository root.
 
@@ -18,6 +22,43 @@ docker compose ps
 - Password recovery test inbox: <http://localhost:8026/>
 
 Compose runs Django/Gunicorn, PostgreSQL, Redis, and Mailpit. PostgreSQL and Redis have persistent volumes and no published database ports. The API uses port 8088 to avoid the other services already running on this computer. Mailpit is accessible only from localhost.
+
+### Development AI: free first, Vertex fallback
+
+From `Backend`, the configured development flow is:
+
+```powershell
+# One-time, with the personal TaskFlow Google account:
+./scripts/setup-vertex.ps1
+./scripts/login-vertex.ps1
+# Start/restart the backend with free-first routing:
+./scripts/start-ai-dev.ps1 -Mode auto
+```
+
+The scripts target `taskflow-511107` explicitly without changing global gcloud
+account/project settings. `setup-vertex.ps1` is idempotent: it creates the staging
+service account and a custom role limited to model prediction and API usage.
+The selected developer can impersonate that account. `login-vertex.ps1` writes
+isolated Application Default Credentials under ignored `.credentials/gcloud`.
+Choose `tech.garbar@gmail.com` in Google's browser chooser. Re-run login if its
+source authorization expires. No service-account key or GPU endpoint is created.
+
+`compose.vertex.yaml` mounts just the ADC file read-only into the API container;
+Git and Docker both exclude `.credentials`. The ADC contains a sensitive local
+source refresh credential: do not share it or use it in a deployed image. For
+Cloud Run, attach a dedicated runtime service account instead of mounting local
+ADC. Flutter only talks to the authenticated Django API.
+
+| Mode | Behaviour |
+| --- | --- |
+| `auto` | AI Studio first; bounded retries, then paid Vertex on quota/temporary failures. |
+| `vertex` | Direct Vertex for predictable development demonstrations. |
+| `ai_studio` | AI Studio only; never makes a Vertex call. |
+
+Switch with `scripts/start-ai-dev.ps1 -Mode vertex` (or another mode).
+Plain `docker compose up` uses the base configuration and free-only default;
+use the script whenever the ADC-mounted Vertex route is wanted. Existing volumes
+and accounts are preserved. The optional overlay does not deploy a public API.
 
 `Backend/.env` is intentionally tracked for this private prototype at the owner's request. It contains the Google key, model names, Django secret, and local database credentials. Docker injects these at runtime; `.dockerignore` excludes the environment files from the image build context, and the Flutter APK does not contain the key. `Backend/.env.example` documents the configuration without real credentials.
 
@@ -43,7 +84,7 @@ On a physical Android phone:
 1. Connect the phone and computer to the same Wi-Fi.
 2. Find the computer's IPv4 address with `ipconfig`.
 3. Add that exact IP to `DJANGO_ALLOWED_HOSTS` in `Backend/.env` if it is not already there, then run `docker compose up -d --force-recreate api` from `Backend/`.
-4. In Account → Connection settings, use `http://COMPUTER_IP:8088`. Use the debug APK for local HTTP. If Windows Firewall blocks the port, allow it on your private network.
+4. On the debug login screen → Connection settings, use `http://COMPUTER_IP:8088`. Use the debug APK for local HTTP. If Windows Firewall blocks the port, allow it on your private network.
 
 You can also pass the address using `--dart-define=API_BASE_URL=...`. Runtime connection settings are stored on the device and take precedence. Sign out before changing servers. Release builds require HTTPS; local HTTP is enabled only in the Android debug manifest.
 
@@ -60,17 +101,19 @@ flutter build apk --debug --target-platform=android-x64
 Output relative to the repository root: `App/build/app/outputs/flutter-apk/app-debug.apk`.
 Each command writes `app-debug.apk`, so copy the phone build before building for the emulator. Selecting one target platform keeps packages smaller without changing their version code. Avoid `--split-per-abi` for local test installations: Flutter adds an ABI-specific version offset, and a subsequent normal test build can trigger a downgrade/uninstall that clears local data. The current development version is `1.0.0+4002`.
 
-The real Android flow can also be checked from `App/` with `flutter test integration_test/backend_flow_test.dart -d emulator-5554`. This checks guest capture, creates a synthetic account, reviews and saves multiple tasks, verifies backup, and signs out and back in. It removes its own guest tasks afterward and preserves existing ones. It does not record the microphone.
+The real Android flow can also be checked from `App/` with `flutter test integration_test/backend_flow_test.dart -d emulator-5554`. This checks the login gate, creates a synthetic account, resumes unfinished account captures, reviews and saves multiple tasks, verifies backup, and signs out and back in. It removes its temporary Inbox tasks afterward. It does not record the microphone.
 
 ## Accounts and recovery
 
-For repeat testing, use **Use test account** on the local browser page. In the Android app, sign in once with `test@taskflow.local` and `TaskFlow-Dev-2026!`; the app saves the session in secure storage. Both clients use the same account and tasks.
+For repeat testing, use **Use test account** on the local browser page. In the Android development build, tap **Use test account** on the login screen. The shortcut uses `app-test@taskflow.local` and `TaskFlow-App-Dev-2026!` from `App/config/development.json`; the app saves the normal session in secure storage. The shortcut is absent from profile/release builds and debug builds without the opt-in. Both clients use the same account and tasks. This account starts empty; later tasks are preserved. The earlier `test@taskflow.local` account and its data have been left intact.
 
 The local `.env` enables this with `LOCAL_TEST_ACCOUNT_ENABLED=1`. Docker startup runs `python manage.py seed_test_user`, which creates a regular user once and preserves its password and tasks on subsequent starts. The shortcut uses the normal JWT login endpoint. Test-account seeding and the browser shortcut are disabled by default in `.env.example`; their email and password are configured with `LOCAL_TEST_ACCOUNT_EMAIL` and `LOCAL_TEST_ACCOUNT_PASSWORD`.
 
 Use an email address and a password of at least 12 characters. Passwords use Argon2 hashing and Django's common-password and similarity checks. Access tokens last 10 minutes; refresh tokens rotate and last 7 days. Tokens are stored in the phone's secure storage. Server session checks revoke both access and refresh tokens immediately on an online logout or password reset. Offline logout removes the device credentials; the server session expires normally.
 
 Login has IP throttling and a 15-minute account lock after 5 failed attempts. Recovery responses do not reveal whether an email is registered. Recovery links last 30 minutes and are single-use. Resetting a password revokes existing sessions.
+
+The Flutter app requires login before Calendar, tasks, notes, voice capture or subscription screens. A saved account can reopen its cached data offline. Sign-out clears the protected navigation stack and credentials without deleting account caches; a server-rejected refresh token also returns to login. Connection failures do not sign the user out. Google sign-in verifies email ownership; password registration does not yet verify email, so requiring an account is only one layer of abuse protection.
 
 For local recovery, choose Forgot password in the app or browser, enter the account email, and open Mailpit on the computer. Follow the link there, or copy its recovery code into the app and choose a new password. Email is captured locally; nothing is sent to a real mailbox. A public deployment needs HTTPS and a real email service; email verification is not part of this local prototype.
 
@@ -110,7 +153,12 @@ WAV recording → Gemini transcription → Gemma extraction → validation → r
 Typed text ────────────────────────────┘
 ```
 
-Defaults are `gemini-3.5-transcribe` for transcription and the requested `gemma-4-31b-it` for extraction. Both can be changed in `.env` and applied by recreating the API container. This uses Google's Gemini API directly through the official SDK inside LangChain runnable steps; no LangSmith account or tracing is enabled.
+AI Studio defaults are `gemini-3.5-transcribe` for transcription and `gemma-4-26b-a4b-it` for extraction. The 26B model replaces the intermittent 31B model with the user's approval. Vertex uses `gemini-3.1-flash-lite` for either stage. Environment settings select each model and route; recreate the API container to apply them. LangChain core composes prompt construction, generation and Pydantic validation. Google's official Gen AI SDK handles each provider call underneath that pipeline. LangGraph, agent loops, model tools and LangSmith tracing are not needed or enabled.
+
+Vertex receives a supported generation schema with explicit assignment enums;
+Pydantic still checks the complete response on both routes. This prevents a
+model response from bypassing task, date, membership or assignment validation.
+Models propose drafts only; database writes require explicit app review/save.
 
 The request includes an IANA time zone and a reference time, so “Friday” is resolved in the user's calendar. Drafts contain titles, optional dates/times, recurrence, priorities, notes and clarification questions. Omitted dates mean Inbox; omitted times mean Any time. Ambiguous times and daylight-saving gaps/overlaps require editing or explicit confirmation. Medical appointments and treatment default to high priority; explicit user priorities take precedence. Preparation notes remain with their appointment. Unsupported recurrence patterns are flagged rather than silently approximated. Drafts are not automatically saved: the app lets you edit/remove each one, then saves all remaining tasks in one SQLite transaction. A failed batch saves none. Signed-in batches enter the existing per-task sync queue.
 
@@ -118,7 +166,40 @@ Audio is accepted only as a validated 16-bit PCM WAV, up to 60 seconds and 6 MB.
 
 Explicit Note capture sends `capture_type=note`. A recording is transcribed once and returned as one note with its wording retained, without a task-extraction call. Typed/on-device-transcribed notes are prepared locally by the phone without an AI request. These processing timings are recorded separately from task extraction. The live synthetic note-recording test passed in 1.807 seconds; that single measurement is not a microphone-quality or task-extraction speed claim.
 
-There is no paid-model fallback. Limits are 6 requests/minute, 5 successful guest captures/day per connection (`AI_GUEST_REQUESTS_PER_DAY`), 50 successful captures/day per account (`AI_REQUESTS_PER_DAY`), and 200 attempts/day globally. A batch counts as one capture. Failed captures release the personal/guest reservation; global attempt counts remain. Voice normally uses two provider calls, text one. Transient extraction errors (HTTP 500/503) get at most one retry within 45 seconds; quota errors are not retried. These are application limits, not guarantees of Google quota/pricing. Guest IPs use server-secret HMAC cache keys; forwarding headers cannot bypass limits. The local deployment trusts the direct peer (`NUM_PROXIES=0`); configure a trusted proxy boundary before public deployment. Task storage, accounts and sync remain authenticated. Provider errors leave manual creation available. Check [Google pricing](https://ai.google.dev/gemini-api/docs/pricing) and AI Studio limits before estimating margins.
+Both AI endpoints require a valid account token and server-verified `taskflow_pro`; anonymous requests return HTTP 401 and unpaid accounts return HTTP 402 before quota reservation or any provider call. Configure `REVENUECAT_API_KEY`; Test Store grants additionally require `DEPLOYMENT_ENVIRONMENT=development` and `REVENUECAT_ALLOW_SANDBOX=1`. Production rejects sandbox access. Limits remain 6 requests/minute, 50 successful captures/day per account (`AI_REQUESTS_PER_DAY`), and 200 attempts/day globally. A batch counts as one capture, including provider fallback. Failed captures release the account reservation; global attempt counts remain. Sign-in, registration and recovery retain their existing burst throttles. The local deployment trusts the direct peer (`NUM_PROXIES=0`); configure a trusted proxy boundary before public deployment. Task storage, accounts and sync remain authenticated. Provider errors leave manual creation available.
+
+In `auto`, each stage makes at most two free attempts, each with a default 10-second
+inference timeout, followed by at most one Vertex attempt. An HTTP 429 skips the
+second free attempt. HTTP 500/502/503/504 and transport timeouts qualify for retry;
+input/authentication/permission and validation errors do not cause paid fallback.
+Each stage shares a 45-second inference/retry budget. Credential refresh and
+network setup can add overhead; a recording has two stages. SDK retries are
+disabled, so they cannot silently multiply these calls. Redis stores a shared
+60-second quota cooldown or 30-second overload cooldown, honoring numeric
+`Retry-After` up to five minutes. During cooldown, `auto` goes straight to Vertex.
+Audio and extraction cooldowns are independent. Logs contain provider, stage,
+status and elapsed time, without recordings, prompts or credentials.
+
+Vertex is pay-as-you-go; there is no reserved GPU or idle model instance. These
+request limits are not a monetary billing cap. AI Studio free availability and
+quota depend on the selected model/project; do not assume unlimited free use.
+Check [AI Studio pricing](https://ai.google.dev/gemini-api/docs/pricing) and
+[Vertex pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing)
+before setting public allowances. [Model lifecycle](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions)
+was checked on 2026-10-11: 3.1 Flash-Lite remains supported; 2.5 Flash-Lite is
+near retirement and was not selected for this new integration.
+
+Automated routing/adapter tests mock both providers. For a separate, small paid
+live probe, run:
+
+```powershell
+docker compose -f compose.yaml -f compose.vertex.yaml run --rm --no-deps api python scripts/validate_vertex.py
+```
+
+It simulates only the free 429
+and actually calls Vertex with synthetic project/member context. `--audio PATH`
+also verifies real Vertex transcription of an explicitly supplied synthetic WAV.
+The probe writes no tasks and uses its own cooldown cache.
 
 ## API outline
 
@@ -144,7 +225,7 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | POST | `lists/<uuid>/invite/`, `revoke_invite/`, `member/`, `leave/` | Explicit invitation and membership changes |
 | GET, POST | `invitations/`, `invitations/<uuid>/respond/` | Pending invites; accept with code or decline |
 | POST | `ai/draft/` | JSON text or multipart WAV + timezone |
-| POST | `ai/drafts/` | Guest or signed-in text/WAV capture; returns up to 12 reviewed drafts |
+| POST | `ai/drafts/` | Authenticated Pro text/WAV capture; returns up to 12 reviewed drafts with project and responsibility |
 
 Task writes accept `title`, nullable offset-aware `due_date`, nullable `scheduled_date` (YYYY-MM-DD), `recurrence` (none/daily/weekly/monthly/yearly), nullable `repeat_until`, `completed_dates` (ISO calendar dates), `priority` (1–3), `reminder_minutes` (null follows device default, -1 off, 0–10080 lead minutes), `reminder_time` (null default or 0–1439 local minute of day for date-only tasks), `notes`, `is_completed`, `is_deleted`, and `version`. Recurrence requires a start date; `is_completed` applies to one-off tasks and `completed_dates` to repeating tasks. A new client-generated UUID uses version 0. Updates/deletes require the current version; HTTP 409 returns `current`. List with `?include_deleted=true` for synchronization; follow pagination until `next` is null. The legacy single-draft endpoint rejects multi-task output instead of discarding tasks.
 
@@ -186,3 +267,9 @@ docker compose exec -T api python scripts/flexible_smoke_test.py --audio /tmp/ta
 ```
 
 It checks a Friday 17:00 doctor appointment, notes, priority, ambiguous time, account recovery through Mailpit, and restoration in a new session. Synthetic test accounts remain in the development database. Do not run the live smoke test as a production monitoring job.
+
+## Architecture and Google login
+
+The [architecture and rollout checklist](docs/ARCHITECTURE.md) records the Cloud Run and Neon deployment design, availability strategy, pricing assumptions, and proposed storage/retention policy. Retention deletion is not enabled.
+
+[Google sign-in setup](docs/GOOGLE_SIGN_IN.md) describes the native Flutter login, development OAuth configuration, safe linking to existing accounts, and production prerequisites.

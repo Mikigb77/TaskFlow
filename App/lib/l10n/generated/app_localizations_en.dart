@@ -9,6 +9,172 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get reviewSchedule => 'Date and time';
+
+  @override
+  String get reviewChooseDate => 'Choose a date before adding a time.';
+
+  @override
+  String get reviewInvalidTime => 'Check this value';
+
+  @override
+  String get reviewReady => 'Ready when you are';
+
+  @override
+  String get reviewOptions => 'More options';
+
+  @override
+  String get reviewOriginal => 'See what I said';
+
+  @override
+  String get reviewKeepDraft => 'Your draft is kept until you save it.';
+
+  @override
+  String get reviewRemove => 'Remove from this capture';
+
+  @override
+  String get reviewRemoved => 'Draft removed';
+
+  @override
+  String get reviewUndoSaved => 'Tasks returned to your drafts.';
+
+  @override
+  String get reviewUndoChanged =>
+      'This task has changed. Your saved tasks were kept.';
+
+  @override
+  String get reviewRepair => 'Repair text';
+
+  @override
+  String get reviewRepairHelp =>
+      'This text may have been saved with damaged accents. Review the correction before saving.';
+
+  @override
+  String get reviewShortTitle =>
+      'Use a short title; keep the details in notes.';
+
+  @override
+  String get reviewConfirmDetail => 'Keep this detail as shown';
+
+  @override
+  String get reviewEditDetail => 'Change this detail';
+
+  @override
+  String get reviewResolved => 'Reviewed';
+
+  @override
+  String get reviewResolve => 'Check this detail';
+
+  @override
+  String get reviewSaveOne => 'Save task';
+
+  @override
+  String get languageNativeName => 'English';
+
+  @override
+  String sharingProblem(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'alreadyMember':
+          'This person already has access. Manage their role in People.',
+      'memberLimit':
+          'This project supports up to 20 members and 20 pending invitations. Remove someone or revoke an invitation first.',
+      'accepted':
+          'This invitation was already accepted. Manage the person’s access in People.',
+      'owner':
+          'The owner cannot leave. You can delete the project if it is no longer needed.',
+      'expired':
+          'This invitation is no longer available. Ask the owner for a new one.',
+      'code': 'Ask the project owner for the current invitation code.',
+      'refresh': 'This project changed. Refresh before deleting it.',
+      'ownerOnly':
+          'Only the project owner can manage sharing and project details.',
+      'other':
+          'This project is read-only for your account. Ask the owner for editing access.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String syncProblem(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'assignmentChanged':
+          'The responsible person changed. Your unsent edit was kept as a personal copy.',
+      'listConflict':
+          'A project changed on another device. Choose which version to keep in Projects.',
+      'readOnly':
+          'This project is now read-only. Your unsent edit was kept as a personal copy.',
+      'accessChanged':
+          'Shared-project access changed. Refresh to finish syncing permitted edits.',
+      'taskConflict':
+          'A task changed on another device. Your edit was kept as an offline copy; a conflicting deletion was cancelled.',
+      'serverUpdate':
+          'Update this server before syncing notes. Your notes are kept on this phone.',
+      'other':
+          'The server did not preserve this content type. Your local copy is kept.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String requestError(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'signOutFirst': 'Sign out before changing servers.',
+      'https': 'Use an HTTPS server address for this build.',
+      'serverAddress':
+          'Enter a valid server address, such as https://your-server.example.',
+      'emailUsed':
+          'An account with this email already exists. Sign in or recover your password.',
+      'email': 'Enter a valid email address.',
+      'credentials': 'The email or password is incorrect. Please try again.',
+      'session': 'Please sign in again to continue. Your local tasks are kept.',
+      'accountChanged':
+          'The account changed. Reopen this screen and try again.',
+      'password':
+          'Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.',
+      'recoveryCode':
+          'The recovery code is invalid or expired. Request a new one.',
+      'forbidden':
+          'This account cannot perform that action. Check your access.',
+      'rateLimit':
+          'Too many requests. Please wait a little before trying again.',
+      'fileLimit': 'Choose a non-empty file up to 6 MiB.',
+      'fileChanged':
+          'The file has changed or could not be verified. Choose it again or retry the download.',
+      'network':
+          'Could not connect to the server. Check your connection and server address, then retry. Your local data is kept.',
+      'unavailable': 'The service is unavailable. Please try again later.',
+      'validation':
+          'Some details were not accepted. Review the information and try again.',
+      'other':
+          'Could not complete the request. Your local data is kept. Please try again.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get languageAutomatic => 'Follow phone';
+
+  @override
+  String get languageHelp =>
+      'Use your phone’s preferred available language, or choose one below. If none is available, TaskFlow uses English. Your choice stays on this device.';
+
+  @override
+  String languageFollowing(String language) {
+    return 'Follow phone · $language';
+  }
+
+  @override
+  String get regionalFormats => 'Time & region';
+
+  @override
+  String get regionalFormatsHelp =>
+      'Clock, first day of the week and capture timezone';
+
+  @override
+  String get sharedCaptureRetained =>
+      'Your shared capture is retained. Reopen TaskFlow to try again.';
+
+  @override
   String get note => 'Note';
 
   @override
@@ -70,7 +236,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewOnlyNote =>
-      'View-only note. The list owner manages editing access.';
+      'View-only note. The project owner manages editing access.';
 
   @override
   String get linkOpenError =>
@@ -363,13 +529,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureDiagnostics => 'Capture diagnostics';
 
   @override
-  String get lists => 'Lists';
+  String get lists => 'Projects';
 
   @override
   String get labels => 'Labels';
 
   @override
-  String get noList => 'No list';
+  String get noList => 'Personal inbox';
 
   @override
   String get priority => 'Priority';
@@ -656,13 +822,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchDark => 'Switch to dark mode';
 
   @override
-  String get list => 'List';
+  String get list => 'Project';
 
   @override
-  String get archivedList => 'Archived list';
+  String get archivedList => 'Archived project';
 
   @override
-  String get yourList => 'Your list';
+  String get yourList => 'Your project';
 
   @override
   String get yourTasks => 'Your tasks';
@@ -699,7 +865,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get listEmpty =>
-      'Add a task to this list. Its date and reminder are yours to choose.';
+      'Add a task to this project. Its date and reminder are yours to choose.';
 
   @override
   String get tasksEmpty =>
@@ -1104,10 +1270,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addStep => 'Add step';
 
   @override
-  String get listUnavailable => 'List unavailable';
+  String get listUnavailable => 'Project unavailable';
 
   @override
-  String get moveToList => 'Move to a list';
+  String get moveToList => 'Move to a project';
 
   @override
   String get moveToListHelp =>
@@ -1117,7 +1283,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get archived => 'Archived';
 
   @override
-  String get createListHelp => 'Create your first list from Tasks → Lists.';
+  String get createListHelp => 'Create a project from the project selector.';
 
   @override
   String get taskReopened => 'Task reopened';
@@ -1429,8 +1595,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Request a recovery email, then use the code to set a new password.';
 
   @override
-  String get accountSignInHelp =>
-      'Sign in to back up your tasks and notes and get a larger voice allowance.';
+  String get accountSignInHelp => 'Sign in to keep your plans together.';
 
   @override
   String get email => 'Email';
@@ -1484,8 +1649,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forgotPassword => 'Forgot password?';
 
   @override
-  String get accountGuestHelp =>
-      'You can also use TaskFlow without an account. Your local tasks and notes stay on this phone.';
+  String get accountGuestHelp => 'Sign in to access your tasks and notes.';
 
   @override
   String get connectionSettings => 'Connection settings';
@@ -1506,10 +1670,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Password updated. Sign in with your new password.';
 
   @override
-  String get newList => 'New list';
+  String get newList => 'New project';
 
   @override
-  String get editList => 'Edit list';
+  String get editList => 'Edit project';
 
   @override
   String get listName => 'Name';
@@ -1518,7 +1682,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listNameHint => 'Work, Personal, Shopping…';
 
   @override
-  String get listNameRequired => 'Name your list.';
+  String get listNameRequired => 'Name your project.';
 
   @override
   String get colorTeal => 'Teal';
@@ -1536,22 +1700,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get colorRose => 'Rose';
 
   @override
-  String get saveList => 'Save list';
+  String get saveList => 'Save project';
 
   @override
-  String get listSaveError => 'Could not save this list. Please retry.';
+  String get listSaveError => 'Could not save this project. Please retry.';
 
   @override
-  String get listRestored => 'List restored';
+  String get listRestored => 'Project restored';
 
   @override
-  String get listArchivedHelp => 'List archived. Contents kept.';
+  String get listArchivedHelp => 'Project archived. Contents kept.';
 
   @override
-  String get listUpdateError => 'Could not update this list. Please retry.';
+  String get listUpdateError => 'Could not update this project. Please retry.';
 
   @override
-  String get chooseListDetails => 'Choose list details';
+  String get chooseListDetails => 'Choose project details';
 
   @override
   String listConflictHelp(String local, String remote) {
@@ -1568,17 +1732,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get useThisPhone => 'Use this phone';
 
   @override
-  String get listResolveError => 'Could not resolve this list. Please retry.';
+  String get listResolveError =>
+      'Could not resolve this project. Please retry.';
 
   @override
-  String get retryLists => 'Retry lists';
+  String get retryLists => 'Retry projects';
 
   @override
-  String get refreshLists => 'Refresh lists and invitations';
+  String get refreshLists => 'Refresh projects and invitations';
 
   @override
   String get listsHelp =>
-      'Keep work, life and everything else in their own lists. Inbox still collects tasks without a date.';
+      'A clear place for every part of life. Keep projects personal or share them with a group.';
 
   @override
   String get listsEmptyTitle => 'A place for each part of life';
@@ -1625,10 +1790,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get restoreList => 'Restore list';
+  String get restoreList => 'Restore project';
 
   @override
-  String get archiveList => 'Archive list';
+  String get archiveList => 'Archive project';
 
   @override
   String get sharingAndPeople => 'Sharing and people';
@@ -1638,14 +1803,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharedListVisibility =>
-      'Shared · everyone in this list can see tasks, notes and uploaded files';
+      'Shared · everyone in this project can see tasks, notes and uploaded files';
 
   @override
   String get invitationCode => 'Invitation code';
 
   @override
   String get invitationCodeHelp =>
-      'Give this code to the intended person through a channel you trust. They need it and the invited TaskFlow account to accept. The code is shown only now; replacing an invitation invalidates its previous code.';
+      'This code and the invited TaskFlow account are both needed to join. Share it only with the intended person. Replacing an invitation invalidates its previous code.';
 
   @override
   String get accountChanged => 'The account changed.';
@@ -1661,11 +1826,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not update sharing. Check the connection and retry.';
 
   @override
-  String get inviteToList => 'Invite to this list';
+  String get inviteToList => 'Invite to this project';
 
   @override
   String get inviteHelp =>
-      'All tasks, notes and uploaded files in this list will be visible after they accept. The invitation appears in their TaskFlow account; no email is sent. Give them the code shown next. It expires in 7 days.';
+      'All tasks, notes and uploaded files in this project will be visible after they accept. We will email the invitation; it also appears in their TaskFlow account. It expires in 7 days.';
 
   @override
   String get inviteeEmail => 'Their account email';
@@ -1678,13 +1843,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharingRolesHelp =>
-      'Editors can add, change, complete and delete tasks and files. Only the owner manages the list and people. Shared tasks stay in this list; exporting creates a personal copy.';
+      'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.';
 
   @override
   String get createInvitation => 'Create invitation';
 
   @override
-  String get listSharing => 'List sharing';
+  String get listSharing => 'Project sharing';
 
   @override
   String get sharingLoadError => 'Could not load sharing.';
@@ -1721,7 +1886,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeAccessHelp =>
-      'This person will lose access to this list and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.';
+      'This person will lose access to this project and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.';
 
   @override
   String get pendingInvitations => 'Pending invitations';
@@ -1750,34 +1915,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.';
 
   @override
-  String get deleteList => 'Delete list';
+  String get deleteList => 'Delete project';
 
   @override
   String get deleteListHelp =>
-      'Delete this list and all its tasks, notes and uploaded files for everyone? This cannot be undone.';
+      'Delete this project and all its tasks, notes and uploaded files for everyone? This cannot be undone.';
 
   @override
-  String get deleteListForEveryone => 'Delete list for everyone';
+  String get deleteListForEveryone => 'Delete project for everyone';
 
   @override
-  String get leaveList => 'Leave list';
+  String get leaveList => 'Leave project';
 
   @override
   String get leaveListHelp =>
-      'Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the list.';
+      'Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the project.';
 
   @override
   String get enterInvitationCode => 'Enter invitation code';
 
   @override
   String get requestInvitationCodeHelp =>
-      'Ask the list owner for the code they received when inviting you.';
+      'Ask the project owner for the code they received when inviting you.';
 
   @override
   String get invitationCodeRequired => 'Paste the full invitation code.';
 
   @override
-  String get joinList => 'Join list';
+  String get joinList => 'Join project';
 
   @override
   String get invitationResponseError =>
@@ -1979,7 +2144,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get archiveContentsHelp =>
-      'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal lists. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.';
+      'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal projects. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.';
 
   @override
   String get exportTaskFlowFile => 'Export TaskFlow file';
@@ -1996,10 +2161,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importCopiesHelp =>
-      'Selected tasks, notes and the file’s lists are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.';
+      'Selected tasks, notes and the file’s projects are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.';
 
   @override
-  String get listsIncluded => 'Lists included';
+  String get listsIncluded => 'Projects included';
 
   @override
   String get archivedPersonalCopy => 'Archived personal copy';
@@ -2043,8 +2208,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp1 = intl.Intl.pluralLogic(
       lists,
       locale: localeName,
-      other: '$lists lists',
-      one: '1 list',
+      other: '$lists projects',
+      one: '1 project',
     );
     return 'Added $_temp0 and $_temp1.';
   }
@@ -2062,7 +2227,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String importCounts(String source, int tasks, int notes, int lists) {
-    return '$source · $tasks tasks · $notes notes · $lists lists';
+    return '$source · $tasks tasks · $notes notes · $lists projects';
   }
 
   @override
@@ -2078,7 +2243,7 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count selected items',
       one: '1 selected item',
     );
-    return 'Import $_temp0 and lists';
+    return 'Import $_temp0 and projects';
   }
 
   @override
@@ -2094,13 +2259,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is not a supported TaskFlow export (versions 1 and 2).';
 
   @override
-  String get archiveInvalidList => 'Invalid list metadata.';
+  String get archiveInvalidList => 'Invalid project metadata.';
 
   @override
-  String get archiveDuplicateLists => 'Duplicate list identifiers.';
+  String get archiveDuplicateLists => 'Duplicate project identifiers.';
 
   @override
-  String get archiveInvalidListStyle => 'Invalid list color or archive status.';
+  String get archiveInvalidListStyle =>
+      'Invalid project color or archive status.';
 
   @override
   String get archiveInvalidTask => 'Invalid task record.';
@@ -2113,7 +2279,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get archiveMissingList =>
-      'The task refers to a list missing from this file.';
+      'The task refers to a project missing from this file.';
 
   @override
   String get archiveInvalidTaskFields => 'Invalid task fields.';
@@ -2306,12 +2472,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String archiveCsvInvalidSection(int row) {
-    return 'Row $row: section name is invalid; its tasks will have no list.';
+    return 'Row $row: section name is invalid; its tasks will have no project.';
   }
 
   @override
   String archiveCsvListDescription(int row) {
-    return 'Row $row: list descriptions are not supported.';
+    return 'Row $row: project descriptions are not supported.';
   }
 
   @override
@@ -2334,9 +2500,9 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(field, {
       'export_id': 'export_id',
       'tasks': 'tasks',
-      'lists': 'lists',
-      'list_id': 'list id',
-      'list_name': 'list name',
+      'lists': 'projects',
+      'list_id': 'project id',
+      'list_name': 'project name',
       'task_identifier': 'task identifier',
       'title': 'title',
       'notes': 'notes',
@@ -2661,10 +2827,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewOnlyTaskTitle => 'View-only task';
 
   @override
-  String get readOnlyList => 'This list is read-only';
+  String get readOnlyList => 'This project is read-only';
 
   @override
-  String get listEditingAccessHelp => 'The list owner manages editing access.';
+  String get listEditingAccessHelp =>
+      'The project owner manages editing access.';
 
   @override
   String get loadTaskError => 'Couldn’t load this task';
@@ -2681,7 +2848,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewOnlyTask =>
-      'View-only shared task. The list owner manages editing access.';
+      'View-only shared task. The project owner manages editing access.';
 
   @override
   String get stepUpdateError => 'Could not update this step. Please retry.';
@@ -2773,4 +2940,417 @@ class AppLocalizationsEn extends AppLocalizations {
     });
     return '$_temp0';
   }
+
+  @override
+  String get taskflowPro => 'TaskFlow Pro';
+
+  @override
+  String get billingSettingsHelp => 'Subscription, purchases and billing';
+
+  @override
+  String get billingIntro => 'Your subscription, in one place.';
+
+  @override
+  String get billingComplimentary =>
+      'Complimentary Pro access. All Pro features are included, with no payment or renewal.';
+
+  @override
+  String billingStatus(String status) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'active': 'Pro is active',
+      'inactive': 'No active Pro subscription',
+      'other': 'Subscription status unavailable',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String billingUntil(String kind, String date) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'renews': 'Renews on $date',
+      'other': 'Access until $date',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get billingTestMode =>
+      'Test purchases only. No real payment will be taken. An active test subscription unlocks voice and AI capture in this development build.';
+
+  @override
+  String get billingGuestHelp =>
+      'Sign in to link purchases to your TaskFlow account and recover Pro on your other devices.';
+
+  @override
+  String get billingSignIn => 'Sign in to TaskFlow';
+
+  @override
+  String get billingWorking => 'Updating subscription';
+
+  @override
+  String billingMonthlyPrice(String price) {
+    return '$price / month';
+  }
+
+  @override
+  String get billingRenewalHelp =>
+      'Automatically renews each month until cancelled. Review the final price and any trial terms before confirming.';
+
+  @override
+  String get billingViewPlans => 'View subscription';
+
+  @override
+  String get billingTestMonthly => 'Test monthly purchase';
+
+  @override
+  String get billingRestore => 'Restore purchases';
+
+  @override
+  String get billingManage => 'Manage subscription';
+
+  @override
+  String get billingOpenStore => 'Open store subscription settings';
+
+  @override
+  String get billingRefresh => 'Refresh status';
+
+  @override
+  String get billingRestoreHelp =>
+      'Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.';
+
+  @override
+  String get billingStoreOpenError =>
+      'Could not open the store. Try again or open your store’s subscription settings.';
+
+  @override
+  String billingError(String reason) {
+    String _temp0 = intl.Intl.selectLogic(reason, {
+      'unsupportedPlatform':
+          'Subscriptions are available in the Android and iOS app.',
+      'configuration':
+          'Subscriptions are not available yet. Please try again later.',
+      'accountUnavailable':
+          'Connect to the TaskFlow server to link your subscription, then refresh.',
+      'network': 'Could not update billing. Check your connection and refresh.',
+      'notAllowed':
+          'Purchases are restricted for this store account or device.',
+      'otherAccount':
+          'This purchase belongs to another account. Sign in to the original account to restore it.',
+      'store': 'The store could not complete the request. Please try again.',
+      'other': 'Could not update your subscription. Please try again.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String billingResult(String result) {
+    String _temp0 = intl.Intl.selectLogic(result, {
+      'active': 'TaskFlow Pro is active.',
+      'restored': 'Your Pro subscription was restored.',
+      'noPurchases': 'No active Pro purchase was found for this account.',
+      'awaitingEntitlement':
+          'Purchase received. Pro is not active yet; refresh or restore purchases shortly.',
+      'updated': 'Subscription status updated.',
+      'pending':
+          'Payment is pending. Pro will activate after the store confirms payment.',
+      'busy': 'Please wait for the current operation to finish.',
+      'accountChanged':
+          'The account changed. Check the subscription on the purchasing account.',
+      'other': 'The request could not be completed. Please try again.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get linkGoogleAccount => 'Link Google account';
+
+  @override
+  String get googleAccountLinked => 'Google account linked';
+
+  @override
+  String get googleLinkHelp =>
+      'Confirm your TaskFlow password, then choose the Google account with the same email. Your tasks and subscription will stay in this account.';
+
+  @override
+  String get googleSignInSetupPending =>
+      'Google sign-in is not available in this build yet. You can use email and password.';
+
+  @override
+  String googleSignInError(String code) {
+    String _temp0 = intl.Intl.selectLogic(code, {
+      'google_not_configured':
+          'Google sign-in is not available yet. Use email and password for now.',
+      'google_link_required':
+          'This email already has a TaskFlow account. Sign in with your password, then choose Link Google account.',
+      'google_password_required':
+          'Enter your current TaskFlow password to link Google.',
+      'google_email_mismatch':
+          'Choose the Google account with the same email as your TaskFlow account.',
+      'google_already_linked':
+          'This Google account is already linked. Sign in to the original TaskFlow account.',
+      'google_account_changed':
+          'Your account changed during sign-in. Please try again.',
+      'google_invalid_token':
+          'Google could not verify your sign-in. Please try again.',
+      'other':
+          'Google sign-in could not finish. Check your connection and try again.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get authWelcome => 'Your day, in focus.';
+
+  @override
+  String get authRegisterHelp =>
+      'Keep your tasks and notes together, wherever you go.';
+
+  @override
+  String get authOr => 'or';
+
+  @override
+  String get authRestoring => 'Opening your space…';
+
+  @override
+  String get authHaveRecoveryCode => 'I already have a code';
+
+  @override
+  String get authEnterRecoveryCode =>
+      'Enter the code from your recovery email.';
+
+  @override
+  String get useTestAccount => 'Use test account';
+
+  @override
+  String get developmentOnly => 'Development only';
+
+  @override
+  String get projectsAll => 'All projects';
+
+  @override
+  String get projectsPersonal => 'Personal projects';
+
+  @override
+  String get projectsShared => 'Shared projects';
+
+  @override
+  String get projectsFind => 'Find a project';
+
+  @override
+  String get projectsManage => 'Manage projects';
+
+  @override
+  String get forMe => 'For me';
+
+  @override
+  String get forTeam => 'Team';
+
+  @override
+  String get responsibility => 'Responsible';
+
+  @override
+  String get assignedToMe => 'Me';
+
+  @override
+  String get assignedToGroup => 'Everyone';
+
+  @override
+  String get assignmentNeeded => 'Needs an assignee';
+
+  @override
+  String get assignmentChoose => 'Who is responsible?';
+
+  @override
+  String get assignmentGroupHelp =>
+      'One shared task. A member completes it for everyone.';
+
+  @override
+  String get assignmentNeedsReview =>
+      'Choose the project and responsible person before sharing this task.';
+
+  @override
+  String assignmentHeard(Object names) {
+    return 'You mentioned: $names';
+  }
+
+  @override
+  String get assignmentConfirm => 'Confirm project and responsibility';
+
+  @override
+  String get audiencePersonal => 'Only you can see this.';
+
+  @override
+  String audienceShared(Object name) {
+    return 'Visible to everyone in $name';
+  }
+
+  @override
+  String get pinProject => 'Pin project';
+
+  @override
+  String get unpinProject => 'Unpin project';
+
+  @override
+  String get groups => 'Groups';
+
+  @override
+  String get newGroup => 'New group';
+
+  @override
+  String get groupName => 'Group name';
+
+  @override
+  String get groupHelp => 'Invite people once, work together across projects.';
+
+  @override
+  String get groupMembers => 'Members';
+
+  @override
+  String get groupAdmin => 'Administrator';
+
+  @override
+  String get groupProjects => 'Group projects';
+
+  @override
+  String get groupInviteHelp =>
+      'They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.';
+
+  @override
+  String get groupJoin => 'Join group';
+
+  @override
+  String get groupLeave => 'Leave group';
+
+  @override
+  String get groupLeaveHelp =>
+      'You will lose access to this group’s projects and files. Your tasks stay in the group for reassignment.';
+
+  @override
+  String get groupTransfer => 'Transfer ownership';
+
+  @override
+  String get groupTransferHelp =>
+      'The new owner controls this group and its projects. You will remain an administrator.';
+
+  @override
+  String get groupArchive => 'Archive group';
+
+  @override
+  String get groupRestore => 'Restore group';
+
+  @override
+  String get groupDeleteHelp =>
+      'Only an empty group can be deleted. Archive a group to keep its projects and content.';
+
+  @override
+  String get groupActionError =>
+      'This change could not be saved. Check your connection and refresh; permissions may have changed.';
+
+  @override
+  String get groupVoiceName => 'Your spoken name';
+
+  @override
+  String get groupVoiceHelp =>
+      'An optional name others can use when assigning tasks by voice.';
+
+  @override
+  String get groupOnline => 'Connect to manage group members and invitations.';
+
+  @override
+  String get projectDestination => 'Where does this project belong?';
+
+  @override
+  String get projectNotifications => 'Project updates';
+
+  @override
+  String get updatesAll => 'All changes';
+
+  @override
+  String get updatesAssigned => 'My assignments';
+
+  @override
+  String get updatesMuted => 'Muted';
+
+  @override
+  String get activity => 'Activity';
+
+  @override
+  String get activityEmpty => 'You’re up to date.';
+
+  @override
+  String get activityHelp =>
+      'Assignments and updates from your shared projects appear here.';
+
+  @override
+  String get activityMarkRead => 'Mark all as read';
+
+  @override
+  String get activityCreated => 'Created a task';
+
+  @override
+  String get activityUpdated => 'Updated a task';
+
+  @override
+  String get activityAssigned => 'Changed responsibility';
+
+  @override
+  String get activityCompleted => 'Completed a task';
+
+  @override
+  String get activityReopened => 'Reopened a task';
+
+  @override
+  String get activityDeleted => 'Deleted a task';
+
+  @override
+  String get activitySystem => 'TaskFlow';
+
+  @override
+  String get voiceProRequired => 'Voice capture is included with TaskFlow Pro.';
+
+  @override
+  String get voiceProAction => 'Explore Pro';
+
+  @override
+  String get voiceAccessUnavailable =>
+      'We could not verify voice access. Your capture is safe; reconnect and try again.';
+
+  @override
+  String get projectsNoneFound => 'No matching projects';
+
+  @override
+  String get groupRename => 'Rename group';
+
+  @override
+  String get groupRemoveHelp =>
+      'Removing this member ends their access to every project in this group. Their tasks stay and will need reassignment.';
+
+  @override
+  String get projectsPinned => 'Pinned projects';
+
+  @override
+  String get invitationEmailSent =>
+      'Invitation sent by email. You can also share the code below.';
+
+  @override
+  String get invitationEmailPending =>
+      'Your invitation is ready. Email delivery is pending and will retry automatically. You can share this code now.';
+
+  @override
+  String get invitationReview => 'Review invitation';
+
+  @override
+  String get invitationReviewHelp =>
+      'Joining gives you access to the shared projects, tasks, notes and files described below.';
+
+  @override
+  String get invitationUnavailable =>
+      'This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.';
+
+  @override
+  String get stagingInviteOnly =>
+      'This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.';
 }

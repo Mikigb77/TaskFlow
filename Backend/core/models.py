@@ -2,6 +2,28 @@ import uuid
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils import timezone
+
+
+class RuntimeState(models.Model):
+    key = models.CharField(primary_key=True, max_length=100)
+    value = models.JSONField()
+    expires_at = models.DateTimeField(db_index=True)
+
+
+class EmailDelivery(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    # Deleting/reissuing an invitation also cancels any unsent email for it.
+    group_invitation = models.ForeignKey("GroupInvitation", null=True, on_delete=models.CASCADE)
+    list_invitation = models.ForeignKey("ListInvitation", null=True, on_delete=models.CASCADE)
+    state = models.CharField(max_length=10, default="pending")
+    attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class UserManager(BaseUserManager):
@@ -21,6 +43,8 @@ class User(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
     timezone = models.CharField(max_length=64, default="UTC")
+    # Stable, opaque RevenueCat App User ID, shared across this account's devices.
+    billing_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = UserManager()
@@ -29,9 +53,56 @@ class User(AbstractUser):
         constraints = [models.UniqueConstraint(Lower("email"), name="unique_email_case_insensitive")]
 
 
+class GoogleIdentity(models.Model):
+    # Google's stable subject, never email, is the external account identifier.
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="google_identity")
+    subject = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class TaskGroup(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="owned_groups")
+    name = models.CharField(max_length=80)
+    archived = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    version = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+
+
+class GroupMembership(models.Model):
+    group = models.ForeignKey(TaskGroup, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="group_memberships")
+    role = models.CharField(max_length=8, choices=[(v, v) for v in ("admin", "editor", "viewer")])
+    voice_name = models.CharField(max_length=60, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["group", "user"], name="unique_group_member"),
+            models.CheckConstraint(condition=models.Q(role__in=["admin", "editor", "viewer"]), name="valid_group_role"),
+        ]
+
+
+class GroupInvitation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    group = models.ForeignKey(TaskGroup, on_delete=models.CASCADE, related_name="invitations")
+    email = models.EmailField()
+    role = models.CharField(max_length=8, choices=[(v, v) for v in ("admin", "editor", "viewer")])
+    expires_at = models.DateTimeField()
+    code_digest = models.CharField(max_length=64)
+    state = models.CharField(max_length=8, default="pending", choices=[(v, v) for v in ("pending", "accepted", "declined", "revoked")])
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["group", "email"], name="unique_group_invitation")]
+
+
 class TaskList(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="task_lists")
+    group = models.ForeignKey(TaskGroup, on_delete=models.PROTECT, null=True, blank=True, related_name="projects")
     name = models.CharField(max_length=80)
     color = models.CharField(max_length=8, default="teal", choices=[
         (value, value) for value in ("teal", "blue", "violet", "amber", "rose")])
@@ -68,9 +139,21 @@ class ListInvitation(models.Model):
         constraints = [models.UniqueConstraint(fields=["task_list", "email"], name="unique_list_invitation")]
 
 
+class ProjectPreference(models.Model):
+    task_list = models.ForeignKey(TaskList, on_delete=models.CASCADE, related_name="preferences")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="project_preferences")
+    pinned = models.BooleanField(default=False)
+    notifications = models.CharField(max_length=8, default="assigned", choices=[(v, v) for v in ("all", "assigned", "muted")])
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["task_list", "user"], name="unique_project_preference")]
+
+
 class Task(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
+    assignment = models.CharField(max_length=10, default="personal", choices=[(v, v) for v in ("personal", "member", "group", "unassigned")])
+    assignee = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_tasks")
     title = models.CharField(max_length=160)
     kind = models.CharField(max_length=4, default="task", choices=[("task", "task"), ("note", "note")])
     due_date = models.DateTimeField(null=True, blank=True)
@@ -116,7 +199,20 @@ class TaskEvent(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="events")
     version = models.PositiveIntegerField()
     action = models.CharField(max_length=16)
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="task_events")
+    details = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class TaskNotification(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="task_notifications")
+    event = models.ForeignKey(TaskEvent, on_delete=models.CASCADE, related_name="notifications")
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
+        constraints = [models.UniqueConstraint(fields=["recipient", "event"], name="unique_task_notification")]
 
 
 def attachment_path(instance, _filename):

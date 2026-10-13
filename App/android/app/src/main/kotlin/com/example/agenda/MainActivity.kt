@@ -2,18 +2,22 @@ package com.example.agenda
 
 import android.content.Intent
 import android.os.Bundle
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
     private var speech: NativeSpeechBridge? = null
     private var entries: CaptureEntryBridge? = null
     private var calendars: DeviceCalendarBridge? = null
+    private var stagingBilling: StagingBillingBridge? = null
+    private var accessibility: AccessibilityBridge? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         speech = NativeSpeechBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         entries = CaptureEntryBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         calendars = DeviceCalendarBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        stagingBilling = StagingBillingBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        accessibility = AccessibilityBridge(this, flutterEngine.dartExecutor.binaryMessenger)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,5 +34,5 @@ class MainActivity: FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
     override fun onPause() { speech?.interrupt(); super.onPause() }
-    override fun onDestroy() { speech?.close(); speech = null; entries?.close(); entries = null; calendars?.close(); calendars = null; super.onDestroy() }
+    override fun onDestroy() { speech?.close(); speech = null; entries?.close(); entries = null; calendars?.close(); calendars = null; stagingBilling?.close(); stagingBilling = null; accessibility?.close(); accessibility = null; super.onDestroy() }
 }

@@ -3,10 +3,11 @@ from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
-from .models import Task, TaskEvent
+from .models import Task
+from .collaboration import record_event, task_change_details
 from .serializers import TaskSerializer
 from .attachment_views import delete_task_attachments, check_list_transfer
-from .list_access import visible_tasks, lock_task
+from .list_access import visible_tasks, lock_task, display_name
 
 
 class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -28,6 +29,7 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
         # Client-generated UUIDs make offline creation idempotent.
         with transaction.atomic():
             task, locked = lock_task(pk, request.user, target_list=request.data.get("list_id"))
+            previous = dict(task.__dict__) if task else {}
             serializer = self.get_serializer(task, data=request.data)
             serializer.is_valid(raise_exception=True)
             destination = serializer.validated_data.get("task_list", task.task_list if task else None)
@@ -49,7 +51,14 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
                 if not current:
                     raise NotFound()
                 return Response({"detail": "Task was already uploaded.", "current": self.get_serializer(current).data}, status=409)
-            TaskEvent.objects.create(task=task, version=task.version, action="deleted" if task.is_deleted else ("created" if is_new else "updated"))
+            details = task_change_details(previous, task)
+            action = "deleted" if task.is_deleted else ("created" if is_new else "updated")
+            if not is_new and not task.is_deleted:
+                if "assignment" in details["fields"] or "assignee_id" in details["fields"]:
+                    action = "assigned"
+                elif "is_completed" in details["fields"] or "completed_dates" in details["fields"]:
+                    action = "completed" if task.is_completed or len(task.completed_dates) > len(previous.get("completed_dates", [])) else "reopened"
+            record_event(task, request.user, action, details=details, previous_assignee=previous.get("assignee_id"))
             if task.is_deleted:
                 delete_task_attachments(task)
             return Response(self.get_serializer(task).data, status=201 if is_new else 200)
@@ -65,10 +74,12 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
             task.version += 1
             task.save()
             delete_task_attachments(task)
-            TaskEvent.objects.create(task=task, version=task.version, action="deleted")
+            record_event(task, request.user, "deleted")
         return Response(status=204)
 
     @action(detail=True, methods=["get"])
     def history(self, request, pk=None):
         task = self.get_object()
-        return Response(list(task.events.order_by("version").values("version", "action", "created_at")))
+        return Response([{"version": row.version, "action": row.action, "created_at": row.created_at,
+                          "actor_id": row.actor_id, "actor_name": display_name(row.actor) if row.actor_id else None,
+                          "details": row.details} for row in task.events.select_related("actor").order_by("version")])

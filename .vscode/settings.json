@@ -1,0 +1,8 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/App/windows",
+    "cmake.buildDirectory": "${workspaceFolder}/App/build/cmake-tools",
+    "cmake.ignoreCMakeListsMissing": true,
+    "cmake.configureOnOpen": false,
+    "cmake.configureOnEdit": false,
+    "cmake.automaticReconfigure": false
+}

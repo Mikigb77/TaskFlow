@@ -1,3 +1,4 @@
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
@@ -12,11 +13,16 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/services/invitation_links.dart';
 
 class MemoryRegionalStore extends RegionalPreferenceStore {
-  MemoryRegionalStore(
-      [this.value = const RegionalPreferences(
-          language: 'en', clock: ClockFormat.twentyFour, weekStart: 1)]);
+  MemoryRegionalStore([
+    this.value = const RegionalPreferences(
+      language: 'en',
+      clock: ClockFormat.twentyFour,
+      weekStart: 1,
+    ),
+  ]);
   RegionalPreferences value;
   @override
   Future<RegionalPreferences> read() async => value;
@@ -43,6 +49,21 @@ class OfflineApiClient extends ApiClient {
   Future<void> restore() async {}
 }
 
+// Screens past the login gate use a synthetic session, never a real credential.
+class SignedInFixtureAuth extends AuthNotifier {
+  SignedInFixtureAuth(super.api);
+  @override
+  Future<void> restore() async {
+    state = AuthState(
+      account: Account.fromJson({
+        'id': 1,
+        'email': 'design@example.invalid',
+        'timezone': 'Europe/Madrid',
+      }),
+    );
+  }
+}
+
 class MemoryTasks extends TaskRepository {
   MemoryTasks() : super(TaskDatabase());
 }
@@ -54,28 +75,32 @@ class DesignTaskNotifier extends TaskNotifier {
     DateTime time(int h, int m) => DateTime(now.year, now.month, now.day, h, m);
     return [
       Task(
-          id: 1,
-          title: 'A little morning movement',
-          dueDate: time(8, 30),
-          priority: 1,
-          isCompleted: true),
+        id: 1,
+        title: 'A little morning movement',
+        dueDate: time(8, 30),
+        priority: 1,
+        isCompleted: true,
+      ),
       Task(
-          id: 2,
-          title: 'Review the new designs',
-          dueDate: time(10, 0),
-          priority: 2,
-          notes: 'Bring your ideas for the next release.'),
+        id: 2,
+        title: 'Review the new designs',
+        dueDate: time(10, 0),
+        priority: 2,
+        notes: 'Bring your ideas for the next release.',
+      ),
       Task(
-          id: 3,
-          title: 'Doctor appointment',
-          dueDate: time(14, 30),
-          priority: 3,
-          notes: 'Remember the blood test results.'),
+        id: 3,
+        title: 'Doctor appointment',
+        dueDate: time(14, 30),
+        priority: 3,
+        notes: 'Remember the blood test results.',
+      ),
       Task(
-          id: 4,
-          title: 'Pick up a few groceries',
-          dueDate: time(18, 0),
-          priority: 1),
+        id: 4,
+        title: 'Pick up a few groceries',
+        dueDate: time(18, 0),
+        priority: 1,
+      ),
     ];
   }
 
@@ -91,9 +116,11 @@ class DesignTaskNotifier extends TaskNotifier {
 
   @override
   Future<void> updateTask(Task task) async {
-    state = AsyncData(state.requireValue
-        .map((item) => item.id == task.id ? task : item)
-        .toList());
+    state = AsyncData(
+      state.requireValue
+          .map((item) => item.id == task.id ? task : item)
+          .toList(),
+    );
   }
 
   @override
@@ -102,7 +129,10 @@ class DesignTaskNotifier extends TaskNotifier {
 
   @override
   Future<TaskScheduleChange> rescheduleTask(
-      int id, DateTime? date, bool hasTime) async {
+    int id,
+    DateTime? date,
+    bool hasTime,
+  ) async {
     final before = state.requireValue.firstWhere((task) => task.id == id);
     final after = TaskScheduleChange.apply(before, date, hasTime);
     await updateTask(after);
@@ -111,8 +141,9 @@ class DesignTaskNotifier extends TaskNotifier {
 
   @override
   Future<bool> undoSchedule(TaskScheduleChange change) async {
-    final current =
-        state.requireValue.firstWhere((task) => task.id == change.after.id);
+    final current = state.requireValue.firstWhere(
+      (task) => task.id == change.after.id,
+    );
     if (!change.canUndo(current)) return false;
     await updateTask(change.restore(current));
     return true;
@@ -120,38 +151,52 @@ class DesignTaskNotifier extends TaskNotifier {
 
   @override
   Future<void> addTasks(List<Task> tasks) async {
-    var id = state.requireValue
-        .fold<int>(0, (max, task) => task.id! > max ? task.id! : max);
+    var id = state.requireValue.fold<int>(
+      0,
+      (max, task) => task.id! > max ? task.id! : max,
+    );
     state = AsyncData([
       ...state.requireValue,
-      ...tasks.map((task) => task.copyWith(id: ++id))
+      ...tasks.map((task) => task.copyWith(id: ++id)),
     ]);
   }
 
   @override
   Future<void> deleteTask(int id) async {
-    state =
-        AsyncData(state.requireValue.where((item) => item.id != id).toList());
+    state = AsyncData(
+      state.requireValue.where((item) => item.id != id).toList(),
+    );
   }
 }
 
-ProviderContainer designContainer(
-        {MemoryThemeStore? store, RegionalPreferenceStore? regionalStore}) =>
-    ProviderContainer(overrides: [
-      attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
-      regionalStoreProvider
-          .overrideWithValue(regionalStore ?? MemoryRegionalStore()),
-      pendingCapturesProvider.overrideWith((ref) async => []),
-      taskListsProvider.overrideWith((ref) async => []),
-      apiClientProvider.overrideWith((ref) {
-        final api = OfflineApiClient();
-        ref.onDispose(api.close);
-        return api;
-      }),
-      taskRepositoryProvider.overrideWithValue(MemoryTasks()),
-      taskProvider.overrideWith((ref) => DesignTaskNotifier()),
-      themeStoreProvider.overrideWithValue(store ?? MemoryThemeStore()),
-    ]);
+ProviderContainer designContainer({
+  MemoryThemeStore? store,
+  RegionalPreferenceStore? regionalStore,
+}) => ProviderContainer(
+  overrides: [
+    invitationLinkProvider.overrideWith(
+      (ref) => InvitationLinks(listen: false),
+    ),
+    hasProProvider.overrideWithValue(true),
+    authProvider.overrideWith(
+      (ref) => SignedInFixtureAuth(ref.read(apiClientProvider)),
+    ),
+    attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
+    regionalStoreProvider.overrideWithValue(
+      regionalStore ?? MemoryRegionalStore(),
+    ),
+    pendingCapturesProvider.overrideWith((ref) async => []),
+    taskListsProvider.overrideWith((ref) async => []),
+    apiClientProvider.overrideWith((ref) {
+      final api = OfflineApiClient();
+      ref.onDispose(api.close);
+      return api;
+    }),
+    taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+    taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+    themeStoreProvider.overrideWithValue(store ?? MemoryThemeStore()),
+  ],
+);
 
 Future<void> setAppearance(ProviderContainer container, ThemeMode mode) =>
     container.read(themeModeProvider.notifier).setMode(mode);

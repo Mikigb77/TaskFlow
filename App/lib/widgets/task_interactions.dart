@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/services/feedback_timeout.dart';
 
 /// Shared by Calendar, Tasks and details, including keyboard/accessible buttons.
 class TaskInteractions {
@@ -15,11 +16,19 @@ class TaskInteractions {
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.l10n;
     try {
+      final timeout = FeedbackTimeout.forAction();
       await notifier.setCompleted(task, !task.isCompleted);
-      if (!messenger.mounted) return;
+      final duration = await timeout;
+      if (!messenger.mounted ||
+          !identical(container.read(taskProvider.notifier), notifier)) {
+        return;
+      }
       HapticFeedback.selectionClick();
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(
+        // Snackbars with an action persist by default in the current SDK.
+        persist: false,
+        duration: duration,
         content: Text(
             task.isCompleted ? strings.taskReopened : strings.taskCompleted),
         action: SnackBarAction(

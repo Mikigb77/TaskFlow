@@ -1,3 +1,5 @@
+// Entitlement is a fixture here; real paid access is covered by projects_flow_test.
+import 'package:agenda/providers/subscription_provider.dart';
 // Run twice per LIFECYCLE_CASE on an emulator launched with `-audio none`.
 // First run waits for an external `adb shell am force-stop`; disconnection is
 // expected. The next run verifies the same SQLite journal and recording bytes.
@@ -33,37 +35,51 @@ const _words = 'Synthetic reference\nFriday at five is an example, not a task.';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('native process recovery: $_case', (tester) async {
-    expect(['audio-abrupt', 'audio-background', 'audio-call', 'text-abrupt'],
-        contains(_case));
+    expect([
+      'audio-abrupt',
+      'audio-background',
+      'audio-call',
+      'text-abrupt',
+    ], contains(_case));
     final database = TaskDatabase();
     final sql = await database.database;
     final store = CaptureStore(database);
-    final rows = await sql
-        .query('app_preferences', where: 'scope = ?', whereArgs: [_marker]);
+    final rows = await sql.query(
+      'app_preferences',
+      where: 'scope = ?',
+      whereArgs: [_marker],
+    );
     final checkpoint = rows.isEmpty
         ? null
         : Map<String, dynamic>.from(jsonDecode(rows.single['data'] as String));
     final api = _ControlledApi(checkpoint);
-    final container = ProviderContainer(overrides: [
-      captureOwnerProvider.overrideWithValue(_owner),
-      apiClientProvider.overrideWithValue(api),
-      // Force the real AudioRecorder path independently of model installation.
-      nativeSpeechProvider.overrideWithValue(_NoNativeSpeech()),
-      taskProvider.overrideWith((ref) => DesignTaskNotifier()),
-      regionalStoreProvider.overrideWithValue(MemoryRegionalStore()),
-      themeStoreProvider.overrideWithValue(MemoryThemeStore()),
-    ]);
+    final container = ProviderContainer(
+      overrides: [
+        hasProProvider.overrideWithValue(true),
+        captureOwnerProvider.overrideWithValue(_owner),
+        apiClientProvider.overrideWithValue(api),
+        // Force the real AudioRecorder path independently of model installation.
+        nativeSpeechProvider.overrideWithValue(_NoNativeSpeech()),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        regionalStoreProvider.overrideWithValue(MemoryRegionalStore()),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ],
+    );
     addTearDown(() {
       container.dispose();
       api.close();
     });
-    await tester.pumpWidget(UncontrolledProviderScope(
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
         container: container,
         child: const MaterialApp(
-            locale: Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: Scaffold(body: Text('Isolated process recovery fixture')))));
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: Text('Isolated process recovery fixture')),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     if (checkpoint == null) {
@@ -73,16 +89,26 @@ void main() {
         for (final orphan in await store.pending(_owner)) {
           await store.discard(orphan.id, _owner);
         }
-        await sql
-            .delete('captures', where: 'owner_key = ?', whereArgs: [_owner]);
+        await sql.delete(
+          'captures',
+          where: 'owner_key = ?',
+          whereArgs: [_owner],
+        );
       }
-      expect(await store.pending(_owner), isEmpty,
-          reason: 'Do not overwrite a previous unfinished fixture.');
+      expect(
+        await store.pending(_owner),
+        isEmpty,
+        reason: 'Do not overwrite a previous unfinished fixture.',
+      );
       expect(await database.getTasks(ownerKey: _owner), isEmpty);
-      navigator.push(MaterialPageRoute<void>(
+      navigator.push(
+        MaterialPageRoute<void>(
           builder: (_) => const VoiceTaskScreen(
-              kind: _case == 'text-abrupt' ? 'note' : 'task',
-              startRecording: _case != 'text-abrupt')));
+            kind: _case == 'text-abrupt' ? 'note' : 'task',
+            startRecording: _case != 'text-abrupt',
+          ),
+        ),
+      );
       await _until(tester, () async {
         if (_case == 'text-abrupt') {
           return find
@@ -97,14 +123,18 @@ void main() {
       });
       if (_case == 'text-abrupt') {
         final words = find.byKey(const ValueKey('capture-words'));
-        await tester.scrollUntilVisible(words, 180,
-            scrollable: find.byType(Scrollable).first);
+        await tester.scrollUntilVisible(
+          words,
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
         await tester.pumpAndSettle();
         await tester.enterText(words, _words);
         await _until(
-            tester,
-            () async =>
-                (await store.pending(_owner)).any((s) => s.text == _words));
+          tester,
+          () async =>
+              (await store.pending(_owner)).any((s) => s.text == _words),
+        );
       }
       final session = (await store.pending(_owner)).single;
       final metadata = <String, dynamic>{
@@ -127,18 +157,24 @@ void main() {
         metadata['minimumLength'] = bytes.length;
         expect(session.status, 'recording');
       }
-      await sql.insert(
-          'app_preferences', {'scope': _marker, 'data': jsonEncode(metadata)});
+      await sql.insert('app_preferences', {
+        'scope': _marker,
+        'data': jsonEncode(metadata),
+      });
       if (_case == 'audio-call') {
         // The host simulates a GSM call, verifies Android's RINGING/OFFHOOK
         // states, then cancels that exact call and returns to this activity.
         debugPrint('CAPTURE_CALL_READY: $_case');
         await _until(
-            tester,
-            () async =>
-                (await store.read(session.id, _owner))?.status == 'editing');
-        expect(find.textContaining('Listening ·'), findsNothing,
-            reason: 'An interrupted recorder must not look active.');
+          tester,
+          () async =>
+              (await store.read(session.id, _owner))?.status == 'editing',
+        );
+        expect(
+          find.textContaining('Listening ·'),
+          findsNothing,
+          reason: 'An interrupted recorder must not look active.',
+        );
         expect(api.calls, 0, reason: 'An interruption must not submit audio.');
         final stopped = (await store.read(session.id, _owner))!;
         final retained = await File(stopped.audioPath!).readAsBytes();
@@ -176,25 +212,34 @@ void main() {
       debugPrint('CAPTURE_RETAINED: $_case ${before.length} bytes');
     }
 
-    navigator.push(MaterialPageRoute<void>(
-        builder: (_) => VoiceTaskScreen(captureId: id)));
+    navigator.push(
+      MaterialPageRoute<void>(builder: (_) => VoiceTaskScreen(captureId: id)),
+    );
     await tester.pumpAndSettle();
     if (_case == 'text-abrupt') {
       expect(
-          tester
-              .widget<TextField>(find.byKey(const ValueKey('capture-words')))
-              .controller!
-              .text,
-          _words);
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('capture-words')))
+            .controller!
+            .text,
+        _words,
+      );
     }
-    final retry = find.widgetWithText(FilledButton,
-        _case == 'text-abrupt' ? 'Review note' : 'Try this recording');
-    await tester.scrollUntilVisible(retry, 200,
-        scrollable: find.byType(Scrollable).first);
+    final retry = find.widgetWithText(
+      FilledButton,
+      _case == 'text-abrupt' ? 'Review note' : 'Try this recording',
+    );
+    await tester.scrollUntilVisible(
+      retry,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(retry);
-    await _until(tester,
-        () async => find.byType(ReviewTasksScreen).evaluate().isNotEmpty);
+    await _until(
+      tester,
+      () async => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,
+    );
     final ready = (await store.read(id, _owner))!;
     expect(ready.ready, hasLength(1));
     expect(api.calls, _case == 'text-abrupt' ? 0 : 1);
@@ -210,8 +255,11 @@ void main() {
     await tester.pumpAndSettle();
     await sql.delete('tasks', where: 'owner_key = ?', whereArgs: [_owner]);
     await sql.delete('captures', where: 'owner_key = ?', whereArgs: [_owner]);
-    await sql
-        .delete('app_preferences', where: 'scope = ?', whereArgs: [_marker]);
+    await sql.delete(
+      'app_preferences',
+      where: 'scope = ?',
+      whereArgs: [_marker],
+    );
     debugPrint('CAPTURE_PROCESS_VALIDATED: $_case');
   }, timeout: const Timeout(Duration(minutes: 3)));
 }
@@ -244,8 +292,10 @@ int _dataOffset(Uint8List bytes) {
 
 void _assertRetainedSamples(Uint8List bytes, Map<String, dynamic> checkpoint) {
   final offset = checkpoint['sampleOffset'] as int;
-  expect(sha256.convert(bytes.sublist(offset, offset + 32000)).toString(),
-      checkpoint['sampleHash']);
+  expect(
+    sha256.convert(bytes.sublist(offset, offset + 32000)).toString(),
+    checkpoint['sampleHash'],
+  );
 }
 
 class _NoNativeSpeech extends NativeSpeech {
@@ -259,11 +309,14 @@ class _ControlledApi extends OfflineApiClient {
   final Map<String, dynamic>? checkpoint;
   int calls = 0;
   @override
-  Future<dynamic> request(String method, String path,
-      {Map<String, dynamic>? data,
-      String? audioPath,
-      bool authenticated = true,
-      int? accountId}) async {
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
     calls++;
     expect(method, 'POST');
     expect(path, 'ai/drafts/');
@@ -283,9 +336,9 @@ class _ControlledApi extends OfflineApiClient {
           'title': 'Synthetic recovery fixture',
           'priority': 1,
           'notes': '',
-          'questions': <String>[]
-        }
-      ]
+          'questions': <String>[],
+        },
+      ],
     };
   }
 }

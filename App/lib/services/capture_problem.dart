@@ -12,6 +12,7 @@ abstract final class CaptureProblem {
   static const timeout = 'capture_problem:timeout';
   static const unavailable = 'capture_problem:unavailable';
   static const allowance = 'capture_problem:allowance';
+  static const proRequired = 'capture_problem:pro_required';
   static const signIn = 'capture_problem:sign_in';
   static const forbidden = 'capture_problem:forbidden';
   static const tooLarge = 'capture_problem:too_large';
@@ -66,6 +67,7 @@ abstract final class CaptureProblem {
         return timeout;
       }
       if (error.status == 0) return offline;
+      if (error.status == 402) return proRequired;
       if (error.status == 401) return signIn;
       if (error.status == 403) return forbidden;
       if (error.status == 413) return tooLarge;
@@ -85,8 +87,8 @@ abstract final class CaptureProblem {
     final message = original.startsWith('Bad state: ')
         ? original.substring('Bad state: '.length)
         : original.startsWith('FormatException: ')
-            ? original.substring('FormatException: '.length)
-            : original;
+        ? original.substring('FormatException: '.length)
+        : original;
     return _legacy[message] ?? original;
   }
 }

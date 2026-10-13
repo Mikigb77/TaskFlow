@@ -4,18 +4,24 @@ All Flutter source, platform projects, tests, dependencies, and builds live in `
 
 The Django service, Docker Compose configuration, environment files, and backend documentation live in `Backend/`: [Local backend guide](../Backend/README.md).
 
-**TaskFlow** captures thoughts as tasks and keeps scheduled commitments in a calendar-first agenda. Tasks work locally; signed-in accounts add synchronization and attachment recovery. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for delivered features, validation evidence and remaining work.
+**TaskFlow** captures thoughts as tasks and keeps scheduled commitments in a calendar-first agenda. Sign in with Google or email before opening your tasks. The app restores the saved account on launch and keeps its tasks available offline, with synchronization and attachment recovery when connected. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for delivered features, validation evidence and remaining work.
 
 ## Features
 
+- Google sign-in on Android, with verified identity tokens exchanged for TaskFlow sessions and explicit linking to existing accounts. iOS configuration is pending. See the [Google sign-in setup and validation guide](../Backend/docs/GOOGLE_SIGN_IN.md).
+
+- RevenueCat subscriptions with `taskflow_pro`, a monthly offering, native paywalls, restore and Customer Center. Voice and AI capture are gated in Flutter and verified independently by Django. Debug builds use Test Store. See the [step-by-step integration and dashboard guide](docs/REVENUECAT_SETUP.md).
+- Personal and group projects, role-based membership, member/group task assignment, For me/Team views, reviewed capture destinations and collaboration activity. See [current implementation and test evidence](docs/PROJECTS_IMPLEMENTATION.md).
+
 - Voice and typed capture with retained unfinished input, editable drafts and partial-batch saving. AI processing needs a connection; provider failures keep the input available for retry.
 - Unscheduled Inbox, date-only and timed tasks, personal lists, labels and checklists.
-- Standalone notes for information and ideas, with an explicit Task/Note choice, selectable text, web links and optional checklists. Typed notes work locally; recorded notes use transcription without inferring tasks. See [notes validation](docs/NOTES_VALIDATION.md).
+- Standalone notes for information and ideas, with an explicit Task/Note choice, selectable text, web links and optional checklists. Signed-in users can write notes offline; recorded notes use transcription without inferring tasks. See [notes validation](docs/NOTES_VALIDATION.md).
 - Shared household lists with explicit invitation codes, editor/viewer roles, conflict recovery and membership controls. Files follow list access; cached group content is removed on the next successful access refresh after leaving/removal. See [sharing validation](docs/SHARING_VALIDATION.md).
 - Recurrence intervals, selected weekdays and individual occurrence move/skip controls.
 - Opt-in reminders with explicit lead times, snooze, notification actions and configurable daily check-ins. Scheduling/delivery limitations are documented in [reminder validation](docs/REMINDER_VALIDATION.md).
 - Local task storage with account-isolated sync, conflict preservation and private attachment upload/download. Older device-only files require an explicit Upload.
-- TaskFlow export/import, Todoist CSV preview, English/Spanish core UI and regional clock/week preferences.
+- English, Spanish and Catalan throughout the app, phone-language detection with English fallback, and a persistent language selector in Settings. Regional clock/week preferences stay independent. See the [translation workflow](docs/LOCALIZATION.md).
+- TaskFlow export/import and Todoist CSV preview.
 - Light, dark, and device-following appearance, with a one-tap sun/moon switch.
 - Calendar and week agenda, visible task times, search, priority filters, and completion undo.
 - Independent planned start, deadline and duration, explicit reminder anchor and an hourly day view with overlapping task blocks. See [planning validation](docs/PLANNING_VALIDATION.md).
@@ -25,6 +31,18 @@ The Django service, Docker Compose configuration, environment files, and backend
 The visual system, references, and Android preview workflow are documented in [Design notes](docs/DESIGN.md).
 
 ## Getting Started
+
+For a phone build using the deployed Cloud Run/Neon backend, run
+`./scripts/build-staging.ps1` from `App`. The private APK appears at
+`build/releases/taskflow-staging.apk` as **TaskFlow Staging** and installs beside
+the local development app. See the [staging guide](../Backend/docs/STAGING.md) for
+invited accounts, Google testers, sandbox purchases and build credentials.
+
+In VS Code, select **TaskFlow (development)** in Run and Debug and press F5. The launch configuration automatically uses the dedicated `TaskFlow_API_36_1` emulator (12 GB internal storage), regardless of the device selected in the status bar. Its pre-launch task starts/reuses that AVD and checks for at least 1 GB free space before Flutter installs anything. This avoids the smaller general-purpose emulator's `INSTALL_FAILED_INSUFFICIENT_STORAGE` error and Flutter's automatic uninstall/reinstall fallback. The task may reclaim disposable Android caches; it never wipes an emulator or clears application data. It requires `pwsh`, Android SDK `adb` on PATH, and the existing named AVD.
+
+The launch configuration loads `config/development.json`, including the public Google sign-in client ID. It works when opening `App` or the repository root, including the Run/Debug links in `lib/main.dart`; the parent workspace has a matching local configuration. Stop and start the session after changing build configuration; hot reload does not add missing Dart defines. See the [Google login guide](../Backend/docs/GOOGLE_SIGN_IN.md) for local backend startup and command-line use.
+
+For fast local testing, the development login screen has **Use test account** below the normal sign-in options. It signs in to the Docker backend as `app-test@taskflow.local` through the normal password/JWT endpoint. The account starts empty; tasks you add are kept between sessions. `config/development.json` explicitly enables the shortcut and supplies fixture credentials matching `Backend/.env`. Start the backend with `docker compose up -d api` from `Backend/`. The shortcut and its credentials are disabled in profile/release builds even if this development file is passed, and debug builds without the opt-in do not show it. These credentials belong only to the local testing database.
 
 This project requires **Flutter 3.44 or newer** and **Dart 3.12 or newer**. The SQLite dependency includes the Android WAL mutation-result fix. Run `flutter pub get` before building; on Windows, Developer Mode enables Flutter's generated plugin links.
 

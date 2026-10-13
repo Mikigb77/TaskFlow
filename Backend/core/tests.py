@@ -139,7 +139,8 @@ class APITests(TestCase):
     def test_unauthenticated_tasks_are_blocked_and_drafts_require_valid_input(self):
         other = APIClient()
         self.assertEqual(other.get("/api/tasks/").status_code, 401)
-        self.assertEqual(other.post("/api/ai/drafts/", {}, format="json").status_code, 400)
+        self.assertEqual(other.post("/api/ai/drafts/", {}, format="json").status_code, 401)
+        self.assertEqual(self.client.post("/api/ai/drafts/", {}, format="json").status_code, 400)
 
     def test_tasks_keep_time_offset_and_are_isolated_by_owner(self):
         response = self.client.post("/api/tasks/", self.task_data, format="json")
@@ -247,15 +248,19 @@ class APITests(TestCase):
             response = self.client.post("/api/tasks/", {**self.task_data, **schedule}, format="json")
             self.assertEqual(response.status_code, 400, response.data)
 
-    @override_settings(AI_GUEST_REQUESTS_PER_DAY=1)
-    @patch("core.views.ai.make_drafts", return_value={"tasks": [{"title": "Coffee"}], "transcript": "Buy coffee"})
-    def test_guest_trial_cannot_bypass_budget_with_forwarded_headers(self, mock):
+    @patch("core.views.ai.make_draft")
+    @patch("core.views.ai.make_drafts")
+    @patch("core.views.consume_budget")
+    def test_anonymous_ai_calls_require_login_before_provider_or_budget(self, budget, batch, single):
         payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}
         guest = APIClient()
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 200)
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json", HTTP_X_FORWARDED_FOR="1.2.3.4").status_code, 429)
-        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 200)
-        self.assertEqual(mock.call_count, 2)
+        for path in ["/api/ai/draft/", "/api/ai/drafts/"]:
+            for headers in [{}, {"HTTP_X_FORWARDED_FOR": "1.2.3.4"}]:
+                response = guest.post(path, payload, format="json", **headers)
+                self.assertEqual(response.status_code, 401, response.data)
+        batch.assert_not_called()
+        single.assert_not_called()
+        budget.assert_not_called()
         self.assertEqual(Task.objects.count(), 0)
 
     def test_malformed_task_id_returns_not_found(self):
@@ -301,6 +306,7 @@ class APITests(TestCase):
 
     @override_settings(AI_REQUESTS_PER_DAY=1)
     @patch("core.views.ai.make_draft", return_value={"title": "Draft"})
+    @patch("core.views.require_pro", new=lambda user: None)
     def test_drafts_do_not_save_tasks_and_daily_budget_is_enforced(self, mock):
         payload = {"text": "Call tomorrow", "timezone": "Europe/Madrid"}
         self.assertEqual(self.client.post("/api/ai/draft/", payload, format="json").status_code, 200)
@@ -308,19 +314,44 @@ class APITests(TestCase):
         self.assertEqual(self.client.post("/api/ai/draft/", payload, format="json").status_code, 429)
         self.assertEqual(mock.call_count, 1)
 
-    @override_settings(AI_GUEST_REQUESTS_PER_DAY=1)
+    @override_settings(AI_REQUESTS_PER_DAY=1)
     @patch("core.views.ai.make_drafts")
-    def test_provider_failure_does_not_spend_guest_trial(self, mock):
+    @patch("core.views.require_pro", new=lambda user: None)
+    def test_provider_failure_does_not_spend_account_allowance(self, mock):
         mock.side_effect = [AIUnavailable("Provider busy"), {"tasks": [{"title": "Coffee"}]}]
-        guest = APIClient()
         payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 503)
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 200)
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 429)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 503)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 200)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 429)
         self.assertEqual(mock.call_count, 2)
 
 
 class DraftTests(TestCase):
+    @patch("core.ai.generate")
+    def test_bare_task_array_preserves_deadline_and_assignment(self, provider):
+        provider.return_value = json.dumps([
+            {**self.output, "date": None, "time": None,
+             "deadline_date": "2026-09-25", "assignment_request": "member", "member_name": "Ana"},
+            {"title": "Prepare presentation", "date": None, "time": None, "priority": 2}])
+        context = {"user_id": 1, "default_project_id": "physics", "projects": [
+            {"id": "physics", "name": "Physics", "shared": True,
+             "people": [{"user_id": 2, "name": "Ana", "role": "editor"}]}]}
+        result = extract_tasks("Ana finishes the exercise by Friday. Prepare presentation.", "Europe/Madrid", self.reference, context)
+        self.assertEqual(len(result["tasks"]), 2)
+        self.assertEqual(result["tasks"][0]["deadline_date"], "2026-09-25")
+        self.assertIsNone(result["tasks"][0]["due_date"])
+        self.assertEqual(result["tasks"][0]["assignment"], "member")
+        self.assertEqual(result["tasks"][0]["assignee_id"], 2)
+        self.assertEqual(result["tasks"][1]["title"], "Prepare presentation")
+
+    @patch("core.ai.generate")
+    def test_bare_array_keeps_schema_and_batch_size_validation(self, provider):
+        from pydantic import ValidationError
+        for tasks in [[], [self.output] * 13, [{**self.output, "priority": 99}], ["not a task"]]:
+            provider.return_value = json.dumps(tasks)
+            with self.assertRaises(ValidationError):
+                extract_tasks("Synthetic task", "Europe/Madrid", self.reference)
+
     @patch("core.ai.generate")
     def test_checklist_extraction_stays_one_task_with_stable_validated_step_ids(self, provider):
         provider.return_value = json.dumps({"tasks": [

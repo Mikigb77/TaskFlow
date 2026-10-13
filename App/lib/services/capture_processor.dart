@@ -16,10 +16,11 @@ class CaptureProcessor {
   Future<CaptureSession> process(CaptureSession session) {
     final key = '${session.ownerKey}:${session.id}';
     return _active.putIfAbsent(
-        key,
-        () => _process(session).whenComplete(() {
-              _active.remove(key);
-            }));
+      key,
+      () => _process(session).whenComplete(() {
+        _active.remove(key);
+      }),
+    );
   }
 
   Future<CaptureSession> _process(CaptureSession session) async {
@@ -42,64 +43,90 @@ class CaptureProcessor {
           throw StateError('A note needs 1 to 8000 characters.');
         }
         final firstLine = existing.text.trim().split('\n').first;
-        final next = existing
-            .copyWith(status: 'ready', transcript: existing.text, drafts: [
-          CaptureDraft(
+        final next = existing.copyWith(
+          status: 'ready',
+          transcript: existing.text,
+          drafts: [
+            CaptureDraft(
               id: const Uuid().v4(),
               task: Task(
-                  kind: 'note',
-                  title: String.fromCharCodes(firstLine.runes.take(160)),
-                  priority: 1,
-                  notes: existing.text))
-        ]);
+                kind: 'note',
+                listId: existing.projectId,
+                title: String.fromCharCodes(firstLine.runes.take(160)),
+                priority: 1,
+                notes: existing.text,
+              ),
+            ),
+          ],
+        );
         await store.update(next);
-        await diagnostics.record(CaptureEvent.notePrepared,
-            elapsedMs: watch.elapsedMilliseconds, count: 1);
+        await diagnostics.record(
+          CaptureEvent.notePrepared,
+          elapsedMs: watch.elapsedMilliseconds,
+          count: 1,
+        );
         return next;
       }
       if (existing.audioPath != null) {
-        await CaptureStore.recoverWav(existing.audioPath!,
-            audioFormat: existing.audioFormat);
+        await CaptureStore.recoverWav(
+          existing.audioPath!,
+          audioFormat: existing.audioFormat,
+        );
       }
-      final raw = await api.request('POST', 'ai/drafts/',
-          audioPath: existing.audioPath,
-          authenticated: existing.ownerKey != 'local',
-          accountId: existing.ownerKey == 'local'
-              ? null
-              : int.parse(existing.ownerKey.split('/').last),
-          data: {
-            'timezone': existing.timezone,
-            'capture_type': existing.kind,
-            'reference_time': existing.capturedAt.toUtc().toIso8601String(),
-            if (existing.audioPath == null) 'text': existing.text
-          });
+      final raw = await api.request(
+        'POST',
+        'ai/drafts/',
+        audioPath: existing.audioPath,
+        authenticated: existing.ownerKey != 'local',
+        accountId: existing.ownerKey == 'local'
+            ? null
+            : int.parse(existing.ownerKey.split('/').last),
+        data: {
+          'timezone': existing.timezone,
+          if (existing.projectId != null) 'project_id': existing.projectId,
+          'capture_type': existing.kind,
+          'reference_time': existing.capturedAt.toUtc().toIso8601String(),
+          if (existing.audioPath == null) 'text': existing.text,
+        },
+      );
       final response = Map<String, dynamic>.from(raw as Map);
       final transcript = response['transcript'] as String;
       final drafts = (response['tasks'] as List)
-          .map((item) => CaptureDraft.fromAI(TaskDraft.fromJson(
-              {...Map<String, dynamic>.from(item), 'transcript': transcript})))
+          .map(
+            (item) => CaptureDraft.fromAI(
+              TaskDraft.fromJson({
+                ...Map<String, dynamic>.from(item),
+                'transcript': transcript,
+              }),
+            ),
+          )
           .toList();
       if (drafts.isEmpty) {
         throw StateError('No tasks were found. Your capture is kept.');
       }
       if (drafts.any((draft) => draft.task.kind != existing.kind)) {
         throw StateError(
-            'This server does not support the selected capture type. Your input is kept.');
+          'This server does not support the selected capture type. Your input is kept.',
+        );
       }
       final next = existing.copyWith(
-          status: 'ready', transcript: transcript, drafts: drafts);
+        status: 'ready',
+        transcript: transcript,
+        drafts: drafts,
+      );
       await store.update(next);
       await diagnostics.record(
-          existing.kind == 'note'
-              ? CaptureEvent.noteTranscribed
-              : CaptureEvent.processing,
-          elapsedMs: watch.elapsedMilliseconds,
-          count: drafts.length);
+        existing.kind == 'note'
+            ? CaptureEvent.noteTranscribed
+            : CaptureEvent.processing,
+        elapsedMs: watch.elapsedMilliseconds,
+        count: drafts.length,
+      );
       final timings = response['timings'];
       if (timings is Map) {
         for (final entry in {
           CaptureEvent.transcription: 'transcription_ms',
-          CaptureEvent.extraction: 'extraction_ms'
+          CaptureEvent.extraction: 'extraction_ms',
         }.entries) {
           if (existing.kind == 'note' && entry.key == CaptureEvent.extraction) {
             continue;
@@ -118,11 +145,14 @@ class CaptureProcessor {
     } catch (error) {
       final latest = await store.read(existing.id, existing.ownerKey);
       if (latest != null && !latest.terminal) {
-        await store.update(latest.copyWith(
-            status: 'failed', error: CaptureProblem.from(error)));
+        await store.update(
+          latest.copyWith(status: 'failed', error: CaptureProblem.from(error)),
+        );
       }
-      await diagnostics.record(CaptureEvent.failed,
-          elapsedMs: watch.elapsedMilliseconds);
+      await diagnostics.record(
+        CaptureEvent.failed,
+        elapsedMs: watch.elapsedMilliseconds,
+      );
       rethrow;
     }
   }

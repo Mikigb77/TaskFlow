@@ -84,8 +84,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(
             find.text(lang == 'es'
-                ? 'Import 1 selected item and lists'
-                : 'Importar 1 elemento seleccionado y listas'),
+                ? 'Import 1 selected item and projects'
+                : 'Importar 1 elemento seleccionado y proyectos'),
             findsOneWidget);
         expect(store.receipts, isEmpty);
         locale.value = Locale(lang);

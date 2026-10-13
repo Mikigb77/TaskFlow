@@ -1,4 +1,5 @@
 import 'package:agenda/models/checklist_item.dart';
+import 'package:agenda/models/capture_clarification.dart';
 
 class TaskDraft {
   final String title;
@@ -16,37 +17,60 @@ class TaskDraft {
   final String notes;
   final String transcript;
   final List<String> questions;
+  final List<CaptureClarification> clarifications;
   final List<ChecklistItem> checklist;
+  final String? listId;
+  final String assignment;
+  final int? assigneeId;
+  final String? assigneeName;
+  final List<String> assignmentIssues;
+  final Map<String, String?> assignmentHints;
 
   TaskDraft.fromJson(Map<String, dynamic> data)
-      : title = data['title'] as String,
-        kind = data['kind'] as String? ?? 'task',
-        dueDate = data['due_date'] == null
-            ? (data['scheduled_date'] ?? data['date']) == null
+    : title = data['title'] as String,
+      clarifications = (data['clarifications'] as List? ?? [])
+          .map(
+            (value) =>
+                CaptureClarification.fromJson(Map<String, dynamic>.from(value)),
+          )
+          .toList(),
+      listId = data['list_id'],
+      assignment = data['assignment'] ?? 'personal',
+      assigneeId = data['assignee_id'],
+      assigneeName = data['assignee_name'],
+      assignmentIssues = List<String>.from(data['assignment_issues'] ?? []),
+      assignmentHints = Map<String, String?>.from(
+        data['assignment_hints'] ?? {},
+      ),
+      kind = data['kind'] as String? ?? 'task',
+      dueDate = data['due_date'] == null
+          ? (data['scheduled_date'] ?? data['date']) == null
                 ? null
                 : DateTime.parse(
-                    (data['scheduled_date'] ?? data['date']) as String)
-            : DateTime.parse(data['due_date'] as String).toLocal(),
-        hasTime = data['due_date'] != null,
-        deadline = data['deadline_at'] != null
-            ? DateTime.parse(data['deadline_at']).toLocal()
-            : data['deadline_date'] != null
-                ? DateTime.parse(data['deadline_date'])
-                : null,
-        deadlineHasTime = data['deadline_at'] != null,
-        durationMinutes = data['duration_minutes'],
-        recurrence = data['recurrence'] as String? ?? 'none',
-        repeatInterval = data['repeat_interval'] as int? ?? 1,
-        repeatWeekdays = List<int>.from(data['repeat_weekdays'] ?? []),
-        repeatUntil = data['repeat_until'] == null
-            ? null
-            : DateTime.parse(data['repeat_until']),
-        priority = data['priority'] as int,
-        notes = data['notes'] as String,
-        checklist = (data['checklist'] as List? ?? [])
-            .map((item) =>
-                ChecklistItem.fromJson(Map<String, dynamic>.from(item)))
-            .toList(),
-        transcript = data['transcript'] as String,
-        questions = List<String>.from(data['questions'] as List);
+                    (data['scheduled_date'] ?? data['date']) as String,
+                  )
+          : DateTime.parse(data['due_date'] as String).toLocal(),
+      hasTime = data['due_date'] != null,
+      deadline = data['deadline_at'] != null
+          ? DateTime.parse(data['deadline_at']).toLocal()
+          : data['deadline_date'] != null
+          ? DateTime.parse(data['deadline_date'])
+          : null,
+      deadlineHasTime = data['deadline_at'] != null,
+      durationMinutes = data['duration_minutes'],
+      recurrence = data['recurrence'] as String? ?? 'none',
+      repeatInterval = data['repeat_interval'] as int? ?? 1,
+      repeatWeekdays = List<int>.from(data['repeat_weekdays'] ?? []),
+      repeatUntil = data['repeat_until'] == null
+          ? null
+          : DateTime.parse(data['repeat_until']),
+      priority = data['priority'] as int,
+      notes = data['notes'] as String,
+      checklist = (data['checklist'] as List? ?? [])
+          .map(
+            (item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList(),
+      transcript = data['transcript'] as String,
+      questions = List<String>.from(data['questions'] as List);
 }

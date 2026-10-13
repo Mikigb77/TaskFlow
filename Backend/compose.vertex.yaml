@@ -1,0 +1,18 @@
+# Optional local development overlay. Never copy credentials into an image.
+services:
+  api:
+    environment:
+      AI_ROUTE: ${TASKFLOW_AI_ROUTE:-auto}
+      AI_TEXT_MODEL: gemma-4-26b-a4b-it
+      AI_VERTEX_PROJECT: taskflow-511107
+      AI_VERTEX_LOCATION: global
+      AI_VERTEX_TEXT_MODEL: gemini-3.1-flash-lite
+      AI_VERTEX_AUDIO_MODEL: gemini-3.1-flash-lite
+      GOOGLE_APPLICATION_CREDENTIALS: /var/run/taskflow-google/adc.json
+    volumes:
+      - type: bind
+        source: ./.credentials/gcloud/application_default_credentials.json
+        target: /var/run/taskflow-google/adc.json
+        read_only: true
+        bind:
+          create_host_path: false

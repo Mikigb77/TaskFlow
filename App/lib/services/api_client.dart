@@ -19,10 +19,16 @@ class Account {
   final int id;
   final String email;
   final String timezone;
+  final String? billingId;
+  final bool googleLinked;
+  final bool complimentaryPro;
   Account.fromJson(Map<String, dynamic> data)
-      : id = data['id'] as int,
-        email = data['email'] as String,
-        timezone = data['timezone'] as String;
+    : id = data['id'] as int,
+      email = data['email'] as String,
+      timezone = data['timezone'] as String,
+      billingId = data['billing_id'] as String?,
+      googleLinked = data['google_linked'] == true,
+      complimentaryPro = data['complimentary_pro'] == true;
 }
 
 class ApiClient {
@@ -33,14 +39,22 @@ class ApiClient {
   Future<void>? _refreshing;
   Future<void> _persisting = Future.value();
   int _generation = 0;
+  final _sessionInvalidated = StreamController<void>.broadcast();
 
-  ApiClient(
-      {http.Client? transport, FlutterSecureStorage? storage, String? url})
-      : _http = transport ?? http.Client(),
-        _storage = storage ?? const FlutterSecureStorage(),
-        baseUrl = url ??
-            const String.fromEnvironment('API_BASE_URL',
-                defaultValue: 'http://10.0.2.2:8088');
+  Stream<void> get sessionInvalidated => _sessionInvalidated.stream;
+
+  ApiClient({
+    http.Client? transport,
+    FlutterSecureStorage? storage,
+    String? url,
+  }) : _http = transport ?? http.Client(),
+       _storage = storage ?? const FlutterSecureStorage(),
+       baseUrl =
+           url ??
+           const String.fromEnvironment(
+             'API_BASE_URL',
+             defaultValue: 'http://10.0.2.2:8088',
+           );
 
   Account? get account => _session == null
       ? null
@@ -77,7 +91,9 @@ class ApiClient {
         uri.hasFragment ||
         !['', '/'].contains(uri.path)) {
       throw ApiException(
-          400, 'Enter a server address such as http://192.168.1.20:8088.');
+        400,
+        'Enter a server address such as http://192.168.1.20:8088.',
+      );
     }
     if (!kDebugMode && uri.scheme != 'https') {
       throw ApiException(400, 'Release builds require an HTTPS server.');
@@ -86,25 +102,70 @@ class ApiClient {
     await _storage.write(key: 'taskflow.server', value: baseUrl);
   }
 
-  Future<void> signIn(String email, String password,
-      {bool register = false, String timezone = 'UTC'}) async {
+  Future<void> signIn(
+    String email,
+    String password, {
+    bool register = false,
+    String timezone = 'UTC',
+  }) async {
     final result = await request(
-        'POST', 'auth/${register ? 'register' : 'login'}/',
-        authenticated: false,
-        data: {
-          'email': email.trim(),
-          'password': password,
-          'timezone': timezone
-        });
+      'POST',
+      'auth/${register ? 'register' : 'login'}/',
+      authenticated: false,
+      data: {'email': email.trim(), 'password': password, 'timezone': timezone},
+    );
     final session = Map<String, dynamic>.from(result as Map);
     await _persist(session, ++_generation);
+  }
+
+  Future<Account> refreshAccount() async {
+    final generation = _generation;
+    final current = account;
+    if (current == null) throw ApiException(401, 'Sign in to continue.');
+    final user = await request('GET', 'auth/me/', accountId: current.id);
+    if (generation != _generation || _session == null) {
+      throw ApiException(401, 'The account changed. Please try again.');
+    }
+    final next = {..._session!, 'user': Map<String, dynamic>.from(user as Map)};
+    await _persist(next, generation);
+    if (generation != _generation) {
+      throw ApiException(401, 'The account changed. Please try again.');
+    }
+    return Account.fromJson(next['user']);
+  }
+
+  Future<void> signInWithGoogle(
+    String idToken, {
+    String timezone = 'UTC',
+  }) async {
+    final result = await request(
+      'POST',
+      'auth/google/',
+      authenticated: false,
+      data: {'id_token': idToken, 'timezone': timezone},
+    );
+    await _persist(Map<String, dynamic>.from(result as Map), ++_generation);
+  }
+
+  Future<void> linkGoogle(String idToken, String password) async {
+    final current = account;
+    if (current == null) throw ApiException(401, 'Sign in to continue.');
+    await request(
+      'POST',
+      'auth/google/link/',
+      accountId: current.id,
+      data: {'id_token': idToken, 'password': password},
+    );
+    await refreshAccount();
   }
 
   Future<void> signOut() async {
     // When offline, local credentials are still removed; server sessions expire.
     try {
       await request('POST', 'auth/logout/', data: {});
-    } on ApiException {/* Local sign-out still succeeds. */}
+    } on ApiException {
+      /* Local sign-out still succeeds. */
+    }
     _generation++;
     _session = null;
     await _persist(null, _generation);
@@ -117,7 +178,9 @@ class ApiClient {
         await _storage.delete(key: 'taskflow.session');
       } else {
         await _storage.write(
-            key: 'taskflow.session', value: jsonEncode(session));
+          key: 'taskflow.session',
+          value: jsonEncode(session),
+        );
       }
       if (generation == _generation) _session = session;
     });
@@ -127,8 +190,20 @@ class ApiClient {
   Future<void> _refresh(int generation) async {
     final previous = _session;
     if (previous == null) throw ApiException(401, 'Sign in to continue.');
-    final result = await request('POST', 'auth/refresh/',
-        authenticated: false, data: {'refresh': previous['refresh']});
+    dynamic result;
+    try {
+      result = await request(
+        'POST',
+        'auth/refresh/',
+        authenticated: false,
+        data: {'refresh': previous['refresh']},
+      );
+    } on ApiException catch (error) {
+      // An offline/server failure retains the saved session. Only an explicit
+      // authentication rejection locks the app and removes the credentials.
+      if (error.status == 401) await _invalidateSession(generation);
+      rethrow;
+    }
     if (generation != _generation) {
       throw ApiException(401, 'The account changed. Please try again.');
     }
@@ -136,11 +211,27 @@ class ApiClient {
     await _persist(next, generation);
   }
 
-  Future<dynamic> request(String method, String path,
-      {Map<String, dynamic>? data,
-      String? audioPath,
-      bool authenticated = true,
-      int? accountId}) async {
+  Future<void> _invalidateSession(int generation) async {
+    if (generation != _generation || _session == null) return;
+    _session = null;
+    final invalidated = ++_generation;
+    try {
+      await _persist(null, invalidated);
+    } finally {
+      if (!_sessionInvalidated.isClosed && _generation == invalidated) {
+        _sessionInvalidated.add(null);
+      }
+    }
+  }
+
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
     final generation = _generation;
     if (authenticated &&
         (account == null || (accountId != null && account!.id != accountId))) {
@@ -150,54 +241,84 @@ class ApiClient {
       if (generation != _generation) {
         throw ApiException(401, 'The account changed. Please try again.');
       }
-      final response =
-          await _send(method, path, data, audioPath, authenticated);
+      final response = await _send(
+        method,
+        path,
+        data,
+        audioPath,
+        authenticated,
+      );
       if (generation != _generation) {
         throw ApiException(401, 'The account changed. Please try again.');
       }
       if (response.statusCode == 401 && authenticated && attempt == 0) {
-        _refreshing ??=
-            _refresh(generation).whenComplete(() => _refreshing = null);
+        _refreshing ??= _refresh(
+          generation,
+        ).whenComplete(() => _refreshing = null);
         await _refreshing;
         continue;
       }
+      if (response.statusCode == 401 && authenticated) {
+        await _invalidateSession(generation);
+      }
       dynamic body;
       try {
-        body = response.body.isEmpty ? null : jsonDecode(response.body);
+        // JSON is UTF-8 even when application/json omits a charset. http 1.2
+        // otherwise falls back to Latin-1 and corrupts accents and emoji.
+        body = response.bodyBytes.isEmpty
+            ? null
+            : jsonDecode(utf8.decode(response.bodyBytes));
       } on FormatException {
         throw ApiException(
-            response.statusCode, 'The server returned an invalid response.');
+          response.statusCode,
+          'The server returned an invalid response.',
+        );
       }
       if (response.statusCode >= 400) {
-        final map =
-            body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
+        final map = body is Map
+            ? Map<String, dynamic>.from(body)
+            : <String, dynamic>{};
         final message = map['detail'] is String
             ? map['detail'] as String
             : map.entries
-                .map((e) =>
-                    '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}')
-                .join('\n');
+                  .map(
+                    (e) =>
+                        '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}',
+                  )
+                  .join('\n');
         throw ApiException(
-            response.statusCode,
-            message.isEmpty ? 'The request failed. Please try again.' : message,
-            map);
+          response.statusCode,
+          message.isEmpty ? 'The request failed. Please try again.' : message,
+          map,
+        );
       }
       return body;
     }
     throw ApiException(401, 'Your session has ended. Please sign in again.');
   }
 
-  Future<http.Response> _send(String method, String path,
-      Map<String, dynamic>? data, String? audioPath, bool authenticated) async {
+  Future<http.Response> _send(
+    String method,
+    String path,
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated,
+  ) async {
     Future<http.Response> perform() async {
       final url = Uri.parse('$baseUrl/api/$path');
       final http.BaseRequest request;
       if (audioPath != null) {
         request = http.MultipartRequest(method, url)
           ..fields.addAll(
-              (data ?? {}).map((key, value) => MapEntry(key, value.toString())))
-          ..files.add(await http.MultipartFile.fromPath('audio', audioPath,
-              filename: 'task.wav'));
+            (data ?? {}).map((key, value) => MapEntry(key, value.toString())),
+          )
+          ..files.add(
+            await http.MultipartFile.fromPath(
+              'audio',
+              audioPath,
+              filename: 'task.wav',
+            ),
+          );
       } else {
         request = http.Request(method, url)
           ..headers['Content-Type'] = 'application/json'
@@ -210,36 +331,52 @@ class ApiClient {
     }
 
     try {
-      return await perform()
-          .timeout(Duration(seconds: path.startsWith('ai/') ? 100 : 12));
+      return await perform().timeout(
+        Duration(seconds: path.startsWith('ai/') ? 100 : 12),
+      );
     } on TimeoutException {
       throw ApiException(
-          0, 'The server took too long to respond. Your local tasks are safe.');
+        0,
+        'The server took too long to respond. Your local tasks are safe.',
+      );
     } on SocketException {
-      throw ApiException(0,
-          'Cannot reach the server. Check your connection and server address.');
+      throw ApiException(
+        0,
+        'Cannot reach the server. Check your connection and server address.',
+      );
     } on http.ClientException {
-      throw ApiException(0,
-          'Cannot reach the server. Check your connection and server address.');
+      throw ApiException(
+        0,
+        'Cannot reach the server. Check your connection and server address.',
+      );
     }
   }
 
-  Future<Map<String, dynamic>> uploadAttachment(
-      {required String id,
-      required String taskId,
-      required String name,
-      required String filePath,
-      required int accountId}) async {
+  Future<Map<String, dynamic>> uploadAttachment({
+    required String id,
+    required String taskId,
+    required String name,
+    required String filePath,
+    required int accountId,
+  }) async {
     final response = await _fileRequest(
-        'attachments/$id/',
-        accountId,
-        (url) async => http.MultipartRequest('PUT', url)
-          ..fields.addAll({'task_id': taskId, 'name': name})
-          ..files.add(await http.MultipartFile.fromPath('file', filePath,
-              filename: 'upload.bin')),
-        maxResponseBytes: 64 * 1024);
+      'attachments/$id/',
+      accountId,
+      (url) async => http.MultipartRequest('PUT', url)
+        ..fields.addAll({'task_id': taskId, 'name': name})
+        ..files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            filePath,
+            filename: 'upload.bin',
+          ),
+        ),
+      maxResponseBytes: 64 * 1024,
+    );
     try {
-      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+      return Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map,
+      );
     } on FormatException {
       throw ApiException(502, 'The server returned invalid file information.');
     } on TypeError {
@@ -247,16 +384,22 @@ class ApiClient {
     }
   }
 
-  Future<Uint8List> downloadAttachment(String id,
-          {required int accountId}) async =>
-      (await _fileRequest('attachments/$id/content/', accountId,
-              (url) async => http.Request('GET', url),
-              maxResponseBytes: 6 * 1024 * 1024))
-          .bodyBytes;
+  Future<Uint8List> downloadAttachment(
+    String id, {
+    required int accountId,
+  }) async => (await _fileRequest(
+    'attachments/$id/content/',
+    accountId,
+    (url) async => http.Request('GET', url),
+    maxResponseBytes: 6 * 1024 * 1024,
+  )).bodyBytes;
 
   Future<http.Response> _fileRequest(
-      String path, int accountId, Future<http.BaseRequest> Function(Uri) create,
-      {required int maxResponseBytes}) async {
+    String path,
+    int accountId,
+    Future<http.BaseRequest> Function(Uri) create, {
+    required int maxResponseBytes,
+  }) async {
     final generation = _generation;
     void checkAccount() {
       if (generation != _generation || account?.id != accountId) {
@@ -277,58 +420,79 @@ class ApiClient {
         await for (final chunk in response.stream) {
           if (bytes.length + chunk.length > maxResponseBytes) {
             throw ApiException(
-                413, 'The server file is larger than the supported limit.');
+              413,
+              'The server file is larger than the supported limit.',
+            );
           }
           bytes.add(chunk);
         }
-        return http.Response.bytes(bytes.takeBytes(), response.statusCode,
-            headers: response.headers);
+        return http.Response.bytes(
+          bytes.takeBytes(),
+          response.statusCode,
+          headers: response.headers,
+        );
       }
 
       late http.Response response;
       try {
         response = await transfer().timeout(const Duration(seconds: 45));
       } on TimeoutException {
-        throw ApiException(0,
-            'The file transfer timed out. Your local copy is safe; retry when connected.');
+        throw ApiException(
+          0,
+          'The file transfer timed out. Your local copy is safe; retry when connected.',
+        );
       } on SocketException {
         throw ApiException(
-            0, 'Cannot reach the server. Your local file is safe.');
+          0,
+          'Cannot reach the server. Your local file is safe.',
+        );
       } on http.ClientException {
         throw ApiException(
-            0, 'The connection was interrupted. Retry this file.');
+          0,
+          'The connection was interrupted. Retry this file.',
+        );
       }
       checkAccount();
       if (response.statusCode == 401 && attempt == 0) {
-        _refreshing ??=
-            _refresh(generation).whenComplete(() => _refreshing = null);
+        _refreshing ??= _refresh(
+          generation,
+        ).whenComplete(() => _refreshing = null);
         await _refreshing;
         continue;
       }
+      if (response.statusCode == 401) await _invalidateSession(generation);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         Map<String, dynamic>? body;
         try {
-          final value = jsonDecode(response.body);
+          final value = jsonDecode(utf8.decode(response.bodyBytes));
           if (value is Map) body = Map<String, dynamic>.from(value);
-        } on FormatException {/* A proxy can return non-JSON errors. */}
+        } on FormatException {
+          /* A proxy can return non-JSON errors. */
+        }
         final detail = body?['detail'];
         final message = detail is String
             ? detail
             : body?.entries
-                .map((e) =>
-                    '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}')
-                .join('\n');
+                  .map(
+                    (e) =>
+                        '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}',
+                  )
+                  .join('\n');
         throw ApiException(
-            response.statusCode,
-            message?.isNotEmpty == true
-                ? message!
-                : 'The file transfer failed. Please retry.',
-            body);
+          response.statusCode,
+          message?.isNotEmpty == true
+              ? message!
+              : 'The file transfer failed. Please retry.',
+          body,
+        );
       }
       return response;
     }
     throw ApiException(401, 'Your session has ended. Please sign in again.');
   }
 
-  void close() => _http.close();
+  void close() {
+    _http.close();
+    unawaited(_sessionInvalidated.close());
+  }
 }

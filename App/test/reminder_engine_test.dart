@@ -245,6 +245,18 @@ void main() {
     final regional = RegionalPreferenceStore(database);
     await regional.write(const RegionalPreferences());
     expect(
+        (await readReminderStrings(database,
+                deviceLocales: [const Locale('ca', 'ES')]))
+            .notificationComplete,
+        'Completa');
+    await regional.write(const RegionalPreferences(language: 'ca'));
+    expect(
+        (await readReminderStrings(database,
+                deviceLocales: [const Locale('en', 'US')]))
+            .notificationSnooze,
+        'Ajorna 10 min');
+    await regional.write(const RegionalPreferences());
+    expect(
         (await readReminderStrings(database, deviceLocales: [
           const Locale('fr', 'FR'),
           const Locale('es', 'ES')

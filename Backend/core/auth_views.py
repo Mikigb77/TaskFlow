@@ -8,7 +8,6 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -25,6 +24,7 @@ from rest_framework_simplejwt.utils import get_md5_hash_password
 
 from .models import User, LoginSession
 from .serializers import RegistrationSerializer, UserSerializer
+from .staging import ensure_registration_allowed
 
 
 def issue_session(user):
@@ -48,6 +48,7 @@ class RegisterView(PublicAuthView):
         serializer = RegistrationSerializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
+            ensure_registration_allowed(serializer.validated_data["email"])
             with transaction.atomic():
                 user = serializer.save()
                 return Response(issue_session(user), status=201)
@@ -117,10 +118,20 @@ class ResetRequestView(PublicAuthView):
         if user:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
-            link = settings.PASSWORD_RESET_BASE_URL + "?" + urlencode({"uid": uid, "token": token})
-            send_mail("Reset your TaskFlow password",
-                      f"Use this link within 30 minutes:\n{link}\n\nOr paste this recovery code in the app:\n{uid}:{token}\n\nIf you did not request this, ignore this email.",
-                      settings.DEFAULT_FROM_EMAIL, [user.email])
+            link = settings.PASSWORD_RESET_BASE_URL + "#" + urlencode({"uid": uid, "token": token})
+            from .models import EmailDelivery
+            from .email_delivery import reserve_email, deliver_email
+            from rest_framework.exceptions import Throttled
+            try:
+                reserve_email(user.email)
+            except Throttled:
+                # Never reveal whether a mailbox has an account or is quota-limited.
+                return Response({"detail": "If that account exists, a recovery email has been sent."})
+            message = EmailDelivery.objects.create(
+                recipient=user.email, subject="Reset your TaskFlow password",
+                body=f"Use this link within 30 minutes:\n{link}\n\nOr paste this recovery code in the app:\n{uid}:{token}\n\nIf you did not request this, ignore this email.",
+                expires_at=timezone.now() + timedelta(minutes=30))
+            deliver_email(message.pk)
         return Response({"detail": "If that account exists, a recovery email has been sent."})
 
 

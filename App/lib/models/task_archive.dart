@@ -12,12 +12,13 @@ class ImportTask {
   final String title;
   final List<ArchiveDiagnostic> warnings;
   final ArchiveDiagnostic? error;
-  const ImportTask(
-      {required this.sourceId,
-      required this.title,
-      this.task,
-      this.warnings = const [],
-      this.error});
+  const ImportTask({
+    required this.sourceId,
+    required this.title,
+    this.task,
+    this.warnings = const [],
+    this.error,
+  });
 }
 
 /// Parsed, bounded data only. Parsing never writes tasks or opens attachments.
@@ -31,12 +32,13 @@ class TaskArchive {
   final List<TaskListInfo> lists;
   final List<ImportTask> tasks;
   final List<ArchiveDiagnostic> warnings;
-  const TaskArchive(
-      {required this.id,
-      required this.source,
-      required this.lists,
-      required this.tasks,
-      this.warnings = const []});
+  const TaskArchive({
+    required this.id,
+    required this.source,
+    required this.lists,
+    required this.tasks,
+    this.warnings = const [],
+  });
 
   factory TaskArchive.parse(String contents) {
     if (utf8.encode(contents).length > maxBytes) {
@@ -60,16 +62,24 @@ class TaskArchive {
         throw const ArchiveDiagnostic(ArchiveCode.duplicateLists);
       }
       final name = _string(item['name'], 'list name', 80);
-      if (!['teal', 'blue', 'violet', 'amber', 'rose']
-              .contains(item['color']) ||
+      if (![
+            'teal',
+            'blue',
+            'violet',
+            'amber',
+            'rose',
+          ].contains(item['color']) ||
           item['archived'] is! bool) {
         throw const ArchiveDiagnostic(ArchiveCode.invalidListStyle);
       }
-      lists.add(TaskListInfo(
+      lists.add(
+        TaskListInfo(
           id: id,
           name: name,
           color: item['color'],
-          archived: item['archived']));
+          archived: item['archived'],
+        ),
+      );
     }
     final tasks = <ImportTask>[];
     final ids = <String>{};
@@ -88,7 +98,7 @@ class TaskArchive {
         final warnings = <ArchiveDiagnostic>[];
         final known = {
           ...Task(title: '', priority: 1).toApi().keys,
-          'attachments'
+          'attachments',
         };
         if (values.keys.any((key) => !known.contains(key))) {
           warnings.add(const ArchiveDiagnostic(ArchiveCode.unknownFields));
@@ -98,35 +108,52 @@ class TaskArchive {
           throw const ArchiveDiagnostic(ArchiveCode.invalidAttachments);
         }
         if (attachments is List && attachments.isNotEmpty) {
-          warnings.add(ArchiveDiagnostic(ArchiveCode.attachmentsOmitted,
-              count: attachments.length));
+          warnings.add(
+            ArchiveDiagnostic(
+              ArchiveCode.attachmentsOmitted,
+              count: attachments.length,
+            ),
+          );
         }
         final task = validatedTask(values);
         if (task.listId != null && !listIds.contains(task.listId)) {
           throw const ArchiveDiagnostic(ArchiveCode.missingList);
         }
-        tasks.add(ImportTask(
-            sourceId: id, title: title, task: task, warnings: warnings));
+        tasks.add(
+          ImportTask(
+            sourceId: id,
+            title: title,
+            task: task,
+            warnings: warnings,
+          ),
+        );
       } on FormatException catch (error) {
-        tasks.add(ImportTask(
+        tasks.add(
+          ImportTask(
             sourceId: id,
             title: title,
             error: error is ArchiveDiagnostic
                 ? error
-                : const ArchiveDiagnostic(ArchiveCode.invalidTaskFields)));
+                : const ArchiveDiagnostic(ArchiveCode.invalidTaskFields),
+          ),
+        );
       } catch (_) {
-        tasks.add(ImportTask(
+        tasks.add(
+          ImportTask(
             sourceId: id,
             title: title,
-            error: const ArchiveDiagnostic(ArchiveCode.invalidTaskFields)));
+            error: const ArchiveDiagnostic(ArchiveCode.invalidTaskFields),
+          ),
+        );
       }
     }
     return TaskArchive(
-        id: data['export_id'],
-        source: ArchiveSource.taskflow,
-        lists: lists,
-        tasks: tasks,
-        warnings: const [ArchiveDiagnostic(ArchiveCode.personalCopies)]);
+      id: data['export_id'],
+      source: ArchiveSource.taskflow,
+      lists: lists,
+      tasks: tasks,
+      warnings: const [ArchiveDiagnostic(ArchiveCode.personalCopies)],
+    );
   }
 
   static Task validatedTask(Map<String, dynamic> data) {
@@ -165,8 +192,12 @@ class TaskArchive {
     if (!Task.repeats.containsKey(recurrence)) {
       throw const ArchiveDiagnostic(ArchiveCode.unsupportedRepeat);
     }
-    final interval =
-        _integer(data['repeat_interval'] ?? 1, 'repeat interval', 1, 99);
+    final interval = _integer(
+      data['repeat_interval'] ?? 1,
+      'repeat interval',
+      1,
+      99,
+    );
     final days = _list(data['repeat_weekdays'] ?? [], 'repeat weekdays', 7);
     for (final day in days) {
       _integer(day, 'weekday', 1, 7);
@@ -178,13 +209,19 @@ class TaskArchive {
       throw const ArchiveDiagnostic(ArchiveCode.repeatNeedsStart);
     }
     if (data['repeat_until'] != null) _date(data['repeat_until']);
-    final completed =
-        _list(data['completed_dates'] ?? [], 'completed dates', 10000);
+    final completed = _list(
+      data['completed_dates'] ?? [],
+      'completed dates',
+      10000,
+    );
     for (final date in completed) {
       _date(date);
     }
-    final exceptions =
-        _list(data['exceptions'] ?? [], 'individual date changes', 500);
+    final exceptions = _list(
+      data['exceptions'] ?? [],
+      'individual date changes',
+      500,
+    );
     final originalDates = <String>{};
     for (final change in exceptions) {
       if (change is! Map) {
@@ -234,8 +271,11 @@ class TaskArchive {
       if (item['completed'] != null && item['completed'] is! bool) {
         throw const ArchiveDiagnostic(ArchiveCode.invalidChecklistProgress);
       }
-      for (final date
-          in _list(item['completed_dates'] ?? [], 'checklist dates', 10000)) {
+      for (final date in _list(
+        item['completed_dates'] ?? [],
+        'checklist dates',
+        10000,
+      )) {
         _date(date);
       }
     }
@@ -245,7 +285,13 @@ class TaskArchive {
     if (data['reminder_time'] != null) {
       _integer(data['reminder_time'], 'reminder time', 0, 1439);
     }
-    final task = Task.fromApi(data);
+    final task = Task.fromApi({
+      ...data,
+      'assignment': 'personal',
+      'assignee_id': null,
+      'assignee_name': null,
+      'created_by': null,
+    });
     if (task.repeatUntil != null &&
         Task.day(task.repeatUntil!).isBefore(Task.day(task.dueDate!))) {
       throw const ArchiveDiagnostic(ArchiveCode.repeatEndBeforeStart);
@@ -259,30 +305,42 @@ class TaskArchive {
   }
 
   static String encode(
-      List<Map<String, dynamic>> rows, List<TaskListInfo> lists,
-      {Map<int, List<String>> attachmentNames = const {}}) {
+    List<Map<String, dynamic>> rows,
+    List<TaskListInfo> lists, {
+    Map<int, List<String>> attachmentNames = const {},
+  }) {
     final data = <String, dynamic>{
       'format': format,
       'version': version,
       'export_id': const Uuid().v4(),
       'created_at': DateTime.now().toUtc().toIso8601String(),
       'lists': lists
-          .map((list) => {
-                'id': list.id,
-                'name': list.name,
-                'color': list.color,
-                'archived': list.archived
-              })
+          .map(
+            (list) => {
+              'id': list.id,
+              'name': list.name,
+              'color': list.color,
+              'archived': list.archived,
+            },
+          )
           .toList(),
       'tasks': rows.map((row) {
         final task = Task.fromMap(row);
         return {
           'id': row['sync_id'] ?? const Uuid().v4(),
-          ...task.toApi(),
-          'attachments': attachmentNames[row['id']] ??
+          ...task
+              .copyWith(
+                assignment: 'personal',
+                assigneeId: null,
+                assigneeName: null,
+                createdBy: null,
+              )
+              .toApi(),
+          'attachments':
+              attachmentNames[row['id']] ??
               [...task.filePaths, ...task.imagePaths]
                   .map((path) => path.replaceAll('\\', '/').split('/').last)
-                  .toList()
+                  .toList(),
         };
       }).toList(),
     };
@@ -297,14 +355,21 @@ class TaskArchive {
 
   static List _list(Object? value, String name, int limit) {
     if (value is! List || value.length > limit) {
-      throw ArchiveDiagnostic(ArchiveCode.invalidCollection,
-          field: name, max: limit);
+      throw ArchiveDiagnostic(
+        ArchiveCode.invalidCollection,
+        field: name,
+        max: limit,
+      );
     }
     return value;
   }
 
-  static String _string(Object? value, String name, int limit,
-      {bool blank = false}) {
+  static String _string(
+    Object? value,
+    String name,
+    int limit, {
+    bool blank = false,
+  }) {
     if (value is! String ||
         value.length > limit ||
         (!blank && value.trim().isEmpty)) {
@@ -315,16 +380,21 @@ class TaskArchive {
 
   static int _integer(Object? value, String name, int min, int max) {
     if (value is! int || value < min || value > max) {
-      throw ArchiveDiagnostic(ArchiveCode.invalidInteger,
-          field: name, min: min, max: max);
+      throw ArchiveDiagnostic(
+        ArchiveCode.invalidInteger,
+        field: name,
+        min: min,
+        max: max,
+      );
     }
     return value;
   }
 
   static String _uuid(Object? value, String name) {
     if (value is! String ||
-        !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
-            .hasMatch(value)) {
+        !RegExp(
+          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+        ).hasMatch(value)) {
       throw ArchiveDiagnostic(ArchiveCode.invalidIdentifier, field: name);
     }
     return value;
@@ -343,8 +413,9 @@ class TaskArchive {
 
   static DateTime _timed(Object? value) {
     if (value is! String ||
-        !RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$')
-            .hasMatch(value)) {
+        !RegExp(
+          r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$',
+        ).hasMatch(value)) {
       throw const ArchiveDiagnostic(ArchiveCode.missingTimezone);
     }
     _date(value.substring(0, 10));
