@@ -2,6 +2,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/models/task_schedule_change.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -172,6 +173,8 @@ class DesignTaskNotifier extends TaskNotifier {
 ProviderContainer designContainer({
   MemoryThemeStore? store,
   RegionalPreferenceStore? regionalStore,
+  TaskNotifier Function()? tasks,
+  List<TaskListInfo>? projects,
 }) => ProviderContainer(
   overrides: [
     invitationLinkProvider.overrideWith(
@@ -186,14 +189,14 @@ ProviderContainer designContainer({
       regionalStore ?? MemoryRegionalStore(),
     ),
     pendingCapturesProvider.overrideWith((ref) async => []),
-    taskListsProvider.overrideWith((ref) async => []),
+    taskListsProvider.overrideWith((ref) async => projects ?? []),
     apiClientProvider.overrideWith((ref) {
       final api = OfflineApiClient();
       ref.onDispose(api.close);
       return api;
     }),
     taskRepositoryProvider.overrideWithValue(MemoryTasks()),
-    taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+    taskProvider.overrideWith((ref) => tasks?.call() ?? DesignTaskNotifier()),
     themeStoreProvider.overrideWithValue(store ?? MemoryThemeStore()),
   ],
 );

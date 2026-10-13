@@ -73,12 +73,14 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 - **The theme toggle** appears on about 23 surfaces: every `CustomAppBar`, plus login.
 - **Contrast:**
   - text is fine — at least 5.7:1 in dark, 5.9–6.3:1 for primary text in light;
-  - field borders are 1.28:1, and the selected-tab pill is 1.20:1.
+  - field borders now `outline` (3.79:1 light / 4.85:1 dark); the selected tab is shown by w800 label + filled icon, so the faint pill no longer carries state.
+- **Tab bar** details (icons, 12 sp labels, < 360 dp label shrink, tooltips, hidden hairline) are in [[ui-patterns]] › Header, tabs and theme.
 
 ## Baselines (2026-10-13)
 - **Settings:** 14 tap targets in the body (21 with the header and tabs), about 150 words. Notificaciones is 10th.
 - **Reminders on a new account:** 0 alerts by default, and 7–8 steps to get them on time.
 - **Theme toggle:** on 23 surfaces.
+- **Tab labels at the 1.3× cap, 320 dp (80 dp tab):** ES "Calendario" selected 77.9 dp after P45 (fits, 2.1 dp spare); CA "Configuració" 92.9 dp (wraps until U13).
 - **Notificaciones:** 8 controls, about 135 words.
 
 Related: [[ui-patterns]], [[screens-a-voice-capture]].

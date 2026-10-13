@@ -2,7 +2,7 @@
  "runId": "2026-10-13-app",
  "mode": "app",
  "created": "2026-10-13",
- "revised": "2026-10-13, after the owner's answers to D1–D15 (the approved plan is in git at d46f888)",
+ "revised": "2026-10-13, after the owner's answers to D1–D15 (the approved plan is in git at d46f888); after trial round 1, UX-429, UX-430 and UX-431 were added to P24, P26 and P18 (plan.md, Round 2 (trial)); after trial round 2, UX-433 and UX-434 were added to P23 and P16, and P35 now checks UX-428's last old Notas icon (plan.md, Round 3 (trial))",
  "conventions": [
   "Paths are relative to the repo root. Line numbers come from the 2026-10-13 reports; earlier packages in this run may have moved them, so search for the code they point at.",
   "Copy is shown between backticks as EN / ES / CA and is exact. Write apostrophes and quotes the way the catalogs already do (’, «», “”).",
@@ -336,6 +336,7 @@
     "UX-126: the `Descartar captura` button (voice_task_screen.dart:972-976) goes; discarding now lives in Cancel's question, where it isn't the filled button. Remove `discardCapture`, `discardCaptureQuestion` and `captureDiscardHelp` if they end up unused.",
     "UX-105: the words are the largest text in the sheet, directly under the status line, and the newest words stay in view (keep the view scrolled to the end as they grow). At 2× text on a 360×740 screen, the newest words and the three controls must be visible while listening.",
     "UX-109, TalkBack. (a) When MediaQuery.accessibleNavigationOf(context) is true, the sheet opens without listening and shows one filled button, focused: EN `Start talking` / ES `Empezar a hablar` / CA `Comença a parlar`; tapping it starts listening, so TalkBack's own speech doesn't end up in the words. (b) Announce EN `Listening` / ES `Escuchando` / CA `S’està escoltant` with SemanticsService.announce when listening starts, and the existing `done` when it stops. (c) One label per control, the same for semantics and tooltip; remove the old mic labels left unused (`stopDraft`, `stopRecording`, `recordTasks`, `tapStopHelp`, `tapSpeak`). (d) Drop the Tooltip around the labelled creation button (task_actions.dart:39-41): TalkBack reads it twice.",
+    "UX-428 (found fixed in trial round 2) gave each concept the icon its tab uses: Tareas `check_box` / `check_box_outlined`, Notas `description` / `description_outlined`. The page's `Revisar nota` button (voice_task_screen.dart:949-955) still shows the old `Icons.notes_rounded`; no package named it, and it goes with the page. If anything in the sheet stands for a note, give it `Icons.description_outlined`. Leave `Icons.notes_rounded` at captures_screen.dart:49 alone: there it means a typed capture with no audio, not Notas.",
     "Keep: P33's session and states, P1's hideCurrentSnackBar when capture opens, P3's speech/typed source, the durable capture record. For accounts without Pro, show the existing Pro wall content inside the sheet for now; P39 replaces it. Don't touch: review and save (P36), the creation buttons' labels (P38), error wording (P40)."
    ],
    "acceptance": [
@@ -345,7 +346,8 @@
     "Widget test with accessibleNavigation on: the sheet doesn't listen until `Empezar a hablar` is tapped.",
     "Widget test: after 5 s without words the silence line shows; a `paused` lifecycle shows `En pausa` with `Seguir`.",
     "Preview: a Spanish 2× preview of the listening sheet (360×740, textScaler 2.0) in test/review_tasks_test.dart behind WRITE_REVIEW_PREVIEWS, written to App/build/capture-listening-es-2x.png, with the speech channel mocked the way test/native_speech_test.dart does; the newest words and the three controls are visible. If it can't be pumped that way, assert the same in a widget test and say so.",
-    "Code: no `discardCapture` button, no Task/Note chips and no speech options in the capture UI; Notes, the pending list and main.dart's entries all call the one sheet entry."
+    "Code: no `discardCapture` button, no Task/Note chips and no speech options in the capture UI; Notes, the pending list and main.dart's entries all call the one sheet entry.",
+    "grep: no `Icons.notes_rounded` in App/lib/screens/voice_task_screen.dart; anything in the sheet that stands for a note shows `Icons.description_outlined` (UX-428)."
    ],
    "deviceChecks": [
     "Say ‘llamar al médico el viernes’, wait 10 s, say ‘a las cinco’, tap `Listo` → one text reaches the review.",
@@ -758,15 +760,18 @@
     "UX-313",
     "UX-312",
     "UX-323",
-    "UX-337"
+    "UX-337",
+    "UX-434"
    ],
    "files": [
     "App/lib/screens/notes_screen.dart",
     "App/lib/widgets/task_editor.dart",
+    "App/lib/services/text_search.dart",
     "App/lib/l10n/app_en.arb",
     "App/lib/l10n/app_es.arb",
     "App/lib/l10n/app_ca.arb",
-    "App/test/notes_ui_test.dart"
+    "App/test/notes_ui_test.dart",
+    "App/test/text_search_test.dart"
    ],
    "brief": [
     "UX-304: notes come back in no order (the query in task_database.dart:437-444 has no ORDER BY). Sort the notes list newest first in notes_screen.dart:91-121 (descending local id is available). After a new note is saved, the list shows it at the top, in view, briefly highlighted with P7's highlight treatment.",
@@ -779,16 +784,19 @@
     "- The note's title hint (task_editor.dart:596-597 uses `noteHint`, which describes the body): EN `e.g. Wi-Fi password` / ES `p. ej., Clave del wifi` / CA `p. ex., Contrasenya del wifi`. Keep `noteHint` for the body if it's used there.",
     "UX-323: the project filter (:70-89) is an unlabelled dropdown whose ‘all’ option reads `Notas`. Label it EN `Project` / ES `Proyecto` / CA `Projecte`, and name the ‘all’ option EN `All notes` / ES `Todas las notas` / CA `Totes les notes`. Don't switch to the global ProjectScopeControl (the report's other option): it would tie Notes to Calendar's filter and to where new tasks are saved.",
     "UX-337: show the note-versus-task paragraph (`notesHelp`, :38-41) only in the empty state, when there are no notes at all.",
-    "UX-118 (Notes flips the voice and typing emphasis) moved to P38, which replaces both buttons with one `Añadir nota`; keep UX-313's rule where P38 can reuse it."
+    "UX-118 (Notes flips the voice and typing emphasis) moved to P38, which replaces both buttons with one `Añadir nota`; keep UX-313's rule where P38 can reuse it.",
+    "UX-434 (added after trial round 2; seen in passing in verify-trial-r2-C.md): search treats the straight apostrophe `'` and the curly `’` as different, so `l'escola` doesn't find `l’escola`, and the reverse. iPhone text fields turn `'` into `’` by default (smart quotes; Flutter material/text_field.dart:334-335), Android keyboards type `'`, and shared projects mix both. Catalan elides all the time (l', d', s'), so a Catalan user can get `No hi ha tasques que coincideixin` for a note that exists. The date parser already treats the two as one (quick_schedule_parser.dart:35). In App/lib/services/text_search.dart, add `’` → `'` to `_plain` (:32-57), so both fold to the straight apostrophe. `’` is above 0x7F, so `_plainByCodeUnit` picks it up; don't map `'` the other way, because characters below 0x80 are never looked up. Change nothing else in that file: P11 and P46 settled the rest, and every existing test in App/test/text_search_test.dart must still pass."
    ],
    "acceptance": [
     "Widget test: three notes saved in turn appear newest first, and a newly saved note is at the top and visible.",
     "Widget test: in a project's notes, `Dictar una nota` opens capture with that projectId.",
     "Widget test: a search with no results on Notes shows `No hay notas que coincidan`; the filter is labelled `Proyecto`, with `Todas las notas`.",
-    "Widget test: with at least one note, `notesHelp` isn't shown."
+    "Widget test: with at least one note, `notesHelp` isn't shown.",
+    "Unit test (App/test/text_search_test.dart): `matchesSearch(\"Portar l'Anna a l'escola\", 'l’escola')` and `matchesSearch('Portar l’Anna a l’escola', \"l'escola\")` are both true, and every existing case still passes."
    ],
    "deviceChecks": [
-    "With 12 notes, save one more → it's visible at the top without scrolling."
+    "With 12 notes, save one more → it's visible at the top without scrolling.",
+    "With an iPhone at hand: in a project shared with an Android phone, save a note `Portar l'Anna a l'escola` on the iPhone (smart quotes store it with ’), then search `l'escola` on the Android phone → the note is listed. Inferred from Flutter's smart-quote default; the unit test covers the matching."
    ],
    "dependsOn": [
     "P7",
@@ -1246,7 +1254,8 @@
     "UX-418",
     "UX-422",
     "UX-406",
-    "UX-120"
+    "UX-120",
+    "UX-431"
    ],
    "files": [
     "App/lib/screens/settings_screen.dart",
@@ -1276,6 +1285,7 @@
     "UX-120 (D13): `Diagnóstico de captura` (settings_screen.dart:262-268) appears only in debug builds (kDebugMode), at the bottom of Otros ajustes. On staging builds (APP_ENV is `staging`, read the way revenuecat_service.dart:43 reads it) a long-press on the version line opens a small sheet with `Diagnóstico de captura` and `Detalles de conexión` (the server URL, apiClientProvider.baseUrl; P44 hides it from Account). In production builds the long-press does nothing.",
     "UX-418 and UX-406 (D5), one place for light and dark. Replace the three theme tiles (settings_screen.dart:37-149) with the Apariencia row: its subtitle is the current choice, and it opens a sheet of full-width radio rows — EN `Light` / `Dark` / `Same as phone`, ES `Claro` / `Oscuro` / `Como el teléfono`, CA `Clar` / `Fosc` / `Com el telèfon`. The default stays ThemeMode.system, so a first run follows the phone. Then remove the sun–moon toggle everywhere else: CustomAppBar's ThemeToggle and its `showAppearance` parameter (custom_app_bar.dart:11, :16, :54, and every `showAppearance:` argument) and the toggle on the sign-in screen (login_screen.dart:208). Delete ThemeToggle (app_components.dart:6) if nothing uses it.",
     "UX-422 (Hora y región): the screen this row opens is titled `Idioma y región` (`regionalSettings`); retitle it `Hora y región`. Remove the second language picker from it. Label the time zone EN `Time zone` / ES `Zona horaria` / CA `Fus horari` (drop ‘de captura’) and update `regionalFormatsHelp` to match. Show time zones as city names — the last part of the IANA id with underscores as spaces, e.g. `America/Argentina/Buenos_Aires` → `Buenos Aires` — while still storing the id. `deviceDefault` (ES `Usar el dispositivo`) becomes EN `Same as phone` / ES `Como el teléfono` / CA `Com el telèfon`. Delete the language sheet's 30-word paragraph (`languageHelp`, language_selector.dart:110-113).",
+    "UX-431 (added after trial round 1; seen in passing in verify-trial-r1-C.md): the time-zone filter (regional_settings_screen.dart:155-156 and :169) only lowercases, so once zones show as city names, `Bogotá` doesn't find `Bogota` and `México` doesn't find `Mexico City`. Filter with `matchesSearch` (App/lib/services/text_search.dart), the helper every other search uses, against the city name and the id together.",
     "Don't touch: Account and the Pro screen (P44), the header's Activity icon (P25), the Voz screen (P34)."
    ],
    "acceptance": [
@@ -1283,7 +1293,8 @@
     "Widget test: Otros ajustes lists Hora y región, Calendarios del teléfono, Botón de dictar en la pantalla de inicio, Exportar e importar and Licencias, then `TaskFlow {version}`; outside debug builds there is no `Diagnóstico de captura` row.",
     "Widget test: Apariencia opens a sheet with Claro, Oscuro and Como el teléfono; grep finds no ThemeToggle and no showAppearance, and neither an app bar nor the sign-in screen has a sun–moon button.",
     "Widget test: the Hora y región screen is titled `Hora y región`, has no language picker, and lists `Buenos Aires` for America/Argentina/Buenos_Aires.",
-    "From Calendar, reminders are two taps away (Ajustes, Recordatorios) without scrolling."
+    "From Calendar, reminders are two taps away (Ajustes, Recordatorios) without scrolling.",
+    "Widget test: in the time-zone list, typing `Bogotá` lists `Bogota`, and typing `mexico city` lists `Mexico City`."
    ],
    "deviceChecks": [
     "Spanish, 2× text, 320 dp wide: the Apariencia sheet's rows don't break mid-word.",
@@ -1514,7 +1525,8 @@
    "severity": 2,
    "findings": [
     "UX-223",
-    "UX-224"
+    "UX-224",
+    "UX-433"
    ],
    "aliases": {
     "UX-223": [
@@ -1529,7 +1541,7 @@
     "App/lib/l10n/app_es.arb",
     "App/lib/l10n/app_ca.arb",
     "App/test/day_timeline_test.dart",
-    "a MainShell widget test"
+    "App/test/main_shell_test.dart (the MainShell widget test, added in trial round 2)"
    ],
    "brief": [
     "UX-223 (merged with UX-410):",
@@ -1538,12 +1550,15 @@
     "UX-224 (day timeline):",
     "- Label the day arrows EN `Previous day` / `Next day`, ES `Día anterior` / `Día siguiente`, CA `Dia anterior` / `Dia següent` (they reuse `previousPeriod` / `nextPeriod`, `Mes o semana anterior`; day_timeline_screen.dart:94-105).",
     "- Delete `timelineShortBlocks` (developer copy) and `timelineHelp` (:116, :171-172).",
-    "- The timeline's `+` create button (:242-246) stays until U8 (D3, D4)."
+    "- The timeline's `+` create button (:242-246) stays until U8 (D3, D4).",
+    "UX-433 (added after trial round 2; seen in passing in verify-trial-r2-D.md): the line meant to separate the tab bar from the screen has never shown. The DecoratedBox around the bar (main_shell.dart:67-74) paints its `outlineVariant` top border behind its child, which is BoxDecoration's default position, and the NavigationBar's opaque `surface` Material covers it. All that's left at the bar's top edge is a change of tint: 1.07:1 in light ((247,248,242) → white) and 1.11:1 in dark ((18,24,22) → (28,34,33)). Paint the border in front: `position: DecorationPosition.foreground` on that DecoratedBox. Keep its colour (`outlineVariant`, which dividers use too, app_theme.dart:77-78) and its 1 px width. Don't touch the bar's label sizing (P47, trial round 3)."
    ],
    "acceptance": [
     "Widget test: MainShell on Tareas, system Back → Calendario is selected; on Calendario, Back pops.",
     "Widget or unit test: a reminder open request whose task is gone doesn't push MainShell and shows `Es posible que esta tarea se haya eliminado.`",
-    "Widget test: the timeline arrows carry the day labels, and neither help paragraph is in the tree."
+    "Widget test: the timeline arrows carry the day labels, and neither help paragraph is in the tree.",
+    "Widget test: in the app shell, in light and dark, the tab bar's top border (`colorScheme.outlineVariant`) is painted in front of the NavigationBar (DecorationPosition.foreground), not behind it.",
+    "Render: in App/build/calendar-feedback-light.png and -dark.png, a 1 px `outlineVariant` line (#DFE5DC in light, #34413A in dark) runs along the top edge of the tab bar."
    ],
    "deviceChecks": [
     "Delete a task that has a pending reminder, wait for the notification and tap it → the app opens on Calendar, with no duplicate, and shows the message; Back leaves the app."
@@ -1562,7 +1577,8 @@
     "UX-314",
     "UX-315",
     "UX-219",
-    "UX-333"
+    "UX-333",
+    "UX-429"
    ],
    "files": [
     "App/lib/screens/home_screen.dart",
@@ -1571,22 +1587,27 @@
     "App/lib/l10n/app_es.arb",
     "App/lib/l10n/app_ca.arb",
     "App/test/project_ui_test.dart",
-    "App/test/task_lists_widget_test.dart"
+    "App/test/task_lists_widget_test.dart",
+    "App/test/project_scope_control_test.dart"
    ],
    "brief": [
     "UX-314: on view-only project pages (home_screen.dart:255-267), `Dictar una tarea` and `Nueva tarea` stay, and `Nueva tarea` quietly creates a personal task that doesn't appear on the page. Replace both buttons with the existing read-only line (`readOnlyList`, `Este proyecto es de solo lectura`, with the existing sentence that the owner manages editing access).",
     "UX-315: project pages (home_screen.dart:41-45) inherit the global ‘For me’ filter, so a shared list hides tasks assigned to others, and toggling it inside a project changes Calendar too. Project pages show all their tasks by default, and a `Para mí` / `Todas` choice made on a project page applies to that page only: local state, not projectScopeProvider.",
     "UX-219: on Tareas, when any filter is on (a chip other than Todas, a label, or a search) and nothing matches (:217-233), show the existing `noMatches` / `differentFilter` (`No hay tareas que coincidan` · `Prueba otra palabra o filtro.`) instead of `Un nuevo comienzo — Usa Dictar una tarea…`.",
     "UX-333: remove the uppercase eyebrow labels (`everythingToDo`, `yourList`, `noDateNeeded`; :72-88) on Tareas, project and Inbox pages, and the headline on project and Inbox pages where it repeats the app-bar title. Keep the row's buttons (`Proyectos`, ✓). An archived project still needs a visible cue: show `archivedList` as a plain subtitle rather than an eyebrow.",
+    "UX-429 (added after trial round 1; seen in passing in verify-trial-r1-C.md): the `Todos los proyectos` sheet (project_scope_control.dart:45-52) is a fixed 70% of the screen height and makes no room for the keyboard. At 2× text on 320×568 the first match already needs a scroll, and with the keyboard up the matches probably sit under it (inferred). Keep the sheet above the keyboard: pad it by `MediaQuery.viewInsetsOf(context).bottom` and fit it to the space left, so the search field and the first match stay visible while typing.",
     "Don't touch: the filter chips' names, including `Bandeja personal` (D6)."
    ],
    "acceptance": [
     "Widget test: a viewer's project page shows the read-only line and no create buttons.",
     "Widget test: a shared project's page lists tasks assigned to others by default; choosing `Para mí` there doesn't change Calendar's scope.",
     "Widget test: Tareas filtered to `Prioridad alta` with no matches shows `No hay tareas que coincidan`.",
-    "Widget test: project and Inbox pages have no uppercase eyebrow and no headline repeating the title."
+    "Widget test: project and Inbox pages have no uppercase eyebrow and no headline repeating the title.",
+    "Widget test: at 320×568 with 2× text and a 280 dp keyboard inset, typing a project's name in the `Todos los proyectos` sheet leaves that project's row visible above the inset."
    ],
-   "deviceChecks": [],
+   "deviceChecks": [
+    "Spanish, 2× text: with the keyboard up in the `Todos los proyectos` sheet, the first match shows above the keyboard."
+   ],
    "dependsOn": [
     "P12",
     "P13"
@@ -1643,7 +1664,8 @@
     "UX-329",
     "UX-332",
     "UX-334",
-    "UX-338"
+    "UX-338",
+    "UX-430"
    ],
    "files": [
     "App/lib/screens/task_lists_screen.dart",
@@ -1662,6 +1684,7 @@
     "- Show the search box only from 8 projects.",
     "- Offline, show one retry line for both kinds of invitations; today two identical `Reintentar invitaciones` buttons appear (list_sharing_screen.dart:508-512, groups_screen.dart:718-721).",
     "- Check that `Proyectos` next to `Grupos` doesn't break mid-word at 320 dp and 2× text.",
+    "UX-430 (added after trial round 1; seen in passing in verify-trial-r1-C.md): a Proyectos search that matches nothing leaves blank space (task_lists_screen.dart:358-367); only having no projects at all has an empty state, unlike the other three searches. When the query matches no project, show the existing `projectsNoneFound` (EN `No matching projects` / ES `No se han encontrado proyectos` / CA `No s’han trobat projectes`), as the `Todos los proyectos` sheet does (project_scope_control.dart:140-142).",
     "UX-332 (:117-138): new projects are teal by default; drop the colour choice from the create dialog (it stays in `Editar proyecto`).",
     "UX-334 (:379-391): the `★ ` pin mark becomes a pin icon announced EN `Pinned` / ES `Fijado` / CA `Fixat`; a directly shared row's subtitle becomes EN `Shared · {role}` / ES `Compartido · {role}` / CA `Compartit · {role}` instead of `Proyectos compartidos · Editor`; the item count counts open items only.",
     "UX-338 (:91-115): when a group is chosen under ‘¿Dónde va este proyecto?’, show EN `Everyone in {group} will see it.` / ES `Todos en {group} lo verán.` / CA `Tothom a {group} el veurà.`"
@@ -1671,7 +1694,8 @@
     "Widget test: a new account's Projects screen has no headline, help line, refresh button or search box (6 tap targets → 4).",
     "Widget test: the create dialog has no colour chips; the edit dialog still has them.",
     "Widget test: a pinned row is announced `Fijado`; a shared row reads `Compartido · Editor`; counts exclude completed items.",
-    "Widget test: choosing a group shows `Todos en Máster lo verán.`"
+    "Widget test: choosing a group shows `Todos en Máster lo verán.`",
+    "Widget test: with 8 projects, typing `zzz` in the Proyectos search shows `No se han encontrado proyectos`."
    ],
    "deviceChecks": [
     "Spanish, 320 dp, 2× text: `Proyectos` and `Grupos` don't break mid-word."

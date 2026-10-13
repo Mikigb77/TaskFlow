@@ -183,6 +183,73 @@ void main() {
       container.dispose();
     }
   });
+  testWidgets(
+      'UX-303: Projects search ignores accents (es/ca, 2x text, 320 dp, both themes)',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    for (final language in ['es', 'ca']) {
+      for (final dark in [false, true]) {
+        final l10n = lookupAppLocalizations(Locale(language));
+        final store = _Lists()
+          ..lists = [
+            TaskListInfo(id: 'school', name: 'Col·legi'),
+            TaskListInfo(id: 'doctor', name: 'Médico'),
+            TaskListInfo(id: 'food', name: 'Compras'),
+          ];
+        final container = ProviderContainer(overrides: [
+          apiClientProvider.overrideWith((ref) => OfflineApiClient()),
+          taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+          taskListStoreProvider.overrideWithValue(store),
+          invitationsProvider.overrideWith((ref) async => []),
+          themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+        ]);
+        await tester.pumpWidget(UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+                locale: Locale(language),
+                theme: dark ? AppTheme.dark : AppTheme.light,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: const TextScaler.linear(2)),
+                    child: child!),
+                home: const TaskListsScreen())));
+        await tester.pumpAndSettle();
+        final list = find.byType(Scrollable).first;
+        final search = find.widgetWithText(TextField, l10n.projectsFind);
+        Future<void> searchFor(String query) async {
+          await tester.drag(list, const Offset(0, 3000));
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(search, 200, scrollable: list);
+          await tester.enterText(search, query);
+          await tester.pumpAndSettle();
+        }
+
+        final reason = '$language dark=$dark';
+        await searchFor('collegi');
+        await tester.scrollUntilVisible(
+            find.widgetWithText(ListTile, 'Col·legi'), 180,
+            scrollable: list);
+        expect(find.widgetWithText(ListTile, 'Col·legi'), findsOneWidget,
+            reason: reason);
+        expect(find.widgetWithText(ListTile, 'Médico'), findsNothing);
+        expect(find.widgetWithText(ListTile, 'Compras'), findsNothing);
+
+        await searchFor('medico');
+        await tester.scrollUntilVisible(
+            find.widgetWithText(ListTile, 'Médico'), 180,
+            scrollable: list);
+        expect(find.widgetWithText(ListTile, 'Médico'), findsOneWidget,
+            reason: reason);
+        expect(find.widgetWithText(ListTile, 'Col·legi'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        container.dispose();
+      }
+    }
+  });
 }
 
 class _Lists extends TaskListStore {

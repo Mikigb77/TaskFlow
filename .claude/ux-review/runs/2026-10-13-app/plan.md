@@ -202,6 +202,7 @@ Severity 4 first, then 3, then 2. A package's prerequisites run before it, even 
 - **UX-406** (S2) the sun–moon is on 23 surfaces → only in Apariencia; the first run follows the phone.
 - **UX-120** (S2) "Diagnóstico de captura" for everyone → debug builds only; on staging, a long-press on the version line.
 - **UX-422** (S1) "Hora y región" opens "Idioma y región", with a second language picker and raw time-zone ids → fixed.
+- **UX-431** (S1; added after trial round 1) the time-zone search ignores accents, so once zones show as cities "Bogotá" finds nothing → it uses the app's accent-free search.
 
 ### P20 · Native labels, share messages and shortcut icons · A · M · after P35, P39 · changed
 - **UX-121** (S2; merged UX-128, UX-417) "Dicta" versus "Dictar", "…conserva las capturas pendientes" → "Dictar una tarea", "Toca para dictar una tarea."
@@ -233,6 +234,7 @@ Severity 4 first, then 3, then 2. A package's prerequisites run before it, even 
 - **UX-315** (S2) project pages hide others' tasks through the global "Para mí" → everything by default; the choice stays on that page.
 - **UX-219** (S2) an empty filter says "Un nuevo comienzo" → "No hay tareas que coincidan".
 - **UX-333** (S1) eyebrow labels and repeated headlines → removed.
+- **UX-429** (S2; added after trial round 1) the "Todos los proyectos" sheet leaves no room for the keyboard → it stays above the keyboard while you type.
 
 ### P25 · One meaning per bell; readable Activity · C · M · after P13, P15
 - **UX-407** (S2) the header bell opens Activity → a people icon, shown only with groups or shared projects.
@@ -245,6 +247,7 @@ Severity 4 first, then 3, then 2. A package's prerequisites run before it, even 
 - **UX-332** (S1) a colour choice to start a project → teal by default.
 - **UX-334** (S1) "black star", "Proyectos compartidos · Editor", counts that include done items → fixed.
 - **UX-338** (S1) choosing a group gives no hint → "Todos en Máster lo verán."
+- **UX-430** (S1; added after trial round 1) a search that matches no project shows blank space → "No se han encontrado proyectos".
 
 ### P27 · Groups: clear dialogs, errors and lists · C · L · after P13, P14
 - **UX-319** (S2) "Guardar" on every step and calendar error text → "Crear grupo", "Siguiente", real errors, titled role sheets.
@@ -313,3 +316,61 @@ UX-128, UX-207, UX-310, UX-410, UX-414 and UX-417: duplicates, merged as listed 
 
 ## Ledger
 `ISSUES.md` lists all 133 items: 124 open, each with its package; 3 waiting on a decision (U10, U13, UX-331); 6 duplicates under Won't fix. The 20 lines your answers unblocked moved from "Decision needed" to "Open", and the lines whose package changed now name the new one.
+
+## Round 2 (trial)
+
+Round 1 of the trial ran P11 and P28: UX-303, UX-412 and UX-413 are verified fixed, the round check passed, and no test failed. UX-421 is only partly fixed, and the two packages caused four small regressions, now UX-425 to UX-428.
+Round 2 fixes those regressions in two small packages, P45 and P46. What's left of UX-421 joins the two-tab decision, and nothing is escalated.
+
+The briefs are in `plan-trial-r2.json`.
+
+### UX-421 now waits on the two tabs (U13)
+- **Done in P28:** the tab labels are 12 sp.
+- **Left:** Catalan "Configuració" still doesn't fit its tab on a 320 dp phone with text at 1.3×. The reviewer measured 103.7 dp selected and 98.1 dp unselected, in an 80 dp tab; at 11 sp it was 93.6 dp.
+- **Why it isn't planned again:** four tabs can't hold the word. Renaming it isn't recommended either: it's Android's own Catalan word for Settings, and two Catalan messages send people there. Two tabs give each tab 160 dp.
+- **My mistake:** P28's device check asked for this fit, but the finding itself said only U13 clears it, and 12 sp makes the word wider.
+- **Where it is now:** under "Decision needed" in `ISSUES.md`, with U13, U10 and UX-331. The recommendation hasn't changed: run the §7 test after this run, then decide.
+
+### Packages, in run order
+
+#### P45 · Tab labels fit at 320 dp; tab icons match their screens · D · S · after P28
+- **UX-427** (S2; R1D-1) on phones under about 348 dp with text at 1.2× or more, the start tab reads "Calendari" with "o" on a second line → no inherited letter spacing, and under 360 dp the labels stop growing at 1.2× (14.4 px, no smaller than before P28). U13's two tabs remain the lasting fix.
+- **UX-428** (S1; R1D-2) the tabs now show a check box and a page, but Tareas and Notas still show the old list icons → the screens use the tabs' icons.
+
+#### P46 · Search keeps matching while you type; empty search does no work · C · S · after P11
+- **UX-425** (S1; R1C-1) typing "col·" shows "No hi ha tasques que coincideixin" for one keystroke → "·" and "ŀ" fold one letter at a time, and "col." searches as "col".
+- **UX-426** (S1; R1C-2) with nothing typed, every task change re-folds the text of every task and note → an empty search matches at once, without folding.
+
+### Seen in passing, added to the main batch
+Reviewer C noted three older problems that P11 didn't cause. Each is now in `ISSUES.md`, with a severity I set, and in the `plan.json` package that already edits its file:
+- **UX-429** (S2) → **P24:** the "Todos los proyectos" sheet is a fixed 70% of the screen and leaves no room for the keyboard; at 2× text the first match is already below the fold → the sheet stays above the keyboard. Inferred; it needs a phone.
+- **UX-430** (S1) → **P26:** a Proyectos search that matches nothing shows blank space → "No se han encontrado proyectos".
+- **UX-431** (S1) → **P18:** the time-zone search ignores accents, so once zones show as cities, "Bogotá" finds nothing → it uses the same search as the rest of the app.
+
+Say if you'd rather leave any of them out.
+
+### Escalated
+None: no finding has failed twice.
+
+## Round 3 (trial)
+
+Round 2 ran P45 and P46: the reviewer found UX-425, UX-426, UX-427 and UX-428 fixed (UX-426 and UX-427 still need their phone checks), the round check passed, and no test failed. P45 caused one small regression, now UX-432.
+Round 3 is one small package, P47, and nothing is escalated.
+
+The brief is in `plan-trial-r3.json`.
+
+### Packages, in run order
+
+#### P47 · Tab tooltips follow the phone's text size again · D · S · after P45
+- **UX-432** (S1; R2D-1) on phones narrower than 360 dp, long-pressing a tab to read its name bigger shows it at 16.8 px instead of up to 28 px at 2× text → only the label stops growing at 1.2×, and the tooltip follows the phone's text size again. The labels look exactly as they do now; U13's two tabs will remove this stopgap.
+
+### Seen in passing, added to the main batch
+The reviewers noted two older problems that round 2 didn't cause. Each is now in `ISSUES.md`, with the reviewer's severity, and in the `plan.json` package that already works on its file:
+- **UX-433** (S1) → **P23:** the line meant to separate the tab bar from the screen has never shown, because the bar paints over it; the only edge is a faint change of tint (1.07:1 in light, 1.11:1 in dark) → the line is drawn in front of the bar. The reviewer suggested pairing it with UX-432, but this round only re-plans what failed. Say if you'd rather have no line; then the unused border goes instead.
+- **UX-434** (S1) → **P16:** search treats ' and ’ as different, so "l'escola" doesn't find "l’escola", which an iPhone types → both count as the same. Whether saved text really carries ’ needs an iPhone to check.
+
+### Added to P35
+- The capture page's "Revisar nota" button still shows the old notes icon (`voice_task_screen.dart:953`), the last one UX-428 left behind; no package named it. P35, which replaces that page, now checks that it's gone, and that anything in the sheet that stands for a note uses the Notas tab's icon.
+
+### Escalated
+None: no finding has failed twice.

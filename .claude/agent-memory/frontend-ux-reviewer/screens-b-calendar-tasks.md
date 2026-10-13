@@ -29,7 +29,8 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
 - **A phone event** opens a sheet with "Abrir en la aplicación de calendario".
 
 ## Tareas tab (`screens/home_screen.dart`, isRoot)
-- An eyebrow label and a headline, then search.
+- An eyebrow label and a headline, then search (accent-insensitive, `matchesSearch`).
+- Empty state (shared with Bandeja and project pages) uses `check_box_outlined`, the Tareas tab icon.
 - **Filter chips:** Todas / Bandeja de entrada (no date) / Bandeja personal (no project) / Hoy / Prioridad alta.
 - **Icons:** the folder opens `/lists` (Projects); ✓ opens `/completedTasks`.
 - The same create buttons as Calendario.

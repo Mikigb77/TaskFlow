@@ -1,4 +1,5 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/services/text_search.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
@@ -128,7 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   if (widget.listId != null)
                     TextButton.icon(
-                      icon: const Icon(Icons.notes_rounded),
+                      icon: const Icon(Icons.description_outlined),
                       label: Text(context.l10n.notes),
                       onPressed: () => Navigator.push(
                         context,
@@ -140,7 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   TextField(
                     onChanged: (value) =>
-                        setState(() => _query = value.trim().toLowerCase()),
+                        setState(() => _query = value.trim()),
                     decoration: InputDecoration(
                       hintText: context.l10n.findTask,
                       prefixIcon: const Icon(Icons.search_rounded),
@@ -209,9 +210,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           (_filter == 2 && task.priority == 3) ||
                           (_filter == 1 &&
                               DateUtils.isSameDay(task.displayDate, now))) &&
-                      ('${task.title} ${task.notes ?? ''} ${task.labels.join(' ')} ${task.checklist.map((item) => item.title).join(' ')}')
-                          .toLowerCase()
-                          .contains(_query),
+                      matchesSearch(
+                        '${task.title} ${task.notes ?? ''} ${task.labels.join(' ')} ${task.checklist.map((item) => item.title).join(' ')}',
+                        _query,
+                      ),
                 )
                 .toList();
             if (filtered.isEmpty) {
@@ -228,7 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : widget.isRoot
                         ? context.l10n.tasksEmpty
                         : context.l10n.inboxEmpty,
-                    icon: Icons.checklist_rounded,
+                    icon: Icons.check_box_outlined,
                   ),
                 ],
               );

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/main.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
@@ -335,6 +337,167 @@ void main() {
     },
   );
 
+  testWidgets('UX-303: Tasks search finds accented tasks typed without accents', (
+    tester,
+  ) async {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final container = await _pump(tester);
+    final now = DateTime.now();
+    await container.read(taskProvider.notifier).addTasks([
+      Task(
+        title: 'Llamar al Médico',
+        dueDate: DateTime(now.year, now.month, now.day, 16),
+        priority: 1,
+      ),
+      Task(
+        title: 'Reunión con José',
+        dueDate: DateTime(now.year, now.month, now.day, 17),
+        priority: 1,
+      ),
+    ]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.tasks));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'medico');
+    await tester.pumpAndSettle();
+    expect(find.text('Llamar al Médico'), findsOneWidget);
+    expect(find.text('Reunión con José'), findsNothing);
+    expect(find.text('Doctor appointment'), findsNothing);
+    expect(find.text(l10n.noMatches), findsNothing);
+    await tester.enterText(find.byType(TextField), 'reunion con jose');
+    await tester.pumpAndSettle();
+    expect(find.text('Reunión con José'), findsOneWidget);
+    expect(find.text('Llamar al Médico'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'dentista');
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.noMatches), findsOneWidget);
+  });
+
+  testWidgets(
+    'UX-412: text-field outlines reach 3:1 against the field and the page in both themes',
+    (tester) async {
+      final container = await _pump(tester);
+      await tester.tap(find.text('Tasks'));
+      await tester.pumpAndSettle();
+      for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+        await setAppearance(container, mode);
+        await tester.pumpAndSettle();
+        final field = find.byType(TextField).first;
+        final theme = Theme.of(tester.element(field));
+        final decoration = tester
+            .widget<InputDecorator>(
+              find.descendant(of: field, matching: find.byType(InputDecorator)),
+            )
+            .decoration;
+        final border = decoration.enabledBorder!.borderSide.color;
+        expect(border, theme.colorScheme.outline, reason: '$mode');
+        final fill = decoration.filled == true
+            ? decoration.fillColor!
+            : theme.colorScheme.surface;
+        expect(
+          _contrast(border, fill),
+          greaterThanOrEqualTo(3),
+          reason: '$mode border on the field fill',
+        );
+        expect(
+          _contrast(border, theme.scaffoldBackgroundColor),
+          greaterThanOrEqualTo(3),
+          reason: '$mode border on the page',
+        );
+        expect(
+          _contrast(border, theme.colorScheme.surface),
+          greaterThanOrEqualTo(3),
+          reason: '$mode border on a card',
+        );
+      }
+    },
+  );
+
+  testWidgets(
+    'UX-413 / UX-421: the selected tab label is bolder and darker, 12 sp, in both themes',
+    (tester) async {
+      final container = await _pump(tester);
+      final bar = find.byType(NavigationBar);
+      TextStyle label(String text) => tester
+          .widget<Text>(
+            find.descendant(of: bar, matching: find.text(text)).first,
+          )
+          .style!;
+      for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+        await setAppearance(container, mode);
+        await tester.pumpAndSettle();
+        final scheme = Theme.of(tester.element(bar)).colorScheme;
+        for (final (selected, other) in [
+          ('Calendar', 'Tasks'),
+          ('Tasks', 'Calendar'),
+        ]) {
+          await tester.tap(find.descendant(of: bar, matching: find.text(selected)));
+          await tester.pumpAndSettle();
+          final on = label(selected);
+          final off = label(other);
+          final reason = '$mode, $selected selected';
+          expect(on.fontWeight, FontWeight.w800, reason: reason);
+          expect(off.fontWeight, FontWeight.w500, reason: reason);
+          expect(on.color, scheme.onSurface, reason: reason);
+          expect(off.color, scheme.onSurfaceVariant, reason: reason);
+          expect(on.fontSize, 12, reason: reason);
+          expect(off.fontSize, 12, reason: reason);
+          for (final style in [on, off]) {
+            expect(
+              _contrast(style.color!, scheme.surface),
+              greaterThanOrEqualTo(4.5),
+              reason: '$reason: label text contrast',
+            );
+          }
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'UX-413: every tab swaps to a different icon when selected',
+    (tester) async {
+      await _pump(tester);
+      final bar = find.byType(NavigationBar);
+      final destinations = tester
+          .widgetList<NavigationDestination>(
+            find.descendant(of: bar, matching: find.byType(NavigationDestination)),
+          )
+          .toList();
+      expect(destinations, hasLength(4));
+      for (final destination in destinations) {
+        final icon = (destination.icon as Icon).icon;
+        final selectedIcon = (destination.selectedIcon as Icon).icon;
+        expect(selectedIcon, isNot(icon), reason: destination.label);
+        await tester.tap(
+          find.descendant(of: bar, matching: find.text(destination.label)),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: find.widgetWithText(NavigationDestination, destination.label),
+            matching: find.byIcon(selectedIcon!),
+          ),
+          findsOneWidget,
+          reason: '${destination.label} selected',
+        );
+        for (final other in destinations.where((d) => d != destination)) {
+          expect(
+            find.descendant(
+              of: find.widgetWithText(NavigationDestination, other.label),
+              matching: find.byIcon((other.selectedIcon as Icon).icon!),
+            ),
+            findsNothing,
+            reason: '${other.label} while ${destination.label} is selected',
+          );
+        }
+      }
+      await tester.tap(find.descendant(of: bar, matching: find.text('Calendar')));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final size in [
     const Size(360, 800),
     const Size(320, 568),
@@ -387,4 +550,10 @@ class _DelayedStore extends MemoryThemeStore {
   final pending = Completer<String?>();
   @override
   Future<String?> read() => pending.future;
+}
+
+double _contrast(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  return (la > lb ? la + 0.05 : lb + 0.05) / (la > lb ? lb + 0.05 : la + 0.05);
 }

@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Fifteen problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text...), as a checklist to run first on any screen
+description: Seventeen problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -72,13 +72,22 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
 13. **Key content falls off-screen at 1.3–2× text.**
     - Today's tasks; the live words while listening; the capture and sign-up error banners.
     - At 2× and 320 dp, labels break mid-word: the theme tiles, "Proyectos" next to "Grupos", the Catalan tab label.
+    - Making a label bigger or bolder (P28: tab labels 11 → 12 sp, w800) broke Spanish "Calendario" at < 348 dp. Any size, weight or letter-spacing change to a fixed-width label needs a 320 dp, 1.3×/2×, es+ca width check.
+    - Fixes for large text can cap it somewhere else: a MediaQuery clamp also capped the tab tooltips (R2D-1).
 14. **Colour or faint contrast carries meaning alone.**
     - An overdue deadline only turns red. The calendar dots differ only by colour. Unread shows only as a 16 px icon.
     - The disabled project chip is at about 38%.
-    - Field borders are 1.28:1; the selected-tab pill is 1.20:1.
+    - Field borders (was 1.28:1) and tab state (was pill-only) were fixed on 2026-10-13; check new components don't reintroduce `outlineVariant` as the only boundary.
 15. **Words get in the way where the user has to act.**
     - Slogans instead of mode names on the login screen.
     - Eyebrow labels ("TU PRÓXIMO PASO", "A TU GUSTO") and headlines that repeat the app bar.
     - Permanent help paragraphs: Notes, the timeline, "Más detalles", the 73-word invite dialog, about 135 words in Notificaciones.
 
-Related: [[ui-patterns]].
+16. **Text matching that rewrites pairs breaks search-as-you-type.**
+    - P11 folded `l·l` → `ll`, so the half-typed `col·` matched nothing for one keystroke (UX-425).
+    - Fold one character at a time and test every prefix. Watch for the same with apostrophes (`'`/`’`) and any future normalisation.
+17. **Work hidden behind tabs runs on every change.**
+    - IndexedStack keeps Tareas and Notas built; their filters re-run on every task change anywhere (UX-426).
+    - Any new per-item cost in a root tab's build is paid on every save in the app.
+
+Related: [[ui-patterns]], [[review-techniques]].

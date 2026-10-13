@@ -2,6 +2,7 @@ import 'package:agenda/models/task_list_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/services/text_search.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
@@ -59,7 +60,7 @@ class ProjectScopeControl extends ConsumerWidget {
                                 prefixIcon: const Icon(Icons.search),
                               ),
                               onChanged: (s) =>
-                                  change(() => query = s.trim().toLowerCase()),
+                                  change(() => query = s.trim()),
                             ),
                           ),
                           Expanded(
@@ -133,7 +134,7 @@ Iterable<Widget> _projectChoices(
       .where(
         (p) =>
             !p.inactive &&
-            '${p.name} ${p.groupName ?? ''}'.toLowerCase().contains(query),
+            matchesSearch('${p.name} ${p.groupName ?? ''}', query),
       )
       .toList();
   if (matching.isEmpty && query.isNotEmpty) {

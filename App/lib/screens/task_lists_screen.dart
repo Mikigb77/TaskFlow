@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/services/text_search.dart';
 import 'package:agenda/models/task_group.dart';
 import 'package:agenda/providers/groups_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
@@ -338,7 +339,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                     prefixIcon: const Icon(Icons.search),
                   ),
                   onChanged: (value) =>
-                      setState(() => _query = value.trim().toLowerCase()),
+                      setState(() => _query = value.trim()),
                 ),
                 const SizedBox(height: 12),
                 const GroupInvitations(),
@@ -362,9 +363,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                 for (final list in lists.where(
                   (p) =>
                       (widget.groupId == null || p.groupId == widget.groupId) &&
-                      '${p.name} ${p.groupName ?? ''}'.toLowerCase().contains(
-                        _query,
-                      ),
+                      matchesSearch('${p.name} ${p.groupName ?? ''}', _query),
                 )) ...[
                   ListTile(
                     contentPadding: EdgeInsets.zero,

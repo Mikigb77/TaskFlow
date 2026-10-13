@@ -8,7 +8,9 @@ import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/review_tasks_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
+import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
 import 'package:flutter/material.dart';
@@ -151,6 +153,142 @@ void main() {
     expect(find.textContaining('View-only note'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets(
+      'UX-303 / UX-425: searching medico, collegi or a half-typed col· lists the note (2x text, 320 dp, both themes, es/ca/en)',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    for (final language in ['es', 'ca', 'en']) {
+      for (final dark in [false, true]) {
+        final l10n = lookupAppLocalizations(Locale(language));
+        final container = ProviderContainer(overrides: [
+          taskProvider.overrideWith((ref) => _AccentNotes()),
+          taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          taskListsProvider.overrideWith((ref) async => []),
+          pendingCapturesProvider.overrideWith((ref) async => []),
+          attachmentEntriesProvider.overrideWith((ref, id) async => []),
+          themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+        ]);
+        await tester.pumpWidget(app(container, const NotesScreen(),
+            dark: dark, language: language));
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('note-search'));
+        final list = find.byType(Scrollable).first;
+        Future<void> searchFor(String query) async {
+          // Back to the top, then down to the search field.
+          await tester.drag(list, const Offset(0, 3000));
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(search, 200, scrollable: list);
+          await tester.enterText(search, query);
+          await tester.pumpAndSettle();
+        }
+
+        await searchFor('medico');
+        await tester.scrollUntilVisible(find.text('Médico'), 180,
+            scrollable: list);
+        expect(find.text('Médico'), findsOneWidget,
+            reason: '$language dark=$dark');
+        expect(find.text('Comprar pan'), findsNothing);
+        expect(find.text(l10n.noMatches), findsNothing);
+
+        await searchFor('collegi');
+        await tester.scrollUntilVisible(find.text('Reunió al col·legi'), 180,
+            scrollable: list);
+        expect(find.text('Reunió al col·legi'), findsOneWidget);
+        expect(find.text('Médico'), findsNothing);
+
+        // UX-425: one keystroke into `col·legi` the query is `col·`; the
+        // note must stay listed while the user looks for the next key.
+        await searchFor('col·');
+        expect(find.text(l10n.noMatches), findsNothing,
+            reason: '$language dark=$dark: `col·` says nothing matches');
+        await tester.scrollUntilVisible(find.text('Reunió al col·legi'), 180,
+            scrollable: list);
+        expect(find.text('Reunió al col·legi'), findsOneWidget,
+            reason: '$language dark=$dark: `col·`');
+        expect(find.text('Médico'), findsNothing);
+
+        await searchFor('dentista');
+        await tester.scrollUntilVisible(find.text(l10n.noMatches), 180,
+            scrollable: list);
+        expect(find.text(l10n.noMatches), findsOneWidget);
+        expect(find.text('Médico'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        container.dispose();
+      }
+    }
+  });
+
+  for (final language in ['es', 'en']) {
+    testWidgets(
+        'UX-428: Notas uses the Notas tab’s description_outlined icon for its empty state and every note row ($language)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final l10n = lookupAppLocalizations(Locale(language));
+      ProviderContainer notes(TaskNotifier Function() tasks) =>
+          ProviderContainer(overrides: [
+            taskProvider.overrideWith((ref) => tasks()),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+            taskListsProvider.overrideWith((ref) async => []),
+            pendingCapturesProvider.overrideWith((ref) async => []),
+            attachmentEntriesProvider.overrideWith((ref, id) async => []),
+            themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+          ]);
+
+      final empty = notes(_NoNotes.new);
+      await tester.pumpWidget(
+          app(empty, const NotesScreen(), language: language));
+      await tester.pumpAndSettle();
+      expect(find.text(l10n.notesEmpty), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byType(EmptyState),
+              matching: find.byIcon(Icons.description_outlined)),
+          findsOneWidget);
+      expect(find.byIcon(Icons.notes_rounded), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      empty.dispose();
+
+      final full = notes(_AccentNotes.new);
+      await tester.pumpWidget(
+          app(full, const NotesScreen(), language: language));
+      await tester.pumpAndSettle();
+      for (final title in ['Médico', 'Reunió al col·legi', 'Comprar pan']) {
+        final row = find.ancestor(
+            of: find.text(title), matching: find.byType(ListTile));
+        expect(row, findsOneWidget, reason: title);
+        expect(tester.widget<ListTile>(row).leading, isA<Icon>());
+        expect((tester.widget<ListTile>(row).leading! as Icon).icon,
+            Icons.description_outlined,
+            reason: title);
+      }
+      expect(find.byIcon(Icons.notes_rounded), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      full.dispose();
+    });
+  }
+}
+
+class _NoNotes extends DesignTaskNotifier {
+  @override
+  Future<void> loadTasks() async {
+    state = const AsyncData(<Task>[]);
+  }
+}
+
+class _AccentNotes extends DesignTaskNotifier {
+  @override
+  Future<void> loadTasks() async {
+    state = AsyncData([
+      Task(id: 1, kind: 'note', title: 'Médico', priority: 1,
+          notes: 'Análisis de sangre'),
+      Task(id: 2, kind: 'note', title: 'Reunió al col·legi', priority: 1),
+      Task(id: 3, kind: 'note', title: 'Comprar pan', priority: 1),
+    ]);
+  }
 }
 
 class _Viewer extends DesignTaskNotifier {

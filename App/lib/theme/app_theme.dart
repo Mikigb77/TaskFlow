@@ -87,7 +87,7 @@ abstract final class AppTheme {
             borderSide: BorderSide(color: scheme.outlineVariant)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: scheme.outlineVariant)),
+            borderSide: BorderSide(color: scheme.outline)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide(color: scheme.primary, width: 2)),
@@ -119,11 +119,15 @@ abstract final class AppTheme {
           height: 72,
           backgroundColor: scheme.surface,
           indicatorColor: scheme.primaryContainer,
-          labelTextStyle: WidgetStatePropertyAll(TextStyle(
-              fontFamily: 'Manrope',
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface))),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+                fontFamily: 'Manrope',
+                fontSize: 12,
+                letterSpacing: 0,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                color: selected ? scheme.onSurface : scheme.onSurfaceVariant);
+          })),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,

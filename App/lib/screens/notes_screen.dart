@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/services/text_search.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -62,7 +63,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               TextField(
                   key: const ValueKey('note-search'),
                   onChanged: (value) =>
-                      setState(() => _query = value.trim().toLowerCase()),
+                      setState(() => _query = value.trim()),
                   decoration: InputDecoration(
                       hintText: context.l10n.findNote,
                       prefixIcon: const Icon(Icons.search_rounded))),
@@ -94,9 +95,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         .where((item) =>
                             item.isNote &&
                             (_listId == null || item.listId == _listId) &&
-                            '${item.title} ${item.notes ?? ''} ${item.labels.join(' ')} ${item.checklist.map((step) => step.title).join(' ')}'
-                                .toLowerCase()
-                                .contains(_query))
+                            matchesSearch(
+                                '${item.title} ${item.notes ?? ''} ${item.labels.join(' ')} ${item.checklist.map((step) => step.title).join(' ')}',
+                                _query))
                         .toList();
                     if (notes.isEmpty) {
                       return <Widget>[
@@ -107,7 +108,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                             message: _query.isEmpty
                                 ? context.l10n.notesEmptyHelp
                                 : context.l10n.differentFilter,
-                            icon: Icons.notes_rounded)
+                            icon: Icons.description_outlined)
                       ];
                     }
                     return notes
@@ -166,7 +167,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           child: ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              leading: const Icon(Icons.notes_rounded),
+              leading: const Icon(Icons.description_outlined),
               title: Text(note.title,
                   maxLines: 3, overflow: TextOverflow.ellipsis),
               subtitle: Column(

@@ -1,6 +1,6 @@
 ---
 name: ui-patterns
-description: How TaskFlow's UI actually behaves as of 2026-10-13 (snackbars/undo, date sheets, task forms, error text, naming, project scope, capture, reminders, header/theme), with the stale "one shared sheet" and "one shared editor" claims corrected
+description: How TaskFlow's UI actually behaves as of 2026-10-13 (snackbars/undo, date sheets, task forms, error text, naming, project scope, capture, reminders, search, tabs/icons/theme), with the stale "one shared sheet" and "one shared editor" claims corrected
 metadata:
   type: project
 ---
@@ -80,13 +80,28 @@ What the app does today, so a consistency finding can name the standard and the 
 - The reminder chip (`widgets/reminder_control.dart`) leads with the timing and ends with the real state ("… · desactivado en el dispositivo"). It checks only the in-app switch, not the OS permission.
 - **Notification actions:** Completar and Posponer 10 min. Tapping opens the task, or pushes a second MainShell if the task is gone.
 
+## Search
+- **The standard (P11/P46, 2026-10-13):** every search over tasks, notes and projects calls `matchesSearch` in `services/text_search.dart`. Callers: Tareas/project pages (`home_screen.dart`), Notas, Proyectos (`task_lists_screen.dart`), the "Todos los proyectos" sheet (`project_scope_control.dart`). Fields pass the trimmed query.
+  - Ignores case and accents on both sides; folds one character at a time (`·` → nothing, `ŀ` → l, `l.l` → ll, trailing `l.` searches as `l`), so every prefix of a word matches.
+  - An empty query returns true before folding anything.
+- **Departures:** the time-zone list (`regional_settings_screen.dart`) still uses plain lowercase. `'` and `’` are not folded together (iOS smart quotes; the date parser does treat them as one).
+- **No-match states:** Tareas, Notas and the sheet show a message; Proyectos shows blank space.
+- Search never crosses between tasks and notes.
+- Tareas and Notas stay built behind the other tabs (IndexedStack in `main_shell.dart`) and watch the task list, so any per-item work in their filters runs on every save made anywhere.
+
 ## Header, tabs and theme
 - `CustomAppBar.showAppearance` defaults to true, so the sun–moon toggle appears on about 23 surfaces.
 - Every root tab shows a bell (it opens Activity), the moon, and the avatar (it opens Account).
-- **Tabs:** Calendario, Tareas, Notas, Ajustes.
-  - Tareas and Ajustes show the same icon selected and unselected.
-  - Labels are 11 sp, and Flutter caps their scaling at 1.3×.
-- **Contrast:** text-field borders use `outlineVariant` (1.28:1 in light). Otherwise the palette's text contrast is fine in both themes.
+- **Tabs (after P28/P45/P47):** Calendario, Tareas, Notas, Ajustes, each outlined when unselected and filled when selected: `calendar_month`, `check_box`, `description`, `settings`.
+  - Labels (`theme/app_theme.dart`): 12 sp, `letterSpacing: 0`; selected w800 `onSurface`, unselected w500 `onSurfaceVariant`. State is carried by weight + filled icon, not the pill (dark pill 1.41:1).
+  - Bar is a fixed 72 dp; Flutter caps labels at 1.3× and long single words wrap mid-word.
+  - Below 360 dp, `main_shell.dart` passes `NavigationBar.labelTextStyle` with a reduced fontSize so labels draw at ≤ 1.2× (14.4 px). Stopgap until U13. `_labelFontSize = 12` there mirrors the theme's 12 sp — they must move together.
+  - Long-press tooltips follow the phone's text size (14 sp, 28 px at 2×).
+  - Catalan "Configuració" still wraps at 320 dp; only U13's two tabs fix it.
+  - The `outlineVariant` hairline above the bar is painted behind the opaque bar, so it never shows; the edge is only a tint change.
+- **Rule to enforce:** never shrink text by wrapping a NavigationBar (or anything with tooltips/menus) in a MediaQuery — OverlayPortal content inherits it. Shrink the style instead.
+- **One icon per concept:** Tareas = `check_box(_outlined)` (tab and the Tareas/Bandeja/project empty state); Notas = `description(_outlined)` (tab, Notas empty state, note rows, a project page's Notas button). Tasks complete with a round Checkbox, steps with square ones. `notes_rounded` remains at `voice_task_screen.dart` ("Revisar nota", should become `description_outlined`) and `captures_screen.dart` (means "typed, no audio" — fine).
+- **Contrast:** enabled text-field borders now use `outline` (3.79:1 light, 4.85:1 dark on the field fill). Disabled/error/focus borders are M3 defaults. Text contrast is fine in both themes.
 - Pushed screens repeat the app-bar title as a headline, with an uppercase eyebrow label above it.
 
 Related: [[recurring-problems]], [[screens-b-calendar-tasks]], [[decisions-in-docs]].

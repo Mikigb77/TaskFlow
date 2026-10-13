@@ -13,9 +13,9 @@ Current as of 2026-10-13 (whole-app run, slice C). Paths are under `App/lib/`.
 ## Projects
 - **The two doors to Projects:**
   - the unlabelled folder icon on the Tareas tab → `/lists`;
-  - "Manage projects", the last row of the "Todos los proyectos" sheet.
+  - "Manage projects", the last row of the "Todos los proyectos" sheet. That sheet (`widgets/project_scope_control.dart`) is a fixed 70% of screen height with a search field and no keyboard inset: at 2× text on 320×568 the first match is below the fold.
 - **`/lists`** (`screens/task_lists_screen.dart`, titled "Projects", plus a repeated headline and a help line):
-  - a Groups button; search, shown even with 0 projects; pending invitations; a refresh button;
+  - a Groups button; search, shown even with 0 projects (a query matching nothing shows blank space, no message); pending invitations; a refresh button;
   - project rows: ★ marks a pinned one, and each row has a ⋮ menu with
     - pin;
     - updates (shared projects only);
@@ -79,7 +79,8 @@ Current as of 2026-10-13 (whole-app run, slice C). Paths are under `App/lib/`.
   - a read-only body, with links as buttons;
   - no bottom bar.
 - **Note editor** = TaskEditor(kind: note).
-- **Search everywhere** lowercases but doesn't ignore accents, and never crosses between tasks and notes.
+- **Search everywhere** ignores case and accents since P11/P46 (see [[ui-patterns]] › Search), but still never crosses between tasks and notes.
+- **Note icon** is `description_outlined` on rows and the empty state (matches the Notas tab).
 
 ## Baselines (2026-10-13)
 - **Tareas tab, new account:** 18 tap targets, ~17 concepts, 56 words in Spanish.
