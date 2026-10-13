@@ -43,6 +43,7 @@ const REVIEWED = {
     reportPath: { type: 'string', description: 'The report you wrote, relative to the repo root' },
     verdict: { type: 'string', description: 'Your verdict line' },
     counts: COUNTS,
+    reportText: { type: 'string', description: 'Only if writing the report file was refused: the full report' },
   },
   required: ['reportPath', 'verdict', 'counts'],
 }
@@ -110,7 +111,7 @@ function reviewPrompt(s) {
     'The previews were rendered just before this run. Read them; do not run Flutter.',
     `Number new findings from UX-${s.idStart} upward. Anything already in .claude/ux-review/ISSUES.md keeps its ID and is not reported as new.`,
     'Another step records memory: skip the memory update and end your report with a "Memory notes" section.',
-    `Write your full report to ${a.runDir}/review-${s.key}.md, then return the structured result.`,
+    `Write your full report to ${a.runDir}/review-${s.key}.md, then return the structured result. If writing the file is refused, put the full report in "reportText" instead.`,
   )
   return lines.join('\n')
 }
@@ -125,7 +126,7 @@ if (!given.length) {
       label: `review ${s.key} · ${s.name}`,
       phase: 'Review',
       schema: REVIEWED,
-    })
+    }).then(r => r && { ...r, key: s.key })
   ))
   reports = results.filter(Boolean)
   const missing = slices.filter((s, i) => !results[i]).map(s => s.key)
@@ -142,13 +143,18 @@ phase('Organize')
 const organize = [
   `Mode: plan. UX loop run ${a.runId}: ${SCOPE[a.mode]} (${a.mode}). Today is ${a.date}. Run folder: ${a.runDir}.`,
   'Reviewer reports:',
-  ...reports.map(r => `- ${r.reportPath} (${r.verdict})`),
+  ...reports.map(r => (r.reportText
+    ? `- area ${r.key}: not saved as a file; its full text is at the end of this message (${r.verdict})`
+    : `- ${r.reportPath} (${r.verdict})`)),
   a.mode === 'app'
     ? 'Whole-app run: the owner approves your plan before anything is fixed, so make plan.md easy to approve or strike from, decisions first.'
     : 'Scoped run: your plan goes straight to the implementers. Keep packages tight.',
 ]
 if (a.notes) organize.push(`From the owner, this session: ${a.notes}`)
 organize.push(`Write ${a.runDir}/plan.json and ${a.runDir}/plan.md, update .claude/ux-review/ISSUES.md, then return the structured result.`)
+for (const r of reports.filter(x => x.reportText)) {
+  organize.push('', `===== Report for area ${r.key} =====`, r.reportText)
+}
 
 const plan = await agent(organize.join('\n'), {
   agentType: 'ux-organizer',
@@ -159,4 +165,15 @@ const plan = await agent(organize.join('\n'), {
 if (!plan) throw new Error('The organizer did not return a plan.')
 log(`Plan: ${plan.counts.fix} to fix in ${plan.packages.length} package(s), ${plan.counts.decide} for the owner, ${plan.counts.skip} skipped.`)
 
-return { runId: a.runId, runDir: a.runDir, mode: a.mode, reports, plan }
+// Reports a reviewer couldn't save: the main session writes them to the run folder.
+const inlineReports = reports
+  .filter(r => r.reportText)
+  .map(r => ({ path: `${a.runDir}/review-${r.key}.md`, text: r.reportText }))
+return {
+  runId: a.runId,
+  runDir: a.runDir,
+  mode: a.mode,
+  reports: reports.map(r => ({ key: r.key, reportPath: r.reportPath, verdict: r.verdict, counts: r.counts })),
+  inlineReports,
+  plan,
+}

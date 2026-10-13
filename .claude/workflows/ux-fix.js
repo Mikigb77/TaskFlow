@@ -155,13 +155,13 @@ const REPLANNED = {
 const CLOSED = {
   type: 'object',
   properties: {
-    reportPath: { type: 'string' },
-    verdict: { type: 'string' },
+    verdict: { type: 'string', description: 'One or two sentences' },
+    report: { type: 'string', description: 'The full run report in Markdown. Return it here; the main session saves it, because subagents may not write report files.' },
     verified: { type: 'array', items: { type: 'string' } },
     open: { type: 'array', items: MISSED },
     deviceChecks: { type: 'array', items: { type: 'string' } },
   },
-  required: ['reportPath', 'verdict', 'verified', 'open', 'deviceChecks'],
+  required: ['verdict', 'report', 'verified', 'open', 'deviceChecks'],
 }
 
 function packageLine(r) {
@@ -182,6 +182,7 @@ function implementPrompt(p, round, planFile) {
     `The findings themselves are in the review reports in ${a.runDir}/ (search for their IDs).`,
     'Earlier packages in this run may already have changed the code; build on their work.',
     'Test files listed in the package are for ux-tester, who writes the acceptance tests after you. Only update existing tests your change breaks.',
+    'If you change Kotlin, Gradle, the manifest or Android resources, compile with: flutter build apk --debug --no-pub --target-platform android-x64 (from App/; build only, never install). The analyzer and tests do not compile native code.',
   )
   if (a.notes) lines.push(`From the owner, this session: ${a.notes}`)
   lines.push('Return the structured result.')
@@ -196,6 +197,9 @@ function testPrompt(round, impl, files) {
     `Files changed this round: ${files.length ? files.join(', ') : 'none reported'}.`,
     `Acceptance checks are in each package's plan file; the findings are in the review reports in ${a.runDir}/; the top-level "conventions" in ${a.runDir}/plan.json apply too.`,
     'Parts of a package marked "waits on D#" were left out on purpose; do not test them.',
+    files.some(f => /[\\/]android[\\/]/.test(f))
+      ? 'Android files changed this round: include the compile check, flutter build apk --debug --no-pub --target-platform android-x64 (build only, never install). A broken native build fails the round.'
+      : 'No Android files changed this round, so no native build is needed.',
     'Return the structured result.',
   ].join('\n')
 }
@@ -263,7 +267,7 @@ function closePrompt(rounds, escalated, files) {
     `Escalated: ${escalated.length ? escalated.map(e => `${e.id} (${e.reason})`).join('; ') : 'none'}.`,
     `Files changed: ${ids(files)}.`,
     'A finding counts as verified only if the last round that checked it said "fixed" and no test for it failed. Note which verified findings are locked by a test. Phone checks stay listed for the owner.',
-    `Update .claude/ux-review/ISSUES.md, write ${reportName} in the run folder${batch ? ` (this batch: ${batch})` : ''}, then return the structured result.`,
+    `Update .claude/ux-review/ISSUES.md, then return the structured result with the full report in "report". Don't write a report file yourself; the main session saves it as ${a.runDir}/${reportName}${batch ? ` (this batch: ${batch})` : ''}.`,
   ].join('\n')
 }
 
@@ -391,7 +395,8 @@ const close = await agent(closePrompt(rounds, escalated, [...changedAll]), {
 await agent(
   [
     `Mode: memory. UX loop run ${a.runId} just finished.`,
-    `Read ${a.runDir}/${reportName} and the verify-${tag}*.md files in ${a.runDir}, and update your memory with what is worth keeping: patterns the app now follows, changes to the screen map, recurring problem types.`,
+    `Read the verify-${tag}*.md files in ${a.runDir} and the run summary below, and update your memory with what is worth keeping: patterns the app now follows, changes to the screen map, recurring problem types.`,
+    `Run summary: ${close ? close.verdict : 'not available'}`,
     'Issue statuses and owner decisions already live in .claude/ux-review/; do not copy them.',
   ].join('\n'),
   { agentType: 'frontend-ux-reviewer', label: 'record reviewer memory', phase: 'Record', effort: 'medium' },
@@ -400,6 +405,7 @@ await agent(
 return {
   runId: a.runId,
   runDir: a.runDir,
+  reportName,
   rounds: rounds.length,
   testsPassed: tested ? tested.passed : false,
   filesChanged: [...changedAll].sort(),

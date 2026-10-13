@@ -87,6 +87,7 @@ Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/wo
 ```
 
 When it returns:
+- **`inlineReports` isn't empty:** a reviewer wasn't allowed to save its report. Write each `text` to its `path`.
 - **`plan` is null** (no findings): run `bash .claude/ux-review/ux.sh save`, tell the owner, and stop.
 - **app mode:**
   1. Run `bash .claude/ux-review/ux.sh save`.
@@ -106,6 +107,7 @@ When it returns:
 1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the round's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
 2. **Run the workflow.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, skip, only, batch, notes }`. Set `batch` (for example `trial`, then `main`) when a plan runs in several batches, so each batch keeps its own report and verify files. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
 3. **When it returns:**
+   - **Save the report.** Write `close.report` to `<runDir>/<reportName>`. Subagents may not write report files, so the organizer returns the text.
    - **`testsPassed` is true:** commit the round.
      - Stage it: `git add -- <filesChanged> .claude/ux-review .claude/agent-memory`.
      - Subject: `UX loop <run id>: <n> fixes verified`.
@@ -115,6 +117,18 @@ When it returns:
    - Either way, run `bash .claude/ux-review/ux.sh save` afterwards.
 
 Never push. Never commit on `main`. Never skip hooks.
+
+### Big plans run in batches
+
+A plan with more than about 6 packages runs in batches of about 5, in plan order.
+- Each batch is one `ux-fix` run, with `only` set to the batch's packages and `batch` set to `b1`, `b2`, and so on.
+- After each batch: save its report, commit, run `ux.sh save`, then start the next batch.
+- Don't wait for the owner between batches.
+- Stop and tell the owner if a batch's tests fail, or if it escalates more than two findings.
+
+Batching keeps each tester and verifier focused on a handful of packages. It catches regressions while they're still small, and it gives one commit per batch.
+
+The first real `ux-fix` run (2026-10-13, 2 small packages, 3 rounds) took about 110 minutes and 1.9M tokens. Expect a batch of 5 to take a few hours.
 
 ## 7. Tell the owner
 

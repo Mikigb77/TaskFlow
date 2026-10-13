@@ -102,7 +102,7 @@ Input: everything from the fix run: rounds, implementer results, test results, v
    - `open` (why);
    - `escalated` (what was tried);
    - `device-check` (verified in code; the check still needs a phone).
-2. Write `<run>/report.md`:
+2. Return the run report as text, in your structured result. Don't write the file yourself: subagents may not write report files, so the main session saves it under the name the delegation gives. The report contains:
    - a verdict line;
    - what was verified, by ID and title;
    - what's still open and why;

@@ -47,13 +47,14 @@ Run all of these from `App/`:
 2. `flutter analyze --no-pub`. Introduce no new issues.
 3. `flutter test --no-pub test/<file>_test.dart` for the tests that cover what you touched. They must pass.
 4. If a preview test covers a screen you touched, re-run that preview. The commands are in CLAUDE.md. Sign-in PNGs land in `App/artifacts/auth/`; all others land in `App/build/`.
+5. If you changed Kotlin, Gradle, the manifest or Android resources, compile with `flutter build apk --debug --no-pub --target-platform android-x64`. The analyzer and the tests don't compile native code. Only build: never install it.
 
 Fix whatever fails. If something fails for a reason outside your package, report it rather than fixing unrelated code.
 
 # Never
 
 - Commit, stage, stash, reset, check out, or change git state in any other way. The main session commits verified rounds.
-- Run `flutter drive` or `adb`, start an emulator, touch a device, or build or install an APK.
+- Run `flutter drive` or `adb`, start an emulator, touch a device, or install an APK. A debug build to compile native changes is fine.
 - Change `Backend/`. If a fix needs the server, do the app side and report the server side.
 - Print, copy or log secrets: `Backend/.env`, `App/config/`.
 - Touch files outside the package, unless the change can't work without it. If you have to, list them.

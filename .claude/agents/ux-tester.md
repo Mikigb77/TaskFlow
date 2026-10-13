@@ -41,6 +41,7 @@ From `App/`:
 3. Your new tests.
 4. The whole `flutter test --no-pub`.
 5. The three preview commands in CLAUDE.md. Sign-in PNGs land in `App/artifacts/auth/`; the others in `App/build/`.
+6. If any file under `App/android/` changed this round, `flutter build apk --debug --no-pub --target-platform android-x64`, as a compile check only. A broken native build fails the round.
 
 Compare the failures with `.claude/ux-review/KNOWN_FAILURES.md`. Failures listed there don't count.
 
@@ -56,7 +57,7 @@ Compare the failures with `.claude/ux-review/KNOWN_FAILURES.md`. Failures listed
 
 - Edit anything outside `App/test/`, apart from removing a fixed entry from `KNOWN_FAILURES.md`.
 - Change git state.
-- Run `flutter drive` or `adb`, start an emulator, touch a device, or build or install an APK.
+- Run `flutter drive` or `adb`, start an emulator, touch a device, or install an APK. Step 6's compile check is the only build.
 - Change `Backend/`, or print secrets.
 - Mark a check passed without a test or a render that shows it.
 
