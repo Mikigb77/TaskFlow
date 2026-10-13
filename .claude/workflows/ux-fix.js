@@ -188,8 +188,8 @@ function implementPrompt(p, round, planFile) {
   ]
   if (Array.isArray(p.dependsOn) && p.dependsOn.length) lines.push(`It builds on ${p.dependsOn.join(', ')}, done earlier in this run.`)
   lines.push(
-    `Your instructions are package ${p.id} in ${planFile} (brief, files, acceptance checks, device checks), plus the top-level "conventions" in ${a.runDir}/plan.json, which apply to every package.`,
-    `The findings themselves are in the review reports in ${a.runDir}/ (search for their IDs).`,
+    `Your instructions are package ${p.id}: its brief, files, acceptance checks and device checks, plus the plan's shared conventions. Print exactly those with: ${PKG} ${p.id} --conventions`,
+    LEAN,
     'Earlier packages in this run may already have changed the code; build on their work.',
     'Test files listed in the package are for ux-tester, who writes the acceptance tests after you. Only update existing tests your change breaks.',
     'If you change Kotlin, Gradle, the manifest or Android resources, compile with: flutter build apk --debug --no-pub --target-platform android-x64 (from App/; build only, never install). The analyzer and tests do not compile native code.',
