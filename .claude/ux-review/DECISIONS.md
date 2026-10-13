@@ -24,6 +24,20 @@ Every agent in the UX loop reads this before reviewing or planning. Only the own
     - 2 MB would block even one phone photo.
   - Enforcement must be on the server; the app shows what's left.
   - This needs backend work, so it's built outside the front-end-only UX loop, then reviewed with `/ux`.
+- **How the free tier works.** The main session decided these while the owner was away; each is reversible, so tell the owner if he disagrees. Full design: `.claude/ux-review/free-tier-plan.md`.
+  - **This replaces D4a's "voice and AI stay Pro".**
+    - The mic is available with Pro, or while free dictations are left.
+    - Understanding typed words with the assistant stays Pro; free typing uses the phone's own date parser and never counts.
+    - So a free user with dictations left seeing the mic is correct, not a regression.
+  - **The month** is the calendar month in UTC; the app shows the reset date in local time.
+  - **What counts:**
+    - A dictation counts only if the assistant actually answered.
+    - Failed, cancelled and offline dictations don't count.
+    - A retry of the same dictation is free.
+  - **Storage** is charged to the project's owner. Over the cap, files stay readable and removable; only new uploads are refused.
+  - **Pro is unlimited for dictations and total storage.** The technical safeguards stay as they are: 50 AI calls a day, 6 per minute, 6 MB per file, 20 files per task, 1,000 files. So the copy avoids promising "unlimited" for anything else.
+  - **The global AI budget** (200 calls a day) becomes a setting, because free dictation will use it sooner.
+  - **For the owner later:** update the paywall's benefit text in the RevenueCat dashboard; agents don't touch external services.
 - **Two tabs** (U13): wait until the UX loop has finished. Then the owner tests with his father and other testers (family and friends), and decides after that.
 
 ## 2026-10-13 — Answers to the whole-app plan (D1–D15 in `runs/2026-10-13-app/plan.md`)

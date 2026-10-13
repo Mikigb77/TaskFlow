@@ -100,7 +100,9 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 1
 FILE_UPLOAD_HANDLERS = ["core.attachment_views.BoundedUploadHandler", "django.core.files.uploadhandler.MemoryFileUploadHandler", "django.core.files.uploadhandler.TemporaryFileUploadHandler"]
 MEDIA_ROOT = BASE_DIR / "private_media"
 ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024
-ATTACHMENT_ACCOUNT_BYTES = 64 * 1024 * 1024
+# Total file storage of an account or project owner without Pro, in MiB like the
+# per-file limit. Pro has no total cap; the 1,000-file bound applies to everyone.
+FREE_ATTACHMENT_BYTES = int(os.getenv("FREE_ATTACHMENT_MB", "100")) * 1024 * 1024
 if os.getenv("AWS_ENDPOINT_URL_S3"):
     from botocore.config import Config as S3Config
     STORAGES = {
@@ -136,6 +138,9 @@ LOGGING = {
     "loggers": {"core.ai_routing": {"handlers": ["ai_console"], "level": "INFO", "propagate": False}},
 }
 AI_REQUESTS_PER_DAY = int(os.getenv("AI_REQUESTS_PER_DAY", "50"))
+AI_GLOBAL_REQUESTS_PER_DAY = int(os.getenv("AI_GLOBAL_REQUESTS_PER_DAY", "200"))
+# AI dictations per UTC calendar month for accounts without Pro.
+FREE_VOICE_CAPTURES_PER_MONTH = int(os.getenv("FREE_VOICE_CAPTURES_PER_MONTH", "10"))
 DEPLOYMENT_ENVIRONMENT = os.getenv("DEPLOYMENT_ENVIRONMENT", "production")
 STAGING_ALLOWED_EMAILS = {email.strip().casefold() for email in os.getenv("STAGING_ALLOWED_EMAILS", "").split(",") if email.strip()}
 COMPLIMENTARY_PRO_EMAILS = {email.strip().casefold() for email in os.getenv("COMPLIMENTARY_PRO_EMAILS", "").split(",") if email.strip()}

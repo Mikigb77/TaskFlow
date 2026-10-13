@@ -141,7 +141,7 @@ class CaptureDirectoryTests(TestCase):
         self.assertEqual(Task.objects.count(), 0)
 
     @patch("core.views.ai.make_drafts", return_value={"tasks": []})
-    @patch("core.views.require_pro", new=lambda user: None)
+    @patch("core.views.has_pro", new=lambda user: True)
     def test_request_cannot_supply_a_forged_directory(self, provider):
         result = self.client.post("/api/ai/drafts/", {"text": "Create a task", "timezone": "UTC",
             "project_id": str(self.project.pk), "collaboration_context": {"user_id": self.owner.pk, "projects": [{"id": str(self.private.pk)}]}}, format="json")

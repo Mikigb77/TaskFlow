@@ -17,6 +17,7 @@ from rest_framework.response import Response
 
 from .models import Attachment, Task, User
 from .list_access import visible_tasks, lock_task
+from .billing import BillingUnavailable, has_pro
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,28 @@ def quota_files(user_id):
         is_deleted=False, task__is_deleted=False)
 
 
+def storage_usage(user):
+    used = quota_files(user.pk).aggregate(total=Sum("size"))["total"] or 0
+    return {"used_bytes": used, "limit_bytes": settings.FREE_ATTACHMENT_BYTES}
+
+
+def storage_allows(owner_id, total_bytes, file_count):
+    # The cap follows the quota owner. When Pro ends, files stay readable and
+    # removable; only additions above the free cap are refused.
+    if file_count > 1000:
+        return False  # A technical bound for every tier.
+    if total_bytes <= settings.FREE_ATTACHMENT_BYTES:
+        return True
+    pro = has_pro(User.objects.get(pk=owner_id))  # Billing is asked only above the free cap.
+    if pro is None:
+        raise BillingUnavailable()  # 503: the app retries later.
+    return pro
+
+
+class StorageFull(Exception):
+    """Raised inside the upload transaction and answered outside it."""
+
+
 def check_list_transfer(task, destination):
     if task is None or (destination.pk if destination else None) == task.task_list_id:
         return
@@ -102,7 +125,7 @@ def check_list_transfer(task, destination):
     moving = task.attachments.filter(is_deleted=False)
     existing = quota_files(owner_id).exclude(task=task)
     size = (moving.aggregate(total=Sum('size'))['total'] or 0) + (existing.aggregate(total=Sum('size'))['total'] or 0)
-    if size > settings.ATTACHMENT_ACCOUNT_BYTES or moving.count() + existing.count() > 1000:
+    if not storage_allows(owner_id, size, moving.count() + existing.count()):
         raise ValidationError({'list_id': 'This destination does not have enough file storage. Remove a backed-up file before moving the task.'})
 
 
@@ -162,8 +185,8 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
                     return Response(self.get_serializer(existing).data)
                 rows = quota_files(quota_owner)
                 used = rows.aggregate(total=Sum("size"))["total"] or 0
-                if used + upload.size > settings.ATTACHMENT_ACCOUNT_BYTES or rows.count() >= 1000:
-                    raise ValidationError({"file": "The account or list owner's file storage is full. Remove a backed-up file before uploading another."})
+                if not storage_allows(quota_owner, used + upload.size, rows.count() + 1):
+                    raise StorageFull()
                 if Attachment.objects.filter(task=task, is_deleted=False).count() >= 20:
                     raise ValidationError({"file": "Use at most 20 backed-up attachments per task."})
                 item = Attachment(id=pk, owner=request.user, task=task, name=data["name"], size=upload.size, sha256=checksum)
@@ -171,6 +194,13 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
                 stored = item.file
                 item.save(force_insert=True)
             return Response(self.get_serializer(item).data, status=201)
+        except StorageFull:
+            # Numbers only for the user's own storage: a member can't free the owner's space.
+            body = {"code": "storage_full", "shared": quota_owner != request.user.pk,
+                    "detail": "The account or list owner's file storage is full. Remove a backed-up file before uploading another."}
+            if not body["shared"]:
+                body["storage"] = storage_usage(request.user)
+            return Response(body, status=400)
         except IntegrityError:
             if stored is not None:
                 _remove_blob(stored)

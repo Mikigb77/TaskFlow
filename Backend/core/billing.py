@@ -15,14 +15,12 @@ from rest_framework.views import APIView
 
 class BillingUnavailable(APIException):
     status_code = 503
-    default_detail = "We could not verify voice access. Please try again."
+    default_detail = "We could not verify TaskFlow Pro. Please try again."
     default_code = "billing_unavailable"
 
-
-class ProRequired(APIException):
-    status_code = 402
-    default_detail = "Voice capture requires TaskFlow Pro. You can still create tasks manually."
-    default_code = "pro_required"
+    def __init__(self):
+        # A stable code lets the app say "try again", never "used up" or "full".
+        super().__init__({"code": self.default_code, "detail": self.default_detail})
 
 
 def _customer(billing_id):
@@ -118,9 +116,15 @@ def subscription_access(user, *, refresh=False):
     return result
 
 
-def require_pro(user):
-    if not subscription_access(user)["active"]:
-        raise ProRequired()
+def has_pro(user):
+    """True or False, or None when the store cannot be reached right now."""
+    if not settings.REVENUECAT_API_KEY:
+        # Billing is not configured, so only complimentary grants can be Pro.
+        return complimentary_pro(user)
+    try:
+        return subscription_access(user)["active"]
+    except BillingUnavailable:
+        return None
 
 
 class BillingAccessView(APIView):

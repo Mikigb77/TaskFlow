@@ -199,7 +199,7 @@ class GroupTests(TestCase):
         self.assertEqual(self.c.get(f"/api/tasks/{data['id']}/").status_code, 200)
         self.assertEqual(self.a.get(self.project_path).status_code, 404)
 
-    @override_settings(ATTACHMENT_ACCOUNT_BYTES=20)
+    @override_settings(FREE_ATTACHMENT_BYTES=20)
     def test_transfer_cannot_overfill_new_owners_storage(self):
         group_task = self.task()
         self.upload(group_task["id"])

@@ -242,3 +242,16 @@ class LoginSession(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     expires_at = models.DateTimeField()
     revoked = models.BooleanField(default=False)
+
+
+class FreeDictation(models.Model):
+    # One AI dictation by an account without Pro. Pro dictations are not recorded.
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="free_dictations")
+    period = models.CharField(max_length=7)  # "2026-10", the UTC calendar month
+    capture_id = models.UUIDField(null=True)  # the app's capture UUID, so it can be cancelled
+    digest = models.CharField(max_length=64)  # sha256 of the capture type and the words or WAV bytes
+    counted = models.BooleanField(default=False)  # False while the AI is still working
+    created_at = models.DateTimeField()  # set from the same clock as period
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "period"], name="free_dictation_month")]

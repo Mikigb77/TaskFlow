@@ -2,13 +2,15 @@ from copy import deepcopy
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .billing import subscription_access, BillingUnavailable, _customer
-from .models import User, Task
+from .free_tier import month
+from .models import FreeDictation, User, Task
 
 
 @override_settings(REVENUECAT_API_KEY="goog_fixture", DEPLOYMENT_ENVIRONMENT="production", REVENUECAT_ALLOW_SANDBOX=False)
@@ -30,10 +32,14 @@ class BillingAccessTests(TestCase):
     @patch("core.views.consume_budget")
     def test_unpaid_cannot_forge_access_or_spend_budget(self, budget, ai, customer):
         customer.return_value = {"entitlements": {}}
+        period, _ = month(self.now)
+        FreeDictation.objects.bulk_create(FreeDictation(user=self.user, period=period, digest="used", counted=True,
+                                                        created_at=self.now) for _ in range(settings.FREE_VOICE_CAPTURES_PER_MONTH))
         for path in ("/api/ai/draft/", "/api/ai/drafts/"):
             result = self.client.post(path, {"text": "Finish physics Thursday", "timezone": "UTC",
                 "billing_id": "another-paying-customer", "has_pro": True, "entitlements": {"taskflow_pro": True}}, format="json")
             self.assertEqual(result.status_code, 402)
+            self.assertEqual(result.data["code"], "free_voice_used_up")
         budget.assert_not_called()
         ai.assert_not_called()
         customer.assert_called_once_with(self.user.billing_id)
@@ -116,12 +122,20 @@ class BillingAccessTests(TestCase):
         self.assertFalse(self.client.post("/api/billing/access/", {}, format="json").data["active"])
         self.assertTrue(all(call.args == (self.user.billing_id,) for call in customer.call_args_list))
 
+    @override_settings(FREE_VOICE_CAPTURES_PER_MONTH=1)
     @patch("core.billing._customer", side_effect=BillingUnavailable())
-    @patch("core.views.ai.make_drafts")
-    def test_outage_does_not_process_voice_or_expose_provider_details(self, ai, customer):
+    @patch("core.views.ai.make_drafts", return_value={"tasks": []})
+    def test_outage_keeps_free_voice_and_never_says_used_up(self, ai, customer):
+        # A dictation left is used and charged even though Pro can't be checked.
         response = self.client.post("/api/ai/drafts/", {"text": "Test task", "timezone": "UTC"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["free_voice"]["left"], 0)
+        self.assertEqual(FreeDictation.objects.filter(user=self.user, counted=True).count(), 1)
+        # With none left, a paying customer could be refused, so the answer is "try again".
+        response = self.client.post("/api/ai/drafts/", {"text": "Another task", "timezone": "UTC"}, format="json")
         self.assertEqual(response.status_code, 503)
-        ai.assert_not_called()
+        self.assertEqual(response.json(), {"code": "billing_unavailable", "detail": BillingUnavailable.default_detail})
+        ai.assert_called_once()
         self.assertNotIn("goog_fixture", str(response.data))
 
     def test_billing_status_requires_authentication(self):

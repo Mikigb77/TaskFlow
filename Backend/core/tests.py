@@ -306,7 +306,7 @@ class APITests(TestCase):
 
     @override_settings(AI_REQUESTS_PER_DAY=1)
     @patch("core.views.ai.make_draft", return_value={"title": "Draft"})
-    @patch("core.views.require_pro", new=lambda user: None)
+    @patch("core.views.has_pro", new=lambda user: True)
     def test_drafts_do_not_save_tasks_and_daily_budget_is_enforced(self, mock):
         payload = {"text": "Call tomorrow", "timezone": "Europe/Madrid"}
         self.assertEqual(self.client.post("/api/ai/draft/", payload, format="json").status_code, 200)
@@ -316,7 +316,7 @@ class APITests(TestCase):
 
     @override_settings(AI_REQUESTS_PER_DAY=1)
     @patch("core.views.ai.make_drafts")
-    @patch("core.views.require_pro", new=lambda user: None)
+    @patch("core.views.has_pro", new=lambda user: True)
     def test_provider_failure_does_not_spend_account_allowance(self, mock):
         mock.side_effect = [AIUnavailable("Provider busy"), {"tasks": [{"title": "Coffee"}]}]
         payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}

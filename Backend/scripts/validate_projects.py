@@ -75,7 +75,10 @@ def main():
     assert call(base, "GET", "notifications/unread/", token=mem)["count"] == 0
     call(base, "POST", f"lists/{project['id']}/preferences/", {"pinned": True, "notifications": "assigned"}, own)
     assert any(item["pinned"] for item in call(base, "GET", "lists/access/", token=own)["lists"])
-    call(base, "POST", "ai/drafts/", {"text": "Ana needs to finish exercise three in Physics by Thursday", "timezone": "Europe/Madrid", "project_id": project["id"]}, own, expect=402)
+    # The Django tests cover the free dictation limit; a new account starts with all of it.
+    me = call(base, "GET", "auth/me/", token=own)
+    limits = {"free_voice": me["free_voice"], "storage": me["storage"]}
+    assert me["free_voice"]["left"] == me["free_voice"]["limit"] and me["storage"]["used_bytes"] == 0, limits
     fixture = {
         "PROJECT_E2E_EMAIL": owner["email"], "PROJECT_E2E_PASSWORD": password,
         "PROJECT_E2E_MEMBER_EMAIL": member["email"], "PROJECT_E2E_MEMBER_ID": str(member["user"]["id"]),
@@ -85,11 +88,11 @@ def main():
     path = Path(args.fixture)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(fixture, indent=2) + "\n", encoding="utf-8")
-    print("Live groups, invitation, assignment, shared completion, isolation, history, preferences and unpaid gate passed.", flush=True)
+    print("Live groups, invitation, assignment, shared completion, isolation, history, preferences and free tier passed.", flush=True)
     verify_billing(base, args.test_key, owner, fixture, skip_ai=args.skip_ai)
     print(json.dumps({"groups": "passed", "invitations": "passed", "member_assignment": "passed",
         "shared_completion": "passed", "access_isolation": "passed", "history": "passed",
-        "notifications": "passed", "preferences": "passed", "unpaid_gate": "passed"}))
+        "notifications": "passed", "preferences": "passed", "free_tier": "passed"}))
 
 
 def verify_billing(base, test_key, owner, fixture, *, skip_ai=False):

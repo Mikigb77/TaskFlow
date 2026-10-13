@@ -83,7 +83,9 @@ def main():
         call('POST', 'auth/password-reset/', {'email':f['STAGING_OUTSIDER_EMAIL']})
         call('POST', 'auth/logout/', {}, out, 204)
         call('GET', 'auth/me/', token=out, expect=401)
-        call('POST', 'ai/drafts/', {'text':'Prepare Physics by Thursday', 'timezone':'Europe/Madrid', 'project_id':project['id']}, own, 402)
+        # The Django tests cover the free limits; earlier runs may have used some, so check the shape only.
+        me = call('GET', 'auth/me/', token=own)
+        assert {'limit', 'left', 'resets_at'} <= set(me['free_voice']) and {'used_bytes', 'limit_bytes'} <= set(me['storage'])
         f.update({'PROJECT_E2E_MEMBER_ID':str(member['user']['id']), 'PROJECT_E2E_PROJECT':project['id'], 'PROJECT_E2E_TASK':task['id']})
         path.write_text(json.dumps(f, indent=2) + '\n')
         print('Real Resend invitation, invited signup, acceptance proof, shared tasks, private Neon files, deletion, recovery and logout passed.', flush=True)

@@ -19,7 +19,7 @@ class AttachmentConcurrencyTests(TransactionTestCase):
         cache.clear()
         self.directory = TemporaryDirectory(prefix="taskflow-concurrent-files-")
         self.addCleanup(self.directory.cleanup)
-        settings = override_settings(MEDIA_ROOT=self.directory.name, ATTACHMENT_ACCOUNT_BYTES=5)
+        settings = override_settings(MEDIA_ROOT=self.directory.name, FREE_ATTACHMENT_BYTES=5)
         settings.enable()
         self.addCleanup(settings.disable)
         self.owner = User.objects.create_user("concurrent-file@example.invalid", "Fixture-passphrase!2026")

@@ -76,22 +76,22 @@ Set alerts for cost, database/file growth, connections, API failures and payment
 
 ## Proposed customer storage and retention policy
 
-These are proposals, not enabled product promises or deletion jobs. Current code has a 6 MiB per-file limit and 64 MiB per-account/list-owner allowance for everyone.
+These are proposals, not enabled product promises or deletion jobs. Current code has a 6 MiB per-file limit and 1,000 files per account for everyone. Without Pro, an account or list owner has a 100 MiB total allowance (`FREE_ATTACHMENT_MB`); Pro has no total allowance.
 
 | Policy | Free proposal | Pro proposal |
 | --- | --- | --- |
 | Individual file | 6 MiB | 25 MiB |
-| Total cloud attachments | 100 MiB | 2 GiB |
+| Total cloud attachments | 100 MiB (enforced) | No total cap (enforced) |
 | Task text and completed history | Retain by default, subject to abuse controls | Retain by default, subject to abuse controls |
 | Completed-task cloud attachments | Eligible for cleanup 30 days after completion | Retain within quota; offer optional 90-day cleanup |
 
 Prefer preserving task text and deleting only old cloud attachments. Do not unexpectedly erase paying users' files after 90 days. If automatic cleanup becomes policy, obtain a clear product decision, publish it before uploads, notify users in advance (for example seven days), allow export and a grace/recovery period, and display the exact deletion date. Do not infer completion age from last modification or due date; record `completed_at` and eligibility explicitly. Reopening cancels eligibility. Active tasks, unscheduled tasks, notes, recurring series with future occurrences, shared-list access and owner changes need separate rules.
 
-Personal quota is measured and enforced server-side; storage for a shared list is charged to its owner. Count pending uploads with atomic reservations, verify actual object size, and reconcile failures/orphan objects. Derive Pro from verified server-side RevenueCat state, never a client-supplied flag. On downgrade, preserve existing content and allow downloads/deletion; block additions above quota after a communicated grace period.
+Personal quota is measured and enforced server-side; storage for a shared list is charged to its owner. Count pending uploads with atomic reservations, verify actual object size, and reconcile failures/orphan objects. Derive Pro from verified server-side RevenueCat state, never a client-supplied flag. RevenueCat is asked only when an addition would go above the free allowance; if it can't be reached, the answer is HTTP 503, never "full". On downgrade, existing content is preserved and downloads and deletion keep working; additions above the free allowance are refused straight away. Whether to add a communicated grace period first is the owner's decision.
 
 Cleanup should be an idempotent scheduled job, not a web-process timer. Mark deletions transactionally, retain synchronization tombstones long enough for offline clients, retry physical blob deletion, and prevent an old offline device from silently restoring deleted cloud files. Distinguish cloud deletion from local device copies in the UI. Measure recovery-window storage too: soft deletion alone does not free physical bytes. Backup expiry and actual object purge must be specified and verified.
 
-At the proposed allowance, 1,000 fully used Free accounts represent roughly 105 GB of object bytes; 1,000 fully used Pro accounts roughly 2,147 GB. Storage, download traffic, API load and AI together determine sustainable pricing. Do not promise unlimited uploads.
+At the free allowance, 1,000 fully used Free accounts represent roughly 105 GB of object bytes. Pro has no total allowance, so a Pro account is bounded only by 1,000 files of up to 6 MiB each (about 6.3 GB); 1,000 such accounts would hold about 6.3 TB. Storage, download traffic, API load and AI together determine sustainable pricing. Do not promise unlimited uploads.
 
 ## Ordered delivery checklist
 
@@ -106,7 +106,7 @@ At the proposed allowance, 1,000 fully used Free accounts represent roughly 105 
 - [x] Make the staging container stateless, configure secrets/email/proxy settings, separate health checks and deploy migrations safely.
 - [x] Connect an isolated Neon staging branch; verify PostgreSQL compatibility and private attachment storage.
 - [x] Replace staging shared-limit dependencies and run concurrent quota/auth tests.
-- [ ] Verify RevenueCat entitlements server-side before implementing distinct Free/Pro storage allowances.
+- [x] Verify RevenueCat entitlements server-side and enforce the free storage allowance; Pro has no total allowance.
 - [ ] Approve and publish retention policy; implement warnings, export, tombstones, cleanup and restore tests before enabling deletion.
 - [ ] Exercise login, offline sync, file access isolation, wake-up latency, load spikes, provider failure, backup and restore.
 - [ ] Enable production billing, monitoring and release configuration; deploy the tested API and then configure Flutter's production API URL.

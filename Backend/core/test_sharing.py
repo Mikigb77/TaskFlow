@@ -156,7 +156,7 @@ class SharingTests(TestCase):
             self.assertEqual(client.get(self.path).status_code, 404)
             self.assertEqual(client.get(f'/api/attachments/{attachment}/content/').status_code, 404)
 
-    @override_settings(ATTACHMENT_ACCOUNT_BYTES=20)
+    @override_settings(FREE_ATTACHMENT_BYTES=20)
     def test_group_files_use_list_owner_quota_and_moves_cannot_bypass_it(self):
         self.join(self.editor, self.b, 'editor')
         key, _ = self.task(self.b)

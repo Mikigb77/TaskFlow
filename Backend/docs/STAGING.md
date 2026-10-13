@@ -133,8 +133,9 @@ after thirty minutes.
 
 App limits are 80 emails/day, 2,700/month, 8/recipient/day, inside Resend's Free
 100/day and 3,000/month allowances. Invitation creation is also throttled.
-Uploads currently remain 6 MiB/file, 64 MiB/account or list owner, 20/task and
-1,000/account. There is no newly enabled automatic customer-data retention purge.
+Uploads remain 6 MiB/file, 20/task and 1,000/account. Without Pro, an account or
+list owner has 100 MiB in total, and Pro has no total cap. There is no newly
+enabled automatic customer-data retention purge.
 AI defaults to the free AI Studio route with a bounded Vertex fallback; secrets
 stay on the backend and paid access is verified independently of the phone.
 

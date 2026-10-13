@@ -10,9 +10,8 @@ from rest_framework.response import Response
 from .models import TaskList, ListMembership, ListInvitation, TaskGroup, ProjectPreference, User, Attachment
 from .serializers import TaskListSerializer
 from .list_access import visible_lists, require_list, require_group
-from .attachment_views import delete_task_attachments, quota_files
+from .attachment_views import delete_task_attachments, quota_files, storage_allows
 from .collaboration import clear_assignments, record_event
-from django.conf import settings
 from django.db.models import Sum
 from rest_framework import serializers
 
@@ -94,7 +93,7 @@ class TaskListViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets
                 moving = Attachment.objects.filter(task__task_list=task_list, task__is_deleted=False, is_deleted=False)
                 existing = quota_files(owner.pk).exclude(task__task_list=task_list)
                 total = (moving.aggregate(n=Sum("size"))["n"] or 0) + (existing.aggregate(n=Sum("size"))["n"] or 0)
-                if total > settings.ATTACHMENT_ACCOUNT_BYTES or moving.count() + existing.count() > 1000:
+                if not storage_allows(owner.pk, total, moving.count() + existing.count()):
                     raise ValidationError("The group owner needs enough storage for this project's files.")
             try:
                 with transaction.atomic():

@@ -10,10 +10,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from . import ai
-from .models import User
+from .models import FreeDictation, User
 from .serializers import DraftRequestSerializer
 from .capture_context import capture_context
-from .billing import require_pro
+from .billing import BillingUnavailable, has_pro
+from .free_tier import capture_digest, free_voice, reserve_free_dictation
 
 
 def health(request):
@@ -91,24 +92,60 @@ class DraftView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         data["collaboration_context"] = capture_context(request.user, data.get("project_id"))
-        require_pro(request.user)
+        pro = has_pro(request.user)
+        dictation = None
+        if not pro:
+            dictation, outcome = reserve_free_dictation(request.user, data.get("capture_id"), capture_digest(data))
+            if outcome == "in_progress":
+                return Response({"code": "capture_in_progress",
+                                 "detail": "This dictation is still being understood."}, status=409)
+            if outcome == "used_up":
+                if pro is None:
+                    raise BillingUnavailable()  # Never tell a paying customer they have run out.
+                return Response({"code": "free_voice_used_up",
+                                 "detail": "This month's free dictations are used up. You can still type tasks.",
+                                 "free_voice": free_voice(request.user)}, status=402)
+        try:
+            result = self.draft(request.user, data)
+        except Exception as error:
+            if dictation is not None:
+                dictation.delete()  # Failed and refused dictations never count.
+            if isinstance(error, ai.AIUnavailable):
+                return Response({"detail": str(error)}, status=error.status)
+            raise
+        if dictation is not None and not FreeDictation.objects.filter(pk=dictation.pk, counted=False).update(counted=True):
+            # Cancelled while the AI was working: the result is discarded, so it never counts.
+            return Response({"code": "capture_cancelled", "detail": "This dictation was cancelled."}, status=409)
+        return Response({**result, "free_voice": free_voice(request.user)})
+
+    def draft(self, user, data):
         day = timezone.now().date().isoformat()
-        budget_key = f"ai:{day}:user:{request.user.pk}"
+        budget_key = f"ai:{day}:user:{user.pk}"
         consume_budget(budget_key, settings.AI_REQUESTS_PER_DAY)
         try:
-            consume_budget(f"ai:{day}:global", 200)
+            consume_budget(f"ai:{day}:global", settings.AI_GLOBAL_REQUESTS_PER_DAY)
         except Throttled:
             release_budget(budget_key)
             raise
         data.setdefault("reference_time", timezone.now())
         try:
-            return Response(ai.make_drafts(data) if self.batch else ai.make_draft(data))
-        except ai.AIUnavailable as error:
+            return ai.make_drafts(data) if self.batch else ai.make_draft(data)
+        except ai.AIUnavailable:
             # Failed captures do not use up the account allowance. The global attempt budget
             # and burst throttle still bound provider traffic and cost.
             release_budget(budget_key)
-            return Response({"detail": str(error)}, status=error.status)
+            raise
 
 
 class DraftBatchView(DraftView):
     batch = True
+
+
+class DraftCancelView(APIView):
+    throttle_scope = "tasks"
+
+    def delete(self, request, capture_id):
+        # Only a dictation still being understood can be cancelled, and its result is
+        # then never returned. Counted dictations stay counted.
+        FreeDictation.objects.filter(user=request.user, capture_id=capture_id, counted=False).delete()
+        return Response(status=204)

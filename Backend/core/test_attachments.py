@@ -83,7 +83,7 @@ class AttachmentTests(TestCase):
         self.assertEqual(self.upload(content=b"").status_code, 400)
         with override_settings(ATTACHMENT_MAX_BYTES=3):
             self.assertEqual(self.upload(content=b"four").status_code, 400)
-        with override_settings(ATTACHMENT_ACCOUNT_BYTES=5):
+        with override_settings(FREE_ATTACHMENT_BYTES=5):
             self.assertEqual(self.upload(content=b"four").status_code, 201)
             self.assertEqual(self.upload(content=b"two").status_code, 400)
         self.assertEqual(Attachment.objects.count(), 1)

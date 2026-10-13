@@ -4,6 +4,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 from .models import User, Task, TaskList, TaskGroup, ProjectPreference
 from .billing import complimentary_pro
+from .free_tier import free_voice
 
 
 def validate_timezone(value):
@@ -17,6 +18,10 @@ def validate_timezone(value):
 class UserSerializer(serializers.ModelSerializer):
     google_linked = serializers.SerializerMethodField()
     complimentary_pro = serializers.SerializerMethodField()
+    # The limits without Pro. Two cheap queries and never a billing call; the app
+    # knows whether the account has Pro.
+    free_voice = serializers.SerializerMethodField()
+    storage = serializers.SerializerMethodField()
 
     def get_complimentary_pro(self, user):
         return complimentary_pro(user)
@@ -24,9 +29,16 @@ class UserSerializer(serializers.ModelSerializer):
     def get_google_linked(self, user):
         return hasattr(user, "google_identity")
 
+    def get_free_voice(self, user):
+        return free_voice(user)
+
+    def get_storage(self, user):
+        from .attachment_views import storage_usage
+        return storage_usage(user)
+
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "timezone", "billing_id", "google_linked", "complimentary_pro"]
+        fields = ["id", "email", "first_name", "timezone", "billing_id", "google_linked", "complimentary_pro", "free_voice", "storage"]
         read_only_fields = ["billing_id"]
 
 
@@ -285,6 +297,8 @@ class DraftRequestSerializer(serializers.Serializer):
     timezone = serializers.CharField(max_length=64, validators=[validate_timezone])
     reference_time = ZonedDateTimeField(required=False)
     audio = serializers.FileField(required=False)
+    # The app's capture UUID: a retry with the same words is free, and it can be cancelled.
+    capture_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if bool(attrs.get("text")) == bool(attrs.get("audio")):

@@ -3,7 +3,6 @@ from datetime import timedelta
 import secrets
 import uuid
 
-from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -13,7 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 
-from .attachment_views import quota_files
+from .attachment_views import quota_files, storage_allows
 from .collaboration import clear_assignments
 from .list_access import visible_groups, require_group, group_role, group_people, visible_tasks, display_name
 from .models import TaskGroup, GroupMembership, GroupInvitation, TaskList, User, TaskNotification
@@ -225,7 +224,7 @@ class TaskGroupViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
             moving = Attachment.objects.filter(task__task_list__group=group, task__is_deleted=False, is_deleted=False)
             existing = quota_files(user_id).exclude(task__task_list__group=group)
             total = (moving.aggregate(n=Sum("size"))["n"] or 0) + (existing.aggregate(n=Sum("size"))["n"] or 0)
-            if total > settings.ATTACHMENT_ACCOUNT_BYTES or moving.count() + existing.count() > 1000:
+            if not storage_allows(user_id, total, moving.count() + existing.count()):
                 raise ValidationError("The new owner needs enough storage for this group's files.")
             GroupMembership.objects.update_or_create(group=group, user_id=group.owner_id, defaults={"role": "admin"})
             group.memberships.filter(user_id=user_id).delete()

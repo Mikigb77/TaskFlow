@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .billing import complimentary_pro, subscription_access
-from .models import GoogleIdentity, User
+from .models import FreeDictation, GoogleIdentity, User
 from .serializers import UserSerializer
 
 
@@ -59,13 +59,16 @@ class ComplimentaryAccessTests(TestCase):
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
     @patch("core.billing._customer", return_value={"entitlements": {}})
-    @patch("core.views.ai.make_drafts")
+    @patch("core.views.ai.make_drafts", return_value={"tasks": []})
     def test_clients_cannot_forge_grant_or_owner_identity(self, ai, customer):
         response = self.client.post("/api/ai/drafts/", {
             "text": "Task", "timezone": "UTC", "complimentary_pro": True,
             "billing_id": str(self.owner.billing_id), "email": "owner@example.invalid"}, format="json")
-        self.assertEqual(response.status_code, 402)
-        ai.assert_not_called()
+        # A forged grant spends a free dictation instead of getting Pro.
+        self.assertEqual(response.status_code, 200)
+        ai.assert_called_once()
+        self.assertEqual(FreeDictation.objects.filter(user=self.owner, counted=True).count(), 1)
+        self.assertEqual(response.data["free_voice"]["left"], response.data["free_voice"]["limit"] - 1)
         serializer = UserSerializer(self.owner, data={"complimentary_pro": True}, partial=True)
         self.assertTrue(serializer.is_valid())
         self.assertNotIn("complimentary_pro", serializer.validated_data)

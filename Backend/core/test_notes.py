@@ -79,7 +79,7 @@ class NoteTests(TestCase):
 
     @patch('core.ai.extract_tasks')
     @patch('core.ai.transcribe')
-    @patch("core.views.require_pro", new=lambda user: None)
+    @patch("core.views.has_pro", new=lambda user: True)
     def test_note_capture_keeps_words_and_never_extracts_commitments(self, transcribe, extract):
         words = 'Ideas for Friday at 17:00\nBring up the reference next month.'
         text = self.a.post('/api/ai/drafts/', {'text': words, 'timezone': 'Europe/Madrid', 'capture_type': 'note'}, format='json')
