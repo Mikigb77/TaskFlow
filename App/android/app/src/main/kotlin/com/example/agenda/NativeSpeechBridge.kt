@@ -48,6 +48,8 @@ class NativeSpeechBridge(private val activity: Activity, messenger: BinaryMessen
     private var sink: EventChannel.EventSink? = null
     private var activeRun: Int? = null
     private var language = ""
+    // Words this person is likely to say: dates, times, their projects and people.
+    private var hints = ArrayList<String>()
     private var stopRequested = false
     private var attempt: Attempt? = null
     // Consecutive attempts that ended at once without hearing anything. A
@@ -97,7 +99,7 @@ class NativeSpeechBridge(private val activity: Activity, messenger: BinaryMessen
                     }
                     val run = call.argument<Int>("run") ?: throw IllegalArgumentException("Missing session")
                     val language = call.argument<String>("language") ?: Locale.getDefault().toLanguageTag()
-                    start(run, language)
+                    start(run, language, ArrayList(call.argument<List<String>>("hints") ?: emptyList()))
                     result.success(null)
                 }
                 "stop" -> { if (activeRun == call.argument<Int>("run")) stop(); result.success(null) }
@@ -145,10 +147,11 @@ class NativeSpeechBridge(private val activity: Activity, messenger: BinaryMessen
         sink?.success(mapOf("run" to run, "kind" to kind, "text" to text, "level" to level, "error" to error))
     }
 
-    private fun start(run: Int, language: String) {
+    private fun start(run: Int, language: String, hints: ArrayList<String>) {
         cancel()
         activeRun = run
         this.language = language
+        this.hints = hints
         try { begin(run) } catch (error: Exception) { cancel(); throw error }
     }
 
@@ -209,6 +212,8 @@ class NativeSpeechBridge(private val activity: Activity, messenger: BinaryMessen
             recognizer.setRecognitionListener(this)
             val request = intent(language)
             if (Build.VERSION.SDK_INT >= 33) {
+                // How much this helps depends on the recognizer.
+                if (hints.isNotEmpty()) request.putExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, hints)
                 feed = MicrophoneFeed.open()?.also {
                     request.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, it.source)
                     request.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)

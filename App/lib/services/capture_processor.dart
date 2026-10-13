@@ -87,6 +87,9 @@ class CaptureProcessor {
           'capture_type': existing.kind,
           'reference_time': existing.capturedAt.toUtc().toIso8601String(),
           if (existing.audioPath == null) 'text': existing.text,
+          'source': existing.audioPath != null
+              ? 'speech'
+              : existing.source ?? 'typed',
         },
       );
       final response = Map<String, dynamic>.from(raw as Map);

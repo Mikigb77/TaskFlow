@@ -13,7 +13,6 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/widgets/task_actions.dart';
-import 'package:agenda/widgets/reminder_ask_card.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_editor.dart';
@@ -80,26 +79,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ? context.l10n.everythingToDo
                         : context.l10n.noDateNeeded,
                   ),
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Expanded(
-                        child: Text(
-                          widget.isRoot ? context.l10n.yourTasks : title,
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
+                      Text(
+                        widget.isRoot ? context.l10n.yourTasks : title,
+                        style: Theme.of(context).textTheme.headlineLarge,
                       ),
-                      if (widget.isRoot)
-                        IconButton(
-                          tooltip: context.l10n.lists,
-                          onPressed: () =>
-                              Navigator.pushNamed(context, '/lists'),
-                          icon: const Icon(Icons.folder_outlined),
-                        ),
-                      IconButton(
-                        tooltip: context.l10n.completedTasks,
-                        onPressed: () =>
-                            Navigator.pushNamed(context, '/completedTasks'),
-                        icon: const Icon(Icons.task_alt_rounded),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (widget.isRoot)
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pushNamed(context, '/lists'),
+                              child: Text(context.l10n.lists),
+                            ),
+                          IconButton(
+                            tooltip: context.l10n.completedTasks,
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/completedTasks'),
+                            icon: const Icon(Icons.task_alt_rounded),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -243,21 +246,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : context.l10n.inboxEmpty,
                     icon: Icons.check_box_outlined,
                   ),
-                  // Other pages may hold the dated tasks it asks about.
-                  if (_query.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      child: ReminderAskCard(),
-                    ),
                 ],
               );
             }
             return RefreshIndicator(
               onRefresh: () => ref.read(taskProvider.notifier).loadTasks(),
-              child: TaskList(
-                tasks: filtered,
-                footer: _query.isEmpty ? const ReminderAskCard() : null,
-              ),
+              child: TaskList(tasks: filtered),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

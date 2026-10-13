@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
@@ -15,7 +19,6 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
-import 'package:agenda/widgets/reminder_ask_card.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/widgets/device_calendar_events.dart';
 
@@ -27,27 +30,137 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen>
     with WidgetsBindingObserver {
-  DateTime _selectedDay = DateTime.now();
-  DateTime _focusedDay = DateTime.now();
+  late DateTime _selectedDay;
+  late DateTime _focusedDay;
+  // The day that was today when Calendar last checked the date.
+  late DateTime _today;
+  Timer? _midnight;
   CalendarFormat _format = CalendarFormat.week;
   PageController? _calendarPage;
-  bool _syncing = false;
+  final _scroll = ScrollController();
+  // Tasks seen open on the selected day. Completing one keeps its place
+  // until the day changes or Calendar is covered.
+  final _openOnDay = <String>{};
+  // A just-saved task: waiting to appear, then shown and highlighted.
+  int? _landingId;
+  int? _landedId;
+  bool _highlight = false;
+  Timer? _highlightTimer;
+  final _landedRow = GlobalKey();
+
+  DateTime _now() => ref.read(calendarClockProvider)();
 
   @override
   void initState() {
     super.initState();
+    _selectedDay = _now();
+    _focusedDay = _selectedDay;
+    _today = Task.day(_selectedDay);
+    _scheduleMidnight();
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _midnight?.cancel();
+    _highlightTimer?.cancel();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  void _select(DateTime day, [DateTime? focused]) {
+    if (!isSameDay(day, _selectedDay)) {
+      _openOnDay.clear();
+      _landingId = null;
+      _landedId = null;
+    }
+    _selectedDay = day;
+    _focusedDay = focused ?? day;
+  }
+
+  /// A calendar left on today moves to the new today after midnight.
+  void _followToday() {
+    final today = Task.day(_now());
+    if (today == _today) return;
+    if (isSameDay(_selectedDay, _today)) _select(today);
+    _today = today;
+  }
+
+  void _scheduleMidnight() {
+    _midnight?.cancel();
+    final now = _now();
+    final next = DateTime(now.year, now.month, now.day + 1);
+    _midnight = Timer(next.difference(now) + const Duration(seconds: 1), () {
+      if (!mounted) return;
+      setState(_followToday);
+      _scheduleMidnight();
+    });
+  }
+
+  void _land(CalendarFocus focus) => setState(() {
+    _select(focus.day);
+    _landingId = focus.taskId;
+    _landedId = null;
+    _highlight = false;
+    _highlightTimer?.cancel();
+  });
+
+  /// Brings the new task's row into view, clear of the save message, then
+  /// lets its highlight fade.
+  Future<void> _reveal() async {
+    for (var i = 0; i < 20 && mounted && _scroll.hasClients; i++) {
+      final row = _landedRow.currentContext?.findRenderObject();
+      final position = _scroll.position;
+      if (row == null) {
+        // Rows far below are only built once scrolled near.
+        if (position.pixels >= position.maxScrollExtent) break;
+        _scroll.jumpTo(
+          math.min(
+            position.pixels + position.viewportDimension,
+            position.maxScrollExtent,
+          ),
+        );
+        await WidgetsBinding.instance.endOfFrame;
+        continue;
+      }
+      final viewport = RenderAbstractViewport.of(row);
+      final top = viewport.getOffsetToReveal(row, 0).offset;
+      final bottom = viewport.getOffsetToReveal(row, 1).offset + 88;
+      final target = position.pixels > top
+          ? top
+          : position.pixels < bottom
+          ? math.min(bottom, top)
+          : position.pixels;
+      final offset = target.clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if (offset != position.pixels) {
+        if (MediaQuery.disableAnimationsOf(context)) {
+          _scroll.jumpTo(offset);
+        } else {
+          await _scroll.animateTo(
+            offset,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      }
+      break;
+    }
+    if (!mounted) return;
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _highlight = false);
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      setState(_followToday);
+      _scheduleMidnight();
       ref.read(taskProvider.notifier).loadTasks();
       ref.read(deviceCalendarProvider.notifier).refresh();
     } else {
@@ -55,23 +168,42 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     }
   }
 
-  Future<void> _refresh() async {
-    setState(() => _syncing = true);
-    try {
-      await Future.wait([
-        ref.read(taskProvider.notifier).loadTasks(),
-        ref.read(deviceCalendarProvider.notifier).refresh(),
-      ]);
-    } finally {
-      if (mounted) setState(() => _syncing = false);
+  Future<void> _refresh() => Future.wait([
+    ref.read(taskProvider.notifier).loadTasks(),
+    ref.read(deviceCalendarProvider.notifier).refresh(),
+  ]);
+
+  void _showView(String view) {
+    if (view == 'day') {
+      Navigator.pushNamed(context, '/timeline', arguments: _selectedDay);
+      return;
     }
+    setState(
+      () => _format = view == 'month'
+          ? CalendarFormat.month
+          : CalendarFormat.week,
+    );
   }
 
-  void _create() =>
-      Navigator.pushNamed(context, '/createTask', arguments: _selectedDay);
+  void _create() {
+    // Never pre-fill a day that has already gone.
+    final today = Task.day(_now());
+    Navigator.pushNamed(
+      context,
+      '/createTask',
+      arguments: Task.day(_selectedDay).isBefore(today) ? today : _selectedDay,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
+      if (focus != null) _land(focus);
+    });
+    _followToday();
+    // Calendar is covered by another screen: the user has left it.
+    final shown = TickerMode.valuesOf(context).enabled;
+    if (!shown) _openOnDay.clear();
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
@@ -81,26 +213,38 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final tasks = (tasksState.valueOrNull ?? <Task>[])
         .where((task) => taskInProjectScope(task, scope, accountId, projects))
         .toList();
-    final events =
-        tasks
-            .expand((task) => task.calendarOccurrencesOn(_selectedDay))
-            .toList()
-          ..sort((a, b) {
-            if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-            return Task.compareBySchedule(a, b);
-          });
-    final now = DateTime.now();
+    String key(Task task) => '${task.id}:${task.occurrenceId}';
+    final events = tasks
+        .expand((task) => task.calendarOccurrencesOn(_selectedDay))
+        .toList();
+    _openOnDay.addAll(events.where((task) => !task.isCompleted).map(key));
+    // Done tasks go last, except those completed while the day was shown.
+    bool settled(Task task) =>
+        task.isCompleted && !_openOnDay.contains(key(task));
+    events.sort((a, b) {
+      if (settled(a) != settled(b)) return settled(a) ? 1 : -1;
+      return Task.compareBySchedule(a, b);
+    });
+    if (_landingId != null &&
+        shown &&
+        events.any((task) => task.id == _landingId)) {
+      _landedId = _landingId;
+      _landingId = null;
+      _highlight = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
+    final landedIndex = _landedId == null
+        ? -1
+        : events.indexWhere((task) => task.id == _landedId);
+    final instant = MediaQuery.disableAnimationsOf(context);
+    final now = _now();
     final today = isSameDay(_selectedDay, now);
-    final listed = {
-      for (final task in events) '${task.id}:${task.occurrenceId}',
-    };
+    final listed = {for (final task in events) key(task)};
     final overdue = today
         ? (tasks
               .map((task) => task.overdueOn(now))
               .whereType<Task>()
-              .where(
-                (task) => !listed.contains('${task.id}:${task.occurrenceId}'),
-              )
+              .where((task) => !listed.contains(key(task)))
               .toList()
             ..sort(
               (a, b) => (a.displayDate ?? a.displayDeadline!).compareTo(
@@ -110,8 +254,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         : <Task>[];
     final completed = events.where((task) => task.isCompleted).length;
     final total = events.length + overdue.length;
-    final signedIn = ref.watch(authProvider).account != null;
     final syncError = ref.read(taskRepositoryProvider).syncError;
+    final inbox = tasks
+        .where(
+          (task) => !task.isNote && task.dueDate == null && !task.isCompleted,
+        )
+        .length;
     final phoneCalendars = ref
         .watch(deviceCalendarProvider)
         .preferences
@@ -122,79 +270,45 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         onRefresh: _refresh,
         child: CustomScrollView(
           key: const PageStorageKey('calendar-scroll'),
+          controller: _scroll,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             const SliverToBoxAdapter(
-              child: Padding(
+              child: ProjectScopeControl(
                 padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: ProjectScopeControl(),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            context.l10n.yourCalendar,
-                            style: text.titleLarge,
-                          ),
+            if (syncError != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                sliver: SliverToBoxAdapter(
+                  // Offline is a normal state: say the tasks are safe, calmly.
+                  child: requestProblem(syncError) == 'network'
+                      ? Row(
+                          key: const ValueKey('calendar-offline'),
+                          children: [
+                            Icon(
+                              Icons.cloud_off_outlined,
+                              size: 20,
+                              color: colors.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                context.l10n.calendarOffline,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : MessageBanner(
+                          requestProblemText(context.l10n, syncError),
+                          isError: true,
                         ),
-                        if (signedIn)
-                          IconButton(
-                            tooltip: context.l10n.syncTasks,
-                            onPressed: _syncing ? null : _refresh,
-                            icon: _syncing
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(
-                                    syncError == null
-                                        ? Icons.cloud_done_outlined
-                                        : Icons.cloud_off_outlined,
-                                    size: 21,
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                          ),
-                      ],
-                    ),
-                    if (syncError != null) ...[
-                      const SizedBox(height: 12),
-                      MessageBanner(
-                        requestProblemText(context.l10n, syncError),
-                        isError: true,
-                      ),
-                    ],
-                    TextButton.icon(
-                      key: const ValueKey('calendar-inbox'),
-                      onPressed: () => Navigator.pushNamed(context, '/inbox'),
-                      icon: const Icon(Icons.inbox_outlined, size: 18),
-                      label: Text(
-                        context.l10n.inboxCount(
-                          tasks
-                              .where(
-                                (task) =>
-                                    !task.isNote &&
-                                    task.dueDate == null &&
-                                    !task.isCompleted,
-                              )
-                              .length,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
                 ),
               ),
-            ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverToBoxAdapter(
@@ -207,11 +321,80 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                DateFormat.yMMMM(
-                                  context.localeName,
-                                ).format(_focusedDay),
-                                style: text.titleMedium,
+                              child: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    // The current year goes without saying.
+                                    (_focusedDay.year == _now().year
+                                            ? DateFormat.LLLL(
+                                                context.localeName,
+                                              )
+                                            : DateFormat.yMMMM(
+                                                context.localeName,
+                                              ))
+                                        .format(_focusedDay),
+                                    style: text.titleMedium,
+                                  ),
+                                  PopupMenuButton<String>(
+                                    key: const ValueKey('calendar-format'),
+                                    tooltip: context.l10n.changeView,
+                                    initialValue:
+                                        _format == CalendarFormat.month
+                                        ? 'month'
+                                        : 'week',
+                                    onSelected: _showView,
+                                    itemBuilder: (context) => [
+                                      for (final (view, label) in [
+                                        ('week', context.l10n.week),
+                                        ('month', context.l10n.month),
+                                        ('day', context.l10n.day),
+                                      ])
+                                        PopupMenuItem(
+                                          value: view,
+                                          child: Text(label),
+                                        ),
+                                    ],
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minHeight: 48,
+                                      ),
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsetsDirectional.only(
+                                              start: 8,
+                                            ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                _format == CalendarFormat.month
+                                                    ? context.l10n.month
+                                                    : context.l10n.week,
+                                                style: text.labelLarge
+                                                    ?.copyWith(
+                                                      color: colors.primary,
+                                                    ),
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.arrow_drop_down_rounded,
+                                              color: colors.primary,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (!today)
+                                    TextButton(
+                                      onPressed: () => setState(
+                                        () => _select(Task.day(_now())),
+                                      ),
+                                      child: Text(context.l10n.today),
+                                    ),
+                                ],
                               ),
                             ),
                             IconButton(
@@ -237,6 +420,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         firstDay: DateTime(2010),
                         lastDay: DateTime(2100, 12, 31),
                         focusedDay: _focusedDay,
+                        currentDay: now,
                         calendarFormat: _format,
                         headerVisible: false,
                         locale: context.localeName,
@@ -252,14 +436,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             _calendarPage = controller,
                         selectedDayPredicate: (day) =>
                             isSameDay(_selectedDay, day),
-                        onDaySelected: (selected, focused) => setState(() {
-                          _selectedDay = selected;
-                          _focusedDay = focused;
-                        }),
+                        onDaySelected: (selected, focused) =>
+                            setState(() => _select(selected, focused)),
                         onPageChanged: (focused) =>
                             setState(() => _focusedDay = focused),
                         eventLoader: (day) => tasks
                             .expand((task) => task.calendarOccurrencesOn(day))
+                            .where((task) => !task.isCompleted)
                             .toList(),
                         calendarStyle: CalendarStyle(
                           outsideDaysVisible: false,
@@ -322,12 +505,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                         height: 4,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: task.isCompleted
-                                              ? colors.primary
-                                              : AppTheme.priorityColor(
-                                                  context,
-                                                  task.priority,
-                                                ),
+                                          color: AppTheme.priorityColor(
+                                            context,
+                                            task.priority,
+                                          ),
                                         ),
                                       ),
                                     )
@@ -337,116 +518,44 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                           },
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      const Divider(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            TextButton(
-                              onPressed: () => setState(() {
-                                _selectedDay = DateTime.now();
-                                _focusedDay = _selectedDay;
-                              }),
-                              child: Text(context.l10n.today),
-                            ),
-                            TextButton.icon(
-                              key: const ValueKey('calendar-format'),
-                              onPressed: () => setState(
-                                () => _format = _format == CalendarFormat.month
-                                    ? CalendarFormat.week
-                                    : CalendarFormat.month,
-                              ),
-                              icon: Icon(
-                                _format == CalendarFormat.month
-                                    ? Icons.view_week_outlined
-                                    : Icons.calendar_month_outlined,
-                                size: 17,
-                              ),
-                              label: Text(
-                                _format == CalendarFormat.month
-                                    ? context.l10n.weekView
-                                    : context.l10n.monthView,
-                              ),
-                            ),
-                            TextButton.icon(
-                              key: const ValueKey('calendar-timeline'),
-                              onPressed: () => Navigator.pushNamed(
-                                context,
-                                '/timeline',
-                                arguments: _selectedDay,
-                              ),
-                              icon: const Icon(
-                                Icons.view_timeline_outlined,
-                                size: 17,
-                              ),
-                              label: Text(context.l10n.dayTimeline),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(24, 26, 24, 12),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
               sliver: SliverToBoxAdapter(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            today
-                                ? context.l10n.todayAgenda
-                                : DateFormat.MMMMEEEEd(
-                                    context.localeName,
-                                  ).format(_selectedDay),
-                            style: text.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            total == 0
-                                ? phoneCalendars
-                                      ? context.l10n.noScheduledTasks
-                                      : context.l10n.breathingRoom
-                                : context.l10n.agendaCounts(
-                                    total - completed,
-                                    completed,
-                                  ),
-                            style: TextStyle(
-                              color: colors.onSurfaceVariant,
-                              fontSize: 12,
+                    Text(
+                      today
+                          ? context.l10n.todayAgenda
+                          : DateFormat.MMMMEEEEd(
+                              context.localeName,
+                            ).format(_selectedDay),
+                      style: text.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      total == 0
+                          ? phoneCalendars
+                                ? context.l10n.noScheduledTasks
+                                : context.l10n.breathingRoom
+                          : context.l10n.agendaCounts(
+                              total - completed,
+                              completed,
                             ),
-                          ),
-                        ],
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 12,
                       ),
                     ),
-                    if (total > 0)
-                      SizedBox(
-                        width: 34,
-                        height: 34,
-                        child: CircularProgressIndicator(
-                          value: completed / total,
-                          strokeWidth: 3,
-                          backgroundColor: colors.outlineVariant,
-                          semanticsLabel: context.l10n.completionCount(
-                            completed,
-                            total,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: DeviceCalendarEvents(day: _selectedDay)),
             if (tasksState.isLoading)
               const SliverToBoxAdapter(
                 child: Padding(
@@ -513,23 +622,55 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverList.builder(
                   itemCount: events.length,
-                  itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: TaskTile(
-                      task: events[index],
-                      showDate:
-                          events[index].displayDate != null &&
-                          Task.dateKey(events[index].displayDate!) !=
-                              Task.dateKey(_selectedDay),
+                  itemBuilder: (context, index) {
+                    final task = events[index];
+                    final showDate =
+                        task.displayDate != null &&
+                        Task.dateKey(task.displayDate!) !=
+                            Task.dateKey(_selectedDay);
+                    final landed = index == landedIndex;
+                    return Padding(
+                      key: landed ? _landedRow : null,
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: landed
+                          // The new task lights up, then fades back.
+                          ? TweenAnimationBuilder<Color?>(
+                              tween: ColorTween(
+                                end: _highlight
+                                    ? colors.primaryContainer
+                                    : colors.surface,
+                              ),
+                              duration: instant
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 600),
+                              builder: (context, color, _) => TaskTile(
+                                task: task,
+                                showDate: showDate,
+                                color: color,
+                              ),
+                            )
+                          : TaskTile(task: task, showDate: showDate),
+                    );
+                  },
+                ),
+              ),
+            ],
+            SliverToBoxAdapter(child: DeviceCalendarEvents(day: _selectedDay)),
+            if (inbox > 0)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverToBoxAdapter(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      key: const ValueKey('calendar-inbox'),
+                      onPressed: () => Navigator.pushNamed(context, '/inbox'),
+                      icon: const Icon(Icons.inbox_outlined, size: 18),
+                      label: Text(context.l10n.inboxCount(inbox)),
                     ),
                   ),
                 ),
               ),
-            ],
-            const SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverToBoxAdapter(child: ReminderAskCard()),
-            ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
         ),

@@ -27,25 +27,25 @@ void main() {
       const Locale('en', 'US'),
       StartingDayOfWeek.sunday,
       TimeOfDayFormat.h_colon_mm_space_a,
-      'Your calendar',
+      'Today’s agenda',
     ),
     (
       const Locale('en', 'GB'),
       StartingDayOfWeek.monday,
       TimeOfDayFormat.HH_colon_mm,
-      'Your calendar',
+      'Today’s agenda',
     ),
     (
       const Locale('es', 'ES'),
       StartingDayOfWeek.monday,
       TimeOfDayFormat.H_colon_mm,
-      'Tu calendario',
+      'Agenda de hoy',
     ),
     (
       const Locale('ca', 'ES'),
       StartingDayOfWeek.monday,
       TimeOfDayFormat.HH_colon_mm,
-      'El teu calendari',
+      'L’agenda d’avui',
     ),
   ]) {
     testWidgets('device defaults follow ${sample.$1}', (tester) async {

@@ -156,7 +156,7 @@ void main() {
         .onDaySelected!(day, day);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-        find.text('See all calendar events (4)'), 160,
+        find.byKey(const ValueKey('calendar-events-line')), 160,
         scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
     await binding.convertFlutterSurfaceToImage();
@@ -165,7 +165,7 @@ void main() {
       await tester.pumpAndSettle();
       await binding.takeScreenshot('device-calendars-${theme.name}');
     }
-    await tester.tap(find.text('See all calendar events (4)'));
+    await tester.tap(find.byKey(const ValueKey('calendar-events-line')));
     await tester.pumpAndSettle();
     final sheet = find.byType(BottomSheet);
     expect(find.descendant(of: sheet, matching: find.byType(Checkbox)),

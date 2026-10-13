@@ -144,12 +144,15 @@ class AppLocalizationsEs extends AppLocalizations {
       'fileChanged':
           'El archivo ha cambiado o no se ha podido verificar. Selecciónalo de nuevo o vuelve a descargarlo.',
       'network':
-          'No se ha podido conectar con el servidor. Revisa la conexión y la dirección del servidor e inténtalo de nuevo. Tus datos locales se conservan.',
+          'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.',
+      'networkKept':
+          'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.',
       'unavailable': 'El servicio no está disponible. Inténtalo más tarde.',
       'validation':
           'No se han aceptado algunos datos. Revisa la información e inténtalo de nuevo.',
-      'other':
-          'No se ha podido completar la solicitud. Tus datos locales se conservan. Inténtalo de nuevo.',
+      'other': 'No se ha podido completar la solicitud. Inténtalo de nuevo.',
+      'otherKept':
+          'No se ha podido completar la solicitud. Inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.',
     });
     return '$_temp0';
   }
@@ -223,10 +226,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get recordNote => 'Dictar una nota';
-
-  @override
-  String get noteCaptureHelp =>
-      'Conserva tus palabras en una nota. El texto se guarda en el teléfono hasta sincronizar; las grabaciones necesitan transcripción en línea.';
 
   @override
   String get noteHint => 'Ideas, detalles de reuniones, enlaces útiles…';
@@ -411,6 +410,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudieron leer los eventos. Actualiza para volver a intentarlo; pueden faltar compromisos en esta vista.';
 
   @override
+  String get calendarReadRetry =>
+      'No se pudieron leer los eventos. Toca para reintentar.';
+
+  @override
+  String get changeView => 'Cambiar vista';
+
+  @override
   String get calendarPreferenceError =>
       'No se pudo guardar esa selección. Vuelve a intentarlo. Puedes elegir hasta 50 calendarios.';
 
@@ -425,10 +431,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarReadOnly => 'Evento del calendario · solo lectura';
 
   @override
-  String get calendarNoEvents =>
-      'No hay eventos de tus calendarios seleccionados este día.';
-
-  @override
   String get calendarNoSelection =>
       'Elige calendarios para mostrar tus compromisos existentes.';
 
@@ -436,10 +438,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarAllDay => 'Todo el día';
 
   @override
-  String get calendarUntitled => 'Evento sin título';
+  String calendarEventCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count eventos',
+      one: '1 evento',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get calendarShowAll => 'Ver todos los eventos';
+  String get calendarOffline =>
+      'Sin conexión: tus tareas están guardadas en este teléfono.';
+
+  @override
+  String get calendarUntitled => 'Evento sin título';
 
   @override
   String get calendarOpenEvent => 'Abrir en la aplicación de calendario';
@@ -463,9 +477,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settings => 'Ajustes';
-
-  @override
-  String get yourCalendar => 'Tu calendario';
 
   @override
   String get inbox => 'Bandeja de entrada';
@@ -748,7 +759,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get month => 'Mes';
 
   @override
-  String get syncTasks => 'Sincronizar tareas';
+  String get day => 'Día';
 
   @override
   String get previousPeriod => 'Mes o semana anterior';
@@ -761,12 +772,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get licenses => 'Licencias de código abierto';
-
-  @override
-  String get weekView => 'Vista semanal';
-
-  @override
-  String get monthView => 'Vista mensual';
 
   @override
   String get todayAgenda => 'Agenda de hoy';
@@ -888,9 +893,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get checkCaptures => 'Ver capturas pendientes';
-
-  @override
-  String get createVoiceTask => 'Crear una tarea con la voz';
 
   @override
   String get createTaskTooltip => 'Crear una tarea';
@@ -1045,42 +1047,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reset => 'Restablecer';
 
   @override
-  String get captureThought => 'Captura una idea';
-
-  @override
-  String get captureIntro =>
-      'Una tarea o varias. Habla con naturalidad o escribe tu plan.';
-
-  @override
-  String get stopDraft => 'Parar y crear borrador';
-
-  @override
-  String get recordTasks => 'Grabar tareas';
-
-  @override
-  String get stopRecording => 'Detener la grabación';
-
-  @override
   String get puttingPlanTogether => 'Preparando tu plan…';
 
   @override
   String get recordingKept => 'Grabación guardada en este teléfono';
-
-  @override
-  String get tapSpeak => 'Pulsa para hablar';
-
-  @override
-  String get inputLevel => 'Nivel de entrada del micrófono';
-
-  @override
-  String get tapStopHelp => 'Pulsa Parar cuando termines. Hasta 60 segundos.';
-
-  @override
-  String get returnCaptureHelp =>
-      'Puedes salir y volver. Las grabaciones pendientes se conservan.';
-
-  @override
-  String get speechOptions => 'Opciones de voz';
 
   @override
   String get onDeviceTranscript => 'Transcripción en directo en el dispositivo';
@@ -1089,16 +1059,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onlineAudio => 'Audio guardado · transcripción en línea';
 
   @override
-  String get liveTranscript => 'Transcripción en directo';
-
-  @override
-  String get savedAudio => 'Audio guardado';
-
-  @override
   String get speechLanguage => 'Idioma de voz';
-
-  @override
-  String get deviceLanguage => 'Idioma del dispositivo';
 
   @override
   String get onDeviceUnavailable =>
@@ -1111,40 +1072,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get checkAgain => 'Comprobar de nuevo';
 
   @override
-  String get holdTalk => 'Mantener pulsado para hablar';
-
-  @override
-  String get holdTalkHelp =>
-      'Mantén pulsado el micrófono y suéltalo al terminar. También puedes tocarlo.';
-
-  @override
-  String get typePlan => 'O escribe tu plan';
-
-  @override
   String get examplePlan =>
       'Médico el viernes a las 17:00. Llevar mis resultados. También comprar café.';
-
-  @override
-  String get tryRecording => 'Procesar esta grabación';
-
-  @override
-  String get reviewText => 'Revisar tareas del texto';
-
-  @override
-  String get discardCapture => 'Descartar captura';
-
-  @override
-  String get discardCaptureQuestion => '¿Descartar esta captura?';
 
   @override
   String get discard => 'Descartar';
 
   @override
   String get keep => 'Conservar';
-
-  @override
-  String get guestTrialHelp =>
-      'Prueba la voz sin una cuenta. Los dispositivos de esta conexión comparten un pequeño límite diario.';
 
   @override
   String get capturePrivacy =>
@@ -1185,11 +1120,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String completionCount(int done, int total) {
-    return '$done de $total tareas completadas';
-  }
-
-  @override
   String pendingCaptureCount(int count) {
     return 'Capturas pendientes · $count';
   }
@@ -1197,11 +1127,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String listeningSeconds(String time) {
     return 'Escuchando · $time';
-  }
-
-  @override
-  String nativeSpeechHelp(String language) {
-    return 'Transcripción local · $language. Las palabras aparecen abajo y se guardan mientras hablas.';
   }
 
   @override
@@ -1284,18 +1209,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get listUnavailable => 'Proyecto no disponible';
 
   @override
-  String get moveToList => 'Mover a un proyecto';
-
-  @override
-  String get moveToListHelp =>
-      'La fecha, el recordatorio y los detalles de la tarea se conservan.';
-
-  @override
   String get archived => 'Archivada';
 
   @override
-  String get createListHelp =>
-      'Crea un proyecto desde el selector de proyectos.';
+  String get sharedProject => 'Compartido';
 
   @override
   String get taskReopened => 'Tarea reabierta';
@@ -1387,7 +1304,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get taskSavedInbox => 'Tarea guardada en la bandeja de entrada';
 
   @override
-  String get taskAddedCalendar => 'Tarea añadida al calendario';
+  String taskAddedOn(String date) {
+    return 'Añadida al $date';
+  }
 
   @override
   String get changesSaved => 'Cambios guardados';
@@ -1820,10 +1739,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chooseDetails => 'Elegir detalles';
 
   @override
-  String get sharedListVisibility =>
-      'Compartido · todas las personas de este proyecto pueden ver sus tareas, notas y archivos subidos';
-
-  @override
   String get invitationCode => 'Código de invitación';
 
   @override
@@ -2038,10 +1953,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get reminderAskQuestion => '¿Quieres un recordatorio antes?';
-
-  @override
-  String get reminderAskQuestionTasks =>
-      '¿Quieres recordatorios antes de tus tareas?';
 
   @override
   String get reminderAskYes => 'Sí, recuérdamelo';
@@ -2697,6 +2608,31 @@ class AppLocalizationsEs extends AppLocalizations {
   String get capturePaused => 'En pausa';
 
   @override
+  String get captureListening => 'Escuchando';
+
+  @override
+  String get captureStartTalking => 'Empezar a hablar';
+
+  @override
+  String get captureContinue => 'Seguir';
+
+  @override
+  String get captureTypeInstead => 'Escribir';
+
+  @override
+  String get captureStillListening =>
+      'Sigo escuchando. Toca Listo cuando termines.';
+
+  @override
+  String get captureTimeLeft => 'Quedan 10 segundos';
+
+  @override
+  String get captureKeepQuestion => '¿Conservar lo que has dicho?';
+
+  @override
+  String get captureKeepHelp => 'Podrás terminarlo más tarde.';
+
+  @override
   String get captureRecordingFirst =>
       'Reintenta esta grabación o descártala antes de grabar otra.';
 
@@ -2758,10 +2694,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureKept => 'Tu captura se conserva en este teléfono.';
-
-  @override
-  String get captureDiscardHelp =>
-      'Se eliminarán la grabación y los borradores sin guardar. Se conservarán las tareas ya guardadas.';
 
   @override
   String get voiceRecording => 'Grabación de voz';
@@ -3257,16 +3189,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Una tarea compartida. Un miembro la completa para todos.';
 
   @override
-  String get assignmentNeedsReview =>
-      'Elige el proyecto y la persona responsable antes de compartir esta tarea.';
-
-  @override
   String assignmentHeard(Object names) {
     return 'Has mencionado: $names';
   }
-
-  @override
-  String get assignmentConfirm => 'Confirmar proyecto y responsable';
 
   @override
   String get audiencePersonal => 'Solo tú puedes verlo.';
@@ -3275,6 +3200,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String audienceShared(Object name) {
     return 'Visible para todos en $name';
   }
+
+  @override
+  String shareTaskConfirm(String name) {
+    return '¿Compartir con $name? Todos verán esta tarea y no podrás volver a hacerla privada.';
+  }
+
+  @override
+  String get shareTask => 'Compartir';
+
+  @override
+  String get sharedTaskStays =>
+      'Las tareas compartidas se quedan en su proyecto.';
+
+  @override
+  String get assignmentIsRight => '¿Es correcto?';
+
+  @override
+  String get yes => 'Sí';
 
   @override
   String get pinProject => 'Fijar proyecto';

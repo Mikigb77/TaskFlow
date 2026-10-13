@@ -21,11 +21,13 @@ import 'package:agenda/widgets/repeat_rule_control.dart';
 import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/widgets/reminder_ask_sheet.dart';
 import 'package:agenda/services/quick_schedule_parser.dart';
 
 /// One editor keeps manual creation, AI review and editing visually consistent.
@@ -369,27 +371,50 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         return;
       }
       final notifier = ref.read(taskProvider.notifier);
+      final focus = ref.read(calendarFocusProvider.notifier);
+      final messenger = ScaffoldMessenger.of(context);
+      final strings = context.l10n;
+      int? created;
       if (widget.task == null) {
-        await notifier.addTask(task);
+        created = await notifier.addTask(task);
       } else {
         await notifier.updateTask(task);
       }
       if (!mounted) return;
+      final day = task.dueDate;
+      // A new task can be taken back; a note keeps its plain message.
+      final undoable = created != null && !_isNote;
       Navigator.pop(context);
       // The save message replaces the suggestion's Undo.
       _suggestionBar = null;
-      unawaited(
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          widget.task == null
-              ? _isNote
-                    ? context.l10n.noteSaved
-                    : _dueDate == null
-                    ? context.l10n.taskSavedInbox
-                    : context.l10n.taskAddedCalendar
-              : context.l10n.changesSaved,
-        ),
+      // Opened from Calendar or the day timeline: show where the task went.
+      if (undoable && day != null && widget.calendarDate != null) {
+        focus.state = CalendarFocus(Task.day(day), created);
+      }
+      final feedback = showFeedback(
+        messenger,
+        widget.task == null
+            ? _isNote
+                  ? strings.noteSaved
+                  : day == null
+                  ? strings.taskSavedInbox
+                  : strings.taskAddedOn(context.weekdayDate(day))
+            : strings.changesSaved,
+        actionLabel: undoable ? strings.undo : null,
+        onAction: undoable
+            ? () async {
+                try {
+                  await notifier.deleteTask(created!);
+                } catch (_) {
+                  if (messenger.mounted) {
+                    unawaited(showFeedback(messenger, strings.undoError));
+                  }
+                }
+              }
+            : null,
       );
+      unawaited(feedback);
+      askAboutRemindersAfterSave(context, [task], feedback: feedback);
     } catch (_) {
       if (mounted) {
         unawaited(

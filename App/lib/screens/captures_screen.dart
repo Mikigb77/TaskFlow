@@ -55,11 +55,9 @@ class CapturesScreen extends ConsumerWidget {
                                       '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${session.remaining.isNotEmpty ? context.l10n.captureDraftSummary(session.remaining.length, session.ready.length) : context.l10n.captureResumeHelp}'),
                                   trailing:
                                       const Icon(Icons.chevron_right_rounded),
-                                  onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute<void>(
-                                          builder: (_) => VoiceTaskScreen(
-                                              captureId: session.id))),
+                                  onTap: () => showCaptureSheet(context,
+                                      captureId: session.id,
+                                      startListening: false),
                                 ))),
                     ])),
           ));

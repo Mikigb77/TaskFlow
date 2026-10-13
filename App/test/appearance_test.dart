@@ -231,7 +231,7 @@ void main() {
     expect(find.text('Undo').hitTestable(), findsOneWidget);
     expect(find.byTooltip('Create task').hitTestable(), findsOneWidget);
     expect(
-      find.byTooltip('Create task with voice').hitTestable(),
+      find.text('Say a task').hitTestable(),
       findsOneWidget,
     );
     await tester.tap(find.text('Undo'));
@@ -296,12 +296,12 @@ void main() {
   });
 
   testWidgets(
-    'Calendar starts compact, keeps empty Inbox visible and opens task actions',
+    'Calendar starts compact, hides an empty Inbox and opens task actions',
     (tester) async {
       final container = await _pump(tester);
-      expect(find.text('Month view'), findsOneWidget);
-      expect(find.byKey(const ValueKey('calendar-inbox')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('calendar-inbox')));
+      expect(find.text('Week'), findsOneWidget);
+      expect(find.byKey(const ValueKey('calendar-inbox')), findsNothing);
+      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/inbox');
       await tester.pumpAndSettle();
       expect(find.text('NO DATE NEEDED'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'All tasks'), findsNothing);

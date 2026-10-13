@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/day_timeline.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
@@ -241,8 +242,12 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
       ]),
       floatingActionButton: FloatingActionButton(
           tooltip: l.newTask,
-          onPressed: () =>
-              Navigator.pushNamed(context, '/createTask', arguments: _day),
+          onPressed: () {
+            // Never pre-fill a day that has already gone.
+            final today = Task.day(ref.read(calendarClockProvider)());
+            Navigator.pushNamed(context, '/createTask',
+                arguments: _day.isBefore(today) ? today : _day);
+          },
           child: const Icon(Icons.add_rounded)),
     );
   }

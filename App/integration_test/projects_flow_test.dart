@@ -134,11 +134,13 @@ void main() {
           }
         }
       });
-      navigator().push(
-        MaterialPageRoute<void>(
-          builder: (_) => const VoiceTaskScreen(projectId: projectId),
-        ),
+      showCaptureSheet(
+        tester.element(find.byType(Navigator)),
+        projectId: projectId,
+        startListening: false,
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Type instead'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('capture-words')),
@@ -146,8 +148,7 @@ void main() {
       );
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      final review = find.text('Review tasks from text');
-      await tester.ensureVisible(review);
+      final review = find.widgetWithText(FilledButton, 'Done');
       await tester.tap(review);
       final problem = find.textContaining(
         'The processing service is unavailable.',
@@ -183,25 +184,20 @@ void main() {
       await binding.takeScreenshot('projects-provider-unavailable');
       navigator().pop();
       await tester.pumpAndSettle();
-      navigator().push(
-        MaterialPageRoute<void>(
-          builder: (_) => VoiceTaskScreen(captureId: retained.id),
-        ),
+      showCaptureSheet(
+        tester.element(find.byType(Navigator)),
+        captureId: retained.id,
+        startListening: false,
       );
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('capture-words')))
-            .controller!
-            .text,
+        tester.widget<Text>(find.byKey(const ValueKey('capture-heard'))).data,
         words,
       );
       expect(problem, findsOneWidget);
       expect(
         tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Review tasks from text'),
-            )
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Done'))
             .onPressed,
         isNotNull,
       );
@@ -328,27 +324,24 @@ void main() {
         await File(audio.audioPath!).writeAsBytes(bytes, flush: true);
         audioCaptureId = audio.id;
       }
-      navigator().push(
-        MaterialPageRoute<void>(
-          builder: (_) =>
-              VoiceTaskScreen(projectId: projectId, captureId: audioCaptureId),
-        ),
+      showCaptureSheet(
+        tester.element(find.byType(Navigator)),
+        projectId: projectId,
+        captureId: audioCaptureId,
+        startListening: false,
       );
       await tester.pumpAndSettle();
       if (audioCaptureId == null) {
+        await tester.tap(find.byTooltip('Type instead'));
+        await tester.pumpAndSettle();
         await tester.enterText(
-          find.byType(TextField).first,
+          find.byKey(const ValueKey('capture-words')),
           'Ana needs to finish exercise three in Physics by Thursday. We all need to prepare the final presentation in Physics by Friday.',
         );
       }
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      final review = find.text(
-        audioCaptureId == null
-            ? 'Review tasks from text'
-            : 'Try this recording',
-      );
-      await tester.ensureVisible(review);
+      final review = find.widgetWithText(FilledButton, 'Done');
       await tester.tap(review);
       await waitFor(
         tester,

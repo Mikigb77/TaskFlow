@@ -16,6 +16,10 @@ import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/native_speech.dart';
+import 'package:agenda/screens/voice_task_screen.dart';
+import 'package:record/record.dart';
+import 'dart:async';
 
 TaskDraft draft(String title, {bool ambiguous = false}) => TaskDraft.fromJson({
   'title': title,
@@ -363,6 +367,111 @@ void main() {
     },
   );
 
+
+  // P35 / UX-105: the listening sheet in Spanish at 2x text on a 360x740
+  // phone. Asserted always; written as a preview with WRITE_REVIEW_PREVIEWS.
+  testWidgets(
+    'UX-105: the Spanish 2x listening sheet keeps the newest words and Cancelar, Listo and Escribir in view',
+    (tester) async {
+      final messenger = tester.binding.defaultBinaryMessenger;
+      const timezone = MethodChannel('flutter_timezone');
+      messenger.setMockMethodCallHandler(timezone, (_) async => 'UTC');
+      addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
+      tester.view.physicalSize = const Size(360, 740);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final speech = _PreviewSpeech();
+      addTearDown(speech.controller.close);
+      final preview = GlobalKey();
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(
+            language: 'es',
+            clock: ClockFormat.twentyFour,
+            weekStart: 1,
+          ),
+        ),
+        overrides: [
+          nativeSpeechProvider.overrideWithValue(speech),
+          captureStoreProvider.overrideWithValue(_ListeningStore()),
+          // No microphone plugin: the recognizer does the listening.
+          captureRecorderFactoryProvider.overrideWithValue(_SilentRecorder.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: RepaintBoundary(key: preview, child: const MyApp()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(const Locale('es'));
+      await tester.tap(find.text(l.sayTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(speech.starts, 1);
+      speech.send('ready');
+      await tester.pump();
+      const newest = 'y reservar mesa para el sábado por la noche';
+      speech.send(
+        'segment',
+        text:
+            'Comprar pan y leche en la tienda de la esquina, llamar al médico '
+            'el viernes a las cinco, recoger a los niños del colegio, pagar '
+            'la factura de la luz antes del lunes, regar las plantas $newest',
+      );
+      await tester.pump();
+      for (var second = 0; second < 3; second++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      const screen = Rect.fromLTWH(0, 0, 360, 740);
+      bool onScreen(Rect rect) =>
+          screen.contains(rect.topLeft) &&
+          screen.contains(rect.bottomRight - const Offset(0.1, 0.1));
+      final heard = find.byKey(const ValueKey('capture-heard'));
+      expect(heard, findsOneWidget);
+      final scroll = find
+          .ancestor(of: heard, matching: find.byType(Scrollable))
+          .first;
+      // Reversed: offset 0 shows the end of the words, the newest ones.
+      expect(tester.state<ScrollableState>(scroll).position.pixels, 0);
+      expect(
+        tester.getRect(heard).bottom,
+        lessThanOrEqualTo(tester.getRect(scroll).bottom + 0.5),
+      );
+      expect(onScreen(tester.getRect(scroll)), isTrue);
+      for (final control in [
+        find.widgetWithText(TextButton, l.cancel),
+        find.widgetWithText(FilledButton, l.done),
+        find.byTooltip(l.captureTypeInstead),
+      ]) {
+        expect(control.hitTestable(), findsOneWidget);
+        expect(onScreen(tester.getRect(control)), isTrue, reason: '$control');
+      }
+      expect(tester.takeException(), isNull);
+      if (const bool.fromEnvironment('WRITE_REVIEW_PREVIEWS')) {
+        final boundary =
+            preview.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 2);
+          final bytes = (await image.toByteData(
+            format: ui.ImageByteFormat.png,
+          ))!;
+          await File(
+            'build/capture-listening-es-2x.png',
+          ).writeAsBytes(bytes.buffer.asUint8List());
+          image.dispose();
+        });
+      }
+      await tester.tap(find.widgetWithText(TextButton, l.cancel));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, l.keep));
+      await tester.pumpAndSettle();
+    },
+  );
   group('UX-101: the voice save’s Deshacer', () {
     const timeoutChannel = MethodChannel('taskflow/accessibility');
     final platform =
@@ -508,4 +617,93 @@ class _SavingStore extends CaptureStore {
     undos++;
     return current = before;
   }
+}
+
+/// The phone's recognizer: `start` is counted and events are sent by the test.
+class _PreviewSpeech extends NativeSpeech {
+  final controller = StreamController<SpeechEvent>.broadcast(sync: true);
+  int starts = 0;
+  int? run;
+  @override
+  Future<SpeechCapability> capability({String? language}) async =>
+      const SpeechCapability(
+        onDevice: true,
+        language: 'es-ES',
+        languageInstalled: true,
+      );
+  @override
+  Stream<SpeechEvent> get events => controller.stream;
+  @override
+  Future<SpeechPermission> permission() async => SpeechPermission.granted;
+  @override
+  Future<void> start(
+    int id,
+    String language, {
+    List<String> hints = const [],
+  }) async {
+    starts++;
+    run = id;
+  }
+
+  void send(String kind, {String? text}) =>
+      controller.add(SpeechEvent(run!, kind, text: text));
+  @override
+  Future<void> stop(int id) async => send('ended');
+  @override
+  Future<void> cancel(int id) async {}
+}
+
+/// A capture kept in memory while it is being said.
+class _ListeningStore extends CaptureStore {
+  _ListeningStore() : super(TaskDatabase());
+  CaptureSession? session;
+  @override
+  Future<CaptureSession> create(
+    String ownerKey,
+    String timezone, {
+    String text = '',
+    DateTime? now,
+    bool audio = false,
+    String kind = 'task',
+    String? projectId,
+    String? source,
+  }) async => session = CaptureSession(
+    id: 'preview-capture',
+    ownerKey: ownerKey,
+    timezone: timezone,
+    capturedAt: (now ?? DateTime.now()).toUtc(),
+    text: text,
+    kind: kind,
+    projectId: projectId,
+    source: source,
+  );
+  @override
+  Future<void> update(CaptureSession value) async => session = value;
+  @override
+  Future<CaptureSession?> read(String id, String ownerKey) async =>
+      session?.id == id ? session : null;
+  @override
+  Future<void> cleanFinished(String ownerKey) async {}
+  @override
+  Future<List<CaptureSession>> pending(String ownerKey) async => [];
+}
+
+/// The audio recorder stands by unused while the recognizer listens.
+class _SilentRecorder extends Fake implements AudioRecorder {
+  final _states = StreamController<RecordState>.broadcast();
+  @override
+  Stream<RecordState> onStateChanged() => _states.stream;
+  @override
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) =>
+      const Stream.empty();
+  @override
+  Future<bool> hasPermission({bool request = true}) async => true;
+  @override
+  Future<bool> isRecording() async => false;
+  @override
+  Future<bool> isPaused() async => false;
+  @override
+  Future<String?> stop() async => null;
+  @override
+  Future<void> dispose() => _states.close();
 }

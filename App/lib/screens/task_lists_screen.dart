@@ -46,144 +46,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
     BuildContext context,
     WidgetRef ref, [
     TaskListInfo? list,
-  ]) async {
-    final store = ref.read(taskListStoreProvider);
-    var name = list?.name ?? '';
-    var color = list?.color ?? 'teal';
-    final groups = (ref.read(groupsProvider).valueOrNull ?? <TaskGroupInfo>[])
-        .where((g) => g.canManage && !g.archived)
-        .toList();
-    var group = groups.where((g) => g.id == widget.groupId).firstOrNull;
-    if (list == null && widget.groupId != null && group == null) {
-      showFeedback(ScaffoldMessenger.of(context),
-          context.l10n.groupActionError);
-      return;
-    }
-    final form = GlobalKey<FormState>();
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          scrollable: true,
-          title: Text(
-            list == null ? context.l10n.newList : context.l10n.editList,
-          ),
-          content: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  key: const ValueKey('list-name'),
-                  initialValue: name,
-                  maxLength: 80,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.listName,
-                    hintText: context.l10n.listNameHint,
-                    errorMaxLines: 3,
-                  ),
-                  onChanged: (value) => name = value,
-                  validator: (value) => value?.trim().isNotEmpty == true
-                      ? null
-                      : context.l10n.listNameRequired,
-                ),
-                if (list == null && widget.groupId == null && groups.isNotEmpty)
-                  DropdownButtonFormField<String>(
-                    initialValue: '',
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.projectDestination,
-                    ),
-                    items: [
-                      DropdownMenuItem(
-                        value: '',
-                        child: Text(context.l10n.projectsPersonal),
-                      ),
-                      for (final choice in groups)
-                        DropdownMenuItem(
-                          value: choice.id,
-                          child: Text(
-                            choice.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (id) => setState(
-                      () => group = groups.where((g) => g.id == id).firstOrNull,
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final choice in [
-                      'teal',
-                      'blue',
-                      'violet',
-                      'amber',
-                      'rose',
-                    ])
-                      ChoiceChip(
-                        label: Text(context.listColorName(choice)),
-                        avatar: Icon(
-                          Icons.circle,
-                          size: 14,
-                          color: taskListColor(choice),
-                        ),
-                        selected: color == choice,
-                        onSelected: (_) => setState(() => color = choice),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (form.currentState!.validate()) {
-                  Navigator.pop(context, true);
-                }
-              },
-              child: Text(context.l10n.saveList),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (accepted != true || !context.mounted) return;
-    try {
-      if (list == null) {
-        await store.create(
-          TaskListInfo(
-            name: name.trim(),
-            color: color,
-            groupId: group?.id,
-            groupName: group?.name,
-            ownerId: group?.ownerId,
-            shared: group != null,
-            role: group?.role ?? 'owner',
-            people: group?.people ?? [],
-          ),
-        );
-      } else {
-        await store.update(list.copyWith(name: name.trim(), color: color));
-      }
-      if (context.mounted) {
-        ref.invalidate(taskListsProvider);
-        ref.read(taskProvider.notifier).loadTasks();
-      }
-    } catch (_) {
-      if (context.mounted) {
-        showFeedback(ScaffoldMessenger.of(context), context.l10n.listSaveError);
-      }
-    }
-  }
+  ]) => editTaskList(context, ref, list: list, groupId: widget.groupId);
 
   Future<void> _archive(
     BuildContext context,
@@ -196,15 +59,19 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       if (context.mounted) {
         ref.invalidate(taskListsProvider);
         ref.read(taskProvider.notifier).loadTasks();
-        showFeedback(ScaffoldMessenger.of(context),
-            list.archived
-                ? context.l10n.listRestored
-                : context.l10n.listArchivedHelp);
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          list.archived
+              ? context.l10n.listRestored
+              : context.l10n.listArchivedHelp,
+        );
       }
     } catch (_) {
       if (context.mounted) {
-        showFeedback(ScaffoldMessenger.of(context),
-            context.l10n.listUpdateError);
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.listUpdateError,
+        );
       }
     }
   }
@@ -252,8 +119,10 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       }
     } catch (_) {
       if (context.mounted) {
-        showFeedback(ScaffoldMessenger.of(context),
-            context.l10n.listResolveError);
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.listResolveError,
+        );
       }
     }
   }
@@ -267,8 +136,10 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       await ref.read(taskProvider.notifier).loadTasks();
     } catch (_) {
       if (mounted) {
-        showFeedback(ScaffoldMessenger.of(context),
-            context.l10n.listUpdateError);
+        showFeedback(
+          ScaffoldMessenger.of(context),
+          context.l10n.listUpdateError,
+        );
       }
     }
   }
@@ -317,8 +188,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                     hintText: context.l10n.projectsFind,
                     prefixIcon: const Icon(Icons.search),
                   ),
-                  onChanged: (value) =>
-                      setState(() => _query = value.trim()),
+                  onChanged: (value) => setState(() => _query = value.trim()),
                 ),
                 const SizedBox(height: 12),
                 const GroupInvitations(),
@@ -458,5 +328,152 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Opens the project name dialog. Returns the project once it's saved.
+Future<TaskListInfo?> editTaskList(
+  BuildContext context,
+  WidgetRef ref, {
+  TaskListInfo? list,
+  String? groupId,
+}) async {
+  final store = ref.read(taskListStoreProvider);
+  var name = list?.name ?? '';
+  var color = list?.color ?? 'teal';
+  final groups = (ref.read(groupsProvider).valueOrNull ?? <TaskGroupInfo>[])
+      .where((g) => g.canManage && !g.archived)
+      .toList();
+  var group = groups.where((g) => g.id == groupId).firstOrNull;
+  if (list == null && groupId != null && group == null) {
+    showFeedback(ScaffoldMessenger.of(context), context.l10n.groupActionError);
+    return null;
+  }
+  final form = GlobalKey<FormState>();
+  final accepted = await showDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        scrollable: true,
+        title: Text(
+          list == null ? context.l10n.newList : context.l10n.editList,
+        ),
+        content: Form(
+          key: form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const ValueKey('list-name'),
+                initialValue: name,
+                maxLength: 80,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: context.l10n.listName,
+                  hintText: context.l10n.listNameHint,
+                  errorMaxLines: 3,
+                ),
+                onChanged: (value) => name = value,
+                validator: (value) => value?.trim().isNotEmpty == true
+                    ? null
+                    : context.l10n.listNameRequired,
+              ),
+              if (list == null && groupId == null && groups.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  initialValue: '',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.projectDestination,
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: '',
+                      child: Text(context.l10n.projectsPersonal),
+                    ),
+                    for (final choice in groups)
+                      DropdownMenuItem(
+                        value: choice.id,
+                        child: Text(
+                          choice.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (id) => setState(
+                    () => group = groups.where((g) => g.id == id).firstOrNull,
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final choice in [
+                    'teal',
+                    'blue',
+                    'violet',
+                    'amber',
+                    'rose',
+                  ])
+                    ChoiceChip(
+                      label: Text(context.listColorName(choice)),
+                      avatar: Icon(
+                        Icons.circle,
+                        size: 14,
+                        color: taskListColor(choice),
+                      ),
+                      selected: color == choice,
+                      onSelected: (_) => setState(() => color = choice),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: Text(context.l10n.saveList),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (accepted != true || !context.mounted) return null;
+  try {
+    final saved = list == null
+        ? TaskListInfo(
+            name: name.trim(),
+            color: color,
+            groupId: group?.id,
+            groupName: group?.name,
+            ownerId: group?.ownerId,
+            shared: group != null,
+            role: group?.role ?? 'owner',
+            people: group?.people ?? [],
+          )
+        : list.copyWith(name: name.trim(), color: color);
+    if (list == null) {
+      await store.create(saved);
+    } else {
+      await store.update(saved);
+    }
+    if (context.mounted) {
+      ref.invalidate(taskListsProvider);
+      ref.read(taskProvider.notifier).loadTasks();
+    }
+    return saved;
+  } catch (_) {
+    if (context.mounted) {
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.listSaveError);
+    }
+    return null;
   }
 }

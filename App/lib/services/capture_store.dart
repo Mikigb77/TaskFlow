@@ -48,6 +48,7 @@ class CaptureStore {
     bool audio = false,
     String kind = 'task',
     String? projectId,
+    String? source,
   }) async {
     if (!['task', 'note'].contains(kind)) {
       throw ArgumentError('Invalid capture type.');
@@ -62,6 +63,7 @@ class CaptureStore {
       projectId: projectId,
       text: text,
       audioPath: audio ? p.join((await _directory()).path, '$id.wav') : null,
+      source: source,
     );
     await (await database.database).insert('captures', {
       'id': id,
@@ -94,6 +96,8 @@ class CaptureStore {
       timezone: timezone,
       text: text,
       capturedAt: capturedAt.toUtc(),
+      // A share or typed shortcut brings words; a voice shortcut brings none.
+      source: text.trim().isEmpty ? null : 'typed',
     );
     return (await database.database).transaction((tx) async {
       await tx.insert('captures', {
@@ -295,6 +299,7 @@ class CaptureStore {
       kind: before.kind,
       text: before.text,
       transcript: before.transcript,
+      source: before.source,
       status: 'ready',
       drafts: [
         for (final draft in current.drafts)

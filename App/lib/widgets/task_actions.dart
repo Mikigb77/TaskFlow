@@ -36,21 +36,10 @@ class TaskActions extends ConsumerWidget {
             ),
         LayoutBuilder(
           builder: (context, constraints) {
-            final voice = Tooltip(
-              message: context.l10n.createVoiceTask,
-              child: FilledButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => VoiceTaskScreen(
-                      startRecording: true,
-                      projectId: projectId,
-                    ),
-                  ),
-                ),
-                icon: const Icon(Icons.mic_none_rounded),
-                label: Text(context.l10n.sayTask),
-              ),
+            final voice = FilledButton.icon(
+              onPressed: () => showCaptureSheet(context, projectId: projectId),
+              icon: const Icon(Icons.mic_none_rounded),
+              label: Text(context.l10n.sayTask),
             );
             final typed = Tooltip(
               message: context.l10n.createTaskTooltip,

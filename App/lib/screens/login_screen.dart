@@ -407,7 +407,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 liveRegion: true,
                                 child: MessageBanner(
                                   _message ??
-                                      requestProblemText(strings, error!),
+                                      requestProblemText(
+                                        strings,
+                                        error!,
+                                        onSignIn: true,
+                                      ),
                                   isError: error != null,
                                 ),
                               ),

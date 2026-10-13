@@ -243,7 +243,7 @@ class TaskDetailScreen extends ConsumerWidget {
                               context,
                               Icons.flag_outlined,
                               context.l10n.deadline,
-                              '${taskDeadlineLabel(context, task)}${task.deadlineHasTime ? '' : '\n${context.l10n.deadlineEndDay}'}',
+                              '${taskDeadlineLabel(context, task)}${task.deadlinePassed(DateTime.now()) ? ' · ${context.l10n.deadlineOverdue}' : ''}${task.deadlineHasTime ? '' : '\n${context.l10n.deadlineEndDay}'}',
                               color: task.deadlinePassed(DateTime.now())
                                   ? colors.error
                                   : null,

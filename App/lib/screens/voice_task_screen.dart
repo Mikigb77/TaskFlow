@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/capture_messages.dart';
 import 'package:agenda/services/capture_problem.dart';
@@ -19,7 +21,6 @@ import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/widgets/app_components.dart';
-import 'package:agenda/widgets/custom_app_bar.dart';
 
 // Each capture screen owns and releases its recorder. A factory also lets the
 // interruption contract be exercised without recording from a test machine.
@@ -27,18 +28,137 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
   (ref) => AudioRecorder.new,
 );
 
-/// All recorder entry points, including shortcuts and recovered sessions, pass
-/// through the same paid-access gate before a recorder is created.
+/// Opens capture as a sheet over the current screen. Every way into capture —
+/// the creation button, Notes, the widget, shortcuts, sharing and the pending
+/// list — comes through here. [kind] is `note` from Notes, `task` elsewhere; a
+/// resumed [captureId] keeps its own.
+Future<void> showCaptureSheet(
+  BuildContext context, {
+  String kind = 'task',
+  String? projectId,
+  String? captureId,
+  bool startListening = true,
+}) {
+  final navigator = Navigator.of(context);
+  final localizations = MaterialLocalizations.of(context);
+  return navigator.push(
+    _CaptureSheetRoute(
+      capturedThemes: InheritedTheme.capture(
+        from: context,
+        to: navigator.context,
+      ),
+      barrierLabel: localizations.scrimLabel,
+      barrierOnTapHint: localizations.scrimOnTapHint(
+        localizations.bottomSheetLabel,
+      ),
+      modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
+      builder: (_) => _SheetFrame(
+        child: VoiceTaskScreen(
+          kind: kind,
+          projectId: projectId,
+          captureId: captureId,
+          startListening: startListening,
+        ),
+      ),
+    ),
+  );
+}
+
+/// A modal bottom sheet whose scrim can't close it while capture is listening
+/// or working. Swiping down is handled by [_SheetFrame], so it asks the same
+/// question as Cancel and Back instead of closing at once.
+class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
+  _CaptureSheetRoute({
+    required super.builder,
+    super.capturedThemes,
+    super.barrierLabel,
+    super.barrierOnTapHint,
+    super.modalBarrierColor,
+  }) : super(
+         isScrollControlled: true,
+         useSafeArea: true,
+         enableDrag: false,
+         showDragHandle: false,
+       );
+
+  bool _holdScrim = false;
+
+  @override
+  bool get barrierDismissible => !_holdScrim;
+
+  void holdScrim(bool hold) {
+    if (hold == _holdScrim) return;
+    _holdScrim = hold;
+    changedInternalState();
+  }
+}
+
+/// The sheet's handle, safe area and keyboard room. A swipe down asks to close
+/// the way Back does, so the capture can answer it.
+class _SheetFrame extends StatefulWidget {
+  const _SheetFrame({required this.child});
+  final Widget child;
+  @override
+  State<_SheetFrame> createState() => _SheetFrameState();
+}
+
+class _SheetFrameState extends State<_SheetFrame> {
+  double _pulled = 0;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onVerticalDragStart: (_) => _pulled = 0,
+    onVerticalDragUpdate: (details) => _pulled += details.delta.dy,
+    onVerticalDragEnd: (details) {
+      if (_pulled > 72 || (details.primaryVelocity ?? 0) > 700) {
+        unawaited(Navigator.maybePop(context));
+      }
+    },
+    child: Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ExcludeSemantics(
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+            Flexible(child: widget.child),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// The capture sheet's content. Open it with [showCaptureSheet]. All recorder
+/// entry points, including shortcuts and recovered sessions, pass through the
+/// same paid-access gate before a recorder is created.
 class VoiceTaskScreen extends ConsumerWidget {
   const VoiceTaskScreen({
     super.key,
     this.captureId,
-    this.startRecording = false,
+    this.startListening = true,
     this.kind = 'task',
     this.projectId,
   });
   final String? captureId;
-  final bool startRecording;
+  final bool startListening;
   final String kind;
   final String? projectId;
   @override
@@ -46,47 +166,41 @@ class VoiceTaskScreen extends ConsumerWidget {
     if (ref.watch(hasProProvider)) {
       return _VoiceCaptureScreen(
         captureId: captureId,
-        startRecording: startRecording,
+        startListening: startListening,
         kind: kind,
         projectId: projectId,
       );
     }
     final billing = ref.watch(subscriptionProvider);
-    return Scaffold(
-      appBar: CustomAppBar(title: context.l10n.sayTask),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.mic_none_rounded, size: 48),
-                const SizedBox(height: 20),
-                Text(
-                  context.l10n.voiceProRequired,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 20),
-                if (billing.busy)
-                  const CircularProgressIndicator()
-                else ...[
-                  FilledButton(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, '/subscription'),
-                    child: Text(context.l10n.voiceProAction),
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        ref.read(subscriptionProvider.notifier).refresh(),
-                    child: Text(context.l10n.billingRefresh),
-                  ),
-                ],
-              ],
+    return Material(
+      type: MaterialType.transparency,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.mic_none_rounded, size: 48),
+            const SizedBox(height: 20),
+            Text(
+              context.l10n.voiceProRequired,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-          ),
+            const SizedBox(height: 20),
+            if (billing.busy)
+              const CircularProgressIndicator()
+            else ...[
+              FilledButton(
+                onPressed: () => Navigator.pushNamed(context, '/subscription'),
+                child: Text(context.l10n.voiceProAction),
+              ),
+              TextButton(
+                onPressed: () =>
+                    ref.read(subscriptionProvider.notifier).refresh(),
+                child: Text(context.l10n.billingRefresh),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -101,14 +215,14 @@ enum _CapturePhase { starting, idle, listening, paused, processing }
 class _VoiceCaptureScreen extends ConsumerStatefulWidget {
   const _VoiceCaptureScreen({
     this.captureId,
-    this.startRecording = false,
+    this.startListening = true,
     this.kind = 'task',
     this.projectId,
   });
   final String kind;
   final String? projectId;
   final String? captureId;
-  final bool startRecording;
+  final bool startListening;
   @override
   ConsumerState<_VoiceCaptureScreen> createState() => _VoiceTaskScreenState();
 }
@@ -117,8 +231,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     with WidgetsBindingObserver {
   late final AudioRecorder _recorder;
   final _words = TextEditingController();
+  final _wordsFocus = FocusNode();
   late final CaptureStore _store;
   late final String _owner;
+  ProviderContainer? _container;
   CaptureSession? _session;
   late String _kind = widget.kind;
   String _zone = 'UTC';
@@ -139,7 +255,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool _initialized = false;
   bool _autoStart = false;
   bool _autoStarted = false;
+  // Opening listens on the next frame: show `starting` until then.
+  bool _startPending = false;
+  // Typing instead: the words become an editable field.
+  bool _typing = false;
+  // The keep-or-discard question is up.
+  bool _asking = false;
   int _seconds = 0;
+  // The listening second the last new words arrived.
+  int _wordsAt = 0;
   double _level = 0;
   String? _error;
   bool _errorRetained = false;
@@ -150,11 +274,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool _nativeMode = false;
   bool _usingNative = false;
   bool _acceptSpeech = false;
-  bool _holdToTalk = false;
-  bool _holding = false;
-  bool _holdSession = false;
-  bool _probing = false;
-  String? _language;
   String _nativePrefix = '';
   int _nativeRun = DateTime.now().millisecondsSinceEpoch % 2000000000;
   final _openingWatch = Stopwatch()..start();
@@ -179,10 +298,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _store = ref.read(captureStoreProvider);
     unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.opened));
     _speech = ref.read(nativeSpeechProvider);
+    // Project and people names for the speech hints, ready before listening.
+    ref.read(taskListsProvider);
     _owner = ref.read(captureOwnerProvider);
     _zone = ref.read(authProvider).account?.timezone ?? 'UTC';
     WidgetsBinding.instance.addObserver(this);
     CaptureInterruption.active = _interruptCapture;
+    // The sheet shows the words and the controls that fit them.
+    _words.addListener(_wordsChanged);
     // An earlier save's Undo must not follow the user into a new capture.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
@@ -190,12 +313,18 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     unawaited(_load());
   }
 
+  void _wordsChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _container ??= ProviderScope.containerOf(context, listen: false);
+    // With TalkBack, listening waits for `Start talking`, so the screen
+    // reader's own speech doesn't end up in the words.
     _autoStart =
-        widget.startRecording ||
-        ModalRoute.of(context)?.settings.arguments == true;
+        widget.startListening && !MediaQuery.accessibleNavigationOf(context);
     _tryAutoStart();
   }
 
@@ -256,14 +385,21 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       return;
     }
     _autoStarted = true;
+    _startPending = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+      if (!mounted) return;
+      setState(() => _startPending = false);
+      if (!_typing && ModalRoute.of(context)?.isCurrent == true) {
         _beginRecording();
       }
     });
   }
 
-  Future<void> _ensureSession({bool audio = false, String text = ''}) async {
+  Future<void> _ensureSession({
+    bool audio = false,
+    String text = '',
+    String? source,
+  }) async {
     if (_session != null) return;
     _session = await _store.create(
       _owner,
@@ -272,6 +408,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       audio: audio,
       kind: _kind,
       projectId: widget.projectId ?? ref.read(projectScopeProvider).projectId,
+      source: source,
     );
     await CaptureDiagnostics(_store.database).record(CaptureEvent.started);
     if (mounted) ref.invalidate(pendingCapturesProvider);
@@ -284,12 +421,19 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         CaptureDiagnostics(_store.database).record(CaptureEvent.typedStarted),
       );
     }
+    // The first words decide whether the AI may treat them as speech.
+    final source = text.trim().isEmpty
+        ? null
+        : _acceptSpeech
+        ? 'speech'
+        : 'typed';
     _writes = _writes.catchError((Object _) {}).then((_) async {
       if (text.trim().isEmpty && _session == null) return;
-      await _ensureSession(text: text);
+      await _ensureSession(text: text, source: source);
       _session = _session!.copyWith(
         text: text,
         status: _recording ? 'recording' : 'editing',
+        source: _session!.source ?? source,
       );
       await _store.update(_session!);
     });
@@ -300,37 +444,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     );
   }
 
-  void _chooseKind(String kind) {
-    if (_busy || _recording || kind == _kind) return;
-    setState(() => _kind = kind);
-    _writes = _writes.catchError((Object _) {}).then((_) async {
-      if (_session != null) {
-        _session = _session!.copyWith(kind: kind);
-        await _store.update(_session!);
-      }
-    });
-    unawaited(
-      _writes.catchError((Object error) {
-        _showProblem(error);
-      }),
-    );
-  }
-
   void _beginRecording() {
     if (_busy || _recording) return;
     _starting = _startRecording();
   }
 
-  Future<void> _chooseLanguage(String? language) async {
-    setState(() => _probing = true);
-    final capability = await _speech.capability(language: language);
+  void _announce(String message) {
     if (!mounted) return;
-    setState(() {
-      _language = language;
-      _capability = capability;
-      _nativeMode = capability.usable;
-      _probing = false;
-    });
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
+        Directionality.of(context),
+      ),
+    );
   }
 
   void _receiveSpeech(SpeechEvent event) {
@@ -344,6 +471,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _nativePrefix = shown.length > 4000 ? shown.substring(0, 4000) : shown;
     }
     if (text.isNotEmpty) {
+      _wordsAt = _seconds;
       if (!_firstWords) {
         _firstWords = true;
         unawaited(
@@ -385,10 +513,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (!mounted || !_recording || _phase != _CapturePhase.starting) return;
     setState(() => _phase = _CapturePhase.listening);
     _armTimer();
+    _announce(context.l10n.captureListening);
   }
 
   void _armTimer() {
     _seconds = 0;
+    _wordsAt = 0;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -406,7 +536,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       state == AppLifecycleState.detached;
 
   Future<void> _startRecording() async {
-    _holdSession = _holding;
     setState(() {
       _phase = _CapturePhase.starting;
       _error = null;
@@ -472,15 +601,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ).record(CaptureEvent.nativeStarted),
         );
         // Listening shows, and its clock runs, from the recognizer's `ready`.
-        await _speech.start(_nativeRun, _capability.language);
+        await _speech.start(
+          _nativeRun,
+          _capability.language,
+          hints: speechHints(
+            _capability.language,
+            projects: ref.read(taskListsProvider).valueOrNull ?? const [],
+          ),
+        );
         if (!mounted || _leaving(WidgetsBinding.instance.lifecycleState)) {
           await _finishRecording(submit: false, interrupted: true);
-        } else if (_holdSession && !_holding) {
-          await _finishRecording(submit: false);
         }
         return;
       }
-      await _ensureSession(audio: true);
+      await _ensureSession(audio: true, source: 'speech');
       if (_session!.audioPath == null) {
         _session = _session!.copyWith(
           audioPath: await _store.audioPathFor(_session!),
@@ -489,6 +623,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _session = _session!.copyWith(
         status: 'recording',
         audioFormat: Platform.isAndroid ? CaptureSession.androidPcmWav : null,
+        source: _session!.source ?? 'speech',
       );
       await _store.update(_session!);
       if (!mounted) return;
@@ -521,10 +656,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       if (!_recording) return;
       if (!mounted || _leaving(WidgetsBinding.instance.lifecycleState)) {
         await _finishRecording(submit: false, interrupted: true);
-        return;
-      }
-      if (_holdSession && !_holding) {
-        await _finishRecording(submit: false);
         return;
       }
       _listening();
@@ -561,13 +692,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   /// Ends listening. Only the user stopping, or the time cap, [submit]s;
   /// leaving the app or an interruption keeps the words: [interrupted].
+  /// [quiet] stops without announcing: Cancel's dialog and Type's field take
+  /// focus themselves.
   Future<void> _finishRecording({
     bool submit = true,
     bool interrupted = false,
-  }) => _stopping ??= _stopRecording(submit, interrupted).whenComplete(() {
-    _stopping = null;
-    if (mounted) setState(() {});
-  });
+    bool quiet = false,
+  }) =>
+      _stopping ??= _stopRecording(submit, interrupted, quiet).whenComplete(() {
+        _stopping = null;
+        if (mounted) setState(() {});
+      });
 
   void _receiveRecorderState(RecordState state) {
     if (!mounted ||
@@ -588,7 +723,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       ? _CapturePhase.paused
       : _CapturePhase.idle;
 
-  Future<void> _stopRecording(bool submit, bool interrupted) async {
+  Future<void> _stopRecording(bool submit, bool interrupted, bool quiet) async {
     if (!_recording) return;
     _recording = false;
     _listeningWatch?.stop();
@@ -598,6 +733,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _phase = submit ? _CapturePhase.processing : _restingPhase(interrupted);
         _level = 0;
       });
+      // Say what happened: `Done` when sending, `Paused` when listening was
+      // cut off without the person asking.
+      if (submit) {
+        _announce(context.l10n.done);
+      } else if (!quiet && _phase == _CapturePhase.paused) {
+        _announce(context.l10n.capturePaused);
+      }
     }
     await _amplitude?.cancel();
     try {
@@ -707,26 +849,73 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     );
   }
 
-  Future<void> _discard() async {
-    final confirmed = await showDialog<bool>(
+  bool get _hasInput =>
+      _words.text.trim().isNotEmpty || _session?.audioPath != null;
+
+  /// `Listo`: stop listening and continue with the words.
+  void _done() {
+    if (_recording) {
+      unawaited(_finishRecording());
+    } else {
+      unawaited(_process());
+    }
+  }
+
+  /// `Escribir`: stop listening, keep the words and edit them.
+  Future<void> _typeInstead() async {
+    setState(() => _typing = true);
+    await _starting;
+    await _finishRecording(submit: false, quiet: true);
+    if (mounted) _wordsFocus.requestFocus();
+  }
+
+  /// Cancel, Back and a swipe down: close at once when nothing was said;
+  /// otherwise ask once whether to keep it.
+  Future<void> _cancel() async {
+    if (_asking || !mounted) return;
+    if (_phase == _CapturePhase.processing || !_hasInput) {
+      Navigator.pop(context);
+      return;
+    }
+    _asking = true;
+    if (_recording) {
+      unawaited(
+        _finishRecording(submit: false, interrupted: true, quiet: true),
+      );
+    }
+    final keep = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(context.l10n.discardCaptureQuestion),
-        content: Text(context.l10n.captureDiscardHelp),
+        title: Text(context.l10n.captureKeepQuestion),
+        content: Text(context.l10n.captureKeepHelp),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.keep),
+            child: Text(context.l10n.discard),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.discard),
+            child: Text(context.l10n.keep),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
+    _asking = false;
+    if (!mounted || keep == null) return;
+    if (keep) {
+      // The capture stays in the pending list.
+      Navigator.pop(context);
+    } else {
+      await _discard();
+    }
+  }
+
+  Future<void> _discard() async {
     try {
+      await _stopping;
       await _writes;
       if (_session != null) await _store.discard(_session!.id, _owner);
       _discarded = true;
@@ -751,6 +940,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _timer?.cancel();
     unawaited(_release());
     _words.dispose();
+    _wordsFocus.dispose();
     super.dispose();
   }
 
@@ -769,331 +959,309 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       await _speechEvents?.cancel();
       await _recorderStates?.cancel();
       await _recorder.dispose();
+      await _writes;
+      final session = _session;
       if (!_movedToReview &&
           !_discarded &&
-          _session != null &&
-          !_session!.terminal) {
-        await CaptureDiagnostics(
-          _store.database,
-        ).record(CaptureEvent.leftCapturePending);
+          session != null &&
+          !session.terminal) {
+        if (session.text.trim().isEmpty &&
+            session.audioPath == null &&
+            session.drafts.isEmpty) {
+          // Nothing was said: closing keeps nothing.
+          await _store.discard(session.id, _owner);
+          _container?.invalidate(pendingCapturesProvider);
+        } else {
+          await CaptureDiagnostics(
+            _store.database,
+          ).record(CaptureEvent.leftCapturePending);
+        }
       }
     } catch (_) {
       /* The durable capture remains available on next launch. */
     }
   }
 
+  /// While the sheet listens or works, a tap on the scrim doesn't close it.
+  void _holdScrim(bool hold) {
+    final route = ModalRoute.of(context);
+    if (route is! _CaptureSheetRoute || route.barrierDismissible != hold) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => route.holdScrim(hold));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final recorded = _session?.audioPath != null;
-    return Scaffold(
-      appBar: CustomAppBar(
-        title: context.l10n.captureThought,
-        showAppearance: false,
+    final phase = _startPending ? _CapturePhase.starting : _phase;
+    final listening = phase == _CapturePhase.listening;
+    _holdScrim(
+      _recording ||
+          phase == _CapturePhase.starting ||
+          phase == _CapturePhase.processing,
+    );
+    final status = switch (phase) {
+      _CapturePhase.listening => l10n.listeningSeconds(
+        '00:${_seconds.toString().padLeft(2, '0')}',
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      _CapturePhase.starting => l10n.captureStarting,
+      _CapturePhase.processing => l10n.puttingPlanTogether,
+      _ when recorded => l10n.recordingKept,
+      _CapturePhase.paused => l10n.capturePaused,
+      _CapturePhase.idle => null,
+    };
+    final hint = !listening
+        ? null
+        : _seconds >= 50
+        ? l10n.captureTimeLeft
+        : _seconds - _wordsAt >= 5
+        ? l10n.captureStillListening
+        : null;
+    final resting =
+        phase == _CapturePhase.idle || phase == _CapturePhase.paused;
+    // Nothing heard and nothing listening (TalkBack, or after a problem): one
+    // button starts listening.
+    final waiting = resting && !_typing && !_hasInput;
+    // `Continue` only where listening stopped: a pause, or a voice capture
+    // reopened. Shared or typed text never listened.
+    final canContinue =
+        (phase == _CapturePhase.paused ||
+            (phase == _CapturePhase.idle && _session?.source == 'speech')) &&
+        !_typing &&
+        !recorded &&
+        _nativeMode &&
+        _words.text.trim().isNotEmpty;
+    final primary = <Widget>[
+      if (waiting)
+        FilledButton(
+          autofocus: true,
+          onPressed: _busy ? null : _beginRecording,
+          child: Text(l10n.captureStartTalking),
+        )
+      else ...[
+        if (canContinue)
+          FilledButton.tonal(
+            onPressed: _busy ? null : _beginRecording,
+            child: Text(l10n.captureContinue),
+          ),
+        FilledButton(
+          onPressed: _busy || !_hasInput ? null : _done,
+          child: Text(l10n.done),
+        ),
+      ],
+    ];
+    final wordsStyle = theme.textTheme.headlineSmall;
+    final Widget? words = _typing
+        ? TextField(
+            key: const ValueKey('capture-words'),
+            controller: _words,
+            focusNode: _wordsFocus,
+            readOnly: _busy || _recording,
+            onChanged: _changedText,
+            minLines: 1,
+            maxLines: null,
+            maxLength: 4000,
+            keyboardType: TextInputType.multiline,
+            style: wordsStyle,
+            decoration: InputDecoration(
+              hintText: _kind == 'note' ? l10n.noteHint : l10n.examplePlan,
+              counterText: '',
+            ),
+          )
+        : _words.text.trim().isEmpty
+        ? null
+        : Text(
+            _words.text,
+            key: const ValueKey('capture-heard'),
+            style: wordsStyle,
+          );
+    final banners = <Widget>[
+      if (_timezoneFallback) MessageBanner(l10n.timezoneFallback(_zone)),
+      if (_micBlocked) ...[
+        MessageBanner(
+          l10n.captureMicrophoneBlocked,
+          isError: true,
+          icon: Icons.mic_off_outlined,
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton(
+            onPressed: openAppSettings,
+            child: Text(l10n.captureOpenSettings),
+          ),
+        ),
+      ],
+      if (_error != null)
+        MessageBanner(
+          '${captureProblemText(l10n, _error!)}${_errorRetained ? '\n${l10n.captureKept}' : ''}',
+          isError: _error != CaptureProblem.setupRequested,
+        ),
+    ];
+    final working = phase == _CapturePhase.processing || _stopping != null;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_cancel());
+      },
+      child: Material(
+        type: MaterialType.transparency,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                context.l10n.onYourMind,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _kind == 'note'
-                    ? context.l10n.noteCaptureHelp
-                    : context.l10n.captureIntro,
-                style: TextStyle(color: colors.onSurfaceVariant),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: Text(context.l10n.tasks),
-                    selected: _kind == 'task',
-                    onSelected: _busy || _recording
-                        ? null
-                        : (_) => _chooseKind('task'),
-                  ),
-                  ChoiceChip(
-                    label: Text(context.l10n.note),
-                    selected: _kind == 'note',
-                    onSelected: _busy || _recording
-                        ? null
-                        : (_) => _chooseKind('note'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              AppSurface(
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onLongPressStart: _holdToTalk && !_busy && !recorded
-                          ? (_) {
-                              _holding = true;
-                              _beginRecording();
-                            }
-                          : null,
-                      onLongPressEnd: _holdToTalk
-                          ? (_) {
-                              _holding = false;
-                              unawaited(_finishRecording());
-                            }
-                          : null,
-                      onLongPressCancel: _holdToTalk
-                          ? () {
-                              _holding = false;
-                              unawaited(_finishRecording(submit: false));
-                            }
-                          : null,
-                      child: Semantics(
-                        button: true,
-                        label: _recording
-                            ? context.l10n.stopDraft
-                            : context.l10n.recordTasks,
-                        child: IconButton.filledTonal(
-                          key: const ValueKey('capture-mic'),
-                          iconSize: 44,
-                          padding: const EdgeInsets.all(24),
-                          // Tooltip's long-press recognizer would consume
-                          // the hold gesture before the parent sees it.
-                          tooltip: _holdToTalk
-                              ? null
-                              : _recording
-                              ? context.l10n.stopRecording
-                              : context.l10n.recordTasks,
-                          onPressed: _busy || (recorded && !_recording)
-                              ? null
-                              : () {
-                                  if (_recording) {
-                                    unawaited(_finishRecording());
-                                  } else {
-                                    _beginRecording();
-                                  }
-                                },
-                          icon: Icon(
-                            _recording
-                                ? Icons.stop_rounded
-                                : Icons.mic_none_rounded,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(switch (_phase) {
-                      _CapturePhase.listening => context.l10n.listeningSeconds(
-                        '00:${_seconds.toString().padLeft(2, '0')}',
-                      ),
-                      _CapturePhase.starting => context.l10n.captureStarting,
-                      _CapturePhase.processing =>
-                        context.l10n.puttingPlanTogether,
-                      _ when recorded => context.l10n.recordingKept,
-                      _CapturePhase.paused => context.l10n.capturePaused,
-                      _CapturePhase.idle => context.l10n.tapSpeak,
-                    }, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 12),
-                    if (_phase == _CapturePhase.listening)
-                      LinearProgressIndicator(
-                        value: _level,
-                        semanticsLabel: context.l10n.inputLevel,
-                      ),
-                    if (_phase == _CapturePhase.processing)
-                      const LinearProgressIndicator(),
-                    const SizedBox(height: 12),
-                    Text(
-                      _recording
-                          ? context.l10n.tapStopHelp
-                          : _nativeMode
-                          ? context.l10n.nativeSpeechHelp(_capability.language)
-                          : context.l10n.returnCaptureHelp,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              if (_micBlocked) ...[
-                const SizedBox(height: 12),
-                MessageBanner(
-                  context.l10n.captureMicrophoneBlocked,
-                  isError: true,
-                  icon: Icons.mic_off_outlined,
-                ),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: TextButton(
-                    onPressed: openAppSettings,
-                    child: Text(context.l10n.captureOpenSettings),
-                  ),
-                ),
-              ],
-              if (!recorded && !_recording && !_busy) ...[
-                const SizedBox(height: 12),
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: Text(context.l10n.speechOptions),
-                  subtitle: Text(
-                    _nativeMode
-                        ? context.l10n.onDeviceTranscript
-                        : context.l10n.onlineAudio,
-                  ),
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
+              if (status != null)
+                Text(status, style: theme.textTheme.titleMedium),
+              if (banners.isNotEmpty || words != null)
+                Flexible(
+                  // Reversed, so the newest words stay in view as they grow.
+                  child: SingleChildScrollView(
+                    reverse: true,
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (_capability.usable)
-                          ChoiceChip(
-                            label: Text(context.l10n.liveTranscript),
-                            selected: _nativeMode,
-                            onSelected: (_) =>
-                                setState(() => _nativeMode = true),
+                        for (final banner in banners)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: banner,
                           ),
-                        ChoiceChip(
-                          label: Text(context.l10n.savedAudio),
-                          selected: !_nativeMode,
-                          onSelected: (_) =>
-                              setState(() => _nativeMode = false),
-                        ),
-                        PopupMenuButton<String>(
-                          tooltip: context.l10n.speechLanguage,
-                          enabled: !_probing,
-                          onSelected: (value) =>
-                              _chooseLanguage(value == 'device' ? null : value),
-                          itemBuilder: (_) => [
-                            for (final entry in {
-                              'device': context.l10n.deviceLanguage,
-                              'en-US': 'English',
-                              'es-ES': 'Español',
-                              'ca-ES': 'Català',
-                            }.entries)
-                              CheckedPopupMenuItem(
-                                value: entry.key,
-                                checked: (_language ?? 'device') == entry.key,
-                                child: Text(entry.value),
-                              ),
-                          ],
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text(context.l10n.speechLanguage),
-                          ),
-                        ),
+                        ?words,
                       ],
                     ),
-                    if (!_capability.usable)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(context.l10n.onDeviceUnavailable),
-                      ),
-                    if (_capability.onDevice && !_capability.usable)
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          TextButton(
-                            onPressed: () async {
-                              try {
-                                final opened = await _speech.prepareLanguage(
-                                  _capability.language,
-                                );
-                                _showProblem(
-                                  opened
-                                      ? CaptureProblem.setupRequested
-                                      : CaptureProblem.setupUnavailable,
-                                );
-                              } catch (_) {
-                                _showProblem(CaptureProblem.setupUnavailable);
-                              }
-                            },
-                            child: Text(context.l10n.setUpSpeech),
-                          ),
-                          TextButton(
-                            onPressed: _probing
-                                ? null
-                                : () => _chooseLanguage(_language),
-                            child: Text(context.l10n.checkAgain),
-                          ),
-                        ],
-                      ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(context.l10n.holdTalk),
-                      subtitle: Text(context.l10n.holdTalkHelp),
-                      value: _holdToTalk,
-                      onChanged: (value) => setState(() => _holdToTalk = value),
-                    ),
-                  ],
-                ),
-              ],
-              if (!recorded) ...[
-                const SizedBox(height: 24),
-                TextField(
-                  key: const ValueKey('capture-words'),
-                  controller: _words,
-                  readOnly: _busy || _recording,
-                  onChanged: _changedText,
-                  minLines: 2,
-                  maxLines: 5,
-                  maxLength: 4000,
-                  decoration: InputDecoration(
-                    labelText: _usingNative && _recording
-                        ? context.l10n.liveTranscript
-                        : _kind == 'note'
-                        ? context.l10n.noteBody
-                        : context.l10n.typePlan,
-                    hintText: _kind == 'note'
-                        ? context.l10n.noteHint
-                        : context.l10n.examplePlan,
-                    counterText: '',
                   ),
                 ),
-              ],
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _busy || _recording ? null : _process,
-                icon: Icon(
-                  _kind == 'note'
-                      ? Icons.notes_rounded
-                      : Icons.auto_awesome_outlined,
-                ),
-                label: Text(
-                  _kind == 'note'
-                      ? context.l10n.reviewNote
-                      : recorded
-                      ? context.l10n.tryRecording
-                      : context.l10n.reviewText,
-                ),
-              ),
-              if (_error != null)
+              // Short, so it never pushes the newest words out of view.
+              if (hint != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: MessageBanner(
-                    '${captureProblemText(context.l10n, _error!)}${_errorRetained ? '\n${context.l10n.captureKept}' : ''}',
-                    isError: _error != CaptureProblem.setupRequested,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    hint,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              if (_session != null)
-                TextButton(
-                  onPressed: _busy || _recording ? null : _discard,
-                  child: Text(context.l10n.discardCapture),
-                ),
+              if (!_typing) ...[
+                const SizedBox(height: 16),
+                Center(child: _ring(colors, phase)),
+              ],
               const SizedBox(height: 16),
-              if (_timezoneFallback)
-                MessageBanner(context.l10n.timezoneFallback(_zone)),
-              if (ref.watch(authProvider).account == null)
-                Text(context.l10n.guestTrialHelp),
-              const SizedBox(height: 12),
-              Text(
-                context.l10n.capturePrivacy,
-                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              _controls(
+                context,
+                primary,
+                showType: !_typing && !recorded,
+                onType: working ? null : () => unawaited(_typeInstead()),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// The level ring around a mic that isn't a button: listening is controlled
+  /// only by the buttons below it.
+  Widget _ring(ColorScheme colors, _CapturePhase phase) => ExcludeSemantics(
+    child: SizedBox.square(
+      dimension: 72,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: CircularProgressIndicator(
+              value: switch (phase) {
+                _CapturePhase.processing => null,
+                _CapturePhase.listening => _level,
+                _ => 0,
+              },
+              strokeWidth: 4,
+              backgroundColor: colors.surfaceContainerHighest,
+            ),
+          ),
+          Icon(
+            Icons.mic_none_rounded,
+            size: 32,
+            color: phase == _CapturePhase.listening
+                ? colors.primary
+                : colors.onSurfaceVariant,
+          ),
+        ],
+      ),
+    ),
+  );
+
+  /// `Cancelar`, the filled action (with `Seguir` beside it when paused) and
+  /// the keyboard. They share a row when it fits, and stack at large text.
+  Widget _controls(
+    BuildContext context,
+    List<Widget> primary, {
+    required bool showType,
+    VoidCallback? onType,
+  }) {
+    final l10n = context.l10n;
+    final cancel = TextButton(
+      onPressed: () => unawaited(_cancel()),
+      child: Text(l10n.cancel),
+    );
+    final type = showType
+        ? IconButton(
+            tooltip: l10n.captureTypeInstead,
+            onPressed: onType,
+            icon: const Icon(Icons.keyboard_outlined),
+          )
+        : null;
+    final large = MediaQuery.textScalerOf(context).scale(14) > 18;
+    Widget side(List<Widget> buttons) => Row(
+      children: [
+        for (var i = 0; i < buttons.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(child: buttons[i]),
+        ],
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!large &&
+            constraints.maxWidth >= (primary.length > 1 ? 440 : 280)) {
+          return Row(
+            children: [
+              cancel,
+              const SizedBox(width: 8),
+              Expanded(child: side(primary)),
+              if (type != null) ...[const SizedBox(width: 4), type],
+            ],
+          );
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (large)
+              for (var i = 0; i < primary.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                primary[i],
+              ]
+            else
+              side(primary),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(child: cancel),
+                ?type,
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

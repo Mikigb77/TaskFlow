@@ -12,6 +12,7 @@ import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/reminder_ask_sheet.dart';
 
 class ReviewTasksScreen extends ConsumerStatefulWidget {
   const ReviewTasksScreen({
@@ -154,70 +155,71 @@ class _ReviewTasksScreenState extends ConsumerState<ReviewTasksScreen> {
           ? context.l10n.noteSaved
           : '${context.l10n.captureTasksSaved(ready.length)}${remaining > 0 ? ' · ${context.l10n.captureKeptForReview(remaining)}' : ''}';
       if (remaining == 0) Navigator.pop(context);
-      unawaited(
-        showFeedback(
-          messenger,
-          message,
-          actionLabel: undoBefore == null ? null : strings.undo,
-          onAction: undoBefore == null
-              ? null
-              : () async {
-                  if (mounted && _saving) return;
-                  if (mounted) setState(() => _saving = true);
-                  try {
-                    final before = undoBefore!;
-                    if (container.read(captureOwnerProvider) !=
-                        before.ownerKey) {
-                      return;
-                    }
-                    // Finish edits to other cards before restoring this save.
-                    await _writes;
-                    final restored = await _store.undoSave(before, undoIds);
-                    if (restored == null) {
-                      if (messenger.mounted) {
-                        unawaited(
-                          showFeedback(messenger, strings.reviewUndoChanged),
-                        );
-                      }
-                      return;
-                    }
-                    await container.read(taskProvider.notifier).loadTasks();
-                    container.invalidate(pendingCapturesProvider);
-                    if (mounted) {
-                      setState(() {
-                        _session = restored;
-                        _items = restored.drafts;
-                        _finished = false;
-                      });
-                    } else if (navigator.mounted &&
-                        container.read(captureOwnerProvider) ==
-                            before.ownerKey) {
-                      unawaited(
-                        navigator.push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                ReviewTasksScreen(session: restored),
-                          ),
-                        ),
-                      );
-                      // The reopened review clears old messages as it opens.
-                      await WidgetsBinding.instance.endOfFrame;
-                    }
-                    if (messenger.mounted) {
-                      unawaited(
-                        showFeedback(messenger, strings.reviewUndoSaved),
-                      );
-                    }
-                  } catch (_) {
-                    if (messenger.mounted) {
-                      unawaited(showFeedback(messenger, strings.undoError));
-                    }
-                  } finally {
-                    if (mounted) setState(() => _saving = false);
+      final feedback = showFeedback(
+        messenger,
+        message,
+        actionLabel: undoBefore == null ? null : strings.undo,
+        onAction: undoBefore == null
+            ? null
+            : () async {
+                if (mounted && _saving) return;
+                if (mounted) setState(() => _saving = true);
+                try {
+                  final before = undoBefore!;
+                  if (container.read(captureOwnerProvider) != before.ownerKey) {
+                    return;
                   }
-                },
-        ),
+                  // Finish edits to other cards before restoring this save.
+                  await _writes;
+                  final restored = await _store.undoSave(before, undoIds);
+                  if (restored == null) {
+                    if (messenger.mounted) {
+                      unawaited(
+                        showFeedback(messenger, strings.reviewUndoChanged),
+                      );
+                    }
+                    return;
+                  }
+                  await container.read(taskProvider.notifier).loadTasks();
+                  container.invalidate(pendingCapturesProvider);
+                  if (mounted) {
+                    setState(() {
+                      _session = restored;
+                      _items = restored.drafts;
+                      _finished = false;
+                    });
+                  } else if (navigator.mounted &&
+                      container.read(captureOwnerProvider) == before.ownerKey) {
+                    unawaited(
+                      navigator.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ReviewTasksScreen(session: restored),
+                        ),
+                      ),
+                    );
+                    // The reopened review clears old messages as it opens.
+                    await WidgetsBinding.instance.endOfFrame;
+                  }
+                  if (messenger.mounted) {
+                    unawaited(showFeedback(messenger, strings.reviewUndoSaved));
+                  }
+                } catch (_) {
+                  if (messenger.mounted) {
+                    unawaited(showFeedback(messenger, strings.undoError));
+                  }
+                } finally {
+                  if (mounted) setState(() => _saving = false);
+                }
+              },
       );
+      unawaited(feedback);
+      if (remaining == 0) {
+        askAboutRemindersAfterSave(
+          context,
+          ready.map((d) => d.task),
+          feedback: feedback,
+        );
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _error = CaptureProblem.saveFailed);

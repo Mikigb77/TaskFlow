@@ -12,6 +12,9 @@ import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/task_list_store.dart';
 import 'package:agenda/widgets/task_editor.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/groups_provider.dart';
+import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -249,6 +252,56 @@ void main() {
         container.dispose();
       }
     }
+  });
+
+  testWidgets(
+      'UX-308: with no projects the picker offers Nuevo proyecto, and saving a name puts the task in it',
+      (tester) async {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final store = _Lists();
+    var task = Task(id: 1, title: 'Comprar pan', priority: 1);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        authProvider.overrideWith(
+            (ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
+        apiClientProvider.overrideWith((ref) => OfflineApiClient()),
+        taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        taskListStoreProvider.overrideWithValue(store),
+        groupsProvider.overrideWith((ref) async => []),
+      ],
+      child: MaterialApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, change) => TaskAssignmentPicker(
+              task: task,
+              onChanged: (value) => change(() => task = value),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, es.noList));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(find.descendant(of: sheet, matching: find.text(es.list)),
+        findsOneWidget);
+    final create = find.descendant(
+        of: sheet, matching: find.widgetWithText(ListTile, es.newList));
+    expect(create, findsOneWidget);
+    await tester.tap(create);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Compras');
+    await tester.tap(find.text(es.saveList));
+    await tester.pumpAndSettle();
+    expect(store.lists.single.name, 'Compras');
+    expect(task.listId, store.lists.single.id);
+    expect(find.widgetWithText(ActionChip, 'Compras'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 

@@ -235,7 +235,7 @@ abstract class AppLocalizations {
   /// Localized account, sync and file error categories. Never display raw server exception text.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{The email or password is incorrect. Please try again.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{Could not connect to the server. Check your connection and server address, then retry. Your local data is kept.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Your local data is kept. Please try again.}}'**
+  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{The email or password is incorrect. Please try again.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
   String requestError(String reason);
 
   /// No description provided for @languageAutomatic.
@@ -363,12 +363,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dictate a note'**
   String get recordNote;
-
-  /// No description provided for @noteCaptureHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep your words as one note. Typed notes stay on your phone until sync; saved recordings need online transcription.'**
-  String get noteCaptureHelp;
 
   /// No description provided for @noteHint.
   ///
@@ -682,6 +676,18 @@ abstract class AppLocalizations {
   /// **'Calendar events could not be read. Refresh to try again; this view may be missing commitments.'**
   String get calendarReadError;
 
+  /// No description provided for @calendarReadRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t read your events. Tap to try again.'**
+  String get calendarReadRetry;
+
+  /// No description provided for @changeView.
+  ///
+  /// In en, this message translates to:
+  /// **'Change view'**
+  String get changeView;
+
   /// No description provided for @calendarPreferenceError.
   ///
   /// In en, this message translates to:
@@ -706,12 +712,6 @@ abstract class AppLocalizations {
   /// **'Calendar event · view only'**
   String get calendarReadOnly;
 
-  /// No description provided for @calendarNoEvents.
-  ///
-  /// In en, this message translates to:
-  /// **'No events from your selected calendars on this day.'**
-  String get calendarNoEvents;
-
   /// No description provided for @calendarNoSelection.
   ///
   /// In en, this message translates to:
@@ -724,17 +724,23 @@ abstract class AppLocalizations {
   /// **'All day'**
   String get calendarAllDay;
 
+  /// Calendar agenda line under the day’s tasks, followed by up to three start times.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 event} other{{count} events}}'**
+  String calendarEventCount(int count);
+
+  /// No description provided for @calendarOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline — your tasks are saved on this phone.'**
+  String get calendarOffline;
+
   /// No description provided for @calendarUntitled.
   ///
   /// In en, this message translates to:
   /// **'Untitled event'**
   String get calendarUntitled;
-
-  /// No description provided for @calendarShowAll.
-  ///
-  /// In en, this message translates to:
-  /// **'See all calendar events'**
-  String get calendarShowAll;
 
   /// No description provided for @calendarOpenEvent.
   ///
@@ -777,12 +783,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings'**
   String get settings;
-
-  /// No description provided for @yourCalendar.
-  ///
-  /// In en, this message translates to:
-  /// **'Your calendar'**
-  String get yourCalendar;
 
   /// No description provided for @inbox.
   ///
@@ -1324,11 +1324,11 @@ abstract class AppLocalizations {
   /// **'Month'**
   String get month;
 
-  /// No description provided for @syncTasks.
+  /// No description provided for @day.
   ///
   /// In en, this message translates to:
-  /// **'Sync tasks'**
-  String get syncTasks;
+  /// **'Day'**
+  String get day;
 
   /// No description provided for @previousPeriod.
   ///
@@ -1353,18 +1353,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open-source licences'**
   String get licenses;
-
-  /// No description provided for @weekView.
-  ///
-  /// In en, this message translates to:
-  /// **'Week view'**
-  String get weekView;
-
-  /// No description provided for @monthView.
-  ///
-  /// In en, this message translates to:
-  /// **'Month view'**
-  String get monthView;
 
   /// No description provided for @todayAgenda.
   ///
@@ -1587,12 +1575,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check unfinished captures'**
   String get checkCaptures;
-
-  /// No description provided for @createVoiceTask.
-  ///
-  /// In en, this message translates to:
-  /// **'Create task with voice'**
-  String get createVoiceTask;
 
   /// No description provided for @createTaskTooltip.
   ///
@@ -1882,36 +1864,6 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get reset;
 
-  /// No description provided for @captureThought.
-  ///
-  /// In en, this message translates to:
-  /// **'Capture a thought'**
-  String get captureThought;
-
-  /// No description provided for @captureIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'One task or several. Say it naturally, or type your plan.'**
-  String get captureIntro;
-
-  /// No description provided for @stopDraft.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop and create draft'**
-  String get stopDraft;
-
-  /// No description provided for @recordTasks.
-  ///
-  /// In en, this message translates to:
-  /// **'Record tasks'**
-  String get recordTasks;
-
-  /// No description provided for @stopRecording.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop recording'**
-  String get stopRecording;
-
   /// No description provided for @puttingPlanTogether.
   ///
   /// In en, this message translates to:
@@ -1923,36 +1875,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recording kept on this phone'**
   String get recordingKept;
-
-  /// No description provided for @tapSpeak.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to speak'**
-  String get tapSpeak;
-
-  /// No description provided for @inputLevel.
-  ///
-  /// In en, this message translates to:
-  /// **'Microphone input level'**
-  String get inputLevel;
-
-  /// No description provided for @tapStopHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap stop when you’re finished. Up to 60 seconds.'**
-  String get tapStopHelp;
-
-  /// No description provided for @returnCaptureHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'You can leave and return. Unfinished recordings are kept.'**
-  String get returnCaptureHelp;
-
-  /// No description provided for @speechOptions.
-  ///
-  /// In en, this message translates to:
-  /// **'Speech options'**
-  String get speechOptions;
 
   /// No description provided for @onDeviceTranscript.
   ///
@@ -1966,29 +1888,11 @@ abstract class AppLocalizations {
   /// **'Saved audio · online transcription'**
   String get onlineAudio;
 
-  /// No description provided for @liveTranscript.
-  ///
-  /// In en, this message translates to:
-  /// **'Live transcript'**
-  String get liveTranscript;
-
-  /// No description provided for @savedAudio.
-  ///
-  /// In en, this message translates to:
-  /// **'Saved audio'**
-  String get savedAudio;
-
   /// No description provided for @speechLanguage.
   ///
   /// In en, this message translates to:
   /// **'Speech language'**
   String get speechLanguage;
-
-  /// No description provided for @deviceLanguage.
-  ///
-  /// In en, this message translates to:
-  /// **'Device language'**
-  String get deviceLanguage;
 
   /// No description provided for @onDeviceUnavailable.
   ///
@@ -2008,53 +1912,11 @@ abstract class AppLocalizations {
   /// **'Check again'**
   String get checkAgain;
 
-  /// No description provided for @holdTalk.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold to talk'**
-  String get holdTalk;
-
-  /// No description provided for @holdTalkHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold the mic, then release. Tapping still works.'**
-  String get holdTalkHelp;
-
-  /// No description provided for @typePlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Or type your plan'**
-  String get typePlan;
-
   /// No description provided for @examplePlan.
   ///
   /// In en, this message translates to:
   /// **'Doctor Friday at 5 p.m. Bring my results. Also buy coffee.'**
   String get examplePlan;
-
-  /// No description provided for @tryRecording.
-  ///
-  /// In en, this message translates to:
-  /// **'Try this recording'**
-  String get tryRecording;
-
-  /// No description provided for @reviewText.
-  ///
-  /// In en, this message translates to:
-  /// **'Review tasks from text'**
-  String get reviewText;
-
-  /// No description provided for @discardCapture.
-  ///
-  /// In en, this message translates to:
-  /// **'Discard capture'**
-  String get discardCapture;
-
-  /// No description provided for @discardCaptureQuestion.
-  ///
-  /// In en, this message translates to:
-  /// **'Discard this capture?'**
-  String get discardCaptureQuestion;
 
   /// No description provided for @discard.
   ///
@@ -2067,12 +1929,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep'**
   String get keep;
-
-  /// No description provided for @guestTrialHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Try voice without an account. A small daily allowance is shared by devices on this connection.'**
-  String get guestTrialHelp;
 
   /// No description provided for @capturePrivacy.
   ///
@@ -2128,12 +1984,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, other{Overdue · {count}}}'**
   String overdueCount(int count);
 
-  /// No description provided for @completionCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{done} of {total} tasks completed'**
-  String completionCount(int done, int total);
-
   /// No description provided for @pendingCaptureCount.
   ///
   /// In en, this message translates to:
@@ -2145,12 +1995,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Listening · {time}'**
   String listeningSeconds(String time);
-
-  /// No description provided for @nativeSpeechHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'On-device speech · {language}. Words appear below and are kept as you speak.'**
-  String nativeSpeechHelp(String language);
 
   /// No description provided for @repeatEvery.
   ///
@@ -2272,29 +2116,17 @@ abstract class AppLocalizations {
   /// **'Project unavailable'**
   String get listUnavailable;
 
-  /// No description provided for @moveToList.
-  ///
-  /// In en, this message translates to:
-  /// **'Move to a project'**
-  String get moveToList;
-
-  /// No description provided for @moveToListHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Your date, reminder and task details stay the same.'**
-  String get moveToListHelp;
-
   /// No description provided for @archived.
   ///
   /// In en, this message translates to:
   /// **'Archived'**
   String get archived;
 
-  /// No description provided for @createListHelp.
+  /// No description provided for @sharedProject.
   ///
   /// In en, this message translates to:
-  /// **'Create a project from the project selector.'**
-  String get createListHelp;
+  /// **'Shared'**
+  String get sharedProject;
 
   /// No description provided for @taskReopened.
   ///
@@ -2458,11 +2290,11 @@ abstract class AppLocalizations {
   /// **'Task saved to Inbox'**
   String get taskSavedInbox;
 
-  /// No description provided for @taskAddedCalendar.
+  /// After saving a new task with a date. The date is a weekday and date such as Fri, Oct 17, never Today or Tomorrow.
   ///
   /// In en, this message translates to:
-  /// **'Task added to your calendar'**
-  String get taskAddedCalendar;
+  /// **'Added to {date}'**
+  String taskAddedOn(String date);
 
   /// No description provided for @changesSaved.
   ///
@@ -3208,12 +3040,6 @@ abstract class AppLocalizations {
   /// **'Choose details'**
   String get chooseDetails;
 
-  /// No description provided for @sharedListVisibility.
-  ///
-  /// In en, this message translates to:
-  /// **'Shared · everyone in this project can see tasks, notes and uploaded files'**
-  String get sharedListVisibility;
-
   /// No description provided for @invitationCode.
   ///
   /// In en, this message translates to:
@@ -3580,17 +3406,11 @@ abstract class AppLocalizations {
   /// **'Done. Reminders are on.'**
   String get remindersOnConfirmation;
 
-  /// Asked once, on a card below the tasks, when a task with a date was saved in this session; "it" is that task.
+  /// Asked once, in a sheet, right after the first task with a date is saved; "it" is that task.
   ///
   /// In en, this message translates to:
   /// **'Want a reminder before it?'**
   String get reminderAskQuestion;
-
-  /// The same question when the account already had dated tasks at launch and none was saved in this session.
-  ///
-  /// In en, this message translates to:
-  /// **'Want reminders before your tasks?'**
-  String get reminderAskQuestionTasks;
 
   /// No description provided for @reminderAskYes.
   ///
@@ -4528,6 +4348,54 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get capturePaused;
 
+  /// Announced to screen readers when the capture sheet starts listening.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening'**
+  String get captureListening;
+
+  /// With a screen reader on, the capture sheet waits for this button before it listens.
+  ///
+  /// In en, this message translates to:
+  /// **'Start talking'**
+  String get captureStartTalking;
+
+  /// Capture sheet: listens again and adds to the words already heard.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get captureContinue;
+
+  /// Keyboard button in the capture sheet: stops listening and lets you edit the words.
+  ///
+  /// In en, this message translates to:
+  /// **'Type instead'**
+  String get captureTypeInstead;
+
+  /// Shown under the words after about 5 seconds without new words.
+  ///
+  /// In en, this message translates to:
+  /// **'Still listening. Tap Done when finished.'**
+  String get captureStillListening;
+
+  /// Shown 10 seconds before the 60-second listening limit.
+  ///
+  /// In en, this message translates to:
+  /// **'10 seconds left'**
+  String get captureTimeLeft;
+
+  /// Asked when closing the capture sheet with words or a recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep what you said?'**
+  String get captureKeepQuestion;
+
+  /// Body of the question asked when closing the capture sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'You can finish it later.'**
+  String get captureKeepHelp;
+
   /// No description provided for @captureRecordingFirst.
   ///
   /// In en, this message translates to:
@@ -4623,12 +4491,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your capture is kept on this phone.'**
   String get captureKept;
-
-  /// No description provided for @captureDiscardHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'The recording and unsaved drafts will be removed. Tasks already saved will stay.'**
-  String get captureDiscardHelp;
 
   /// No description provided for @voiceRecording.
   ///
@@ -5188,23 +5050,11 @@ abstract class AppLocalizations {
   /// **'One shared task. A member completes it for everyone.'**
   String get assignmentGroupHelp;
 
-  /// No description provided for @assignmentNeedsReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose the project and responsible person before sharing this task.'**
-  String get assignmentNeedsReview;
-
   /// No description provided for @assignmentHeard.
   ///
   /// In en, this message translates to:
   /// **'You mentioned: {names}'**
   String assignmentHeard(Object names);
-
-  /// No description provided for @assignmentConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm project and responsibility'**
-  String get assignmentConfirm;
 
   /// No description provided for @audiencePersonal.
   ///
@@ -5217,6 +5067,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Visible to everyone in {name}'**
   String audienceShared(Object name);
+
+  /// Asked before a personal task moves into a shared project. {name} is the group, or the project when it has no group.
+  ///
+  /// In en, this message translates to:
+  /// **'Share with {name}? Everyone there will see this task. It can’t be made private again.'**
+  String shareTaskConfirm(String name);
+
+  /// No description provided for @shareTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareTask;
+
+  /// No description provided for @sharedTaskStays.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared tasks stay in their project.'**
+  String get sharedTaskStays;
+
+  /// No description provided for @assignmentIsRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Is this right?'**
+  String get assignmentIsRight;
+
+  /// No description provided for @yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yes;
 
   /// No description provided for @pinProject.
   ///

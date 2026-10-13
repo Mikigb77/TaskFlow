@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'support/design_fixtures.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -321,9 +322,15 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(find.byType(CreateTaskScreen), findsNothing);
-      expect(find.text(l.taskAddedCalendar), findsOneWidget);
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      expect(
+        find.text(l.taskAddedOn(DateFormat.MMMEd('en').format(tomorrow))),
+        findsOneWidget,
+      );
       expect(find.text(l.suggestionApplied), findsNothing);
-      expect(find.text(l.undo), findsNothing);
+      // Only the save's own Undo, not the suggestion's.
+      expect(find.text(l.undo), findsOneWidget);
       expect((await repository.getAllTasks()).single.title, 'Call');
       await tester.pumpAndSettle();
     },
@@ -393,8 +400,10 @@ Future<_MemoryTaskRepository> _pumpApp(WidgetTester tester) async {
 }
 
 Future<void> _selectCalendarDay(WidgetTester tester, int day) async {
-  if (find.text('Month view').evaluate().isNotEmpty) {
+  if (find.text('Week').evaluate().isNotEmpty) {
     await tester.tap(find.byKey(const ValueKey('calendar-format')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Month').last);
     await tester.pumpAndSettle();
   }
   await tester.tap(

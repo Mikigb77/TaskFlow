@@ -172,14 +172,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         await CaptureInterruption.stop();
         if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
         unawaited(
-          _navigator.currentState!.push(
-            MaterialPageRoute<void>(
-              settings: const RouteSettings(name: '/voiceTask'),
-              builder: (_) => VoiceTaskScreen(
-                captureId: session.id,
-                startRecording: entry.kind == 'voice',
-              ),
-            ),
+          showCaptureSheet(
+            _navigator.currentContext!,
+            captureId: session.id,
+            startListening: entry.kind == 'voice',
           ),
         );
       }
@@ -362,7 +358,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               '/createTask': (_) => const CreateTaskScreen(),
               '/account': (_) => const AccountScreen(),
               '/subscription': (_) => const SubscriptionScreen(),
-              '/voiceTask': (_) => const VoiceTaskScreen(),
               '/captures': (_) => const CapturesScreen(),
               '/captureDiagnostics': (_) => const CaptureDiagnosticsScreen(),
               '/notifications': (_) => const NotificationSettingsScreen(),

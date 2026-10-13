@@ -107,7 +107,7 @@ void main() {
     await binding.convertFlutterSurfaceToImage();
     await tester.tap(find.text(words));
     await tester.pumpAndSettle();
-    final request = find.widgetWithText(FilledButton, 'Review tasks from text');
+    final request = find.widgetWithText(FilledButton, 'Done');
     await tester.ensureVisible(request);
     await tester.pumpAndSettle();
     await tester.tap(request);

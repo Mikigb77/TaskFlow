@@ -547,6 +547,59 @@ void main() {
   );
 
   test(
+    'U6: the capture request says speech for recorded audio and recognizer words, typed for typed and shared text',
+    () async {
+      final api = _CaptureApi();
+      addTearDown(api.close);
+      Future<String?> sent(CaptureSession session) async {
+        await CaptureProcessor(store, api).process(session);
+        return api.requests.last['source'] as String?;
+      }
+
+      final audio = await store.create(
+        'local',
+        'UTC',
+        audio: true,
+        source: 'speech',
+      );
+      await File(audio.audioPath!).writeAsBytes(_wav());
+      expect(await sent(audio), 'speech');
+
+      final live = await store.create(
+        'local',
+        'UTC',
+        text: 'llamar al médico el viernes',
+        source: 'speech',
+      );
+      // The source survives a restart, so a resumed capture keeps it.
+      await database.close();
+      await reopen();
+      final resumed = (await store.read(live.id, 'local'))!;
+      expect(resumed.source, 'speech');
+      expect(await sent(resumed), 'speech');
+      expect(api.requests.last['text'], 'llamar al médico el viernes');
+
+      final typed = await store.create(
+        'local',
+        'UTC',
+        text: 'Comprar pan',
+        source: 'typed',
+      );
+      expect(await sent(typed), 'typed');
+
+      final shared = (await store.acceptEntry(
+        '0b6f3a52-6f2e-4c55-9a43-6a1f0f7d2c11',
+        'local',
+        'UTC',
+        text: 'Comprar leche',
+        capturedAt: DateTime.utc(2026, 10, 13, 9),
+      ))!;
+      expect(shared.source, 'typed');
+      expect(await sent(shared), 'typed');
+    },
+  );
+
+  test(
     'diagnostics retain only bounded counters and timing percentiles',
     () async {
       final diagnostics = CaptureDiagnostics(database);

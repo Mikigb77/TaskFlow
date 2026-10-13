@@ -92,21 +92,17 @@ void main() {
       );
       await tester.pumpAndSettle();
       final navigator = tester.state<NavigatorState>(find.byType(Navigator));
-      navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => const VoiceTaskScreen(kind: 'note'),
-        ),
+      showCaptureSheet(
+        tester.element(find.byType(Navigator)),
+        kind: 'note',
+        startListening: false,
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Type instead'));
       await tester.pumpAndSettle();
       const words =
           'Trip reference\nOpening hours are Friday at 17:00.\nhttps://example.org/visit';
       final field = find.byKey(const ValueKey('capture-words'));
-      await tester.scrollUntilVisible(
-        field,
-        180,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
       await tester.enterText(field, words);
       await _until(
         tester,
@@ -132,19 +128,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(words));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Note'))
-            .selected,
-        isTrue,
-      );
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Review note'),
-        180,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Review note'));
+      // The resumed capture keeps its own kind.
+      expect((await store.read(capture.id, owner))!.kind, 'note');
+      await tester.tap(find.widgetWithText(FilledButton, 'Done'));
       await _until(
         tester,
         () async => find.byType(ReviewTasksScreen).evaluate().isNotEmpty,

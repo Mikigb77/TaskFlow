@@ -37,7 +37,7 @@
       }
     }
   },
-  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{The email or password is incorrect. Please try again.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{Could not connect to the server. Check your connection and server address, then retry. Your local data is kept.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Your local data is kept. Please try again.}}",
+  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{The email or password is incorrect. Please try again.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
   "@requestError": {
     "description": "Localized account, sync and file error categories. Never display raw server exception text.",
     "placeholders": {
@@ -78,7 +78,6 @@
   "saveNote": "Save note",
   "noteSaved": "Note saved",
   "recordNote": "Dictate a note",
-  "noteCaptureHelp": "Keep your words as one note. Typed notes stay on your phone until sync; saved recordings need online transcription.",
   "noteHint": "Ideas, meeting details, useful links…",
   "deleteNoteQuestion": "Delete this note?",
   "keepNote": "Keep note",
@@ -153,15 +152,25 @@
   "calendarRefresh": "Refresh calendars",
   "calendarClear": "Clear selection",
   "calendarReadError": "Calendar events could not be read. Refresh to try again; this view may be missing commitments.",
+  "calendarReadRetry": "Couldn’t read your events. Tap to try again.",
+  "changeView": "Change view",
   "calendarPreferenceError": "Could not save that calendar choice. Try again. You can select up to 50 calendars.",
   "calendarTruncated": "This calendar result is too large to show in full. Select fewer calendars to see the remaining events.",
   "calendarEvents": "Calendar events",
   "calendarReadOnly": "Calendar event · view only",
-  "calendarNoEvents": "No events from your selected calendars on this day.",
   "calendarNoSelection": "Choose calendars to show your existing commitments.",
   "calendarAllDay": "All day",
+  "calendarEventCount": "{count, plural, one{1 event} other{{count} events}}",
+  "@calendarEventCount": {
+    "description": "Calendar agenda line under the day’s tasks, followed by up to three start times.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "calendarOffline": "Offline — your tasks are saved on this phone.",
   "calendarUntitled": "Untitled event",
-  "calendarShowAll": "See all calendar events",
   "calendarOpenEvent": "Open in calendar app",
   "calendarOpenError": "The calendar app could not open this event.",
   "calendarEventGone": "This event is no longer available in the selected calendars.",
@@ -169,7 +178,6 @@
   "calendar": "Calendar",
   "tasks": "Tasks",
   "settings": "Settings",
-  "yourCalendar": "Your calendar",
   "inbox": "Inbox",
   "inboxCount": "Inbox · {count}",
   "@inboxCount": {
@@ -274,13 +282,11 @@
   },
   "week": "Week",
   "month": "Month",
-  "syncTasks": "Sync tasks",
+  "day": "Day",
   "previousPeriod": "Previous month or week",
   "nextPeriod": "Next month or week",
   "moreClarity": "More clarity. More room for life.",
   "licenses": "Open-source licences",
-  "weekView": "Week view",
-  "monthView": "Month view",
   "todayAgenda": "Today’s agenda",
   "breathingRoom": "A little breathing room.",
   "loadTasksError": "Couldn’t load your tasks",
@@ -318,7 +324,6 @@
   "inboxEmpty": "Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.",
   "savedOnDevice": "Your saved tasks are still on your device.",
   "checkCaptures": "Check unfinished captures",
-  "createVoiceTask": "Create task with voice",
   "createTaskTooltip": "Create task",
   "reviewTask": "Review task",
   "fineTunePlan": "Fine-tune your plan.",
@@ -367,38 +372,17 @@
   "skipOccurrence": "Skip this occurrence",
   "resetOccurrence": "Reset this occurrence",
   "reset": "Reset",
-  "captureThought": "Capture a thought",
-  "captureIntro": "One task or several. Say it naturally, or type your plan.",
-  "stopDraft": "Stop and create draft",
-  "recordTasks": "Record tasks",
-  "stopRecording": "Stop recording",
   "puttingPlanTogether": "Putting your plan together…",
   "recordingKept": "Recording kept on this phone",
-  "tapSpeak": "Tap to speak",
-  "inputLevel": "Microphone input level",
-  "tapStopHelp": "Tap stop when you’re finished. Up to 60 seconds.",
-  "returnCaptureHelp": "You can leave and return. Unfinished recordings are kept.",
-  "speechOptions": "Speech options",
   "onDeviceTranscript": "On-device live transcript",
   "onlineAudio": "Saved audio · online transcription",
-  "liveTranscript": "Live transcript",
-  "savedAudio": "Saved audio",
   "speechLanguage": "Speech language",
-  "deviceLanguage": "Device language",
   "onDeviceUnavailable": "On-device speech is unavailable for this language on this device. Record audio for online processing, or type.",
   "setUpSpeech": "Set up on-device speech",
   "checkAgain": "Check again",
-  "holdTalk": "Hold to talk",
-  "holdTalkHelp": "Hold the mic, then release. Tapping still works.",
-  "typePlan": "Or type your plan",
   "examplePlan": "Doctor Friday at 5 p.m. Bring my results. Also buy coffee.",
-  "tryRecording": "Try this recording",
-  "reviewText": "Review tasks from text",
-  "discardCapture": "Discard capture",
-  "discardCaptureQuestion": "Discard this capture?",
   "discard": "Discard",
   "keep": "Keep",
-  "guestTrialHelp": "Try voice without an account. A small daily allowance is shared by devices on this connection.",
   "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.",
   "checkTasks": "Check your tasks",
   "lookRight": "Look right?",
@@ -426,17 +410,6 @@
       }
     }
   },
-  "completionCount": "{done} of {total} tasks completed",
-  "@completionCount": {
-    "placeholders": {
-      "done": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
   "pendingCaptureCount": "Unfinished captures · {count}",
   "@pendingCaptureCount": {
     "placeholders": {
@@ -449,14 +422,6 @@
   "@listeningSeconds": {
     "placeholders": {
       "time": {
-        "type": "String"
-      }
-    }
-  },
-  "nativeSpeechHelp": "On-device speech · {language}. Words appear below and are kept as you speak.",
-  "@nativeSpeechHelp": {
-    "placeholders": {
-      "language": {
         "type": "String"
       }
     }
@@ -526,10 +491,8 @@
   "addChecklist": "Add checklist",
   "addStep": "Add step",
   "listUnavailable": "Project unavailable",
-  "moveToList": "Move to a project",
-  "moveToListHelp": "Your date, reminder and task details stay the same.",
   "archived": "Archived",
-  "createListHelp": "Create a project from the project selector.",
+  "sharedProject": "Shared",
   "taskReopened": "Task reopened",
   "taskCompleted": "Task completed",
   "undoError": "Could not undo. Please try again.",
@@ -557,7 +520,15 @@
   "keepEditing": "Keep editing",
   "resetSave": "Reset and save",
   "taskSavedInbox": "Task saved to Inbox",
-  "taskAddedCalendar": "Task added to your calendar",
+  "taskAddedOn": "Added to {date}",
+  "@taskAddedOn": {
+    "description": "After saving a new task with a date. The date is a weekday and date such as Fri, Oct 17, never Today or Tomorrow.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "changesSaved": "Changes saved",
   "taskSaveError": "Could not save your task. Please try again.",
   "localAttachmentHelp": "Attachments currently stay on this phone. Signing in restores your tasks, but these files will not appear on another device.",
@@ -761,7 +732,6 @@
   "archiveList": "Archive project",
   "sharingAndPeople": "Sharing and people",
   "chooseDetails": "Choose details",
-  "sharedListVisibility": "Shared · everyone in this project can see tasks, notes and uploaded files",
   "invitationCode": "Invitation code",
   "invitationCodeHelp": "This code and the invited TaskFlow account are both needed to join. Share it only with the intended person. Replacing an invitation invalidates its previous code.",
   "accountChanged": "The account changed.",
@@ -853,11 +823,7 @@
   "remindersOnConfirmation": "Done. Reminders are on.",
   "reminderAskQuestion": "Want a reminder before it?",
   "@reminderAskQuestion": {
-    "description": "Asked once, on a card below the tasks, when a task with a date was saved in this session; \"it\" is that task."
-  },
-  "reminderAskQuestionTasks": "Want reminders before your tasks?",
-  "@reminderAskQuestionTasks": {
-    "description": "The same question when the account already had dated tasks at launch and none was saved in this session."
+    "description": "Asked once, in a sheet, right after the first task with a date is saved; \"it\" is that task."
   },
   "reminderAskYes": "Yes, remind me",
   "reminderAskNotNow": "Not now",
@@ -1198,6 +1164,38 @@
   "@capturePaused": {
     "description": "Capture status after leaving the app or an interruption ended listening; the words are kept."
   },
+  "captureListening": "Listening",
+  "@captureListening": {
+    "description": "Announced to screen readers when the capture sheet starts listening."
+  },
+  "captureStartTalking": "Start talking",
+  "@captureStartTalking": {
+    "description": "With a screen reader on, the capture sheet waits for this button before it listens."
+  },
+  "captureContinue": "Continue",
+  "@captureContinue": {
+    "description": "Capture sheet: listens again and adds to the words already heard."
+  },
+  "captureTypeInstead": "Type instead",
+  "@captureTypeInstead": {
+    "description": "Keyboard button in the capture sheet: stops listening and lets you edit the words."
+  },
+  "captureStillListening": "Still listening. Tap Done when finished.",
+  "@captureStillListening": {
+    "description": "Shown under the words after about 5 seconds without new words."
+  },
+  "captureTimeLeft": "10 seconds left",
+  "@captureTimeLeft": {
+    "description": "Shown 10 seconds before the 60-second listening limit."
+  },
+  "captureKeepQuestion": "Keep what you said?",
+  "@captureKeepQuestion": {
+    "description": "Asked when closing the capture sheet with words or a recording."
+  },
+  "captureKeepHelp": "You can finish it later.",
+  "@captureKeepHelp": {
+    "description": "Body of the question asked when closing the capture sheet."
+  },
   "captureRecordingFirst": "Retry this recording or discard it before recording another.",
   "captureEmptyInput": "Say or type what you need to do first.",
   "captureSpeechStopped": "Speech stopped. Your retained words are safe; record audio or type to continue.",
@@ -1214,7 +1212,6 @@
   "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
   "captureSetupUnavailable": "Speech setup is unavailable here. Use saved audio or type.",
   "captureKept": "Your capture is kept on this phone.",
-  "captureDiscardHelp": "The recording and unsaved drafts will be removed. Tasks already saved will stay.",
   "voiceRecording": "Voice recording",
   "retryCaptures": "Retry loading captures",
   "capturesCaughtUp": "All caught up",
@@ -1481,11 +1478,22 @@
   "assignmentNeeded": "Needs an assignee",
   "assignmentChoose": "Who is responsible?",
   "assignmentGroupHelp": "One shared task. A member completes it for everyone.",
-  "assignmentNeedsReview": "Choose the project and responsible person before sharing this task.",
   "assignmentHeard": "You mentioned: {names}",
-  "assignmentConfirm": "Confirm project and responsibility",
   "audiencePersonal": "Only you can see this.",
   "audienceShared": "Visible to everyone in {name}",
+  "shareTaskConfirm": "Share with {name}? Everyone there will see this task. It can’t be made private again.",
+  "@shareTaskConfirm": {
+    "description": "Asked before a personal task moves into a shared project. {name} is the group, or the project when it has no group.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareTask": "Share",
+  "sharedTaskStays": "Shared tasks stay in their project.",
+  "assignmentIsRight": "Is this right?",
+  "yes": "Yes",
   "pinProject": "Pin project",
   "unpinProject": "Unpin project",
   "groups": "Groups",

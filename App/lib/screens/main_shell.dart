@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/providers/shell_tab_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/settings_screen.dart';
@@ -50,7 +52,15 @@ class _MainShellState extends State<MainShell> {
     final navigationBar = NavigationBar(
       labelTextStyle: labelTextStyle,
       selectedIndex: _index,
-      onDestinationSelected: (index) => setState(() => _index = index),
+      onDestinationSelected: (index) {
+        if (index != _index) {
+          ProviderScope.containerOf(
+            context,
+            listen: false,
+          ).read(shellTabSwitchesProvider.notifier).state++;
+        }
+        setState(() => _index = index);
+      },
       destinations: [
         NavigationDestination(
           icon: const Icon(Icons.calendar_month_outlined),

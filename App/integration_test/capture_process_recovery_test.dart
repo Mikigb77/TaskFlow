@@ -81,7 +81,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     if (checkpoint == null) {
       // Explicit opt-in cleanup after a failed fixture preparation. Only the
       // constant synthetic owner is eligible, never normal guest/account data.
@@ -101,14 +100,16 @@ void main() {
         reason: 'Do not overwrite a previous unfinished fixture.',
       );
       expect(await database.getTasks(ownerKey: _owner), isEmpty);
-      navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => const VoiceTaskScreen(
-            kind: _case == 'text-abrupt' ? 'note' : 'task',
-            startRecording: _case != 'text-abrupt',
-          ),
-        ),
+      showCaptureSheet(
+        tester.element(find.byType(Navigator)),
+        kind: _case == 'text-abrupt' ? 'note' : 'task',
+        startListening: _case != 'text-abrupt',
       );
+      if (_case == 'text-abrupt') {
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Type instead'));
+        await tester.pumpAndSettle();
+      }
       await _until(tester, () async {
         if (_case == 'text-abrupt') {
           return find
@@ -123,12 +124,6 @@ void main() {
       });
       if (_case == 'text-abrupt') {
         final words = find.byKey(const ValueKey('capture-words'));
-        await tester.scrollUntilVisible(
-          words,
-          180,
-          scrollable: find.byType(Scrollable).first,
-        );
-        await tester.pumpAndSettle();
         await tester.enterText(words, _words);
         await _until(
           tester,
@@ -212,29 +207,19 @@ void main() {
       debugPrint('CAPTURE_RETAINED: $_case ${before.length} bytes');
     }
 
-    navigator.push(
-      MaterialPageRoute<void>(builder: (_) => VoiceTaskScreen(captureId: id)),
+    showCaptureSheet(
+      tester.element(find.byType(Navigator)),
+      captureId: id,
+      startListening: false,
     );
     await tester.pumpAndSettle();
     if (_case == 'text-abrupt') {
       expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('capture-words')))
-            .controller!
-            .text,
+        tester.widget<Text>(find.byKey(const ValueKey('capture-heard'))).data,
         _words,
       );
     }
-    final retry = find.widgetWithText(
-      FilledButton,
-      _case == 'text-abrupt' ? 'Review note' : 'Try this recording',
-    );
-    await tester.scrollUntilVisible(
-      retry,
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
+    final retry = find.widgetWithText(FilledButton, 'Done');
     await tester.tap(retry);
     await _until(
       tester,

@@ -8,7 +8,7 @@ String taskDeadlineLabel(BuildContext context, Task task) {
   final date = task.displayDeadline;
   if (date == null) return context.l10n.deadlineUnset;
   return context.l10n.deadlineLabel(
-    '${context.shortDate(date)}${task.deadlineHasTime ? ' · ${context.clockTime(date)}' : ''}',
+    '${context.weekdayDate(date)}${task.deadlineHasTime ? ' · ${context.clockTime(date)}' : ''}',
   );
 }
 

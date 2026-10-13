@@ -9,7 +9,7 @@ String taskScheduleLabel(Task task,
   if (context != null) {
     if (date == null) return '${context.l10n.inbox} · ${context.l10n.noDate}';
     final time = task.hasTime ? context.clockTime(date) : context.l10n.anyTime;
-    return showDate ? '${context.shortDate(date)} · $time' : time;
+    return showDate ? '${context.dayLabel(date)} · $time' : time;
   }
   if (date == null) return 'Inbox · No date';
   if (!task.hasTime) {

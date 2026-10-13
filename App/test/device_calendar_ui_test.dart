@@ -84,9 +84,11 @@ void main() {
             home: Scaffold(
                 body: DeviceCalendarEvents(day: DateTime(2026, 9, 22))))));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('calendar-events-line')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Calendar appointment'));
     await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNWidgets(2));
     expect(find.text('Open in calendar app'), findsOneWidget);
     bridge.access = CalendarAccess.denied;
     await container.read(deviceCalendarProvider.notifier).refresh();
@@ -96,7 +98,7 @@ void main() {
     expect(
         find.text(
             'This event is no longer available in the selected calendars.'),
-        findsOneWidget);
+        findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

@@ -9,8 +9,8 @@ class ReminderPreferences {
   final int? morning;
   final int? evening;
 
-  /// Whether this account on this phone has answered the one-time
-  /// ‘Want a reminder before it?’ question, either way.
+  /// Whether this account on this phone has been asked the one-time
+  /// ‘Want a reminder before it?’ question, whatever the answer.
   final bool asked;
   const ReminderPreferences(
       {this.enabled = false,

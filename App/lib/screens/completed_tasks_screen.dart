@@ -46,7 +46,8 @@ class CompletedTasksScreen extends ConsumerWidget {
                                 Text(context.l10n
                                     .completedTaskSummary(completed.length)),
                               ])),
-                      Expanded(child: TaskList(tasks: completed)),
+                      Expanded(
+                          child: TaskList(tasks: completed, newestFirst: true)),
                     ]);
               },
               loading: () => const Center(child: CircularProgressIndicator()),

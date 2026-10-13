@@ -144,13 +144,16 @@ class AppLocalizationsCa extends AppLocalizations {
       'fileChanged':
           'El fitxer ha canviat o no s’ha pogut verificar. Tria’l de nou o torna’l a baixar.',
       'network':
-          'No s’ha pogut connectar amb el servidor. Revisa la connexió i l’adreça del servidor i torna-ho a provar. Les dades locals es conserven.',
+          'No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar.',
+      'networkKept':
+          'No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar. Les tasques continuen desades en aquest telèfon.',
       'unavailable':
           'El servei no està disponible. Torna-ho a provar més endavant.',
       'validation':
           'No s’han acceptat algunes dades. Revisa la informació i torna-ho a provar.',
-      'other':
-          'No s’ha pogut completar la petició. Les dades locals es conserven. Torna-ho a provar.',
+      'other': 'No s’ha pogut completar la petició. Torna-ho a provar.',
+      'otherKept':
+          'No s’ha pogut completar la petició. Torna-ho a provar. Les tasques continuen desades en aquest telèfon.',
     });
     return '$_temp0';
   }
@@ -224,10 +227,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get recordNote => 'Dicta una nota';
-
-  @override
-  String get noteCaptureHelp =>
-      'Conserva les teves paraules en una sola nota. Les notes escrites es queden al telèfon fins que se sincronitzen; les gravacions desades necessiten transcripció en línia.';
 
   @override
   String get noteHint => 'Idees, detalls de reunions, enllaços útils…';
@@ -412,6 +411,13 @@ class AppLocalizationsCa extends AppLocalizations {
       'No s’han pogut llegir els esdeveniments. Actualitza per tornar-ho a provar; pot ser que faltin compromisos en aquesta vista.';
 
   @override
+  String get calendarReadRetry =>
+      'No s’han pogut llegir els esdeveniments. Toca per tornar-ho a provar.';
+
+  @override
+  String get changeView => 'Canvia la vista';
+
+  @override
   String get calendarPreferenceError =>
       'No s’ha pogut desar la selecció de calendaris. Torna-ho a provar. Pots seleccionar fins a 50 calendaris.';
 
@@ -426,10 +432,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarReadOnly => 'Esdeveniment del calendari · només lectura';
 
   @override
-  String get calendarNoEvents =>
-      'No hi ha esdeveniments dels calendaris seleccionats per a aquest dia.';
-
-  @override
   String get calendarNoSelection =>
       'Tria calendaris per veure els compromisos que ja tens.';
 
@@ -437,10 +439,22 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarAllDay => 'Tot el dia';
 
   @override
-  String get calendarUntitled => 'Esdeveniment sense títol';
+  String calendarEventCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count esdeveniments',
+      one: '1 esdeveniment',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get calendarShowAll => 'Mostra tots els esdeveniments';
+  String get calendarOffline =>
+      'Sense connexió: les tasques estan desades en aquest telèfon.';
+
+  @override
+  String get calendarUntitled => 'Esdeveniment sense títol';
 
   @override
   String get calendarOpenEvent => 'Obre a l’aplicació de calendari';
@@ -464,9 +478,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get settings => 'Configuració';
-
-  @override
-  String get yourCalendar => 'El teu calendari';
 
   @override
   String get inbox => 'Safata d’entrada';
@@ -749,7 +760,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get month => 'Mes';
 
   @override
-  String get syncTasks => 'Sincronitza les tasques';
+  String get day => 'Dia';
 
   @override
   String get previousPeriod => 'Mes o setmana anterior';
@@ -762,12 +773,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get licenses => 'Llicències de codi obert';
-
-  @override
-  String get weekView => 'Vista setmanal';
-
-  @override
-  String get monthView => 'Vista mensual';
 
   @override
   String get todayAgenda => 'L’agenda d’avui';
@@ -890,9 +895,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get checkCaptures => 'Revisa les captures pendents';
-
-  @override
-  String get createVoiceTask => 'Crea una tasca amb la veu';
 
   @override
   String get createTaskTooltip => 'Crea una tasca';
@@ -1048,42 +1050,10 @@ class AppLocalizationsCa extends AppLocalizations {
   String get reset => 'Restableix';
 
   @override
-  String get captureThought => 'Captura una idea';
-
-  @override
-  String get captureIntro =>
-      'Una tasca o diverses. Explica-ho amb naturalitat o escriu el teu pla.';
-
-  @override
-  String get stopDraft => 'Atura i crea un esborrany';
-
-  @override
-  String get recordTasks => 'Grava tasques';
-
-  @override
-  String get stopRecording => 'Atura la gravació';
-
-  @override
   String get puttingPlanTogether => 'S’està preparant el teu pla…';
 
   @override
   String get recordingKept => 'Gravació conservada en aquest telèfon';
-
-  @override
-  String get tapSpeak => 'Toca per parlar';
-
-  @override
-  String get inputLevel => 'Nivell d’entrada del micròfon';
-
-  @override
-  String get tapStopHelp => 'Toca Atura quan hagis acabat. Màxim 60 segons.';
-
-  @override
-  String get returnCaptureHelp =>
-      'Pots sortir i tornar-hi. Les gravacions pendents es conserven.';
-
-  @override
-  String get speechOptions => 'Opcions de veu';
 
   @override
   String get onDeviceTranscript => 'Transcripció en directe al dispositiu';
@@ -1092,16 +1062,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get onlineAudio => 'Àudio desat · transcripció en línia';
 
   @override
-  String get liveTranscript => 'Transcripció en directe';
-
-  @override
-  String get savedAudio => 'Àudio desat';
-
-  @override
   String get speechLanguage => 'Idioma de la veu';
-
-  @override
-  String get deviceLanguage => 'Idioma del dispositiu';
 
   @override
   String get onDeviceUnavailable =>
@@ -1114,40 +1075,14 @@ class AppLocalizationsCa extends AppLocalizations {
   String get checkAgain => 'Torna a comprovar-ho';
 
   @override
-  String get holdTalk => 'Mantén premut per parlar';
-
-  @override
-  String get holdTalkHelp =>
-      'Mantén premut el micròfon i deixa’l anar. També funciona amb un toc.';
-
-  @override
-  String get typePlan => 'O escriu el teu pla';
-
-  @override
   String get examplePlan =>
       'Metge divendres a les 17 h. Portar els resultats. També comprar cafè.';
-
-  @override
-  String get tryRecording => 'Prova aquesta gravació';
-
-  @override
-  String get reviewText => 'Revisa les tasques del text';
-
-  @override
-  String get discardCapture => 'Descarta la captura';
-
-  @override
-  String get discardCaptureQuestion => 'Vols descartar aquesta captura?';
 
   @override
   String get discard => 'Descarta';
 
   @override
   String get keep => 'Conserva';
-
-  @override
-  String get guestTrialHelp =>
-      'Prova la veu sense compte. Els dispositius d’aquesta connexió comparteixen un petit límit diari.';
 
   @override
   String get capturePrivacy =>
@@ -1189,11 +1124,6 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String completionCount(int done, int total) {
-    return '$done de $total tasques completades';
-  }
-
-  @override
   String pendingCaptureCount(int count) {
     return 'Captures pendents · $count';
   }
@@ -1201,11 +1131,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String listeningSeconds(String time) {
     return 'S’està escoltant · $time';
-  }
-
-  @override
-  String nativeSpeechHelp(String language) {
-    return 'Veu local · $language. Les paraules apareixen a sota i es desen mentre parles.';
   }
 
   @override
@@ -1288,18 +1213,10 @@ class AppLocalizationsCa extends AppLocalizations {
   String get listUnavailable => 'Projecte no disponible';
 
   @override
-  String get moveToList => 'Mou a un projecte';
-
-  @override
-  String get moveToListHelp =>
-      'La data, el recordatori i els detalls de la tasca es mantenen.';
-
-  @override
   String get archived => 'Arxivada';
 
   @override
-  String get createListHelp =>
-      'Crea un projecte des del selector de projectes.';
+  String get sharedProject => 'Compartit';
 
   @override
   String get taskReopened => 'Tasca reoberta';
@@ -1390,7 +1307,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get taskSavedInbox => 'Tasca desada a la safata d’entrada';
 
   @override
-  String get taskAddedCalendar => 'Tasca afegida al calendari';
+  String taskAddedOn(String date) {
+    return 'Afegida al $date';
+  }
 
   @override
   String get changesSaved => 'Canvis desats';
@@ -1828,10 +1747,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get chooseDetails => 'Tria els detalls';
 
   @override
-  String get sharedListVisibility =>
-      'Compartit · tothom del projecte pot veure les tasques, notes i fitxers pujats';
-
-  @override
   String get invitationCode => 'Codi d’invitació';
 
   @override
@@ -2045,10 +1960,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get reminderAskQuestion => 'Vols un recordatori abans?';
-
-  @override
-  String get reminderAskQuestionTasks =>
-      'Vols recordatoris abans de les teves tasques?';
 
   @override
   String get reminderAskYes => 'Sí, recorda-m’ho';
@@ -2697,6 +2608,30 @@ class AppLocalizationsCa extends AppLocalizations {
   String get capturePaused => 'En pausa';
 
   @override
+  String get captureListening => 'S’està escoltant';
+
+  @override
+  String get captureStartTalking => 'Comença a parlar';
+
+  @override
+  String get captureContinue => 'Continua';
+
+  @override
+  String get captureTypeInstead => 'Escriu';
+
+  @override
+  String get captureStillListening => 'Encara t’escolto. Toca Fet quan acabis.';
+
+  @override
+  String get captureTimeLeft => 'Queden 10 segons';
+
+  @override
+  String get captureKeepQuestion => 'Vols conservar el que has dit?';
+
+  @override
+  String get captureKeepHelp => 'Ho podràs acabar més tard.';
+
+  @override
   String get captureRecordingFirst =>
       'Torna a provar aquesta gravació o descarta-la abans de gravar-ne una altra.';
 
@@ -2757,10 +2692,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureKept => 'La captura es conserva en aquest telèfon.';
-
-  @override
-  String get captureDiscardHelp =>
-      'Se suprimiran la gravació i els esborranys no desats. Les tasques ja desades es mantindran.';
 
   @override
   String get voiceRecording => 'Gravació de veu';
@@ -3252,16 +3183,9 @@ class AppLocalizationsCa extends AppLocalizations {
       'Una tasca compartida. Un membre la completa per a tothom.';
 
   @override
-  String get assignmentNeedsReview =>
-      'Tria el projecte i la persona responsable abans de compartir aquesta tasca.';
-
-  @override
   String assignmentHeard(Object names) {
     return 'Has esmentat: $names';
   }
-
-  @override
-  String get assignmentConfirm => 'Confirma el projecte i el responsable';
 
   @override
   String get audiencePersonal => 'Només tu ho pots veure.';
@@ -3270,6 +3194,24 @@ class AppLocalizationsCa extends AppLocalizations {
   String audienceShared(Object name) {
     return 'Visible per a tothom a $name';
   }
+
+  @override
+  String shareTaskConfirm(String name) {
+    return 'Vols compartir-la amb $name? Tothom la veurà i no la podràs tornar a fer privada.';
+  }
+
+  @override
+  String get shareTask => 'Comparteix';
+
+  @override
+  String get sharedTaskStays =>
+      'Les tasques compartides es queden al seu projecte.';
+
+  @override
+  String get assignmentIsRight => 'És correcte?';
+
+  @override
+  String get yes => 'Sí';
 
   @override
   String get pinProject => 'Fixa el projecte';

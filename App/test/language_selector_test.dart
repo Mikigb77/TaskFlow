@@ -31,7 +31,7 @@ void main() {
         UncontrolledProviderScope(container: container, child: const MyApp()),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Your calendar'), findsOneWidget);
+      expect(find.text('Today’s agenda'), findsOneWidget);
       final navigator = tester.state<NavigatorState>(find.byType(Navigator));
       navigator.pushNamed('/settings');
       await tester.pumpAndSettle();
@@ -57,7 +57,7 @@ void main() {
       expect(find.text('Català'), findsOneWidget);
       navigator.pop();
       await tester.pumpAndSettle();
-      expect(find.text('El teu calendari'), findsOneWidget);
+      expect(find.text('L’agenda d’avui'), findsOneWidget);
       expect(container.read(regionalProvider).language, 'ca');
 
       navigator.pushNamed('/region');

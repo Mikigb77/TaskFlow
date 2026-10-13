@@ -111,8 +111,9 @@ class DesignTaskNotifier extends TaskNotifier {
   }
 
   @override
-  Future<void> addTask(Task task) async {
+  Future<int> addTask(Task task) async {
     state = AsyncData([...state.requireValue, task.copyWith(id: 5)]);
+    return 5;
   }
 
   @override

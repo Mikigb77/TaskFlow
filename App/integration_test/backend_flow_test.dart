@@ -80,14 +80,17 @@ void main() {
 
       // Signed-in capture exercises resumable account-scoped persistence.
       final owner = container.read(captureOwnerProvider);
-      tester
-          .state<NavigatorState>(find.byType(Navigator))
-          .pushNamed('/voiceTask');
+      showCaptureSheet(
+        tester.element(find.byType(Scaffold).first),
+        startListening: false,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Type instead'));
       await tester.pumpAndSettle();
       final captureTitle =
           'Buy coffee ${DateTime.now().millisecondsSinceEpoch}';
       await tester.enterText(
-        find.byType(TextField).first,
+        find.byKey(const ValueKey('capture-words')),
         '$captureTitle sometime. Pay my electricity bill on Friday.',
       );
       FocusManager.instance.primaryFocus?.unfocus();
@@ -110,13 +113,11 @@ void main() {
       )).firstWhere((s) => s.text.startsWith(captureTitle));
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();
-      tester
-          .state<NavigatorState>(find.byType(Navigator))
-          .push(
-            MaterialPageRoute<void>(
-              builder: (_) => VoiceTaskScreen(captureId: unfinished.id),
-            ),
-          );
+      showCaptureSheet(
+        tester.element(find.byType(Scaffold).first),
+        captureId: unfinished.id,
+        startListening: false,
+      );
       await tester.pumpAndSettle();
       await waitFor(
         tester,
@@ -125,7 +126,7 @@ void main() {
             .evaluate()
             .isNotEmpty,
       );
-      final captureGenerate = find.text('Review tasks from text');
+      final captureGenerate = find.widgetWithText(FilledButton, 'Done');
       await tester.ensureVisible(captureGenerate);
       await tester.tap(captureGenerate);
       await waitFor(
@@ -166,22 +167,22 @@ void main() {
       await container.read(taskProvider.notifier).loadTasks();
       await tester.pumpAndSettle();
 
-      tester
-          .state<NavigatorState>(find.byType(Navigator))
-          .pushNamed('/voiceTask');
+      showCaptureSheet(
+        tester.element(find.byType(Scaffold).first),
+        startListening: false,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Type instead'));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.byType(TextField).first,
+        find.byKey(const ValueKey('capture-words')),
         'On Friday at 5 p.m. I have an appointment with the doctor. '
         'I need to bring my blood test results from last month. Also buy coffee sometime. '
         'Water the plants every Sunday at 9 a.m.',
       );
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      final generate = find.widgetWithText(
-        FilledButton,
-        'Review tasks from text',
-      );
+      final generate = find.widgetWithText(FilledButton, 'Done');
       await tester.ensureVisible(generate);
       await tester.tap(generate);
       await waitFor(

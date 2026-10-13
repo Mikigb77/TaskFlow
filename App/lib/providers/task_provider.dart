@@ -58,10 +58,11 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     } while (_loadAgain && mounted);
   }
 
-  Future<void> addTask(Task task) async {
-    await _repository.addTask(task);
-    if (!mounted) return;
-    unawaited(loadTasks());
+  /// Returns the new task's id, so a save can show it and undo it.
+  Future<int> addTask(Task task) async {
+    final id = await _repository.addTask(task);
+    if (mounted) unawaited(loadTasks());
+    return id;
   }
 
   Future<void> updateTask(Task task) async {

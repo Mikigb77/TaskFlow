@@ -148,6 +148,10 @@ class CaptureSession {
   final List<CaptureDraft> drafts;
   final String? projectId;
 
+  /// Where the first words came from: `speech` (the recognizer or recorded
+  /// audio) or `typed` (the keyboard or a share). Null until words arrive.
+  final String? source;
+
   const CaptureSession({
     required this.id,
     required this.ownerKey,
@@ -162,6 +166,7 @@ class CaptureSession {
     this.status = 'editing',
     this.error,
     this.drafts = const [],
+    this.source,
   });
 
   bool get terminal => status == 'saved' || status == 'discarded';
@@ -177,6 +182,7 @@ class CaptureSession {
     String? error,
     String? kind,
     List<CaptureDraft>? drafts,
+    String? source,
   }) => CaptureSession(
     id: id,
     ownerKey: ownerKey,
@@ -191,6 +197,7 @@ class CaptureSession {
     status: status ?? this.status,
     error: error,
     drafts: drafts ?? this.drafts,
+    source: source ?? this.source,
   );
 
   Map<String, dynamic> toJson() => {
@@ -207,6 +214,7 @@ class CaptureSession {
     'status': status,
     'error': error,
     'drafts': drafts.map((d) => d.toJson()).toList(),
+    'source': source,
   };
 
   factory CaptureSession.fromJson(Map<String, dynamic> json) => CaptureSession(
@@ -225,5 +233,6 @@ class CaptureSession {
     drafts: (json['drafts'] as List? ?? [])
         .map((d) => CaptureDraft.fromJson(Map<String, dynamic>.from(d)))
         .toList(),
+    source: json['source'],
   );
 }

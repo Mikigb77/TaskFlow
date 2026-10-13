@@ -13,9 +13,17 @@ import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskTile extends ConsumerWidget {
-  const TaskTile({super.key, required this.task, this.showDate = false});
+  const TaskTile({
+    super.key,
+    required this.task,
+    this.showDate = false,
+    this.color,
+  });
   final Task task;
   final bool showDate;
+
+  /// Replaces the surface colour, for example to highlight a new task.
+  final Color? color;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,7 +58,7 @@ class TaskTile extends ConsumerWidget {
         Alignment.centerRight,
       ),
       child: Material(
-        color: colors.surface,
+        color: color ?? colors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(color: colors.outlineVariant),
@@ -172,7 +180,9 @@ class TaskTile extends ConsumerWidget {
                             ),
                           if (task.deadline != null)
                             Text(
-                              taskDeadlineLabel(context, task),
+                              task.deadlinePassed(DateTime.now())
+                                  ? '${taskDeadlineLabel(context, task)} · ${context.l10n.deadlineOverdue}'
+                                  : taskDeadlineLabel(context, task),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: task.deadlinePassed(DateTime.now())

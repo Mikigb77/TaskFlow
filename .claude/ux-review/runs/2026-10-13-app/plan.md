@@ -408,3 +408,66 @@ No new packages. P49 and P50 passed; the only failure is UX-401, which has now f
 
 ### Regressions
 None.
+
+## Round 2 (b2)
+
+Round 1 of batch 2 ran P51, P3, P35, P6, P7 and P12. The round check failed on 5 new tests: UX-202 at 1.3× Spanish text (light, dark) and UX-308 at 2× text on 320 dp (es, ca, en). Both findings are partly fixed, first failure. The reviewers also found nine regressions; two of them are the same problem (R1D-1, R1B-1), so they become eight lines, UX-439 to UX-446.
+Round 2 has four packages: P52 (S3), P53 (S3), P54 (S2) and P55 (S2). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b2-r2.json`.
+
+### Packages, in run order
+
+#### P52 · Calendar: room for today's tasks at large text, and three small fixes · B · M · after P6, P7
+- **UX-202** (S3; partly, failed once) At 1.3× Spanish text the second task still ends under the buttons (y 639 against 590). Last attempt removed five things but left the month line wrapping (`octubre de 2026` / `Semana ▾`) and a 26 dp gap above "Agenda de hoy". Now the month shows without the year in the current year (`octubre`), the gap becomes 12 dp, and an empty project filter takes no space: about 52 dp for the 49 needed. P38 later removes the second creation button, which frees another 60 dp.
+- **UX-446** (S1; R1B-4) TalkBack reads the view switcher as "Mostrar menú". It gets the name "Cambiar vista".
+- **UX-442** (S2; R1B-2) The events error line says "Actualiza" but opens calendar choice. Now tapping it tries again, and it reads "No se pudieron leer los eventos. Toca para reintentar.".
+- **UX-445** (S1; R1B-3) One tile showed dates in two formats (`vie, 16 oct` and `12 oct`). Deadlines now use the weekday format too.
+
+#### P53 · Tareas heading never overflows; shared projects look shared in the picker · C · S · after P12
+- **UX-308** (S3; partly, failed once) The 2× / 320 dp test overflowed. The reviewer showed the test measured a placeholder font (with the app's real font the row fits), but the two buttons sat in a Row that can't wrap. Now they sit in a small Wrap, and the test loads the real font.
+- **UX-443** (S2; R1C-1) A project shared person by person looked private in the project sheet. Every shared row now has a subtitle: the group name, or "Compartido".
+
+#### P54 · Capture sheet: Seguir only after a pause; honest TalkBack; shorter hint · A · S · after P35
+- **UX-440** (S2; R1A-1) "Seguir" showed next to "Listo" on shared and typed text that never listened. It now shows only after a pause, or on a resumed voice capture.
+- **UX-441** (S2; R1A-2) TalkBack said "Listo" when the person cancelled or chose to type. It now says "Listo" only on Listo, "En pausa" on interruptions, and nothing on Cancelar or Escribir.
+- **UX-444** (S1; R1A-3) The English silence hint was cut at 2× text. It becomes "Still listening. Tap Done when finished.".
+
+#### P55 · The reminders question waits until the save message is gone · D · M · after P51
+- **UX-439** (S2; R1D-1, alias R1B-1) The one-time reminders question opened 300 ms after the first dated save and hid the "Añadida al …" message, its Deshacer and the landing highlight. It now waits for the message to close, and isn't asked if the person tapped Deshacer or opened another screen in the meantime; the next dated save asks instead.
+
+### Escalated
+None: no finding has failed twice.
+
+### Skipped
+- **R1B-1**: the same problem as R1D-1; both are UX-439 (P55).
+
+### Noted, not planned
+- U6's server half (the speech-only instruction in `Backend/core/ai.py`) stays open as server-side.
+- UX-401 (P51) was found fixed in code; its line moves at close, with its phone checks.
+
+## Round 3 (b2)
+
+Round 2 of batch 2 ran P52, P53, P54 and P55. The reviewers found all ten findings fixed: UX-202, UX-308, UX-439 to UX-446. Several still need their phone checks. The round check passed and no test failed. P52 and P55 caused three small regressions, now UX-447 to UX-449.
+Round 3 has two small packages: P56 (S2) and P57 (S1). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b2-r3.json`.
+
+### Packages, in run order
+
+#### P56 · The reminders question skips replaced messages and tab switches · D · S
+- **UX-448** (S2; R2D-1, regression from P55) The person ticks or moves a just-saved dated task within about 4 s. Their new message replaces the save message, and the question opens at once over `Tarea completada · Deshacer`. Now the question goes ahead only when the save message timed out or was swiped away. When another message replaced it, the next dated save asks instead.
+- **UX-449** (S1; R2D-2, regression from P55; needs a phone) The person saves on Calendario, then switches to Notas within about 4 s. The question opens over Notas, because tabs aren't screens of their own. Now the shell counts tab switches, and a switch since the save skips the question until the next dated save.
+
+#### P57 · Calendar events retry keeps its line and shows progress · B · S
+- **UX-447** (S1; R2B-1, regression from P52) Tapping `Toca para reintentar` collapsed the line, so the content jumped, and a quick failure looked like nothing happened. Now the line stays in place with a small spinner instead of its icon until the retry settles. There is no new text.
+
+### Escalated
+None: no finding has failed twice.
+
+### Skipped
+None.
+
+### Noted, not planned
+- UX-202, UX-308, UX-439 to UX-446 were found fixed in code. Their lines move at close, with their phone checks.
+- From the D verify note, not counted: with a long Android "Time to take action" the question comes late (accepted in P55). A stray tap on the scrim as the question appears counts as asked. Watch for it on the phone check.

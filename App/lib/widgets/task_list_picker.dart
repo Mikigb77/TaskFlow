@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/screens/task_lists_screen.dart';
+import 'package:agenda/widgets/app_components.dart';
 
 Color taskListColor(String color) => switch (color) {
   'blue' => const Color(0xff497dac),
@@ -11,6 +13,9 @@ Color taskListColor(String color) => switch (color) {
   'rose' => const Color(0xffb56b87),
   _ => const Color(0xff23877a),
 };
+
+/// Sheet result for the "New project" row; project ids are UUIDs.
+const _newProject = '+new';
 
 class TaskListPicker extends ConsumerWidget {
   const TaskListPicker({
@@ -21,91 +26,138 @@ class TaskListPicker extends ConsumerWidget {
     this.lockShared = false,
   });
   final String? listId;
-  final ValueChanged<String?>? onChanged;
+  final ValueChanged<TaskListInfo?>? onChanged;
+
+  /// The task already exists: moving it into a shared project asks first,
+  /// and a shared task stays in its project.
   final bool lockShared;
   final bool asRow;
+
+  Future<void> _choose(
+    BuildContext context,
+    WidgetRef ref,
+    List<TaskListInfo> lists,
+    TaskListInfo? selected,
+  ) async {
+    final choices = lists
+        .where((list) => list.canEdit && (!list.inactive || list.id == listId))
+        .toList();
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(title: Text(context.l10n.list)),
+            ListTile(
+              leading: const Icon(Icons.folder_off_outlined),
+              title: Text(context.l10n.noList),
+              selected: listId == null,
+              onTap: () => Navigator.pop(context, ''),
+            ),
+            for (final list in choices)
+              ListTile(
+                leading: Icon(
+                  Icons.folder_outlined,
+                  color: taskListColor(list.color),
+                ),
+                title: Text(list.name),
+                subtitle: list.shared
+                    ? Text(list.groupName ?? context.l10n.sharedProject)
+                    : list.inactive
+                    ? Text(context.l10n.archived)
+                    : null,
+                selected: listId == list.id,
+                onTap: () => Navigator.pop(context, list.id),
+              ),
+            if (choices.isEmpty)
+              ListTile(
+                leading: const Icon(Icons.add_rounded),
+                title: Text(context.l10n.newList),
+                onTap: () => Navigator.pop(context, _newProject),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || !context.mounted) return;
+    final project = chosen == _newProject
+        ? await editTaskList(context, ref)
+        : lists.where((list) => list.id == chosen).firstOrNull;
+    if (chosen == _newProject && project == null) return;
+    if (lockShared && project?.shared == true && selected?.shared != true) {
+      if (!context.mounted) return;
+      final share = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          scrollable: true,
+          content: Text(
+            context.l10n.shareTaskConfirm(project!.groupName ?? project.name),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.l10n.shareTask),
+            ),
+          ],
+        ),
+      );
+      if (share != true) return;
+    }
+    onChanged!(project);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lists = ref.watch(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
     final selected = lists.where((list) => list.id == listId).firstOrNull;
-    final chip = ActionChip(
+    final locked = lockShared && selected?.shared == true;
+    final name =
+        selected?.name ??
+        (listId == null ? context.l10n.noList : context.l10n.listUnavailable);
+    final VoidCallback? onPressed = locked
+        ? () => showFeedback(
+            ScaffoldMessenger.of(context),
+            context.l10n.sharedTaskStays,
+          )
+        : onChanged == null
+        ? null
+        : () => _choose(context, ref, lists, selected);
+    final avatar = Icon(
+      Icons.folder_outlined,
+      size: 18,
+      color: selected == null ? null : taskListColor(selected.color),
+    );
+    if (asRow) {
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: avatar,
+        title: Text(name),
+        trailing: locked
+            ? null
+            : const Icon(Icons.chevron_right_rounded, size: 20),
+        onTap: onPressed,
+      );
+    }
+    return ActionChip(
       labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-      avatar: Icon(
-        Icons.folder_outlined,
-        size: 18,
-        color: selected == null ? null : taskListColor(selected.color),
-      ),
+      avatar: avatar,
       label: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 230),
-        child: Text(
-          selected?.name ??
-              (listId == null
-                  ? context.l10n.noList
-                  : context.l10n.listUnavailable),
-          overflow: TextOverflow.ellipsis,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: Text(name, overflow: TextOverflow.ellipsis)),
+            if (!locked && onChanged != null)
+              const Icon(Icons.arrow_drop_down_rounded, size: 18),
+          ],
         ),
       ),
-      onPressed: onChanged == null || (lockShared && selected?.shared == true)
-          ? null
-          : () async {
-              final chosen = await showModalBottomSheet<String>(
-                context: context,
-                builder: (context) => SafeArea(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      ListTile(
-                        title: Text(context.l10n.moveToList),
-                        subtitle: Text(context.l10n.moveToListHelp),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.folder_off_outlined),
-                        title: Text(context.l10n.noList),
-                        selected: listId == null,
-                        onTap: () => Navigator.pop(context, ''),
-                      ),
-                      for (final list in lists.where(
-                        (list) =>
-                            list.canEdit &&
-                            (!list.inactive || list.id == listId),
-                      ))
-                        ListTile(
-                          leading: Icon(
-                            Icons.folder_outlined,
-                            color: taskListColor(list.color),
-                          ),
-                          title: Text(list.name),
-                          subtitle: list.shared
-                              ? Text(context.l10n.sharedListVisibility)
-                              : list.inactive
-                              ? Text(context.l10n.archived)
-                              : null,
-                          selected: listId == list.id,
-                          onTap: () => Navigator.pop(context, list.id),
-                        ),
-                      if (lists.isEmpty)
-                        ListTile(title: Text(context.l10n.createListHelp)),
-                    ],
-                  ),
-                ),
-              );
-              if (chosen != null) onChanged!(chosen.isEmpty ? null : chosen);
-            },
+      onPressed: onPressed,
     );
-    return asRow
-        ? ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: chip.avatar,
-            title: Text(
-              selected?.name ??
-                  (listId == null
-                      ? context.l10n.noList
-                      : context.l10n.listUnavailable),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-            onTap: chip.onPressed,
-          )
-        : chip;
   }
 }

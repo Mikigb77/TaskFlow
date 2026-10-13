@@ -17,6 +17,7 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +25,9 @@ import 'package:record/record.dart';
 import 'support/design_fixtures.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/screens/calendar_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -81,37 +85,29 @@ void main() {
     (tester) async {
       final store = _Captures();
       final api = _OfflineExtraction();
-      final container = await _open(tester, _Speech(), store, api);
+      final container = await _open(
+        tester,
+        _Speech(),
+        store,
+        api,
+        listen: false,
+      );
       const original = 'Doctor Friday at 17:00 · bring José’s report';
+      await tester.tap(find.byTooltip('Type instead'));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('capture-words')),
         original,
       );
       await tester.pumpAndSettle();
-      final request = find.widgetWithText(
-        FilledButton,
-        'Review tasks from text',
-      );
-      await tester.ensureVisible(request);
-      await tester.pumpAndSettle();
-      await tester.tap(request);
+      await tester.tap(find.widgetWithText(FilledButton, 'Done'));
       await tester.pumpAndSettle();
       expect(store.session!.error, CaptureProblem.offline);
       final retained = store.session!.toJson().toString();
       tester.view.physicalSize = const Size(320, 568);
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      Future<void> show(Finder finder, double step) async {
-        // Drag in the page padding: a centered gesture can land inside the
-        // multiline input's own scroll view at 2x text size.
-        for (
-          var attempt = 0;
-          finder.evaluate().isEmpty && attempt < 30;
-          attempt++
-        ) {
-          await tester.dragFrom(const Offset(12, 280), Offset(0, -step));
-          await tester.pumpAndSettle();
-        }
+      Future<void> show(Finder finder) async {
         await tester.ensureVisible(finder);
         await tester.pumpAndSettle();
       }
@@ -127,10 +123,10 @@ void main() {
               ? AppLocalizationsEs().captureOffline
               : AppLocalizationsEn().captureOffline;
           final error = find.textContaining(expected);
-          await show(error, 180);
+          await show(error);
           expect(error, findsOneWidget);
           expect(store.session!.toJson().toString(), retained);
-          await show(find.byKey(const ValueKey('capture-words')), -180);
+          await show(find.byKey(const ValueKey('capture-words')));
           expect(
             tester
                 .widget<TextField>(find.byKey(const ValueKey('capture-words')))
@@ -150,17 +146,16 @@ void main() {
   ) async {
     final store = _Captures();
     final api = _OfflineExtraction();
-    final container = await _open(tester, _Speech(), store, api);
+    final container = await _open(tester, _Speech(), store, api, listen: false);
+    await tester.tap(find.byTooltip('Type instead'));
+    await tester.pumpAndSettle();
     final words = find.byKey(const ValueKey('capture-words'));
     await tester.enterText(words, 'Already kept');
     await tester.pumpAndSettle();
     store.failWrites = true;
     await tester.enterText(words, 'New words that could not be kept');
     await tester.pumpAndSettle();
-    final request = find.widgetWithText(FilledButton, 'Review tasks from text');
-    await tester.ensureVisible(request);
-    await tester.pumpAndSettle();
-    await tester.tap(request);
+    await tester.tap(find.widgetWithText(FilledButton, 'Done'));
     await tester.pumpAndSettle();
     for (final language in ['en', 'es']) {
       await container
@@ -195,8 +190,6 @@ void main() {
         final store = _Captures();
         final api = _OfflineExtraction();
         await _open(tester, speech, store, api, recorder: recorder);
-        await tester.tap(find.byTooltip('Record tasks'));
-        await tester.pumpAndSettle();
         final id = store.session!.id;
         final capturedAt = store.session!.capturedAt;
         if (!interruption.contains('during-start')) {
@@ -218,13 +211,7 @@ void main() {
         expect(recorder.stops, 1);
         expect(api.requests, 0);
         expect(find.textContaining('Listening ·'), findsNothing);
-        final retry = find.widgetWithText(FilledButton, 'Try this recording');
-        await tester.scrollUntilVisible(
-          retry,
-          180,
-          scrollable: find.byType(Scrollable).first,
-        );
-        await tester.pumpAndSettle();
+        final retry = find.widgetWithText(FilledButton, 'Done');
         expect(tester.widget<FilledButton>(retry).onPressed, isNotNull);
         // Late platform events and the former time limit cannot send or reopen it.
         recorder.states.add(RecordState.record);
@@ -268,8 +255,6 @@ void main() {
       final store = _Captures();
       final api = _OfflineExtraction();
       await _open(tester, speech, store, api);
-      await tester.tap(find.byTooltip('Record tasks'));
-      await tester.pumpAndSettle();
       expect(speech.run, isNotNull);
       speech.emit('partial', text: 'Call the doctor Friday at five');
       await tester.pumpAndSettle();
@@ -301,28 +286,16 @@ void main() {
       final id = store.session!.id;
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();
-      tester
-          .state<NavigatorState>(find.byType(Navigator))
-          .push(
-            MaterialPageRoute<void>(
-              builder: (_) => VoiceTaskScreen(captureId: id),
-            ),
-          );
-      await tester.pumpAndSettle();
-      expect(find.text('Call the doctor Friday at five'), findsOneWidget);
-      final review = find.text('Review tasks from text');
-      await tester.scrollUntilVisible(
-        review,
-        180,
-        scrollable: find
-            .descendant(
-              of: find.byType(VoiceTaskScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(Scaffold).first),
+          captureId: id,
+          startListening: false,
+        ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(review);
+      expect(find.text('Call the doctor Friday at five'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Done'));
       await tester.pumpAndSettle();
       expect(store.session!.status, 'failed');
       expect(store.session!.text, 'Call the doctor Friday at five');
@@ -340,8 +313,6 @@ void main() {
       final store = _Captures();
       final api = _OfflineExtraction();
       await _open(tester, speech, store, api);
-      await tester.tap(find.byTooltip('Record tasks'));
-      await tester.pumpAndSettle();
       speech.emit('partial', text: 'Buy');
       speech.emit('segment', text: 'Buy coffee');
       await tester.pumpAndSettle();
@@ -366,54 +337,16 @@ void main() {
       final speech = _Speech()..allowed = false;
       final store = _Captures();
       await _open(tester, speech, store, _OfflineExtraction());
-      await tester.tap(find.byTooltip('Record tasks'));
-      await tester.pumpAndSettle();
       expect(speech.run, isNull);
-      await tester.enterText(find.byType(TextField).first, 'Remember the keys');
+      await tester.tap(find.byTooltip('Type instead'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('capture-words')),
+        'Remember the keys',
+      );
       await tester.pumpAndSettle();
       expect(store.session!.text, 'Remember the keys');
       expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'hold to talk releases the mic and retains input when extraction is offline',
-    (tester) async {
-      final speech = _Speech();
-      final store = _Captures();
-      final api = _OfflineExtraction();
-      await _open(tester, speech, store, api);
-      await tester.tap(find.text('Speech options'));
-      await tester.pumpAndSettle();
-      final hold = find.byType(SwitchListTile);
-      await tester.ensureVisible(hold);
-      await tester.pumpAndSettle();
-      await tester.tap(hold);
-      await tester.pumpAndSettle();
-      final mic = find.byKey(const ValueKey('capture-mic'));
-      await tester.scrollUntilVisible(
-        mic,
-        -180,
-        scrollable: find
-            .descendant(
-              of: find.byType(VoiceTaskScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.pumpAndSettle();
-      final gesture = await tester.startGesture(tester.getCenter(mic));
-      await tester.pump(const Duration(milliseconds: 700));
-      await tester.pump();
-      expect(speech.run, isNotNull);
-      speech.emit('partial', text: 'Bring the keys');
-      await tester.pump();
-      await gesture.up();
-      await tester.pumpAndSettle();
-      expect(speech.cancelled, isTrue);
-      expect(store.session!.text, 'Bring the keys');
-      expect(api.requests, 1);
-      expect(store.session!.status, 'failed');
     },
   );
 
@@ -429,8 +362,6 @@ void main() {
         final store = _Captures();
         final api = _OfflineExtraction();
         await _open(tester, bridge.speech, store, api, language: 'es');
-        await tester.tap(find.byTooltip(es.recordTasks));
-        await tester.pumpAndSettle();
         expect(bridge.starts, 1);
         bridge.send('ready');
         bridge.send('partial', text: 'Comprar');
@@ -456,7 +387,7 @@ void main() {
         expect(bridge.cancels, 0);
         expect(api.requests, 0);
 
-        await tester.tap(find.byTooltip(es.stopRecording));
+        await tester.tap(find.widgetWithText(FilledButton, es.done));
         await tester.pumpAndSettle();
         expect(bridge.stops, 1);
         expect(api.requests, 1);
@@ -477,9 +408,6 @@ void main() {
           _OfflineExtraction(),
           language: 'es',
         );
-        await tester.tap(find.byTooltip(es.recordTasks));
-        await tester.pump();
-        await tester.pump();
         expect(bridge.starts, 1);
         expect(inCapture(find.text(es.captureStarting)), findsOneWidget);
         expect(inCapture(find.byType(LinearProgressIndicator)), findsNothing);
@@ -502,8 +430,10 @@ void main() {
           inCapture(find.text(es.listeningSeconds('00:02'))),
           findsOneWidget,
         );
-        await tester.tap(find.byTooltip(es.stopRecording));
+        // Nothing said yet: Cancelar just closes.
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
         await tester.pumpAndSettle();
+        expect(find.byType(VoiceTaskScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
@@ -515,8 +445,6 @@ void main() {
         final store = _Captures();
         final api = _OfflineExtraction();
         await _open(tester, speech, store, api, language: 'es');
-        await tester.tap(find.byTooltip(es.recordTasks));
-        await tester.pumpAndSettle();
         speech.emit('ready');
         speech.emit('segment', text: 'Comprar pan mañana');
         await tester.pump();
@@ -547,8 +475,6 @@ void main() {
         final store = _Captures();
         final api = _OfflineExtraction();
         await _open(tester, speech, store, api, language: 'es');
-        await tester.tap(find.byTooltip(es.recordTasks));
-        await tester.pump();
         // The permission dialog covers the app: inactive, then resumed.
         tester.binding.handleAppLifecycleStateChanged(
           AppLifecycleState.inactive,
@@ -658,8 +584,6 @@ void main() {
           _OfflineExtraction(),
           language: 'es',
         );
-        await tester.tap(find.byTooltip(es.recordTasks));
-        await tester.pumpAndSettle();
         expect(bridge.starts, 0);
         final banner = find.text(es.captureMicrophoneBlocked);
         await tester.ensureVisible(banner);
@@ -690,10 +614,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(bridge.starts, 1);
         expect(find.text(es.captureMicrophoneBlocked), findsNothing);
-        expect(find.byTooltip(es.stopRecording), findsOneWidget);
-        await tester.ensureVisible(find.byTooltip(es.stopRecording));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip(es.stopRecording));
+        expect(find.text(es.captureStarting), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
@@ -710,17 +632,11 @@ void main() {
           _OfflineExtraction(),
           language: 'es',
         );
-        await tester.tap(find.byTooltip(es.recordTasks));
-        await tester.pumpAndSettle();
         expect(bridge.starts, 0);
         expect(find.text(es.captureMicrophoneBlocked), findsNothing);
         expect(find.text(es.captureOpenSettings), findsNothing);
         final message = find.textContaining(es.captureMicrophone);
-        await tester.scrollUntilVisible(
-          message,
-          180,
-          scrollable: inCapture(find.byType(Scrollable)).first,
-        );
+        await tester.ensureVisible(message);
         expect(message, findsOneWidget);
         expect(tester.takeException(), isNull);
       },
@@ -763,17 +679,10 @@ void main() {
   // heard but never finalized.
   group('P49: words heard before a speech restart stay in the field', () {
     final es = lookupAppLocalizations(const Locale('es'));
-    String field(WidgetTester tester) => tester
-        .widget<TextField>(
-          find
-              .descendant(
-                of: find.byType(VoiceTaskScreen),
-                matching: find.byType(TextField),
-              )
-              .first,
-        )
-        .controller!
-        .text;
+    String field(WidgetTester tester) {
+      final heard = find.byKey(const ValueKey('capture-heard'));
+      return heard.evaluate().isEmpty ? '' : tester.widget<Text>(heard).data!;
+    }
 
     Future<_Bridge> listen(WidgetTester tester) async {
       final bridge = _Bridge(tester);
@@ -784,8 +693,6 @@ void main() {
         _OfflineExtraction(),
         language: 'es',
       );
-      await tester.tap(find.byTooltip(es.recordTasks));
-      await tester.pumpAndSettle();
       expect(bridge.starts, 1);
       return bridge;
     }
@@ -830,26 +737,881 @@ void main() {
         bridge.send('partial', text: 'y leche');
         await deliver(tester);
         expect(field(tester), 'comprar pan y leche');
-        await tester.tap(find.byTooltip(es.stopRecording));
+        await tester.tap(find.widgetWithText(FilledButton, es.done));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
     );
 
-    testWidgets('UX-437: a first ready on an empty field adds no leading space', (
+    testWidgets(
+      'UX-437: a first ready on an empty field adds no leading space',
+      (tester) async {
+        final bridge = await listen(tester);
+        expect(field(tester), isEmpty);
+        bridge.send('ready');
+        await deliver(tester);
+        bridge.send('partial', text: 'hola');
+        await deliver(tester);
+        expect(field(tester), 'hola');
+        await tester.tap(find.widgetWithText(FilledButton, es.done));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // P3 / U6, app side: speech hints for the recognizer and the source of the
+  // words for the assistant.
+  group('U6: speech hints and the source of the words', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final garden = TaskListInfo(
+      id: 'garden',
+      name: 'Huerto',
+      shared: true,
+      groupId: 'family',
+      groupName: 'Familia',
+      people: const [
+        ProjectMember(id: 2, name: 'Ana', role: 'editor', voiceName: 'Anita'),
+      ],
+    );
+
+    test('U6: the es-ES hints hold weekdays, day words and project names', () {
+      final hints = speechHints('es-ES', projects: [garden]);
+      expect(hints, containsAll(['viernes', 'mañana', 'Huerto', 'Ana']));
+      expect(hints, contains('octubre'));
+      expect(hints.length, lessThanOrEqualTo(100));
+    });
+
+    test('U6: the ca-ES hints hold the Catalan weekdays', () {
+      final hints = speechHints('ca-ES', projects: [garden]);
+      expect(hints, containsAll(['divendres', 'demà', 'Huerto']));
+      expect(hints, isNot(contains('viernes')));
+    });
+
+    test('U6: the hints stay about 100 short strings with many projects', () {
+      final hints = speechHints(
+        'es-ES',
+        projects: [
+          for (var i = 0; i < 200; i++) TaskListInfo(name: 'Proyecto $i'),
+        ],
+      );
+      expect(hints.length, lessThanOrEqualTo(100));
+      expect(hints, contains('viernes'));
+      expect(hints.every((hint) => hint.length <= 40), isTrue);
+    });
+
+    testWidgets(
+      'U6: listening sends the recognizer the speech language’s hints with the user’s projects and people',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          projects: [garden],
+        );
+        expect(bridge.starts, 1);
+        expect(
+          bridge.hints,
+          containsAll(['viernes', 'mañana', 'Huerto', 'Ana']),
+        );
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('U6: words from the recognizer go to the assistant as speech', (
       tester,
     ) async {
-      final bridge = await listen(tester);
-      expect(field(tester), isEmpty);
+      final bridge = _Bridge(tester);
+      final store = _Captures();
+      final api = _OfflineExtraction();
+      await _open(tester, bridge.speech, store, api, language: 'es');
       bridge.send('ready');
-      await deliver(tester);
-      bridge.send('partial', text: 'hola');
-      await deliver(tester);
-      expect(field(tester), 'hola');
-      await tester.tap(find.byTooltip(es.stopRecording));
+      bridge.send('segment', text: 'llamar al médico el viernes');
+      await tester.pump();
+      await tester.pump();
+      expect(store.session!.source, 'speech');
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
       await tester.pumpAndSettle();
+      expect(api.sent.single['source'], 'speech');
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('U6: typed words go to the assistant as typed', (tester) async {
+      final store = _Captures();
+      final api = _OfflineExtraction();
+      await _open(tester, _Speech(), store, api, language: 'es', listen: false);
+      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('capture-words')),
+        'Comprar pan',
+      );
+      await tester.pumpAndSettle();
+      expect(store.session!.source, 'typed');
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
+      await tester.pumpAndSettle();
+      expect(api.sent.single['source'], 'typed');
+      expect(api.sent.single['text'], 'Comprar pan');
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  // P35: capture is a sheet over the current screen, and Listo always
+  // continues.
+  group('P35: capture opens as a sheet', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    Finder sheet() => find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet(), matching: finder);
+    Future<void> deliver(WidgetTester tester) async {
+      // A platform event reaches the screen on the next frame.
+      await tester.pump();
+      await tester.pump();
+    }
+
+    testWidgets(
+      'U3: Dictar una tarea on Calendar opens a listening sheet over Calendar with Cancelar, Listo and Escribir, and no mic button',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final bridge = _Bridge(tester);
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          fromButton: true,
+        );
+        // A sheet over Calendar, not a new page.
+        expect(find.byType(CalendarScreen), findsOneWidget);
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.byType(VoiceTaskScreen)), findsOneWidget);
+        // Listening at once.
+        expect(bridge.starts, 1);
+        bridge.send('ready');
+        await deliver(tester);
+        expect(
+          inSheet(find.text(es.listeningSeconds('00:00'))),
+          findsOneWidget,
+        );
+        // No mic button: the only icon button is the keyboard.
+        final icons = inSheet(find.byType(IconButton));
+        expect(icons, findsOneWidget);
+        expect(tester.widget<IconButton>(icons).tooltip, es.captureTypeInstead);
+        expect(inSheet(find.byIcon(Icons.keyboard_outlined)), findsOneWidget);
+        // The controls, and nothing else to press.
+        expect(
+          inSheet(find.widgetWithText(TextButton, es.cancel)),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(
+            find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+          ),
+          // Cancelar, Listo and the keyboard (an M3 IconButton).
+          findsNWidgets(3),
+        );
+        // No Task/Note chips, speech options or help from the old page.
+        for (final type in [
+          ChoiceChip,
+          FilterChip,
+          ActionChip,
+          Switch,
+          SwitchListTile,
+          DropdownButton<String>,
+          PopupMenuButton<String>,
+        ]) {
+          expect(inSheet(find.byType(type)), findsNothing, reason: '$type');
+        }
+        // One label per control, the same for TalkBack and the tooltip.
+        final keyboard = tester
+            .getSemantics(inSheet(find.byTooltip(es.captureTypeInstead)))
+            .getSemanticsData();
+        expect(keyboard.tooltip, es.captureTypeInstead);
+        expect(keyboard.label, anyOf('', es.captureTypeInstead));
+        // UX-109 (d): the labelled creation button has no tooltip to read
+        // twice.
+        expect(
+          find.ancestor(
+            of: find.text(es.sayTask),
+            matching: find.byType(Tooltip),
+          ),
+          findsNothing,
+        );
+        // While listening, a tap on the scrim doesn't close the sheet.
+        await tester.tapAt(const Offset(20, 20));
+        await tester.pumpAndSettle();
+        expect(sheet(), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(find.byType(CalendarScreen), findsOneWidget);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'U3: Notas’ Dictar una nota opens the same sheet over Notes, and the capture is a note',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        final store = _Captures();
+        await _open(
+          tester,
+          bridge.speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        await tester.tap(find.text(es.notes).last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(es.recordNote).hitTestable());
+        await tester.pumpAndSettle();
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.byType(VoiceTaskScreen)), findsOneWidget);
+        expect(bridge.starts, 1);
+        bridge.send('ready');
+        bridge.send('segment', text: 'Ideas para el viaje');
+        await deliver(tester);
+        expect(store.session!.kind, 'note');
+        expect(inSheet(find.byIcon(Icons.notes_rounded)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'U2: Listo is disabled with no words and no audio; with words it stops and processes them',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        final store = _Captures();
+        final api = _OfflineExtraction();
+        await _open(tester, bridge.speech, store, api, language: 'es');
+        bridge.send('ready');
+        await deliver(tester);
+        final done = find.widgetWithText(FilledButton, es.done);
+        expect(done, findsOneWidget);
+        expect(tester.widget<FilledButton>(done).onPressed, isNull);
+        bridge.send('partial', text: 'Comprar pan');
+        await deliver(tester);
+        expect(tester.widget<FilledButton>(done).onPressed, isNotNull);
+        await tester.tap(done);
+        await tester.pumpAndSettle();
+        expect(bridge.stops, 1);
+        expect(api.requests, 1);
+        expect(api.sent.single['text'], 'Comprar pan');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final close in ['Cancelar', 'Back', 'swipe down']) {
+      testWidgets('U2: with nothing said, $close just closes the sheet', (
+        tester,
+      ) async {
+        final bridge = _Bridge(tester);
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        bridge.send('ready');
+        await deliver(tester);
+        expect(sheet(), findsOneWidget);
+        switch (close) {
+          case 'Cancelar':
+            await tester.tap(find.widgetWithText(TextButton, es.cancel));
+          case 'Back':
+            await tester.binding.handlePopRoute();
+          default:
+            await tester.drag(
+              find.text(es.listeningSeconds('00:00')),
+              const Offset(0, 300),
+            );
+        }
+        await tester.pumpAndSettle();
+        expect(find.text(es.captureKeepQuestion), findsNothing);
+        expect(sheet(), findsNothing);
+        expect(find.byType(VoiceTaskScreen), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    Future<_Captures> withWords(WidgetTester tester) async {
+      final bridge = _Bridge(tester);
+      final store = _Captures();
+      await _open(
+        tester,
+        bridge.speech,
+        store,
+        _OfflineExtraction(),
+        language: 'es',
+      );
+      bridge.send('ready');
+      bridge.send('segment', text: 'Comprar pan');
+      await deliver(tester);
+      expect(store.session!.text, 'Comprar pan');
+      return store;
+    }
+
+    testWidgets(
+      'U2: with words, Cancelar asks ¿Conservar lo que has dicho?; Conservar is the filled button and keeps the capture',
+      (tester) async {
+        final store = await withWords(tester);
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        expect(
+          find.descendant(
+            of: dialog,
+            matching: find.text(es.captureKeepQuestion),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: dialog, matching: find.text(es.captureKeepHelp)),
+          findsOneWidget,
+        );
+        final keep = find.widgetWithText(FilledButton, es.keep);
+        final discard = find.widgetWithText(TextButton, es.discard);
+        expect(keep, findsOneWidget);
+        expect(discard, findsOneWidget);
+        // Discarding is never the filled button, and reads as destructive.
+        final error = Theme.of(tester.element(dialog)).colorScheme.error;
+        expect(
+          tester
+              .widget<TextButton>(discard)
+              .style
+              ?.foregroundColor
+              ?.resolve({}),
+          error,
+        );
+        await tester.tap(keep);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(store.discarded, isEmpty);
+        expect(store.session!.status, isNot('discarded'));
+        expect(store.session!.text, 'Comprar pan');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('U2: with words, Descartar deletes the capture', (
+      tester,
+    ) async {
+      final store = await withWords(tester);
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, es.discard));
+      await tester.pumpAndSettle();
+      expect(store.discarded, ['test-capture']);
+      expect(sheet(), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('U2: with words, Back asks the same question as Cancelar', (
+      tester,
+    ) async {
+      await withWords(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text(es.captureKeepQuestion), findsOneWidget);
+      expect(sheet(), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
+      await tester.pumpAndSettle();
+      expect(sheet(), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'U2: with words, a swipe down asks the same question as Cancelar',
+      (tester) async {
+        await withWords(tester);
+        await tester.drag(
+          find.byKey(const ValueKey('capture-heard')),
+          const Offset(0, 300),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(es.captureKeepQuestion), findsOneWidget);
+        expect(sheet(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-126: the sheet has no Descartar captura button; discarding lives only in Cancelar’s question',
+      (tester) async {
+        await withWords(tester);
+        expect(inSheet(find.textContaining(es.discard)), findsNothing);
+        expect(
+          inSheet(
+            find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+          ),
+          // Cancelar, Listo and the keyboard (an M3 IconButton).
+          findsNWidgets(3),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-109: with TalkBack the sheet waits for Empezar a hablar, then announces Escuchando and Listo',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(accessibleNavigation: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        final bridge = _Bridge(tester);
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        await tester.pump(const Duration(seconds: 3));
+        expect(bridge.starts, 0);
+        final start = find.widgetWithText(FilledButton, es.captureStartTalking);
+        expect(start, findsOneWidget);
+        expect(tester.widget<FilledButton>(start).autofocus, isTrue);
+        tester.takeAnnouncements();
+        await tester.tap(start);
+        await tester.pump();
+        expect(bridge.starts, 1);
+        bridge.send('ready');
+        await deliver(tester);
+        expect(
+          tester.takeAnnouncements().map((a) => a.message),
+          contains(es.captureListening),
+        );
+        bridge.send('segment', text: 'Comprar pan');
+        await deliver(tester);
+        await tester.tap(find.widgetWithText(FilledButton, es.done));
+        await tester.pump();
+        expect(
+          tester.takeAnnouncements().map((a) => a.message),
+          contains(es.done),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'P35: after 5 s without new words the silence line shows, and goes when words arrive; at 50 s Quedan 10 segundos',
+      (tester) async {
+        final speech = _Speech();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        speech.emit('ready');
+        await tester.pump();
+        for (var second = 0; second < 4; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(find.text(es.captureStillListening), findsNothing);
+        await tester.pump(const Duration(seconds: 1));
+        expect(inSheet(find.text(es.captureStillListening)), findsOneWidget);
+        speech.emit('partial', text: 'Comprar pan');
+        await tester.pump();
+        expect(find.text(es.captureStillListening), findsNothing);
+        for (var second = 5; second < 49; second++) {
+          await tester.pump(const Duration(seconds: 1));
+          speech.emit('partial', text: 'Comprar pan $second');
+        }
+        await tester.pump();
+        expect(find.text(es.captureTimeLeft), findsNothing);
+        await tester.pump(const Duration(seconds: 1));
+        expect(inSheet(find.text(es.captureTimeLeft)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'P35: leaving the app shows En pausa with Seguir and Listo; Seguir listens again and appends',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        final store = _Captures();
+        await _open(
+          tester,
+          bridge.speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        bridge.send('ready');
+        bridge.send('segment', text: 'Comprar pan');
+        await deliver(tester);
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text(es.capturePaused)), findsOneWidget);
+        final resume = find.widgetWithText(FilledButton, es.captureContinue);
+        expect(resume, findsOneWidget);
+        expect(
+          find.widgetWithText(FilledButton, es.done).hitTestable(),
+          findsOneWidget,
+        );
+        expect(bridge.starts, 1);
+        await tester.tap(resume);
+        await tester.pump();
+        expect(bridge.starts, 2);
+        bridge.send('ready');
+        await deliver(tester);
+        bridge.send('partial', text: 'y leche');
+        await deliver(tester);
+        expect(store.session!.text, 'Comprar pan y leche');
+        expect(
+          tester.widget<Text>(find.byKey(const ValueKey('capture-heard'))).data,
+          'Comprar pan y leche',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-105: at 2x text on 360x740 the newest words and the three controls stay in view while listening',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final bridge = _Bridge(tester);
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: const Size(360, 740),
+        );
+        bridge.send('ready');
+        const words =
+            'Comprar pan y leche en la tienda de la esquina, llamar al médico '
+            'el viernes a las cinco, recoger a los niños del colegio, pagar la '
+            'factura de la luz antes del lunes, regar las plantas del balcón, '
+            'escribir a la abuela y reservar mesa para el sábado por la noche';
+        bridge.send('segment', text: words);
+        await deliver(tester);
+        const screen = Rect.fromLTWH(0, 0, 360, 740);
+        bool onScreen(Rect rect) =>
+            screen.contains(rect.topLeft) &&
+            screen.contains(rect.bottomRight - const Offset(0.1, 0.1));
+        final heard = find.byKey(const ValueKey('capture-heard'));
+        expect(heard, findsOneWidget);
+        // The words' scroll view sits at its end: the newest words show.
+        final scroll = find
+            .ancestor(of: heard, matching: find.byType(Scrollable))
+            .first;
+        final view = tester.getRect(scroll);
+        expect(onScreen(view), isTrue);
+        expect(
+          tester.getRect(heard).bottom,
+          lessThanOrEqualTo(view.bottom + 0.5),
+        );
+        expect(
+          tester.state<ScrollableState>(scroll).position.pixels,
+          0,
+          reason: 'reversed: 0 is the end of the words',
+        );
+        // The words are the largest text in the sheet.
+        final status = find.textContaining(es.listeningSeconds(''));
+        expect(
+          tester.renderObject<RenderParagraph>(heard).text.style!.fontSize!,
+          greaterThan(
+            tester.renderObject<RenderParagraph>(status).text.style!.fontSize!,
+          ),
+        );
+        for (final control in [
+          find.widgetWithText(TextButton, es.cancel),
+          find.widgetWithText(FilledButton, es.done),
+          find.byTooltip(es.captureTypeInstead),
+        ]) {
+          expect(control.hitTestable(), findsOneWidget);
+          expect(onScreen(tester.getRect(control)), isTrue, reason: '$control');
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // P54: Seguir only where listening stopped; TalkBack hears what happened.
+  group('P54: capture sheet regressions', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    Finder sheet() => find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet(), matching: finder);
+    Future<void> deliver(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump();
+    }
+
+    Future<void> reopen(
+      WidgetTester tester,
+      ProviderContainer container,
+      _Captures store, {
+      required String? source,
+    }) async {
+      store.session = CaptureSession(
+        id: 'reopened',
+        ownerKey: container.read(captureOwnerProvider),
+        timezone: 'UTC',
+        capturedAt: DateTime.now().toUtc(),
+        text: 'Comprar pan',
+        source: source,
+      );
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(Scaffold).first),
+          captureId: 'reopened',
+          startListening: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'UX-440: shared text opened in the sheet without listening shows Listo and Cancelar, and no Seguir',
+      (tester) async {
+        final speech = _Speech();
+        final store = _Captures();
+        final container = await _open(
+          tester,
+          speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        // A share arrives as typed text (CaptureStore.acceptEntry).
+        await reopen(tester, container, store, source: 'typed');
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.text('Comprar pan')), findsOneWidget);
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.done)).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.widgetWithText(TextButton, es.cancel)).hitTestable(),
+          findsOneWidget,
+        );
+        expect(inSheet(find.text(es.captureContinue)), findsNothing);
+        expect(inSheet(find.text(es.captureStartTalking)), findsNothing);
+        expect(speech.starts, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-440: a voice capture cut off by leaving the app shows En pausa and Seguir; a reopened voice capture shows Seguir too',
+      (tester) async {
+        final bridge = _Bridge(tester);
+        final store = _Captures();
+        final container = await _open(
+          tester,
+          bridge.speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+        );
+        bridge.send('ready');
+        bridge.send('segment', text: 'Comprar pan');
+        await deliver(tester);
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text(es.capturePaused)), findsOneWidget);
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.captureContinue)),
+          findsOneWidget,
+        );
+        // Closed with its words kept, then reopened from Capturas pendientes.
+        tester.state<NavigatorState>(find.byType(Navigator)).pop();
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        await reopen(tester, container, store, source: 'speech');
+        expect(inSheet(find.text('Comprar pan')), findsOneWidget);
+        expect(
+          inSheet(
+            find.widgetWithText(FilledButton, es.captureContinue),
+          ).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.done)).hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    Future<_Bridge> listeningWithWords(WidgetTester tester) async {
+      final bridge = _Bridge(tester);
+      await _open(
+        tester,
+        bridge.speech,
+        _Captures(),
+        _OfflineExtraction(),
+        language: 'es',
+      );
+      bridge.send('ready');
+      bridge.send('segment', text: 'Comprar pan');
+      await deliver(tester);
+      tester.takeAnnouncements();
+      return bridge;
+    }
+
+    List<String> announced(WidgetTester tester) =>
+        tester.takeAnnouncements().map((a) => a.message).toList();
+
+    testWidgets(
+      'UX-441: with words heard, Cancelar announces nothing before the keep-or-discard question',
+      (tester) async {
+        await listeningWithWords(tester);
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        expect(find.text(es.captureKeepQuestion), findsOneWidget);
+        final heard = announced(tester);
+        expect(heard, isNot(contains(es.done)));
+        expect(heard, isNot(contains(es.capturePaused)));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-441: Listo announces Listo exactly once', (tester) async {
+      await listeningWithWords(tester);
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
+      await tester.pumpAndSettle();
+      expect(announced(tester).where((m) => m == es.done), hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'UX-441: the keyboard button stops listening without announcing Listo or En pausa',
+      (tester) async {
+        await listeningWithWords(tester);
+        await tester.tap(find.byTooltip(es.captureTypeInstead));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('capture-words')), findsOneWidget);
+        final heard = announced(tester);
+        expect(heard, isNot(contains(es.done)));
+        expect(heard, isNot(contains(es.capturePaused)));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-441: the app going to the background while listening announces En pausa, not Listo',
+      (tester) async {
+        await listeningWithWords(tester);
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        final heard = announced(tester);
+        expect(heard, contains(es.capturePaused));
+        expect(heard, isNot(contains(es.done)));
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // Last in the file: the real fonts stay loaded for the rest of the run, and
+  // the tests above were written against the test font.
+  group('UX-444: the silence hint with the app’s fonts', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    testWidgets(
+      'UX-444: in English at 2x text on 360x740, after 5 s of silence the hint reads Still listening. Tap Done when finished. in full',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final en = lookupAppLocalizations(const Locale('en'));
+        expect(
+          en.captureStillListening,
+          'Still listening. Tap Done when finished.',
+        );
+        final speech = _Speech();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          size: const Size(360, 740),
+        );
+        speech.emit('ready');
+        await tester.pump();
+        for (var second = 0; second < 5; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        final hint = find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(en.captureStillListening),
+        );
+        expect(hint, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(hint);
+        expect(paragraph.didExceedMaxLines, isFalse, reason: 'not cut off');
+        final rect = tester.getRect(hint);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(360));
+        expect(rect.bottom, lessThanOrEqualTo(740));
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 
@@ -860,9 +1622,16 @@ Future<ProviderContainer> _open(
   _OfflineExtraction api, {
   _Recorder? recorder,
   String language = 'en',
+  bool listen = true,
   Future<void> Function()? beforeCapture,
+  List<TaskListInfo>? projects,
+  Size size = const Size(390, 844),
+  // Opens capture by tapping Calendar's creation button instead.
+  bool fromButton = false,
+  // Leaves opening capture to the test.
+  bool open = true,
 }) async {
-  tester.view.physicalSize = const Size(390, 844);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -882,6 +1651,8 @@ Future<ProviderContainer> _open(
       apiClientProvider.overrideWithValue(api),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
       taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+      if (projects != null)
+        taskListsProvider.overrideWith((ref) async => projects),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
       regionalStoreProvider.overrideWithValue(
         MemoryRegionalStore(
@@ -903,7 +1674,18 @@ Future<ProviderContainer> _open(
   );
   await tester.pumpAndSettle();
   await beforeCapture?.call();
-  tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/voiceTask');
+  if (!open) return container;
+  if (fromButton) {
+    final l = lookupAppLocalizations(Locale(language));
+    await tester.tap(find.text(l.sayTask).hitTestable());
+  } else {
+    unawaited(
+      showCaptureSheet(
+        tester.element(find.byType(Scaffold).first),
+        startListening: listen,
+      ),
+    );
+  }
   await tester.pumpAndSettle();
   return container;
 }
@@ -940,7 +1722,11 @@ class _Speech extends NativeSpeech {
   }
 
   @override
-  Future<void> start(int id, String language) async {
+  Future<void> start(
+    int id,
+    String language, {
+    List<String> hints = const [],
+  }) async {
     starts++;
     run = id;
     text = null;
@@ -977,9 +1763,11 @@ class _Captures extends CaptureStore {
     bool audio = false,
     String kind = 'task',
     String? projectId,
+    String? source,
   }) async => session = CaptureSession(
     id: 'test-capture',
     projectId: projectId,
+    source: source,
     kind: kind,
     ownerKey: ownerKey,
     timezone: timezone,
@@ -998,10 +1786,21 @@ class _Captures extends CaptureStore {
       session?.id == id && session?.ownerKey == ownerKey ? session : null;
   @override
   Future<void> cleanFinished(String ownerKey) async {}
+
+  /// Ids discarded through the store, as Descartar does.
+  final discarded = <String>[];
+  @override
+  Future<void> discard(String id, String ownerKey) async {
+    discarded.add(id);
+    if (session?.id == id) session = session!.copyWith(status: 'discarded');
+  }
 }
 
 class _OfflineExtraction extends OfflineApiClient {
   int requests = 0;
+
+  /// The fields of each capture request.
+  final sent = <Map<String, dynamic>>[];
   @override
   Future<dynamic> request(
     String method,
@@ -1012,7 +1811,10 @@ class _OfflineExtraction extends OfflineApiClient {
     int? accountId,
     bool retry = true,
   }) async {
-    if (path.startsWith('ai/')) requests++;
+    if (path.startsWith('ai/')) {
+      requests++;
+      sent.add({...?data});
+    }
     throw ApiException(0, 'Offline. Retry when connected.');
   }
 }
@@ -1074,6 +1876,7 @@ class _Bridge {
           return permission;
         case 'start':
           run = (arguments as Map)['run'] as int;
+          hints = List<String>.from(arguments['hints'] as List? ?? const []);
           starts++;
           return null;
         case 'stop':
@@ -1110,6 +1913,9 @@ class _Bridge {
   MockStreamHandlerEventSink? _sink;
   Object permission = 'granted';
   int? run;
+
+  /// The speech hints the last `start` call carried.
+  List<String> hints = const [];
   int starts = 0;
   int stops = 0;
   int cancels = 0;

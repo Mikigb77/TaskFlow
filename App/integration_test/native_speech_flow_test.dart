@@ -58,11 +58,8 @@ void main() {
       UncontrolledProviderScope(container: container, child: const MyApp()),
     );
     await tester.pumpAndSettle();
-    tester
-        .state<NavigatorState>(find.byType(Navigator))
-        .pushNamed('/voiceTask');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Record tasks'));
+    // Opening capture starts listening.
+    unawaited(showCaptureSheet(tester.element(find.byType(Scaffold).first)));
     await _wait(tester, () async => speech.run != null);
     speech.emit('partial', 'Call the doctor Friday at five');
     await _wait(
@@ -84,13 +81,13 @@ void main() {
     expect(retained.audioPath, isNull);
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
-    tester
-        .state<NavigatorState>(find.byType(Navigator))
-        .push(
-          MaterialPageRoute<void>(
-            builder: (_) => VoiceTaskScreen(captureId: retained.id),
-          ),
-        );
+    unawaited(
+      showCaptureSheet(
+        tester.element(find.byType(Scaffold).first),
+        captureId: retained.id,
+        startListening: false,
+      ),
+    );
     await _wait(
       tester,
       () async =>
@@ -133,7 +130,11 @@ class _SpeechFixture extends NativeSpeech {
   @override
   Future<SpeechPermission> permission() async => SpeechPermission.granted;
   @override
-  Future<void> start(int id, String language) async {
+  Future<void> start(
+    int id,
+    String language, {
+    List<String> hints = const [],
+  }) async {
     run = id;
   }
 

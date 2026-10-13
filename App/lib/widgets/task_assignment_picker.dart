@@ -78,12 +78,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
               lockShared: lockShared,
               onChanged: onChanged == null
                   ? null
-                  : (id) => onChanged!(
-                      taskWithProject(
-                        task,
-                        projects.where((p) => p.id == id).firstOrNull,
-                      ),
-                    ),
+                  : (project) => onChanged!(taskWithProject(task, project)),
             ),
             if (shared && !task.isNote)
               ActionChip(
@@ -171,19 +166,21 @@ class TaskAssignmentPicker extends ConsumerWidget {
             ),
           ),
         if (needsReview) ...[
-          Text(
-            context.l10n.assignmentNeedsReview,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
           if (names.isNotEmpty)
             Text(
               context.l10n.assignmentHeard(names),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-          TextButton.icon(
-            onPressed: valid && onChanged != null ? onReviewed : null,
-            icon: const Icon(Icons.check_rounded, size: 18),
-            label: Text(context.l10n.assignmentConfirm),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            children: [
+              Text(context.l10n.assignmentIsRight),
+              TextButton(
+                onPressed: valid && onChanged != null ? onReviewed : null,
+                child: Text(context.l10n.yes),
+              ),
+            ],
           ),
         ],
       ],

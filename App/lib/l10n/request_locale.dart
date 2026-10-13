@@ -4,7 +4,13 @@ import 'generated/app_localizations.dart';
 
 /// Keep server diagnostics separate from UI copy. Unknown responses must not
 /// leak raw English, internal field names or exception details into the UI.
-String requestProblemText(AppLocalizations strings, Object error) {
+/// Outside sign-in, connection and unknown failures also say the tasks are
+/// still on the phone; [onSignIn] leaves that out where there are none yet.
+String requestProblemText(
+  AppLocalizations strings,
+  Object error, {
+  bool onSignIn = false,
+}) {
   Object? code;
   if (error is GoogleSignInProblem) code = error.code;
   if (error is ApiException && error.body != null) code = error.body!['code'];
@@ -47,9 +53,10 @@ String requestProblemText(AppLocalizations strings, Object error) {
       'contentType',
     _ => null,
   };
-  return sync == null
-      ? strings.requestError(requestProblem(error))
-      : strings.syncProblem(sync);
+  if (sync != null) return strings.syncProblem(sync);
+  final reason = requestProblem(error);
+  final kept = !onSignIn && (reason == 'network' || reason == 'other');
+  return strings.requestError(kept ? '${reason}Kept' : reason);
 }
 
 String requestProblem(Object error) {

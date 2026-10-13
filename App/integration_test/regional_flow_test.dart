@@ -95,7 +95,7 @@ void main() {
     await tester.pumpWidget(
         UncontrolledProviderScope(container: container, child: const MyApp()));
     await tester.pumpAndSettle();
-    expect(find.text('Your calendar'), findsOneWidget);
+    expect(find.text('Today’s agenda'), findsOneWidget);
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     navigator.pushNamed('/region');
     await tester.pumpAndSettle();
@@ -120,7 +120,7 @@ void main() {
     restored.dispose();
     navigator.pop();
     await tester.pumpAndSettle();
-    expect(find.text('Tu calendario'), findsOneWidget);
+    expect(find.text('Agenda de hoy'), findsOneWidget);
     expect(
         tester
             .widget<TableCalendar<Task>>(find.byType(TableCalendar<Task>))

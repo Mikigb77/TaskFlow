@@ -151,11 +151,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     OutlinedButton.icon(
                         icon: const Icon(Icons.mic_none_rounded),
                         label: Text(context.l10n.recordNote),
-                        onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                                builder: (_) => const VoiceTaskScreen(
-                                    kind: 'note', startRecording: true)))),
+                        onPressed: () =>
+                            showCaptureSheet(context, kind: 'note')),
                   ]))),
     );
   }

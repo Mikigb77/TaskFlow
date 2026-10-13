@@ -23,6 +23,8 @@ void main() {
       await binding.takeScreenshot('calendar-${mode.name}');
       await tester.tap(find.byKey(const ValueKey('calendar-format')));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Month').last);
+      await tester.pumpAndSettle();
       await binding.takeScreenshot('agenda-${mode.name}');
       await tester.tap(find.byTooltip('Create task'));
       await tester.pumpAndSettle();
@@ -44,8 +46,8 @@ void main() {
       await binding.takeScreenshot('account-${mode.name}');
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();
-      tester.state<NavigatorState>(find.byType(Navigator)).push(
-          MaterialPageRoute<void>(builder: (_) => const VoiceTaskScreen()));
+      showCaptureSheet(tester.element(find.byType(Scaffold).first),
+          startListening: false);
       await tester.pumpAndSettle();
       await binding.takeScreenshot('voice-${mode.name}');
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
@@ -53,6 +55,8 @@ void main() {
       await tester.tap(find.text('Calendar'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('calendar-format')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Week').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }

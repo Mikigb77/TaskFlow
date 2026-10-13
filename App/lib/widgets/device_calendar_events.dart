@@ -15,66 +15,139 @@ Future<void> showDeviceCalendarEvent(
         showDragHandle: true,
         builder: (_) => _CalendarSheet(day: day, eventKey: event.identity));
 
-class DeviceCalendarEvents extends ConsumerWidget {
+/// One line under the day's tasks: the phone-calendar event count and the
+/// first start times. Tapping it opens every event; access problems take the
+/// same line and open calendar choice, read problems retry, and a day without
+/// events shows nothing. A tapped retry keeps its line, busy, until the read
+/// settles.
+class DeviceCalendarEvents extends ConsumerStatefulWidget {
   const DeviceCalendarEvents({super.key, required this.day});
   final DateTime day;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DeviceCalendarEvents> createState() =>
+      _DeviceCalendarEventsState();
+}
+
+class _DeviceCalendarEventsState extends ConsumerState<DeviceCalendarEvents> {
+  bool _retrying = false;
+
+  @override
+  void didUpdateWidget(DeviceCalendarEvents oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (Task.dateKey(oldWidget.day) != Task.dateKey(widget.day)) {
+      _retrying = false;
+    }
+  }
+
+  Future<void> _retry(Future<void> Function() read) async {
+    setState(() => _retrying = true);
+    try {
+      await read();
+    } catch (_) {
+      // A failed retry shows the retry line again.
+    }
+    if (mounted) setState(() => _retrying = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final day = widget.day;
     final state = ref.watch(deviceCalendarProvider);
     if (!state.preferences.enabled) return const SizedBox.shrink();
     final l = context.l10n;
+    final busy = _EventsLine(l.calendarReadRetry, onTap: null, busy: true);
+    void choose() => Navigator.pushNamed(context, '/deviceCalendars');
+    void showAll() => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (context) => _CalendarSheet(day: day));
+    if (state.error) {
+      if (_retrying) return busy;
+      return _EventsLine(l.calendarReadRetry,
+          onTap: () =>
+              _retry(() => ref.read(deviceCalendarProvider.notifier).refresh()));
+    }
+    if (state.access == CalendarAccess.checking) {
+      return _retrying ? busy : const SizedBox.shrink();
+    }
+    if (state.access != CalendarAccess.granted) {
+      return _EventsLine(l.calendarDenied, onTap: choose);
+    }
+    if (state.preferences.selected.isEmpty) {
+      return _EventsLine(l.calendarNoSelection, onTap: choose);
+    }
+    final key = Task.dateKey(day);
+    return ref.watch(deviceEventsProvider(key)).when(
+        skipLoadingOnRefresh: false,
+        skipLoadingOnReload: false,
+        loading: () => _retrying ? busy : const SizedBox.shrink(),
+        error: (_, __) => _retrying
+            ? busy
+            : _EventsLine(l.calendarReadRetry,
+                onTap: () => _retry(() {
+                      ref.invalidate(deviceEventsProvider(key));
+                      return ref.read(deviceEventsProvider(key).future);
+                    })),
+        data: (result) {
+          if (result.items.isEmpty) return const SizedBox.shrink();
+          final times = result.items
+              .take(3)
+              .map((event) => _startTime(context, event, day));
+          return _EventsLine(
+              [l.calendarEventCount(result.items.length), ...times]
+                  .join(' · '),
+              onTap: showAll);
+        });
+  }
+}
+
+String _startTime(
+    BuildContext context, DeviceCalendarEvent event, DateTime day) {
+  if (event.allDay) return context.l10n.calendarAllDay;
+  final start = event.start.toLocal();
+  return Task.dateKey(start) == Task.dateKey(day)
+      ? context.clockTime(start)
+      : context.shortDate(start);
+}
+
+class _EventsLine extends StatelessWidget {
+  const _EventsLine(this.text, {required this.onTap, this.busy = false});
+  final String text;
+  final VoidCallback? onTap;
+
+  /// A tapped retry in progress: a spinner takes the icon's place.
+  final bool busy;
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
     return Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: SectionLabel(l.calendarEvents)),
-            IconButton(
-                tooltip: l.calendarChoose,
-                onPressed: () =>
-                    Navigator.pushNamed(context, '/deviceCalendars'),
-                icon: const Icon(Icons.tune_rounded, size: 20))
-          ]),
-          if (state.error)
-            MessageBanner(l.calendarReadError, isError: true)
-          else if (state.access == CalendarAccess.checking)
-            const LinearProgressIndicator()
-          else if (state.access != CalendarAccess.granted)
-            TextButton(
-                onPressed: () =>
-                    Navigator.pushNamed(context, '/deviceCalendars'),
-                child: Text(l.calendarDenied))
-          else if (state.preferences.selected.isEmpty)
-            TextButton(
-                onPressed: () =>
-                    Navigator.pushNamed(context, '/deviceCalendars'),
-                child: Text(l.calendarNoSelection))
-          else
-            ref.watch(deviceEventsProvider(Task.dateKey(day))).when(
-                skipLoadingOnRefresh: false,
-                skipLoadingOnReload: false,
-                loading: () => const LinearProgressIndicator(),
-                error: (_, __) =>
-                    MessageBanner(l.calendarReadError, isError: true),
-                data: (result) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (result.truncated)
-                            MessageBanner(l.calendarTruncated),
-                          if (result.items.isEmpty) Text(l.calendarNoEvents),
-                          for (final event in result.items.take(3))
-                            _EventTile(event: event, day: day),
-                          if (result.items.length > 3)
-                            TextButton(
-                                onPressed: () => showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    showDragHandle: true,
-                                    builder: (context) =>
-                                        _CalendarSheet(day: day)),
-                                child: Text(
-                                    '${l.calendarShowAll} (${result.items.length})')),
-                        ])),
-        ]));
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Semantics(
+            button: true,
+            child: InkWell(
+                key: const ValueKey('calendar-events-line'),
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 8),
+                        child: Row(children: [
+                          if (busy)
+                            SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: color))
+                          else
+                            Icon(Icons.event_outlined, size: 20, color: color),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Text(text,
+                                  style: TextStyle(color: color))),
+                        ]))))));
   }
 }
 
@@ -142,6 +215,7 @@ class _CalendarSheet extends ConsumerWidget {
           data: (result) {
             if (eventKey == null) {
               return Column(children: [
+                if (result.truncated) MessageBanner(l.calendarTruncated),
                 for (final event in result.items)
                   _EventTile(event: event, day: day)
               ]);
@@ -183,6 +257,18 @@ class _CalendarSheet extends ConsumerWidget {
                       })
                 ]);
           });
+    }
+    if (eventKey == null) {
+      body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: SectionLabel(l.calendarEvents)),
+          IconButton(
+              tooltip: l.calendarChoose,
+              onPressed: () => Navigator.pushNamed(context, '/deviceCalendars'),
+              icon: const Icon(Icons.tune_rounded, size: 20))
+        ]),
+        body,
+      ]);
     }
     return SafeArea(
         child: SizedBox(

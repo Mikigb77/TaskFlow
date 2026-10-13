@@ -563,6 +563,31 @@
    "dependsOn": []
   },
   {
+   "id": "P58",
+   "title": "The events line reads as disabled while a retry runs",
+   "area": "B",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-450"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/widgets/device_calendar_events.dart",
+    "App/test/device_calendar_ui_test.dart"
+   ],
+   "brief": [
+    "UX-450 (S1 regression R3B-1 from P57, batch b2): while a retry runs, TalkBack still announces the phone-events line as an enabled button (App/lib/widgets/device_calendar_events.dart ~126).",
+    "Give the line Semantics(button: true, enabled: onTap != null), or set enabled on the Semantics it already has. No new strings and no visual change."
+   ],
+   "acceptance": [
+    "While a retry is in progress, the events line's semantics report a button that is not enabled; when idle, the button is enabled.",
+    "Nothing changes visually; the existing device-calendar tests still pass."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
    "id": "P19",
    "title": "Voice review: fewer, clearer choices",
    "area": "A",
@@ -968,7 +993,8 @@
    "severity": 3,
    "findings": [
     "U7",
-    "UX-103"
+    "UX-103",
+    "UX-451"
    ],
    "files": [
     "App/lib/screens/voice_task_screen.dart",
@@ -988,13 +1014,15 @@
     "Decision D3: ‘Guardar tal cual’ appears when the AI is slow or fails (UX_REVIEW §3.2 and §3.5; report A U7 and UX-103). Today the sheet waits up to 100 s (api_client.dart:335), and errors can show raw English server text (capture_messages.dart:35 falls back to the raw value).",
     "U7. (1) While processing (P36's `Entendiendo…`), after about 8 s add under the words EN `Taking longer than usual.` / ES `Está tardando más de lo normal.` / CA `Està trigant més del normal.` and a button EN `Save as written` / ES `Guardar tal cual` / CA `Desa-ho tal com està`. (2) When processing fails, the sheet shows the words, the reason (below) and two buttons: the existing `tryAgain` (`Reintentar`) and `Guardar tal cual`. (3) `Guardar tal cual` builds the result with P38's local helper (the parser's date applied) and saves it at once through the normal save, so P37's landing and `Deshacer` apply. An answer from the assistant that arrives afterwards is ignored: the capture is already saved, and CaptureProcessor must not treat that as an error. (4) Saved audio with no words can't be saved as written: there the button isn't offered.",
     "UX-103, errors in plain words, under the status line. (1) capture_messages.dart:35: unknown values are never shown as they are; use EN `That didn't work. Your words are saved here — try again.` / ES `No ha funcionado. Tus palabras siguen aquí; inténtalo de nuevo.` / CA `No ha funcionat. Les teves paraules continuen aquí; torna-ho a provar.` Map HTTP 400, 404 and 422 explicitly in capture_problem.dart:62-93, and keep api_client.dart:277-293's `field: message` text away from capture. (2) Server unreachable, a 5xx or a timeout: EN `Couldn't reach the assistant — your words are kept.` / ES `No he podido contactar con el asistente; tus palabras se conservan.` / CA `No he pogut contactar amb l’assistent; les teves paraules es conserven.` (3) `captureOffline`: EN `No internet. Your words are saved — try again when you're online.` / ES `Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.` / CA `Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.` (4) Short or silent audio (the server's 422 and `captureNoSpeech`): EN `I didn't catch that. Tap Continue and try again.` / ES `No te he entendido. Toca Seguir y vuelve a intentarlo.` / CA `No t’he entès. Toca Continua i torna-ho a provar.` (report A's text names the mic, which the sheet no longer has; `Seguir` is P35's button). (5) `captureSpeechStopped`: EN `Listening stopped. Tap Continue to keep talking, or type.` / ES `Se ha dejado de escuchar. Toca Seguir para continuar o escribe.` / CA `S’ha deixat d’escoltar. Toca Continua per seguir o escriu.` (6) `captureAllowance`, the daily limit: EN `You've reached today's limit. Type the task, or try again tomorrow.` / ES `Has llegado al límite de hoy. Escribe la tarea o inténtalo mañana.` / CA `Has arribat al límit d’avui. Escriu la tasca o torna-ho a provar demà.` (7) Stop appending `captureKept` to messages (voice_task_screen.dart:968). Errors sit directly under the status line in a MessageBanner with isError, and MessageBanner (app_components.dart:102-131) is a live region (Semantics(liveRegion: true)) when isError is true.",
-    "Don't touch: the listening states (P33, P35), the result layout (P36), the typing path itself (P38)."
+    "Don't touch: the listening states (P33, P35), the result layout (P36), the typing path itself (P38).",
+    "UX-451 (S2, seen in verify-b2-r2-A): recognizer errors are silent to TalkBack because the capture error banner is not a live region (App/lib/screens/voice_task_screen.dart ~1098). Make the banner a live region (Semantics liveRegion: true) so each new error is announced."
    ],
    "acceptance": [
     "Widget test with a processor that never answers: after 8 s the sheet shows `Está tardando más de lo normal.` and `Guardar tal cual`; tapping it saves `Llamar al médico` on Friday from the words `llamar al médico el viernes` and lands with `Deshacer`; a later answer changes nothing.",
     "Widget test: a failing processor shows the reason with `Reintentar` and `Guardar tal cual`.",
     "Unit test on captureProblemText: an unknown string, an ApiException with status 400, 404 or 422, and a `field: message` text produce no English and no `field:` in Spanish or Catalan; unknown input gives the generic message.",
-    "Widget test: a capture error sits under the status line, is a live region, and doesn't end with `Tu captura se conserva en este teléfono.`"
+    "Widget test: a capture error sits under the status line, is a live region, and doesn't end with `Tu captura se conserva en este teléfono.`",
+    "UX-451: when the recognizer reports an error, the error banner is a live region and TalkBack announces it (semantics liveRegion: true on the banner)."
    ],
    "deviceChecks": [
     "With the backend stopped, or in airplane mode: say ‘llamar al médico el viernes’ → `Listo` → `Guardar tal cual` → a task dated Friday (U7's done-when).",

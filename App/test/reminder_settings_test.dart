@@ -373,15 +373,6 @@ void main() {
         expect(en.remindersOnConfirmation, 'Done. Reminders are on.');
         expect(ca.allowPreciseAlarms, 'Permet «Alarmes i recordatoris»');
         expect(ca.remindersOnConfirmation, 'Fet. Recordatoris activats.');
-        expect(en.reminderAskQuestionTasks, 'Want reminders before your tasks?');
-        expect(
-          ca.reminderAskQuestionTasks,
-          'Vols recordatoris abans de les teves tasques?',
-        );
-        expect(
-          es.reminderAskQuestionTasks,
-          '¿Quieres recordatorios antes de tus tareas?',
-        );
       },
     );
 

@@ -10,7 +10,10 @@ import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/revenuecat_service.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/billing_fixtures.dart';
@@ -208,7 +211,7 @@ void main() {
           ],
           child: localized(
             const VoiceTaskScreen(
-              startRecording: true,
+              startListening: true,
               captureId: 'retained-capture',
             ),
           ),
@@ -223,4 +226,281 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  group('P12: moving a task into a project is safe and findable', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final home = TaskListInfo(id: 'home', name: 'Casa');
+
+    Future<Task Function()> pickFor(
+      WidgetTester tester,
+      Task initial, {
+      bool dark = false,
+      bool needsReview = false,
+      VoidCallback? onReviewed,
+    }) async {
+      var task = initial;
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(api),
+            authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+            taskListsProvider.overrideWith((ref) async => [shared, home]),
+            groupsProvider.overrideWith((ref) async => []),
+          ],
+          child: localized(
+            Scaffold(
+              body: StatefulBuilder(
+                // As the task's detail screen uses it: the task exists.
+                builder: (context, change) => TaskAssignmentPicker(
+                  task: task,
+                  lockShared: true,
+                  needsReview: needsReview,
+                  onReviewed: onReviewed,
+                  onChanged: (value) => change(() => task = value),
+                ),
+              ),
+            ),
+            language: 'es',
+            dark: dark,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return () => task;
+    }
+
+    testWidgets(
+      'UX-302: choosing a shared project for a personal task asks first; Cancelar leaves it, Compartir moves it',
+      (tester) async {
+        final task = await pickFor(
+          tester,
+          Task(id: 1, title: 'Comprar pan', priority: 1),
+        );
+        // UX-324: the chip reads as a control.
+        final chip = find.widgetWithText(ActionChip, es.noList);
+        expect(
+          find.descendant(
+            of: chip,
+            matching: find.byIcon(Icons.arrow_drop_down_rounded),
+          ),
+          findsOneWidget,
+        );
+        Future<void> choosePhysics() async {
+          await tester.tap(find.widgetWithText(ActionChip, es.noList));
+          await tester.pumpAndSettle();
+          final sheet = find.byType(BottomSheet);
+          // UX-308: titled Proyecto, without the old subtitle.
+          expect(
+            find.descendant(of: sheet, matching: find.text(es.list)),
+            findsOneWidget,
+          );
+          // UX-324: a shared row's subtitle is just the group's name.
+          final row = find.widgetWithText(ListTile, 'Physics');
+          expect(
+            find.descendant(of: row, matching: find.text('Master')),
+            findsOneWidget,
+          );
+          await tester.tap(row);
+          await tester.pumpAndSettle();
+        }
+
+        await choosePhysics();
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        expect(
+          find.descendant(
+            of: dialog,
+            matching: find.text(es.shareTaskConfirm('Master')),
+          ),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(FilledButton, es.shareTask), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(task().listId, isNull);
+        expect(task().assignment, isNot('group'));
+
+        await choosePhysics();
+        await tester.tap(find.widgetWithText(FilledButton, es.shareTask));
+        await tester.pumpAndSettle();
+        expect(task().listId, shared.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-302: moving a personal task into a personal project asks nothing',
+      (tester) async {
+        final task = await pickFor(
+          tester,
+          Task(id: 1, title: 'Comprar pan', priority: 1),
+        );
+        await tester.tap(find.widgetWithText(ActionChip, es.noList));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ListTile, 'Casa'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(task().listId, home.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final dark in [false, true]) {
+      testWidgets(
+        'UX-302: a shared task’s project chip is drawn enabled, and a tap says it stays in its project (dark=$dark)',
+        (tester) async {
+          final task = await pickFor(
+            tester,
+            Task(
+              id: 1,
+              title: 'Ejercicio tres',
+              priority: 1,
+              listId: shared.id,
+              assignment: 'group',
+            ),
+            dark: dark,
+          );
+          final chip = find.widgetWithText(ActionChip, 'Physics');
+          expect(chip, findsOneWidget);
+          expect(tester.widget<ActionChip>(chip).isEnabled, isTrue);
+          final label = find.descendant(
+            of: chip,
+            matching: find.text('Physics'),
+          );
+          final colors = Theme.of(tester.element(chip)).colorScheme;
+          final color = tester
+              .renderObject<RenderParagraph>(label)
+              .text
+              .style
+              ?.color;
+          expect(color, colors.onSurface);
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          expect(find.text(es.sharedTaskStays), findsOneWidget);
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(task().listId, shared.id);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final dark in [false, true]) {
+      testWidgets(
+        'UX-325: when the assistant isn’t sure, it asks ¿Es correcto? with one Sí, in no error colour (dark=$dark)',
+        (tester) async {
+          var reviewed = 0;
+          await pickFor(
+            tester,
+            Task(
+              id: 1,
+              title: 'Ejercicio',
+              priority: 1,
+              listId: shared.id,
+              assignment: 'group',
+            ),
+            dark: dark,
+            needsReview: true,
+            onReviewed: () => reviewed++,
+          );
+          final question = find.text(es.assignmentIsRight);
+          expect(question, findsOneWidget);
+          final yes = find.widgetWithText(TextButton, es.yes);
+          expect(yes, findsOneWidget);
+          final colors = Theme.of(tester.element(question)).colorScheme;
+          expect(
+            tester.renderObject<RenderParagraph>(question).text.style?.color,
+            isNot(colors.error),
+          );
+          for (final element
+              in find
+                  .descendant(
+                    of: find.byType(TaskAssignmentPicker),
+                    matching: find.byType(RichText),
+                  )
+                  .evaluate()) {
+            final paragraph = element.renderObject! as RenderParagraph;
+            expect(
+              paragraph.text.style?.color,
+              isNot(colors.error),
+              reason: paragraph.text.toPlainText(),
+            );
+          }
+          await tester.tap(yes);
+          await tester.pumpAndSettle();
+          expect(reviewed, 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-443: the project sheet marks a project shared person by person as Compartido, a group project with its group, a personal one with nothing ($language)',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final byPerson = TaskListInfo(
+          id: 'trip',
+          name: 'Viaje',
+          shared: true,
+          people: const [
+            ProjectMember(id: 1, name: 'Miki', role: 'owner'),
+            ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+          ],
+        );
+        final personal = TaskListInfo(id: 'home', name: 'Casa');
+        final api = OfflineApiClient();
+        addTearDown(api.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              apiClientProvider.overrideWithValue(api),
+              authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+              taskListsProvider.overrideWith(
+                (ref) async => [byPerson, shared, personal],
+              ),
+            ],
+            child: localized(
+              Scaffold(body: TaskListPicker(listId: null, onChanged: (_) {})),
+              language: language,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ActionChip, l.noList));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        ListTile row(String name) => tester.widget<ListTile>(
+          find.descendant(
+            of: sheet,
+            matching: find.widgetWithText(ListTile, name),
+          ),
+        );
+        String? subtitle(String name) => (row(name).subtitle as Text?)?.data;
+        expect(subtitle('Viaje'), l.sharedProject);
+        expect(subtitle('Physics'), 'Master');
+        expect(subtitle('Casa'), isNull);
+        expect(
+          find.descendant(of: sheet, matching: find.text(l.sharedProject)),
+          findsOneWidget,
+        );
+        expect(
+          l.sharedProject,
+          {'es': 'Compartido', 'en': 'Shared', 'ca': 'Compartit'}[language],
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
