@@ -17,12 +17,16 @@ export const meta = {
 //   skip:           [packageId] — packages the owner struck (optional)
 //   only:           [packageId] — run just these (optional)
 //   maxExtraRounds: number      — re-plan rounds after the first; default 2
+//   batch:          string      — names this batch's files when a plan runs in several batches (optional)
 //   notes:          string      — owner context from the conversation (optional)
 const a = args || {}
 if (!a.runId || !a.runDir) throw new Error('ux-fix needs runId and runDir. Start it with /ux.')
 const EXTRA_ROUNDS = Number.isInteger(a.maxExtraRounds) ? a.maxExtraRounds : 2
 const skip = new Set(Array.isArray(a.skip) ? a.skip : [])
 const only = Array.isArray(a.only) && a.only.length ? new Set(a.only) : null
+const batch = typeof a.batch === 'string' && a.batch ? a.batch : ''
+const tag = batch ? `${batch}-` : ''
+const reportName = batch ? `report-${batch}.md` : 'report.md'
 
 const HEADER = {
   type: 'object',
@@ -177,6 +181,7 @@ function implementPrompt(p, round, planFile) {
     `Your instructions are package ${p.id} in ${planFile} (brief, files, acceptance checks, device checks), plus the top-level "conventions" in ${a.runDir}/plan.json, which apply to every package.`,
     `The findings themselves are in the review reports in ${a.runDir}/ (search for their IDs).`,
     'Earlier packages in this run may already have changed the code; build on their work.',
+    'Test files listed in the package are for ux-tester, who writes the acceptance tests after you. Only update existing tests your change breaks.',
   )
   if (a.notes) lines.push(`From the owner, this session: ${a.notes}`)
   lines.push('Return the structured result.')
@@ -213,7 +218,7 @@ function verifyPrompt(round, area, items, tested) {
     'Judge every listed finding as fixed, partly or not_fixed, with evidence. Then look for regressions, only in these files and the flows they touch.',
     `Number regressions R${round}${area}-1, R${round}${area}-2 and so on; the organizer gives them final IDs.`,
     'The tester re-rendered the previews just now. Read them; do not run Flutter. Another step records memory.',
-    `Write your notes to ${a.runDir}/verify-r${round}-${area}.md, then return the structured result.`,
+    `Write your notes to ${a.runDir}/verify-${tag}r${round}-${area}.md, then return the structured result.`,
   ].join('\n')
 }
 
@@ -236,7 +241,7 @@ function replanPrompt(round, failing, regressions, unchecked, tested, impl, fail
     ...impl.map(r => `- ${r.id}: ${r.status}${r.notes ? `. ${r.notes}` : ''}`),
   )
   if (twice.length) lines.push(`Failed twice, so escalate instead of re-planning: ${twice.join(', ')}`)
-  lines.push(`Write the new packages to ${a.runDir}/plan-r${round + 1}.json (same structure as plan.json), append them to plan.md under "Round ${round + 1}", add regressions to ISSUES.md with final IDs, then return the structured result.`)
+  lines.push(`Write the new packages to ${a.runDir}/plan-${tag}r${round + 1}.json (same structure as plan.json), append them to plan.md under "Round ${round + 1}${batch ? ` (${batch})` : ''}", add regressions to ISSUES.md with final IDs, then return the structured result.`)
   return lines.join('\n')
 }
 
@@ -258,7 +263,7 @@ function closePrompt(rounds, escalated, files) {
     `Escalated: ${escalated.length ? escalated.map(e => `${e.id} (${e.reason})`).join('; ') : 'none'}.`,
     `Files changed: ${ids(files)}.`,
     'A finding counts as verified only if the last round that checked it said "fixed" and no test for it failed. Note which verified findings are locked by a test. Phone checks stay listed for the owner.',
-    'Update .claude/ux-review/ISSUES.md, write report.md in the run folder, then return the structured result.',
+    `Update .claude/ux-review/ISSUES.md, write ${reportName} in the run folder${batch ? ` (this batch: ${batch})` : ''}, then return the structured result.`,
   ].join('\n')
 }
 
@@ -372,7 +377,7 @@ for (let round = 1; ; round++) {
   if (!next) break
   escalated.push(...next.escalated)
   packages = next.packages
-  planFile = `${a.runDir}/plan-r${round + 1}.json`
+  planFile = `${a.runDir}/plan-${tag}r${round + 1}.json`
   if (!packages.length) break
 }
 
@@ -386,7 +391,7 @@ const close = await agent(closePrompt(rounds, escalated, [...changedAll]), {
 await agent(
   [
     `Mode: memory. UX loop run ${a.runId} just finished.`,
-    `Read ${a.runDir}/report.md and the verify-*.md files in ${a.runDir}, and update your memory with what is worth keeping: patterns the app now follows, changes to the screen map, recurring problem types.`,
+    `Read ${a.runDir}/${reportName} and the verify-${tag}*.md files in ${a.runDir}, and update your memory with what is worth keeping: patterns the app now follows, changes to the screen map, recurring problem types.`,
     'Issue statuses and owner decisions already live in .claude/ux-review/; do not copy them.',
   ].join('\n'),
   { agentType: 'frontend-ux-reviewer', label: 'record reviewer memory', phase: 'Record', effort: 'medium' },

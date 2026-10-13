@@ -1,135 +1,107 @@
-# UX plan — 2026-10-13-app (whole app)
+# UX plan — 2026-10-13-app (whole app), revised after your answers
 
-The four reviews found 119 problems. After merging 6 duplicates, 103 are fixes in 30 packages (P3 also carries U6's app side), and 10 need your answer, as do 13 of the earlier plan items U1–U14.
-Both severity-4 problems need you first: unfinished tasks vanish from Today (D1), and reminders are off by default (D2). Until you answer, P8 makes the reminder chip honest and lets one tap turn reminders on.
+Your answers to D1–D15 turned 20 waiting items into fixes: 124 of the 133 findings now sit in 41 packages, 3 still wait on you, and 6 are duplicates.
+Overdue tasks (P31) run first, then the reminder question (P32) and the capture redesign (P33–P41); nothing in the run waits on the questions below.
 
-**How to answer**
-- **Decisions:** reply by number ("D1 yes, D6b Personal, D9 no") or "all recommendations". The main session records them in DECISIONS.md; then `/ux plan 2026-10-13-app` turns what they unblock into packages.
-- **Packages:** "go" runs P1 → P30 in order, one at a time. Strike some with `/ux fix skip P5 P18`, or run a few with `/ux fix only P1 P2`. No package depends on an unanswered decision; where a finding has a part that needs you, the package does the rest and says so.
+**How it runs:** you approved the plan, so `/ux fix` runs the packages below in this order, one at a time, without stopping. To hold some back: `/ux fix skip P43`, or `/ux fix only P31 P1`. The plan you approved first is in git (d46f888).
 
-## Decisions
+After the last package, ux-tester turns the acceptance checks into tests. Where an older package's check names a screen the redesign replaces (the review page, the typed "Nueva tarea" form), it's tested on the replacement.
 
-### D1 · Unfinished tasks from earlier days — UX-201 (S4)
-An open task appears only on its own date. Yesterday's "Llamar al banco" isn't on Today, the counts say "0 pendientes", and only a 4 px dot is left. People add it again.
-- (a) Carry them into Today under "Atrasadas · N", with their date, counted in "pendientes" and in the Tareas "Hoy" filter; a repeating task shows only its latest missed occurrence.
-- (b) Leave them on their date, with one link: "N sin hacer de días anteriores ›".
+## Still open
 
-**Recommend (a):** it's what other task apps do, and it needs no extra tap.
+### Two tabs — U13, with U10 and UX-331
+You approved Calendario + Listas, with Ajustes behind the avatar, in principle (D7a), for after the capture fixes and the §7 test with your father. Two items wait on it:
+- **U10:** after P6, P18, P25 and P38, a new account's Calendar has 16 tap targets. The goal is 15 or fewer; two tabs bring it to 14.
+- **UX-331:** "En Notas: 2" when a search finds nothing isn't built: one Listas search would replace it (D7b).
 
-### D2 · Reminders for new accounts — UX-401 (S4), U12
-Reminders are off for every new account, and only Ajustes › Notificaciones asks for Android's permission, so "Recordatorio: 10 minutos antes" never rings.
-- (a) At the first saved task with a date, ask once: "¿Quieres un recordatorio antes?" "Sí, recuérdamelo" turns reminders on and asks Android in the same tap; "Ahora no" leaves them off.
-- (b) Once on, date-only tasks remind at 9:00 (an editable default).
-- (c) Apply for Google Play's USE_EXACT_ALARM, which calendar apps may use, so on-time reminders skip the "Alarmas y recordatorios" screen?
+**Recommend:** run the §7 test after this run, then decide.
 
-**Recommend** yes to (a) and (b). For (c): yes if the Play listing presents TaskFlow as a calendar app; otherwise P8's one-sentence ask covers it. P8 ships without any of these.
+### Using TaskFlow before signing in — U14 option 2
+**Recommend:** revisit after the §7 test, as you decided (D8). P17 does option 1 now.
 
-### D3 · The capture direction (UX_REVIEW §3) — U1, U2, U3, U4, U5, U7, U9
-- Listening ends only on Done (U1, U2).
-- Capture opens as a sheet with one mic (U3).
-- The result shows in that sheet, with the date as its main line (U4).
-- The calendar lands on the saved task (U5).
-- "Guardar tal cual" when the AI is slow or fails (U7).
-- Capture options leave the screen and the Task/Note choice goes, with a new Ajustes › Voz (U9).
+### Exact alarms — D2c
+Not for now, as you decided: it's a store-policy question for production. P8 asks for "Alarmas y recordatorios" in one sentence when it's needed.
 
-**Recommend** approving it. At the very least approve U1 — the pause that stopped your father — and U5, which can reuse the landing P7 builds for typed saves. Approving also unblocks U8, U12, the timeline's "+" (UX-224) and folding Discard into Cancel (UX-126).
+### Free voice captures — D4b, and D4c
+Your pricing call; nothing in this run depends on it.
+**Still unknown (D4c):** is your father's account Pro? Without Pro, "Añadir tarea" opens typing, not the mic, so check before the §7 test.
 
-### D4 · Pro and the single Add button — U8, part of UX-423
-- (a) Once U8 leaves one "Añadir tarea" button, should users without Pro get free typing in that sheet (with the local date parser), or the paywall?
-- (b) Should the first few voice captures be free?
-- (c) Is your father's account Pro or complimentary? If it is, the 10-minute test won't show the wall other newcomers meet.
-- (d) The Pro screen shows four secondary buttons. Keep only "Ver suscripción" and "Restaurar compras"?
+### Invitations without the code — D14
+Approved, but it needs a Backend change outside the UX loop. P14 keeps the code field. Once the server allows it, a scoped `/ux` run can hide the field for Google accounts.
 
-**Recommend:** (a) free typing; voice and AI stay Pro. (b) Your pricing call. (d) Keep "Gestionar suscripción" for paying users too, drop "Abrir suscripciones de la tienda", and refresh the status automatically instead of "Actualizar estado". P5 already lets today's Pro wall open the free typed editor ("Escribir la tarea"); typing is already free from "Nueva tarea", so nothing paid changes.
+## What changed since you approved it
+- **New packages from your answers:**
+  - P31 overdue tasks (D1);
+  - P32 the reminder question and the 9:00 default (D2a, D2b);
+  - P33–P41 the capture redesign (D3, D4a, D9, D10, plus U12's first run);
+  - P42 delete and Back with Undo (D11, D12);
+  - P43 the renames (D6a, D6b);
+  - P44 Account and the Pro screen (D13, D4d), split from P18.
+- **Folded into the redesign (D3).** P2, P4 and P5 polished the page the sheet replaces. What still applies moved:
+  - UX-104, UX-107, UX-108 → P33;
+  - UX-105, UX-109, UX-126 → P35;
+  - UX-115 → P34;
+  - UX-102, UX-106, UX-114 → P39;
+  - UX-103 → P40.
+- **Changed:**
+  - P3 runs right after P33 and adds its hints to P33's new session.
+  - P9 leaves the typed-time chips to P38: the typed form's date suggestion goes.
+  - P13 drops the Editor/Viewer choice (D15b).
+  - P16 hands UX-118 to P38, which gives Notes one button.
+  - P17 puts Google first, with one line saying what TaskFlow does (D8).
+  - P18 builds the six-row Ajustes with Otros ajustes (D7c), hides the developer screens (D13), and keeps the sun–moon only in Apariencia (D5).
+  - P20 builds on P35 and P39 instead of P2 and P5.
+  - P21 works on the edit form only.
+- **Unchanged:** P1, P6–P8, P10–P12, P14, P15, P19 and P22–P30, word for word.
 
-### D5 · Where the sun–moon switch lives — UX-406, U10
-It's on 23 surfaces: next to the avatar (reaching for Account turns the app dark), beside Delete on a task, and on Notificaciones, where a moon reads as Do Not Disturb. (a) Ajustes › Apariencia only, with first run following the phone; (b) the Calendar header only; (c) the avatar menu.
+## How your answers were read
+Say if any of these is wrong; only the package named changes.
+- **D1:** a repeating task counts as overdue only while its most recent occurrence is still open. Older misses don't come back (P31).
+- **D2a:** the question is a small card above the Add button, so it never covers the task that just landed. Accounts that already have dated tasks are asked once too (P32).
+- **D3 with D7c:** Ajustes keeps six rows, so Voz is a row inside Otros ajustes (P34).
+- **D3 with D9:** typed and spoken words take the same path. With today selected, a task without a date goes to Sin fecha; with a later day selected, it goes on that day (P38).
+- **D4a:** "Añadir tarea" shows a mic with Pro and a + without (P38).
+- **D10:** applies to typing in the sheet, which replaces the typed form (P38). The local parser also learns Catalan day words, so free typing works in all three languages.
+- **Left out of the approved §3 design, to keep it small.** Say if you want any of them:
+  - "Guardar como nota" on the result: notes come from Notes' own button;
+  - press-and-hold on the Add button as a walkie-talkie: the hold-to-talk switch just goes;
+  - keeping a WAV recording alongside the live words;
+  - editing "Ver lo que dije" and extracting again.
 
-**Recommend (a).** P18 already turns the theme tiles into one Apariencia row (Claro / Oscuro / Como el teléfono), which works with any answer. U10's limit of 15 tap targets on Calendar also needs this and U8; P6 and P25 remove 6 targets in the meantime.
+## Packages, in run order
+Severity 4 first, then 3, then 2. A package's prerequisites run before it, even when they're less severe. Sizes: S, M, L.
 
-### D6 · Names — U11, UX-311
-- (a) Approve UX_REVIEW §5.4's renames: "Bandeja de entrada" (no date) → "Sin fecha"; "Capturas pendientes" → "Sin guardar"; drop "Lista para cuando tú quieras".
-- (b) Call the no-project bucket "Personal" (§5.4) or "Sin proyecto" (UX-311)? "Personal" would sit next to the "Proyectos personales" section and the example project name "Personal".
-- (c) Keep "Proyectos" (decided 2026-10-11), or call personal containers "Listas"? Report C notes nobody calls the shopping list "un proyecto".
-
-**Recommend:** (a) yes; (b) "Sin proyecto", with UX-311's new examples ("Casa, Trabajo, Compras") and the "Bandeja personal" chip dropped from Tareas; (c) keep "Proyectos" unless your father stumbles on it.
-
-### D7 · Tabs and Settings — U13, UX-331, part of UX-404
-- (a) Two tabs, Calendario and Listas (search, Sin fecha, projects, Notes, Completed), with Ajustes behind the avatar — or does Notes keep its own tab?
-- (b) If Notes stays a tab: when a search finds nothing, show "En Notas: 2" (UX-331)?
-- (c) Settings in six rows by need, with the rare ones (Hora y región, Calendarios del teléfono, the home-screen mic button, Exportar e importar, Licencias) in a new "Otros ajustes" screen, and "Tareas completadas" moved to Tareas/Listas?
-
-**Recommend:** (a) two tabs, after the capture fixes and the §7 test; (b) only if Notes stays; (c) yes. P18 already puts Recordatorios first and removes the noise.
-
-### D8 · Sign-in order — U14
-Option 1: Google first, email second, and one line saying what TaskFlow does. Option 2: use the app before signing in.
-
-**Recommend option 1 now**, and revisit option 2 after the §7 test. P17's sign-in fixes apply either way. `App/test/auth_gate_test.dart`, which locks Google below the email form, changes with option 1.
-
-### D9 · Spoken tasks without a date — UX-112
-With Thursday selected, "Nueva tarea" pre-fills Thursday, but a spoken "comprar pan" goes to the inbox with no date. Use the selected day (when it isn't today) for spoken tasks without a date?
-
-**Recommend yes.** A spoken time without a day needs the server.
-
-### D10 · Typed dates — UX-204
-"Dentista viernes 10:00" saves on today unless the small "Usar vie, 17 oct · 10:00" chip is tapped. Apply the understood date straight away, with "Dejar como está" one tap away? A code comment says suggestions are never applied automatically, but it isn't a recorded decision.
-
-**Recommend yes.**
-
-### D11 · Delete — UX-208
-Replace the "¿Eliminar?" confirmation, whose filled button is Eliminar, with an immediate delete and "Tarea eliminada · Deshacer"?
-
-**Recommend yes.** Keep one confirmation only for deleting a whole repeating series, with "Conservar tarea" as the filled button.
-
-### D12 · Back in the task form — UX-211
-Back throws away what was typed. (a) Save it — a new task with a title, or an edit with changes — and show "Cambios guardados · Deshacer"; an empty form just closes. Or (b) ask "¿Guardar esta tarea?"
-
-**Recommend (a)**, like the voice path.
-
-### D13 · Developer tools in release builds — UX-120, part of UX-408
-"Diagnóstico de captura" (P50/P95) is a Settings row every user sees, and "Detalles de conexión" shows the server URL on Account. Hide both from release builds?
-
-**Recommend** debug builds only, plus a long-press on the version line so you keep them on staging.
-
-### D14 · Invitations without the code for Google accounts — report C (nothing waits on it)
-Invitations need a separately shared code because password sign-up doesn't verify the email (2026-10-11). Google sign-in does. Let an invitee signed in with Google, whose email matches, join without the code?
-
-**Recommend yes**, keeping the code for password accounts. It needs a server change; P14 works either way.
-
-### D15 · One way to share — report C, part of UX-305
-- (a) Should "Compartir" on a project be the only door, creating or reusing a group behind the scenes, with Grupos as an advanced view?
-- (b) Drop the Editor/Viewer choice from the invite dialog? Everyone would join as an editor; the role can still be changed on the person's row.
-
-**Recommend:** (a) not now — P13 already puts "Compartir" on the project page; (b) yes.
-
-## Packages, in order
-
-Severity-3 packages first, then severity 2. Each runs alone, after the packages it builds on. Sizes: S, M, L.
+### P31 · Overdue tasks show on Today · B · M · new
+- **UX-201** (S4) yesterday's unfinished task vanishes from Today → "Atrasadas · N" at the top of Today, counted in pendientes and in Tareas' "Hoy".
 
 ### P1 · Snackbars time out and never outlive their screen · A · L
 - **UX-101** (S3; merged UX-207) "1 tarea guardada · Deshacer" never leaves and follows you into the next capture → every undo bar times out; opening a capture clears it.
 - **UX-416** (S2) messages ignore Android's accessibility timeout; widget instructions vanish in 4 s → one helper for every snackbar; the instructions open in a sheet.
 - **UX-335** (S1) Projects uses fixed snackbars → they float like the rest.
 
-### P2 · Capture: listening the user controls · A · L · after P1
-- **UX-104** (S3) pulling down the notification shade stops listening → only leaving the app does.
-- **UX-107** (S3) a microphone blocked for good can't be fixed → a banner by the mic with "Abrir Ajustes".
-- **UX-108** (S2) "Preparando tu plan…" before anything is said → "Un momento…", then "Escuchando" once the recognizer is ready.
-- **UX-109** (S2) TalkBack: listening starts by itself; the stop control has three names → no auto-start, spoken cues, one label per state ("Empezar a hablar" / "Parar").
-- **UX-115** (S2) speech follows the phone's language, forgets the choice and shows "es-ES" → the app's language, remembered, no code.
+### P8 · Reminders: an honest chip and a one-tap turn-on · B · L · after P1
+- **UX-209** (S3; with UX-401's chip fix) "Recordatorio: 10 minutos antes · desactivado en el dispositivo" → "Sin recordatorio · Activar", which turns reminders on.
+- **UX-210** (S3) the timing hides behind ⋮ and an extra button → the chip opens the choices; one tap applies.
+- **UX-405** (S3) on-time reminders take 7–8 steps and 135 words → one switch, one sentence for exact alarms, a confirmation; details folded away; "Por la mañana" instead of "Mañana".
 
-### P3 · Speech hints for the recognizer and the assistant · A · M · after P2
+### P32 · Ask once to turn reminders on, after the first dated task · D · M · after P1, P8 · new
+- **UX-401** (S4) reminders are off and nothing asks → after the first dated task, "¿Quieres un recordatorio antes?" · "Sí, recuérdamelo" / "Ahora no"; once on, tasks without a time remind at 9:00.
+
+### P33 · Listening stops only when you say so · A · L · after P1 · new
+- **U1** (P0) the mic stops at the first pause → one continuous session until Listo; pauses never end it.
+- **UX-104** (S3) the notification shade stops listening → only leaving the app does, and the words are kept.
+- **UX-107** (S3) a microphone blocked for good can't be fixed → "Abrir Ajustes" by the mic; listening starts when you come back.
+- **UX-108** (S2) "Preparando tu plan…" before anything is said → "Un momento…", then "Escuchando" once the recognizer is ready.
+
+### P3 · Speech hints for the recognizer and the assistant (U6, app side) · A · M · after P33 · changed
 - **U6** (P0, app side) the recognizer is biased towards weekday and month names, day words, and your project and people names; requests say whether the words were spoken or typed. The prompt change is server-side.
 
-### P4 · Capture screen: words and errors in view, in plain words · A · L · after P2
-- **UX-105** (S3) at large text the live words are off-screen → while listening, only the status and big words show.
-- **UX-103** (S3) raw English server errors and jargon, below the fold → plain messages in three languages, under the status, announced by TalkBack.
-- **UX-126** (S1) "Descartar captura" sits under the main button, and its dialog favours it → a quiet text button.
-
-### P5 · Capture: every way in leads somewhere · A · L · after P4
-- **UX-102** (S3) opening the mic and going back leaves "Capturas pendientes · 1" → empty captures are never kept.
-- **UX-106** (S3) without Pro, every way in ends on the wall → "Escribir la tarea" opens the free editor with the words; no wall flash while billing loads.
-- **UX-114** (S2) "Captura texto" and shared text open a mic-first page → keyboard first; the shortcut is renamed "Escribir una tarea".
+### P35 · Capture opens as a sheet; Listo always continues · A · L · after P33 · new
+- **U3** (P0) a second mic on a separate page → a sheet over the screen you were on, listening at once, with Cancelar, Listo and Escribir.
+- **U2** (P0) "finished" means two things → Listo always continues; Cancelar asks "¿Conservar lo que has dicho?".
+- **UX-105** (S3) at large text the live words are off-screen → the words are the biggest thing in the sheet.
+- **UX-109** (S2) with TalkBack, listening starts by itself → it waits for "Empezar a hablar"; spoken cues; one label per control.
+- **UX-126** (S1) Discard sits under the main button → it lives in Cancelar's question, as the quiet choice.
 
 ### P6 · Calendar: today's tasks first, and offline is calm · B · L
 - **UX-202** (S3) today's tasks start below the fold → remove "Tu calendario", "Bandeja · 0", the project chip until there are projects, the completion ring, and two of the three view buttons (one switcher).
@@ -143,32 +115,67 @@ Severity-3 packages first, then severity 2. Each runs alone, after the packages 
 - **UX-111** (S2) dates have no weekday → "Hoy", "Mañana", "vie, 17 oct".
 - **UX-220** (S2) a completed task jumps away; Completed lists the oldest first → it stays put until you leave the day; newest first.
 
-### P8 · Reminders: an honest chip and a one-tap turn-on · B · L · after P1
-- **UX-209** (S3; with UX-401's chip fix) "Recordatorio: 10 minutos antes · desactivado en el dispositivo" → "Sin recordatorio · Activar", which turns reminders on.
-- **UX-210** (S3) the timing hides behind ⋮ and an extra button → the chip opens the choices; one tap applies.
-- **UX-405** (S3) on-time reminders take 7–8 steps and 135 words → one switch, one sentence for exact alarms, a confirmation; details folded away; "Por la mañana" instead of "Mañana".
-
-### P9 · One date sheet; a moved task names its day · B · L · after P1, P7
-- **UX-206** (S3) a moved task vanishes behind "Programación actualizada" → "Hoy" and "Mañana" apply at once: "Movida al mié, 14 oct · Deshacer".
-- **UX-212** (S2) two date sheets and two repeat editors → one of each.
-- **UX-221** (S2) "a las 17" is treated as ambiguous, a. m. is preselected, empty minutes are rejected → time chips, 13–23 unambiguous, :00 by default.
-
-### P10 · Task detail: only what's set, tap to change it · B · M · after P9
-- **UX-309** (S3) a note can only be edited from the corner pencil → "Editar nota" at the bottom; tap the text to edit.
-- **UX-213** (S2) a plain task shows about 45 words of empty sections → about 20.
-- **UX-214** (S2) the date rows look tappable but aren't → they open the date sheet; the title opens the form.
-
-### P11 · Search ignores accents · C · S
-- **UX-303** (S3) "medico" doesn't find "Médico" → all four searches ignore accents.
-
 ### P12 · Moving a task into a project: safe and findable · C · L
 - **UX-302** (S3) one tap shares a private task for good → it asks once; the locked chip explains itself.
 - **UX-308** (S3) Projects hides behind an unlabelled folder; the picker dead-ends → a "Proyectos" button; a "Nuevo proyecto" row.
 - **UX-324** (S2) the chip doesn't look tappable, and a warning repeats on every shared row → ▾; the group's name only.
 - **UX-325** (S2) the assistant's doubt shows as a red error → "¿Es correcto? · Sí".
 
-### P13 · Share from the project page; shorter invitations · C · L
-- **UX-305** (S3) no Share on the project; 8 taps and 73 words → "Compartir" on the project page, a one-field invitation, a one-line code dialog.
+### P19 · Voice review: fewer, clearer choices · A · L · after P1, P7
+- **UX-110** (S2) the AM/PM card has four buttons, and one saves without the time → "5:00 · 17:00 · Sin hora".
+- **UX-116** (S2) batch questions and ✕ appear only on expanded cards → on every card.
+- **UX-117** (S2) nothing left: a disabled button and a tiny link → "Terminar".
+- **UX-113** (S2) a voice note's title is the whole transcript → its first sentence.
+- **UX-124** (S1) "Task Title"; "Ver lo que dije" for typed text → "Task title"; "Texto original".
+- **UX-127** (S1) "Prioridad Baja · No se repite" on every task → only what's set.
+
+### P36 · The result appears in the sheet, with the date first · A · L · after P7, P12, P19, P35 · new
+- **U4** (P0) the result is a separate page, and the date is the 4th row → the same sheet shows the title, then "vie, 17 oct · 17:00" as the main line, then "Añadir al calendario"; the review page goes.
+
+### P37 · After adding, the screen shows the task · A · M · after P7, P36 · new
+- **U5** (P0) after saving you aren't shown the task → the calendar moves to its day and highlights it: "Añadida al vie, 17 oct · Deshacer". Tareas and the pending list land too.
+
+### P9 · One date sheet; a moved task names its day · B · L · after P1, P7 · changed
+- **UX-206** (S3) a moved task vanishes behind "Programación actualizada" → "Hoy" and "Mañana" apply at once: "Movida al mié, 14 oct · Deshacer".
+- **UX-212** (S2) two date sheets and two repeat editors → one of each.
+- **UX-221** (S2) "a las 17" is treated as ambiguous, a. m. is preselected, empty minutes are rejected → 13–23 unambiguous, nothing preselected, :00 by default. The chips for typed times are in P38.
+
+### P11 · Search ignores accents · C · S
+- **UX-303** (S3) "medico" doesn't find "Médico" → all four searches ignore accents.
+
+### P16 · Notes: newest first, saved where you are · C · M · after P7, P11 · changed
+- **UX-304** (S3) notes have no order → newest first; a new note shows at the top.
+- **UX-313** (S2) dictating a note inside a project saves it outside → saved in the project.
+- **UX-312** (S2) Notes uses task wording → note wording.
+- **UX-323** (S2) an unlabelled project dropdown → "Proyecto: Todas las notas".
+- **UX-337** (S1) a permanent explanation above the list → only when Notes is empty.
+
+### P38 · One Añadir tarea button, with typing in the same sheet · A · L · after P9, P16, P37 · new
+- **U8** (P1) three or four ways to create → one "Añadir tarea" (on Notes, "Añadir nota"); typing moves into the sheet and is free without Pro; the typed form only edits.
+- **UX-204** (S3) "Dentista viernes 10:00" saves on today → the date applies at once, with "Dejar como está".
+- **UX-112** (S2) a spoken task ignores the selected Thursday → it goes on Thursday.
+- **UX-118** (S2) Notes flips the button emphasis → one button.
+
+### P39 · Every way into capture works, with or without Pro · A · L · after P35, P38 · new
+- **UX-102** (S3) opening the mic and going back leaves "Capturas pendientes · 1" → empty captures are never kept.
+- **UX-106** (S3) without Pro, the widget, shortcuts and share end on a wall → they open typing; the voice ones say voice is Pro, with "Ver Pro".
+- **UX-114** (S2) "Captura texto" and shared text open a mic-first page → the keyboard comes up; the shortcut is "Escribir una tarea".
+
+### P40 · When the assistant is slow or fails, save it as written · A · L · after P36, P38 · new
+- **U7** (P0) the app waits up to 100 s → after 8 s, and on failure, "Guardar tal cual" saves the phone's own reading of the words.
+- **UX-103** (S3) raw English server errors and jargon → plain messages in three languages, under the status line, announced by TalkBack.
+
+### P10 · Task detail: only what's set, tap to change it · B · M · after P9
+- **UX-309** (S3) a note can only be edited from the corner pencil → "Editar nota" at the bottom; tap the text to edit.
+- **UX-213** (S2) a plain task shows about 45 words of empty sections → about 20.
+- **UX-214** (S2) the date rows look tappable but aren't → they open the date sheet; the title opens the form.
+
+### P42 · Delete and Back never lose a task · B · M · after P1, P10 · new
+- **UX-208** (S3) delete can't be undone → it's immediate, with "Tarea eliminada · Deshacer"; only a whole repeating series asks, with "Conservar tarea" filled.
+- **UX-211** (S3) Back drops what was typed → Back saves the changes: "Cambios guardados · Deshacer".
+
+### P13 · Share from the project page; shorter invitations · C · L · changed
+- **UX-305** (S3) no Share on the project; 8 taps and 73 words → "Compartir" on the project page, a one-field invitation with no Editor/Viewer choice (D15b), a one-line code dialog.
 - **UX-318** (S2) tapping a pending invitation silently re-sends it → a menu with Reenviar and Anular.
 - **UX-316** (S2) five words for the other people → "Todas", "Todos", "Miembros".
 - **UX-339** (S1) owner noise and empty headings → removed.
@@ -183,42 +190,31 @@ Severity-3 packages first, then severity 2. Each runs alone, after the packages 
 - **UX-317** (S2) deleting a personal project hides under Compartir; destructive buttons look normal → "Eliminar proyecto" in the menu; the error colour.
 - **UX-340** (S1) leaving or deleting closes the screen silently → "Has salido de Física" / "Proyecto eliminado".
 
-### P16 · Notes: newest first, saved where you are · C · M · after P7, P11
-- **UX-304** (S3) notes have no order → newest first; a new note shows at the top.
-- **UX-313** (S2) dictating a note inside a project saves it outside → saved in the project.
-- **UX-312** (S2) Notes uses task wording → note wording.
-- **UX-323** (S2) an unlabelled project dropdown → "Proyecto: Todas las notas".
-- **UX-118** (S2) typing is the filled button on Notes → voice is, as on Calendar.
-- **UX-337** (S1) a permanent explanation above the list → only when Notes is empty.
-
-### P17 · Sign-in that leads somewhere · D · L
+### P17 · Sign-in: Google first, and every path leads somewhere · D · L · changed
 - **UX-402** (S3) a newcomer "signs in" and hits "incorrect password" → the error offers "Crear una cuenta con este correo"; headings name the mode.
 - **UX-403** (S3) sign-up errors fall below the fold at 2× → errors on the field; the password rule shown before typing.
 - **UX-415** (S2) Back from Create or Recover exits the app; both recovery steps say "Continuar" → Back returns to sign-in; "Enviar código" / "Guardar contraseña nueva".
+- **U14** (P2, option 1) Google sits below the email form → Google first, then email, under one line: "Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario."
 
-### P18 · Settings: reminders first, fewer words · D · L · after P1, P8
-- **UX-404** (S3) 14 entries, with Notificaciones 10th → "Recordatorios" first, showing its state; no eyebrow, tagline or misleading section labels. The six-row version waits on D7, diagnostics on D13.
-- **UX-408** (S2) Account's main button is "Sincronizar ahora", and signing out silently stops reminders → one status line; sign-out asks first.
+### P18 · Settings: six rows, reminders first, one place for appearance · D · L · after P1, P8 · changed
+- **UX-404** (S3) 14 entries, with Notificaciones 10th → six rows: Recordatorios (showing its state), Idioma, Apariencia, Cuenta, TaskFlow Pro, Otros ajustes; "Tareas completadas" stays on Tareas.
 - **UX-418** (S2) "Sistema" breaks mid-word at 2× → one Apariencia row: Claro / Oscuro / Como el teléfono.
+- **UX-406** (S2) the sun–moon is on 23 surfaces → only in Apariencia; the first run follows the phone.
+- **UX-120** (S2) "Diagnóstico de captura" for everyone → debug builds only; on staging, a long-press on the version line.
 - **UX-422** (S1) "Hora y región" opens "Idioma y región", with a second language picker and raw time-zone ids → fixed.
-- **UX-423** (S1) a 45-word Export intro → one line. The Pro screen's buttons wait on D4.
 
-### P19 · Voice review: fewer, clearer choices · A · L · after P1, P7
-- **UX-110** (S2) the AM/PM card has four buttons, and one saves without the time → "5:00 · 17:00 · Sin hora".
-- **UX-116** (S2) batch questions and ✕ appear only on expanded cards → on every card.
-- **UX-117** (S2) nothing left: a disabled button and a tiny link → "Terminar".
-- **UX-113** (S2) a voice note's title is the whole transcript → its first sentence.
-- **UX-124** (S1) "Task Title"; "Ver lo que dije" for typed text → "Task title"; "Texto original".
-- **UX-127** (S1) "Prioridad Baja · No se repite" on every task → only what's set.
-
-### P20 · Native labels, share messages and shortcut icons · A · M · after P2, P5
+### P20 · Native labels, share messages and shortcut icons · A · M · after P35, P39 · changed
 - **UX-121** (S2; merged UX-128, UX-417) "Dicta" versus "Dictar", "…conserva las capturas pendientes" → "Dictar una tarea", "Toca para dictar una tarea."
 - **UX-119** (S2) share errors only in English → in Spanish and Catalan too.
 - **UX-125** (S1) both shortcuts use the app icon → a mic and a pencil.
 - **UX-420** (S1) the iOS microphone prompt says "borrador de tarea" → plain words.
 
-### P21 · Task form: the title first, fewer words · B · L · after P8, P9, P10, P19
-- **UX-215** (S2) a headline, a help line, a project row and a Task/Note choice before the title → the title first, focused.
+### P34 · Voice options move to Ajustes › Voz · A · M · after P18, P35 · new
+- **U9** (P1) technical options on the capture screen → the sheet has none; language and how speech becomes text live in Ajustes › Otros ajustes › Voz; the privacy note shows once.
+- **UX-115** (S2) speech follows the phone's language, forgets the choice and shows "es-ES" → the app's language by default, remembered, no code.
+
+### P21 · Task form: the title first, fewer words · B · L · after P8, P9, P10, P19 · changed
+- **UX-215** (S2) a headline, a help line and a project row before the title → the edit form opens on the title; the Task/Note choice went with typed creation (P38).
 - **UX-216** (S2) "Más detalles" opens 8 things and 4 paragraphs → the common ones first; "Añade una fecha para repetir".
 - **UX-222** (S2) one dialog per checklist step → an inline field.
 - **UX-227** (S1) polish: "Create task", "up to 32", inert chips, a duplicate "Quitar fecha", Catalan "Canvia la data", reduced motion.
@@ -230,7 +226,7 @@ Severity-3 packages first, then severity 2. Each runs alone, after the packages 
 
 ### P23 · Back and reminders never strand you · B · M · after P1
 - **UX-223** (S2; merged UX-410) Back on a tab closes the app, and a reminder for a deleted task opens a second home → Back goes to Calendario; no second home.
-- **UX-224** (S2) the timeline's arrows say "Mes o semana", plus developer copy → "Día anterior / Día siguiente"; the copy goes. Its "+" waits on U8.
+- **UX-224** (S2) the timeline's arrows say "Mes o semana", plus developer copy → "Día anterior / Día siguiente"; the copy goes. P38 already turned its "+" into the Añadir tarea bar.
 
 ### P24 · Project pages and Tareas show what's there · C · M · after P12, P13
 - **UX-314** (S2) view-only projects keep their create buttons → the read-only line.
@@ -257,6 +253,10 @@ Severity-3 packages first, then severity 2. Each runs alone, after the packages 
 - **UX-330** (S2) unlabelled pending invitations, a prominent spoken-name button, emails instead of names → a heading, the member's own menu, names first.
 - **UX-336** (S1) a group's page is titled "Grupos" → its name.
 
+### P43 · Plain names: Sin fecha, Sin proyecto, Sin guardar · C · M · after P6, P7, P12, P20, P24, P34, P36, P38–P40 · new
+- **U11** (P1) "Bandeja de entrada", "Capturas pendientes", "Lista para cuando tú quieras" → "Sin fecha", "Sin guardar", gone; no "captura" left on screen.
+- **UX-311** (S2) "Personal" collides three ways → the no-project bucket is "Sin proyecto", the examples are "Casa, Trabajo, Compras", and the "Bandeja personal" chip leaves Tareas.
+
 ### P28 · Text fields and tabs you can see · D · S
 - **UX-412** (S2) field outlines at 1.28:1 → about 3.8:1.
 - **UX-413** (S2) the selected tab is hard to tell → a bolder label and a filled icon.
@@ -270,33 +270,46 @@ Severity-3 packages first, then severity 2. Each runs alone, after the packages 
 - **UX-419** (S2) an expired session rebuilds the app and loses typing → sign-in on top, then back where you were.
 - **UX-424** (S1) startup waits for reminder setup → it runs after the first frame.
 
+### P41 · A brand-new account is told what to try · D · S · after P32, P37, P38 · new
+- **U12** (P1) no learn-by-doing first run → a new account's empty Calendar says "Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10»." (or "escribe", without Pro). P32's question follows the first task.
+
+### P44 · Account and TaskFlow Pro: the state in one line, fewer buttons · D · M · after P1, P18 · new
+- **UX-408** (S2) Account's main button is "Sincronizar ahora", and signing out silently stops reminders → one status line; sign-out asks first; "Detalles de conexión" in debug builds only (D13).
+- **UX-423** (S1) a 45-word Export intro, and four extra buttons on the Pro screen → one line; Ver suscripción, Restaurar compras and, if you've bought it, Gestionar suscripción; the status refreshes by itself (D4d).
+
 ## Merged duplicates
 - **UX-207 → UX-101:** undo snackbars that never close (P1).
 - **UX-414 → UX-218:** "server address" in network errors (P6).
 - **UX-410 → UX-223:** a second home screen after a reminder for a deleted task (P23). The reports differ on the deleted-task case; P23 uses the existing "Es posible que esta tarea se haya eliminado." and adds no copy.
 - **UX-310 → UX-225:** "Proyecto de pasos" and the other rename artefacts (P22).
-- **UX-128, UX-417 → UX-121:** native strings (P20). The "Captura texto" rename is done in P5 with UX-114, and the in-app stop label in P2 with UX-109.
-- **UX-401's chip fix → UX-209** (P8). UX-401 itself — reminders off by default — stays as decision D2.
-- **UX-404's diagnostics row → UX-120** (D13).
+- **UX-128, UX-417 → UX-121:** native strings (P20). The "Captura texto" rename is done in P39 with UX-114, and the sheet's stop control is P35's "Listo".
+- **UX-401's chip fix → UX-209** (P8). UX-401 itself — reminders off by default — is P32.
+- **UX-404's diagnostics row → UX-120** (P18).
 - "Task Title" (UX-124 and UX-227) is fixed once, in P19. "COMPLETADAS" (UX-227) is fixed with UX-213, in P10.
 
 ## Skipped (6)
 UX-128, UX-207, UX-310, UX-410, UX-414 and UX-417: duplicates, merged as listed above. Nothing was skipped as already fixed or server-side only.
 
-## Waiting, or not in this plan
-- **Waiting on decisions:** the parts named in each decision above, and the U-items they cover.
-- **Server-side (reported, not planned):** U6's speech-aware prompt in `Backend/core/ai.py`; the inviter's name on invitations (UX-326); the English-only invitation web page; owners can't set a spoken name (a deliberate server rule, UX-330); a spoken time without a day (UX-112).
+## Not in this plan
+- **Server-side (reported, not planned):**
+  - U6's speech-aware prompt in `Backend/core/ai.py`;
+  - the inviter's name on invitations (UX-326);
+  - the English-only invitation web page;
+  - owners can't set a spoken name, a deliberate server rule (UX-330);
+  - a spoken time without a day (UX-112);
+  - joining without the code for Google accounts (D14).
 - **Not planned:**
   - Changing which project new tasks are saved to when Calendar is filtered (UX-302): it would change what gets shared, so it's yours to raise.
   - Muting a project also silences your own reminders (UX-301). P15 says so on the label; if you'd rather muting not do that, say so.
-  - The reviewer's "later" single task form (UX-215): it overlaps U4.
+  - The reviewer's "later" single task form (UX-215): P36's result card now covers creation.
   - Adding checklist steps from the task detail (UX-222).
   - The iOS local-network text (UX-420).
+  - The four parts of the §3 design listed under "How your answers were read".
 
 ## Corrections to the reports
 - **Renames:** the Lista→Proyecto and "No list"→"Personal inbox" renames were committed in f0da53d before the reviews ran. Report C calls them uncommitted; the problems are real either way.
-- **Raw server text:** report D's "Keep" note says no raw server text reaches the screen. Capture errors can (`captureProblemText` falls back to the raw text); UX-103 fixes it in P4.
-- **Completed tasks:** report D says "Tareas completadas" is reachable only from Settings. It is also the ✓ on Tareas (reports B and C).
+- **Raw server text:** report D's "Keep" note says no raw server text reaches the screen. Capture errors can (`captureProblemText` falls back to the raw text); UX-103 fixes it in P40.
+- **Completed tasks:** report D says "Tareas completadas" is reachable only from Settings. It is also the ✓ on Tareas (reports B and C), which is where P18 leaves it.
 
 ## Ledger
-`ISSUES.md` now lists all 119 findings and U1–U14: 104 open (each with its package), 23 waiting on a decision, and 6 duplicates under Won't fix. U1–U5 and U7–U12 moved to "Decision needed", because they depend on decisions still open in DECISIONS.md; U6 stays open, in P3.
+`ISSUES.md` lists all 133 items: 124 open, each with its package; 3 waiting on a decision (U10, U13, UX-331); 6 duplicates under Won't fix. The 20 lines your answers unblocked moved from "Decision needed" to "Open", and the lines whose package changed now name the new one.

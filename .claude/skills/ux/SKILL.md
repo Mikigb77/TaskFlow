@@ -104,7 +104,7 @@ When it returns:
 ## 6. Fix and verify — workflow `ux-fix`
 
 1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the round's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
-2. **Run the workflow.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, skip, only, notes }`. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
+2. **Run the workflow.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, skip, only, batch, notes }`. Set `batch` (for example `trial`, then `main`) when a plan runs in several batches, so each batch keeps its own report and verify files. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
 3. **When it returns:**
    - **`testsPassed` is true:** commit the round.
      - Stage it: `git add -- <filesChanged> .claude/ux-review .claude/agent-memory`.
