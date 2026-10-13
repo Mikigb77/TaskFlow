@@ -1,0 +1,162 @@
+export const meta = {
+  name: 'ux-review',
+  description: 'TaskFlow UX loop, part 1: frontend-ux-reviewer reviews each area in scope, then ux-organizer turns the findings into a fix plan',
+  whenToUse: 'Started by the /ux skill, which works out the scope and passes it as args. Not useful on its own.',
+  phases: [
+    { title: 'Review', detail: 'one frontend-ux-reviewer per area, in parallel; each writes its report to the run folder' },
+    { title: 'Organize', detail: 'ux-organizer merges duplicates, separates owner decisions, writes plan.json, plan.md and the ledger' },
+  ],
+}
+
+// args, from the /ux skill:
+//   runId, runDir, date, mode ('changes' | 'screens' | 'app')
+//   slices:      [{ key: 'A'..'D', name, scope, idStart }] — one reviewer each
+//   reportPaths: [path] — optional; reviews already written, so the Review phase is skipped
+//   changedKeys: [key]  — ARB keys changed since the last review (changes mode)
+//   notes:       string — owner context from the conversation
+const a = args || {}
+const slices = Array.isArray(a.slices) ? a.slices : []
+const given = Array.isArray(a.reportPaths) ? a.reportPaths : []
+if (!a.runId || !a.runDir || !a.mode || !(slices.length || given.length)) {
+  throw new Error('ux-review needs runId, runDir, mode and slices (or reportPaths). Start it with /ux.')
+}
+const SCOPE = {
+  changes: 'what changed since the last UX review',
+  screens: 'the screens the owner named',
+  app: 'the whole app',
+}
+
+const COUNTS = {
+  type: 'object',
+  properties: {
+    s4: { type: 'integer' },
+    s3: { type: 'integer' },
+    s2: { type: 'integer' },
+    s1: { type: 'integer' },
+  },
+  required: ['s4', 's3', 's2', 's1'],
+}
+
+const REVIEWED = {
+  type: 'object',
+  properties: {
+    reportPath: { type: 'string', description: 'The report you wrote, relative to the repo root' },
+    verdict: { type: 'string', description: 'Your verdict line' },
+    counts: COUNTS,
+  },
+  required: ['reportPath', 'verdict', 'counts'],
+}
+
+const PLANNED = {
+  type: 'object',
+  properties: {
+    planPath: { type: 'string', description: 'plan.md, relative to the repo root' },
+    summary: { type: 'string', description: 'Two or three sentences for the owner' },
+    counts: {
+      type: 'object',
+      properties: {
+        fix: { type: 'integer' },
+        decide: { type: 'integer' },
+        skip: { type: 'integer' },
+      },
+      required: ['fix', 'decide', 'skip'],
+    },
+    packages: {
+      type: 'array',
+      description: 'Package headers only; the briefs live in plan.json',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          area: { type: 'string' },
+          size: { type: 'string' },
+          findings: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['id', 'title', 'area', 'size', 'findings'],
+      },
+    },
+    decisions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' },
+          findings: { type: 'array', items: { type: 'string' } },
+          recommendation: { type: 'string' },
+        },
+        required: ['question', 'findings', 'recommendation'],
+      },
+    },
+  },
+  required: ['planPath', 'summary', 'counts', 'packages', 'decisions'],
+}
+
+function reviewPrompt(s) {
+  const others = slices.filter(o => o.key !== s.key).map(o => o.key + ' — ' + o.name)
+  const lines = [
+    `UX loop run ${a.runId}: review ${SCOPE[a.mode]}. Your area: ${s.key} — ${s.name}. Today is ${a.date}.`,
+    'Scope:',
+    s.scope,
+  ]
+  if (a.mode === 'changes' && Array.isArray(a.changedKeys) && a.changedKeys.length) {
+    lines.push(`ARB keys changed since the last review: ${a.changedKeys.join(', ')}. Check every screen in your area that shows them.`)
+  }
+  if (a.notes) lines.push(`From the owner, this session: ${a.notes}`)
+  lines.push(
+    others.length
+      ? `Other areas are reviewed in parallel (${others.join('; ')}). Stay in yours; put anything else in one line under "Cross-slice notes".`
+      : 'You are the only reviewer in this run.',
+    'The previews were rendered just before this run. Read them; do not run Flutter.',
+    `Number new findings from UX-${s.idStart} upward. Anything already in .claude/ux-review/ISSUES.md keeps its ID and is not reported as new.`,
+    'Another step records memory: skip the memory update and end your report with a "Memory notes" section.',
+    `Write your full report to ${a.runDir}/review-${s.key}.md, then return the structured result.`,
+  )
+  return lines.join('\n')
+}
+
+let reports = given.map(p => ({ reportPath: p, verdict: 'reviewed earlier', counts: null }))
+
+if (!given.length) {
+  phase('Review')
+  const results = await parallel(slices.map(s => () =>
+    agent(reviewPrompt(s), {
+      agentType: 'frontend-ux-reviewer',
+      label: `review ${s.key} · ${s.name}`,
+      phase: 'Review',
+      schema: REVIEWED,
+    })
+  ))
+  reports = results.filter(Boolean)
+  const missing = slices.filter((s, i) => !results[i]).map(s => s.key)
+  if (missing.length) log(`No report from area ${missing.join(', ')}; the plan covers the others only.`)
+  if (!reports.length) throw new Error('No reviewer returned a report.')
+  const total = reports.reduce((n, r) => n + r.counts.s4 + r.counts.s3 + r.counts.s2 + r.counts.s1, 0)
+  log(`Reviews done: ${total} finding(s) in ${reports.length} report(s).`)
+  if (total === 0) {
+    return { runId: a.runId, runDir: a.runDir, mode: a.mode, reports, plan: null }
+  }
+}
+
+phase('Organize')
+const organize = [
+  `Mode: plan. UX loop run ${a.runId}: ${SCOPE[a.mode]} (${a.mode}). Today is ${a.date}. Run folder: ${a.runDir}.`,
+  'Reviewer reports:',
+  ...reports.map(r => `- ${r.reportPath} (${r.verdict})`),
+  a.mode === 'app'
+    ? 'Whole-app run: the owner approves your plan before anything is fixed, so make plan.md easy to approve or strike from, decisions first.'
+    : 'Scoped run: your plan goes straight to the implementers. Keep packages tight.',
+]
+if (a.notes) organize.push(`From the owner, this session: ${a.notes}`)
+organize.push(`Write ${a.runDir}/plan.json and ${a.runDir}/plan.md, update .claude/ux-review/ISSUES.md, then return the structured result.`)
+
+const plan = await agent(organize.join('\n'), {
+  agentType: 'ux-organizer',
+  label: 'organize',
+  phase: 'Organize',
+  schema: PLANNED,
+})
+if (!plan) throw new Error('The organizer did not return a plan.')
+log(`Plan: ${plan.counts.fix} to fix in ${plan.packages.length} package(s), ${plan.counts.decide} for the owner, ${plan.counts.skip} skipped.`)
+
+return { runId: a.runId, runDir: a.runDir, mode: a.mode, reports, plan }

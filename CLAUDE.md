@@ -11,21 +11,21 @@ This repo holds the app (`App/`) and its backend (`Backend/`). The marketing web
 - **Show advanced things only when relevant:** projects, deadlines, durations, assignees, checklists and the like.
 - **Current direction and open decisions:** `../UX_REVIEW.md` (plan items U1–U14). Earlier critique: `../CRITIQUE.md`. Both files sit one folder above this repo.
 
-## UX review gate
+## UX review loop
 
 This section is for the main session.
 
-When user-facing app work is finished, run the `frontend-ux-reviewer` agent **once on the whole change**, before you report it as done — not after every edit.
+When user-facing app work is finished, run **`/ux`** once on the whole change, before you report it as done — not after every edit. This is the owner's standing opt-in to the UX workflows (2026-10-13).
+- `/ux` reviews what changed since the last UX review, fixes the findings, re-checks them, and commits the verified round on `dev`.
+- `/ux app` reviews the whole app and stops for the owner's approval. `/ux fix` then carries out the approved plan.
+- `/ux <screens>` reviews only the screens named.
 
-Give the reviewer:
-- what the change was meant to achieve;
-- the scope (files, flows or screens);
-- any owner decisions from the conversation — the reviewer can't see the conversation.
+Owner policy (2026-10-13):
+- fix everything the reviewer finds, except product decisions;
+- stop for approval only on whole-app runs;
+- commit each verified round on `dev`. Never push, and never touch `main`.
 
-Then:
-- fix the severity 3–4 findings that fall within the task;
-- raise the rest with the owner, plus anything that needs a product decision;
-- tell the owner the verdict and what you changed because of it.
+The agents can't see the conversation. Before running `/ux`, record lasting owner decisions in `.claude/ux-review/DECISIONS.md`, and pass anything else they need to know as notes. How the loop works: `.claude/ux-review/README.md`. Issues and their status: `.claude/ux-review/ISSUES.md`.
 
 **User-facing** means:
 - `App/lib/screens/`, `App/lib/widgets/`, `App/lib/theme/`, and routes in `App/lib/main.dart`;
@@ -59,7 +59,7 @@ flutter gen-l10n                                     # after editing ARB files
 flutter build apk --debug --no-pub --target-platform android-x64   # emulator APK
 ```
 
-Rendered screen previews, no device needed — each writes PNGs to `App/build/`:
+Rendered screen previews, no device needed. The calendar and review previews write PNGs to `App/build/`; the sign-in previews write them to `App/artifacts/auth/`, and that command then fails on an unrelated plugin error (see `.claude/ux-review/KNOWN_FAILURES.md`):
 
 ```powershell
 flutter test --no-pub --dart-define=WRITE_CALENDAR_PREVIEWS=true test/calendar_feedback_test.dart

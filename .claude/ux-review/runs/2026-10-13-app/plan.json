@@ -1,0 +1,1332 @@
+{
+  "runId": "2026-10-13-app",
+  "mode": "app",
+  "created": "2026-10-13",
+  "conventions": [
+    "Paths are relative to the repo root. Line numbers come from the 2026-10-13 reports; earlier packages in this run may have moved them, so search for the code they point at.",
+    "Copy is shown between backticks as EN / ES / CA and is exact. Write apostrophes and quotes the way the catalogs already do (’, «», “”).",
+    "Every new string goes in app_en.arb, app_es.arb and app_ca.arb as a whole sentence, with ICU plurals for counts and the locale helpers for dates (App/docs/LOCALIZATION.md). Remove keys a change leaves unused. Never edit lib/l10n/generated/.",
+    "From P1 on, every snackbar goes through P1's helper (persist: false plus FeedbackTimeout.forAction()).",
+    "Decisions D1–D15 (plan.md) are open. A part marked ‘waits on D#’ is not in the package: don't build it.",
+    "The owner's corrections: the Lista→Proyecto and No list→Personal inbox renames were committed in f0da53d before the reviews (report C calls them uncommitted); capture errors can show raw server text through captureProblemText, so report D's ‘no raw server text reaches the screen’ is wrong for capture."
+  ],
+  "packages": [
+    {
+      "id": "P1",
+      "title": "Snackbars time out and never outlive their screen",
+      "area": "A",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-101", "UX-416", "UX-335"],
+      "aliases": {"UX-101": ["UX-207"]},
+      "files": [
+        "App/lib/services/feedback_timeout.dart",
+        "App/lib/screens/review_tasks_screen.dart",
+        "App/lib/widgets/task_interactions.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/screens/voice_task_screen.dart",
+        "App/lib/screens/settings_screen.dart",
+        "App/lib/screens/data_transfer_screen.dart",
+        "App/lib/screens/subscription_screen.dart",
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/main.dart",
+        "every other App/lib file that builds a SnackBar (grep -rn 'SnackBar(' App/lib: about 70 call sites in 19 files)",
+        "App/test/feedback_timeout_test.dart",
+        "App/test/review_tasks_test.dart",
+        "App/test/calendar_feedback_test.dart"
+      ],
+      "brief": [
+        "Why: in Flutter 3.44 a SnackBar with an action never times out unless `persist: false` is set (SDK material/snack_bar.dart:303, scaffold.dart:622), and snackbars live on the root messenger, so they follow the user onto the next screen. Only task completion is right today (App/lib/widgets/task_interactions.dart:19-31: `persist: false` plus `duration: await FeedbackTimeout.forAction()`), and it is also the only snackbar that honours Android's accessibility timeout.",
+        "1. Add one helper beside FeedbackTimeout (App/lib/services/feedback_timeout.dart, or App/lib/widgets/app_components.dart if it needs widgets), for example `showFeedback(messenger, text, {actionLabel, onAction})`. It hides the current snackbar, awaits `FeedbackTimeout.forAction()`, then shows a floating SnackBar with `persist: false` and that duration. Later packages in this run use it for every new message, so give it an obvious name.",
+        "2. Route every SnackBar in App/lib through the helper, keeping each message and action exactly as it is. The ones with an action today: review_tasks_screen.dart:160 (voice save `1 tarea guardada · Deshacer`, with a hard-coded 8 s — drop it), review_tasks_screen.dart:236 (`Borrador retirado`), task_interactions.dart:87 (move), task_editor.dart:245 (`Sugerencia de fecha aplicada`).",
+        "3. UX-101: when a capture opens (VoiceTaskScreen) and when ReviewTasksScreen is pushed, call `ScaffoldMessenger.of(context).hideCurrentSnackBar()`, so a stale `Deshacer` never floats above `Guardar tarea` and can't undo an earlier save and push the old review back (review_tasks_screen.dart:190-200).",
+        "4. UX-207 (merged into UX-101): TaskEditor `_save` (task_editor.dart:268 onward) clears the current snackbar before its save message, so the message isn't queued behind `Sugerencia de fecha aplicada`. That suggestion's Undo must not outlive the form: hide it when the form closes.",
+        "5. UX-416: the home-screen widget instructions in Settings (settings_screen.dart:184-198, strings `homeCaptureInstructions` and `widgetPickerHelp`, 26–29 words) vanish after 4 s. Show them in a bottom sheet that stays until the user closes it: the same text and one button with the existing `done` string. data_transfer_screen.dart:51, subscription_screen.dart:28 and main.dart:187 go through the helper like the rest.",
+        "6. UX-335: remove `behavior: SnackBarBehavior.fixed` from task_lists_screen.dart (:185, :206, :219, :272) and from data_transfer_screen.dart, so every snackbar floats above the bottom bar (test/calendar_feedback_test.dart:170-173 asserts this on Calendar).",
+        "Don't change any message's wording or what any Undo does: later packages reword messages."
+      ],
+      "acceptance": [
+        "grep: every SnackBar in App/lib is built by the helper, or has `persist: false` and a FeedbackTimeout duration; no `SnackBarBehavior.fixed` remains.",
+        "Widget test mirroring test/calendar_feedback_test.dart:87-93: after a voice save on ReviewTasksScreen, the `Deshacer` snackbar is gone after the accessibility timeout.",
+        "Widget test: pushing a second ReviewTasksScreen after a save shows no `Deshacer`.",
+        "Widget test: after a move through TaskInteractions.reschedule, the snackbar disappears after the timeout.",
+        "Widget test: saving TaskEditor right after accepting a date suggestion shows the save message at once, with no stale suggestion bar.",
+        "Widget test: when home-screen pinning isn't supported, the instructions open in a sheet that stays until it is closed."
+      ],
+      "deviceChecks": [
+        "With Android's ‘Time to take action’ accessibility setting at 1 minute, the save bar stays about a minute and then goes.",
+        "After a voice save, start a second capture: no `Deshacer` above `Guardar tarea`."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P2",
+      "title": "Capture: listening the user controls",
+      "area": "A",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-104", "UX-107", "UX-108", "UX-109", "UX-115"],
+      "files": [
+        "App/lib/screens/voice_task_screen.dart",
+        "App/lib/services/native_speech.dart",
+        "App/android/app/src/main/kotlin/com/example/agenda/NativeSpeechBridge.kt",
+        "App/lib/widgets/task_actions.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/native_speech_test.dart",
+        "a VoiceTaskScreen widget test (new or existing)"
+      ],
+      "brief": [
+        "Scope: the current full-page capture. The capture direction (U1–U5, U7, U9) waits on D3: don't build a sheet, don't change the session mode or endpointing (U1), don't change what an automatic stop does with the words (U2), don't move options to Settings (U9). These fixes carry over if D3 is approved.",
+        "UX-104: treat only `hidden`, `paused` and `detached` as interruptions. Remove `inactive` from the lifecycle check at voice_task_screen.dart:576 and from the start guards at :429-430 and :477. On Android, `inactive` fires for the notification shade, system dialogs and the return from the permission dialog. The native side already stops on Activity.onPause (MainActivity.kt:36), and the recorder handles losing audio focus.",
+        "UX-108: `_busy` (:127) means both ‘starting’ and ‘processing’, so every capture opens with `Preparando tu plan…` and a progress bar. Split it. While starting, the status reads EN `One moment…` / ES `Un momento…` / CA `Un moment…`, with no progress bar. Switch to the listening status, and start the clock, only when the native `ready` event arrives (NativeSpeechBridge.kt:123 emits it from onReadyForSpeech; the Dart side ignores it today, :418). `puttingPlanTogether` stays for the wait after the user stops.",
+        "UX-109 (TalkBack): (a) when `MediaQuery.accessibleNavigationOf(context)` is true, don't start listening when the screen opens (:234-249); put focus on the mic instead. (b) Announce start and stop with SemanticsService.announce: EN `Listening` / ES `Escuchando` / CA `S’està escoltant` when listening starts, and the existing `done` (`Done` / `Listo` / `Fet`) when the user stops. (c) One label per state for the mic (:762-792), identical for its Semantics label and its tooltip: idle EN `Start talking` / ES `Empezar a hablar` / CA `Comença a parlar`; listening EN `Stop` / ES `Parar` / CA `Atura`, which matches the ■ icon and the existing help line `Pulsa Parar cuando termines`. This settles the in-app half of UX-121: `stopDraft` (`Parar y crear borrador`) and `stopRecording` (`Detener la grabación`) collapse into that one label; remove the key left unused. The verb becomes `Listo` only when U3's sheet shows a Done button (D3). (d) task_actions.dart:39-41: drop the tooltip on the labelled `Dictar una tarea` button; TalkBack reads it twice.",
+        "UX-107: after two denials Android refuses at once, with no dialog, and every tap repeats the red banner below the fold. In NativeSpeechBridge.kt's `permission` handler (:52-61), when the request comes back denied and `shouldShowRequestPermissionRationale(RECORD_AUDIO)` is false, return a distinct ‘blocked’ result. The screen then shows, next to the mic, EN `Microphone is off for TaskFlow. Turn it on in Settings, or type instead.` with a button `Open Settings` / ES `El micrófono está desactivado para TaskFlow. Actívalo en Ajustes o escribe.` with `Abrir Ajustes` / CA `El micròfon està desactivat per a TaskFlow. Activa’l a Configuració o escriu.` with `Obre Configuració`. The button calls `openAppSettings()` from permission_handler (already used in notification_settings_screen.dart:190). When the app resumes, check again and start listening if the permission is now granted. A first, ordinary denial keeps today's `captureMicrophone` text.",
+        "UX-115: (a) the speech language defaults to the app's language, not the phone's (NativeSpeechBridge.kt:51 and :68 fall back to Locale.getDefault(); voice_task_screen.dart:146 sets the initial choice). (b) Remember the user's last manual choice on this device, in the storage the app already uses for per-device preferences, so opening the screen no longer resets it (:309-319). (c) Drop the raw code from the help line (:820, `nativeSpeechHelp`): ES `Transcripción local · es-ES. Las palabras aparecen abajo…` becomes `Transcripción local. Las palabras aparecen abajo…`, and the same in English and Catalan (remove the placeholder).",
+        "Don't touch: the Pro wall and the entries (P5), error copy and layout (P4), hold-to-talk and the engine choice (U9, D3)."
+      ],
+      "acceptance": [
+        "Widget test: AppLifecycleState.inactive while listening, and during start, keeps recording; `paused` still stops and keeps the words.",
+        "Widget test with the native channel mocked: the status reads `Un momento…` until a `ready` event, then the listening status with the clock at 00:00.",
+        "Widget test with accessibleNavigation on: the screen doesn't start listening and the mic is labelled `Empezar a hablar`; while listening, its Semantics label and tooltip are both `Parar`.",
+        "`stopDraft` is gone from App/lib and from the ARB files.",
+        "Widget test: a ‘blocked’ permission result shows the banner text above, next to the mic, with an `Abrir Ajustes` button.",
+        "Code: the initial speech language comes from the app's locale; a manual choice is stored and restored; the help line contains no language code."
+      ],
+      "deviceChecks": [
+        "Fresh install: tap `Dictar una tarea`, allow the microphone, speak at once → it keeps listening (the race right after the first permission answer is inferred).",
+        "Pull down the notification shade for 3 s mid-sentence → it keeps listening.",
+        "Deny the microphone twice, tap `Dictar una tarea`, use `Abrir Ajustes`, allow → back in the app, listening starts.",
+        "TalkBack on: the screen doesn't listen by itself, TalkBack's own speech doesn't end up in the transcript, and the start and stop announcements are spoken.",
+        "The first words aren't cut off now that the listening status waits for `ready`."
+      ],
+      "dependsOn": ["P1"]
+    },
+    {
+      "id": "P3",
+      "title": "Speech hints for the recognizer and the assistant (U6, app side)",
+      "area": "A",
+      "size": "M",
+      "severity": 3,
+      "findings": ["U6"],
+      "files": [
+        "App/android/app/src/main/kotlin/com/example/agenda/NativeSpeechBridge.kt",
+        "App/lib/services/native_speech.dart",
+        "App/lib/screens/voice_task_screen.dart",
+        "App/lib/services/capture_processor.dart",
+        "App/test/native_speech_test.dart",
+        "a capture_processor unit test"
+      ],
+      "brief": [
+        "Source: UX_REVIEW.md §4, layers 2 and 3 (one folder above the repo). It is not part of the open capture direction (§3, D3). App side only: Backend/ is out of scope.",
+        "Recognizer biasing: in NativeSpeechBridge.kt `intent()` (:39-46), on API 33 and above, add `RecognizerIntent.EXTRA_BIASING_STRINGS` with an ArrayList passed from Dart in the `start` call. Build the list in Dart for the speech language: weekday and month names (intl DateFormat symbols for that locale); the words for today, tomorrow, the day after tomorrow and next week; morning, afternoon, evening and AM/PM words; and the user's own project names and the names of the people in their groups and shared projects (taskListsProvider and the projects' people). Keep it to about 100 short strings. Below API 33 send nothing. AOSP says the effect depends on the recognizer.",
+        "Speech or typed: in capture_processor.dart:84-90, add a request field `source` with the value `speech` when the words came from the microphone (live transcript or recorded audio) and `typed` for typed or shared text. Before sending it, read the capture endpoint in Backend/core (views and serializers) and confirm it ignores unknown fields. If it would reject the field, don't send it, and report that the server needs it first.",
+        "Server side (report it; don't change it): Backend/core/ai.py's prompt needs the speech-only instruction from UX_REVIEW §4 layer 3, and typed text must never be ‘repaired’. U6's full acceptance — sound-alike cases such as ‘fry them at five’ produce the intended date or a question — depends on that change.",
+        "Don't touch: the session mode and endpointing (U1, D3), any UI."
+      ],
+      "acceptance": [
+        "Code: on API 33+ the recognizer intent carries EXTRA_BIASING_STRINGS built from the speech language's weekday and month names, the day words, and the user's project and people names; nothing is added below API 33.",
+        "Unit test: the hint list for es-ES contains `viernes`, `mañana` and a project name from the test data; for ca-ES it contains `divendres`.",
+        "Unit test: a spoken capture request carries source `speech` and a typed or shared one `typed` — or the implementer reports why the field can't be sent yet.",
+        "U6 is judged on its app side here; the prompt change is server-side and stays in the ledger."
+      ],
+      "deviceChecks": [
+        "On a physical Android 13+ phone, say ‘llamar al médico el viernes a las cinco’ ten times with and without biasing and compare how often ‘viernes’ is heard. Recognizer-dependent: measure it."
+      ],
+      "dependsOn": ["P2"]
+    },
+    {
+      "id": "P4",
+      "title": "Capture screen: words and errors in view, in plain words",
+      "area": "A",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-105", "UX-103", "UX-126"],
+      "files": [
+        "App/lib/screens/voice_task_screen.dart",
+        "App/lib/l10n/capture_messages.dart",
+        "App/lib/services/capture_problem.dart",
+        "App/lib/services/api_client.dart",
+        "App/lib/widgets/app_components.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/review_tasks_test.dart (capture preview)",
+        "a captureProblemText unit test"
+      ],
+      "brief": [
+        "Scope: the current capture page. U7 (`Guardar tal cual` when the AI is slow or fails) and U2 (Cancel asks keep or discard) wait on D3; this package is layout and copy only.",
+        "UX-105 (subtract): while listening (`_recording`), hide the headline (`onYourMind`), the intro (`captureIntro` / `noteCaptureHelp`), the Tareas/Nota chips (voice_task_screen.dart:709-738) and the help line under the mic (around :806-822), and show the words field (:925-947) large, directly under the status line. At 2× text on a 360×740 screen the newest words must be visible while listening. `tapStopHelp` is then never shown: remove it. When not listening, the page stays as it is.",
+        "Preview: add a Spanish 2× preview of the listening state (360×740, textScaler 2.0) to test/review_tasks_test.dart behind WRITE_REVIEW_PREVIEWS, writing App/build/capture-listening-es-2x.png, with the native speech channel mocked the way test/native_speech_test.dart does. If the screen can't be pumped that way, add a widget test asserting the words field is inside the viewport at 2× instead, and say so.",
+        "UX-103 — errors (captureProblemText ends with `_ => value`, so unmapped server text is shown raw, in English):",
+        "1. Disable `Revisar tareas del texto` (`reviewText`, :950) while the words field is empty and no audio is kept. Today a silent attempt sends empty text and shows the server's `text: This field may not be blank.`",
+        "2. App/lib/l10n/capture_messages.dart:35: replace the raw fallback with one message — EN `That didn't work. Your words are saved here — try again.` / ES `No ha funcionado. Tus palabras siguen aquí; inténtalo de nuevo.` / CA `No ha funcionat. Les teves paraules continuen aquí; torna-ho a provar.` Map HTTP 400, 404 and 422 explicitly in capture_problem.dart:62-93, and make sure api_client.dart:277-293's `field: message` validation text never reaches this screen.",
+        "3. Short or silent audio (the server's 422 `Use a 16-bit PCM WAV recording between 1 and 60 seconds.`, and `captureNoSpeech`): EN `I didn't catch that. Tap the mic and try again.` / ES `No te he entendido. Toca el micrófono y vuelve a intentarlo.` / CA `No t’he entès. Toca el micròfon i torna-ho a provar.`",
+        "4. `captureOffline`: EN `No internet. Your words are saved — try again when you're online.` / ES `Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.` / CA `Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.`",
+        "5. `captureSpeechStopped`: EN `Listening stopped. Tap the mic to keep talking, or type.` / ES `Se ha dejado de escuchar. Toca el micrófono para seguir o escribe.` / CA `S’ha deixat d’escoltar. Toca el micròfon per continuar o escriu.`",
+        "6. `captureAllowance` (the daily limit): EN `You've reached today's limit. Type the task, or try again tomorrow.` / ES `Has llegado al límite de hoy. Escribe la tarea o inténtalo mañana.` / CA `Has arribat al límit d’avui. Escriu la tasca o torna-ho a provar demà.`",
+        "7. Stop appending `captureKept` (`Tu captura se conserva en este teléfono.`) to every banner. Move the banner from below the primary button (:964-971) to directly under the status line. Make MessageBanner (app_components.dart:102-131) a live region (`Semantics(liveRegion: true)`) when `isError` is true, and show capture errors with `isError`.",
+        "UX-126: `Descartar captura` (:949-976) becomes a TextButton placed away from the primary button, not directly under `Revisar tareas del texto`. In its confirmation (:633-636) the destructive action isn't the filled button: make Discard a TextButton in `colorScheme.error` and keep the safe choice as the default. When U2 lands (D3), Discard folds into Cancel.",
+        "Don't touch: the listening logic (P2), entries and the Pro wall (P5), the review page (P19)."
+      ],
+      "acceptance": [
+        "Unit test on captureProblemText: no input — an unknown string, an ApiException with status 400, 404 or 422, a `field: message` text — produces English, or `field:`, in Spanish or Catalan; unknown input gives the generic message.",
+        "Widget test: with empty words and no audio, `Revisar tareas del texto` is disabled.",
+        "Preview or widget test: Spanish, 2× text, 360×740, listening → the words field is visible without scrolling; the headline, intro, chips and help line aren't in the tree.",
+        "Widget test: a capture error banner sits directly under the status line, is a live region, and doesn't end with `Tu captura se conserva en este teléfono.`",
+        "Code: `Descartar captura` is a TextButton not adjacent to the primary button; in its dialog Discard isn't the filled button."
+      ],
+      "deviceChecks": [
+        "At 1.3× and 2× text on a 360×740 phone, dictate: the newest words stay visible while listening.",
+        "TalkBack announces a capture error when it appears.",
+        "Airplane mode, finish a capture: the offline message reads as above and is visible without scrolling."
+      ],
+      "dependsOn": ["P2"]
+    },
+    {
+      "id": "P5",
+      "title": "Capture: every way in leads somewhere",
+      "area": "A",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-102", "UX-106", "UX-114"],
+      "files": [
+        "App/lib/screens/voice_task_screen.dart",
+        "App/lib/services/capture_store.dart",
+        "App/lib/main.dart",
+        "App/lib/providers/subscription_provider.dart",
+        "App/lib/screens/captures_screen.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/android/app/src/main/res/values/strings.xml",
+        "App/android/app/src/main/res/values-es/strings.xml",
+        "App/android/app/src/main/res/values-ca/strings.xml",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/capture_entries_test.dart",
+        "App/test/capture_recovery_test.dart"
+      ],
+      "brief": [
+        "UX-102 (subtract): never keep a capture that has no words, no audio and no drafts.",
+        "- voice_task_screen.dart:397-401 writes a capture record as soon as listening starts. Create it on the first partial words or the first audio bytes instead; once there is something in it, it must still survive the app being killed.",
+        "- Leaving the screen (:675-695): delete the record if it is still empty.",
+        "- Widget and shortcut entries (main.dart:158-166 → capture_store.dart:81-112 `acceptEntry`) carry no text. Don't write a record up front for them: open VoiceTaskScreen without a captureId, and let it create one on the first words. Shared text still creates its record, because it has words.",
+        "- When the pending list loads (pendingCapturesProvider / captures_screen.dart), drop stored records that are empty; they were never real.",
+        "UX-106: without Pro, every way into capture — the button, the widget, both shortcuts and Android share (main.dart:173-183) — ends on a wall with no way to type (voice_task_screen.dart:44-92).",
+        "- While billing hasn't loaded, show only a spinner, not `La captura por voz está incluida en TaskFlow Pro.` (subscription_provider.dart:82-88 counts ‘not loaded yet’ as ‘not Pro’; expose a loading state instead of guessing).",
+        "- Replace `Actualizar estado` (`billingRefresh`; it stays on the Subscription screen) with EN `Type it instead` / ES `Escribir la tarea` / CA `Escriu la tasca` (for kind `note`, reuse the existing `newNote`). It opens the typed TaskEditor (or TaskEditor(kind: `note`)) with any kept or shared words: the first sentence, at most 160 characters and cut at a word, as the title, and the full text in the notes when it's longer. Pass it as an initial title, not as a `draft`, so the local date suggestion still works (task_editor.dart:461-468 switches it off for drafts). Delete the capture only when the editor saves; if the user backs out, the capture stays.",
+        "- For text and share entries the wall says EN `Turning text into tasks is part of TaskFlow Pro. You can still type the task.` / ES `Convertir texto en tareas es parte de TaskFlow Pro. Aún puedes escribir la tarea.` / CA `Convertir text en tasques forma part de TaskFlow Pro. Encara pots escriure la tasca.` Voice entries keep `voiceProRequired`.",
+        "- What Pro includes doesn't change: voice and AI stay Pro-only (the server enforces it), and typing is already free from `Nueva tarea`. Don't touch prices, the paywall, or the meaning of hasProProvider beyond the loading state. What the single Add button does for users without Pro is decision D4.",
+        "UX-114: the `Captura texto` shortcut and shared text land on `Pulsa para hablar` and a big mic, with the text field unfocused further down (main.dart:177-180; voice_task_screen.dart:925-946). For text entries, open with the words field focused and the keyboard up, and hide the mic block (:740-826) for that session. Rename the text shortcut (`capture_text` in the three res/values*/strings.xml): EN `Type a task` / ES `Escribir una tarea` / CA `Escriu una tasca`. P20 changes the other native strings."
+      ],
+      "acceptance": [
+        "Widget test: open VoiceTaskScreen(startRecording: true), send no speech, leave → pendingCapturesProvider is empty.",
+        "Unit test: a widget or shortcut voice entry creates no capture record; a shared-text entry does; an empty stored record is dropped when the list loads.",
+        "Widget test with hasPro false: the wall shows `Escribir la tarea` and no `Actualizar estado`; tapping it opens TaskEditor with the shared text's first sentence as the title.",
+        "Widget test: while billing is loading, the wall shows a spinner and no Pro message.",
+        "Widget test: a text entry opens with the words field focused and no mic button.",
+        "strings.xml: `capture_text` reads `Type a task` / `Escribir una tarea` / `Escriu una tasca`."
+      ],
+      "deviceChecks": [
+        "Tap the home-screen widget, then Back → no `Capturas pendientes` count appears on Calendar.",
+        "Account without Pro: share text from WhatsApp → `Escribir la tarea` opens the editor with the text.",
+        "Pro account, cold start from the widget: no Pro wall flashes before billing loads (inferred).",
+        "Long-press the launcher icon → `Escribir una tarea` opens with the keyboard up."
+      ],
+      "dependsOn": ["P4"]
+    },
+    {
+      "id": "P6",
+      "title": "Calendar: today's tasks first, and offline is calm",
+      "area": "B",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-202", "UX-217", "UX-218", "UX-226"],
+      "aliases": {"UX-218": ["UX-414"]},
+      "files": [
+        "App/lib/screens/calendar_screen.dart",
+        "App/lib/widgets/project_scope_control.dart",
+        "App/lib/widgets/device_calendar_events.dart",
+        "App/lib/l10n/request_locale.dart",
+        "App/lib/screens/login_screen.dart",
+        "App/lib/screens/account_screen.dart",
+        "App/lib/widgets/task_tile.dart",
+        "App/lib/screens/task_detail_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/calendar_feedback_test.dart",
+        "App/test/device_calendar_ui_test.dart"
+      ],
+      "brief": [
+        "UX-202 (subtract; recovers about 290 dp in Spanish and adds no controls), in calendar_screen.dart:",
+        "1. Delete the `Tu calendario` row with its cloud/sync button (around :110-145; remove `yourCalendar` and `syncTasks` if unused). Pull-to-refresh stays; sync problems show as in UX-218 below.",
+        "2. Hide the `Todos los proyectos` chip until the user has at least one project (project_scope_control.dart:25-41: only when `fixedProjectId == null`, no project exists and none is selected). The `Para mí` / `Equipo` chips keep their own condition.",
+        "3. Show `Bandeja · N` (`inboxCount`, :156-172) only when N > 0, as one row inside the agenda, under the day's tasks. Keep its label: renaming it waits on D6.",
+        "4. Replace the `Hoy` / `Vista mensual` / `Horario del día` row (:322-369) with one switcher on the month line, next to the month name: a compact menu button that shows the current view (for example `Semana ▾`) and offers EN `Week` / `Month` / `Day`, ES `Semana` / `Mes` / `Día`, CA `Setmana` / `Mes` / `Dia`. `Día` opens the existing day timeline (/timeline) for the selected day. Show a `Hoy` button on that line only when another day is selected. Remove `weekView`, `monthView` and `dayTimeline` if they end up unused.",
+        "5. Delete the completion ring (:411-424); the counts line says the same. Remove `completionCount` if unused.",
+        "This advances U10, which waits on D5 for the rest: the moon and the avatar stay in the header, and P25 hides the Activity bell for people without groups.",
+        "UX-217: phone-calendar events sit above the day's tasks (calendar_screen.dart:429; device_calendar_events.dart:26-77). Put the tasks first. Under them, show one line with an event icon: the count, then up to three start times in the locale's clock format — EN `{count, plural, one{1 event} other{{count} events}}`, ES `{count, plural, one{1 evento} other{{count} eventos}}`, CA `{count, plural, one{1 esdeveniment} other{{count} esdeveniments}}`, for example `3 eventos · 9:00 · 11:30 · 16:00`; all-day events use the existing `calendarAllDay`. Tapping the line opens the existing `_CalendarSheet` with every event; move the ‘choose calendars’ (tune) action into that sheet. The access prompts (`calendarDenied`, `calendarNoSelection`) and the read error become that same single line. With no events, show nothing.",
+        "UX-218 (merged with UX-414): being offline is normal, and the server address is a developer setting.",
+        "1. In the ARB `requestError` message, `network` becomes EN `No connection. Check Wi-Fi or mobile data and try again.` / ES `No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.` / CA `No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar.`, and `other` drops its ‘your local data is kept’ sentence.",
+        "2. Outside the sign-in screen the same errors also say EN `Your tasks are still saved on this phone.` / ES `Tus tareas siguen guardadas en este teléfono.` / CA `Les tasques continuen desades en aquest telèfon.` Write whole sentences rather than joining fragments: for example, add select cases such as `networkKept` and `otherKept` that contain both sentences, and have requestProblemText (request_locale.dart:92-93) use them unless the caller is the login screen. This also fixes Account (account_screen.dart:209-213).",
+        "3. On Calendar, when the sync error is the network kind, show one neutral line instead of the red MessageBanner — a cloud-off icon and onSurfaceVariant text: EN `Offline — your tasks are saved on this phone.` / ES `Sin conexión: tus tareas están guardadas en este teléfono.` / CA `Sense connexió: les tasques estan desades en aquest telèfon.` Other sync errors keep the banner.",
+        "Leave the developer-only reasons (`serverAddress`, `https`, `signOutFirst`) as they are.",
+        "UX-226: (a) a passed deadline only turns red. Append the existing `deadlineOverdue` (`Fecha límite vencida`) to the deadline text on the tile (task_tile.dart:173-182) and on the detail (task_detail_screen.dart:240-250). (b) Draw the week-strip dots (calendar_screen.dart:287-317) only for open tasks.",
+        "Don't touch: the header icons (D5, P25), the empty-state text (U8, U11), overdue tasks (D1), how the selected day is chosen (P7)."
+      ],
+      "acceptance": [
+        "Render: add a Spanish 1.3× text variant to test/calendar_feedback_test.dart's previews, without ensureVisible; in it the first two tasks are fully above the capture bar. The 1.0× renders still pass.",
+        "Widget test: a brand-new account (no projects, nothing undated) shows no `Todos los proyectos`, no `Tu calendario`, no `Bandeja · 0`, no completion ring, and one view switcher; selecting another day shows `Hoy`.",
+        "Widget test: with four phone events, the tasks come first, and one `4 eventos · …` line under them opens the sheet.",
+        "Unit test: requestProblemText for a network error in Spanish contains no `servidor`, and outside sign-in it ends with `Tus tareas siguen guardadas en este teléfono.`",
+        "Widget test: an offline sync error on Calendar shows the neutral line, not an error-coloured banner.",
+        "Widget test: an overdue deadline reads `… · Fecha límite vencida`; a day with only completed tasks has no dot."
+      ],
+      "deviceChecks": [
+        "Spanish, 1.3× text, 390×844 phone: open the app → today's tasks are visible without scrolling (inferred from the layout until the 1.3× render exists).",
+        "Airplane mode: Calendar shows the grey offline line, not a red box."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P7",
+      "title": "Calendar shows where your task went, and follows today",
+      "area": "B",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-205", "UX-203", "UX-111", "UX-220"],
+      "files": [
+        "App/lib/l10n/region.dart",
+        "App/lib/widgets/task_schedule_label.dart",
+        "App/lib/screens/calendar_screen.dart",
+        "a new small provider for the landing, e.g. App/lib/providers/calendar_focus_provider.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/providers/task_provider.dart",
+        "App/lib/screens/day_timeline_screen.dart",
+        "App/lib/widgets/task_list.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/calendar_feedback_test.dart",
+        "App/test/task_creation_test.dart"
+      ],
+      "brief": [
+        "Shared date wording (UX-111; P9, P19 and P29 reuse it). In App/lib/l10n/region.dart add (a) `weekdayDate(date)`: DateFormat.MMMEd for the active locale (ES `vie, 17 oct`); and (b) `dayLabel(date)`: the existing `today` / `tomorrow` (`Hoy` / `Mañana`) when they apply, otherwise weekdayDate. Use dayLabel in taskScheduleLabel (task_schedule_label.dart:10-12), so tiles and the voice review read `Mañana · 17:00` or `vie, 17 oct · 17:00` instead of `16 oct · 17:00`. Fix the context-less branch the same way if it is still used. Undated tasks keep `Bandeja de entrada · Sin fecha`: renaming it waits on D6.",
+        "UX-205 (typed saves): add one landing mechanism the Calendar listens to, a small provider holding a day and a task id. U5 will reuse it for voice saves once D3 is answered; don't wire voice saves now.",
+        "- TaskEditor `_save` (task_editor.dart:358-372), new task with a date: after the form closes, if it was opened from Calendar or from the day timeline, Calendar selects the task's day (and moves the week strip), scrolls its row into view, and highlights it for about 1.5 s with a fading primaryContainer background (no animation when MediaQuery.disableAnimations is on).",
+        "- The message leads with the day and offers Undo (Undo deletes the new task), through P1's helper: EN `Added to {date}` / ES `Añadida al {date}` / CA `Afegida al {date}`, where {date} is weekdayDate. Never use `Hoy`/`Mañana` in this message: `Añadida al hoy` is wrong. Undated: keep `taskSavedInbox` and add Undo. Notes: keep `noteSaved`. Opened from anywhere else (Tareas, a project page): the same message and Undo, with no navigation.",
+        "- addTask (App/lib/providers/task_provider.dart:61) returns nothing today; return the created task, or its id, so the landing and Undo can target it.",
+        "UX-203: the selected day is set once (calendar_screen.dart:29-30), and coming back to the app only reloads data (:47-55). On resume, and at midnight while the app is open, if the selected day was today when last shown, select the new today and move the week strip. Never pre-fill a past day: `Nueva tarea` (`_create`, :69-70) and the timeline's create button (day_timeline_screen.dart:244-245) use today when the selected day is in the past.",
+        "UX-220: (a) a task completed on Calendar keeps its place in the list until the user selects another day or leaves Calendar; today it jumps to the bottom at once (:87-89). (b) The Completed tasks screen lists the newest first (App/lib/widgets/task_list.dart:10 sorts it oldest first).",
+        "Don't touch: voice saves (U5, D3), overdue tasks (D1), the `Bandeja` wording (D6)."
+      ],
+      "acceptance": [
+        "Widget test: create a Friday task from Calendario → Friday is selected, the row is visible and highlighted, the snackbar reads `Añadida al vie, 17 oct` (Spanish) with `Deshacer`, and Undo removes the task.",
+        "Widget test: a fake clock crosses midnight, then a resume event → the header reads `Agenda de hoy` and the new day is selected; `Nueva tarea` with a past day selected pre-fills today.",
+        "Unit test: taskScheduleLabel gives `Hoy · 17:00`, `Mañana · 17:00` and a weekday date for other days, in es, en and ca.",
+        "Widget test: completing a task keeps its row in place until the day changes; Completed tasks lists the newest first."
+      ],
+      "deviceChecks": [
+        "Leave the app in recent apps overnight and open it after midnight → today is selected (whether the app survives in memory needs a phone)."
+      ],
+      "dependsOn": ["P1", "P6"]
+    },
+    {
+      "id": "P8",
+      "title": "Reminders: an honest chip and a one-tap turn-on",
+      "area": "B",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-209", "UX-210", "UX-405"],
+      "files": [
+        "App/lib/widgets/reminder_control.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/screens/notification_settings_screen.dart",
+        "App/lib/services/notification_service.dart",
+        "App/lib/services/reminder_preferences.dart",
+        "App/lib/providers/reminder_provider.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/reminder_settings_test.dart",
+        "App/test/planning_ui_test.dart"
+      ],
+      "brief": [
+        "Background: reminders are off by default (reminder_preferences.dart:12) and the OS permission is only ever requested from Ajustes › Notificaciones (notification_settings_screen.dart:105). Asking at the first saved task with a date, and a 9:00 default for date-only tasks, are decision D2: add neither.",
+        "One shared ‘turn reminders on’ action, used by the chip, by the ReminderControl link and by the Notificaciones switch: (1) request the notification permission (TaskReminders.requestPermission, as notification_settings_screen.dart:105 does); (2) if granted, save ReminderPreferences with enabled = true; (3) on Android 14+, when exact alarms aren't allowed, show one sentence with a button that calls TaskReminders.requestExactAccess(): EN `To get reminders on time, allow “Alarms & reminders”.` / ES `Para que el aviso llegue a su hora, permite «Alarmas y recordatorios».` / CA `Perquè l’avís arribi a l’hora, permet «Alarmes i recordatoris».`; (4) finish with a confirmation through P1's helper: EN `Done. You'll get a reminder before each timed task.` / ES `Listo. Te avisaremos antes de cada tarea con hora.` / CA `Fet. T’avisarem abans de cada tasca amb hora.` (The report's sentence names ‘10 minutos’; the lead time is a user setting, so the sentence stays general, and P18's Settings row shows the lead.) If the permission is denied, reminders stay off and the existing `notificationPermissionOff` shows with the existing `openSystemSettings` action.",
+        "UX-209 (with UX-401's chip fix merged in): the chip (reminder_control.dart:24-50) checks only the in-app switch and puts the truth last: `Recordatorio: 10 minutos antes · desactivado en el dispositivo`. Work out its state from both the switch and the OS permission, as ReminderControl already does (:201-205). When a reminder can't fire, the chip shows only the state and the fix, with a bell-off icon: EN `No reminder · Turn on` / ES `Sin recordatorio · Activar` / CA `Sense recordatori · Activa`. Tapping it runs the shared action; afterwards the chip reads normally. Delete the `· desactivado en el dispositivo` suffix and the `deviceOff` key. In ReminderControl (:201-211), the `remindersDisabled` link keeps its bell-off icon, reads the existing `enableReminders` (`Activar recordatorios`), and runs the same action instead of opening /notifications.",
+        "UX-210: the timing hides behind ⋮ and then needs `Usar recordatorio`. The chip opens the list of choices directly — today's values from the PopupMenu at :146-171 (the default, off, at the scheduled time, 10 and 30 minutes, 1 hour and 1 day before, plus the current value), and the existing `chooseAlertTime` for date-only tasks. Choosing applies and closes. Remove the ⋮ PopupMenuButton and the `Usar recordatorio` button (`useReminder`). In the task form (task_editor.dart:886-895), tapping the Recordatorio row opens the same list.",
+        "UX-405, Notificaciones (notification_settings_screen.dart:166-262):",
+        "1. One switch, `Activar recordatorios`, without its subtitle (remove `deviceReminderScope`). Turning it on runs the shared action.",
+        "2. The permission and exact-alarm status line, `Abrir ajustes del sistema`, `Permitir alarmas precisas` and `Actualizar y reintentar` show only when something is wrong: the permission is off, exact alarms are off on Android 14+, the scheduler reported an error, or alerts were deferred.",
+        "3. The defaults (`Tareas con hora`, `Tareas sin hora`) stay visible. Fold the check-ins, the upcoming alerts and the explanations (`dailyCheckInsHelp`, `scheduledAlertHelp`, `androidAlertRefreshHelp`, `backgroundAlertRefreshHelp`, `approximateAlarmsHelp`) into one collapsed section: EN `Details` / ES `Detalles` / CA `Detalls`.",
+        "4. Check-ins: Spanish `morningCheckIn` `Por la mañana` and `eveningCheckIn` `Por la tarde`; Catalan `Al matí` and `Al vespre`; English unchanged. Spanish `Mañana` reads as ‘tomorrow’, in the row and in the alert list.",
+        "P18 renames this screen and its Settings row to `Recordatorios`; don't do it here. Don't change scheduling, defaults, or what fires."
+      ],
+      "acceptance": [
+        "Widget tests: with the switch off the chip reads `Sin recordatorio · Activar`; with the switch on but the permission denied, the same; after the action grants the permission, the normal text.",
+        "grep: no `deviceOff`, no `useReminder`, and no PopupMenuButton in reminder_control.dart.",
+        "Widget test: chip → `1 hora antes` → the chip reads `Recordatorio: 1 hora antes` and the sheet has closed.",
+        "Widget test: in the task form, tapping the Recordatorio row opens the list.",
+        "Widget test: with everything allowed, Notificaciones shows the switch and the defaults, the check-ins and upcoming alerts collapsed under `Detalles`, and no `Actualizar y reintentar`; with the permission off it shows the status line and its actions.",
+        "Spanish check-ins read `Por la mañana` and `Por la tarde`."
+      ],
+      "deviceChecks": [
+        "Android 14 phone or emulator, fresh install: on a timed task tap `Sin recordatorio · Activar` → system dialog → the exact-alarms screen if needed → back; Detalles lists the alert as programado, not aproximado.",
+        "Revoke the notification permission in Android settings: the chip reads `Sin recordatorio · Activar`."
+      ],
+      "dependsOn": ["P1"]
+    },
+    {
+      "id": "P9",
+      "title": "One date sheet; a moved task names its day",
+      "area": "B",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-206", "UX-212", "UX-221"],
+      "files": [
+        "App/lib/widgets/task_interactions.dart",
+        "App/lib/widgets/schedule_editor.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/widgets/repeat_rule_control.dart",
+        "App/lib/services/quick_schedule_parser.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/schedule_editor_test.dart",
+        "App/test/quick_schedule_parser_test.dart",
+        "App/test/recurrence_controls_test.dart",
+        "App/test/task_creation_test.dart"
+      ],
+      "brief": [
+        "UX-212 (subtract: one date sheet and one repeat editor):",
+        "- `Cambiar fecha` (TaskInteractions.reschedule, task_interactions.dart:54 onward; opened by a tile's swipe or long-press, task_tile.dart:32-37 and :71-73, and by the detail's button, task_detail_screen.dart:406-414) opens `editSchedule()` (schedule_editor.dart) instead of `_ScheduleSheet`. Delete `_ScheduleSheet` (task_interactions.dart:118-262).",
+        "- Carry over what only `_ScheduleSheet` has: for repeating tasks, the `thisOccurrence` / `wholeSeries` choice with `occurrenceRescheduleHelp` / `seriesRescheduleHelp`, above the date; `skipOccurrence` and `restoreOriginal` for an occurrence; and `Sin fecha` only for a whole series or a task that doesn't repeat (an occurrence can't be undated). Use the existing `rescheduleTask` / `rescheduleRepeating` as the title. The result keeps today's scopes (series, occurrence, skip, reset) and their undo paths.",
+        "- Repeat: replace TaskEditor's repeat dropdown (task_editor.dart:772-883) with the repeat sheet voice review uses (repeat_rule_control.dart:101-182).",
+        "- The sheet confirms with its existing `done` (`Listo`). Remove `saveSchedule` (`Guardar programación`; ‘programación’ reads as programming).",
+        "UX-206:",
+        "- In the move flow only (an editSchedule option such as `applyOnChip`), tapping `Hoy` or `Mañana` applies and closes the sheet at once, keeping the task's time. The calendar and the time row still need `Listo`. In the editor and the voice review the chips keep selecting, because people often set a time next.",
+        "- The message names the day and offers Undo, through P1's helper: reuse `movedOccurrenceDate` (EN `Moved to {date}` / ES `Movida al {date}` / CA `Moguda al {date}`) with {date} from P7's weekdayDate, for series and occurrence moves alike. Keep `movedInbox`, `occurrenceSkippedNotice` and `originalRestored`; remove `scheduleUpdated` (`Programación actualizada`).",
+        "- Moving a task to tomorrow drops from 4 taps to 3 (swipe, `Mañana`).",
+        "UX-221 (time traps):",
+        "- In TaskEditor's suggestion (task_editor.dart:637-638), replace the `ambiguousTimeHelp` paragraph (`Elige a. m./p. m. o añade la hora…`, which offers no control) with two time chips for the ambiguous hour: with a 24-hour clock `5:00` and `17:00`, with a 12-hour clock `5:00 AM` and `5:00 PM`, in the locale's clock format. Tapping one accepts the suggestion with that time. Remove `ambiguousTimeHelp` if unused. Whether a typed date applies by itself is decision D10: keep the `Usar …` chip as it is.",
+        "- quick_schedule_parser.dart:108-110: hours 13–23, and 0, are not ambiguous; `a las 17` is 17:00.",
+        "- schedule_editor.dart: an empty minutes box means :00, not `Revisa este valor`. With a 12-hour clock, when the task had no time, don't preselect a. m. (:40 `_pm`): neither chip is selected until the user picks one. If they press `Listo` without choosing, show under the chips EN `Choose AM or PM.` / ES `Elige a. m. o p. m.` / CA `Tria a. m. o p. m.` (the organizer's copy; the report gives none)."
+      ],
+      "acceptance": [
+        "grep: `_ScheduleSheet`, `saveSchedule` and `scheduleUpdated` are gone, and TaskInteractions.reschedule calls editSchedule.",
+        "Widget test: swipe left on a tile → `Mañana` → the sheet closes and the snackbar reads `Movida al mié, 14 oct` (Spanish) with `Deshacer`, which restores the date.",
+        "Widget test: for a repeating task the sheet offers this occurrence or the whole series; skipping and restoring behave as before.",
+        "Widget test: TaskEditor's Repetir opens the repeat sheet; there is no repeat dropdown.",
+        "Unit test: `a las 17` parses as 17:00 with no ambiguity; `a las 5` is ambiguous, and the editor offers `5:00` and `17:00`.",
+        "Widget test: hour 9 with empty minutes saves 9:00; with a 12-hour clock and no previous time, no a. m./p. m. chip is selected and `Listo` asks for one."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P1", "P7"]
+    },
+    {
+      "id": "P10",
+      "title": "Task detail: only what's set, tap to change it",
+      "area": "B",
+      "size": "M",
+      "severity": 3,
+      "findings": ["UX-309", "UX-213", "UX-214"],
+      "files": [
+        "App/lib/screens/task_detail_screen.dart",
+        "App/lib/widgets/attachment_panel.dart",
+        "App/lib/widgets/note_text.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/notes_ui_test.dart",
+        "App/test/attachment_panel_test.dart"
+      ],
+      "brief": [
+        "UX-213 — a plain task's detail is about 45 words, mostly empty or default sections:",
+        "- Delete the uppercase label above the title (task_detail_screen.dart:152-158: `nextStep`, `TU PRÓXIMO PASO`, and `note` for notes). For a completed task, show the existing `taskCompleted` (`Tarea completada`) there instead of the plural `completed` (`COMPLETADAS` above one task — UX-227's item, done here).",
+        "- Hide the project chip and `Solo tú puedes verlo.` until the user has at least one project (:171-194).",
+        "- Show the priority only when it is above the default (:266-276; the default reads `Prioridad: Baja`).",
+        "- Hide Notes when they're empty (`NOTAS — Sin texto añadido.`) and Attachments when there are none (`ADJUNTOS — No hay archivos adjuntos. Añade un archivo al editar.`; attachment_panel.dart:159-186; :377-378).",
+        "- Target: about 20 words for a plain task.",
+        "UX-214: `Planificado para` and `Hora` (:433-471) look like the form's tappable rows but do nothing, and editing hides behind an unlabelled ✏ in the top corner. Tapping the date row or the time row opens the same sheet as `Cambiar fecha` (P9's editSchedule move flow); tapping the title opens the edit form (/editTask). Keep ✏ for tasks.",
+        "UX-309 (notes): a note has no bottom bar (:381), and its body is read-only text in a card (:475-487, note_text.dart:32). Put a labelled button in the empty bottom slot, using the existing `editNote` (EN `Edit note` / ES `Editar nota` / CA `Edita la nota`). A tap on the body opens the editor; links keep their own buttons. Remove ✏ from the app bar for notes; Delete stays there, on its own.",
+        "Don't touch: the delete confirmation (D11), the moon (D5), the project picker (P12)."
+      ],
+      "acceptance": [
+        "Widget test: a plain task (no notes, attachments or project; default priority) shows no `TU PRÓXIMO PASO`, no priority, no NOTAS or ADJUNTOS section and no project chip; a completed task shows `Tarea completada`.",
+        "Widget test: tapping the date row opens the schedule sheet; tapping the title opens the edit form.",
+        "test/notes_ui_test.dart: tapping a note's body opens the editor; the note detail has `Editar nota` at the bottom and no ✏ in the app bar."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P9"]
+    },
+    {
+      "id": "P11",
+      "title": "Search ignores accents",
+      "area": "C",
+      "size": "S",
+      "severity": 3,
+      "findings": ["UX-303"],
+      "files": [
+        "App/lib/services/text_search.dart (new)",
+        "App/lib/screens/notes_screen.dart",
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/widgets/project_scope_control.dart",
+        "App/lib/screens/home_screen.dart",
+        "App/test/text_search_test.dart (new)",
+        "App/test/notes_ui_test.dart"
+      ],
+      "brief": [
+        "Searches lowercase the text but don't ignore accents, so `medico` doesn't find `Médico` and `collegi` doesn't find `col·legi`. The recognizer always writes accents; people typing often leave them out, and then the result says nothing matches.",
+        "Add one helper (e.g. App/lib/services/text_search.dart) that lowercases and folds both the query and the searched text: á à â ä → a, é è ê ë → e, í ì î ï → i, ó ò ô ö → o, ú ù û ü → u, ñ → n, ç → c, and Catalan `l·l` (and `l.l`) → `ll`. Use it in all four searches: notes_screen.dart:93-99, task_lists_screen.dart:340-341 and :365-367, project_scope_control.dart:61-62 and :136, and home_screen.dart:212-214. Nothing changes on screen."
+      ],
+      "acceptance": [
+        "Unit test: `medico` finds `Médico`, `collegi` finds `col·legi`, `cafe` finds `Café`, `jose` finds `José`, `reunion` finds `reunión`.",
+        "test/notes_ui_test.dart: searching `medico` lists a note titled `Médico`.",
+        "All four searches use the helper."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    },
+    {
+      "id": "P12",
+      "title": "Moving a task into a project: safe and findable",
+      "area": "C",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-302", "UX-308", "UX-324", "UX-325"],
+      "files": [
+        "App/lib/widgets/task_list_picker.dart",
+        "App/lib/widgets/task_assignment_picker.dart",
+        "App/lib/screens/task_detail_screen.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/screens/home_screen.dart",
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/project_ui_test.dart",
+        "App/test/task_lists_widget_test.dart"
+      ],
+      "brief": [
+        "UX-302 — one tap shares a private task, and it can't be undone:",
+        "1. When a personal task is moved into a shared project (task_list_picker.dart:49 and :68-86, called from task_detail_screen.dart:171-191 and from the editor), ask once: EN `Share with {name}? Everyone there will see this task. It can't be made private again.` with `Share` / `Cancel`; ES `¿Compartir con {name}? Todos verán esta tarea y no podrás volver a hacerla privada.` with `Compartir` / `Cancelar`; CA `Vols compartir-la amb {name}? Tothom la veurà i no la podràs tornar a fer privada.` with `Comparteix` / `Cancel·la`. {name} is the group's name for a group project, otherwise the project's name. Cancel leaves the task where it was.",
+        "2. A task in a shared project shows its project chip greyed out (lockShared: task_detail_screen.dart:174, task_editor.dart:522-523; about 38% contrast). Draw it in normal contrast instead, and on tap show EN `Shared tasks stay in their project.` / ES `Las tareas compartidas se quedan en su proyecto.` / CA `Les tasques compartides es queden al seu projecte.`",
+        "3. Keep the audience line (`Solo tú puedes verlo` / `Visible para todos en {group}`, task_assignment_picker.dart:161-172) on the capture review whenever the destination is shared. This is a note for U4 (D3): if the review later hides the project chip, this line stays.",
+        "Not in this package: the view filter also decides where new tasks are saved (project_scope_control.dart:101-104 → voice_task_screen.dart:259, create_task_screen.dart:14-20). Changing that would change what gets shared, so it's a question for the owner.",
+        "UX-308 — projects hide behind an unlabelled icon, and the picker dead-ends:",
+        "1. On the Tasks tab (home_screen.dart:89-95), the folder icon becomes a labelled text button in the same place: EN `Projects` / ES `Proyectos` / CA `Projectes`.",
+        "2. With no projects, the picker says `Crea un proyecto desde el selector de proyectos.` (task_list_picker.dart:87-88, `createListHelp`) and offers nothing. Replace that sentence with a row EN `New project` / ES `Nuevo proyecto` / CA `Projecte nou` that opens the existing new-project name dialog (task_lists_screen.dart's create flow) and puts the task in the new project once it's saved. Remove `createListHelp` if unused.",
+        "3. Title the sheet EN `Project` / ES `Proyecto` / CA `Projecte` and drop its subtitle (`moveToListHelp`, which is wrong for a task still being created; :58-61).",
+        "UX-324: add a ▾ to the chip so it reads as a control. In the sheet, shared rows show just the group's name as their subtitle instead of the 15-word `sharedListVisibility`; the audience line under the chip already warns.",
+        "UX-325: when the assistant isn't sure of the project or the person (task_assignment_picker.dart:173-187), replace the red text, the instruction and `Confirmar proyecto y responsabilidad` with a question in the normal text colour — EN `Is this right?` / ES `¿Es correcto?` / CA `És correcte?` — and one button, EN `Yes` / ES `Sí` / CA `Sí`, that confirms. The chips stay as the way to change it.",
+        "Don't touch: the `noList` name (`Bandeja personal`, D6)."
+      ],
+      "acceptance": [
+        "test/project_ui_test.dart: choosing a shared project for a personal task shows the dialog; Cancel leaves the project unchanged; Compartir moves it.",
+        "Widget test: a shared task's project chip isn't drawn as disabled, and tapping it shows `Las tareas compartidas se quedan en su proyecto.`",
+        "test/task_lists_widget_test.dart: with no projects the picker shows `Nuevo proyecto`, and saving a name puts the task in that project.",
+        "Widget test: the Tasks tab shows a `Proyectos` text button, not a bare folder icon.",
+        "Widget test: the assistant-doubt state shows `¿Es correcto?` and `Sí`, in no error colour."
+      ],
+      "deviceChecks": [
+        "Walkthrough with no help: ‘make a shopping list and put buy bread on it’, starting from Calendar."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P13",
+      "title": "Share from the project page; shorter invitations",
+      "area": "C",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-305", "UX-318", "UX-316", "UX-339"],
+      "files": [
+        "App/lib/screens/home_screen.dart",
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/screens/list_sharing_screen.dart",
+        "App/lib/widgets/project_scope_control.dart",
+        "App/lib/widgets/task_assignment_picker.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/sharing_ui_test.dart",
+        "App/test/project_assignment_test.dart"
+      ],
+      "brief": [
+        "UX-305 — sharing is hidden behind ⋮ and missing from the project itself:",
+        "1. Project page (home_screen.dart:105-128): for a project the user owns and can share directly, always show the existing Members button. Label it EN `Share` / ES `Compartir` / CA `Comparteix` until someone else has access, then EN `Members · {count}` / ES `Miembros · {count}` / CA `Membres · {count}`, where {count} is the number of people with access, the owner included. Group projects keep opening the group. On Projects, rename the ⋮ item (task_lists_screen.dart:423-437, `sharingAndPeople`, ES `Compartir y gestionar personas`) to the same `Compartir`, and show it even before the project's first sync.",
+        "2. Invite dialog (list_sharing_screen.dart:135-206): title EN `Share {project}` / ES `Compartir {project}` / CA `Comparteix {project}`; one autofocused email field labelled EN `Their email` / ES `Su correo` / CA `El seu correu`; one sentence, EN `They'll see everything in {project}.` / ES `Verá todo lo que hay en {project}.` / CA `Veurà tot el que hi ha a {project}.`; and one button, EN `Send invitation` / ES `Enviar invitación` / CA `Envia la invitació`. Remove both paragraphs (`inviteHelp`; `sharingRolesHelp` stays only under ‘How sharing works’). Keep the access dropdown (Editor or Viewer) for now: removing it is decision D15.",
+        "3. Code dialog (:75-124): title EN `Invitation sent` / ES `Invitación enviada` / CA `Invitació enviada`; one line, EN `If the email doesn't arrive, send them this code:` / ES `Si no le llega el correo, envíale este código:` / CA `Si no li arriba el correu, envia-li aquest codi:`; then the code, `copyCode` and `done`. Drop `invitationCodeHelp` and the email-status lines from this dialog, and remove keys left unused.",
+        "4. If the project hasn't synced yet, the sharing screen says EN `Connect to the internet to share.` / ES `Conéctate a internet para compartir.` / CA `Connecta’t a internet per compartir.` instead of offering the invite button.",
+        "UX-318: tapping a pending invitation (:332-358) silently sends it again and invalidates the code already sent, and X revokes at once. Make the rows not tappable and give each a ⋮ menu with EN `Send again` / ES `Reenviar` / CA `Torna a enviar` and EN `Cancel invitation` / ES `Anular invitación` / CA `Anul·la la invitació`. Delete the help line `Toca una invitación pendiente para sustituir su código.` and its key.",
+        "UX-316 — one word per idea for ‘the other people’ (app_en.arb:1445, :1448, :787, :1463; app_es.arb:1158, :1161, :566, :1176): rename the `Equipo` chip (`forTeam`) to EN `All` / ES `Todas` / CA `Totes`; in Spanish and Catalan the assignment `Todo el grupo` / `Tot el grup` becomes `Todos` / `Tothom` (English `Everyone` stays); and where `People` / `Personas` names the people with access (the sharing screen's `people` heading, and the `sharingProblem` texts that say People), use EN `Members` / ES `Miembros` / CA `Membres`.",
+        "UX-339: for owners, drop `Tu rol: Propietario` and `sharingHelp` (`…Los cambios se sincronizan…`) from the sharing screen (:263-269), and hide section headings that have nothing under them (`INVITACIONES PENDIENTES`, :331).",
+        "Don't touch: the access choice (D15), groups' invitations (P27), `Bandeja personal` (D6)."
+      ],
+      "acceptance": [
+        "test/sharing_ui_test.dart: an unshared project's page shows `Compartir`; the invite dialog has one autofocused email field, the access dropdown, one sentence and `Enviar invitación`; the code dialog reads `Invitación enviada` plus the one line.",
+        "Widget test: tapping a pending invitation does nothing; its ⋮ offers Reenviar and Anular invitación.",
+        "Widget test: the scope chips read `Para mí` and `Todas`; the Spanish assignment reads `Todos`.",
+        "Widget test: the owner's sharing screen has no `Tu rol` line and no empty heading."
+      ],
+      "deviceChecks": [
+        "Walkthrough starting inside a project: ‘share this list with your wife’."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P14",
+      "title": "Invitations: find them, join, and land on what you joined",
+      "area": "C",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-306", "UX-307", "UX-326"],
+      "files": [
+        "App/lib/screens/calendar_screen.dart",
+        "a pending-invitations provider shared by Calendar, Projects and Groups",
+        "App/lib/screens/list_sharing_screen.dart",
+        "App/lib/screens/groups_screen.dart",
+        "App/lib/screens/invitation_review_screen.dart",
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/main.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/invitation_review_test.dart",
+        "App/test/sharing_ui_test.dart"
+      ],
+      "brief": [
+        "UX-306:",
+        "1. While an invitation is pending for this account, show one card at the top of Calendar's agenda: EN `You're invited to {name} · View` / ES `Te han invitado a {name} · Ver` / CA `T’han convidat a {name} · Mostra`. View opens the join dialog below. The card disappears after Join or Decline. Reuse the invitation data the Projects and Groups screens already load (task_lists_screen.dart:344-345, groups_screen.dart:174) through one shared provider, refreshed by Calendar's pull-to-refresh. With several invitations, show the first and `+N`.",
+        "2. One join dialog for both kinds, replacing the list dialog (list_sharing_screen.dart:425-469) and the group's reuse of `groupTextDialog` (groups_screen.dart:675-682), which shows the inviter's text and a `Guardar` button: title EN `Join {name}` / ES `Unirte a {name}` / CA `Uneix-te a {name}`; text EN `Open your invitation email and tap its link. Or paste the code from it here.` / ES `Abre el correo de invitación y pulsa su enlace. O pega aquí el código que aparece.` / CA `Obre el correu d’invitació i toca’n l’enllaç. O enganxa-hi el codi que hi apareix.`; a code field; the button EN `Join` / ES `Unirme` / CA `Uneix-me`; and, for an empty field, the existing `invitationCodeRequired`.",
+        "3. Decline asks once, because it can't be undone: EN `Decline the invitation to {name}? You'd need a new one to join later.` / ES `¿Rechazar la invitación a {name}? Para unirte más tarde necesitarías otra.` / CA `Vols rebutjar la invitació a {name}? Per unir-t’hi més endavant en necessitaries una altra.` Place Decline away from Join (today they are 8 dp apart: list_sharing_screen.dart:547-552, groups_screen.dart:745-750).",
+        "Whether invitees signed in with Google can skip the code is decision D14: keep the code.",
+        "UX-307: after accepting — from the link (invitation_review_screen.dart:67-96) or from the card's dialog — replace the screen with the joined project's page (HomeScreen with its listId) or the group's page (GroupScreen), and show EN `You joined {name}` / ES `Te has unido a {name}` / CA `T’has unit a {name}` through P1's helper.",
+        "UX-326, the invitation review screen: the help text (:129) promises details ‘described below’, but only the role follows — make it EN `You'll see its tasks, notes and files.` / ES `Verás sus tareas, notas y archivos.` / CA `En veuràs les tasques, les notes i els fitxers.`; label the signed-in email (:139-142) EN `Signed in as {email}` / ES `Sesión iniciada como {email}` / CA `Sessió iniciada com a {email}`; rename `Cancelar` (:176-181) to EN `Not now` / ES `Ahora no` / CA `Ara no`, and make it keep the invitation link rather than discard it (main.dart:212-219), since Calendar's card offers it again.",
+        "Server side (report it; don't change Backend/): the invitation data has no inviter name (Backend/core/list_views.py:33-35, group_views.py:52-54), so the screen can't say who invited you."
+      ],
+      "acceptance": [
+        "Widget test: with a pending list invitation, Calendar shows `Te han invitado a Compras · Ver`; after a confirmed Decline the card is gone.",
+        "Widget test: the group join dialog shows the invitee's text and `Unirme`, not `Guardar` or the inviter's help.",
+        "test/invitation_review_test.dart: after Accept, the project's page is on screen with `Te has unido a Compras`.",
+        "Widget test: `Ahora no` closes the review without clearing the stored invitation."
+      ],
+      "deviceChecks": [
+        "With a second account: invite, open the app as the invitee without using the email → the card is on Calendar; paste the code → you land on the project. integration_test/sharing_flow_test.dart can cover it against the local backend."
+      ],
+      "dependsOn": ["P1", "P6", "P13"]
+    },
+    {
+      "id": "P15",
+      "title": "Archive, delete and leave say what happens",
+      "area": "C",
+      "size": "M",
+      "severity": 3,
+      "findings": ["UX-301", "UX-317", "UX-340"],
+      "files": [
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/screens/groups_screen.dart",
+        "App/lib/widgets/project_preferences.dart",
+        "App/lib/screens/list_sharing_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/archive_test.dart",
+        "App/test/task_lists_widget_test.dart",
+        "App/test/sharing_ui_test.dart"
+      ],
+      "brief": [
+        "UX-301 — keep the behaviour (archived groups leaving the daily view and reminders is a recorded decision); say what it does, and offer Undo:",
+        "- Archiving a project (task_lists_screen.dart:193-213, from the ⋮ item at :423-431): replace `Project archived. Contents kept.` with a message through P1's helper, with Undo (Undo unarchives the project and has its reminders rescheduled): EN `{name} archived — hidden from your calendar, no reminders.` / ES `«{name}» archivado: ya no aparece en el calendario ni te avisará.` / CA `«{name}» arxivat: ja no surt al calendari ni t’avisarà.`",
+        "- Archiving a group (groups_screen.dart:588-603; today there's no message at all), with Undo: EN `{name} archived for everyone — hidden from calendars, no reminders.` / ES `«{name}» archivado para todos: ya no aparece en el calendario ni avisará.` / CA `«{name}» arxivat per a tothom: ja no surt al calendari ni avisarà.` (The report gives only the ending ‘…for everyone in Master’; these whole sentences are the organizer's.)",
+        "- The `Muted` option (project_preferences.dart:25-39) also silences your own reminders: label it EN `Muted — no updates or reminders` / ES `Silenciado: sin novedades ni recordatorios` / CA `Silenciat: sense novetats ni recordatoris`. Its behaviour stays.",
+        "UX-317: a personal project can only be deleted through ⋮ → Compartir → `Eliminar el proyecto para todos`. Put a delete item in the project's ⋮ menu for owners (task_lists_screen.dart:402-463): EN `Delete project` / ES `Eliminar proyecto` / CA `Suprimeix el projecte`, worded ‘for everyone’ (the existing string) only when the project is shared, with the existing confirmation. Use `colorScheme.error` for destructive controls — delete, leave, remove member, revoke — in task_lists_screen.dart, list_sharing_screen.dart and groups_screen.dart.",
+        "UX-340: leaving a project or a group, or deleting a project, closes the screen without a word (list_sharing_screen.dart:125; groups_screen.dart:264-266). Show, through P1's helper, EN `You left {name}` / ES `Has salido de {name}` / CA `Has sortit de {name}`, and EN `Project deleted` / ES `Proyecto eliminado` / CA `Projecte suprimit`."
+      ],
+      "acceptance": [
+        "Widget test: archiving a project shows the message with Undo; Undo restores the project, and the reminder engine is asked to reschedule.",
+        "Widget test: archiving a group shows the ‘para todos’ message.",
+        "Widget test: the mute option reads `Silenciado: sin novedades ni recordatorios`.",
+        "Widget test: an owner's personal project has `Eliminar proyecto` in its ⋮ menu; destructive buttons use the error colour.",
+        "Widget test: leaving a project shows `Has salido de …`."
+      ],
+      "deviceChecks": [
+        "Set a reminder 2 minutes ahead in a project, archive the project, read the message, tap Deshacer, and confirm the reminder still fires."
+      ],
+      "dependsOn": ["P1"]
+    },
+    {
+      "id": "P16",
+      "title": "Notes: newest first, saved where you are",
+      "area": "C",
+      "size": "M",
+      "severity": 3,
+      "findings": ["UX-304", "UX-313", "UX-312", "UX-323", "UX-118", "UX-337"],
+      "files": [
+        "App/lib/screens/notes_screen.dart",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/notes_ui_test.dart"
+      ],
+      "brief": [
+        "UX-304: notes come back in no order (the query in task_database.dart:437-444 has no ORDER BY). Sort the notes list newest first in notes_screen.dart:91-121 (descending local id is available). After a new note is saved, the list shows it at the top, in view, briefly highlighted with P7's highlight treatment.",
+        "UX-313: in a project's notes, `Dictar una nota` (notes_screen.dart:150-157) passes `projectId: _listId` when the project is editable — the rule `Nueva nota` already follows (:146-148).",
+        "UX-312 — notes reuse wording written for tasks:",
+        "- No search results on Notes: EN `No matching notes` / ES `No hay notas que coincidan` / CA `No hi ha notes que coincideixin` (instead of `noMatches`).",
+        "- A project in the filter that is no longer available: the existing `listUnavailable` (instead of `taskUnavailable`).",
+        "- The load error (`savedOnDevice`, about saved tasks): EN `Your notes are still on this phone.` / ES `Tus notas siguen en este teléfono.` / CA `Les notes continuen en aquest telèfon.`",
+        "- The note editor's empty-title error (task_editor.dart:603): EN `Give your note a title` / ES `Ponle un título a la nota` / CA `Posa un títol a la nota`. Tasks keep theirs.",
+        "- The note's title hint (task_editor.dart:596-597 uses `noteHint`, which describes the body): EN `e.g. Wi-Fi password` / ES `p. ej., Clave del wifi` / CA `p. ex., Contrasenya del wifi`. Keep `noteHint` for the body if it's used there.",
+        "UX-323: the project filter (:70-89) is an unlabelled dropdown whose ‘all’ option reads `Notas`. Label it EN `Project` / ES `Proyecto` / CA `Projecte`, and name the ‘all’ option EN `All notes` / ES `Todas las notas` / CA `Totes les notes`. Don't switch to the global ProjectScopeControl (the report's other option): it would tie Notes to Calendar's filter and to where new tasks are saved.",
+        "UX-118: on Notes, typing is the filled button and voice is outlined (:138-157), the opposite of Calendar and Tasks. Make `Dictar una nota` the filled button and `Nueva nota` the outlined one.",
+        "UX-337: show the note-versus-task paragraph (`notesHelp`, :38-41) only in the empty state, when there are no notes at all."
+      ],
+      "acceptance": [
+        "Widget test: three notes saved in turn appear newest first, and a newly saved note is at the top and visible.",
+        "Widget test: in a project's notes, `Dictar una nota` opens capture with that projectId.",
+        "Widget test: a search with no results on Notes shows `No hay notas que coincidan`; the filter is labelled `Proyecto`, with `Todas las notas`.",
+        "Widget test: with at least one note, `notesHelp` isn't shown, and the voice button is the filled one."
+      ],
+      "deviceChecks": [
+        "With 12 notes, save one more → it's visible at the top without scrolling."
+      ],
+      "dependsOn": ["P7", "P11"]
+    },
+    {
+      "id": "P17",
+      "title": "Sign-in that leads somewhere",
+      "area": "D",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-402", "UX-403", "UX-415"],
+      "files": [
+        "App/lib/screens/login_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/auth_gate_test.dart"
+      ],
+      "brief": [
+        "These apply whichever way U14 goes (D8). Don't move the Google button: App/test/auth_gate_test.dart:163-178 asserts its place.",
+        "UX-402 — signing in without an account is a dead end:",
+        "1. The credentials error (`requestError` → credentials) carries its own fix. The message reads EN `We couldn't find that account, or the password is wrong.` / ES `No encontramos esa cuenta o la contraseña no es correcta.` / CA `No trobem aquest compte o la contrasenya no és correcta.`, followed by a button EN `Create an account with this email` / ES `Crear una cuenta con este correo` / CA `Crea un compte amb aquest correu` that switches to create mode and keeps both fields. The wording doesn't reveal whether the account exists.",
+        "2. The headings name the mode, replacing the slogans `authWelcome`, `registerHeading` and `recoveryHeading` (login_screen.dart:230-239): sign in EN `Sign in` / ES `Inicia sesión` / CA `Inicia la sessió`; create EN `Create your account` / ES `Crea tu cuenta` / CA `Crea el teu compte`; recover EN `Reset your password` / ES `Recupera tu contraseña` / CA `Recupera la contrasenya`.",
+        "3. Keep the typed password when switching between sign-in and create (login_screen.dart:56 clears it).",
+        "UX-403 — sign-up errors land below the fold at large text:",
+        "- Show field errors on the field itself (`errorText` under Contraseña or Correo): password rules, an email already in use, an invalid email.",
+        "- Scroll any other error (no connection, too many attempts) into view when it appears; today it sits under the submit button inside a ListView (:403-414).",
+        "- State the password rule before typing, as the helper under Contraseña (:327-329): EN `At least 12 characters, not only numbers` / ES `Al menos 12 caracteres, no solo números` / CA `Com a mínim 12 caràcters, no només números`.",
+        "UX-415 — the modes don't behave like screens:",
+        "- Back from create or recover returns to sign-in (a PopScope), instead of leaving the app (:50-62, :87-105).",
+        "- The two recovery steps are labelled EN `Send code` / ES `Enviar código` / CA `Envia el codi`, then EN `Save new password` / ES `Guardar contraseña nueva` / CA `Desa la contrasenya nova`, instead of `continueRecovery` twice (remove it if unused).",
+        "- On success, return to sign-in with the email and the new password filled in; today the filled code form stays on screen (:182-183)."
+      ],
+      "acceptance": [
+        "Widget test: unknown credentials show the message and `Crear una cuenta con este correo`; tapping it lands in create mode with both fields filled.",
+        "Widget test: in Spanish the headings read `Inicia sesión`, `Crea tu cuenta` and `Recupera tu contraseña`.",
+        "test/auth_gate_test.dart: Spanish, text at 2×, 360×740, a mocked password error → the error is visible without scrolling, on the password field.",
+        "Widget test: Back in create mode returns to sign-in; the recovery buttons read `Enviar código`, then `Guardar contraseña nueva`; after success, the sign-in form holds the new password.",
+        "The sign-in previews (WRITE_AUTH_PREVIEWS) re-render; their app_links failure is the known one in KNOWN_FAILURES.md."
+      ],
+      "deviceChecks": [
+        "Newcomer walkthrough in Spanish at 2× text: type an unknown email and a password, follow the button → the account is created on the first attempt."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P18",
+      "title": "Settings: reminders first, fewer words",
+      "area": "D",
+      "size": "L",
+      "severity": 3,
+      "findings": ["UX-404", "UX-408", "UX-418", "UX-422", "UX-423"],
+      "files": [
+        "App/lib/screens/settings_screen.dart",
+        "App/lib/screens/notification_settings_screen.dart",
+        "App/lib/screens/account_screen.dart",
+        "App/lib/providers/auth_provider.dart",
+        "App/lib/screens/regional_settings_screen.dart",
+        "App/lib/widgets/language_selector.dart",
+        "App/lib/screens/data_transfer_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/account_regional_ui_test.dart",
+        "App/test/regional_ui_test.dart",
+        "App/test/language_selector_test.dart",
+        "App/test/data_transfer_screen_test.dart",
+        "App/test/appearance_test.dart",
+        "App/test/reminder_settings_test.dart"
+      ],
+      "brief": [
+        "UX-404 — only the parts that need no decision. The six-row layout with a new ‘Otros ajustes’ screen, and moving `Tareas completadas` out, wait on D7; hiding `Diagnóstico de captura` waits on D13.",
+        "1. Rename `Notificaciones` to EN `Reminders` / ES `Recordatorios` / CA `Recordatoris` — both the row and the screen it opens — and make it the first row. Its subtitle shows the state: EN `On · {lead}` / ES `Activados · {lead}` / CA `Activats · {lead}`, where {lead} is the existing reminderLead phrase for the default (e.g. `10 minutos antes`), or EN `Off` / ES `Desactivados` / CA `Desactivats`.",
+        "2. Order the rest by need: Idioma, Apariencia, Cuenta, TaskFlow Pro, then Hora y región, Calendarios del teléfono, the home-screen mic button, Exportar e importar, Tareas completadas, Diagnóstico de captura, Licencias.",
+        "3. Delete the `A TU GUSTO` eyebrow (`welcomeSettings`), the footer tagline (`moreClarity`), and the section labels `APARIENCIA` and `TU ESPACIO`, which group unrelated rows. Use one row style: plain ListTiles with chevrons, and Licencias as a row rather than a centred text button.",
+        "4. Rename the mic-button row (`homeCapture`): EN `Mic button on your home screen` / ES `Botón de dictar en la pantalla de inicio` / CA `Botó de dictar a la pantalla d’inici`.",
+        "UX-418: replace the three theme tiles (settings_screen.dart:52-76) with one row, EN `Appearance` / ES `Apariencia` / CA `Aparença`, whose subtitle is the current choice and which opens a sheet of full-width radio rows: EN `Light` / `Dark` / `Same as phone`, ES `Claro` / `Oscuro` / `Como el teléfono`, CA `Clar` / `Fosc` / `Com el telèfon`. This works with any answer to the sun–moon question (D5); don't touch the header toggle.",
+        "UX-422 (Hora y región): the screen this row opens is titled `Idioma y región` (`regionalSettings`); retitle it `Hora y región`. Remove the second language picker from it. Label the time zone EN `Time zone` / ES `Zona horaria` / CA `Fus horari` (drop ‘de captura’) and update `regionalFormatsHelp` to match. Show time zones as city names — the last part of the IANA id with underscores as spaces, e.g. `America/Argentina/Buenos_Aires` → `Buenos Aires` — while still storing the id. `deviceDefault` (ES `Usar el dispositivo`) becomes EN `Same as phone` / ES `Como el teléfono` / CA `Com el telèfon`. Delete the language sheet's 30-word paragraph (`languageHelp`, language_selector.dart:110-113).",
+        "UX-423, the Export part: replace the 45-word inventory (data_transfer_screen.dart:152-168; its Spanish says ‘proyectos de pasos’) with one line: EN `Save a copy of your tasks to a file, or bring tasks from Todoist.` / ES `Guarda una copia de tus tareas en un archivo o trae tareas de Todoist.` / CA `Desa una còpia de les tasques en un fitxer o porta tasques de Todoist.` The Pro screen's buttons (subscription_screen.dart:176-213) wait on D4.",
+        "UX-408, Account (account_screen.dart:140-260):",
+        "- Replace the sync card and its 40-word paragraph with one status line, EN `Saved to your account` / ES `Guardado en tu cuenta` / CA `Desat al teu compte`, and a text button with the existing `Sincronizar ahora` that shows its own progress (no spinner at the bottom of the list).",
+        "- Show `Importar tareas y notas locales` only when there are local items (auth_provider.dart:112-117).",
+        "- Show a failed sync's error once; today it appears twice (:209-216 and :249-260).",
+        "- Confirm sign-out, which silently cancels every reminder on the phone: EN `Sign out? Reminders on this phone stop until you sign in again.` / ES `¿Cerrar sesión? Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.` / CA `Vols tancar la sessió? Deixaràs de rebre recordatoris en aquest telèfon fins que tornis a entrar.`, with the existing sign-out and cancel labels.",
+        "- `Detalles de conexión` stays until D13."
+      ],
+      "acceptance": [
+        "Widget test: Settings' first row is `Recordatorios`, reading `Desactivados` on a fresh account or `Activados · 10 minutos antes`; there's no `A TU GUSTO`, footer tagline or section label; one `Apariencia` row opens a sheet with Claro, Oscuro and Como el teléfono.",
+        "Widget test: the Hora y región screen is titled `Hora y región`, has no language picker, and lists `Buenos Aires` for America/Argentina/Buenos_Aires.",
+        "Widget test: Export shows the one line.",
+        "Widget test: Account shows `Guardado en tu cuenta`, no import row without local items, and asks before signing out.",
+        "From Calendar, reminders are two taps away (Ajustes, Recordatorios) without scrolling."
+      ],
+      "deviceChecks": [
+        "Spanish, 2× text, 320 dp wide: the Apariencia sheet's rows don't break mid-word."
+      ],
+      "dependsOn": ["P1", "P8"]
+    },
+    {
+      "id": "P19",
+      "title": "Voice review: fewer, clearer choices",
+      "area": "A",
+      "size": "L",
+      "severity": 2,
+      "findings": ["UX-110", "UX-116", "UX-117", "UX-113", "UX-124", "UX-127"],
+      "files": [
+        "App/lib/widgets/capture_review_editor.dart",
+        "App/lib/screens/review_tasks_screen.dart",
+        "App/lib/services/capture_processor.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/review_tasks_test.dart"
+      ],
+      "brief": [
+        "These fix the current review page. The result-in-the-sheet redesign (U4) waits on D3; these changes carry over if it's approved.",
+        "UX-110 (capture_review_editor.dart:150-211): when a question offers times (‘¿a las 5 de la mañana o de la tarde?’), show only the time chips plus EN `No time` / ES `Sin hora` / CA `Sense hora`. Drop `Cambiar este dato` there (the date row above already opens the editor), and don't offer the confirm that saves the task without the time the user said. For other questions, relabel the confirm (`reviewConfirmDetail`): EN `That's right` / ES `Así está bien` / CA `Així està bé`.",
+        "UX-116 (:282-321): show every open question on collapsed batch cards too — including title questions, so Save's `Revisa los datos de arriba` always points at something visible. Put ✕ (remove) on each collapsed card, and drop the pencil: tapping the title already expands the card.",
+        "UX-117 (review_tasks_screen.dart:335-344 and :381-391): when every draft has been removed, the pinned bottom button becomes an enabled EN `Done` / ES `Terminar` / CA `Fet` that finishes as today's link does; remove the small `Terminar` link.",
+        "UX-113 (capture_processor.dart:45-55; capture_review_editor.dart:316-320): a voice note's title is its first sentence, or about 60 characters cut at a word, not the whole transcript; the transcript stays in the body. Drop the `Usa un título breve…` hint.",
+        "UX-124: English `taskTitle` `Task Title` → `Task title`. `Ver lo que dije` shows only when the words came from speech; for typed or shared text use EN `Original text` / ES `Texto original` / CA `Text original`.",
+        "UX-127 (:466-468): the `Más opciones` summary lists only values that differ from the defaults (e.g. `Prioridad alta`, `Cada semana`); with none set, it has no summary. `Prioridad Baja · No se repite` goes.",
+        "Don't touch: the date row's layout and the project chip (U4, D3), the `Lista para cuando tú quieras` header (U11, D6), the save snackbar (done in P1)."
+      ],
+      "acceptance": [
+        "Widget test: an AM/PM question shows only `5:00`, `17:00` and `Sin hora`, with no `Cambiar este dato` and no confirm.",
+        "Widget test: a batch with a title question shows it on the collapsed card; every collapsed card has ✕ and no pencil.",
+        "Widget test: removing every draft leaves an enabled `Terminar` bottom button and no link.",
+        "Unit test: a 160-character spoken note gets a title of at most about 60 characters that ends at a word.",
+        "Widget test: typed text shows `Texto original`, speech shows `Ver lo que dije`; the English label reads `Task title`.",
+        "Render: the review previews (WRITE_REVIEW_PREVIEWS) re-render, and `Más opciones` no longer reads `Prioridad Baja · No se repite`."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P1", "P7"]
+    },
+    {
+      "id": "P20",
+      "title": "Native labels, share messages and shortcut icons",
+      "area": "A",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-121", "UX-119", "UX-125", "UX-420"],
+      "aliases": {"UX-121": ["UX-128", "UX-417"]},
+      "files": [
+        "App/android/app/src/main/res/values/strings.xml",
+        "App/android/app/src/main/res/values-es/strings.xml",
+        "App/android/app/src/main/res/values-ca/strings.xml",
+        "App/android/app/src/main/res/xml/capture_shortcuts.xml",
+        "App/android/app/src/main/res/drawable/ (two new vector icons)",
+        "App/android/app/src/main/kotlin/com/example/agenda/CaptureEntryBridge.kt",
+        "App/ios/Runner/en.lproj/InfoPlist.strings",
+        "App/ios/Runner/es.lproj/InfoPlist.strings",
+        "App/ios/Runner/ca.lproj/InfoPlist.strings",
+        "App/ios/Runner/Info.plist"
+      ],
+      "brief": [
+        "UX-121 (merged with UX-128 and UX-417; U11's native strings):",
+        "- The widget-picker description `capture_widget_description` is developer text (`…retained capture flow` / `…conserva las capturas pendientes`). Make it EN `Tap to say a task.` / ES `Toca para dictar una tarea.` / CA `Toca per dictar una tasca.`",
+        "- Spanish `capture_voice` `Dicta una tarea` → `Dictar una tarea`, to match the in-app button. English `Say a task` and Catalan `Dicta una tasca` already match.",
+        "- `capture_text` was renamed in P5 (UX-114), and the in-app stop control got one name in P2 (UX-109). Check both are in place.",
+        "UX-119: CaptureEntryBridge.kt:66, :71 and :82 show three toasts hard-coded in English. Move them to the three res/values*/strings.xml files and read them with getString:",
+        "1. Empty text or more than 4,000 characters: EN `TaskFlow accepts up to 4,000 characters. Share a shorter text.` / ES `TaskFlow admite hasta 4000 caracteres. Comparte un texto más corto.` / CA `TaskFlow admet fins a 4.000 caràcters. Comparteix un text més curt.` (Spanish and Catalan from the report; English is the organizer's.)",
+        "2. Too many shares waiting: EN `Open TaskFlow and finish what you shared before sharing more.` / ES `Abre TaskFlow y termina lo que ya has compartido antes de compartir más.` / CA `Obre TaskFlow i acaba el que ja has compartit abans de compartir-ne més.` (organizer's copy; avoids ‘captures’).",
+        "3. It couldn't be kept: EN `Couldn't save what you shared. Please share it again.` / ES `No se ha podido guardar lo que has compartido. Vuelve a compartirlo.` / CA `No s’ha pogut desar el que has compartit. Torna-ho a compartir.` (organizer's copy).",
+        "UX-125: both shortcuts use the app icon (capture_shortcuts.xml:2 and :6). Add two vector drawables — a microphone for `capture_voice` and a pencil for `capture_text`, drawn from the Material Symbols mic and edit paths in the brand teal on a light circle — and point the shortcuts at them.",
+        "UX-420: the iOS microphone prompt (`NSMicrophoneUsageDescription`, line 1 of each InfoPlist.strings, and the default in Info.plist) says ‘task draft’. Replace it with EN `TaskFlow listens only while you use the microphone, so you can say a task instead of typing it.` / ES `TaskFlow solo escucha mientras usas el micrófono, para que puedas dictar una tarea en lugar de escribirla.` / CA `TaskFlow només escolta mentre fas servir el micròfon, perquè puguis dictar una tasca en lloc d’escriure-la.` Leave `NSLocalNetworkUsageDescription`: development builds need it, and the report gives no replacement.",
+        "You can't build an APK in this loop: keep the Kotlin change small and obviously correct."
+      ],
+      "acceptance": [
+        "The three strings.xml files hold the new description, Spanish `capture_voice` reads `Dictar una tarea`, and the three share messages exist in all three languages; CaptureEntryBridge.kt has no hard-coded user text.",
+        "capture_shortcuts.xml points at the two new drawables, which are valid vector XML.",
+        "The three InfoPlist.strings and Info.plist carry the new microphone text."
+      ],
+      "deviceChecks": [
+        "Long-press the launcher icon: a mic and a pencil, labelled `Dictar una tarea` and `Escribir una tarea`.",
+        "The widget picker's description reads `Toca para dictar una tarea.`",
+        "Phone in Spanish: share more than 4,000 characters to TaskFlow → the Spanish toast.",
+        "iOS, if built: the microphone prompt shows the new text."
+      ],
+      "dependsOn": ["P2", "P5"]
+    },
+    {
+      "id": "P21",
+      "title": "Task form: the title first, fewer words",
+      "area": "B",
+      "size": "L",
+      "severity": 2,
+      "findings": ["UX-215", "UX-216", "UX-222", "UX-227"],
+      "files": [
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/widgets/task_planning_control.dart",
+        "App/lib/widgets/checklist_editor.dart",
+        "App/lib/screens/calendar_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/task_creation_test.dart",
+        "App/test/planning_ui_test.dart",
+        "App/test/checklist_test.dart"
+      ],
+      "brief": [
+        "UX-215 (task_editor.dart:497-558 and :582-605):",
+        "- Delete the headline at the top (`onYourMind` / `fineTunePlan` / `wordsPlan` / `noteTitle`) and the help line under it (`giveName` / `checkBeforeAdd` / `notesHelp`). Keep `seriesEdits` for repeating tasks only: it warns that the edit changes the whole series.",
+        "- Hide the project row (TaskAssignmentPicker) until the user has at least one project.",
+        "- Drop the `Nueva tarea` / `Nota` choice (:532-557); Notes has its own `Nueva nota` (UX_REVIEW §5.1).",
+        "- Autofocus the title when creating.",
+        "- Result: above the title, 10 targets become 6 and 2 decisions become 0. The reviewer's later step — one task form built on the review layout — isn't in this plan: it overlaps U4 (D3). App/docs/DESIGN.md's ‘one shared editor’ is out of date; don't edit docs.",
+        "UX-216 (`Más detalles`, task_editor.dart:759-1019; task_planning_control.dart:116-186):",
+        "- Order by how often each is used: Recordatorio, Repetir and Pasos first, then duration, deadline, priority, labels and attachments.",
+        "- Delete the four help paragraphs, and write `MB` instead of `MiB` in user copy (`fileUploadHelp`, `fileLocalHelp`, `fileLimit`, and `requestError` → fileLimit).",
+        "- Without a date, show Repetir greyed out with EN `Add a date to repeat` / ES `Añade una fecha para repetir` / CA `Afegeix una data per repetir`; today it disappears.",
+        "- Target: about 100 words down to about 30.",
+        "UX-222 (checklist_editor.dart:18-55 and :136-143): replace the one-dialog-per-step flow with an inline add-step field (reuse the existing add-step label) that stays focused after Enter, and delete the dialog. Adding steps from the detail screen isn't part of this package.",
+        "UX-227 (polish):",
+        "- English `createTask` `Create Task` → `Create task`. (`Task Title` was fixed in P19.)",
+        "- English `labelLimit` `…under 33 characters` → `…up to 32 characters`; Catalan `de menys de 33 caràcters` → `de fins a 32 caràcters`.",
+        "- The summary chips under `Más detalles` (task_editor.dart:726-749) look tappable but aren't: show them as plain text.",
+        "- Remove `Quitar fecha` (:683-687); the date sheet's `Sin fecha` does the same.",
+        "- Catalan `Reprograma` → `Canvia la data` (`reschedule`), `Reprograma la tasca` → `Canvia la data de la tasca` (`rescheduleTask`), `Reprograma la tasca periòdica` → `Canvia la data de la tasca periòdica` (`rescheduleRepeating`).",
+        "- Calendar's paging (calendar_screen.dart:199-211) jumps without animation when MediaQuery.disableAnimations is on.",
+        "- `COMPLETADAS` above one task was fixed in P10."
+      ],
+      "acceptance": [
+        "Widget test: `Nueva tarea` from Calendar opens with the title focused, no headline, no help line, no task/note choice, and — with no projects — no project row.",
+        "Widget test: `Más detalles` lists Recordatorio, Repetir and Pasos first, shows no `MiB`, and without a date shows Repetir disabled with `Añade una fecha para repetir`.",
+        "Widget test: typing a step and pressing Enter adds it and keeps the field focused; no dialog opens.",
+        "ARB: English `Create task` and `up to 32 characters`; Catalan `Canvia la data`.",
+        "Widget test: with disableAnimations on, the week arrows change the week without animating."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P8", "P9", "P10", "P19"]
+    },
+    {
+      "id": "P22",
+      "title": "Spanish and Catalan copy slips",
+      "area": "B",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-225", "UX-122", "UX-123"],
+      "aliases": {"UX-225": ["UX-310"]},
+      "files": [
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/lib/widgets/task_editor.dart",
+        "App/lib/l10n/region.dart",
+        "App/lib/screens/calendar_screen.dart",
+        "App/test/localization_catalog_test.dart"
+      ],
+      "brief": [
+        "UX-225 (merged with UX-310): the Lista → Proyecto rename, committed in f0da53d, left artefacts.",
+        "1. `Proyecto de pasos` / `Projecte de passos` (`checklist`, `checklistSemantics`) → `Lista de pasos` / `Llista de passos` everywhere, including `notesEmptyHelp` (`lista de verificación` → `lista de pasos`). Spanish then has one name for a checklist. TalkBack reads `checklistSemantics`, and note tiles show `checklist` (notes_screen.dart:180).",
+        "2. Projects take masculine agreement in Spanish and Catalan: `Archivada` → `Archivado` / `Arxivada` → `Arxivat`; `Modificada` → `Modificado` / `Modificat`; `si ya no la necesitas` → `si ya no lo necesitas`; `Actualízala antes de eliminarla` → `Actualízalo antes de eliminarlo` / CA `Actualitza’l abans de suprimir-lo`; `un proyecto compartida` → `un proyecto compartido` / `compartit`. The report's lines: app_es.arb:179, 444, 645, 391, 539, 22, 23 and app_ca.arb:158, 423, 370, 517, 518, 23, 24. Check every use of a key first: a key that also labels a task or a note (feminine nouns) needs its own project key rather than a blanket change.",
+        "3. The tooltip `Remove {file}` is hard-coded in English (task_editor.dart:986). Add a key: EN `Remove {file}` / ES `Quitar {file}` / CA `Treu {file}`.",
+        "4. ICU plurals for `agendaCounts` (the current render reads `0 pendientes · 1 completadas`) and `repeatEvery` (`Cada 1 semanas · lun, mié`; region.dart:64 passes the unit in as a word — move the unit into the plural message, e.g. ES `{count, plural, one{Cada semana} other{Cada {count} semanas}}`).",
+        "5. Add a check to test/localization_catalog_test.dart that fails on `Proyecto de pasos`, `Projecte de passos` and `proyecto compartida`.",
+        "UX-122: Catalan buttons use imperatives: `reviewSaveOne` `Desar tasca` → `Desa la tasca`; `reviewEditDetail` `Canviar aquesta dada` → `Canvia aquesta dada`; `reviewRemove` `Treure d’aquesta captura` → `Treu d’aquesta captura`; `reviewRepair` `Corregir el text` → `Corregeix el text`. P19 already relabelled `reviewConfirmDetail`. Check the other Catalan review buttons for the same slip.",
+        "UX-123: `captureKeptForReview` needs ICU plurals in English and Catalan (Spanish has them): CA `{count, plural, one{1 pendent de revisar} other{{count} pendents de revisar}}`; EN `{count, plural, one{1 kept for review} other{{count} kept for review}}`."
+      ],
+      "acceptance": [
+        "grep in the ARB files: no `Proyecto de pasos`, `Projecte de passos` or `proyecto compartida`; localization_catalog_test.dart has the new check and passes.",
+        "Unit test: in Spanish, agendaCounts(1, 1) reads `1 pendiente · 1 completada`, and a weekly repeat with weekdays reads `Cada semana · lun, mié`.",
+        "The attachment remove tooltip is translated in all three languages.",
+        "The Catalan review buttons are imperatives; Catalan captureKeptForReview(1) reads `1 pendent de revisar`."
+      ],
+      "deviceChecks": [
+        "TalkBack in Spanish on a note with steps reads `Lista de pasos, 1 de 3 completados`."
+      ],
+      "dependsOn": ["P19", "P21"]
+    },
+    {
+      "id": "P23",
+      "title": "Back and reminders never strand you",
+      "area": "B",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-223", "UX-224"],
+      "aliases": {"UX-223": ["UX-410"]},
+      "files": [
+        "App/lib/screens/main_shell.dart",
+        "App/lib/main.dart",
+        "App/lib/screens/day_timeline_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/day_timeline_test.dart",
+        "a MainShell widget test"
+      ],
+      "brief": [
+        "UX-223 (merged with UX-410):",
+        "- Back on Tareas, Notas or Ajustes selects Calendario (a PopScope in MainShell, main_shell.dart:18-76). Back on Calendario leaves the app, as today.",
+        "- Tapping a reminder (main.dart:245-255) must never push a second MainShell. If the task exists, open it as today. If it doesn't (deleted, or the alert is stale), stay where the user is and show the existing `taskRemoved` (`Es posible que esta tarea se haya eliminado.`) through P1's helper. The reports differ on this case — B suggests the detail's `Tarea no disponible` state, D a new `Esta tarea se ha eliminado.` — but the alert can't always name a task id, and the existing hedged sentence is true in every case and adds no copy.",
+        "UX-224 (day timeline):",
+        "- Label the day arrows EN `Previous day` / `Next day`, ES `Día anterior` / `Día siguiente`, CA `Dia anterior` / `Dia següent` (they reuse `previousPeriod` / `nextPeriod`, `Mes o semana anterior`; day_timeline_screen.dart:94-105).",
+        "- Delete `timelineShortBlocks` (developer copy) and `timelineHelp` (:116, :171-172).",
+        "- The timeline's `+` create button (:242-246) stays until U8 (D3, D4)."
+      ],
+      "acceptance": [
+        "Widget test: MainShell on Tareas, system Back → Calendario is selected; on Calendario, Back pops.",
+        "Widget or unit test: a reminder open request whose task is gone doesn't push MainShell and shows `Es posible que esta tarea se haya eliminado.`",
+        "Widget test: the timeline arrows carry the day labels, and neither help paragraph is in the tree."
+      ],
+      "deviceChecks": [
+        "Delete a task that has a pending reminder, wait for the notification and tap it → the app opens on Calendar, with no duplicate, and shows the message; Back leaves the app."
+      ],
+      "dependsOn": ["P1"]
+    },
+    {
+      "id": "P24",
+      "title": "Project pages and Tareas show what's there",
+      "area": "C",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-314", "UX-315", "UX-219", "UX-333"],
+      "files": [
+        "App/lib/screens/home_screen.dart",
+        "App/lib/widgets/project_scope_control.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/project_ui_test.dart",
+        "App/test/task_lists_widget_test.dart"
+      ],
+      "brief": [
+        "UX-314: on view-only project pages (home_screen.dart:255-267), `Dictar una tarea` and `Nueva tarea` stay, and `Nueva tarea` quietly creates a personal task that doesn't appear on the page. Replace both buttons with the existing read-only line (`readOnlyList`, `Este proyecto es de solo lectura`, with the existing sentence that the owner manages editing access).",
+        "UX-315: project pages (home_screen.dart:41-45) inherit the global ‘For me’ filter, so a shared list hides tasks assigned to others, and toggling it inside a project changes Calendar too. Project pages show all their tasks by default, and a `Para mí` / `Todas` choice made on a project page applies to that page only: local state, not projectScopeProvider.",
+        "UX-219: on Tareas, when any filter is on (a chip other than Todas, a label, or a search) and nothing matches (:217-233), show the existing `noMatches` / `differentFilter` (`No hay tareas que coincidan` · `Prueba otra palabra o filtro.`) instead of `Un nuevo comienzo — Usa Dictar una tarea…`.",
+        "UX-333: remove the uppercase eyebrow labels (`everythingToDo`, `yourList`, `noDateNeeded`; :72-88) on Tareas, project and Inbox pages, and the headline on project and Inbox pages where it repeats the app-bar title. Keep the row's buttons (`Proyectos`, ✓). An archived project still needs a visible cue: show `archivedList` as a plain subtitle rather than an eyebrow.",
+        "Don't touch: the filter chips' names, including `Bandeja personal` (D6)."
+      ],
+      "acceptance": [
+        "Widget test: a viewer's project page shows the read-only line and no create buttons.",
+        "Widget test: a shared project's page lists tasks assigned to others by default; choosing `Para mí` there doesn't change Calendar's scope.",
+        "Widget test: Tareas filtered to `Prioridad alta` with no matches shows `No hay tareas que coincidan`.",
+        "Widget test: project and Inbox pages have no uppercase eyebrow and no headline repeating the title."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P12", "P13"]
+    },
+    {
+      "id": "P25",
+      "title": "One meaning per bell; readable Activity",
+      "area": "C",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-407", "UX-322", "UX-321"],
+      "files": [
+        "App/lib/screens/activity_screen.dart",
+        "App/lib/widgets/custom_app_bar.dart",
+        "App/lib/screens/home_screen.dart",
+        "App/lib/widgets/project_preferences.dart",
+        "App/lib/screens/list_sharing_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb"
+      ],
+      "brief": [
+        "UX-407 (and U10's ‘bell only with groups’): the header bell (activity_screen.dart:27-33, custom_app_bar.dart:53) opens Activity, while a bell means reminders everywhere else. Give the Activity button a people icon (Icons.groups_outlined) with the tooltip EN `Group activity` / ES `Actividad del grupo` / CA `Activitat del grup`, keeping the unread badge. Show it only when the user belongs to a group or has a shared project — the condition the `Para mí` / `Todas` chips already use (project_scope_control.dart:18-19).",
+        "UX-322: the project page has its own bell (home_screen.dart:121-126) for project updates. Remove it from the page. On the sharing screen of directly shared projects (ListSharingScreen), add a labelled row with the existing `projectNotifications` (`Novedades del proyecto`) that opens the same preferences sheet. Group projects keep the setting in the Projects ⋮ menu, because a group's page isn't per project.",
+        "UX-321 (activity_screen.dart:122-152):",
+        "- Each row leads with who did what: EN `Ana completed: Buy bread` / ES `Ana ha completado: Comprar pan` / CA `Ana ha completat: Comprar pa`, built as whole-sentence messages per action (check that every action reads naturally), with the subtitle `{project} · {date}` (e.g. `Física · 12 oct`). The report writes the Catalan with the personal article (`L’Ana`); the app can't know a name's article, so leave it out.",
+        "- Unread rows are bold and announced EN `Unread` / ES `No leída` / CA `No llegida` (Semantics), not shown only as a 16 px icon.",
+        "- Drop the help line at the top; the empty state keeps its sentence once."
+      ],
+      "acceptance": [
+        "Widget test: an account with no group and no shared project has no Activity button in the header; with one, the button shows a people icon and the tooltip `Actividad del grupo`.",
+        "Widget test: a shared project's page has no bell, and ListSharingScreen has `Novedades del proyecto`.",
+        "Widget test: an activity row reads `Ana ha completado: Comprar pan` with `Física · 12 oct`; unread rows are bold, with `No leída` in their semantics."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P13", "P15"]
+    },
+    {
+      "id": "P26",
+      "title": "Projects list: less noise; land on the new project",
+      "area": "C",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-327", "UX-329", "UX-332", "UX-334", "UX-338"],
+      "files": [
+        "App/lib/screens/task_lists_screen.dart",
+        "App/lib/screens/groups_screen.dart",
+        "App/lib/screens/list_sharing_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/task_lists_widget_test.dart"
+      ],
+      "brief": [
+        "UX-327: after `Guardar proyecto` (task_lists_screen.dart:159-180) — from Projects, or from a group page (groups_screen.dart:551-564, which today detours through a Projects screen filtered to the group) — open the new project's page (HomeScreen with its listId). Its empty state already says what to do next.",
+        "UX-329 (:314-361):",
+        "- Remove the `Proyectos` headline (the app bar says it) and the help line that repeats the empty state.",
+        "- Remove the `Actualizar proyectos e invitaciones` button: refresh when the screen opens (pull-to-refresh stays), and show the progress bar only when there's nothing to show yet, not as a flash over content every time.",
+        "- Show the search box only from 8 projects.",
+        "- Offline, show one retry line for both kinds of invitations; today two identical `Reintentar invitaciones` buttons appear (list_sharing_screen.dart:508-512, groups_screen.dart:718-721).",
+        "- Check that `Proyectos` next to `Grupos` doesn't break mid-word at 320 dp and 2× text.",
+        "UX-332 (:117-138): new projects are teal by default; drop the colour choice from the create dialog (it stays in `Editar proyecto`).",
+        "UX-334 (:379-391): the `★ ` pin mark becomes a pin icon announced EN `Pinned` / ES `Fijado` / CA `Fixat`; a directly shared row's subtitle becomes EN `Shared · {role}` / ES `Compartido · {role}` / CA `Compartit · {role}` instead of `Proyectos compartidos · Editor`; the item count counts open items only.",
+        "UX-338 (:91-115): when a group is chosen under ‘¿Dónde va este proyecto?’, show EN `Everyone in {group} will see it.` / ES `Todos en {group} lo verán.` / CA `Tothom a {group} el veurà.`"
+      ],
+      "acceptance": [
+        "Widget test: saving a new project lands on its page, from Projects and from a group page.",
+        "Widget test: a new account's Projects screen has no headline, help line, refresh button or search box (6 tap targets → 4).",
+        "Widget test: the create dialog has no colour chips; the edit dialog still has them.",
+        "Widget test: a pinned row is announced `Fijado`; a shared row reads `Compartido · Editor`; counts exclude completed items.",
+        "Widget test: choosing a group shows `Todos en Máster lo verán.`"
+      ],
+      "deviceChecks": [
+        "Spanish, 320 dp, 2× text: `Proyectos` and `Grupos` don't break mid-word."
+      ],
+      "dependsOn": ["P15"]
+    },
+    {
+      "id": "P27",
+      "title": "Groups: clear dialogs, errors and lists",
+      "area": "C",
+      "size": "L",
+      "severity": 2,
+      "findings": ["UX-319", "UX-320", "UX-328", "UX-330", "UX-336"],
+      "files": [
+        "App/lib/screens/groups_screen.dart",
+        "App/lib/screens/activity_screen.dart",
+        "App/lib/screens/list_sharing_screen.dart",
+        "App/lib/providers/groups_provider.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb"
+      ],
+      "brief": [
+        "UX-319 (groups_screen.dart:19-82 and :325-365): `groupTextDialog` serves every step with a `Guardar` button. Its button reads EN `Create group` / ES `Crear grupo` / CA `Crea el grup` when creating, and EN `Next` / ES `Siguiente` / CA `Següent` on an intermediate step (for example, invite → role). Errors: an empty name says EN `Enter a name.` / ES `Escribe un nombre.` / CA `Escriu un nom.`; a bad email uses the existing `enterEmailAddress`; never `Revisa los datos antes de añadirlos al calendario.` The role sheets get a title, EN `What can {name} do?` / ES `¿Qué puede hacer {name}?` / CA `Què pot fer {name}?`, and mark the current role.",
+        "UX-320: when Activity or a group page fails to load (activity_screen.dart:106-113; groups_screen.dart:422-430 and :315-319 reuse `groupActionError`, which says something couldn't be saved), show EN `Couldn't load. Check your connection.` / ES `No se ha podido cargar. Revisa la conexión.` / CA `No s’ha pogut carregar. Revisa la connexió.` with a Reintentar button. Route group action errors through `requestProblemText`, as list_sharing_screen.dart:241-243 does, so the server's reason shows (already a member, the 20-member limit).",
+        "UX-328: offline, the Groups list loads from cache, so `Nuevo grupo` looks usable; when creating a group or sending an invitation fails, the dialog closes and the typed name or email is lost (groups_screen.dart:117-155; list_sharing_screen.dart:203-205). Keep the dialog open, with the error shown inside it, until the request succeeds.",
+        "UX-330 (groups_screen.dart:465-532):",
+        "- Pending invitations under Members get a heading, EN `Invited` / ES `Invitados` / CA `Convidats`, and each row says EN `Pending` / ES `Pendiente` / CA `Pendent`.",
+        "- Move `Tu nombre para voz` from a prominent button into the member's own row menu, labelled EN `Name for voice assignments` / ES `Nombre para asignarte por voz` / CA `Nom per assignar-te per veu`. Members only: the server refuses it for the owner on purpose (Backend/core/group_views.py:194-195, ‘The group owner uses their account name for voice assignments’); changing that is server-side.",
+        "- On ListSharingScreen (:288-291), show each person's name first and the email second. The sharing endpoint returns only emails, so map user_id to names from the project's `people` (the lists data); fall back to the email.",
+        "UX-336 (:417): a group's page is titled with the group's name, not `Grupos`."
+      ],
+      "acceptance": [
+        "Widget tests: the create-group dialog's button reads `Crear grupo`; an empty name shows `Escribe un nombre.`; the role sheet is titled `¿Qué puede hacer Ana?` with the current role selected.",
+        "Widget test: a failed Activity load shows `No se ha podido cargar. Revisa la conexión.` and Reintentar.",
+        "Widget test: a failed group creation keeps the dialog open with the typed name and the error.",
+        "Widget test: the group page shows `Invitados` with `Pendiente` rows, the spoken-name action sits in the member's own row menu (and not for the owner), and the page is titled with the group's name; ListSharingScreen shows names first."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["P13", "P14"]
+    },
+    {
+      "id": "P28",
+      "title": "Text fields and tabs you can see",
+      "area": "D",
+      "size": "S",
+      "severity": 2,
+      "findings": ["UX-412", "UX-413", "UX-421"],
+      "files": [
+        "App/lib/theme/app_theme.dart",
+        "App/lib/screens/main_shell.dart",
+        "App/test/appearance_test.dart",
+        "App/test/calendar_feedback_test.dart"
+      ],
+      "brief": [
+        "UX-412: text-field outlines use `outlineVariant` (app_theme.dart:85-90): 1.28:1 on the white card, 1.51:1 in dark, below WCAG 1.4.11's 3:1. Use `colorScheme.outline` for the enabled border (3.79:1 light, 4.85:1 dark). Keep the palette.",
+        "UX-413 (app_theme.dart:118-126; main_shell.dart:57-71): style the tab labels by state — selected w800 in `onSurface`, unselected w500 in `onSurfaceVariant` — and give every tab an outlined/filled icon pair. Tareas and Ajustes show the same icon selected and unselected today: use, for example, `Icons.check_box_outlined` / `Icons.check_box` and `Icons.settings_outlined` / `Icons.settings`.",
+        "UX-421: tab labels go from 11 sp to 12 sp (Flutter caps their scaling at 1.3×)."
+      ],
+      "acceptance": [
+        "Code: the enabled InputDecoration border uses `outline`; the NavigationBar label style differs by state; every destination has a different icon and selectedIcon; the label font size is 12.",
+        "Render: in the calendar-feedback previews (light and dark) the selected tab is clearly different."
+      ],
+      "deviceChecks": [
+        "Catalan, 320 dp, 1.3× text: `Configuració` fits its tab (inferred from font metrics)."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P29",
+      "title": "Reminder notifications say when, and can be undone",
+      "area": "D",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-409", "UX-411"],
+      "files": [
+        "App/lib/services/reminder_engine.dart",
+        "App/lib/services/notification_service.dart",
+        "App/lib/services/reminder_copy.dart",
+        "App/lib/l10n/reminder_locale.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/reminder_engine_test.dart"
+      ],
+      "brief": [
+        "UX-409: notification bodies are relative and go stale (reminder_engine.dart:189-196 and :314): `Programada dentro de 10 minutos.` is wrong 20 minutes later, the deadline text doesn't say when, and after a snooze the body becomes `Tu tarea pospuesta.` Lead with the absolute time, in the alert's language and with the stored 12/24-hour choice:",
+        "- Timed: EN `Today at 5:00 PM · in 10 min` / ES `Hoy a las 17:00 · en 10 min` / CA `Avui a les 17:00 · d’aquí a 10 min`; tomorrow uses EN `Tomorrow` / ES `Mañana` / CA `Demà`; other days use P7's weekday date.",
+        "- Deadline: EN `Deadline: today at 5:00 PM` / ES `Fecha límite: hoy a las 17:00` / CA `Termini: avui a les 17:00`.",
+        "- Spanish and Catalan use the singular article at one o'clock: `a la 1:00`.",
+        "- After a snooze, repeat the original line instead of `Tu tarea pospuesta.`",
+        "UX-411: one mis-tap on Completar (beside Posponer 10 min, notification_service.dart:82-89; reminder_engine.dart:524-547) completes the task silently. After Completar, replace the notification for about 10 seconds with EN `Completed: {title}` / ES `Completada: {title}` / CA `Completada: {title}` and an action EN `Undo` / ES `Deshacer` / CA `Desfés` that reopens the task and restores its reminder (Android `timeoutAfter`). Posponer stays as it is."
+      ],
+      "acceptance": [
+        "Unit test (reminder_engine_test.dart): a timed alert's body in Spanish reads `Hoy a las 17:00 · en 10 min`; in English with a 12-hour clock `Today at 5:00 PM · in 10 min`; a snoozed alert repeats the original line; one o'clock uses `a la`.",
+        "Unit test: the complete action posts the undo notification, and its Undo reopens the task."
+      ],
+      "deviceChecks": [
+        "A reminder delivered 20 minutes late (phone idle) still reads `Hoy a las 17:00`.",
+        "Tap Completar on a notification → `Completada: …` with Deshacer; Deshacer reopens the task and the reminder comes back."
+      ],
+      "dependsOn": ["P7"]
+    },
+    {
+      "id": "P30",
+      "title": "Start fast; keep what you typed when the session ends",
+      "area": "D",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-419", "UX-424"],
+      "files": [
+        "App/lib/main.dart",
+        "App/lib/providers/auth_provider.dart",
+        "App/lib/services/reminder_engine.dart"
+      ],
+      "brief": [
+        "UX-424: startup waits for reminder setup before drawing the first frame (main.dart:46-53), and again before showing the signed-in app (auth_provider.dart:61-70), where reconciling can wait up to 10 s for a background job (reminder_engine.dart:265-274) behind a spinner with no text. Run reminder setup and reconciliation after the first frame, without blocking the signed-in app; reminders are still reconciled.",
+        "UX-419: when the session is invalidated (auth_provider.dart:39-43), the whole navigator is rebuilt (main.dart:293-315) and anything being typed is lost. Show sign-in over the current screen instead, and rebuild only if a different account signs in; when the same account signs back in, the user returns to where they were. The report marks this as inferred."
+      ],
+      "acceptance": [
+        "Widget test: with a slow fake reminder setup, the first frame renders before setup finishes.",
+        "Widget test: a session invalidation while TaskEditor holds text shows sign-in on top; signing in as the same account returns to the editor with the text."
+      ],
+      "deviceChecks": [
+        "Cold-start timing on a phone with reminders on (inferred).",
+        "Expire the session from the server while typing a task → after signing in again, the text is still there (inferred)."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "question": "Unfinished tasks from earlier days vanish from Today (S4). Carry them into Today under `Atrasadas · N` (with their date, counted in ‘pendientes’ and the Tareas ‘Hoy’ filter, a repeating task showing only its latest missed occurrence), or leave them on their date with one link `N sin hacer de días anteriores ›`?",
+      "findings": ["UX-201"],
+      "recommendation": "Carry them into Today. It's what other task apps do, and it needs no extra tap."
+    },
+    {
+      "id": "D2",
+      "question": "Reminders are off for every new account and only Ajustes asks for Android's permission (S4). (a) At the first saved task with a date, ask once ‘¿Quieres un recordatorio antes?’ — ‘Sí, recuérdamelo’ turns reminders on and asks Android in the same tap. (b) Once on, date-only tasks remind at 9:00 (an editable default). (c) Apply for Google Play's USE_EXACT_ALARM, allowed for calendar apps, so on-time reminders skip the ‘Alarmas y recordatorios’ screen?",
+      "findings": ["UX-401", "U12"],
+      "recommendation": "Yes to (a) and (b). (c) Yes if the Play listing presents TaskFlow as a calendar app; otherwise P8's one-sentence ask covers it. P8 ships without these: the chip says ‘Sin recordatorio · Activar’ and one tap turns reminders on."
+    },
+    {
+      "id": "D3",
+      "question": "Approve the capture direction in UX_REVIEW §3? Listening ends only on Done (U1, U2); capture opens as a sheet with one mic (U3); the result shows in that sheet with the date as its main line (U4); the calendar lands on the saved task (U5); ‘Guardar tal cual’ when the AI is slow or fails (U7); capture options leave the screen and the Task/Note choice goes, with a new Ajustes › Voz (U9).",
+      "findings": ["U1", "U2", "U3", "U4", "U5", "U7", "U9"],
+      "recommendation": "Approve it. At minimum approve U1 — the pause that stopped your father — and U5, which can reuse the landing P7 builds for typed saves. Approving also unblocks U8, U12, the timeline's ‘+’ (UX-224) and Discard folding into Cancel (UX-126)."
+    },
+    {
+      "id": "D4",
+      "question": "Pro and the single Add button: (a) once U8 leaves one ‘Añadir tarea’, should users without Pro get free typing in that sheet (local date parser) or the paywall? (b) Should the first few voice captures be free? (c) Is your father's account Pro or complimentary? (d) The Pro screen shows four secondary buttons — keep only ‘Ver suscripción’ and ‘Restaurar compras’ (UX-423)?",
+      "findings": ["U8", "UX-423 (Pro-screen part; the rest is in P18)"],
+      "recommendation": "(a) Free typing; voice and AI stay Pro. (b) Your pricing call. (c) Tell us: if it's Pro, the 10-minute test won't show the wall other newcomers meet. (d) Keep ‘Gestionar suscripción’ for paying users too, drop ‘Abrir suscripciones de la tienda’, and refresh the status automatically instead of ‘Actualizar estado’. P5 already lets the current Pro wall open the free typed editor; nothing paid changes."
+    },
+    {
+      "id": "D5",
+      "question": "Where should the sun–moon switch live? It's on 23 surfaces today: (a) Ajustes › Apariencia only (first run follows the phone), (b) the Calendar header only, or (c) the avatar menu.",
+      "findings": ["UX-406", "U10"],
+      "recommendation": "(a). P18 already makes Apariencia one row (Claro / Oscuro / Como el teléfono), which works with any answer. U10's limit of 15 tap targets also needs this and U8; P6 and P25 remove 6 targets meanwhile."
+    },
+    {
+      "id": "D6",
+      "question": "Names: (a) approve UX_REVIEW §5.4's renames — ‘Bandeja de entrada’ (no date) → ‘Sin fecha’, ‘Capturas pendientes’ → ‘Sin guardar’, drop ‘Lista para cuando tú quieras’; (b) call the no-project bucket ‘Personal’ (§5.4) or ‘Sin proyecto’ (UX-311)?; (c) keep ‘Proyectos’ (decided 2026-10-11) or call personal containers ‘Listas’ (report C)?",
+      "findings": ["U11", "UX-311"],
+      "recommendation": "(a) Yes. (b) ‘Sin proyecto’, with UX-311's new examples (‘Casa, Trabajo, Compras’) and the ‘Bandeja personal’ chip dropped from Tareas: ‘Personal’ would sit next to the ‘Proyectos personales’ section. (c) Keep ‘Proyectos’ unless your father stumbles on it."
+    },
+    {
+      "id": "D7",
+      "question": "Tabs and Settings: (a) two tabs, Calendario and Listas (search, Sin fecha, projects, Notes, Completed), with Ajustes behind the avatar — or does Notes keep its own tab? (b) If Notes stays, show ‘En Notas: 2’ when a search finds nothing (UX-331)? (c) Settings in six rows by need, with the rare ones in a new ‘Otros ajustes’ screen and ‘Tareas completadas’ moved to Tareas/Listas (UX-404)?",
+      "findings": ["U13", "UX-331", "UX-404 (grouping part; the rest is in P18)"],
+      "recommendation": "(a) Two tabs, after the capture fixes and the §7 test. (b) Only if Notes stays a tab. (c) Yes. P18 already puts Recordatorios first and removes the noise."
+    },
+    {
+      "id": "D8",
+      "question": "Sign-in order (U14): option 1, Google first with one line saying what TaskFlow does; or option 2, use the app before signing in?",
+      "findings": ["U14"],
+      "recommendation": "Option 1 now; revisit option 2 after the §7 test. P17's sign-in fixes apply either way. App/test/auth_gate_test.dart, which locks Google below the email form, changes with option 1."
+    },
+    {
+      "id": "D9",
+      "question": "Spoken tasks with no date ignore the day selected in the calendar (‘Nueva tarea’ uses it). Use the selected day, when it isn't today, for spoken tasks with no date?",
+      "findings": ["UX-112"],
+      "recommendation": "Yes. U3's sheet will need it anyway. A spoken time without a day needs the server."
+    },
+    {
+      "id": "D10",
+      "question": "Typed dates: ‘Dentista viernes 10:00’ saves on today unless the small ‘Usar vie, 17 oct · 10:00’ chip is tapped. Apply the understood date straight away, with ‘Dejar como está’ one tap away? (A code comment says suggestions are never applied automatically; it isn't a recorded decision.)",
+      "findings": ["UX-204"],
+      "recommendation": "Yes."
+    },
+    {
+      "id": "D11",
+      "question": "Delete: replace the ‘¿Eliminar?’ confirmation, whose filled button is Eliminar, with immediate delete and ‘Tarea eliminada · Deshacer’?",
+      "findings": ["UX-208"],
+      "recommendation": "Yes. Keep one confirmation only for deleting a whole repeating series, with ‘Conservar tarea’ as the filled button."
+    },
+    {
+      "id": "D12",
+      "question": "Back in the task form throws away what was typed. (a) Save it — a new task with a title, or an edit with changes — with ‘Cambios guardados · Deshacer’ (an empty form just closes), or (b) ask ‘¿Guardar esta tarea?’?",
+      "findings": ["UX-211"],
+      "recommendation": "(a), like the voice path: nothing is lost and there's no extra question."
+    },
+    {
+      "id": "D13",
+      "question": "Developer tools in release builds: hide ‘Diagnóstico de captura’ (P50/P95, a Settings row every user sees) and ‘Detalles de conexión’ (the server URL on Account)?",
+      "findings": ["UX-120", "UX-408 (connection-details part; the rest is in P18)"],
+      "recommendation": "Debug builds only, plus a long-press on the version line so you keep them on staging."
+    },
+    {
+      "id": "D14",
+      "question": "Invitations need a separately shared code because password sign-up doesn't verify the email (decided 2026-10-11); Google sign-in does. Let an invitee signed in with Google, whose email matches, join without the code? Nothing in this plan waits on it.",
+      "findings": ["UX-306 (related; planned in P14)"],
+      "recommendation": "Yes, for Google-verified matching emails; keep the code for password accounts. It needs a server change. P14 works either way."
+    },
+    {
+      "id": "D15",
+      "question": "Sharing: (a) should ‘Compartir’ on a project be the only door, creating or reusing a group behind the scenes, with Grupos as an advanced view? (b) Drop the Editor/Viewer choice from the invite dialog (everyone joins as an editor; the role can be changed on the person's row)?",
+      "findings": ["UX-305 (role-choice part; the rest is in P13)"],
+      "recommendation": "(a) Not now: P13 already puts ‘Compartir’ on the project page; revisit after the §7 test. (b) Yes."
+    }
+  ],
+  "skipped": [
+    {"id": "UX-128", "reason": "Duplicate: merged into UX-121 (native strings), fixed in P20."},
+    {"id": "UX-207", "reason": "Duplicate: merged into UX-101 (undo snackbars that never close), fixed in P1."},
+    {"id": "UX-310", "reason": "Duplicate: merged into UX-225 (‘Proyecto de pasos’ and the other Lista→Proyecto rename artefacts), fixed in P22. The rename was committed in f0da53d; report C calls it uncommitted."},
+    {"id": "UX-410", "reason": "Duplicate: merged into UX-223 (a second home screen after tapping a reminder for a deleted task), fixed in P23."},
+    {"id": "UX-414", "reason": "Duplicate: merged into UX-218 (‘server address’ in network errors), fixed in P6."},
+    {"id": "UX-417", "reason": "Duplicate: merged into UX-121 (native strings); the text-shortcut rename is done in P5 with UX-114, the rest in P20."}
+  ]
+}

@@ -1,0 +1,156 @@
+# UX issues
+
+The UX loop maintains this file (`/ux`). There is one line per issue, and the line moves to the section for its current status.
+
+- **Line format:** ID · severity (S1–S4; P0–P2 for UX_REVIEW items) · area · status · title · main `path:line` · the run that last changed it, then a short note.
+- **Areas:**
+  - A — voice capture;
+  - B — calendar, home and tasks;
+  - C — lists, notes, groups and sharing;
+  - D — first run, sign-in, settings, notifications, native surfaces and theme.
+- **Notes:** P# and D# are the packages and decisions in that run's `plan.md`. "Merged" lists the duplicates folded into a line.
+
+## Open
+- **U6** · P0 · A · open · No speech-aware extraction or recognizer biasing (the app side) · `App/lib/services/capture_processor.dart:84` · 2026-10-13-app · P3 (app side); the prompt change in Backend/core/ai.py is server-side; reviewer A: still open
+- **UX-101** · S3 · A · open · "Saved" bar never leaves; its only button undoes · `App/lib/screens/review_tasks_screen.dart:153` · 2026-10-13-app · P1; merged UX-207
+- **UX-102** · S3 · A · open · Leaving creates phantom "Capturas pendientes", even empty ones · `App/lib/screens/voice_task_screen.dart:397` · 2026-10-13-app · P5
+- **UX-103** · S3 · A · open · Capture errors show raw English and jargon, out of view · `App/lib/l10n/capture_messages.dart:35` · 2026-10-13-app · P4
+- **UX-104** · S3 · A · open · Listening stops whenever anything covers the app · `App/lib/screens/voice_task_screen.dart:576` · 2026-10-13-app · P2
+- **UX-105** · S3 · A · open · At large text, live words are off-screen · `App/lib/screens/voice_task_screen.dart:709` · 2026-10-13-app · P4
+- **UX-106** · S3 · A · open · Without Pro, every way into capture dead-ends · `App/lib/screens/voice_task_screen.dart:44` · 2026-10-13-app · P5
+- **UX-107** · S3 · A · open · A blocked microphone can't be fixed from the app · `App/lib/screens/voice_task_screen.dart:383` · 2026-10-13-app · P2
+- **UX-108** · S2 · A · open · Wrong status while capture starts · `App/lib/screens/voice_task_screen.dart:797` · 2026-10-13-app · P2
+- **UX-109** · S2 · A · open · TalkBack: listening auto-starts; no cues; mismatched mic labels · `App/lib/screens/voice_task_screen.dart:234` · 2026-10-13-app · P2
+- **UX-110** · S2 · A · open · AM/PM question shows four buttons · `App/lib/widgets/capture_review_editor.dart:150` · 2026-10-13-app · P19
+- **UX-111** · S2 · A · open · Review date has no weekday · `App/lib/widgets/task_schedule_label.dart:10` · 2026-10-13-app · P7
+- **UX-113** · S2 · A · open · Voice notes get the whole transcript as title · `App/lib/services/capture_processor.dart:45` · 2026-10-13-app · P19
+- **UX-114** · S2 · A · open · Typing entries open a mic-first screen · `App/lib/main.dart:177` · 2026-10-13-app · P5
+- **UX-115** · S2 · A · open · Speech language ignores the app; choice forgotten; raw code · `App/android/app/src/main/kotlin/com/example/agenda/NativeSpeechBridge.kt:51` · 2026-10-13-app · P2
+- **UX-116** · S2 · A · open · Batch cards hide questions and the remove button · `App/lib/widgets/capture_review_editor.dart:282` · 2026-10-13-app · P19
+- **UX-117** · S2 · A · open · Nothing left to review: disabled button, tiny exit · `App/lib/screens/review_tasks_screen.dart:335` · 2026-10-13-app · P19
+- **UX-118** · S2 · A · open · Notes flips the voice and typing button emphasis · `App/lib/screens/notes_screen.dart:138` · 2026-10-13-app · P16
+- **UX-119** · S2 · A · open · Share error messages are English-only · `App/android/app/src/main/kotlin/com/example/agenda/CaptureEntryBridge.kt:66` · 2026-10-13-app · P20
+- **UX-121** · S2 · A · open · Native labels and the stop button use inconsistent, technical names · `App/android/app/src/main/res/values-es/strings.xml:2` · 2026-10-13-app · P20 (in-app stop label in P2, text shortcut in P5); merged UX-128, UX-417; S1 → S2 on merging
+- **UX-122** · S1 · A · open · Catalan buttons mix infinitives and imperatives · `App/lib/l10n/app_ca.arb:20` · 2026-10-13-app · P22
+- **UX-123** · S1 · A · open · Missing plural in "kept for review" (English, Catalan) · `App/lib/l10n/app_en.arb:1226` · 2026-10-13-app · P22
+- **UX-124** · S1 · A · open · "Task Title" casing; "Ver lo que dije" for typed text · `App/lib/l10n/app_en.arb:232` · 2026-10-13-app · P19
+- **UX-125** · S1 · A · open · Both launcher shortcuts use the app icon · `App/android/app/src/main/res/xml/capture_shortcuts.xml:2` · 2026-10-13-app · P20
+- **UX-126** · S1 · A · open · Discard sits under the primary; its dialog favours Discard · `App/lib/screens/voice_task_screen.dart:949` · 2026-10-13-app · P4; folding it into Cancel waits on D3
+- **UX-127** · S1 · A · open · "Más opciones" lists default values as if chosen · `App/lib/widgets/capture_review_editor.dart:466` · 2026-10-13-app · P19
+- **UX-202** · S3 · B · open · Today's tasks start below the fold · `App/lib/screens/calendar_screen.dart:107` · 2026-10-13-app · P6
+- **UX-203** · S3 · B · open · The calendar stays on yesterday after midnight · `App/lib/screens/calendar_screen.dart:29` · 2026-10-13-app · P7
+- **UX-205** · S3 · B · open · After typing a task, nothing shows where it went · `App/lib/widgets/task_editor.dart:358` · 2026-10-13-app · P7
+- **UX-206** · S3 · B · open · A moved task vanishes; the message names no day · `App/lib/widgets/task_interactions.dart:80` · 2026-10-13-app · P9
+- **UX-209** · S3 · B · open · The reminder chip promises a reminder that can't fire · `App/lib/widgets/reminder_control.dart:49` · 2026-10-13-app · P8; includes UX-401's chip fix
+- **UX-210** · S3 · B · open · Reminder timing can only be changed through a ⋮ icon · `App/lib/widgets/reminder_control.dart:136` · 2026-10-13-app · P8
+- **UX-212** · S2 · B · open · Two date pickers and two repeat editors · `App/lib/widgets/task_interactions.dart:118` · 2026-10-13-app · P9
+- **UX-213** · S2 · B · open · A plain task's detail is mostly empty or default sections · `App/lib/screens/task_detail_screen.dart:152` · 2026-10-13-app · P10
+- **UX-214** · S2 · B · open · Detail date rows look tappable but aren't · `App/lib/screens/task_detail_screen.dart:433` · 2026-10-13-app · P10
+- **UX-215** · S2 · B · open · The typed task form asks questions before the title · `App/lib/widgets/task_editor.dart:497` · 2026-10-13-app · P21; the reviewer's later single task form isn't planned (overlaps U4)
+- **UX-216** · S2 · B · open · "Más detalles" opens eight things at once · `App/lib/widgets/task_editor.dart:759` · 2026-10-13-app · P21
+- **UX-217** · S2 · B · open · Phone-calendar events sit above the day's tasks · `App/lib/widgets/device_calendar_events.dart:26` · 2026-10-13-app · P6
+- **UX-218** · S2 · B · open · Offline shows a red error about a "server address" · `App/lib/screens/calendar_screen.dart:149` · 2026-10-13-app · P6; merged UX-414
+- **UX-219** · S2 · B · open · An empty filter looks like all tasks are gone · `App/lib/screens/home_screen.dart:217` · 2026-10-13-app · P24
+- **UX-220** · S2 · B · open · Completed tasks jump away; Completed list is oldest first · `App/lib/screens/calendar_screen.dart:87` · 2026-10-13-app · P7
+- **UX-221** · S2 · B · open · Typed and picked times have AM/PM traps · `App/lib/widgets/schedule_editor.dart:40` · 2026-10-13-app · P9
+- **UX-222** · S2 · B · open · Each checklist step needs its own dialog · `App/lib/widgets/checklist_editor.dart:18` · 2026-10-13-app · P21
+- **UX-223** · S2 · B · open · Back on a secondary tab closes the app · `App/lib/screens/main_shell.dart:18` · 2026-10-13-app · P23; merged UX-410
+- **UX-224** · S2 · B · open · Timeline: wrong arrow labels, developer copy, extra create button · `App/lib/screens/day_timeline_screen.dart:94` · 2026-10-13-app · P23; its "+" waits on U8 (D3, D4)
+- **UX-225** · S2 · B · open · Translation slips: "Proyecto de pasos", feminine forms, plurals · `App/lib/l10n/app_es.arb:179` · 2026-10-13-app · P22; merged UX-310
+- **UX-226** · S2 · B · open · Passed deadlines and calendar dots rely on colour alone · `App/lib/widgets/task_tile.dart:173` · 2026-10-13-app · P6
+- **UX-227** · S1 · B · open · Polish: casing, labels, Catalan wording, reduced motion · `App/lib/widgets/task_editor.dart:726` · 2026-10-13-app · P21 ("COMPLETADAS" in P10, "Task Title" in P19)
+- **UX-301** · S3 · C · open · Archive and Mute silently switch off a project's reminders · `App/lib/screens/task_lists_screen.dart:193` · 2026-10-13-app · P15
+- **UX-302** · S3 · C · open · One tap shares a private task, with no way back · `App/lib/widgets/task_list_picker.dart:49` · 2026-10-13-app · P12
+- **UX-303** · S3 · C · open · Search fails when Spanish or Catalan users skip accents · `App/lib/screens/notes_screen.dart:93` · 2026-10-13-app · P11
+- **UX-304** · S3 · C · open · Notes have no order; a new note lands anywhere · `App/lib/screens/notes_screen.dart:91` · 2026-10-13-app · P16
+- **UX-305** · S3 · C · open · Sharing is hidden behind ⋮ and missing from the project · `App/lib/screens/task_lists_screen.dart:402` · 2026-10-13-app · P13; removing the role choice waits on D15
+- **UX-306** · S3 · C · open · Invitees can't find invitations, then hit an unexplained code · `App/lib/screens/task_lists_screen.dart:344` · 2026-10-13-app · P14
+- **UX-307** · S3 · C · open · After joining, nothing shows what you joined · `App/lib/screens/invitation_review_screen.dart:67` · 2026-10-13-app · P14
+- **UX-308** · S3 · C · open · Projects hide behind an unlabelled icon; the picker dead-ends · `App/lib/screens/home_screen.dart:89` · 2026-10-13-app · P12
+- **UX-309** · S3 · C · open · A note can only be edited from a corner pencil · `App/lib/screens/task_detail_screen.dart:121` · 2026-10-13-app · P10
+- **UX-312** · S2 · C · open · Notes reuse wording written for tasks · `App/lib/screens/notes_screen.dart:104` · 2026-10-13-app · P16
+- **UX-313** · S2 · C · open · Dictating a note in a project ignores the project · `App/lib/screens/notes_screen.dart:150` · 2026-10-13-app · P16
+- **UX-314** · S2 · C · open · A view-only project page keeps its create buttons · `App/lib/screens/home_screen.dart:255` · 2026-10-13-app · P24
+- **UX-315** · S2 · C · open · Project pages inherit the global "For me" filter · `App/lib/screens/home_screen.dart:41` · 2026-10-13-app · P24
+- **UX-316** · S2 · C · open · Five different words for "the other people" · `App/lib/l10n/app_en.arb:1445` · 2026-10-13-app · P13
+- **UX-317** · S2 · C · open · Personal-project delete is hidden; destructive controls look normal · `App/lib/screens/list_sharing_screen.dart:369` · 2026-10-13-app · P15
+- **UX-318** · S2 · C · open · Tapping a pending invitation silently re-sends it · `App/lib/screens/list_sharing_screen.dart:332` · 2026-10-13-app · P13
+- **UX-319** · S2 · C · open · Group dialogs: "Save" on every step, wrong error text · `App/lib/screens/groups_screen.dart:19` · 2026-10-13-app · P27
+- **UX-320** · S2 · C · open · Load failures say "could not be saved" · `App/lib/screens/activity_screen.dart:106` · 2026-10-13-app · P27
+- **UX-321** · S2 · C · open · Activity rows put who did what last · `App/lib/screens/activity_screen.dart:137` · 2026-10-13-app · P25
+- **UX-322** · S2 · C · open · The bell means Activity and project updates · `App/lib/screens/home_screen.dart:121` · 2026-10-13-app · P25
+- **UX-323** · S2 · C · open · Notes' project filter is an unlabelled dropdown · `App/lib/screens/notes_screen.dart:70` · 2026-10-13-app · P16
+- **UX-324** · S2 · C · open · The project chip has no tap cue; warning repeats · `App/lib/widgets/task_list_picker.dart:32` · 2026-10-13-app · P12
+- **UX-325** · S2 · C · open · Assistant doubt about project or person shown as an error · `App/lib/widgets/task_assignment_picker.dart:173` · 2026-10-13-app · P12
+- **UX-326** · S2 · C · open · Invitation review copy; "Cancel" reads like reject · `App/lib/screens/invitation_review_screen.dart:129` · 2026-10-13-app · P14; the inviter's name is server-side
+- **UX-327** · S2 · C · open · No landing after creating a project · `App/lib/screens/task_lists_screen.dart:159` · 2026-10-13-app · P26
+- **UX-328** · S2 · C · open · Failed group and invite dialogs lose typed input · `App/lib/screens/groups_screen.dart:117` · 2026-10-13-app · P27
+- **UX-329** · S2 · C · open · Projects screen repeats itself and shows idle controls · `App/lib/screens/task_lists_screen.dart:314` · 2026-10-13-app · P26
+- **UX-330** · S2 · C · open · Group page: unlabelled invitations, spoken-name button; sharing shows emails · `App/lib/screens/groups_screen.dart:465` · 2026-10-13-app · P27; owners can't set a spoken name (a server rule)
+- **UX-332** · S1 · C · open · Choosing a colour is required to start a project · `App/lib/screens/task_lists_screen.dart:117` · 2026-10-13-app · P26
+- **UX-333** · S1 · C · open · Eyebrow labels and repeated headlines on project pages · `App/lib/screens/home_screen.dart:72` · 2026-10-13-app · P24
+- **UX-334** · S1 · C · open · Project rows: "black star", wrong subtitle, count includes done · `App/lib/screens/task_lists_screen.dart:379` · 2026-10-13-app · P26
+- **UX-335** · S1 · C · open · The Projects screen uses fixed snackbars · `App/lib/screens/task_lists_screen.dart:185` · 2026-10-13-app · P1
+- **UX-336** · S1 · C · open · A single group's page is titled "Groups" · `App/lib/screens/groups_screen.dart:417` · 2026-10-13-app · P27
+- **UX-337** · S1 · C · open · A permanent note-versus-task paragraph tops Notes · `App/lib/screens/notes_screen.dart:38` · 2026-10-13-app · P16
+- **UX-338** · S1 · C · open · No hint that a chosen group will see the project · `App/lib/screens/task_lists_screen.dart:91` · 2026-10-13-app · P26
+- **UX-339** · S1 · C · open · Owners see noise lines and empty section headings · `App/lib/screens/list_sharing_screen.dart:263` · 2026-10-13-app · P13
+- **UX-340** · S1 · C · open · Leaving or deleting closes the screen without a word · `App/lib/screens/list_sharing_screen.dart:125` · 2026-10-13-app · P15
+- **UX-402** · S3 · D · open · Signing in without an account is a dead end · `App/lib/screens/login_screen.dart:28` · 2026-10-13-app · P17
+- **UX-403** · S3 · D · open · Sign-up errors land below the fold at large text · `App/lib/screens/login_screen.dart:403` · 2026-10-13-app · P17
+- **UX-404** · S3 · D · open · Settings has 14 entries; Reminders is the 10th · `App/lib/screens/settings_screen.dart:23` · 2026-10-13-app · P18; the "Otros ajustes" grouping waits on D7, the diagnostics row on D13 (UX-120)
+- **UX-405** · S3 · D · open · On-time reminders take 7–8 steps and two system screens · `App/lib/screens/notification_settings_screen.dart:166` · 2026-10-13-app · P8; the USE_EXACT_ALARM question is in D2
+- **UX-407** · S2 · D · open · The bell means Activity in the header, reminders elsewhere · `App/lib/screens/activity_screen.dart:27` · 2026-10-13-app · P25
+- **UX-408** · S2 · D · open · Account: manual sync dominates; sign-out unconfirmed · `App/lib/screens/account_screen.dart:140` · 2026-10-13-app · P18; "Detalles de conexión" waits on D13
+- **UX-409** · S2 · D · open · Notification bodies are relative and go stale · `App/lib/services/reminder_engine.dart:189` · 2026-10-13-app · P29
+- **UX-411** · S2 · D · open · "Completar" on a notification can't be undone · `App/lib/services/notification_service.dart:82` · 2026-10-13-app · P29
+- **UX-412** · S2 · D · open · Text-field outlines are nearly invisible (1.28:1) · `App/lib/theme/app_theme.dart:85` · 2026-10-13-app · P28
+- **UX-413** · S2 · D · open · The selected tab is hard to tell apart · `App/lib/theme/app_theme.dart:118` · 2026-10-13-app · P28
+- **UX-415** · S2 · D · open · Sign-in modes: Back exits; recovery labels repeat · `App/lib/screens/login_screen.dart:50` · 2026-10-13-app · P17
+- **UX-416** · S2 · D · open · Snackbars ignore Android's accessibility timeout · `App/lib/screens/settings_screen.dart:184` · 2026-10-13-app · P1
+- **UX-418** · S2 · D · open · Theme tiles break mid-word at 2×; "Sistema" is jargon · `App/lib/screens/settings_screen.dart:52` · 2026-10-13-app · P18
+- **UX-419** · S2 · D · open · Session expiry wipes in-progress typing · `App/lib/main.dart:293` · 2026-10-13-app · P30
+- **UX-420** · S1 · D · open · iOS microphone prompt mentions a "task draft" · `App/ios/Runner/es.lproj/InfoPlist.strings:1` · 2026-10-13-app · P20
+- **UX-421** · S1 · D · open · Tab labels are 11 sp; Catalan overflows · `App/lib/theme/app_theme.dart:122` · 2026-10-13-app · P28
+- **UX-422** · S1 · D · open · Time & region: wrong title, second language picker, raw zones · `App/lib/screens/regional_settings_screen.dart:47` · 2026-10-13-app · P18
+- **UX-423** · S1 · D · open · Long export intro; four extra buttons on the Pro screen · `App/lib/screens/data_transfer_screen.dart:152` · 2026-10-13-app · P18 (export); the Pro screen's buttons wait on D4
+- **UX-424** · S1 · D · open · Startup waits for reminder setup · `App/lib/main.dart:46` · 2026-10-13-app · P30
+
+## Decision needed
+- **U1** · P0 · A · decision · The mic stops after a ~3 s pause · `App/android/app/src/main/kotlin/com/example/agenda/NativeSpeechBridge.kt:39` · 2026-10-13-app · D3, the capture direction (open in DECISIONS.md); reviewer A: still open — a one-shot session, and hesitating also shows a red banner
+- **U2** · P0 · A · decision · "Finished" means two things; automatic stops park the words · `App/lib/screens/voice_task_screen.dart:348` · 2026-10-13-app · D3; reviewer A: still open — three automatic stops park the words, and at 2× the continue button is below the fold
+- **U3** · P0 · A · decision · A second mic waits on a separate capture page · `App/lib/widgets/task_actions.dart:42` · 2026-10-13-app · D3; reviewer A: still open — no Cancel while listening
+- **U4** · P0 · A · decision · The result isn't in the same sheet, and the date isn't the hero · `App/lib/widgets/capture_review_editor.dart:373` · 2026-10-13-app · D3; reviewer A: still open — the date is the 4th row with no weekday; reviewer C: the project chip always shows "Bandeja personal"
+- **U5** · P0 · A · decision · After saving, the user isn't shown the task · `App/lib/screens/review_tasks_screen.dart:152` · 2026-10-13-app · D3; P7 builds the landing for typed saves that U5 can reuse; reviewer A: still open
+- **U7** · P0 · A · decision · No "Save as written" when the AI is slow or fails · `App/lib/screens/voice_task_screen.dart` · 2026-10-13-app · D3; reviewer A: still open — the app waits up to 100 s
+- **U8** · P1 · A · decision · Several creation buttons (3 on an empty day, 4 with the timeline) · `App/lib/widgets/task_actions.dart:39` · 2026-10-13-app · D3, D4; reviewers A, B, C: still open, also on Notes and project pages
+- **U9** · P1 · A · decision · Technical options on the capture screen · `App/lib/screens/voice_task_screen.dart:828` · 2026-10-13-app · D3; reviewer A: still open — options reset on every open, hold-to-talk is unreachable; reviewer D: no Ajustes › Voz
+- **U10** · P1 · B · decision · Home shows 25 tap targets for a new account (target ≤ 15) · `App/lib/screens/calendar_screen.dart:107` · 2026-10-13-app · D5 (with U8); reviewer B: still open at 25; reviewer C: partly advanced (For me/Team now conditional); P6 and P25 remove 6 targets
+- **U11** · P1 · C · decision · Naming: Inbox vs Personal inbox, "captures", "Lista para…" · `App/lib/l10n/app_en.arb:203` · 2026-10-13-app · D6; reviewers A–D: still open, native strings included (those are fixed in P5 and P20)
+- **U12** · P1 · D · decision · No learn-by-doing first run; notification permission timing · `App/lib/screens/notification_settings_screen.dart:105` · 2026-10-13-app · D2, D3; reviewer D: still open — no first-run code; the permission is asked only in Settings
+- **U13** · P2 · C · decision · Two tabs (Calendar + Lists), or Notes keeps its own tab · `App/lib/screens/main_shell.dart:51` · 2026-10-13-app · D7; reviewers C, D: undecided
+- **U14** · P2 · D · decision · Google sign-in first, or local use before sign-in · `App/lib/screens/login_screen.dart:353` · 2026-10-13-app · D8; reviewer D: undecided; auth_gate_test.dart locks Google below the form
+- **UX-112** · S2 · A · decision · Spoken tasks ignore the day selected in the calendar · `App/lib/screens/calendar_screen.dart:69` · 2026-10-13-app · D9
+- **UX-120** · S2 · A · decision · Capture diagnostics is a Settings row every user sees · `App/lib/screens/settings_screen.dart:262` · 2026-10-13-app · D13; merged UX-404's diagnostics part
+- **UX-201** · S4 · B · decision · Unfinished tasks from earlier days vanish from Today · `App/lib/screens/calendar_screen.dart:83` · 2026-10-13-app · D1 — carry over, or a link
+- **UX-204** · S3 · B · decision · Typed dates are ignored unless a small chip is tapped · `App/lib/widgets/task_editor.dart:462` · 2026-10-13-app · D10
+- **UX-208** · S3 · B · decision · Delete can't be undone, and Delete is the dominant button · `App/lib/screens/task_detail_screen.dart:30` · 2026-10-13-app · D11
+- **UX-211** · S3 · B · decision · Back in the task form drops what was typed · `App/lib/widgets/task_editor.dart:470` · 2026-10-13-app · D12
+- **UX-311** · S2 · C · decision · "Personal" collides: list examples, the no-project bucket, sections · `App/lib/l10n/app_en.arb:694` · 2026-10-13-app · D6
+- **UX-331** · S2 · C · decision · Search never crosses tasks and notes · `App/lib/screens/notes_screen.dart:93` · 2026-10-13-app · D7
+- **UX-401** · S4 · D · decision · Reminders off by default; nothing asks to turn them on · `App/lib/services/reminder_preferences.dart:12` · 2026-10-13-app · D2; the chip fix is merged into UX-209 (P8)
+- **UX-406** · S2 · D · decision · The theme toggle is on 23 surfaces · `App/lib/widgets/custom_app_bar.dart:11` · 2026-10-13-app · D5
+
+## Escalated
+
+## Device check
+
+## Verified
+
+## Won't fix
+- **UX-128** · S1 · A · wontfix · Widget picker description is developer jargon · `App/android/app/src/main/res/values/strings.xml:4` · 2026-10-13-app · duplicate, merged into UX-121 (P20)
+- **UX-207** · S3 · B · wontfix · Undo bars never go away, and one Undo does nothing · `App/lib/widgets/task_interactions.dart:79` · 2026-10-13-app · duplicate, merged into UX-101 (P1)
+- **UX-310** · S2 · C · wontfix · The Lista→Proyecto rename broke Spanish and Catalan text · `App/lib/l10n/app_es.arb:179` · 2026-10-13-app · duplicate, merged into UX-225 (P22)
+- **UX-410** · S2 · D · wontfix · A reminder for a deleted task opens a second home · `App/lib/main.dart:245` · 2026-10-13-app · duplicate, merged into UX-223 (P23)
+- **UX-414** · S2 · D · wontfix · Network errors mention the server address · `App/lib/l10n/app_en.arb:40` · 2026-10-13-app · duplicate, merged into UX-218 (P6)
+- **UX-417** · S2 · D · wontfix · Android strings: jargon and mismatched names · `App/android/app/src/main/res/values-es/strings.xml:2` · 2026-10-13-app · duplicate, merged into UX-121 (P20; the text shortcut in P5)

@@ -1,0 +1,84 @@
+---
+name: screens-d-first-run-settings
+description: Screen and flow map for UX-loop area D (first run, sign-in, Settings, Account, Notificaciones and reminders, native surfaces, header and theme) as of 2026-10-13, with baseline counts
+metadata:
+  type: project
+---
+
+Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
+
+**Why:** reviews start faster from a current map, and the baselines supply the "before" numbers.
+**How to apply:** start area-D reviews here, and refresh this file whenever these screens change.
+
+## First run and sign-in
+- **Cold start** asks for nothing, but startup waits for reminder setup before the first frame.
+- **Sign-in is required** — the login wall, which U14 still has open. Shared and widget entries wait until there's an account.
+- **Login** (`lib/screens/login_screen.dart`):
+  - opens in sign-in mode, under slogan headings ("Tu día, más claro." / "Un espacio para tus planes.");
+  - email and password, a filled "Iniciar sesión", and the error banner below that button (a live region);
+  - "Crear una cuenta" is a text link, and switching modes clears the password;
+  - recovery takes 2 steps, both labelled "Continuar recuperación";
+  - Google comes last, below "o" — `test/auth_gate_test.dart` enforces that order;
+  - it has a language picker, which works before sign-in, and the sun–moon toggle;
+  - Back from create or recovery exits the app.
+- **Install → Calendar:** 5 actions by email, 3 with Google.
+- **First run:** nothing teaches the app. The notification permission is only ever asked from Settings.
+
+## Settings tab (`lib/screens/settings_screen.dart`, tab 4)
+- **14 entries in the body, in order:**
+  1. TaskFlow Pro;
+  2–4. the theme tiles Claro / Oscuro / Sistema;
+  5. Idioma;
+  6. "Hora y región" — the screen it opens is titled "Idioma y región", repeats the language picker, and has a capture time zone listed by raw IDs;
+  7. Calendarios del teléfono;
+  8. Captura desde la pantalla de inicio — it opens a system dialog and has no chevron;
+  9. Exportar e importar (`/dataTransfer`);
+  10. Notificaciones;
+  11. Cuenta y copia (`/account`);
+  12. Tareas completadas;
+  13. Diagnóstico de captura;
+  14. Licencias.
+- Also on the tab: the eyebrow "A TU GUSTO" and a footer tagline. About 150 words in all.
+- **Account:**
+  - "Vincular Google";
+  - a card with a filled "Sincronizar ahora" and a 40-word paragraph;
+  - "Importar tareas y notas locales", always shown;
+  - "Detalles de conexión", which shows the server URL;
+  - "Cerrar sesión" — no confirmation, and it cancels this phone's reminders.
+- **Notificaciones** (`lib/screens/notification_settings_screen.dart`):
+  - the master switch, off by default — the only place that asks for the OS permission;
+  - permission status, exact alarms (Android 14+), the default timing;
+  - check-ins labelled "Mañana" / "Tarde", the list of upcoming alerts, and "Actualizar y reintentar" (always shown);
+  - about 8 controls and 135 words.
+- **Subscription** (`/subscription`): four secondary buttons.
+
+## Reminders and notifications
+- **Turning reminders on from Calendar:** Ajustes → scroll → Notificaciones → the switch → the system dialog, plus exact alarms on Android 14+. That's 7–8 steps.
+- **Notification body:** relative time ("Programada dentro de 10 minutos").
+- **Notification actions:** Completar (no undo) and Posponer 10 min.
+- **Tapping a notification** opens the task detail, or a second MainShell if the task is gone.
+- The task-detail reminder chip and the off-by-default switch are described in [[ui-patterns]].
+
+## Native surfaces
+- **Android** (`android/app/src/main/res/values*/strings.xml`, `res/xml/capture_shortcuts.xml`):
+  - the widget "Dicta una tarea", whose picker description reads "…conserva las capturas pendientes";
+  - the shortcuts "Dicta una tarea" and "Captura texto", both using the app icon;
+  - the share entry, whose error toasts are hard-coded in English.
+- **iOS:**
+  - the microphone text says "…crear un borrador de tarea";
+  - the local-network text is written for developers.
+
+## Header and theme
+- **Header on every root tab:** a bell (Activity), the moon (theme) and the avatar (Account).
+- **The theme toggle** appears on about 23 surfaces: every `CustomAppBar`, plus login.
+- **Contrast:**
+  - text is fine — at least 5.7:1 in dark, 5.9–6.3:1 for primary text in light;
+  - field borders are 1.28:1, and the selected-tab pill is 1.20:1.
+
+## Baselines (2026-10-13)
+- **Settings:** 14 tap targets in the body (21 with the header and tabs), about 150 words. Notificaciones is 10th.
+- **Reminders on a new account:** 0 alerts by default, and 7–8 steps to get them on time.
+- **Theme toggle:** on 23 surfaces.
+- **Notificaciones:** 8 controls, about 135 words.
+
+Related: [[ui-patterns]], [[screens-a-voice-capture]].
