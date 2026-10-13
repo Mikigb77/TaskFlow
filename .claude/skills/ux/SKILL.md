@@ -106,12 +106,12 @@ When it returns:
 1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the round's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
 2. **Run the workflow.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, skip, only, notes }`. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
 3. **When it returns:**
-   - **`gatePassed` is true:** commit the round.
+   - **`testsPassed` is true:** commit the round.
      - Stage it: `git add -- <filesChanged> .claude/ux-review .claude/agent-memory`.
      - Subject: `UX loop <run id>: <n> fixes verified`.
      - Body: the verified IDs, then the IDs still open, each with a short reason.
      - End with the attribution line.
-   - **`gatePassed` is false:** don't commit. Tell the owner which checks fail, and that the changes are left uncommitted for them to look at.
+   - **`testsPassed` is false:** don't commit. Tell the owner which checks fail, and that the changes are left uncommitted for them to look at.
    - Either way, run `bash .claude/ux-review/ux.sh save` afterwards.
 
 Never push. Never commit on `main`. Never skip hooks.
@@ -127,7 +127,7 @@ Keep it short; the details live in `report.md`.
 
 ## Size and cost
 
-- **Scoped run, one area:** 1 reviewer, 1 organizer, 1–3 implementers, 1 gate, 1 verifier, 2 recording steps. That's about 7 agents.
-- **Whole app:** 4 reviewers and 1 organizer, then one implementer per approved package, a gate per round, and one verifier per area touched. A large plan can take hours.
+- **Scoped run, one area:** 1 reviewer, 1 organizer, 1–3 implementers, 1 tester, 1 verifier, 2 recording steps. That's about 7–8 agents.
+- **Whole app:** 4 reviewers and 1 organizer, then one implementer per approved package, one tester per round, and one verifier per area touched. A large plan can take hours.
 
 Models and effort are set in each agent's frontmatter in `.claude/agents/`.

@@ -1,6 +1,6 @@
 ---
 name: ux-implementer
-description: Implements one work package from TaskFlow's UX loop plan in the Flutter app — the code, the copy in English, Spanish and Catalan, l10n generation, the analyzer, tests and fresh previews — then reports exactly what changed. Also runs the loop's gate. Used by the ux-fix workflow.
+description: Implements one work package from TaskFlow's UX loop plan in the Flutter app — the code, the copy in English, Spanish and Catalan, l10n generation, the analyzer, the existing tests it affects and fresh previews — then reports exactly what changed. Used by the ux-fix workflow; ux-tester writes the acceptance tests afterwards.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: opus
 effort: high
@@ -35,8 +35,8 @@ Implementers run one at a time, so you may run Flutter commands. Earlier package
   - Remove any ARB key your change leaves unused.
   - Never edit `lib/l10n/generated/`.
 - **Tests:**
-  - Update a test only when your change breaks it for the right reason.
-  - When an acceptance check names a widget or unit test, add that test.
+  - Keep the existing tests that cover your change passing. Update one only when your change breaks it for the right reason.
+  - Don't write the acceptance tests yourself. `ux-tester` writes them after you, from the plan, so that the code and its proof come from different hands.
 - **Layout:** check Spanish and Catalan at 2× text and 320 dp width by reasoning through the constraints. If the brief asks for a preview, add or update it.
 
 # Checks
@@ -49,17 +49,6 @@ Run all of these from `App/`:
 4. If a preview test covers a screen you touched, re-run that preview. The commands are in CLAUDE.md. Sign-in PNGs land in `App/artifacts/auth/`; all others land in `App/build/`.
 
 Fix whatever fails. If something fails for a reason outside your package, report it rather than fixing unrelated code.
-
-# Gate mode
-
-When the delegation says **gate**, you aren't implementing a package. Instead:
-
-1. Run `flutter gen-l10n` if any ARB file changed this round.
-2. Run `flutter analyze --no-pub`.
-3. Run the whole `flutter test --no-pub`.
-4. Run all three preview commands from CLAUDE.md.
-5. Compare failures against `.claude/ux-review/KNOWN_FAILURES.md`. Failures listed there don't count against the round.
-6. Fix any other failure that this round's changes caused; the delegation lists the files changed. Report anything else.
 
 # Never
 

@@ -29,7 +29,11 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
    - sends product decisions to you;
    - groups the fixes into work packages, each with an exact brief.
 4. **Fix.** `ux-implementer` (Opus, high effort) works through the packages one at a time. Each one changes the code, the copy in all three languages, and the tests, then checks its own work.
-5. **Gate.** The whole test suite and the screen previews run once per round.
+5. **Test.** `ux-tester` (Opus, high effort) runs once per round.
+   - It writes a test for every acceptance check a test can prove, working from the plan rather than the code, so the fix and its proof come from different hands.
+   - It then runs the analyzer, the whole suite and the previews.
+   - If a test fails because the app falls short, that finding counts as not fixed, whatever the reviewer says.
+   - Every fix that passes stays protected by its test.
 6. **Verify.** The reviewer checks only the findings just fixed and the files just changed.
 7. **Re-plan.** Anything that failed goes back to the organizer, for at most 2 more rounds. A finding that fails twice comes to you instead.
 8. **Record.** The issue log and the run report are updated, and the reviewer updates its memory. If the gate passed, the round is committed on `dev`. The snapshot then moves forward.
@@ -59,6 +63,6 @@ The other pieces:
 ## Cost
 
 - **Scoped run** (one area): about 7 agents.
-- **Whole-app run:** 4 reviewers and an organizer, then one implementer per package you approve, plus one verifier per area each round.
+- **Whole-app run:** 4 reviewers and an organizer, then one implementer per package you approve, plus, each round, one tester and one verifier per area.
 
 To change a model or an effort level, edit the agent's frontmatter.

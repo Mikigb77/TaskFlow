@@ -64,7 +64,7 @@ Input: the reviewer report files, the run folder, the run mode (changes, screens
    - the exact copy in English, Spanish and Catalan, taken from the reports;
    - what not to touch.
    - Settle any conflict between reports here. When a report says "needs Catalan translation", write the Catalan only if you're confident; otherwise give English and Spanish and say so.
-   - `acceptance` lists checks the reviewer can confirm from the code or a render. Device-only checks go in `deviceChecks`.
+   - `acceptance` lists checks the reviewer can confirm from the code or a render. `ux-tester` turns every one a widget or unit test can prove into a test. So write them as observable outcomes, with the screen, the state, the text size and the language: "At 2× text on 360×740, in Spanish, the newest words are visible while listening." Device-only checks go in `deviceChecks`.
 6. **Write `<run>/plan.json`**:
 
    ```json
@@ -86,7 +86,7 @@ Input: the reviewer report files, the run folder, the run mode (changes, screens
 
 ## replan
 
-Input: the findings the reviewer found not fixed or only partly fixed, with evidence; regressions; the gate result; the implementer notes; and how many times each finding has failed.
+Input: the findings the reviewer found not fixed or only partly fixed, with evidence; regressions; the failing tests from `ux-tester`; the round check's result; the implementer notes; and how many times each finding has failed.
 
 - Plan packages only for what failed. Each brief says what the last attempt did and why it failed.
 - A finding that has now failed twice is **escalated**, not re-planned: it goes to the owner with what was tried.
@@ -95,7 +95,7 @@ Input: the findings the reviewer found not fixed or only partly fixed, with evid
 
 ## close
 
-Input: everything from the fix run: rounds, implementer results, gate results, verification results, escalations and changed files.
+Input: everything from the fix run: rounds, implementer results, test results, verification results, escalations and changed files.
 
 1. Update every touched line in `ISSUES.md`:
    - `verified` (run ID, date);
@@ -109,7 +109,8 @@ Input: everything from the fix run: rounds, implementer results, gate results, v
    - escalations;
    - checks for the owner's phone;
    - the files changed;
-   - the rounds, with the gate result for each.
+   - which verified findings a test now protects;
+   - the rounds, with the test result for each.
 3. Return the structured summary.
 
 # Ledger format — `.claude/ux-review/ISSUES.md`
