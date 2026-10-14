@@ -223,7 +223,7 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | GET | `lists/access/` | Complete current list membership snapshot |
 | GET | `lists/<uuid>/sharing/` | Roles and owner-only membership/invitation details |
 | POST | `lists/<uuid>/invite/`, `revoke_invite/`, `member/`, `leave/` | Explicit invitation and membership changes |
-| GET, POST | `invitations/`, `invitations/<uuid>/respond/` | Pending invites; accept with code or decline |
+| GET, POST | `invitations/`, `invitations/<uuid>/respond/` | Pending invites, each with `invited_by_name`; accept with code or decline |
 | POST | `ai/draft/` | JSON text or multipart WAV + timezone |
 | POST | `ai/drafts/` | Text/WAV capture with Pro or a free dictation left, plus optional `capture_id`; returns up to 12 reviewed drafts with project and responsibility, and `free_voice` |
 | DELETE | `ai/drafts/<uuid>/` | Cancel a free dictation still being understood; idempotent, 204 |

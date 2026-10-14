@@ -59,6 +59,7 @@ class SharingTests(TestCase):
         self.assertEqual(self.d.get('/api/invitations/').data['invitations'], [])
         self.assertEqual(self.d.post(f'/api/invitations/{key}/respond/', {'decision': 'accept'}, format='json').status_code, 404)
         self.assertEqual(self.b.get('/api/invitations/').data['invitations'][0]['list_name'], 'Household')
+        self.assertEqual(self.b.get('/api/invitations/').data['invitations'][0]['invited_by_name'], 'sharing-owner')
         self.assertNotIn('code', self.b.get('/api/invitations/').data['invitations'][0])
         self.assertEqual(self.b.post(f'/api/invitations/{key}/respond/', {'decision': 'accept', 'code': 'wrong-code'}, format='json').status_code, 400)
         self.assertFalse(ListMembership.objects.exists())

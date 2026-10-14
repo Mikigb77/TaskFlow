@@ -50,6 +50,7 @@ class GroupInviteSerializer(serializers.Serializer):
 
 def invitation_data(invite):
     return {"id": str(invite.pk), "group_id": str(invite.group_id), "group_name": invite.group.name,
+            "invited_by_name": display_name(invite.invited_by) if invite.invited_by_id else None,
             "email": invite.email, "role": invite.role, "expires_at": invite.expires_at, "state": invite.state}
 
 
@@ -138,7 +139,7 @@ class TaskGroupViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
                 raise ValidationError("This person already belongs to the group.")
             group.invitations.filter(email=data["email"]).delete()
             code = secrets.token_urlsafe(18)
-            invitation = GroupInvitation.objects.create(group=group, **data,
+            invitation = GroupInvitation.objects.create(group=group, invited_by=request.user, **data,
                 code_digest=salted_hmac("group-invite", code, algorithm="sha256").hexdigest(),
                 expires_at=timezone.now() + timedelta(days=7))
             bump_group(group, projects)

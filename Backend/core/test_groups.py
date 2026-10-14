@@ -112,6 +112,7 @@ class GroupTests(TestCase):
         url = f"/api/group-invitations/{invited.data['id']}/respond/"
         pending = self.e.get("/api/group-invitations/").data["invitations"]
         self.assertEqual(pending[0]["group_name"], self.group.name)
+        self.assertEqual(pending[0]["invited_by_name"], "Admin")  # the admin who sent it, not the owner
         self.assertNotIn("code", pending[0])
         self.assertEqual(self.c.post(url, {"decision": "accept", "code": invited.data["code"]}, format="json").status_code, 404)
         self.assertEqual(self.e.post(url, {"decision": "accept", "code": "wrong"}, format="json").status_code, 400)

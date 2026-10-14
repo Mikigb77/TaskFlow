@@ -9,7 +9,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from .models import TaskList, ListMembership, ListInvitation, TaskGroup, ProjectPreference, User, Attachment
 from .serializers import TaskListSerializer
-from .list_access import visible_lists, require_list, require_group
+from .list_access import visible_lists, require_list, require_group, display_name
 from .attachment_views import delete_task_attachments, quota_files, storage_allows
 from .collaboration import clear_assignments, record_event
 from django.db.models import Sum
@@ -30,7 +30,9 @@ def bump(task_list):
 
 
 def invitation_data(invite):
+    # Only the list's owner can invite, so the owner is the sender.
     return {"id": str(invite.pk), "list_id": str(invite.task_list_id), "list_name": invite.task_list.name,
+            "invited_by_name": display_name(invite.task_list.owner),
             "email": invite.email, "role": invite.role, "expires_at": invite.expires_at, "state": invite.state}
 
 
