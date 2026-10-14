@@ -26,7 +26,11 @@ class InvitationCard extends StatelessWidget {
     child: ListTile(
       key: ValueKey('invitation-${invitation.id}'),
       leading: const Icon(Icons.mail_outline),
-      title: Text(context.l10n.invitedTo(invitation.name)),
+      title: Text(
+        invitation.sender == null
+            ? context.l10n.invitedTo(invitation.name)
+            : context.l10n.invitedByTo(invitation.sender!, invitation.name),
+      ),
       trailing: more > 0 ? Text(context.l10n.invitationsMore(more)) : null,
       onTap: () => openInvitation(context, invitation),
     ),

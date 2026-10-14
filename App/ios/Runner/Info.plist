@@ -5,7 +5,7 @@
     <key>UIBackgroundModes</key>
     <array><string>fetch</string></array>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Record your plans to create a task draft.</string>
+    <string>TaskFlow listens only while you use the microphone, so you can say a task instead of typing it.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Connect to your local TaskFlow backend.</string>
 	<key>CFBundleDevelopmentRegion</key>

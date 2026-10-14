@@ -684,6 +684,8 @@ void main() {
       await openOther(tester);
       final titles = [
         es.regionalFormats,
+        // P34: Voz, the speech options moved out of capture.
+        es.voiceSettings,
         es.deviceCalendars,
         es.homeCapture,
         es.exportImport,

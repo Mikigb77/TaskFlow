@@ -107,11 +107,114 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-485: ($language) deleting an empty group from its page lands on the previous screen with Grupo eliminado',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final api = await _open(
+          tester,
+          role: 'owner',
+          projectCount: 0,
+          language: language,
+        );
+        final delete = find.widgetWithText(ListTile, l.delete);
+        await tester.scrollUntilVisible(
+          delete,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(delete);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.widgetWithText(FilledButton, l.delete),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(api.calls.last.take(2), ['DELETE', 'groups/familia/']);
+        expect(find.byType(GroupScreen), findsNothing);
+        expect(find.byKey(const ValueKey('open-group')), findsOneWidget);
+        final message = find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(l.groupDeleted),
+        );
+        expect(message, findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-490: deleting a group in Catalan with Suprimeix lands on the screen underneath with Grup suprimit, the catalog’s word for delete',
+    (tester) async {
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(ca.delete, 'Suprimeix');
+      expect(ca.groupDeleted, 'Grup suprimit');
+      // The same verb as deleting a project.
+      expect(ca.groupDeleted, contains('suprimit'));
+      expect(ca.groupDeleted, isNot(contains('eliminat')));
+      final api = await _open(
+        tester,
+        role: 'owner',
+        projectCount: 0,
+        language: 'ca',
+      );
+      final delete = find.widgetWithText(ListTile, ca.delete);
+      await tester.scrollUntilVisible(
+        delete,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(delete);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(FilledButton, ca.delete),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(api.calls.last.take(2), ['DELETE', 'groups/familia/']);
+      expect(find.byType(GroupScreen), findsNothing);
+      expect(find.byKey(const ValueKey('open-group')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(ca.groupDeleted),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('eliminat'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UX-485: Grupo eliminado reads right in each language', () {
+    expect(es.groupDeleted, 'Grupo eliminado');
+    expect(
+      lookupAppLocalizations(const Locale('en')).groupDeleted,
+      'Group deleted',
+    );
+    expect(
+      lookupAppLocalizations(const Locale('ca')).groupDeleted,
+      'Grup suprimit',
+    );
+  });
 }
 
 /// Group `Familia` in Spanish, where this account has [role], opened from a
 /// page underneath so closing it can be seen.
-Future<_Groups> _open(WidgetTester tester, {required String role}) async {
+Future<_Groups> _open(
+  WidgetTester tester, {
+  required String role,
+  int projectCount = 1,
+  String language = 'es',
+}) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -135,7 +238,7 @@ Future<_Groups> _open(WidgetTester tester, {required String role}) async {
             'version': version,
             'role': role,
             'archived': archived,
-            'project_count': 1,
+            'project_count': projectCount,
             'people': [
               {'user_id': 1, 'name': 'Yo', 'role': role},
               if (role != 'owner')
@@ -158,7 +261,7 @@ Future<_Groups> _open(WidgetTester tester, {required String role}) async {
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
-        locale: const Locale('es'),
+        locale: Locale(language),
         theme: AppTheme.light,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -166,6 +269,7 @@ Future<_Groups> _open(WidgetTester tester, {required String role}) async {
           builder: (context) => Scaffold(
             body: Center(
               child: TextButton(
+                key: const ValueKey('open-group'),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute<void>(
@@ -180,7 +284,7 @@ Future<_Groups> _open(WidgetTester tester, {required String role}) async {
       ),
     ),
   );
-  await tester.tap(find.text('Abrir'));
+  await tester.tap(find.byKey(const ValueKey('open-group')));
   await tester.pumpAndSettle();
   return api;
 }

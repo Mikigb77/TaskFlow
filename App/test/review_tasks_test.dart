@@ -1394,7 +1394,9 @@ class _ListeningStore extends CaptureStore {
     String? source,
     DateTime? day,
     String? id,
+    String? language,
   }) async => session = CaptureSession(
+    language: language,
     id: 'preview-capture',
     ownerKey: ownerKey,
     timezone: timezone,

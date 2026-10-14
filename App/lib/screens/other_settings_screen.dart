@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/screens/voice_settings_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
@@ -30,6 +32,9 @@ class OtherSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
     final version = ref.watch(appVersionProvider).valueOrNull;
+    final speechLanguage = ref.watch(
+      regionalProvider.select((p) => p.speechLanguage),
+    );
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.otherSettings),
       body: ListView(
@@ -40,6 +45,13 @@ class OtherSettingsScreen extends ConsumerWidget {
             title: Text(context.l10n.regionalFormats),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => Navigator.pushNamed(context, '/region'),
+          ),
+          ListTile(
+            leading: Icon(Icons.mic_none_rounded, color: colors.primary),
+            title: Text(context.l10n.voiceSettings),
+            subtitle: Text(speechLanguageName(context, speechLanguage)),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.pushNamed(context, '/voiceSettings'),
           ),
           ListTile(
             leading: Icon(Icons.calendar_month_outlined, color: colors.primary),

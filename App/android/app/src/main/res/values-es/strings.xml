@@ -1,5 +1,9 @@
 <resources>
-    <string name="capture_voice">Dicta una tarea</string>
+    <string name="capture_voice">Dictar una tarea</string>
     <string name="capture_text">Escribir una tarea</string>
-    <string name="capture_widget_description">Abre TaskFlow para grabar una tarea. Usa el mismo permiso de micrófono y conserva las capturas pendientes.</string>
+    <string name="capture_widget_description">Toca para dictar una tarea.</string>
+    <string name="share_empty">No hay texto que añadir. Comparte un texto con TaskFlow.</string>
+    <string name="share_too_long">TaskFlow admite hasta 4000 caracteres. Comparte un texto más corto.</string>
+    <string name="share_queue_full">Abre TaskFlow y termina lo que ya has compartido antes de compartir más.</string>
+    <string name="share_not_saved">No se ha podido guardar lo que has compartido. Vuelve a compartirlo.</string>
 </resources>

@@ -1687,6 +1687,206 @@
    ]
   },
   {
+   "id": "P89",
+   "title": "Free dictations: free accounts get the mic while dictations are left",
+   "area": "A",
+   "size": "L",
+   "severity": 3,
+   "findings": [
+    "UX-497",
+    "UX-499"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/providers/auth_provider.dart",
+    "App/lib/providers/subscription_provider.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/services/capture_processor.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_task_screen_test.dart",
+    "App/test/capture_processor_test.dart"
+   ],
+   "brief": [
+    "Owner decision (DECISIONS.md, 2026-10-13 late: 'Free tier' and 'How the free tier works'): accounts without Pro get 10 free dictations a month, typing is never capped, and free accounts have a 100 MB total file space. The server half is done and committed (d40eae7, 8142f79). P89 to P92 are the app half: P89 voice, P90 running out, P91 file space, P92 the Pro screen. Read only the parts of .claude/ux-review/free-tier-plan.md and .claude/ux-review/free-tier-backend-notes.md named below; don't read the rest.",
+    "Read .claude/ux-review/free-tier-plan.md lines 226-252 ('Where to read the counts', 'When the sheet decides voice or typing') and lines 263-268 (capture_id and the cancel), the string drafts at lines 288-292, and .claude/ux-review/free-tier-backend-notes.md from '## For the app half, as built' to the end.",
+    "UX-497: `Account` parses `free_voice` {limit, left, resets_at} and `storage` {used_bytes, limit_bytes}. Both are nullable and saved with the session, so they work offline. Refresh them at start, on resume, and from every dictation's 200 or 402 body. One derived `voiceAvailable` provider: Pro or complimentary is true; otherwise `left > 0`, and once now >= resets_at a cached `left` counts as the full limit; with no block (an old server) it falls back to hasPro. The decision never waits on the network.",
+    "The mic follows `voiceAvailable`. Typed words go to the assistant only with Pro (`local: !pro && source != 'speech'`), so a free account's typed words are parsed on the phone and never count. Decide at the four moments in the plan: when the sheet opens, on 'Volver a decirlo', on widget and voice-shortcut entries (P39), and for the Añadir tarea icon (P38).",
+    "Show `freeVoiceLeft` (string 1 in the plan) on the result only when 3 or fewer are left. The copy says 'dictados', never 'tareas'.",
+    "UX-499: send `capture_id` (the capture session's UUID) with every AI request. A new attempt after a cancel must use a new `capture_id`, because the server refuses a cancelled ID for 5 minutes (8142f79). Send `DELETE ai/drafts/<capture_id>/` without waiting, and ignore the 409 `capture_cancelled` that follows, when the person taps 'Guardar tal cual' while the request is in flight, or when Cancel drops words that are being understood. Closing the sheet while it's understanding keeps the result in 'Sin guardar', so that dictation counts and no cancel is sent.",
+    "The speed bar (DECISIONS.md, top): for anyone with dictations left, capture stays exactly as fast as today, with no new taps, dialogs or waits."
+   ],
+   "acceptance": [
+    "A free account with dictations left sees the mic; its dictation request carries a capture_id, and the 200 body's free_voice updates the cached count.",
+    "A free account's typed words are parsed on the phone with no AI request; Pro and complimentary accounts behave as today.",
+    "With 3 or fewer left, the result shows the free-dictations-left line with correct plurals in EN, ES and CA; with more left, it shows nothing.",
+    "'Guardar tal cual' while understanding sends one DELETE for that capture_id and saves the words; the next dictation uses a new capture_id.",
+    "With no free_voice block, the mic follows hasPro; once now >= resets_at, a cached left of 0 counts as the full limit."
+   ],
+   "deviceChecks": [
+    "On a free account against the real server, dictate a task: it is understood, and the count on the Pro screen (after P92) goes down by one."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P90",
+   "title": "Free dictations used up: keep the words, type instead, say when more come",
+   "area": "A",
+   "size": "M",
+   "severity": 3,
+   "findings": [
+    "UX-498"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/services/capture_processor.dart",
+    "App/lib/screens/captures_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_task_screen_test.dart"
+   ],
+   "brief": [
+    "Owner decision (DECISIONS.md, 2026-10-13 late: 'Free tier' and 'How the free tier works'): accounts without Pro get 10 free dictations a month, typing is never capped, and free accounts have a 100 MB total file space. The server half is done and committed (d40eae7, 8142f79). P89 to P92 are the app half: P89 voice, P90 running out, P91 file space, P92 the Pro screen. Read only the parts of .claude/ux-review/free-tier-plan.md and .claude/ux-review/free-tier-backend-notes.md named below; don't read the rest.",
+    "Read .claude/ux-review/free-tier-plan.md lines 253-262 (the 0-left details and 'Handling free voice used up without losing words') and strings 2, 3, 8 and 9 at lines 293-301 and 315-321.",
+    "UX-498: at 0 left (cached), the sheet opens in typing with the used-up line (`freeVoiceUsedUp`, naming the local reset date) and 'Ver Pro' (`voiceProAction`), and never creates a recorder. This replaces P39's 'voice is Pro' line for free accounts. 'Seguir' continues an unsent dictation, so it stays allowed.",
+    "Map a 402 with code `free_voice_used_up` to a new `CaptureProblem.freeVoiceUsedUp`; keep `pro_required` as a legacy value with the same text. The capture is already kept with its words. After a 402, the sheet switches to typing with the phone's own transcript in the field, the used-up line, and P40's 'Guardar tal cual' (local parser). No second request is made. Write the 402 body's free_voice into the account cache.",
+    "A capture that is only a WAV recording can't be saved as written: it stays in 'Sin guardar' with `freeVoiceUsedUpRecording` (the reset date). A spoken capture reopened at 0 left opens the same way. A 503 `billing_unavailable` keeps today's 'try again' handling and never says 'used up'."
+   ],
+   "acceptance": [
+    "At 0 left, the sheet opens in typing with the used-up line naming the reset date (EN, ES, CA) and 'Ver Pro'; no recorder is created.",
+    "A 402 free_voice_used_up keeps the words in the typing field with 'Guardar tal cual', and no second request is made.",
+    "A WAV-only capture refused with 402 stays in Sin guardar with the recording line.",
+    "A 503 billing_unavailable shows the existing try-again message."
+   ],
+   "deviceChecks": [
+    "On a free account with 0 left, open capture from the app and from the home-screen widget: both open in typing with the used-up line and the reset date."
+   ],
+   "dependsOn": [
+    "P89"
+   ]
+  },
+  {
+   "id": "P91",
+   "title": "File space: a usage line near the cap; a refused file isn't sent again",
+   "area": "B",
+   "size": "M",
+   "severity": 3,
+   "findings": [
+    "UX-500"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/widgets/attachment_panel.dart",
+    "App/lib/services/attachment_sync.dart",
+    "App/lib/providers/auth_provider.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/attachment_panel_test.dart"
+   ],
+   "brief": [
+    "Owner decision (DECISIONS.md, 2026-10-13 late: 'Free tier' and 'How the free tier works'): accounts without Pro get 10 free dictations a month, typing is never capped, and free accounts have a 100 MB total file space. The server half is done and committed (d40eae7, 8142f79). P89 to P92 are the app half: P89 voice, P90 running out, P91 file space, P92 the Pro screen. Read only the parts of .claude/ux-review/free-tier-plan.md and .claude/ux-review/free-tier-backend-notes.md named below; don't read the rest.",
+    "Read .claude/ux-review/free-tier-plan.md lines 270-281 ('Attachment usage near the cap') and strings 4 to 6 at lines 302-313, plus the 'Uploads' part and the trap at the end of .claude/ux-review/free-tier-backend-notes.md: `requestProblem` reads any 400 whose body has a `code` as a recovery-code error, so don't route `storage_full` through it. The file names in this package are guesses: search for the attachment panel and the upload sync first.",
+    "UX-500: when an upload answers 400 `storage_full` (with `shared` true or false), store a stable token, not the English text. Background sync must not re-send that file; today it would re-upload up to 6 MiB on every task change. Re-send it only on its Retry, after the person removes a file, or when hasPro turns on.",
+    "In the attachment panel, for accounts without Pro: one usage line (`storageUsage`) once storage is at 80% or more; on a refused file, `storageFull` (the user's own space, with 'Ver Pro') or `storageFullShared` (a shared project's owner's space, without 'Ver Pro'). Refresh the account after a removal. No new screens or settings."
+   ],
+   "acceptance": [
+    "A storage_full answer marks the file refused with the own or the shared message, and the next background sync doesn't re-send it; its Retry does.",
+    "Removing a file, or Pro turning on, re-sends refused files.",
+    "At 80 of 100 MB the panel shows the usage line (EN, ES, CA); below 80%, and for Pro, it shows nothing.",
+    "storage_full never shows a recovery-code error."
+   ],
+   "deviceChecks": [
+    "On a free account near the cap, attach a photo that crosses it: the message names the cap. Remove a file and tap Retry: it uploads."
+   ],
+   "dependsOn": [
+    "P89"
+   ]
+  },
+  {
+   "id": "P44",
+   "title": "Account and TaskFlow Pro: the state in one line, fewer buttons",
+   "area": "D",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-408",
+    "UX-423"
+   ],
+   "files": [
+    "App/lib/screens/account_screen.dart",
+    "App/lib/providers/auth_provider.dart",
+    "App/lib/screens/subscription_screen.dart",
+    "App/lib/providers/subscription_provider.dart",
+    "App/lib/screens/data_transfer_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/account_regional_ui_test.dart",
+    "App/test/subscription_screen_test.dart",
+    "App/test/data_transfer_screen_test.dart"
+   ],
+   "brief": [
+    "These were P18's Account and Export parts; they moved here so P18 fits one sitting, and they now include decisions D13 (developer screens) and D4d (the Pro screen).",
+    "UX-408, Account (account_screen.dart:140-260):",
+    "- Replace the sync card and its 40-word paragraph with one status line, EN `Saved to your account` / ES `Guardado en tu cuenta` / CA `Desat al teu compte`, and a text button with the existing `Sincronizar ahora` that shows its own progress (no spinner at the bottom of the list).",
+    "- Show `Importar tareas y notas locales` only when there are local items (auth_provider.dart:112-117).",
+    "- Show a failed sync's error once; today it appears twice (:209-216 and :249-260).",
+    "- Confirm sign-out, which silently cancels every reminder on the phone: EN `Sign out? Reminders on this phone stop until you sign in again.` / ES `¿Cerrar sesión? Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.` / CA `Vols tancar la sessió? Deixaràs de rebre recordatoris en aquest telèfon fins que tornis a entrar.`, with the existing sign-out and cancel labels.",
+    "- D13: `Detalles de conexión` (:217-229, the server URL) shows only in debug builds (kDebugMode). On staging it is reached through the version line in Otros ajustes (P18).",
+    "UX-423, Export: replace the 45-word inventory (data_transfer_screen.dart:152-168; its Spanish says ‘proyectos de pasos’) with one line: EN `Save a copy of your tasks to a file, or bring tasks from Todoist.` / ES `Guarda una copia de tus tareas en un archivo o trae tareas de Todoist.` / CA `Desa una còpia de les tasques en un fitxer o porta tasques de Todoist.`",
+    "UX-423, TaskFlow Pro (subscription_screen.dart:176-213; D4d): keep `Ver suscripción` (`billingViewPlans`), `Restaurar compras` (`billingRestore`) and, for people who have bought it, `Gestionar suscripción` (`billingManage`). Remove `Abrir suscripciones de la tienda` (`billingOpenStore`, :197-201, and `_openStore` if unused) and `Actualizar estado` (`billingRefresh`, :202-207): the screen refreshes the status itself when it opens, and main.dart:120 already refreshes it when the app comes back to the foreground. Remove keys left unused. Prices, plans and what Pro includes don't change."
+   ],
+   "acceptance": [
+    "Widget test: Account shows `Guardado en tu cuenta`, no import row without local items, and asks before signing out; outside debug builds there is no `Detalles de conexión`.",
+    "Widget test: Export shows the one line.",
+    "Widget test: the Pro screen for a subscriber shows `Ver suscripción`, `Restaurar compras` and `Gestionar suscripción`, and no `Abrir suscripciones de la tienda` or `Actualizar estado`; for someone who hasn't bought it, no `Gestionar suscripción`.",
+    "Widget test: opening the Pro screen asks for a status refresh."
+   ],
+   "deviceChecks": [
+    "Staging: subscribe or restore, leave for the store and come back → the Pro screen shows the new status without a button."
+   ],
+   "dependsOn": [
+    "P1",
+    "P18"
+   ]
+  },
+  {
+   "id": "P92",
+   "title": "The Pro screen shows the free tier's numbers; Pro-only copy goes",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-501"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/subscription_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/subscription_screen_test.dart"
+   ],
+   "brief": [
+    "Owner decision (DECISIONS.md, 2026-10-13 late: 'Free tier' and 'How the free tier works'): accounts without Pro get 10 free dictations a month, typing is never capped, and free accounts have a 100 MB total file space. The server half is done and committed (d40eae7, 8142f79). P89 to P92 are the app half: P89 voice, P90 running out, P91 file space, P92 the Pro screen. Read only the parts of .claude/ux-review/free-tier-plan.md and .claude/ux-review/free-tier-backend-notes.md named below; don't read the rest.",
+    "UX-501: after P44's Pro screen, for accounts without Pro, show two plain lines from the cached account: the free dictations left this month with the reset date (draft: EN 'Free dictations: {left} of {limit} left this month. More on {date}.' / ES 'Dictados gratis: te quedan {left} de {limit} este mes. Más el {date}.' / CA 'Dictats gratuïts: et queden {left} de {limit} aquest mes. Més el {date}.'), and the file space used (reuse `storageUsage`). Pro and complimentary accounts show neither.",
+    "Change `billingTestMode` from 'unlocks voice and AI capture' to unlimited dictation and file space, in all three languages (.claude/ux-review/free-tier-plan.md string 7, line 314). Remove `voiceAccessUnavailable` (unused) and any key that P90 left unused, such as `voiceProRequired` and P39's Pro line. Don't promise 'unlimited' for anything else: the technical safeguards stay (DECISIONS.md)."
+   ],
+   "acceptance": [
+    "A free account's Pro screen shows the dictations-left line with the reset date and the file-space line, in EN, ES and CA; a Pro account shows neither.",
+    "billingTestMode no longer says Pro unlocks voice capture; removed keys are gone from the three ARB files and the analyzer is clean."
+   ],
+   "deviceChecks": [],
+   "dependsOn": [
+    "P44",
+    "P89"
+   ]
+  },
+  {
    "id": "P21",
    "title": "Task form: the title first, fewer words",
    "area": "B",
@@ -2215,52 +2415,29 @@
    ]
   },
   {
-   "id": "P44",
-   "title": "Account and TaskFlow Pro: the state in one line, fewer buttons",
-   "area": "D",
-   "size": "M",
-   "severity": 2,
+   "id": "P93",
+   "title": "Voz: one message after a failed set-up",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
    "findings": [
-    "UX-408",
-    "UX-423"
+    "UX-496"
    ],
+   "aliases": {},
    "files": [
-    "App/lib/screens/account_screen.dart",
-    "App/lib/providers/auth_provider.dart",
-    "App/lib/screens/subscription_screen.dart",
-    "App/lib/providers/subscription_provider.dart",
-    "App/lib/screens/data_transfer_screen.dart",
-    "App/lib/l10n/app_en.arb",
-    "App/lib/l10n/app_es.arb",
-    "App/lib/l10n/app_ca.arb",
-    "App/test/account_regional_ui_test.dart",
-    "App/test/subscription_screen_test.dart",
-    "App/test/data_transfer_screen_test.dart"
+    "App/lib/screens/voice_settings_screen.dart",
+    "App/test/voice_settings_test.dart"
    ],
    "brief": [
-    "These were P18's Account and Export parts; they moved here so P18 fits one sitting, and they now include decisions D13 (developer screens) and D4d (the Pro screen).",
-    "UX-408, Account (account_screen.dart:140-260):",
-    "- Replace the sync card and its 40-word paragraph with one status line, EN `Saved to your account` / ES `Guardado en tu cuenta` / CA `Desat al teu compte`, and a text button with the existing `Sincronizar ahora` that shows its own progress (no spinner at the bottom of the list).",
-    "- Show `Importar tareas y notas locales` only when there are local items (auth_provider.dart:112-117).",
-    "- Show a failed sync's error once; today it appears twice (:209-216 and :249-260).",
-    "- Confirm sign-out, which silently cancels every reminder on the phone: EN `Sign out? Reminders on this phone stop until you sign in again.` / ES `¿Cerrar sesión? Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.` / CA `Vols tancar la sessió? Deixaràs de rebre recordatoris en aquest telèfon fins que tornis a entrar.`, with the existing sign-out and cancel labels.",
-    "- D13: `Detalles de conexión` (:217-229, the server URL) shows only in debug builds (kDebugMode). On staging it is reached through the version line in Otros ajustes (P18).",
-    "UX-423, Export: replace the 45-word inventory (data_transfer_screen.dart:152-168; its Spanish says ‘proyectos de pasos’) with one line: EN `Save a copy of your tasks to a file, or bring tasks from Todoist.` / ES `Guarda una copia de tus tareas en un archivo o trae tareas de Todoist.` / CA `Desa una còpia de les tasques en un fitxer o porta tasques de Todoist.`",
-    "UX-423, TaskFlow Pro (subscription_screen.dart:176-213; D4d): keep `Ver suscripción` (`billingViewPlans`), `Restaurar compras` (`billingRestore`) and, for people who have bought it, `Gestionar suscripción` (`billingManage`). Remove `Abrir suscripciones de la tienda` (`billingOpenStore`, :197-201, and `_openStore` if unused) and `Actualizar estado` (`billingRefresh`, :202-207): the screen refreshes the status itself when it opens, and main.dart:120 already refreshes it when the app comes back to the foreground. Remove keys left unused. Prices, plans and what Pro includes don't change."
+    "UX-496 (verify-b6-r3-A, regression R3A-1 from P87): after a failed set-up of on-device speech, Voz says the same thing twice. Both `onDeviceUnavailable` and the `voiceSetupUnavailable` banner end '…así que TaskFlow lo hace en línea.', and the `Configurar…` button stays live (`voice_settings_screen.dart:162-190`).",
+    "The reviewer's fix: once set-up has failed, hide the set-up row (`Configurar…`, `Comprobar de nuevo`) and the `onDeviceUnavailable` line, and keep only the banner. No copy change."
    ],
    "acceptance": [
-    "Widget test: Account shows `Guardado en tu cuenta`, no import row without local items, and asks before signing out; outside debug builds there is no `Detalles de conexión`.",
-    "Widget test: Export shows the one line.",
-    "Widget test: the Pro screen for a subscriber shows `Ver suscripción`, `Restaurar compras` and `Gestionar suscripción`, and no `Abrir suscripciones de la tienda` or `Actualizar estado`; for someone who hasn't bought it, no `Gestionar suscripción`.",
-    "Widget test: opening the Pro screen asks for a status refresh."
+    "After a failed set-up, Voz shows the banner once, with no `onDeviceUnavailable` line and no `Configurar…` or `Comprobar de nuevo`.",
+    "Before any set-up attempt, Voz looks as it does today."
    ],
-   "deviceChecks": [
-    "Staging: subscribe or restore, leave for the store and come back → the Pro screen shows the new status without a button."
-   ],
-   "dependsOn": [
-    "P1",
-    "P18"
-   ]
+   "deviceChecks": [],
+   "dependsOn": []
   }
  ],
  "decisions": [

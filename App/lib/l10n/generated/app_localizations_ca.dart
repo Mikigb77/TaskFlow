@@ -656,10 +656,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get exportImport => 'Exporta i importa';
 
   @override
-  String get regionalSettingsHelp =>
-      'Idioma, rellotge, inici de setmana i fus horari de captura';
-
-  @override
   String get language => 'Idioma';
 
   @override
@@ -968,17 +964,26 @@ class AppLocalizationsCa extends AppLocalizations {
   String get recordingKept => 'Gravació conservada en aquest telèfon';
 
   @override
-  String get onDeviceTranscript => 'Transcripció en directe al dispositiu';
+  String get onDeviceTranscript => 'Al telèfon, mentre parles';
 
   @override
-  String get onlineAudio => 'Àudio desat · transcripció en línia';
+  String get onlineAudio => 'En línia, en acabar';
+
+  @override
+  String get speechMethod => 'Com es passa la veu a text';
 
   @override
   String get speechLanguage => 'Idioma de la veu';
 
   @override
+  String get voiceSettings => 'Veu';
+
+  @override
+  String get sameAsApp => 'Com l’aplicació';
+
+  @override
   String get onDeviceUnavailable =>
-      'El reconeixement de veu local no està disponible per a aquest idioma en aquest dispositiu. Grava àudio per processar-lo en línia o escriu.';
+      'Aquest telèfon no pot amb aquest idioma tot sol, així que TaskFlow ho fa en línia.';
 
   @override
   String get setUpSpeech => 'Configura el reconeixement de veu local';
@@ -1002,6 +1007,10 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get capturePrivacy =>
       'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. L’extracció de tasques amb IA necessita internet i envia les teves paraules a Google. L’àudio desat es transcriu en línia. Les captures pendents es queden al telèfon fins que les desis o descartis.';
+
+  @override
+  String get capturePrivacyLine =>
+      'Les paraules van per internet. Més a Configuració.';
 
   @override
   String get lookRight => 'Tot correcte?';
@@ -1437,6 +1446,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get passwordTooShort => 'Utilitza com a mínim 12 caràcters';
 
   @override
+  String get enterPassword => 'Introdueix la contrasenya';
+
+  @override
   String get showPassword => 'Mostra la contrasenya';
 
   @override
@@ -1456,6 +1468,9 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get createAccountWithEmail => 'Crea un compte amb aquest correu';
+
+  @override
+  String get signInWithEmail => 'Inicia la sessió amb aquest correu';
 
   @override
   String get backToSignIn => 'Torna a l’inici de sessió';
@@ -1792,6 +1807,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get projectDeleted => 'Projecte suprimit';
 
   @override
+  String get groupDeleted => 'Grup suprimit';
+
+  @override
   String get invitationCodeRequired => 'Enganxa el codi d’invitació complet.';
 
   @override
@@ -1814,6 +1832,11 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String invitedTo(String name) {
     return 'T’han convidat a $name · Mostra';
+  }
+
+  @override
+  String invitedByTo(String sender, String name) {
+    return '$sender et convida a «$name» · Mostra';
   }
 
   @override
@@ -2624,6 +2647,14 @@ class AppLocalizationsCa extends AppLocalizations {
       'S’ha demanat la configuració de veu. Segueix les indicacions d’Android i toca Torna a comprovar-ho. Mentrestant pots continuar escrivint.';
 
   @override
+  String get voiceSetupRequested =>
+      'Segueix els passos d’Android i després toca Torna a comprovar-ho.';
+
+  @override
+  String get voiceSetupUnavailable =>
+      'Aquest telèfon no ho pot configurar, així que TaskFlow ho fa en línia.';
+
+  @override
   String get captureSetupUnavailable =>
       'La configuració de veu no està disponible aquí. Utilitza àudio desat o escriu.';
 
@@ -3330,6 +3361,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get invitationReview => 'Revisa la invitació';
+
+  @override
+  String invitationFrom(String sender, String name) {
+    return '$sender et convida a «$name»';
+  }
 
   @override
   String get invitationReviewHelp =>

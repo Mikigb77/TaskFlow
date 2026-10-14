@@ -1,2 +1,2 @@
-"NSMicrophoneUsageDescription" = "Record your plans to create a task draft.";
+"NSMicrophoneUsageDescription" = "TaskFlow listens only while you use the microphone, so you can say a task instead of typing it.";
 "NSLocalNetworkUsageDescription" = "Connect to your local TaskFlow backend.";

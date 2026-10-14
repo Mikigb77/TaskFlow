@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/widgets/invitation_cards.dart';
@@ -112,6 +113,14 @@ class _InvitationReviewScreenState
       _error is ApiException &&
       (_error as ApiException).status == 404;
 
+  /// The first line: who invited you to what, or just what when the
+  /// server doesn't say who.
+  String _headline(Map details) {
+    final name = (details['group_name'] ?? details['list_name']) as String;
+    final sender = invitationSender(details);
+    return sender == null ? name : context.l10n.invitationFrom(sender, name);
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = context.l10n;
@@ -138,8 +147,7 @@ class _InvitationReviewScreenState
                   else ...[
                     if (_details != null) ...[
                       Text(
-                        (_details!['group_name'] ?? _details!['list_name'])
-                            as String,
+                        _headline(_details!),
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 12),

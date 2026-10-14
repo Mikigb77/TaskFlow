@@ -157,6 +157,7 @@ class CaptureProcessor {
           'source': existing.audioPath != null
               ? 'speech'
               : existing.source ?? 'typed',
+          if (existing.language != null) 'language': existing.language,
         },
       );
       final response = Map<String, dynamic>.from(raw as Map);

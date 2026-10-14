@@ -153,7 +153,9 @@ class MemoryCaptures extends CaptureStore {
     String? source,
     DateTime? day,
     String? id,
+    String? language,
   }) async => current = CaptureSession(
+    language: language,
     id: 'memory-capture',
     ownerKey: ownerKey,
     timezone: timezone,

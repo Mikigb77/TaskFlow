@@ -578,6 +578,444 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- P77 (UX-484): sign-in asks only for a password; a used email
+  // offers sign-in ----
+
+  String? passwordError(WidgetTester tester) => tester
+      .widget<TextField>(
+        find.descendant(of: password, matching: find.byType(TextField)),
+      )
+      .decoration!
+      .errorText;
+
+  testWidgets(
+    'UX-484: in sign-in mode a 6-character password is sent with no 12-character message; wrong credentials then offer Crear una cuenta con este correo with the email kept',
+    (tester) async {
+      final api = await openSpanish(
+        tester,
+        api: _LoginApi(
+          signInError: ApiException(
+            401,
+            'No active account found with the given credentials',
+          ),
+        ),
+      );
+      expect(find.text(es.signInHeading), findsOneWidget);
+      // An empty password is still refused, without reaching the server.
+      await tester.enterText(email, 'nueva@example.invalid');
+      await tapVisible(tester, submit);
+      expect(api.signIns, isEmpty);
+      expect(passwordError(tester), isNotNull);
+      expect(passwordError(tester), isNot(es.passwordTooShort));
+      // A short everyday password goes to the server.
+      await tester.enterText(password, 'abc123');
+      await tapVisible(tester, submit);
+      expect(api.signIns.single, ('nueva@example.invalid', false));
+      expect(find.text(es.passwordTooShort), findsNothing);
+      expect(passwordError(tester), isNot(es.passwordTooShort));
+      expect(find.text(es.requestError('credentials')), findsOneWidget);
+      final create = find.byKey(const ValueKey('create-account-with-email'));
+      expect(
+        find.descendant(
+          of: create,
+          matching: find.text(es.createAccountWithEmail),
+        ),
+        findsOneWidget,
+      );
+      await tapVisible(tester, create);
+      expect(find.text(es.registerHeading), findsOneWidget);
+      expect(typed(tester, email), 'nueva@example.invalid');
+      // Creating the account then asks for 12 characters.
+      await tapVisible(tester, submit);
+      expect(api.signIns, hasLength(1));
+      expect(passwordError(tester), es.passwordTooShort);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-484: in create mode a password under 12 characters is still refused with Usa al menos 12 caracteres',
+    (tester) async {
+      expect(es.passwordTooShort, 'Usa al menos 12 caracteres');
+      final api = await openSpanish(tester);
+      await tapVisible(tester, find.text(es.createAnAccount));
+      expect(find.text(es.registerHeading), findsOneWidget);
+      await tester.enterText(email, 'ana@example.invalid');
+      await tester.enterText(password, 'clave-11chr');
+      expect('clave-11chr'.length, 11);
+      await tapVisible(tester, submit);
+      expect(api.signIns, isEmpty);
+      expect(passwordError(tester), es.passwordTooShort);
+      expect(
+        find.descendant(of: password, matching: find.text(es.passwordTooShort)),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-484: in create mode ($language), an email already in use shows a sign-in button that switches to sign-in with the email kept',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final api = _LoginApi(
+          signInError: ApiException(
+            400,
+            'An account with this email already exists.',
+          ),
+        );
+        final (_, auth) = await _open(
+          tester,
+          client: api,
+          language: language,
+          size: const Size(360, 740),
+        );
+        auth.finish();
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.text(l.createAnAccount));
+        expect(find.text(l.registerHeading), findsOneWidget);
+        await tester.enterText(email, 'ana@example.invalid');
+        await tester.enterText(password, 'una-clave-larga-2026');
+        await tapVisible(tester, submit);
+        expect(api.signIns.single, ('ana@example.invalid', true));
+        expect(
+          find.descendant(
+            of: email,
+            matching: find.text(l.requestError('emailUsed')),
+          ),
+          findsOneWidget,
+        );
+        final signIn = find.byKey(const ValueKey('sign-in-with-email'));
+        expect(signIn, findsOneWidget);
+        expect(
+          find.descendant(of: signIn, matching: find.text(l.signInWithEmail)),
+          findsOneWidget,
+        );
+        await tapVisible(tester, signIn);
+        // In English and Catalan the heading and the button read the same.
+        expect(find.text(l.signInHeading), findsWidgets);
+        expect(find.text(l.registerHeading), findsNothing);
+        expect(typed(tester, email), 'ana@example.invalid');
+        expect(find.text(l.requestError('emailUsed')), findsNothing);
+        expect(signIn, findsNothing);
+        expect(
+          find.descendant(of: submit, matching: find.text(l.signIn)),
+          findsOneWidget,
+        );
+        // Signing in now sends it as a sign-in.
+        api.signInError = ApiException(0, 'Network unavailable');
+        await tapVisible(tester, submit);
+        expect(api.signIns.last, ('ana@example.invalid', false));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // ---- P83 (UX-488): the email-in-use button names itself; a known account
+  // offers recovery ----
+
+  final recoverButton = find.byKey(const ValueKey('recover-with-email'));
+  final createButton = find.byKey(const ValueKey('create-account-with-email'));
+  final signInButton = find.byKey(const ValueKey('sign-in-with-email'));
+  ApiException emailInUse() =>
+      ApiException(400, 'An account with this email already exists.');
+  ApiException wrongCredentials() =>
+      ApiException(401, 'No active account found with the given credentials');
+
+  /// Create mode with [address]; the server says the email is in use.
+  Future<_LoginApi> reachEmailInUse(
+    WidgetTester tester,
+    AppLocalizations l, {
+    required String language,
+    required Size size,
+    String address = 'ana@example.invalid',
+  }) async {
+    final api = _LoginApi(signInError: emailInUse());
+    final (_, auth) = await _open(
+      tester,
+      client: api,
+      language: language,
+      size: size,
+    );
+    auth.finish();
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text(l.createAnAccount));
+    expect(find.text(l.registerHeading), findsOneWidget);
+    await tester.enterText(email, address);
+    await tester.enterText(password, 'una-clave-larga-2026');
+    await tapVisible(tester, submit);
+    expect(api.signIns.last, (address, true));
+    expect(signInButton, findsOneWidget);
+    return api;
+  }
+
+  testWidgets(
+    'UX-488: Spanish at 2× text on 360×740: email in use → Iniciar sesión con este correo → wrong credentials offer ¿Has olvidado tu contraseña?, not Crear una cuenta con este correo → recovery with the email kept',
+    (tester) async {
+      expect(es.signInWithEmail, 'Iniciar sesión con este correo');
+      expect(es.forgotPassword, '¿Has olvidado tu contraseña?');
+      expect(es.signInWithEmail, isNot(es.signIn));
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final api = await reachEmailInUse(
+        tester,
+        es,
+        language: 'es',
+        size: const Size(360, 740),
+      );
+      expect(
+        find.descendant(
+          of: signInButton,
+          matching: find.text(es.signInWithEmail),
+        ),
+        findsOneWidget,
+      );
+      // It doesn't read like the submit button.
+      expect(
+        find.descendant(of: signInButton, matching: find.text(es.signIn)),
+        findsNothing,
+      );
+      await tapVisible(tester, signInButton);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      expect(find.text(es.registerHeading), findsNothing);
+      expect(typed(tester, email), 'ana@example.invalid');
+      expect(
+        find.descendant(of: submit, matching: find.text(es.signIn)),
+        findsOneWidget,
+      );
+      // The old password is wrong for that account.
+      api.signInError = wrongCredentials();
+      await tapVisible(tester, submit);
+      expect(api.signIns.last, ('ana@example.invalid', false));
+      expect(find.text(es.requestError('credentials')), findsOneWidget);
+      expect(recoverButton, findsOneWidget);
+      expect(
+        find.descendant(
+          of: recoverButton,
+          matching: find.text(es.forgotPassword),
+        ),
+        findsOneWidget,
+      );
+      expect(createButton, findsNothing);
+      expect(find.text(es.createAccountWithEmail), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tapVisible(tester, recoverButton);
+      expect(find.text(es.recoveryHeading), findsOneWidget);
+      expect(typed(tester, email), 'ana@example.invalid');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-488: after reaching sign-in through Iniciar sesión con este correo, changing the email and getting wrong credentials offers Crear una cuenta con este correo again',
+    (tester) async {
+      final api = await reachEmailInUse(
+        tester,
+        es,
+        language: 'es',
+        size: const Size(390, 844),
+      );
+      await tapVisible(tester, signInButton);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      await tester.enterText(email, 'otra@example.invalid');
+      await tester.pumpAndSettle();
+      api.signInError = wrongCredentials();
+      await tapVisible(tester, submit);
+      expect(api.signIns.last, ('otra@example.invalid', false));
+      expect(find.text(es.requestError('credentials')), findsOneWidget);
+      expect(createButton, findsOneWidget);
+      expect(
+        find.descendant(
+          of: createButton,
+          matching: find.text(es.createAccountWithEmail),
+        ),
+        findsOneWidget,
+      );
+      expect(recoverButton, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-488: a direct sign-in with wrong credentials still offers Crear una cuenta con este correo and no recovery button (UX-402 unchanged)',
+    (tester) async {
+      final api = await openSpanish(
+        tester,
+        api: _LoginApi(signInError: wrongCredentials()),
+      );
+      expect(find.text(es.signInHeading), findsOneWidget);
+      await tester.enterText(email, 'ana@example.invalid');
+      await tester.enterText(password, 'una-clave-larga-2026');
+      await tapVisible(tester, submit);
+      expect(api.signIns.single, ('ana@example.invalid', false));
+      expect(createButton, findsOneWidget);
+      expect(
+        find.descendant(
+          of: createButton,
+          matching: find.text(es.createAccountWithEmail),
+        ),
+        findsOneWidget,
+      );
+      expect(recoverButton, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-488: a mode switch through the links forgets the known account: email in use → sign in → Crear una cuenta → Iniciar sesión → wrong credentials offers Crear una cuenta con este correo',
+    (tester) async {
+      final api = await reachEmailInUse(
+        tester,
+        es,
+        language: 'es',
+        size: const Size(390, 844),
+      );
+      await tapVisible(tester, signInButton);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      // To create mode and back again by the links.
+      await tapVisible(tester, find.text(es.createAnAccount));
+      expect(find.text(es.registerHeading), findsOneWidget);
+      await tapVisible(tester, find.text(es.alreadyHaveAccount));
+      expect(find.text(es.signInHeading), findsOneWidget);
+      api.signInError = wrongCredentials();
+      await tapVisible(tester, submit);
+      expect(createButton, findsOneWidget);
+      expect(recoverButton, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-488: the button reads Sign in with this email in English and Inicia la sessió amb aquest correu in Catalan; in Catalan at 2× text on 320×640 it wraps without overflow',
+    (tester) async {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(en.signInWithEmail, 'Sign in with this email');
+      expect(ca.signInWithEmail, 'Inicia la sessió amb aquest correu');
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await reachEmailInUse(
+        tester,
+        ca,
+        language: 'ca',
+        size: const Size(320, 640),
+      );
+      final label = find.descendant(
+        of: signInButton,
+        matching: find.text(ca.signInWithEmail),
+      );
+      expect(label, findsOneWidget);
+      await tester.ensureVisible(signInButton);
+      await tester.pumpAndSettle();
+      final button = tester.getRect(signInButton);
+      final text = tester.getRect(label);
+      expect(button.left, greaterThanOrEqualTo(0));
+      expect(button.right, lessThanOrEqualTo(320.5));
+      // The whole label is inside its button, on more than one line if needed.
+      expect(text.left, greaterThanOrEqualTo(button.left - 0.5));
+      expect(text.right, lessThanOrEqualTo(button.right + 0.5));
+      expect(text.top, greaterThanOrEqualTo(button.top - 0.5));
+      expect(text.bottom, lessThanOrEqualTo(button.bottom + 0.5));
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: label, matching: find.byType(RichText)).first,
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P88 (UX-495): one ¿Has olvidado tu contraseña? control, not two ----
+
+  /// Every ¿Has olvidado tu contraseña? on the page, on screen or scrolled.
+  Finder forgotAnywhere() => find.text(es.forgotPassword, skipOffstage: false);
+
+  testWidgets(
+    'UX-495: Spanish at 2× text on 360×740: email in use → Iniciar sesión con este correo → wrong credentials show ¿Has olvidado tu contraseña? exactly once, as the recover-with-email button',
+    (tester) async {
+      expect(es.forgotPassword, '¿Has olvidado tu contraseña?');
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final semantics = tester.ensureSemantics();
+      final api = await reachEmailInUse(
+        tester,
+        es,
+        language: 'es',
+        size: const Size(360, 740),
+      );
+      await tapVisible(tester, signInButton);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      api.signInError = wrongCredentials();
+      await tapVisible(tester, submit);
+      expect(find.text(es.requestError('credentials')), findsOneWidget);
+      expect(recoverButton, findsOneWidget);
+      expect(forgotAnywhere(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: recoverButton,
+          matching: find.text(es.forgotPassword),
+        ),
+        findsOneWidget,
+      );
+      // TalkBack meets the name once.
+      expect(
+        find.bySemanticsLabel(es.forgotPassword, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'UX-495: a direct sign-in with wrong credentials still shows the small ¿Has olvidado tu contraseña? link once, and Crear una cuenta con este correo',
+    (tester) async {
+      await openSpanish(
+        tester,
+        api: _LoginApi(signInError: wrongCredentials()),
+      );
+      await tester.enterText(email, 'ana@example.invalid');
+      await tester.enterText(password, 'una-clave-larga-2026');
+      await tapVisible(tester, submit);
+      expect(find.text(es.requestError('credentials')), findsOneWidget);
+      expect(recoverButton, findsNothing);
+      expect(forgotAnywhere(), findsOneWidget);
+      expect(
+        find.ancestor(of: forgotAnywhere(), matching: find.byType(TextButton)),
+        findsOneWidget,
+      );
+      expect(createButton, findsOneWidget);
+      expect(
+        find.descendant(
+          of: createButton,
+          matching: find.text(es.createAccountWithEmail),
+        ),
+        findsOneWidget,
+      );
+      // The link still opens recovery.
+      await tapVisible(tester, find.text(es.forgotPassword));
+      expect(find.text(es.recoveryHeading), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-495: plain sign-in mode with no error still shows the small ¿Has olvidado tu contraseña? link',
+    (tester) async {
+      await openSpanish(tester);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      expect(recoverButton, findsNothing);
+      expect(forgotAnywhere(), findsOneWidget);
+      expect(
+        find.ancestor(of: forgotAnywhere(), matching: find.byType(TextButton)),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// The server for sign-in: [signInError] answers every sign-in until it is

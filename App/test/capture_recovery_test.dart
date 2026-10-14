@@ -657,6 +657,140 @@ void main() {
       });
     },
   );
+
+  // ---- P82 (UX-493): the Voz language reaches online transcription ----
+
+  test(
+    'UX-493: a spoken capture made with the speech language ca-ES sends language ca-ES to ai/drafts/, also after a restart',
+    () async {
+      final session = await store.create(
+        'local',
+        'Europe/Madrid',
+        audio: true,
+        source: 'speech',
+        language: 'ca-ES',
+      );
+      await File(session.audioPath!).writeAsBytes(_wav());
+      // Closed and opened again before it is sent: the language is kept.
+      await database.close();
+      await reopen();
+      final restored = (await store.read(session.id, 'local'))!;
+      expect(restored.language, 'ca-ES');
+      final api = _CaptureApi();
+      addTearDown(api.close);
+      final result = await CaptureProcessor(store, api).process(restored);
+      expect(api.requests, hasLength(1));
+      expect(api.requests.single['language'], 'ca-ES');
+      expect(api.requests.single['source'], 'speech');
+      expect(result.drafts, isNotEmpty);
+    },
+  );
+
+  test(
+    'UX-493: a typed capture and a shared text send no language and still process',
+    () async {
+      final typed = await store.create(
+        'local',
+        'Europe/Madrid',
+        text: 'Two tasks',
+        source: 'typed',
+      );
+      final shared = await store.acceptEntry(
+        '6f1c2a54-3c1e-4bd4-9b8e-1b2f0a7d9c11',
+        'local',
+        'Europe/Madrid',
+        text: 'Buy coffee',
+        capturedAt: DateTime.utc(2026, 9, 22),
+      );
+      expect(typed.language, isNull);
+      expect(shared!.language, isNull);
+      final api = _CaptureApi();
+      addTearDown(api.close);
+      for (final session in [typed, shared]) {
+        final result = await CaptureProcessor(store, api).process(session);
+        expect(result.drafts, isNotEmpty, reason: session.text);
+      }
+      expect(api.requests, hasLength(2));
+      for (final request in api.requests) {
+        expect(request.containsKey('language'), isFalse, reason: '$request');
+      }
+    },
+  );
+
+  test(
+    'UX-493: a capture stored before this change (JSON without language) loads with none, sends none and still processes',
+    () async {
+      const id = '0d4a7e2c-5b1f-4f6a-8c3d-2e9b7a1c4f00';
+      // The shape CaptureSession.toJson wrote before `language` existed.
+      final legacy = <String, dynamic>{
+        'id': id,
+        'ownerKey': 'local',
+        'capturedAt': DateTime.utc(2026, 10, 1, 9).toIso8601String(),
+        'timezone': 'Europe/Madrid',
+        'projectId': null,
+        'kind': 'task',
+        'text': 'Llamar al médico mañana',
+        'transcript': '',
+        'audioPath': null,
+        'audioFormat': null,
+        'status': 'editing',
+        'error': null,
+        'drafts': <Object>[],
+        'source': 'speech',
+        'day': null,
+      };
+      await (await database.database).insert('captures', {
+        'id': id,
+        'owner_key': 'local',
+        'status': 'editing',
+        'captured_at': legacy['capturedAt'],
+        'data': jsonEncode(legacy),
+      });
+      final stored = (await store.read(id, 'local'))!;
+      expect(stored.language, isNull);
+      final api = _CaptureApi();
+      addTearDown(api.close);
+      final result = await CaptureProcessor(store, api).process(stored);
+      expect(result.drafts, isNotEmpty);
+      expect(api.requests.single.containsKey('language'), isFalse);
+      expect(api.requests.single['text'], 'Llamar al médico mañana');
+    },
+  );
+
+  test('UX-493: a CaptureSession with language survives toJson/fromJson', () {
+    final session = CaptureSession(
+      id: 'c1',
+      ownerKey: 'local',
+      capturedAt: DateTime.utc(2026, 10, 14, 8, 30),
+      timezone: 'Europe/Madrid',
+      text: 'Comprar pa',
+      source: 'speech',
+      language: 'ca-ES',
+    );
+    final json = jsonDecode(jsonEncode(session.toJson()));
+    final back = CaptureSession.fromJson(Map<String, dynamic>.from(json));
+    expect(back.language, 'ca-ES');
+    expect(back.text, 'Comprar pa');
+    expect(back.source, 'speech');
+    // copyWith keeps it unless told otherwise.
+    expect(back.copyWith(status: 'processing').language, 'ca-ES');
+    // Without a language, none comes back.
+    final plain = CaptureSession.fromJson(
+      Map<String, dynamic>.from(
+        jsonDecode(
+          jsonEncode(
+            CaptureSession(
+              id: 'c2',
+              ownerKey: 'local',
+              capturedAt: DateTime.utc(2026, 10, 14),
+              timezone: 'UTC',
+            ).toJson(),
+          ),
+        ),
+      ),
+    );
+    expect(plain.language, isNull);
+  });
 }
 
 Uint8List _wav() {

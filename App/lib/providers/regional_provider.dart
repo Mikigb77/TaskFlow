@@ -16,18 +16,37 @@ class RegionalPreferences {
     this.clock = ClockFormat.system,
     this.weekStart,
     this.captureTimezone,
+    this.speechLanguage = sameAsApp,
+    this.speechOnline = false,
+    this.privacyShown = false,
   });
+
+  /// [speechLanguage] when speech follows the app's language.
+  static const sameAsApp = 'app';
   final String language;
   final ClockFormat clock;
 
   /// Sunday = 0, matching MaterialLocalizations, not DateTime.weekday.
   final int? weekStart;
   final String? captureTimezone;
+
+  /// The language capture listens in: [sameAsApp], or an app language code.
+  final String speechLanguage;
+
+  /// Saved audio, transcribed online, even where on-device speech works.
+  final bool speechOnline;
+
+  /// The capture sheet has shown its privacy line, the first time the
+  /// microphone was used on this device.
+  final bool privacyShown;
   Map<String, dynamic> toJson() => {
         'language': language,
         'clock': clock.name,
         'weekStart': weekStart,
         'captureTimezone': captureTimezone,
+        'speechLanguage': speechLanguage,
+        'speechOnline': speechOnline,
+        'privacyShown': privacyShown,
       };
   factory RegionalPreferences.fromJson(Map<String, dynamic> json) =>
       RegionalPreferences(
@@ -46,31 +65,43 @@ class RegionalPreferences {
         captureTimezone: CaptureTimezone.valid(json['captureTimezone'])
             ? json['captureTimezone'] as String
             : null,
+        speechLanguage: json['speechLanguage'] is String &&
+                AppLanguages.supports(json['speechLanguage'] as String)
+            ? json['speechLanguage'] as String
+            : sameAsApp,
+        speechOnline: json['speechOnline'] == true,
+        privacyShown: json['privacyShown'] == true,
       );
-  RegionalPreferences withLanguage(String value) => RegionalPreferences(
-        language: value,
-        clock: clock,
-        weekStart: weekStart,
-        captureTimezone: captureTimezone,
+  RegionalPreferences _copy({
+    String? language,
+    ClockFormat? clock,
+    int? Function()? weekStart,
+    String? Function()? captureTimezone,
+    String? speechLanguage,
+    bool? speechOnline,
+    bool? privacyShown,
+  }) =>
+      RegionalPreferences(
+        language: language ?? this.language,
+        clock: clock ?? this.clock,
+        weekStart: weekStart == null ? this.weekStart : weekStart(),
+        captureTimezone:
+            captureTimezone == null ? this.captureTimezone : captureTimezone(),
+        speechLanguage: speechLanguage ?? this.speechLanguage,
+        speechOnline: speechOnline ?? this.speechOnline,
+        privacyShown: privacyShown ?? this.privacyShown,
       );
-  RegionalPreferences withClock(ClockFormat value) => RegionalPreferences(
-        language: language,
-        clock: value,
-        weekStart: weekStart,
-        captureTimezone: captureTimezone,
-      );
-  RegionalPreferences withWeekStart(int? value) => RegionalPreferences(
-        language: language,
-        clock: clock,
-        weekStart: value,
-        captureTimezone: captureTimezone,
-      );
-  RegionalPreferences withTimezone(String? value) => RegionalPreferences(
-        language: language,
-        clock: clock,
-        weekStart: weekStart,
-        captureTimezone: value,
-      );
+  RegionalPreferences withLanguage(String value) => _copy(language: value);
+  RegionalPreferences withClock(ClockFormat value) => _copy(clock: value);
+  RegionalPreferences withWeekStart(int? value) =>
+      _copy(weekStart: () => value);
+  RegionalPreferences withTimezone(String? value) =>
+      _copy(captureTimezone: () => value);
+  RegionalPreferences withSpeechLanguage(String value) =>
+      _copy(speechLanguage: value);
+  RegionalPreferences withSpeechOnline(bool value) =>
+      _copy(speechOnline: value);
+  RegionalPreferences withPrivacyShown() => _copy(privacyShown: true);
   Locale localeFor(List<Locale>? devices) =>
       AppLanguages.resolve(language, devices);
 }

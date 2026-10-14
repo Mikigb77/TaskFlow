@@ -9,6 +9,7 @@ class PendingInvitation {
     required this.name,
     required this.targetId,
     required this.role,
+    this.sender,
   });
 
   factory PendingInvitation.fromJson(String kind, Map json) =>
@@ -20,6 +21,7 @@ class PendingInvitation {
         targetId: (kind == 'group' ? json['group_id'] : json['list_id'])
             as String?,
         role: json['role'] as String,
+        sender: invitationSender(json),
       );
 
   /// `list` (a project) or `group`.
@@ -31,8 +33,17 @@ class PendingInvitation {
   final String? targetId;
   final String role;
 
+  /// Who sent it; null when the server doesn't say (older invitations).
+  final String? sender;
+
   bool get group => kind == 'group';
   String get endpoint => group ? 'group-invitations' : 'invitations';
+}
+
+/// The sender's name in a pending invitation's JSON, or null.
+String? invitationSender(Map json) {
+  final name = (json['invited_by_name'] as String?)?.trim();
+  return name == null || name.isEmpty ? null : name;
 }
 
 /// Every pending invitation for the signed-in account, groups first.

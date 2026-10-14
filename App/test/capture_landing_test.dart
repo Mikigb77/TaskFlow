@@ -738,7 +738,9 @@ class _Captures extends CaptureStore {
     String? source,
     DateTime? day,
     String? id,
+    String? language,
   }) async => current = CaptureSession(
+    language: language,
     id: 'capture-${DateTime.now().microsecondsSinceEpoch}',
     ownerKey: ownerKey,
     timezone: timezone,

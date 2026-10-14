@@ -671,6 +671,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                       onTap: _busy || group.projectCount != 0
                           ? null
                           : () async {
+                              final deleted = context.l10n.groupDeleted;
                               if (await groupConfirm(
                                     context,
                                     context.l10n.delete,
@@ -683,6 +684,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                                   {'version': group.version},
                                   method: 'DELETE',
                                   leave: true,
+                                  done: deleted,
                                 );
                               }
                             },

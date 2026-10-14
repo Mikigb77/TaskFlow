@@ -650,10 +650,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exportImport => 'Export & import';
 
   @override
-  String get regionalSettingsHelp =>
-      'Language, clock, week start and capture timezone';
-
-  @override
   String get language => 'Language';
 
   @override
@@ -955,17 +951,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recordingKept => 'Recording kept on this phone';
 
   @override
-  String get onDeviceTranscript => 'On-device live transcript';
+  String get onDeviceTranscript => 'On this phone, as you speak';
 
   @override
-  String get onlineAudio => 'Saved audio · online transcription';
+  String get onlineAudio => 'Online, after you finish';
+
+  @override
+  String get speechMethod => 'How speech becomes text';
 
   @override
   String get speechLanguage => 'Speech language';
 
   @override
+  String get voiceSettings => 'Voice';
+
+  @override
+  String get sameAsApp => 'Same as the app';
+
+  @override
   String get onDeviceUnavailable =>
-      'On-device speech is unavailable for this language on this device. Record audio for online processing, or type.';
+      'This phone can’t do this language by itself, so TaskFlow does it online.';
 
   @override
   String get setUpSpeech => 'Set up on-device speech';
@@ -989,6 +994,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get capturePrivacy =>
       'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.';
+
+  @override
+  String get capturePrivacyLine => 'Your words go online. More in Settings.';
 
   @override
   String get lookRight => 'Look right?';
@@ -1415,6 +1423,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordTooShort => 'Use at least 12 characters';
 
   @override
+  String get enterPassword => 'Enter your password';
+
+  @override
   String get showPassword => 'Show password';
 
   @override
@@ -1434,6 +1445,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createAccountWithEmail => 'Create an account with this email';
+
+  @override
+  String get signInWithEmail => 'Sign in with this email';
 
   @override
   String get backToSignIn => 'Back to sign in';
@@ -1765,6 +1779,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get projectDeleted => 'Project deleted';
 
   @override
+  String get groupDeleted => 'Group deleted';
+
+  @override
   String get invitationCodeRequired => 'Paste the full invitation code.';
 
   @override
@@ -1787,6 +1804,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String invitedTo(String name) {
     return 'You’re invited to $name · View';
+  }
+
+  @override
+  String invitedByTo(String sender, String name) {
+    return '$sender invited you to “$name” · View';
   }
 
   @override
@@ -2578,6 +2600,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.';
 
   @override
+  String get voiceSetupRequested =>
+      'Follow Android’s steps, then tap Check again.';
+
+  @override
+  String get voiceSetupUnavailable =>
+      'This phone can’t set this up, so TaskFlow does it online.';
+
+  @override
   String get captureSetupUnavailable =>
       'Speech setup is unavailable here. Use saved audio or type.';
 
@@ -3275,6 +3305,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invitationReview => 'Review invitation';
+
+  @override
+  String invitationFrom(String sender, String name) {
+    return '$sender invited you to “$name”';
+  }
 
   @override
   String get invitationReviewHelp => 'You’ll see its tasks, notes and files.';

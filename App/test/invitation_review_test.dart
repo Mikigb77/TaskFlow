@@ -660,7 +660,10 @@ void main() {
     testWidgets(
       'UX-478: a $kind invitation refused with “$message” keeps the dialog and the code, shows Pide a quien te invitó el código actual. under the field and no SnackBar',
       (tester) async {
-        expect(es.invitationCodeWrong, 'Pide a quien te invitó el código actual.');
+        expect(
+          es.invitationCodeWrong,
+          'Pide a quien te invitó el código actual.',
+        );
         final api = _Invitations(
           groups: kind == 'group' ? [invitation] : const [],
           lists: kind == 'project' ? [invitation] : const [],
@@ -748,6 +751,206 @@ void main() {
     },
   );
 
+  // ---- P80 (UX-326): the invitation says who sent it ----
+
+  const anaInvitation = {...comprasInvitation, 'invited_by_name': 'Ana'};
+  const comprasLink = 'taskflow://invite?kind=list&id=$listId&code=$code';
+
+  for (final language in ['en', 'es', 'ca']) {
+    testWidgets(
+      'UX-326: ($language) with invited_by_name Ana, Calendar’s card and the review screen name Ana',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final api = _Invitations(lists: [anaInvitation]);
+        await _openApp(tester, api, language: language);
+        final named = find.text(l.invitedByTo('Ana', 'Compras'));
+        expect(l.invitedByTo('Ana', 'Compras'), contains('Ana'));
+        expect(l.invitedByTo('Ana', 'Compras'), contains('Compras'));
+        expect(named.hitTestable(), findsOneWidget);
+        expect(find.text(l.invitedTo('Compras')), findsNothing);
+
+        // The review screen, opened from the emailed link.
+        await tester.pumpWidget(const SizedBox());
+        await _openApp(
+          tester,
+          _Invitations(lists: [anaInvitation]),
+          language: language,
+          link: comprasLink,
+        );
+        expect(find.byType(InvitationReviewScreen), findsOneWidget);
+        final headline = l.invitationFrom('Ana', 'Compras');
+        expect(headline, contains('Ana'));
+        expect(headline, contains('Compras'));
+        expect(
+          find.descendant(
+            of: find.byType(InvitationReviewScreen),
+            matching: find.text(headline),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-326: a group invitation with invited_by_name Ana names Ana on Calendar’s card',
+    (tester) async {
+      final api = _Invitations(
+        groups: [
+          {...familiaInvitation, 'invited_by_name': 'Ana'},
+        ],
+      );
+      await _openApp(tester, api);
+      expect(find.text(es.invitedByTo('Ana', 'Familia')), findsOneWidget);
+      expect(card('Familia'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (label, sender) in [
+    ('null', null),
+    ('missing', 'missing'),
+    ('blank', '  '),
+  ]) {
+    testWidgets(
+      'UX-326: with invited_by_name $label, the card and the review screen keep today’s wording',
+      (tester) async {
+        final invitation = <String, dynamic>{...comprasInvitation};
+        if (sender != 'missing') invitation['invited_by_name'] = sender;
+        await _openApp(tester, _Invitations(lists: [invitation]));
+        expect(card('Compras'), findsOneWidget);
+        expect(find.text(es.invitedByTo('', 'Compras')), findsNothing);
+
+        await tester.pumpWidget(const SizedBox());
+        await _openApp(
+          tester,
+          _Invitations(lists: [invitation]),
+          link: comprasLink,
+        );
+        final review = find.byType(InvitationReviewScreen);
+        expect(review, findsOneWidget);
+        expect(
+          find.descendant(of: review, matching: find.text('Compras')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: review,
+            matching: find.textContaining(es.invitationFrom('', 'Compras')),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // ---- P78 (UX-487): ‘Ahora no’ is remembered across restarts ----
+
+  testWidgets(
+    'UX-487: a stored invitation not yet answered reopens the review on a cold start',
+    (tester) async {
+      final storage = _MemoryStorage();
+      await _openApp(
+        tester,
+        _Invitations(lists: [comprasInvitation]),
+        link: comprasLink,
+        storage: storage,
+      );
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      expect(storage.values, isNotEmpty);
+      // The app is killed with the review open, then started again.
+      await tester.pumpWidget(const SizedBox());
+      await _openApp(
+        tester,
+        _Invitations(lists: [comprasInvitation]),
+        storage: storage,
+        restore: true,
+      );
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-487: after Ahora no, a restart from the same storage stays on Calendar, whose card still offers the invitation with its code',
+    (tester) async {
+      final storage = _MemoryStorage();
+      await _openApp(
+        tester,
+        _Invitations(lists: [comprasInvitation]),
+        link: comprasLink,
+        storage: storage,
+      );
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      await tester.tap(find.text(es.invitationNotNow));
+      await tester.pumpAndSettle();
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+      expect(storage.values, isNotEmpty);
+
+      // Force-stop and reopen: a fresh container over the same storage.
+      await tester.pumpWidget(const SizedBox());
+      final api = _Invitations(lists: [comprasInvitation]);
+      final container = await _openApp(
+        tester,
+        api,
+        storage: storage,
+        restore: true,
+      );
+      expect(container.read(invitationLinkProvider), isNotNull);
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+      expect(find.byType(CalendarScreen), findsOneWidget);
+      expect(card('Compras').hitTestable(), findsOneWidget);
+      await tester.tap(card('Compras'));
+      await tester.pumpAndSettle();
+      expect(codeInField(tester), code);
+      expect(api.responses, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-487: opening the invitation link again after Ahora no opens the review, in the same session and after a restart',
+    (tester) async {
+      final storage = _MemoryStorage();
+      final container = await _openApp(
+        tester,
+        _Invitations(lists: [comprasInvitation]),
+        link: comprasLink,
+        storage: storage,
+      );
+      await tester.tap(find.text(es.invitationNotNow));
+      await tester.pumpAndSettle();
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+      // The same link, tapped again in the email.
+      container
+          .read(invitationLinkProvider.notifier)
+          .receive(Uri.parse(comprasLink));
+      await tester.pumpAndSettle();
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      await tester.tap(find.text(es.invitationNotNow));
+      await tester.pumpAndSettle();
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+
+      // After a restart, the postponed invitation stays quiet until its
+      // link is opened again.
+      await tester.pumpWidget(const SizedBox());
+      final restarted = await _openApp(
+        tester,
+        _Invitations(lists: [comprasInvitation]),
+        storage: storage,
+        restore: true,
+      );
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+      restarted
+          .read(invitationLinkProvider.notifier)
+          .receive(Uri.parse(comprasLink));
+      await tester.pumpAndSettle();
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _InvitationApi extends OfflineApiClient {
@@ -792,7 +995,10 @@ Future<ProviderContainer> _openApp(
   WidgetTester tester,
   _Invitations api, {
   String? link,
-  _Storage? storage,
+  FlutterSecureStorage? storage,
+  String language = 'es',
+  // Reads the stored invitation back, as a cold start does.
+  bool restore = false,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -800,14 +1006,18 @@ Future<ProviderContainer> _openApp(
   final container = ProviderContainer(
     overrides: [
       invitationLinkProvider.overrideWith(
-        (ref) => InvitationLinks(storage: storage ?? _Storage(), listen: false),
+        (ref) => InvitationLinks(
+          storage: storage ?? _Storage(),
+          listen: false,
+          restore: restore,
+        ),
       ),
       hasProProvider.overrideWithValue(true),
       billingLoadingProvider.overrideWithValue(false),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
       attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
       regionalStoreProvider.overrideWithValue(
-        MemoryRegionalStore(const RegionalPreferences(language: 'es')),
+        MemoryRegionalStore(RegionalPreferences(language: language)),
       ),
       pendingCapturesProvider.overrideWith((ref) async => []),
       taskListsProvider.overrideWith(
@@ -902,6 +1112,32 @@ class _Storage implements FlutterSecureStorage {
   dynamic noSuchMethod(Invocation invocation) {
     if (invocation.memberName == #delete) deletes++;
     if (invocation.memberName == #read) return Future<String?>.value();
+    return Future<void>.value();
+  }
+}
+
+/// The phone's secure storage, keeping what is written, as it survives a
+/// restart.
+class _MemoryStorage implements FlutterSecureStorage {
+  final values = <String, String>{};
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final key = invocation.namedArguments[#key] as String?;
+    switch (invocation.memberName) {
+      case #read:
+        return Future<String?>.value(values[key]);
+      case #write:
+        final value = invocation.namedArguments[#value] as String?;
+        if (value == null) {
+          values.remove(key);
+        } else {
+          values[key!] = value;
+        }
+        return Future<void>.value();
+      case #delete:
+        values.remove(key);
+        return Future<void>.value();
+    }
     return Future<void>.value();
   }
 }

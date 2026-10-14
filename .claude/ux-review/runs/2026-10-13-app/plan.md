@@ -681,3 +681,86 @@ From the b5 report's open items and reviewer notes. They go first in b6.
 - **P80** (UX-326, S2, C): invitations name who sent them. The backend half is done (bc93848, `invited_by_name`).
 - **P78** (UX-485 and UX-487, S2, C): deleting a group says "Grupo eliminado"; "Ahora no" on an invitation survives a cold start.
 - **P79** (UX-486, S1, D): time-zone search knows Spanish and Catalan city names, hides the legacy `US/*` and `Canada/*` duplicates, and drops the unused `regionalSettingsHelp` key.
+
+## Round 2 (b6)
+
+Round 1 of batch 6 ran P77, P80, P78, P79, P20 and P34. The reviewers found 11 of 12 findings fixed in code: UX-484, UX-486, UX-326, UX-485, UX-487, UX-121, UX-119, UX-125, UX-420 and UX-115 (several still need a phone or an iOS build). U9 is only partly fixed, first failure: the first-capture privacy note is the whole four-sentence paragraph, not a small line. The round check passed and no test failed. Reviewers A, C and D found seven regressions, now UX-488 to UX-494. UX-491 is U9's remaining part.
+
+Round 2 has six packages: P81 (S2), P82 (S2), P83 (S2), P84 (S1), P85 (S1) and P86 (S1). There are no new decisions and nothing is escalated. UX-493 has a server half that the implementer can't do (see below).
+
+The briefs are in `plan-b6-r2.json`.
+
+### Packages, in run order
+
+#### P81 · Voice copy: one short privacy line in the sheet; Voz in plain words · A · M
+- **U9 / UX-491** (U9 P1, second attempt; UX-491 S2, R1A-1, from P34) The sheet showed the whole `capturePrivacy` paragraph in a scrolling box that took a third of the words area and was cut mid-line. Now a new one-sentence key: `TaskFlow envía tus palabras por internet para convertirlas en tareas. Más en Ajustes.`, as a plain two-line `bodySmall` text. The words lose their `flex: 2`. The paragraph stays on Voz only.
+- **UX-492** (S2; R1A-2, from P34) Voz gets a heading over the second group, `Cómo se pasa la voz a texto`, and outcome labels: `En el teléfono, mientras hablas` / `En línea, al terminar`. The unavailable message and a new Voz-only set-up message no longer tell the user to record or type.
+
+#### P82 · The Voz language reaches online transcription · A · M
+- **UX-493** (S2; R1A-3, from P34) The app stores the speech language (e.g. `ca-ES`) with each spoken capture and sends it as `language` in the `ai/drafts/` request. The reviewer's fallback, hiding `Idioma de voz` while the online way is selected, isn't needed. It also wouldn't cover the case where on-device speech can't do the language.
+
+#### P83 · Sign-in: the email-in-use button names itself; a known account offers recovery · D · S
+- **UX-488** (S2; R1D-1, from P77) The button reads `Iniciar sesión con este correo` instead of the submit button's `Iniciar sesión`. When sign-in was reached through it and fails with wrong credentials, the offered button is `¿Has olvidado tu contraseña?`, not `Crear una cuenta con este correo`. That breaks the create → email in use → sign in → create loop.
+
+#### P84 · An empty share says there's no text · A · S
+- **UX-494** (S1; R1A-4, from P20) An empty share shows a new `share_empty`: `No hay texto que añadir. Comparte un texto con TaskFlow.` `share_too_long` is kept for over 4,000 characters.
+
+#### P85 · Catalan: 'Grup suprimit', like the button · C · S
+- **UX-490** (S1; R1C-1, from P78) CA `groupDeleted` becomes `Grup suprimit`, matching `Suprimeix` and `Projecte suprimit`. The b6 brief's `Grup eliminat` was the organizer's mistake.
+
+#### P86 · Time-zone search shows which name matched · D · S
+- **UX-489** (S1; R1D-2, from P79) When a row matched only through a Spanish or Catalan alias, the alias shows as its subtitle (`Shanghai` / `Pekín`). The aliases become lists, so multi-word names stay whole. Toronto's `Montreal` alias goes, so `montreal` lists one row.
+
+### Server side, for the main session
+- **UX-493**: the drafts serializer (`Backend/core/serializers.py`, near :295) should accept an optional `language`. `transcribe` / `_transcribe_once` (`Backend/core/ai.py:88`, :108-112) should tell the model the speaker's chosen language. The finding stays open until both halves are in and a phone confirms Catalan online audio comes back in Catalan.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- Reviewer A: `captureSpeechLanguage` still says "Elige otro idioma" without saying where; the choice now lives in Ajustes › Otros ajustes › Voz. This was already so before P34, and `_load`'s pre-check makes the message rare.
+- Organizer: the `capturePrivacy` paragraph that stays on Voz still uses internal terms (`extracción de tareas con IA`, `capturas pendientes`). The new sheet line points there (`Más en Ajustes`). No reviewer flagged it; consider it at the next Voz review.
+- P78's implementer: the existing `_Storage` fake in invitation_review_test.dart always reads null; restart tests need a fake that stores.
+- P20's implementer: the InfoPlist.strings files are now UTF-8 (accented text and ’). Xcode accepts this.
+
+## Round 3 (b6)
+
+Round 2 of batch 6 ran P81 to P86. The reviewers found U9, UX-488, UX-489, UX-490 and UX-494 fixed in code (U9, UX-488 and UX-494 still need a phone). UX-491 and UX-492 are partly fixed (second failure each). UX-493's app half is done and its server half is open. The round check passed and no test failed. Reviewer D found one regression, now UX-495.
+
+Round 3 has two packages: P87 (S2) and P88 (S1). There are no new decisions and nothing is escalated. A third failure of UX-491 or UX-492 escalates it.
+
+The briefs are in `plan-b6-r3.json`.
+
+### Packages, in run order
+
+#### P87 · Voice copy: a privacy line that fits; no 'type' on Voz · A · S
+- **UX-491** (S2; R1A-1, third attempt) P81's two-line line was cut at 2× in Spanish before `Más en Ajustes.` The copy gets shorter: `Tus palabras van por internet. Más en Ajustes.` / `Your words go online. More in Settings.` / `Les paraules van per internet. Més a Configuració.` If Spanish or Catalan still needs a third line at 2× on 360 dp, the line allows 3 lines.
+- **UX-492** (S2; R1A-2, third attempt) When Android's speech set-up can't open, Voz still said `Usa audio guardado o escribe.` A new Voz-only message replaces it: `Este teléfono no puede configurarlo, así que TaskFlow lo hace en línea.` The test fake can now fail, so the branch gets tested.
+
+#### P88 · Sign-in: one 'Forgot password?' control, not two · D · S
+- **UX-495** (S1; R2D-1, from P83) After email in use → sign in → wrong credentials, the card showed `¿Has olvidado tu contraseña?` twice. The small link hides while the recovery button shows. Nothing is added.
+
+### Server side, for the main session
+- **UX-493**: unchanged from round 2. The app now sends `language` with `ai/drafts/` for spoken captures. `Backend/core/serializers.py` (drafts serializer, near :295) and `Backend/core/ai.py` (`transcribe` / `_transcribe_once`, :88, :108-112) still need to use it. Not re-planned for the implementer, and not counted as a second failure.
+
+### Escalated
+None.
+
+### Skipped
+- **UX-493**: the rest of it is server-side (see above). It stays open.
+
+### Noted, not planned
+- Reviewer A: on the first capture, the privacy line stays through typing, processing and error states, and can stack with the 2-line hint under it. That's consistent with "for this capture", and minor.
+- Reviewer A: `share_too_long` writes `4000` in Spanish and `4.000` in Catalan. Both are correct for their language.
+- Organizer: on Voz, after a failed set-up, the new message repeats the second half of `onDeviceUnavailable` just above it ("…así que TaskFlow lo hace en línea"). It answers the tap, so it stays. Reconsider at the next Voz review.
+
+## The free tier's app half, queued by the main session (2026-10-14)
+
+The owner's free tier (DECISIONS.md, 2026-10-13 late) is done on the server (d40eae7, 8142f79). These packages run as batch b7, before the rest of the polish, because they are the owner's newest requirement. P44 moved up to run before P92.
+- **P89** (UX-497, UX-499, S3, A): free accounts get the mic while dictations are left; `capture_id` and the cancel.
+- **P90** (UX-498, S3, A): when free dictations run out, the words are kept and the sheet offers typing, with the reset date.
+- **P91** (UX-500, S3, B): a file-space line near the cap; a refused file isn't sent again.
+- **P44**, then **P92** (UX-501, S2, D): the Pro screen shows the free tier's numbers; Pro-only copy goes.

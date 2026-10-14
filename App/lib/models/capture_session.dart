@@ -167,6 +167,10 @@ class CaptureSession {
   /// timeline's day): a task understood with no date and no deadline gets it.
   final DateTime? day;
 
+  /// The speech language chosen in Voz (e.g. `ca-ES`) for spoken captures,
+  /// so online transcription hears that language. Null for typed captures.
+  final String? language;
+
   const CaptureSession({
     required this.id,
     required this.ownerKey,
@@ -183,6 +187,7 @@ class CaptureSession {
     this.drafts = const [],
     this.source,
     this.day,
+    this.language,
   });
 
   bool get terminal => status == 'saved' || status == 'discarded';
@@ -199,6 +204,7 @@ class CaptureSession {
     String? kind,
     List<CaptureDraft>? drafts,
     String? source,
+    String? language,
   }) => CaptureSession(
     id: id,
     ownerKey: ownerKey,
@@ -215,6 +221,7 @@ class CaptureSession {
     drafts: drafts ?? this.drafts,
     source: source ?? this.source,
     day: day,
+    language: language ?? this.language,
   );
 
   Map<String, dynamic> toJson() => {
@@ -233,6 +240,7 @@ class CaptureSession {
     'drafts': drafts.map((d) => d.toJson()).toList(),
     'source': source,
     'day': day == null ? null : Task.dateKey(day!),
+    if (language != null) 'language': language,
   };
 
   factory CaptureSession.fromJson(Map<String, dynamic> json) => CaptureSession(
@@ -253,5 +261,6 @@ class CaptureSession {
         .toList(),
     source: json['source'],
     day: json['day'] == null ? null : DateTime.parse(json['day']),
+    language: json['language'],
   );
 }

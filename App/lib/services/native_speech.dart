@@ -1,5 +1,7 @@
 import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/providers/regional_provider.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -86,6 +88,36 @@ class NativeSpeech {
   });
   Future<void> stop(int run) => channel.invokeMethod('stop', {'run': run});
   Future<void> cancel(int run) => channel.invokeMethod('cancel', {'run': run});
+}
+
+/// The recognizer's language, a BCP 47 tag, for the Voz choice [preference]
+/// (`app`, or a language code): the app's language unless another was
+/// chosen. The phone's own variant is kept when it speaks that language
+/// (`es-MX`); otherwise the language's main one. Every capture passes it, so
+/// the phone's language never decides.
+String speechLanguageTag(
+  String preference, {
+  required Locale app,
+  Iterable<Locale> devices = const [],
+}) {
+  final code = preference == RegionalPreferences.sameAsApp
+      ? app.languageCode
+      : preference;
+  final phone = devices
+      .where(
+        (locale) =>
+            locale.languageCode == code &&
+            (locale.countryCode?.isNotEmpty ?? false),
+      )
+      .firstOrNull;
+  final region =
+      phone?.countryCode ??
+      switch (code) {
+        'en' => 'US',
+        'ca' || 'es' => 'ES',
+        _ => code.toUpperCase(),
+      };
+  return '$code-$region';
 }
 
 /// Day and time-of-day words per speech language. Recognizer vocabulary, never

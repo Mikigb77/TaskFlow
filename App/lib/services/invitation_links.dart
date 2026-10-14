@@ -45,23 +45,34 @@ final invitationLinkProvider =
     );
 
 /// Keeps an invitation across sign-in/process restarts; never stores it in logs.
+/// An invitation left with ‘Not now’ stays stored, but only Calendar's card
+/// offers it again; opening its link again reopens the review.
 class InvitationLinks extends StateNotifier<InvitationLink?> {
-  InvitationLinks({FlutterSecureStorage? storage, bool listen = true})
-    : _storage = storage ?? const FlutterSecureStorage(),
-      super(null) {
+  InvitationLinks({
+    FlutterSecureStorage? storage,
+    bool listen = true,
+    bool? restore,
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       super(null) {
     if (listen) {
       _subscription = AppLinks().uriLinkStream.listen(
         receive,
         onError: (Object _) {},
       );
-      unawaited(_restore());
     }
+    if (restore ?? listen) unawaited(_restore());
   }
   final FlutterSecureStorage _storage;
   StreamSubscription<Uri>? _subscription;
   Future<void> _writes = Future.value();
   int _revision = 0;
+  Map<String, Object?>? _saved;
+  bool _postponed = false;
   static const _key = 'taskflow.pending-invitation';
+
+  /// Whether [link] is the stored invitation and was left with ‘Not now’.
+  bool isPostponed(InvitationLink link) =>
+      _postponed && identical(state, link);
 
   Future<void> _restore() async {
     final revision = _revision;
@@ -71,7 +82,11 @@ class InvitationLinks extends StateNotifier<InvitationLink?> {
       final value = jsonDecode(raw) as Map;
       final saved = DateTime.parse(value['saved'] as String);
       if (DateTime.now().difference(saved) > const Duration(days: 7)) return;
-      state = InvitationLink.parse(Uri.parse(value['uri'] as String));
+      final link = InvitationLink.parse(Uri.parse(value['uri'] as String));
+      if (link == null) return;
+      _saved = {'uri': value['uri'], 'saved': value['saved']};
+      _postponed = value['postponed'] == true;
+      state = link;
     } catch (_) {
       /* Unsupported storage/platform must not block app startup. */
     }
@@ -81,23 +96,35 @@ class InvitationLinks extends StateNotifier<InvitationLink?> {
     final link = InvitationLink.parse(uri);
     if (link == null || !mounted) return;
     _revision++;
+    _postponed = false;
+    _saved = {
+      'uri': uri.toString(),
+      'saved': DateTime.now().toUtc().toIso8601String(),
+    };
     state = link;
+    _write(_saved!);
+  }
+
+  /// Keeps [expected] for Calendar's card without opening it by itself again,
+  /// across restarts too.
+  void postpone(InvitationLink expected) {
+    if (!identical(state, expected)) return;
+    _postponed = true;
+    final saved = _saved;
+    if (saved != null) _write({...saved, 'postponed': true});
+  }
+
+  void _write(Map<String, Object?> value) {
     _writes = _writes
-        .then(
-          (_) => _storage.write(
-            key: _key,
-            value: jsonEncode({
-              'uri': uri.toString(),
-              'saved': DateTime.now().toUtc().toIso8601String(),
-            }),
-          ),
-        )
+        .then((_) => _storage.write(key: _key, value: jsonEncode(value)))
         .catchError((Object _) {});
   }
 
   void clear(InvitationLink expected) {
     if (!identical(state, expected)) return;
     _revision++;
+    _postponed = false;
+    _saved = null;
     state = null;
     _writes = _writes
         .then((_) => _storage.delete(key: _key))

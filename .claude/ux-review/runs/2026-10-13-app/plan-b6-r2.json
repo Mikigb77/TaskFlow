@@ -1,0 +1,195 @@
+{
+ "runId": "2026-10-13-app",
+ "mode": "app",
+ "round": "b6-r2",
+ "packages": [
+  {
+   "id": "P81",
+   "title": "Voice copy: one short privacy line in the sheet; Voz in plain words",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": ["U9", "UX-491", "UX-492"],
+   "aliases": {"UX-491": "R1A-1", "UX-492": "R1A-2"},
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/screens/voice_settings_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_settings_test.dart",
+    "App/test/review_tasks_test.dart (only if its capture-listening preview needs the new key)"
+   ],
+   "brief": [
+    "Context: b6 round 1 ran P34 (U9, UX-115). The options are out of capture and the Voz screen exists (Ajustes › Otros ajustes › Voz, voice_settings_screen.dart). The reviewer (verify-b6-r1-A) found U9 only partly done, first failure, and found one more problem on Voz.",
+    "U9 / UX-491 (R1A-1, S2) — what the last attempt did and why it failed: the first-capture privacy note in the sheet shows the whole `capturePrivacy` paragraph (4 sentences, about 60 Spanish words: reconocimiento local, extracción de tareas con IA, audio guardado, capturas pendientes), in a Flexible + SingleChildScrollView (voice_task_screen.dart:1669-1681, key `capture-privacy`), and the words area was given `flex: 2` (:1648) to share the height with it. In the render App/build/capture-listening-es-2x.png the note takes about a third of the words area, its last visible line is cut in half, and it appears while the user is speaking. U9 asked for 'a small line under the words'.",
+    "Fix: add a new key `capturePrivacyLine`, used only by the sheet: EN `TaskFlow sends your words online to turn them into tasks. More in Settings.` / ES `TaskFlow envía tus palabras por internet para convertirlas en tareas. Más en Ajustes.` / CA `TaskFlow envia les teves paraules per internet per convertir-les en tasques. Més a Configuració.` Keep `capturePrivacy` for the Voz screen only (voice_settings_screen.dart:195).",
+    "In the sheet, replace the note's Flexible + SingleChildScrollView with a plain `Text(l10n.capturePrivacyLine, maxLines: 2, overflow: TextOverflow.ellipsis)` in `bodySmall` with `onSurfaceVariant`, inside a `Padding(top: 8)`. Keep the key `capture-privacy` on that widget so the existing tests still find it. Remove `flex: 2` from the words' Flexible (:1648), so the words get the remaining height again. Update the comment above the note. Don't change when the note shows (`_privacy`: first microphone use on this device only, :702-712, :772).",
+    "UX-492 (R1A-2, S2), on the Voz screen (voice_settings_screen.dart:133-190): the second radio group has no heading, its options are technical, and two messages tell the user to record or type, which only makes sense on the capture sheet.",
+    "(1) Add a heading above the second RadioGroup, styled exactly like the `speechLanguage` heading (:106-109, titleSmall, horizontal padding 24). New key `speechMethod`: EN `How speech becomes text` / ES `Cómo se pasa la voz a texto` / CA `Com es passa la veu a text`.",
+    "(2) Reword in place, because only Voz uses these keys (grep of App/lib): `onDeviceTranscript` → EN `On this phone, as you speak` / ES `En el teléfono, mientras hablas` / CA `Al telèfon, mentre parles`; `onlineAudio` → EN `Online, after you finish` / ES `En línea, al terminar` / CA `En línia, en acabar`; `onDeviceUnavailable` → EN `This phone can’t do this language by itself, so TaskFlow does it online.` / ES `Este teléfono no puede con este idioma por sí solo, así que TaskFlow lo hace en línea.` / CA `Aquest telèfon no pot amb aquest idioma tot sol, així que TaskFlow ho fa en línia.`",
+    "(3) Add a Voz-only key `voiceSetupRequested` and use it at voice_settings_screen.dart:77 instead of `captureSetupRequested`: EN `Follow Android’s steps, then tap Check again.` / ES `Sigue los pasos de Android y luego pulsa Comprobar de nuevo.` / CA `Segueix els passos d’Android i després toca Torna a comprovar-ho.` (The button names match `checkAgain` in each catalog.) Leave `captureSetupRequested` untouched: the capture sheet still uses it (App/lib/l10n/capture_messages.dart:33).",
+    "Run `flutter gen-l10n` after the ARB edits. Update the existing tests that look for `capturePrivacy` in the sheet (voice_settings_test.dart:176, :220, :304, :312) to the new key; the ones that check the Voz screen keep `capturePrivacy`.",
+    "Don't touch: the Voz language rows, `setUpSpeech`, `checkAgain`, the `capturePrivacy` paragraph on Voz, `captureSpeechLanguage`, NativeSpeechBridge.kt, and anything about free dictations. UX-493 (the language for online transcription) is the next package, P82."
+   ],
+   "acceptance": [
+    "Widget test: on the first capture, in Spanish at 2× text on 360×740 while listening, the sheet shows `TaskFlow envía tus palabras por internet para convertirlas en tareas. Más en Ajustes.` (key `capture-privacy`) and not the `capturePrivacy` paragraph; on the second capture neither shows.",
+    "Widget test: in Spanish at 2× text on 360×740, with the privacy line showing and enough dictated words to fill the area, the newest words are visible and nothing overflows.",
+    "Render: re-run `flutter test --no-pub --dart-define=WRITE_REVIEW_PREVIEWS=true test/review_tasks_test.dart`; in App/build/capture-listening-es-2x.png the note is one or two whole lines and no line is cut.",
+    "Widget test: Ajustes › Otros ajustes › Voz in Spanish shows `Cómo se pasa la voz a texto` above the options `En el teléfono, mientras hablas` and `En línea, al terminar`, and the Voz screen still shows the `capturePrivacy` paragraph.",
+    "Widget test: on Voz in Spanish, with on-device speech unusable for the language, the message reads `Este teléfono no puede con este idioma por sí solo, así que TaskFlow lo hace en línea.`; after tapping `Configurar la transcripción local` the banner reads `Sigue los pasos de Android y luego pulsa Comprobar de nuevo.` No text on Voz contains `escribe`, `Graba` or `escribiendo`.",
+    "Widget test: Voz in Catalan at 2× text on 320×640: the heading and both options fit without overflow.",
+    "Code: `captureSetupRequested` is still used by capture_messages.dart; `capturePrivacy` is used only by voice_settings_screen.dart."
+   ],
+   "deviceChecks": [
+    "First capture after a fresh install, phone in Spanish: one short line under the words while speaking, nothing cut."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P82",
+   "title": "The Voz language reaches online transcription",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": ["UX-493"],
+   "aliases": {"UX-493": "R1A-3"},
+   "files": [
+    "App/lib/models/capture_session.dart",
+    "App/lib/services/capture_store.dart",
+    "App/lib/services/capture_processor.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/test/capture_recovery_test.dart (or the existing processor test that checks the ai/drafts/ request)"
+   ],
+   "brief": [
+    "UX-493 (R1A-3, S2, from P34): P34 made every on-device recognition use the Voz language (`_speechLanguage`, voice_task_screen.dart:438-446, passed at :812-814). But when the online way is used — because the user picked `Online, after you finish`, or because on-device speech can't do the language, which is common for Catalan — the `ai/drafts/` request (capture_processor.dart:143-160) sends no language. The server then guesses the language from the audio (Backend/core/ai.py:112, 'Transcribe the speech verbatim in its original language'). A user who chose Català may get Spanish words. Reviewer's inference; the outcome needs a device.",
+    "App side (this package): (1) Add an optional `language` field (String?, e.g. `ca-ES`) to CaptureSession, in the constructor, copyWith, toJson and fromJson. Captures are stored as JSON in the `data` column (capture_store.dart:71-77), so no database migration is needed; a stored capture with no `language` loads as null. (2) Add an optional `language` parameter to `CaptureStore.create` (capture_store.dart:44-70) and keep it in the session. Leave the external-share path (:110-127) without one. (3) In voice_task_screen.dart, pass `language: _speechLanguage` to `_store.create` (:535) whenever the capture is created for speech (audio or the recognizer); not for typed text. Make sure `_speechLanguage` is already set at that point (it is loaded in `_load`). (4) In capture_processor.dart, add `if (existing.language != null) 'language': existing.language` to the `ai/drafts/` data map.",
+    "Don't change the free-tier digest, the timezone, the Voz screen, or NativeSpeechBridge.kt. Don't hide `Idioma de voz` (the reviewer's fallback): sending the language is possible, so it isn't needed.",
+    "Server side (not for this package; you can't change Backend/): the drafts serializer (Backend/core/serializers.py, near :295) must accept an optional `language`, and `transcribe` / `_transcribe_once` (Backend/core/ai.py:88, :108-112) must tell the model which language the speaker chose. Report in your notes that the app now sends `language`, so the main session can do the server half. Django serializers ignore unknown fields, so sending it now is safe."
+   ],
+   "acceptance": [
+    "Unit test: a speech capture created with the speech language `ca-ES` sends `language: ca-ES` in the `ai/drafts/` request data.",
+    "Unit test: a typed capture, and a capture stored before this change (JSON without `language`), send no `language` and still process.",
+    "Unit test: CaptureSession with `language` survives toJson/fromJson."
+   ],
+   "deviceChecks": [
+    "After the server half is done: Voz on Català and `En línia, en acabar`, say a Catalan sentence → the words come back in Catalan."
+   ],
+   "dependsOn": ["P81"]
+  },
+  {
+   "id": "P83",
+   "title": "Sign-in: the email-in-use button names itself; a known account offers recovery",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": ["UX-488"],
+   "aliases": {"UX-488": "R1D-1"},
+   "files": [
+    "App/lib/screens/login_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/auth_gate_test.dart"
+   ],
+   "brief": [
+    "UX-488 (R1D-1, S2, from P77). What P77 did: in create mode, an email-in-use error shows an OutlinedButton `sign-in-with-email` (login_screen.dart:426-439) that calls `_mode()`, switching to sign-in with the email and password kept. Its label reuses `signIn` (`Iniciar sesión`), the same as the submit button, so it looks like it signs in but only switches mode. And it can loop: someone who forgot an old account, or made it with Google, types a new password in create mode → email in use → taps the button → submits → wrong credentials → UX-402's `Crear una cuenta con este correo` (:595-608) → create mode → email in use again.",
+    "(1) Give the button its own label, the mirror of UX-402's: new key `signInWithEmail`, EN `Sign in with this email` / ES `Iniciar sesión con este correo` / CA `Inicia la sessió amb aquest correu`. Keep its key, place and behaviour.",
+    "(2) Add one bool to the state, e.g. `_accountExists`. Set it to true when the user reaches sign-in through the `sign-in-with-email` button. Set it back to false when the email text changes, and on any other mode switch (the create, sign-in and recovery links). When it is true and sign-in fails with the wrong-credentials error (today's `unknownAccount` case), show the same OutlinedButton slot with key `recover-with-email` and the existing `forgotPassword` string (`¿Has olvidado tu contraseña?`), calling `_mode(recover: true)`, instead of `create-account-with-email`. `_mode` already keeps the email; recovery clears the password, as it does today.",
+    "Don't touch: the password validators (UX-484), the error texts, the headings, Google sign-in, the small `¿Has olvidado tu contraseña?` text link. A normal sign-in failure (not reached through the email-in-use button) still offers `Crear una cuenta con este correo` (UX-402)."
+   ],
+   "acceptance": [
+    "Widget test, Spanish, 2× text on 360×740: create mode, the server answers email in use → the button reads `Iniciar sesión con este correo` → tap → sign-in mode with the email kept → submit → wrong credentials → a button `¿Has olvidado tu contraseña?` shows and `Crear una cuenta con este correo` doesn't → tap → `Recupera tu contraseña` with the email kept.",
+    "Widget test: after reaching sign-in through that button, changing the email and getting wrong credentials offers `Crear una cuenta con este correo` again.",
+    "Widget test: a direct sign-in with wrong credentials still offers `Crear una cuenta con este correo` (UX-402 unchanged).",
+    "Widget test: the button label in English is `Sign in with this email` and in Catalan `Inicia la sessió amb aquest correu`; at 2× text on 320×640 in Catalan it wraps without overflow."
+   ],
+   "deviceChecks": [
+    "Against the real server, with an account made with Google: create with that email → email in use → sign in with this email → wrong password → the recovery button opens recovery with the email kept, and the recovery email arrives (inferred: a Google-only account may have no password to recover)."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P84",
+   "title": "An empty share says there's no text",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
+   "findings": ["UX-494"],
+   "aliases": {"UX-494": "R1A-4"},
+   "files": [
+    "App/android/app/src/main/kotlin/com/example/agenda/CaptureEntryBridge.kt",
+    "App/android/app/src/main/res/values/strings.xml",
+    "App/android/app/src/main/res/values-es/strings.xml",
+    "App/android/app/src/main/res/values-ca/strings.xml",
+    "App/test/native_resources_test.dart"
+   ],
+   "brief": [
+    "UX-494 (R1A-4, S1, from P20): CaptureEntryBridge.kt:65-66 shows `share_too_long` both when the shared text is empty and when it is over 4,000 characters, so an empty share says `TaskFlow admite hasta 4000 caracteres. Comparte un texto más corto.`",
+    "Add a string `share_empty` in the three strings.xml files: EN `There’s no text to add. Share some text with TaskFlow.` / ES `No hay texto que añadir. Comparte un texto con TaskFlow.` / CA `No hi ha cap text per afegir. Comparteix un text amb TaskFlow.` Escape apostrophes the way these files already do (the typographic ’ needs no escape; a straight ' does).",
+    "Split the branch: `text.isEmpty()` → `R.string.share_empty`; `text.length > 4000` → `R.string.share_too_long`. Both still return. Change nothing else in the bridge. A build-only compile is fine if you can run it; don't install or uninstall anything."
+   ],
+   "acceptance": [
+    "Unit test (native_resources_test.dart): `share_empty` exists in values, values-es and values-ca with the exact copy above.",
+    "Unit test (native_resources_test.dart): CaptureEntryBridge.kt uses `R.string.share_empty` for the empty case and `R.string.share_too_long` only for the over-4,000 case."
+   ],
+   "deviceChecks": [
+    "Phone in Spanish: share an empty text/plain to TaskFlow → `No hay texto que añadir. Comparte un texto con TaskFlow.`"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P85",
+   "title": "Catalan: 'Grup suprimit', like the button",
+   "area": "C",
+   "size": "S",
+   "severity": 1,
+   "findings": ["UX-490"],
+   "aliases": {"UX-490": "R1C-1"},
+   "files": [
+    "App/lib/l10n/app_ca.arb",
+    "App/test/groups_screen_test.dart"
+   ],
+   "brief": [
+    "UX-490 (R1C-1, S1, from P78): P78 followed its brief and set CA `groupDeleted` to `Grup eliminat` (app_ca.arb:508). The Catalan catalog says `suprimir` for delete everywhere else: the button just tapped is `Suprimeix` (:157) and deleting a project says `Projecte suprimit` (:507). The brief was wrong; the catalog's term wins.",
+    "Set CA `groupDeleted` to `Grup suprimit`, run `flutter gen-l10n`, and update the Catalan string check in App/test/groups_screen_test.dart (around :152-161). Leave EN `Group deleted` and ES `Grupo eliminado` unchanged."
+   ],
+   "acceptance": [
+    "Widget test: deleting a group in Catalan lands on the screen underneath with `Grup suprimit`."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P86",
+   "title": "Time-zone search shows which name matched",
+   "area": "D",
+   "size": "S",
+   "severity": 1,
+   "findings": ["UX-489"],
+   "aliases": {"UX-489": "R1D-2"},
+   "files": [
+    "App/lib/screens/regional_settings_screen.dart",
+    "App/test/regional_ui_test.dart"
+   ],
+   "brief": [
+    "UX-489 (R1D-2, S1, from P79): `_cityAliases` (regional_settings_screen.dart:168-231) maps zones to Spanish and Catalan names, and some are other cities in the same zone: Pekín → Shanghai, Quito → Guayaquil, Nueva Delhi and Bombay → Kolkata, Montreal → Toronto, Tel Aviv → Jerusalem, Ciudad del Cabo → Johannesburg, Canarias/Tenerife → Canary. The row (:270-273) shows only the tz city, so `Pekín` lists a row reading `Shanghai` and the user can't tell it's right. `montreal` lists two rows, `Montreal` and `Toronto`.",
+    "(1) Change the alias values from one space-separated string to a list of names (`Map<String, List<String>>`), so multi-word names such as `Nueva Delhi`, `Nova Delhi` and `Ciudad del Cabo` stay whole. Keep every name except the ones in (3).",
+    "(2) In the picker, a zone still matches when `matchesSearch` finds the query in its city, its id or any alias. When the query doesn't match `'${timeZoneName(z)} $z'` and matches an alias, show that alias (the first one in the list that `matchesSearch` accepts on its own; if none does, the first alias) as the row's `subtitle`. Rows that match by city or id, and every row when the query is empty, stay as they are: title only.",
+    "(3) Remove the `America/Toronto` entry, whose only names are `Montreal Montréal` (:198): accent folding already finds `America/Montreal`. Toronto itself still matches by its tz city.",
+    "Don't change the listed zones, `_listedZone`, the Settings row, or any ARB file; the subtitle is the alias as written, so it needs no translation."
+   ],
+   "acceptance": [
+    "Widget test, Spanish: searching `pekin` lists one row, titled `Shanghai` with the subtitle `Pekín`.",
+    "Widget test: searching `montreal` lists exactly one row, `Montreal`, with no subtitle.",
+    "Widget test: searching `Londres` lists `London` with the subtitle `Londres`; searching `london` lists `London` with no subtitle.",
+    "Widget test, Catalan at 2× text on 360×740: searching `Nova Delhi` lists `Kolkata` with the subtitle `Nova Delhi`, without overflow."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": [],
+ "escalated": []
+}

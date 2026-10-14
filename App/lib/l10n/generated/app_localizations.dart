@@ -1132,12 +1132,6 @@ abstract class AppLocalizations {
   /// **'Export & import'**
   String get exportImport;
 
-  /// No description provided for @regionalSettingsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Language, clock, week start and capture timezone'**
-  String get regionalSettingsHelp;
-
   /// No description provided for @language.
   ///
   /// In en, this message translates to:
@@ -1717,14 +1711,20 @@ abstract class AppLocalizations {
   /// No description provided for @onDeviceTranscript.
   ///
   /// In en, this message translates to:
-  /// **'On-device live transcript'**
+  /// **'On this phone, as you speak'**
   String get onDeviceTranscript;
 
   /// No description provided for @onlineAudio.
   ///
   /// In en, this message translates to:
-  /// **'Saved audio · online transcription'**
+  /// **'Online, after you finish'**
   String get onlineAudio;
+
+  /// Heading on the Voice screen above the two choices for how speech becomes text: on this phone while speaking, or online after finishing.
+  ///
+  /// In en, this message translates to:
+  /// **'How speech becomes text'**
+  String get speechMethod;
 
   /// No description provided for @speechLanguage.
   ///
@@ -1732,10 +1732,22 @@ abstract class AppLocalizations {
   /// **'Speech language'**
   String get speechLanguage;
 
+  /// Row in Other settings, and the title of the screen it opens, where the speech language, how speech becomes text and the privacy note live.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get voiceSettings;
+
+  /// Speech language option, the default: capture listens in the app's language.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as the app'**
+  String get sameAsApp;
+
   /// No description provided for @onDeviceUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'On-device speech is unavailable for this language on this device. Record audio for online processing, or type.'**
+  /// **'This phone can’t do this language by itself, so TaskFlow does it online.'**
   String get onDeviceUnavailable;
 
   /// No description provided for @setUpSpeech.
@@ -1779,6 +1791,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.'**
   String get capturePrivacy;
+
+  /// One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Your words go online. More in Settings.'**
+  String get capturePrivacyLine;
 
   /// No description provided for @lookRight.
   ///
@@ -2512,6 +2530,12 @@ abstract class AppLocalizations {
   /// **'Use at least 12 characters'**
   String get passwordTooShort;
 
+  /// No description provided for @enterPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password'**
+  String get enterPassword;
+
   /// No description provided for @showPassword.
   ///
   /// In en, this message translates to:
@@ -2553,6 +2577,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create an account with this email'**
   String get createAccountWithEmail;
+
+  /// No description provided for @signInWithEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with this email'**
+  String get signInWithEmail;
 
   /// No description provided for @backToSignIn.
   ///
@@ -3118,6 +3148,12 @@ abstract class AppLocalizations {
   /// **'Project deleted'**
   String get projectDeleted;
 
+  /// No description provided for @groupDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Group deleted'**
+  String get groupDeleted;
+
   /// No description provided for @invitationCodeRequired.
   ///
   /// In en, this message translates to:
@@ -3159,6 +3195,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You’re invited to {name} · View'**
   String invitedTo(String name);
+
+  /// The invitation card when the server says who sent it: sender's name, then the project or group.
+  ///
+  /// In en, this message translates to:
+  /// **'{sender} invited you to “{name}” · View'**
+  String invitedByTo(String sender, String name);
 
   /// How many more invitations wait behind the one shown.
   ///
@@ -4354,6 +4396,18 @@ abstract class AppLocalizations {
   /// **'Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.'**
   String get captureSetupRequested;
 
+  /// Banner on the Voice screen after Android was asked to set up on-device speech for the language. The button name must match checkAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow Android’s steps, then tap Check again.'**
+  String get voiceSetupRequested;
+
+  /// Banner on the Voice screen when Android's on-device speech setup for the language cannot be opened. Live transcription then runs online.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone can’t set this up, so TaskFlow does it online.'**
+  String get voiceSetupUnavailable;
+
   /// No description provided for @captureSetupUnavailable.
   ///
   /// In en, this message translates to:
@@ -5289,6 +5343,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review invitation'**
   String get invitationReview;
+
+  /// First line of the invitation review screen when the server says who sent it.
+  ///
+  /// In en, this message translates to:
+  /// **'{sender} invited you to “{name}”'**
+  String invitationFrom(String sender, String name);
 
   /// No description provided for @invitationReviewHelp.
   ///

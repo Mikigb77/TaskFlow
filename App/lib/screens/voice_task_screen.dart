@@ -352,6 +352,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   String? _saveAtOnce;
   late final NativeSpeech _speech;
   SpeechCapability _capability = const SpeechCapability();
+  // The recognizer's language, e.g. `ca-ES`, passed to every listening run.
+  String _speechLanguage = '';
+  // The privacy line, shown in the sheet only the first time the microphone
+  // is used on this device; after that it lives in Ajustes › Voz.
+  bool _privacy = false;
   StreamSubscription<SpeechEvent>? _speechEvents;
   Completer<void>? _speechEnded;
   bool _nativeMode = false;
@@ -428,11 +433,18 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   Future<void> _load() async {
     try {
-      if (_voice) {
-        _capability = await _speech.capability();
-        _nativeMode = _capability.usable;
-      }
       await ref.read(regionalProvider.notifier).ready;
+      if (_voice && mounted) {
+        // The language chosen in Voz, else the app's; never the phone's.
+        final preferences = ref.read(regionalProvider);
+        _speechLanguage = speechLanguageTag(
+          preferences.speechLanguage,
+          app: Localizations.localeOf(context),
+          devices: WidgetsBinding.instance.platformDispatcher.locales,
+        );
+        _capability = await _speech.capability(language: _speechLanguage);
+        _nativeMode = _capability.usable && !preferences.speechOnline;
+      }
       final zone = await CaptureTimezone.resolve(
         ref.read(regionalProvider),
         accountTimezone: _zone,
@@ -533,6 +545,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           (ref.read(listCanEditProvider(scoped)) ? scoped : null),
       source: source,
       id: id,
+      // Spoken captures keep the Voz language, so online transcription
+      // hears it too.
+      language: _spokenLanguage(audio: audio, source: source),
       // Kept with the capture, so resuming it keeps the day. Today, or a day
       // gone by, adds nothing; notes never get a day.
       day: _kind == 'task' && day != null && day.isAfter(Task.day(now))
@@ -542,6 +557,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     await CaptureDiagnostics(_store.database).record(CaptureEvent.started);
     if (mounted) ref.invalidate(pendingCapturesProvider);
   }
+
+  String? _spokenLanguage({bool audio = false, String? source}) =>
+      (audio || source == 'speech') && _speechLanguage.isNotEmpty
+      ? _speechLanguage
+      : null;
 
   /// The recorder stopped before any audio arrived: its file holds nothing,
   /// and no capture was kept.
@@ -685,6 +705,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
   }
 
+  /// The first time the microphone is used on this device, the privacy line
+  /// shows under the words for this capture; later captures leave it to Voz.
+  void _showPrivacyOnce() {
+    final preferences = ref.read(regionalProvider);
+    if (preferences.privacyShown) return;
+    setState(() => _privacy = true);
+    unawaited(
+      ref
+          .read(regionalProvider.notifier)
+          .set(preferences.withPrivacyShown())
+          .catchError((Object _) {}),
+    );
+  }
+
   /// The microphone is really listening: show it and start the clock.
   void _listening() {
     if (!mounted || !_recording || _phase != _CapturePhase.starting) return;
@@ -743,6 +777,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       }
       if (!mounted) return;
       if (_micBlocked) setState(() => _micBlocked = false);
+      _showPrivacyOnce();
       if (_session?.audioPath != null) {
         throw StateError(
           'Retry this recording or discard it before recording another.',
@@ -782,9 +817,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         // Listening shows, and its clock runs, from the recognizer's `ready`.
         await _speech.start(
           _nativeRun,
-          _capability.language,
+          _speechLanguage,
           hints: speechHints(
-            _capability.language,
+            _speechLanguage,
             projects: ref.read(taskListsProvider).valueOrNull ?? const [],
           ),
         );
@@ -805,6 +840,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           status: 'recording',
           audioFormat: _audioFormat,
           source: _session!.source ?? 'speech',
+          language: _session!.language ?? _spokenLanguage(audio: true),
         );
         await _store.update(_session!);
       }
@@ -1632,6 +1668,22 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                           ),
                         ?words,
                       ],
+                    ),
+                  ),
+                ),
+              // One small line under the words, at most three lines tall (at
+              // 2× text Catalan needs three), so it never takes the newest
+              // words' room. The full note is on Voz.
+              if (_privacy)
+                Padding(
+                  key: const ValueKey('capture-privacy'),
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    l10n.capturePrivacyLine,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ),

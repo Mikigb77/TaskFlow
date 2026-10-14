@@ -32,6 +32,7 @@ import 'package:agenda/screens/day_timeline_screen.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/screens/regional_settings_screen.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
+import 'package:agenda/screens/voice_settings_screen.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/subscription_screen.dart';
@@ -77,8 +78,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   StreamSubscription<void>? _entries;
   bool _openingEntry = false;
   bool _openingInvitation = false;
-  // An invitation left with ‘Not now’ isn't opened again this session.
-  InvitationLink? _postponedInvitation;
   @override
   void initState() {
     super.initState();
@@ -220,7 +219,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       return;
     }
     final invitation = ref.read(invitationLinkProvider);
-    if (invitation == null || identical(invitation, _postponedInvitation)) {
+    if (invitation == null ||
+        ref.read(invitationLinkProvider.notifier).isPostponed(invitation)) {
       return;
     }
     _openingInvitation = true;
@@ -231,11 +231,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         ),
       );
       if (!mounted) return;
+      final links = ref.read(invitationLinkProvider.notifier);
       if (handled == true) {
-        ref.read(invitationLinkProvider.notifier).clear(invitation);
+        links.clear(invitation);
       } else {
         // Kept: Calendar's card offers it again, with its code.
-        _postponedInvitation = invitation;
+        links.postpone(invitation);
       }
     } finally {
       _openingInvitation = false;
@@ -372,6 +373,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               '/dataTransfer': (_) => const DataTransferScreen(),
               '/region': (_) => const RegionalSettingsScreen(),
               '/otherSettings': (_) => const OtherSettingsScreen(),
+              '/voiceSettings': (_) => const VoiceSettingsScreen(),
               '/deviceCalendars': (_) => const DeviceCalendarsScreen(),
               '/calendar': (_) => const MainShell(),
               '/notes': (_) => const MainShell(initialIndex: 2),

@@ -692,8 +692,10 @@ class _Captures extends CaptureStore {
     String? source,
     DateTime? day,
     String? id,
+    String? language,
   }) async {
     final session = CaptureSession(
+      language: language,
       id: 'capture-${_next++}',
       ownerKey: ownerKey,
       timezone: timezone,

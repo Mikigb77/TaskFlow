@@ -62,13 +62,17 @@ class CaptureEntryBridge(private val activity: Activity, messenger: BinaryMessen
             else -> return
         }
         val text = if (kind == "share") try { intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim().orEmpty() } catch (_: Exception) { "" } else ""
-        if (kind == "share" && (text.isEmpty() || text.length > 4000)) {
-            Toast.makeText(activity, "Share between 1 and 4,000 characters with TaskFlow.", Toast.LENGTH_LONG).show()
+        if (kind == "share" && text.isEmpty()) {
+            Toast.makeText(activity, R.string.share_empty, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (kind == "share" && text.length > 4000) {
+            Toast.makeText(activity, R.string.share_too_long, Toast.LENGTH_LONG).show()
             return
         }
         val queue = pending()
         if (queue.length() >= 16) {
-            Toast.makeText(activity, "Open TaskFlow to review your pending captures before sharing more.", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, R.string.share_queue_full, Toast.LENGTH_LONG).show()
             return
         }
         queue.put(JSONObject().put("id", UUID.randomUUID().toString()).put("kind", kind)
@@ -79,7 +83,7 @@ class CaptureEntryBridge(private val activity: Activity, messenger: BinaryMessen
             intent.removeExtra(Intent.EXTRA_TEXT)
             channel.invokeMethod("changed", null)
         } else {
-            Toast.makeText(activity, "Could not retain this capture. Please share it again.", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, R.string.share_not_saved, Toast.LENGTH_LONG).show()
         }
     }
     fun close() { channel.setMethodCallHandler(null) }

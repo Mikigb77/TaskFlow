@@ -656,10 +656,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get exportImport => 'Exportar e importar';
 
   @override
-  String get regionalSettingsHelp =>
-      'Idioma, reloj, inicio de semana y zona de captura';
-
-  @override
   String get language => 'Idioma';
 
   @override
@@ -967,17 +963,26 @@ class AppLocalizationsEs extends AppLocalizations {
   String get recordingKept => 'Grabación guardada en este teléfono';
 
   @override
-  String get onDeviceTranscript => 'Transcripción en directo en el dispositivo';
+  String get onDeviceTranscript => 'En el teléfono, mientras hablas';
 
   @override
-  String get onlineAudio => 'Audio guardado · transcripción en línea';
+  String get onlineAudio => 'En línea, al terminar';
+
+  @override
+  String get speechMethod => 'Cómo se pasa la voz a texto';
 
   @override
   String get speechLanguage => 'Idioma de voz';
 
   @override
+  String get voiceSettings => 'Voz';
+
+  @override
+  String get sameAsApp => 'Como la aplicación';
+
+  @override
   String get onDeviceUnavailable =>
-      'La transcripción local no está disponible para este idioma en este dispositivo. Graba audio para procesarlo en línea o escribe.';
+      'Este teléfono no puede con este idioma por sí solo, así que TaskFlow lo hace en línea.';
 
   @override
   String get setUpSpeech => 'Configurar la transcripción local';
@@ -1001,6 +1006,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get capturePrivacy =>
       'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. La extracción de tareas con IA necesita internet y envía tus palabras a Google. El audio guardado se transcribe en línea. Las capturas pendientes permanecen en este teléfono hasta que las guardes o descartes.';
+
+  @override
+  String get capturePrivacyLine =>
+      'Tus palabras van por internet. Más en Ajustes.';
 
   @override
   String get lookRight => '¿Está bien así?';
@@ -1434,6 +1443,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get passwordTooShort => 'Usa al menos 12 caracteres';
 
   @override
+  String get enterPassword => 'Introduce tu contraseña';
+
+  @override
   String get showPassword => 'Mostrar contraseña';
 
   @override
@@ -1453,6 +1465,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get createAccountWithEmail => 'Crear una cuenta con este correo';
+
+  @override
+  String get signInWithEmail => 'Iniciar sesión con este correo';
 
   @override
   String get backToSignIn => 'Volver a iniciar sesión';
@@ -1787,6 +1802,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get projectDeleted => 'Proyecto eliminado';
 
   @override
+  String get groupDeleted => 'Grupo eliminado';
+
+  @override
   String get invitationCodeRequired => 'Pega el código de invitación completo.';
 
   @override
@@ -1808,6 +1826,11 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String invitedTo(String name) {
     return 'Te han invitado a $name · Ver';
+  }
+
+  @override
+  String invitedByTo(String sender, String name) {
+    return '$sender te invita a «$name» · Ver';
   }
 
   @override
@@ -2628,6 +2651,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se ha solicitado configurar el reconocimiento. Sigue las indicaciones de Android y pulsa Comprobar de nuevo. Mientras tanto, puedes seguir escribiendo.';
 
   @override
+  String get voiceSetupRequested =>
+      'Sigue los pasos de Android y luego pulsa Comprobar de nuevo.';
+
+  @override
+  String get voiceSetupUnavailable =>
+      'Este teléfono no puede configurarlo, así que TaskFlow lo hace en línea.';
+
+  @override
   String get captureSetupUnavailable =>
       'La configuración del reconocimiento no está disponible aquí. Usa audio guardado o escribe.';
 
@@ -3338,6 +3369,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get invitationReview => 'Revisar invitación';
+
+  @override
+  String invitationFrom(String sender, String name) {
+    return '$sender te invita a «$name»';
+  }
 
   @override
   String get invitationReviewHelp => 'Verás sus tareas, notas y archivos.';

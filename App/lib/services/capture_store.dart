@@ -51,6 +51,7 @@ class CaptureStore {
     String? source,
     DateTime? day,
     String? id,
+    String? language,
   }) async {
     if (!['task', 'note'].contains(kind)) {
       throw ArgumentError('Invalid capture type.');
@@ -67,6 +68,7 @@ class CaptureStore {
       audioPath: audio ? p.join((await _directory()).path, '$id.wav') : null,
       source: source,
       day: day,
+      language: language,
     );
     await (await database.database).insert('captures', {
       'id': id,
@@ -339,6 +341,7 @@ class CaptureStore {
       transcript: before.transcript,
       source: before.source,
       day: before.day,
+      language: before.language,
       status: 'ready',
       drafts: [
         for (final draft in current.drafts)

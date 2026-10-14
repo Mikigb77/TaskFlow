@@ -33,6 +33,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _hasRecoveryCode = false;
   bool _busy = false;
   bool _showPassword = false;
+  // Reached sign-in from create's email-in-use answer, so this email has an
+  // account: wrong credentials mean a forgotten password, not a new account.
+  bool _accountExists = false;
   String? _message;
   Object? _error;
   final _emailField = GlobalKey();
@@ -53,13 +56,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _mode({bool register = false, bool recover = false}) {
+  void _mode({
+    bool register = false,
+    bool recover = false,
+    bool accountExists = false,
+  }) {
     ref.read(authProvider.notifier).clearError();
     setState(() {
       // Sign-in and create share the typed password; recovery sets a new one.
       if (recover || _recover) _password.clear();
       _register = register;
       _recover = recover;
+      _accountExists = accountExists;
       _hasRecoveryCode = false;
       _code.clear();
       _message = null;
@@ -252,6 +260,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         error != null &&
         error is! GoogleSignInProblem &&
         requestProblem(error) == 'credentials';
+    // The mirror of [unknownAccount]: the email has an account, so offer
+    // sign-in with it kept.
+    final emailUsed =
+        _register &&
+        field == _Field.email &&
+        requestProblem(error!) == 'emailUsed';
     final submitLabel = _recover
         ? _hasRecoveryCode
               ? strings.saveNewPassword
@@ -379,37 +393,68 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     if (_showsEmail) ...[
                                       KeyedSubtree(
                                         key: _emailField,
-                                        child: TextFormField(
-                                          key: const ValueKey('account-email'),
-                                          controller: _email,
-                                          enabled: !busy,
-                                          keyboardType:
-                                              TextInputType.emailAddress,
-                                          autocorrect: false,
-                                          autofillHints: const [
-                                            AutofillHints.username,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            TextFormField(
+                                              key: const ValueKey(
+                                                'account-email',
+                                              ),
+                                              controller: _email,
+                                              enabled: !busy,
+                                              keyboardType:
+                                                  TextInputType.emailAddress,
+                                              autocorrect: false,
+                                              autofillHints: const [
+                                                AutofillHints.username,
+                                              ],
+                                              textInputAction: _recover
+                                                  ? TextInputAction.done
+                                                  : TextInputAction.next,
+                                              onFieldSubmitted: _recover
+                                                  ? (_) => _submit()
+                                                  : null,
+                                              onChanged: (_) {
+                                                if (_accountExists) {
+                                                  setState(
+                                                    () =>
+                                                        _accountExists = false,
+                                                  );
+                                                }
+                                                if (emailError != null) {
+                                                  _clearProblem();
+                                                }
+                                              },
+                                              decoration: InputDecoration(
+                                                labelText: strings.email,
+                                                errorText: emailError,
+                                                errorMaxLines: 4,
+                                              ),
+                                              validator: (value) =>
+                                                  value == null ||
+                                                      !value.contains('@')
+                                                  ? strings.enterEmail
+                                                  : null,
+                                            ),
+                                            if (emailUsed) ...[
+                                              const SizedBox(height: 12),
+                                              OutlinedButton(
+                                                key: const ValueKey(
+                                                  'sign-in-with-email',
+                                                ),
+                                                onPressed: busy
+                                                    ? null
+                                                    : () => _mode(
+                                                        accountExists: true,
+                                                      ),
+                                                child: Text(
+                                                  strings.signInWithEmail,
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ),
+                                            ],
                                           ],
-                                          textInputAction: _recover
-                                              ? TextInputAction.done
-                                              : TextInputAction.next,
-                                          onFieldSubmitted: _recover
-                                              ? (_) => _submit()
-                                              : null,
-                                          onChanged: (_) {
-                                            if (emailError != null) {
-                                              _clearProblem();
-                                            }
-                                          },
-                                          decoration: InputDecoration(
-                                            labelText: strings.email,
-                                            errorText: emailError,
-                                            errorMaxLines: 4,
-                                          ),
-                                          validator: (value) =>
-                                              value == null ||
-                                                  !value.contains('@')
-                                              ? strings.enterEmail
-                                              : null,
                                         ),
                                       ),
                                       const SizedBox(height: 16),
@@ -488,13 +533,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               ),
                                             ),
                                           ),
+                                          // Length rules are for new passwords;
+                                          // signing in only needs one typed.
                                           validator: (value) =>
-                                              value == null || value.length < 12
+                                              !_register && !_recover
+                                              ? value == null || value.isEmpty
+                                                    ? strings.enterPassword
+                                                    : null
+                                              : value == null ||
+                                                    value.length < 12
                                               ? strings.passwordTooShort
                                               : null,
                                         ),
                                       ),
-                                    if (!_recover && !_register)
+                                    // Hidden while the banner offers the same
+                                    // recovery as a button (UX-495).
+                                    if (!_recover &&
+                                        !_register &&
+                                        !(unknownAccount && _accountExists))
                                       Align(
                                         alignment: Alignment.centerRight,
                                         child: TextButton(
@@ -558,7 +614,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       problem ?? _message!,
                                       isError: error != null,
                                     ),
-                                    if (unknownAccount) ...[
+                                    if (unknownAccount && _accountExists) ...[
+                                      const SizedBox(height: 12),
+                                      OutlinedButton(
+                                        key: const ValueKey(
+                                          'recover-with-email',
+                                        ),
+                                        onPressed: busy
+                                            ? null
+                                            : () => _mode(recover: true),
+                                        child: Text(
+                                          strings.forgotPassword,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ] else if (unknownAccount) ...[
                                       const SizedBox(height: 12),
                                       OutlinedButton(
                                         key: const ValueKey(

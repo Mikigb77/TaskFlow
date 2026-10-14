@@ -277,7 +277,6 @@
   },
   "completedTasks": "Completed tasks",
   "exportImport": "Export & import",
-  "regionalSettingsHelp": "Language, clock, week start and capture timezone",
   "language": "Language",
   "deviceDefault": "Same as phone",
   "clockFormat": "Time format",
@@ -381,10 +380,22 @@
   "resetOccurrence": "Reset this occurrence",
   "reset": "Reset",
   "recordingKept": "Recording kept on this phone",
-  "onDeviceTranscript": "On-device live transcript",
-  "onlineAudio": "Saved audio · online transcription",
+  "onDeviceTranscript": "On this phone, as you speak",
+  "onlineAudio": "Online, after you finish",
+  "speechMethod": "How speech becomes text",
+  "@speechMethod": {
+    "description": "Heading on the Voice screen above the two choices for how speech becomes text: on this phone while speaking, or online after finishing."
+  },
   "speechLanguage": "Speech language",
-  "onDeviceUnavailable": "On-device speech is unavailable for this language on this device. Record audio for online processing, or type.",
+  "voiceSettings": "Voice",
+  "@voiceSettings": {
+    "description": "Row in Other settings, and the title of the screen it opens, where the speech language, how speech becomes text and the privacy note live."
+  },
+  "sameAsApp": "Same as the app",
+  "@sameAsApp": {
+    "description": "Speech language option, the default: capture listens in the app's language."
+  },
+  "onDeviceUnavailable": "This phone can’t do this language by itself, so TaskFlow does it online.",
   "setUpSpeech": "Set up on-device speech",
   "checkAgain": "Check again",
   "examplePlan": "Doctor Friday at 5 p.m. Bring my results. Also buy coffee.",
@@ -395,6 +406,10 @@
   "discard": "Discard",
   "keep": "Keep",
   "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.",
+  "capturePrivacyLine": "Your words go online. More in Settings.",
+  "@capturePrivacyLine": {
+    "description": "One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings."
+  },
   "lookRight": "Look right?",
   "finalSay": "Tap a detail to change it. You have the final say.",
   "changePriority": "Change priority",
@@ -635,6 +650,7 @@
   "password": "Password",
   "passwordHelp": "At least 12 characters, not only numbers",
   "passwordTooShort": "Use at least 12 characters",
+  "enterPassword": "Enter your password",
   "showPassword": "Show password",
   "hidePassword": "Hide password",
   "createAccount": "Create account",
@@ -642,6 +658,7 @@
   "alreadyHaveAccount": "Already have an account? Sign in",
   "createAnAccount": "Create an account",
   "createAccountWithEmail": "Create an account with this email",
+  "signInWithEmail": "Sign in with this email",
   "backToSignIn": "Back to sign in",
   "sendRecoveryCode": "Send code",
   "saveNewPassword": "Save new password",
@@ -827,6 +844,7 @@
     }
   },
   "projectDeleted": "Project deleted",
+  "groupDeleted": "Group deleted",
   "invitationCodeRequired": "Paste the full invitation code.",
   "invitationCodeWrong": "Ask the person who invited you for the current code.",
   "invitationResponseError": "Could not respond. Retry when connected.",
@@ -837,6 +855,18 @@
   "@invitedTo": {
     "description": "A card for a pending invitation, on Calendar, Projects and Groups; tapping it opens the join dialog.",
     "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitedByTo": "{sender} invited you to “{name}” · View",
+  "@invitedByTo": {
+    "description": "The invitation card when the server says who sent it: sender's name, then the project or group.",
+    "placeholders": {
+      "sender": {
+        "type": "String"
+      },
       "name": {
         "type": "String"
       }
@@ -1294,6 +1324,14 @@
   "captureReviewWriteFailed": "Could not keep these changes. Please try again before leaving.",
   "captureSaveFailed": "Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.",
   "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
+  "voiceSetupRequested": "Follow Android’s steps, then tap Check again.",
+  "@voiceSetupRequested": {
+    "description": "Banner on the Voice screen after Android was asked to set up on-device speech for the language. The button name must match checkAgain."
+  },
+  "voiceSetupUnavailable": "This phone can’t set this up, so TaskFlow does it online.",
+  "@voiceSetupUnavailable": {
+    "description": "Banner on the Voice screen when Android's on-device speech setup for the language cannot be opened. Live transcription then runs online."
+  },
   "captureSetupUnavailable": "Speech setup is unavailable here. Use saved audio or type.",
   "voiceRecording": "Voice recording",
   "retryCaptures": "Retry loading captures",
@@ -1641,6 +1679,18 @@
   "invitationEmailSent": "Invitation sent by email. You can also share the code below.",
   "invitationEmailPending": "Your invitation is ready. Email delivery is pending and will retry automatically. You can share this code now.",
   "invitationReview": "Review invitation",
+  "invitationFrom": "{sender} invited you to “{name}”",
+  "@invitationFrom": {
+    "description": "First line of the invitation review screen when the server says who sent it.",
+    "placeholders": {
+      "sender": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "invitationReviewHelp": "You’ll see its tasks, notes and files.",
   "invitationUnavailable": "This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.",
   "stagingInviteOnly": "This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address."

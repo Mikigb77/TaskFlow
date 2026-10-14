@@ -1787,7 +1787,9 @@ class _Captures extends CaptureStore {
     String? source,
     DateTime? day,
     String? id,
+    String? language,
   }) async => session = CaptureSession(
+    language: language,
     id: 'test-capture',
     projectId: projectId,
     source: source,
