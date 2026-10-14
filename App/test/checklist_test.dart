@@ -20,14 +20,14 @@ void main() {
                     child: ChecklistEditor(
                         items: items,
                         onChanged: (next) => setState(() => items = next)))))));
-    await tester.tap(find.byKey(const ValueKey('add-checklist-item')));
+    // Steps are typed in place: Enter on an empty field adds nothing.
+    final add = find.byKey(const ValueKey('add-checklist-item'));
+    await tester.tap(add);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Keep step'));
-    await tester.pumpAndSettle();
-    expect(find.text('Add a short step.'), findsOneWidget);
-    await tester.enterText(
-        find.byKey(const ValueKey('checklist-title')), 'Coat');
-    await tester.tap(find.text('Keep step'));
+    expect(items.length, 2);
+    await tester.enterText(add, 'Coat');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     expect(items.length, 3);
     await tester.tap(find.byTooltip('Edit Passport'));
@@ -36,8 +36,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
         find.byKey(const ValueKey('checklist-title')), 'New passport');
-    await tester.tap(find.text('Keep step'));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
+    expect(items.first.title, 'New passport');
     expect(items.first.id, passportId);
     await tester.tap(find.byTooltip('Edit New passport'));
     await tester.pumpAndSettle();
@@ -81,4 +82,52 @@ void main() {
       expect(tester.takeException(), isNull);
     }
   });
+
+  // ---- Round 2 (b8) · P110 (UX-621): a disabled editor keeps typed text ----
+
+  testWidgets(
+    'UX-621: a ChecklistEditor with onChanged null keeps the typed step in the field when the field loses focus',
+    (tester) async {
+      var items = [ChecklistItem(title: 'Charger')];
+      var enabled = true;
+      late StateSetter rebuild;
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: StatefulBuilder(builder: (context, setState) {
+        rebuild = setState;
+        return SingleChildScrollView(
+            child: ChecklistEditor(
+                items: items,
+                onChanged: enabled
+                    ? (next) => setState(() => items = next)
+                    : null));
+      }))));
+      final add = find.byKey(const ValueKey('add-checklist-item'));
+      String fieldText() => tester
+          .widget<EditableText>(
+              find.descendant(of: add, matching: find.byType(EditableText)))
+          .controller
+          .text;
+      await tester.enterText(add, 'Passport');
+      await tester.pump();
+      expect(fieldText(), 'Passport');
+
+      // The card is disabled (as while saving), then the field loses focus.
+      rebuild(() => enabled = false);
+      await tester.pump();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<EditableText>(
+                find.descendant(of: add, matching: find.byType(EditableText)))
+            .focusNode
+            .hasFocus,
+        isFalse,
+      );
+      expect(fieldText(), 'Passport', reason: 'the typed step is kept');
+      expect(items.map((item) => item.title), ['Charger']);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

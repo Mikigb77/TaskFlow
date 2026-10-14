@@ -1,7 +1,18 @@
 import 'package:agenda/models/day_timeline.dart';
 import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/models/task.dart';
+import 'dart:async';
+
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/main.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/day_timeline_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/design_fixtures.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -94,4 +105,60 @@ void main() {
     expect(autumn.offset(repeated[1]) - autumn.offset(repeated[0]), 60);
     expect(repeated[0].timeZoneOffset, isNot(repeated[1].timeZoneOffset));
   });
+
+  // ---- Round 1 · P23 · UX-224: the day timeline's arrows and copy ----
+
+  for (final (language, previous, next) in [
+    ('es', 'Día anterior', 'Día siguiente'),
+    ('en', 'Previous day', 'Next day'),
+    ('ca', 'Dia anterior', 'Dia següent'),
+  ]) {
+    testWidgets(
+        'UX-224: the timeline arrows read $previous / $next, and neither help paragraph is shown ($language)',
+        (tester) async {
+      const timeoutChannel = MethodChannel('taskflow/accessibility');
+      final platform =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => null);
+      addTearDown(
+          () => platform.setMockMethodCallHandler(timeoutChannel, null));
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = designContainer(
+          regionalStore:
+              MemoryRegionalStore(RegionalPreferences(language: language)));
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container, child: const MyApp()));
+      await tester.pumpAndSettle();
+      unawaited(Navigator.of(tester.element(find.byType(CalendarScreen)))
+          .pushNamed('/timeline', arguments: DateTime.now()));
+      await tester.pumpAndSettle();
+      final timeline = find.byType(DayTimelineScreen);
+      expect(timeline, findsOneWidget);
+      final l = lookupAppLocalizations(Locale(language));
+      expect(l.previousDay, previous);
+      expect(l.nextDay, next);
+      Finder inTimeline(Finder finder) =>
+          find.descendant(of: timeline, matching: finder);
+      expect(inTimeline(find.byTooltip(previous)), findsOneWidget);
+      expect(inTimeline(find.byTooltip(next)), findsOneWidget);
+      // Not the calendar's month-or-week wording.
+      expect(inTimeline(find.byTooltip(l.previousPeriod)), findsNothing);
+      expect(inTimeline(find.byTooltip(l.nextPeriod)), findsNothing);
+      // timelineHelp and timelineShortBlocks, as they read before (keys gone).
+      for (final gone in [
+        'Trabajo planificado y eventos del teléfono',
+        'Los eventos cortos tienen una zona táctil más grande',
+        'Planned work and phone events',
+        'Short events have larger tap targets',
+        'Tasques planificades i esdeveniments del telèfon',
+        'Els esdeveniments curts tenen una àrea tàctil més gran',
+      ]) {
+        expect(find.textContaining(gone), findsNothing, reason: gone);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

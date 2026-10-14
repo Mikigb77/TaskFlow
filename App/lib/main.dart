@@ -46,11 +46,6 @@ Future<void> main() async {
       'Manrope',
     ], await rootBundle.loadString('assets/fonts/OFL.txt'));
   });
-  try {
-    await TaskReminders.initialize();
-  } catch (_) {
-    await TaskReminders.recordError('setup_failed');
-  }
   final appearance = ThemeController(ThemePreferenceStore());
   final regional = RegionalController(RegionalPreferenceStore());
   await Future.wait([appearance.ready, regional.ready]);
@@ -61,6 +56,14 @@ Future<void> main() async {
         regionalProvider.overrideWith((ref) => regional),
       ],
       child: const MyApp(),
+    ),
+  );
+  // Reminder setup never holds back the first frame.
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => unawaited(
+      TaskReminders.initialize().catchError(
+        (Object _) => TaskReminders.recordError('setup_failed'),
+      ),
     ),
   );
 }
@@ -74,6 +77,9 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   var _navigator = GlobalKey<NavigatorState>();
   String? _navigationSession;
+
+  /// Sign-in shown over the open screens after the session expired.
+  Route<void>? _signInAgain;
   StreamSubscription<void>? _actions;
   StreamSubscription<void>? _entries;
   bool _openingEntry = false;
@@ -129,6 +135,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (!mounted ||
         _openingEntry ||
         ref.read(authProvider).loading ||
+        ref.read(authProvider).expired ||
         ref.read(authProvider).account == null ||
         _navigator.currentState == null) {
       return;
@@ -214,6 +221,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (!mounted ||
         _openingInvitation ||
         ref.read(authProvider).loading ||
+        ref.read(authProvider).expired ||
         ref.read(authProvider).account == null ||
         _navigator.currentState == null) {
       return;
@@ -246,6 +254,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Future<void> _openReminder() async {
     if (!mounted ||
         ref.read(authProvider).loading ||
+        ref.read(authProvider).expired ||
         ref.read(authProvider).account == null) {
       return;
     }
@@ -263,19 +272,58 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           session == _navigationSession &&
           ref.read(authProvider).account != null &&
           _navigator.currentState != null) {
+        if (task == null) {
+          // The task is gone, or the alert is stale: stay where the user is.
+          final context = _navigator.currentContext!;
+          final messenger = ScaffoldMessenger.maybeOf(context);
+          if (messenger != null) {
+            unawaited(showFeedback(messenger, context.l10n.taskRemoved));
+          }
+          return;
+        }
         _navigator.currentState!.push(
           MaterialPageRoute<void>(
-            builder: (_) => task == null
-                ? const MainShell()
-                : TaskDetailScreen(
-                    taskId: task.id!,
-                    occurrenceDate: task.occurrenceDate,
-                    occurrenceKey: task.occurrenceId,
-                  ),
+            builder: (_) => TaskDetailScreen(
+              taskId: task.id!,
+              occurrenceDate: task.occurrenceDate,
+              occurrenceKey: task.occurrenceId,
+            ),
           ),
         );
       }
     });
+  }
+
+  /// Covers the open screens with sign-in, so nothing typed in them is lost.
+  void _showSignInAgain() {
+    final navigator = _navigator.currentState;
+    if (!mounted ||
+        _signInAgain != null ||
+        navigator == null ||
+        !ref.read(authProvider).expired) {
+      return;
+    }
+    final route = MaterialPageRoute<void>(
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: LoginScreen(signInAgain: true),
+      ),
+    );
+    _signInAgain = route;
+    unawaited(navigator.push(route));
+  }
+
+  /// The same account signed back in: return to where the user was.
+  void _closeSignInAgain() {
+    final route = _signInAgain;
+    _signInAgain = null;
+    final navigator = _navigator.currentState;
+    if (route == null || navigator == null || !route.isActive) return;
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
   }
 
   @override
@@ -307,6 +355,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       }
     });
     ref.listen(authProvider, (previous, next) {
+      if (next.expired) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _showSignInAgain());
+        return;
+      }
+      if (_signInAgain != null && !next.loading) _closeSignInAgain();
       if (!next.loading && next.account != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
         WidgetsBinding.instance.addPostFrameCallback((_) => _openEntries());
@@ -329,6 +382,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       _navigationSession = session;
       // A fresh navigator prevents Back from restoring protected routes after logout.
       _navigator = GlobalKey<NavigatorState>();
+      _signInAgain = null;
     }
     final regional = ref.watch(regionalProvider);
     final system24Hour =

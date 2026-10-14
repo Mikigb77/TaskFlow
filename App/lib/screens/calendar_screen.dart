@@ -195,6 +195,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     });
   }
 
+  /// The week or month arrows; with animations off the page just changes.
+  void _turnPage(int by, {required bool instant}) {
+    final pages = _calendarPage;
+    if (pages == null || !pages.hasClients) return;
+    if (instant) {
+      pages.jumpToPage((pages.page ?? pages.initialPage).round() + by);
+    } else if (by < 0) {
+      pages.previousPage(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    } else {
+      pages.nextPage(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   /// Only the no-date row landed: no saved task has a date.
   bool get _inboxOnly => _landedInbox && _landedIds.isEmpty;
 
@@ -477,18 +496,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             ),
                             IconButton(
                               tooltip: context.l10n.previousPeriod,
-                              onPressed: () => _calendarPage?.previousPage(
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeOut,
-                              ),
+                              onPressed: () => _turnPage(-1, instant: instant),
                               icon: const Icon(Icons.chevron_left_rounded),
                             ),
                             IconButton(
                               tooltip: context.l10n.nextPeriod,
-                              onPressed: () => _calendarPage?.nextPage(
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeOut,
-                              ),
+                              onPressed: () => _turnPage(1, instant: instant),
                               icon: const Icon(Icons.chevron_right_rounded),
                             ),
                           ],
@@ -510,6 +523,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                 7],
                         rowHeight: 48,
                         daysOfWeekHeight: 30,
+                        pageAnimationEnabled: !instant,
                         onCalendarCreated: (controller) =>
                             _calendarPage = controller,
                         selectedDayPredicate: (day) =>

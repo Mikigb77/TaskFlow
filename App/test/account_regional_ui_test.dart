@@ -105,7 +105,8 @@ void main() {
       String? syncError,
       bool debug = false,
       bool dark = false,
-      double textScale = 1}) async {
+      double textScale = 1,
+      DesignTaskNotifier Function()? tasks}) async {
     final api = OfflineApiClient();
     late _SignOutAuth auth;
     final repository = _LocalItems(localItems)..syncError = syncError;
@@ -113,7 +114,7 @@ void main() {
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => auth = _SignOutAuth(api)),
       taskRepositoryProvider.overrideWithValue(repository),
-      taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+      taskProvider.overrideWith((ref) => tasks?.call() ?? DesignTaskNotifier()),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
     ]);
     addTearDown(container.dispose);
@@ -287,6 +288,126 @@ void main() {
     });
   }
 
+  // ---- Round 1 · P100 · UX-513: in-button spinners say what is happening ----
+
+  /// What TalkBack hears on [button]: its own label merged with its children.
+  String spoken(WidgetTester tester, Finder button) =>
+      tester.getSemantics(button).label;
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+        'UX-513: while syncing, the spinner in Sincronizar ahora is labelled with what is happening ($language)',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final semantics = tester.ensureSemantics();
+      final l = lookupAppLocalizations(Locale(language));
+      late _HeldTasks tasks;
+      await openAccount(tester,
+          language: language, tasks: () => tasks = _HeldTasks());
+      final button = find.ancestor(
+          of: find.text(l.syncNow), matching: find.byType(TextButton));
+      expect(spoken(tester, button), isNot(contains(l.accountSyncing)),
+          reason: 'nothing is announced at rest');
+
+      tasks.hold = Completer<void>();
+      await tester.tap(button);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final spinner = find.descendant(
+          of: button, matching: find.byType(CircularProgressIndicator));
+      expect(spinner, findsOneWidget);
+      expect(tester.widget<CircularProgressIndicator>(spinner).semanticsLabel,
+          l.accountSyncing);
+      expect(spoken(tester, button), contains(l.accountSyncing));
+      expect(l.accountSyncing.trim(), isNotEmpty);
+      expect(tester.takeException(), isNull);
+
+      tasks.hold!.complete();
+      await tester.pumpAndSettle();
+      expect(spinner, findsNothing);
+      semantics.dispose();
+    });
+  }
+
+  testWidgets(
+      'UX-513: while importing, the spinner in Importar tareas y notas locales is labelled Importando tareas y notas',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    final (_, repository) = await openAccount(tester, localItems: 3);
+    repository.hold = Completer<void>();
+    final button = find.ancestor(
+        of: find.text(es.importLocalItems),
+        matching: find.byType(OutlinedButton));
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, es.importItems)));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final spinner = find.descendant(
+        of: button, matching: find.byType(CircularProgressIndicator));
+    expect(spinner, findsOneWidget);
+    expect(tester.widget<CircularProgressIndicator>(spinner).semanticsLabel,
+        es.accountImporting);
+    expect(spoken(tester, button), contains(es.accountImporting));
+    expect(tester.takeException(), isNull);
+
+    repository.hold!.complete();
+    await tester.pumpAndSettle();
+    expect(spinner, findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets(
+      'UX-513: while signing out, the spinner in Cerrar sesión is labelled Cerrando sesión',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    final (auth, _) = await openAccount(tester);
+    auth.hold = Completer<void>();
+    final button = find.ancestor(
+        of: find.text(es.signOut), matching: find.byType(TextButton));
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, es.signOut)));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    final spinner = find.descendant(
+        of: button, matching: find.byType(CircularProgressIndicator));
+    expect(spinner, findsOneWidget);
+    expect(tester.widget<CircularProgressIndicator>(spinner).semanticsLabel,
+        es.accountSigningOut);
+    expect(spoken(tester, button), contains(es.accountSigningOut));
+    expect(tester.takeException(), isNull);
+
+    auth.hold!.complete();
+    await tester.pumpAndSettle();
+    semantics.dispose();
+  });
+
+  test('UX-513: each in-button progress label is written in EN, ES and CA', () {
+    for (final language in ['en', 'es', 'ca']) {
+      final l = lookupAppLocalizations(Locale(language));
+      final labels = [l.accountSyncing, l.accountImporting, l.accountSigningOut];
+      for (final label in labels) {
+        expect(label.trim(), isNotEmpty, reason: language);
+      }
+      expect(labels.toSet(), hasLength(3), reason: 'each names its action');
+    }
+  });
+
   test('UX-408: the sign-out question names the reminders in EN, ES and CA',
       () {
     for (final (language, word) in [
@@ -319,8 +440,26 @@ class _SignOutAuth extends SignedInFixtureAuth {
 class _LocalItems extends MemoryTasks {
   _LocalItems(this.count);
   final int count;
+
+  /// When set, importing waits for it, as on a slow server.
+  Completer<void>? hold;
   @override
   Future<int> localTaskCount() async => count;
+  @override
+  Future<int> importLocalTasks() async {
+    await hold?.future;
+    return count;
+  }
+}
+
+/// Sync waits for [hold] once it is set, as on a slow server.
+class _HeldTasks extends DesignTaskNotifier {
+  Completer<void>? hold;
+  @override
+  Future<void> loadTasks() async {
+    await hold?.future;
+    await super.loadTasks();
+  }
 }
 
 class _GuestAuth extends AuthNotifier {

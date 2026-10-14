@@ -394,12 +394,6 @@ abstract class AppLocalizations {
   /// **'When you intend to do this task. A deadline can be set separately in More details.'**
   String get plannedForHelp;
 
-  /// No description provided for @planning.
-  ///
-  /// In en, this message translates to:
-  /// **'Duration & deadline'**
-  String get planning;
-
   /// No description provided for @duration.
   ///
   /// In en, this message translates to:
@@ -411,12 +405,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No duration set'**
   String get durationUnset;
-
-  /// No description provided for @durationEstimateHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'An estimate until you choose a planned start time.'**
-  String get durationEstimateHelp;
 
   /// No description provided for @durationMinutes.
   ///
@@ -453,12 +441,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No deadline'**
   String get deadlineUnset;
-
-  /// No description provided for @deadlineHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Must be finished by this date. Moving the planned start keeps this deadline.'**
-  String get deadlineHelp;
 
   /// No description provided for @deadlineTime.
   ///
@@ -532,12 +514,6 @@ abstract class AppLocalizations {
   /// **'Showing the first 200 timed items. Use the agenda to see every task.'**
   String get timelineLimit;
 
-  /// No description provided for @timelineHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Planned work and phone events. Deadlines mark when something must be finished.'**
-  String get timelineHelp;
-
   /// No description provided for @timelineUnblocked.
   ///
   /// In en, this message translates to:
@@ -555,12 +531,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No duration · time only'**
   String get timelinePoint;
-
-  /// No description provided for @timelineShortBlocks.
-  ///
-  /// In en, this message translates to:
-  /// **'Short events have larger tap targets; the accent bar shows their actual duration.'**
-  String get timelineShortBlocks;
 
   /// No description provided for @timelineHours.
   ///
@@ -928,6 +898,12 @@ abstract class AppLocalizations {
   /// **'Repeat'**
   String get repeat;
 
+  /// No description provided for @repeatNeedsDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a date to repeat'**
+  String get repeatNeedsDate;
+
   /// No description provided for @neverRepeat.
   ///
   /// In en, this message translates to:
@@ -1252,6 +1228,18 @@ abstract class AppLocalizations {
   /// **'Next month or week'**
   String get nextPeriod;
 
+  /// No description provided for @previousDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day'**
+  String get previousDay;
+
+  /// No description provided for @nextDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day'**
+  String get nextDay;
+
   /// No description provided for @licenses.
   ///
   /// In en, this message translates to:
@@ -1444,23 +1432,11 @@ abstract class AppLocalizations {
   /// **'Check unfinished captures'**
   String get checkCaptures;
 
-  /// No description provided for @fineTunePlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Fine-tune your plan.'**
-  String get fineTunePlan;
-
   /// No description provided for @seriesEdits.
   ///
   /// In en, this message translates to:
   /// **'Edits apply to the whole repeating task.'**
   String get seriesEdits;
-
-  /// No description provided for @giveName.
-  ///
-  /// In en, this message translates to:
-  /// **'Give it a name. Add a date whenever you’re ready.'**
-  String get giveName;
 
   /// No description provided for @checkBeforeAdd.
   ///
@@ -1852,11 +1828,11 @@ abstract class AppLocalizations {
   /// **'Listening · {time}'**
   String listeningSeconds(String time);
 
-  /// No description provided for @repeatEvery.
+  /// How often a task repeats. frequency is the internal rule: daily, weekly, monthly or yearly.
   ///
   /// In en, this message translates to:
-  /// **'Every {interval} {unit}'**
-  String repeatEvery(int interval, String unit);
+  /// **'{frequency, select, daily{{interval, plural, one{Every day} other{Every {interval} days}}} weekly{{interval, plural, one{Every week} other{Every {interval} weeks}}} monthly{{interval, plural, one{Every month} other{Every {interval} months}}} other{{interval, plural, one{Every year} other{Every {interval} years}}}}'**
+  String repeatEvery(int interval, String frequency);
 
   /// No description provided for @repeatEveryPrompt.
   ///
@@ -1882,35 +1858,11 @@ abstract class AppLocalizations {
   /// **'Pick a date'**
   String get pickDate;
 
-  /// No description provided for @addStepDialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Add a step'**
-  String get addStepDialog;
-
   /// No description provided for @editStep.
   ///
   /// In en, this message translates to:
   /// **'Edit step'**
   String get editStep;
-
-  /// No description provided for @step.
-  ///
-  /// In en, this message translates to:
-  /// **'Step'**
-  String get step;
-
-  /// No description provided for @shortStep.
-  ///
-  /// In en, this message translates to:
-  /// **'Add a short step.'**
-  String get shortStep;
-
-  /// No description provided for @keepStep.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep step'**
-  String get keepStep;
 
   /// No description provided for @repeatingSteps.
   ///
@@ -1935,12 +1887,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove step'**
   String get removeStep;
-
-  /// No description provided for @addChecklist.
-  ///
-  /// In en, this message translates to:
-  /// **'Add checklist'**
-  String get addChecklist;
 
   /// No description provided for @addStep.
   ///
@@ -2170,12 +2116,6 @@ abstract class AppLocalizations {
   /// **'Keep as typed'**
   String get keepAsTyped;
 
-  /// No description provided for @clearDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear date'**
-  String get clearDate;
-
   /// No description provided for @optionalTime.
   ///
   /// In en, this message translates to:
@@ -2194,16 +2134,10 @@ abstract class AppLocalizations {
   /// **'Skipped'**
   String get skipped;
 
-  /// No description provided for @theDetails.
-  ///
-  /// In en, this message translates to:
-  /// **'The details'**
-  String get theDetails;
-
   /// No description provided for @labelLimit.
   ///
   /// In en, this message translates to:
-  /// **'Use up to 10 labels, each under 33 characters.'**
+  /// **'Use up to 10 labels, each up to 32 characters.'**
   String get labelLimit;
 
   /// No description provided for @notesHint.
@@ -2356,6 +2290,12 @@ abstract class AppLocalizations {
   /// **'Remove attachment'**
   String get fileRemove;
 
+  /// Tooltip on the remove button next to an attached file. file is the file name.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {file}'**
+  String removeFileNamed(String file);
+
   /// No description provided for @fileRemoveQuestion.
   ///
   /// In en, this message translates to:
@@ -2392,11 +2332,23 @@ abstract class AppLocalizations {
   /// **'Sync now'**
   String get syncNow;
 
+  /// No description provided for @accountSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing'**
+  String get accountSyncing;
+
   /// No description provided for @importLocalItems.
   ///
   /// In en, this message translates to:
   /// **'Import local tasks and notes'**
   String get importLocalItems;
+
+  /// No description provided for @accountImporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing tasks and notes'**
+  String get accountImporting;
 
   /// No description provided for @importLocalItemsQuestion.
   ///
@@ -2434,6 +2386,12 @@ abstract class AppLocalizations {
   /// **'Sign out'**
   String get signOut;
 
+  /// No description provided for @accountSigningOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Signing out'**
+  String get accountSigningOut;
+
   /// No description provided for @signOutQuestion.
   ///
   /// In en, this message translates to:
@@ -2463,6 +2421,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Note down what you need to do, and TaskFlow puts it on your calendar.'**
   String get authPitch;
+
+  /// Shown above the sign-in form when the session ended while the app was open.
+  ///
+  /// In en, this message translates to:
+  /// **'You were signed out. Sign in again to pick up where you left off.'**
+  String get signInAgainReason;
 
   /// No description provided for @recoveryHelp.
   ///
@@ -3273,12 +3237,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.'**
   String get fileLimit;
-
-  /// No description provided for @fileManageHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Open task details to download, upload, or remove account attachments.'**
-  String get fileManageHelp;
 
   /// No description provided for @notificationLoadError.
   ///
@@ -4453,7 +4411,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureKeptForReview.
   ///
   /// In en, this message translates to:
-  /// **'{count} kept for review'**
+  /// **'{count, plural, one{1 kept for review} other{{count} kept for review}}'**
   String captureKeptForReview(int count);
 
   /// After a save, follows the count of tasks added ("2 tasks added · also on Sat, Oct 17") when one other task is on a day other than the one Calendar shows. The date is a weekday and date such as Sat, Oct 17.
@@ -4813,7 +4771,7 @@ abstract class AppLocalizations {
   /// No description provided for @billingError.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Connect to the TaskFlow server to link your subscription.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
+  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
   String billingError(String reason);
 
   /// No description provided for @billingResult.

@@ -144,10 +144,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final google = ref.watch(googleSignInServiceProvider);
     ref.watch(taskProvider);
     final syncError = ref.read(taskRepositoryProvider).syncError;
-    const progress = SizedBox(
+    // In-button progress names what is happening, so TalkBack says it.
+    Widget progress(String label, {Color? color}) => SizedBox(
       width: 18,
       height: 18,
-      child: CircularProgressIndicator(strokeWidth: 2),
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: color,
+        semanticsLabel: label,
+      ),
     );
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.yourAccount),
@@ -224,7 +229,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 child: TextButton.icon(
                   onPressed: busy ? null : _sync,
                   icon: _running == _Action.sync
-                      ? progress
+                      ? progress(context.l10n.accountSyncing)
                       : const Icon(Icons.sync_rounded, size: 20),
                   label: Text(context.l10n.syncNow),
                 ),
@@ -240,7 +245,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                     child: OutlinedButton.icon(
                       onPressed: busy ? null : _import,
                       icon: _running == _Action.import
-                          ? progress
+                          ? progress(context.l10n.accountImporting)
                           : const Icon(Icons.file_upload_outlined, size: 20),
                       label: Text(context.l10n.importLocalItems),
                     ),
@@ -284,13 +289,9 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 child: TextButton.icon(
                   onPressed: busy ? null : _signOut,
                   icon: _running == _Action.signOut
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colors.error,
-                          ),
+                      ? progress(
+                          context.l10n.accountSigningOut,
+                          color: colors.error,
                         )
                       : null,
                   label: Text(

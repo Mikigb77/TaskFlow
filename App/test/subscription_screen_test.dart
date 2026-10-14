@@ -387,15 +387,15 @@ void main() {
       );
       expect(
         es.billingError('accountUnavailable'),
-        'Conéctate al servidor de TaskFlow para vincular tu suscripción.',
+        'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.',
       );
       expect(
         en.billingError('accountUnavailable'),
-        'Connect to the TaskFlow server to link your subscription.',
+        'Could not connect to your TaskFlow account. Check your connection and open this screen again.',
       );
       expect(
         ca.billingError('accountUnavailable'),
-        'Connecta’t al servidor de TaskFlow per vincular la subscripció.',
+        'No s’ha pogut connectar amb el teu compte de TaskFlow. Revisa la connexió i torna a obrir aquesta pantalla.',
       );
       // awaitingEntitlement names the restore button, as it reads.
       for (final (l, restore) in [
@@ -409,6 +409,27 @@ void main() {
           contains(restore),
           reason: l.localeName,
         );
+      }
+    },
+  );
+
+  test(
+    'UX-514: billingError accountUnavailable names no server in EN, ES or CA, and still says to open the screen again',
+    () {
+      for (final (language, again) in [
+        ('en', 'open this screen again'),
+        ('es', 'vuelve a abrir esta pantalla'),
+        ('ca', 'torna a obrir aquesta pantalla'),
+      ]) {
+        final message = lookupAppLocalizations(
+          Locale(language),
+        ).billingError('accountUnavailable');
+        expect(
+          message.toLowerCase(),
+          isNot(matches(RegExp('server|servidor'))),
+          reason: '$language: $message',
+        );
+        expect(message, contains(again), reason: language);
       }
     },
   );

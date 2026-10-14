@@ -1837,6 +1837,82 @@ void main() {
     );
   }
 
+  // ---- Round 1 · P21 · UX-227: the arrows respect Remove animations ----
+
+  for (final instant in [true, false]) {
+    testWidgets(
+      'UX-227: with animations ${instant ? 'off, the week and month arrows change the page at once' : 'on, the arrows still animate'}',
+      (tester) async {
+        if (instant) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        await openCalendar(
+          tester,
+          [],
+          overrides: [calendarClockProvider.overrideWithValue(() => october13)],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        Finder day(int number) => find
+            .descendant(
+              of: find.byType(TableCalendar<Task>),
+              matching: find.text('$number'),
+            )
+            .hitTestable();
+        double page() => tester
+            .widget<PageView>(
+              find.descendant(
+                of: find.byType(TableCalendar<Task>),
+                matching: find.byType(PageView),
+              ),
+            )
+            .controller!
+            .page!;
+
+        /// Taps [arrow] and checks the page lands at once, or animates.
+        Future<void> turn(String arrow, int by) async {
+          final from = page();
+          await tester.tap(find.byTooltip(arrow));
+          await tester.pump();
+          if (instant) {
+            // One frame, no time passed: the page has already changed.
+            expect(page(), from + by);
+            await tester.pump();
+          } else {
+            await tester.pump(const Duration(milliseconds: 100));
+            final moving = page();
+            expect(
+              moving != from && moving != from + by,
+              isTrue,
+              reason: 'mid-animation the page is between $from and ${from + by}',
+            );
+            await tester.pumpAndSettle();
+            expect(page(), from + by);
+          }
+        }
+
+        // Week view: the 13th's week shows; the 20th is next week.
+        expect(day(13), findsOneWidget);
+        expect(day(20), findsNothing);
+        await turn(l.nextPeriod, 1);
+        expect(day(20), findsOneWidget);
+        expect(day(13), findsNothing);
+        await turn(l.previousPeriod, -1);
+        expect(day(13), findsOneWidget);
+
+        // Month view: the next month's name shows in the same frame.
+        await monthView(tester);
+        expect(inCalendar(find.text('octubre')), findsOneWidget);
+        await turn(l.nextPeriod, 1);
+        expect(inCalendar(find.text('noviembre')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('UX-202: with no projects the project scope takes no height', (
     tester,
   ) async {

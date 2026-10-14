@@ -4,7 +4,9 @@ import 'package:agenda/l10n/app_languages.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/services/api_client.dart';
-import 'package:flutter/widgets.dart';
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/models/task.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -268,4 +270,124 @@ void main() {
       expect([en.keep, es.keep, ca.keep], ['Keep', 'Conservar', 'Conserva']);
     },
   );
+
+  test(
+    'UX-225: no catalog value keeps the Lista → Proyecto rename slips',
+    () {
+      final slip = RegExp(
+        'Proyecto de pasos|Projecte de passos|proyecto compartida',
+        caseSensitive: false,
+      );
+      for (final file in files) {
+        final catalog =
+            jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+        for (final MapEntry(:key, :value) in catalog.entries) {
+          if (key.startsWith('@')) continue;
+          expect(
+            slip.hasMatch(value as String),
+            isFalse,
+            reason: '${file.path} $key: $value',
+          );
+        }
+      }
+    },
+  );
+
+  // ---- Round 1 · P22 · UX-225, UX-122, UX-123: Spanish and Catalan slips ----
+
+  test('UX-225: in Spanish, agendaCounts(1, 1) reads 1 pendiente · 1 completada',
+      () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    expect(es.agendaCounts(1, 1), '1 pendiente · 1 completada');
+    expect(es.agendaCounts(0, 1), '0 pendientes · 1 completada');
+    expect(es.agendaCounts(2, 3), '2 pendientes · 3 completadas');
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(ca.agendaCounts(1, 1), isNot(contains('1 completades')));
+  });
+
+  for (final (language, one, two) in [
+    ('es', 'Cada semana', 'Cada 2 semanas'),
+    ('ca', 'Cada setmana', 'Cada 2 setmanes'),
+    ('en', 'Every week', 'Every 2 weeks'),
+  ]) {
+    testWidgets(
+        'UX-225: a weekly repeat with weekdays reads $one · …, never Cada 1 semanas ($language)',
+        (tester) async {
+      late BuildContext context;
+      await tester.pumpWidget(MaterialApp(
+          locale: Locale(language),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: Builder(builder: (c) {
+            context = c;
+            return const SizedBox();
+          })));
+      await tester.pumpAndSettle();
+      Task weekly(int interval) => Task(
+          title: 'Correr',
+          priority: 1,
+          dueDate: DateTime(2026, 10, 12),
+          recurrence: 'weekly',
+          repeatInterval: interval,
+          repeatWeekdays: const [1, 3]);
+      final label = context.repeatLabel(weekly(1));
+      expect(label, startsWith('$one · '));
+      expect(label, isNot(contains(' 1 ')));
+      expect(context.repeatLabel(weekly(2)), startsWith('$two · '));
+      if (language == 'es') {
+        expect(label, 'Cada semana · lun, mié');
+      }
+    });
+  }
+
+  test('UX-225: Lista de pasos is the one Spanish name for a checklist', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(es.checklist, 'Lista de pasos');
+    expect(es.checklistSemantics(1, 3), 'Lista de pasos, 1 de 3 completados');
+    expect(ca.checklist, 'Llista de passos');
+    expect(ca.checklistSemantics(1, 3), startsWith('Llista de passos'));
+    expect(es.notesEmptyHelp, isNot(contains('verificación')));
+  });
+
+  test('UX-225: a project is masculine in Spanish and Catalan', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(es.archived, 'Archivado');
+    expect(ca.archived, 'Arxivat');
+    expect(es.archivedListHelp, startsWith('Archivado'));
+    expect(ca.archivedListHelp, startsWith('Arxivat'));
+    expect(ca.listConflict, startsWith('Modificat'));
+  });
+
+  test('UX-122: the Catalan review buttons are imperatives', () {
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(ca.reviewEditDetail, 'Canvia aquesta dada');
+    expect(ca.reviewRepair, 'Corregeix el text');
+    expect(ca.reviewRemove, startsWith('Treu'));
+    // No review button starts with an infinitive (Desar, Canviar, Treure…).
+    final infinitive = RegExp(r'^\S+(ar|er|re|ir)$');
+    for (final label in [
+      ca.reviewEditDetail,
+      ca.reviewRepair,
+      ca.reviewRemove,
+      ca.reviewOriginal,
+      ca.reviewResolve,
+      ca.reviewOptions,
+    ]) {
+      final first = label.split(RegExp(r'[\s’]')).first;
+      expect(infinitive.hasMatch(first), isFalse, reason: label);
+    }
+  });
+
+  test('UX-123: captureKeptForReview has plurals in English and Catalan', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(ca.captureKeptForReview(1), '1 pendent de revisar');
+    expect(ca.captureKeptForReview(3), '3 pendents de revisar');
+    expect(en.captureKeptForReview(1), '1 kept for review');
+    expect(en.captureKeptForReview(3), '3 kept for review');
+    expect(es.captureKeptForReview(1), '1 pendiente de revisar');
+  });
 }

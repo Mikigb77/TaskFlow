@@ -47,7 +47,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Repeat settings'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Every 1 weeks'));
+      await tester.tap(find.text('Every week'));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const ValueKey('repeat-interval')), '2');

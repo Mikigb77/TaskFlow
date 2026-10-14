@@ -263,4 +263,110 @@ void main() {
       },
     );
   }
+
+  // ---- Round 1 · P23 · UX-223: Back never strands you ----
+
+  /// Records whether system Back asked the platform to leave the app.
+  List<String> watchExits(WidgetTester tester) {
+    final exits = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'SystemNavigator.pop') exits.add(call.method);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    return exits;
+  }
+
+  int selectedTab(WidgetTester tester) =>
+      tester.widget<NavigationBar>(bar).selectedIndex;
+
+  for (final tab in ['tasks', 'notes', 'settings']) {
+    testWidgets(
+      'UX-223: system Back on ${tab == 'tasks' ? 'Tareas' : tab == 'notes' ? 'Notas' : 'Ajustes'} selects Calendario and stays in the app',
+      (tester) async {
+        final l = await pumpShell(
+          tester,
+          language: 'es',
+          size: const Size(390, 844),
+          scale: 1,
+        );
+        final exits = watchExits(tester);
+        final label = switch (tab) {
+          'tasks' => l.tasks,
+          'notes' => l.notes,
+          _ => l.settings,
+        };
+        await select(tester, label);
+        expect(selectedTab(tester), isNot(0));
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(selectedTab(tester), 0, reason: 'Calendario is selected');
+        expect(exits, isEmpty, reason: 'Back did not leave the app');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('UX-223: system Back on Calendario leaves the app, as today', (
+    tester,
+  ) async {
+    await pumpShell(
+      tester,
+      language: 'es',
+      size: const Size(390, 844),
+      scale: 1,
+    );
+    final exits = watchExits(tester);
+    expect(selectedTab(tester), 0);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(exits, ['SystemNavigator.pop']);
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---- Round 1 · P23 · UX-433: the tab bar's top line shows ----
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'UX-433: the tab bar’s 1 px outlineVariant top border is painted in front of the NavigationBar (${dark ? 'dark' : 'light'})',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = designContainer(
+          store: MemoryThemeStore(dark ? 'dark' : 'light'),
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(container: container, child: const MyApp()),
+        );
+        await tester.pumpAndSettle();
+        final colors = Theme.of(tester.element(bar)).colorScheme;
+        expect(colors.brightness, dark ? Brightness.dark : Brightness.light);
+        final frame = find.byWidgetPredicate(
+          (widget) => widget is DecoratedBox && widget.child is NavigationBar,
+        );
+        expect(frame, findsOneWidget);
+        final box = tester.widget<DecoratedBox>(frame);
+        expect(box.position, DecorationPosition.foreground);
+        final border = (box.decoration as BoxDecoration).border! as Border;
+        expect(border.top.color, colors.outlineVariant);
+        expect(border.top.width, 1);
+        expect(border.left, BorderSide.none);
+        expect(border.bottom, BorderSide.none);
+        // The line runs along the bar's top edge, the full width.
+        expect(tester.getRect(frame).top, tester.getRect(bar).top);
+        expect(tester.getRect(frame).width, 390);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

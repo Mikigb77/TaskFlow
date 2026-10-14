@@ -2078,6 +2078,33 @@
    ]
   },
   {
+   "id": "P113",
+   "title": "A typed step is never lost",
+   "area": "B",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-624"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/widgets/checklist_editor.dart",
+    "App/lib/widgets/task_editor.dart",
+    "App/test/task_editor_form_test.dart",
+    "App/test/checklist_test.dart"
+   ],
+   "brief": [
+    "UX-624 (b8 report; noted on the UX-622 ledger line): after P110 and P112, text typed in the inline 'Añadir paso' field is kept when Más detalles collapses and when the result card saves. Two older cases still drop it: (1) collapsing the form when the task already has 50 steps (the step limit), and (2) removing the last step through ⋮ in the short form while text is typed in 'Añadir paso'.",
+    "Fix both the way P112 did: commit or keep the typed text before the field goes away. At the 50-step limit, keep the typed text in the field and say the limit is reached (reuse the existing limit string if there is one), rather than silently dropping it."
+   ],
+   "acceptance": [
+    "With 50 steps, text typed in 'Añadir paso' is not silently dropped when Más detalles collapses; the person sees why it can't be added.",
+    "Removing the last step through ⋮ in the short form keeps the text typed in 'Añadir paso'."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
    "id": "P24",
    "title": "Project pages and Tareas show what's there",
    "area": "C",

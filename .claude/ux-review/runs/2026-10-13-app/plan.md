@@ -838,3 +838,56 @@ None.
 - P95's implementer: if `_pullRemote` throws (offline) or a 401 comes back mid-upload, the storage refresh is skipped; the next successful sync with an upload refreshes it.
 - Reviewer D: the sign-out, Sync and Import spinners have no `semanticsLabel`, so TalkBack hears only "Cerrar sesión, disabled". Not worse than before P96.
 - Reviewer B: a code comment at `attachment_panel.dart:196` still says "Attachments section". Not user-facing.
+
+## Round 2 (b8)
+
+Round 1 of batch 8 ran P100, P21, P22, P23 and P30. The reviewers found all fourteen findings fixed in code: UX-513, UX-514, UX-424, UX-419, UX-215, UX-216, UX-222, UX-227, UX-225, UX-122, UX-123, UX-223, UX-224 and UX-433. Several still need a phone. The round check passed and no test failed. Reviewers B and D found three regressions, now UX-621 to UX-623.
+
+Round 2 has two small packages: P110 (B, S3) and P111 (D, S2). There are no new owner questions, and nothing is escalated. The package numbers start at P110 because P101–P109 belong to run 2026-10-14-speed.
+
+The briefs are in `plan-b8-r2.json`.
+
+### Packages, in run order
+
+#### P110 · A typed step is never lost · B · S
+- **UX-621** (S3; R1B-1, from P21) In the capture result card, a step typed in `Añadir paso` and saved with `Añadir al calendario` without Enter was dropped. The save now unfocuses and waits one microtask before it reads the drafts, as TaskEditor's save does. A disabled checklist editor no longer clears typed text.
+- **UX-622** (S2; R1B-2, from P21) Tapping `Más detalles` / `Menos detalles` while a step was half-typed erased it. Both checklist editors in the task form now share one GlobalKey, as the capture card's already do.
+
+#### P111 · Sign-in again says why, keeps the email, and Back changes nothing · D · S
+- **UX-623** (S2; R1D-1, from P30) Sign-in over the open screens looked like the cold-start login, had an empty email field, and pressing Back erased the only explanation. Now the email is filled in. One line replaces the sales pitch: `Tu sesión se ha cerrado. Vuelve a entrar y seguirás donde lo dejaste.` (EN, CA too). It stays on Back and while typing, and replaces the session banner below the button. Back in sign-in mode no longer clears anything.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- Reviewer D (UX-623): signing in on that route with a different email still drops the kept screens without a warning. Prefilling the email makes this unlikely, and a warning would add copy nobody asked for. Revisit if it comes up in use.
+- P21's implementer: the "known limit" they reported is UX-621, planned above.
+- P22's implementer: the ARB key `sharedListRole` ('{role} · compartida') is unused in `lib/`. Delete it at the next copy cleanup. It was unused before P22.
+- P30's implementer: on the sign-in-again route, Android Back now does nothing (before, it left the app and could lose the typed text). That's intended, and P111 keeps it.
+- Reviewer B: the project row in the task form can appear one frame late if `taskListsProvider` hasn't loaded yet. In practice it's cached from Tareas, so it isn't a finding.
+
+## Round 3 (b8)
+
+Round 2 of batch 8 ran P110 and P111. The reviewers found UX-621 and UX-623 fixed in code (both still need a phone). UX-622 was partly fixed: the shared GlobalKey keeps a half-typed step across `Más detalles` when the task already has a step, but not on a task with no steps. The round check passed, no test failed, and there were no regressions.
+
+Round 3 has one small package: P112 (B, S2). There are no new owner questions, and nothing is escalated: UX-622 has failed once.
+
+The brief is in `plan-b8-r3.json`.
+
+### Packages, in run order
+
+#### P112 · Menos detalles keeps a first step typed without Enter · B · S
+- **UX-622** (S2; R1B-2, second attempt) Last time: both checklist editors in the task form got one GlobalKey, which covers a task that already has a step. On a task with no steps, the short form has no steps section, so a first step typed inside `Más detalles` was still lost on `Menos detalles`. Now `Menos detalles` first leaves the field and waits one microtask, as saving does, so the step is committed and the short form shows it. `Más detalles` still opens at once, without closing the keyboard. No copy change. Inferred from code; needs a phone.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- Reviewer B: in the short form, removing the last step through ⋮ hides the steps section, and any text in `Añadir paso` goes with it. It predates this run and is rare, so it's only noted.
+- Reviewer D: on the sign-in-again route, system Back does nothing and gives no feedback. That's P30's intended `PopScope(canPop: false)`; the new reason line explains the screen.

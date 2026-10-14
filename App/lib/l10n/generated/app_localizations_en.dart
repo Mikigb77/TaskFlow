@@ -239,17 +239,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'When you intend to do this task. A deadline can be set separately in More details.';
 
   @override
-  String get planning => 'Duration & deadline';
-
-  @override
   String get duration => 'Duration';
 
   @override
   String get durationUnset => 'No duration set';
-
-  @override
-  String get durationEstimateHelp =>
-      'An estimate until you choose a planned start time.';
 
   @override
   String durationMinutes(int minutes) {
@@ -270,10 +263,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deadlineUnset => 'No deadline';
-
-  @override
-  String get deadlineHelp =>
-      'Must be finished by this date. Moving the planned start keeps this deadline.';
 
   @override
   String get deadlineTime => 'Deadline time';
@@ -318,10 +307,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Showing the first 200 timed items. Use the agenda to see every task.';
 
   @override
-  String get timelineHelp =>
-      'Planned work and phone events. Deadlines mark when something must be finished.';
-
-  @override
   String get timelineUnblocked => 'Without a time block';
 
   @override
@@ -330,10 +315,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get timelinePoint => 'No duration · time only';
-
-  @override
-  String get timelineShortBlocks =>
-      'Short events have larger tap targets; the accent bar shows their actual duration.';
 
   @override
   String timelineHours(int hours) {
@@ -544,6 +525,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get repeat => 'Repeat';
 
   @override
+  String get repeatNeedsDate => 'Add a date to repeat';
+
+  @override
   String get neverRepeat => 'Does not repeat';
 
   @override
@@ -714,6 +698,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nextPeriod => 'Next month or week';
 
   @override
+  String get previousDay => 'Previous day';
+
+  @override
+  String get nextDay => 'Next day';
+
+  @override
   String get licenses => 'Open-source licences';
 
   @override
@@ -814,13 +804,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkCaptures => 'Check unfinished captures';
 
   @override
-  String get fineTunePlan => 'Fine-tune your plan.';
-
-  @override
   String get seriesEdits => 'Edits apply to the whole repeating task.';
-
-  @override
-  String get giveName => 'Give it a name. Add a date whenever you’re ready.';
 
   @override
   String get checkBeforeAdd =>
@@ -1039,8 +1023,38 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String repeatEvery(int interval, String unit) {
-    return 'Every $interval $unit';
+  String repeatEvery(int interval, String frequency) {
+    String _temp0 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Every $interval days',
+      one: 'Every day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Every $interval weeks',
+      one: 'Every week',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Every $interval months',
+      one: 'Every month',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Every $interval years',
+      one: 'Every year',
+    );
+    String _temp4 = intl.Intl.selectLogic(frequency, {
+      'daily': '$_temp0',
+      'weekly': '$_temp1',
+      'monthly': '$_temp2',
+      'other': '$_temp3',
+    });
+    return '$_temp4';
   }
 
   @override
@@ -1062,19 +1076,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pickDate => 'Pick a date';
 
   @override
-  String get addStepDialog => 'Add a step';
-
-  @override
   String get editStep => 'Edit step';
-
-  @override
-  String get step => 'Step';
-
-  @override
-  String get shortStep => 'Add a short step.';
-
-  @override
-  String get keepStep => 'Keep step';
 
   @override
   String get repeatingSteps =>
@@ -1088,9 +1090,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeStep => 'Remove step';
-
-  @override
-  String get addChecklist => 'Add checklist';
 
   @override
   String get addStep => 'Add step';
@@ -1215,9 +1214,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keepAsTyped => 'Keep as typed';
 
   @override
-  String get clearDate => 'Clear date';
-
-  @override
   String get optionalTime => 'Time (optional)';
 
   @override
@@ -1227,10 +1223,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skipped => 'Skipped';
 
   @override
-  String get theDetails => 'The details';
-
-  @override
-  String get labelLimit => 'Use up to 10 labels, each under 33 characters.';
+  String get labelLimit => 'Use up to 10 labels, each up to 32 characters.';
 
   @override
   String get notesHint => 'Anything you’d like to remember…';
@@ -1316,6 +1309,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileRemove => 'Remove attachment';
 
   @override
+  String removeFileNamed(String file) {
+    return 'Remove $file';
+  }
+
+  @override
   String get fileRemoveQuestion => 'Remove this attachment?';
 
   @override
@@ -1335,7 +1333,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncNow => 'Sync now';
 
   @override
+  String get accountSyncing => 'Syncing';
+
+  @override
   String get importLocalItems => 'Import local tasks and notes';
+
+  @override
+  String get accountImporting => 'Importing tasks and notes';
 
   @override
   String get importLocalItemsQuestion => 'Import local tasks and notes?';
@@ -1372,6 +1376,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signOut => 'Sign out';
 
   @override
+  String get accountSigningOut => 'Signing out';
+
+  @override
   String get signOutQuestion =>
       'Sign out? Reminders on this phone stop until you sign in again.';
 
@@ -1387,6 +1394,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get authPitch =>
       'Note down what you need to do, and TaskFlow puts it on your calendar.';
+
+  @override
+  String get signInAgainReason =>
+      'You were signed out. Sign in again to pick up where you left off.';
 
   @override
   String get recoveryHelp =>
@@ -1862,10 +1873,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get fileLimit =>
       'Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.';
-
-  @override
-  String get fileManageHelp =>
-      'Open task details to download, upload, or remove account attachments.';
 
   @override
   String get notificationLoadError =>
@@ -2652,7 +2659,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String captureKeptForReview(int count) {
-    return '$count kept for review';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kept for review',
+      one: '1 kept for review',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -2972,7 +2985,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'configuration':
           'Subscriptions are not available yet. Please try again later.',
       'accountUnavailable':
-          'Connect to the TaskFlow server to link your subscription.',
+          'Could not connect to your TaskFlow account. Check your connection and open this screen again.',
       'network':
           'Could not check your subscription. Check your connection and open this screen again.',
       'notAllowed':

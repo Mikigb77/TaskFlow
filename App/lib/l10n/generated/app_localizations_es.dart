@@ -80,12 +80,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'accepted':
           'Esta invitación ya se ha aceptado. Gestiona el acceso de la persona en Miembros.',
       'owner':
-          'El propietario no puede salir. Puedes eliminar el proyecto si ya no la necesitas.',
+          'El propietario no puede salir. Puedes eliminar el proyecto si ya no lo necesitas.',
       'expired':
           'Esta invitación ya no está disponible. Pide una nueva al propietario.',
       'code':
           'Pide al propietario del proyecto el código de invitación actual.',
-      'refresh': 'Este proyecto ha cambiado. Actualízala antes de eliminarla.',
+      'refresh': 'Este proyecto ha cambiado. Actualízalo antes de eliminarlo.',
       'ownerOnly':
           'Solo el propietario puede gestionar los detalles y el acceso al proyecto.',
       'other':
@@ -104,7 +104,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'readOnly':
           'Este proyecto ahora es de solo lectura. Tu cambio pendiente se ha conservado como copia personal.',
       'accessChanged':
-          'El acceso a un proyecto compartida ha cambiado. Actualiza para terminar de sincronizar los cambios permitidos.',
+          'El acceso a un proyecto compartido ha cambiado. Actualiza para terminar de sincronizar los cambios permitidos.',
       'taskConflict':
           'Una tarea ha cambiado en otro dispositivo. Tu cambio se ha conservado como copia local y se ha cancelado una eliminación en conflicto.',
       'serverUpdate':
@@ -192,7 +192,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get notesEmptyHelp =>
-      'Escribe o dicta una nota. Añade enlaces o una lista de verificación cuando los necesites.';
+      'Escribe o dicta una nota. Añade enlaces o una lista de pasos cuando los necesites.';
 
   @override
   String get findNote => 'Buscar notas';
@@ -243,17 +243,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cuándo quieres hacer esta tarea. Puedes añadir una fecha límite en Más detalles.';
 
   @override
-  String get planning => 'Duración y fecha límite';
-
-  @override
   String get duration => 'Duración';
 
   @override
   String get durationUnset => 'Sin duración';
-
-  @override
-  String get durationEstimateHelp =>
-      'Una estimación hasta que elijas una hora de inicio.';
 
   @override
   String durationMinutes(int minutes) {
@@ -274,10 +267,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get deadlineUnset => 'Sin fecha límite';
-
-  @override
-  String get deadlineHelp =>
-      'Debe estar terminada para esta fecha. Cambiar el inicio previsto mantiene esta fecha límite.';
 
   @override
   String get deadlineTime => 'Hora límite';
@@ -322,10 +311,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se muestran los primeros 200 elementos con hora. Usa la agenda para ver todas las tareas.';
 
   @override
-  String get timelineHelp =>
-      'Trabajo planificado y eventos del teléfono. Las fechas límite indican cuándo debe estar terminado algo.';
-
-  @override
   String get timelineUnblocked => 'Sin bloque de tiempo';
 
   @override
@@ -334,10 +319,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get timelinePoint => 'Sin duración · solo hora';
-
-  @override
-  String get timelineShortBlocks =>
-      'Los eventos cortos tienen una zona táctil más grande; la barra de color muestra su duración real.';
 
   @override
   String timelineHours(int hours) {
@@ -550,6 +531,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get repeat => 'Repetir';
 
   @override
+  String get repeatNeedsDate => 'Añade una fecha para repetir';
+
+  @override
   String get neverRepeat => 'No se repite';
 
   @override
@@ -577,7 +561,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get attachments => 'Archivos';
 
   @override
-  String get checklist => 'Proyecto de pasos';
+  String get checklist => 'Lista de pasos';
 
   @override
   String get complete => 'Completar';
@@ -721,6 +705,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get nextPeriod => 'Mes o semana siguiente';
 
   @override
+  String get previousDay => 'Día anterior';
+
+  @override
+  String get nextDay => 'Día siguiente';
+
+  @override
   String get licenses => 'Licencias de código abierto';
 
   @override
@@ -823,14 +813,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get checkCaptures => 'Ver capturas pendientes';
 
   @override
-  String get fineTunePlan => 'Ajusta tu plan.';
-
-  @override
   String get seriesEdits =>
       'Los cambios se aplican a toda la tarea recurrente.';
-
-  @override
-  String get giveName => 'Ponle un nombre. Añade una fecha cuando quieras.';
 
   @override
   String get checkBeforeAdd =>
@@ -1028,7 +1012,19 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String agendaCounts(int remaining, int done) {
-    return '$remaining pendientes · $done completadas';
+    String _temp0 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$remaining pendientes',
+      one: '1 pendiente',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '$done completadas',
+      one: '1 completada',
+    );
+    return '$_temp0 · $_temp1';
   }
 
   @override
@@ -1053,8 +1049,38 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String repeatEvery(int interval, String unit) {
-    return 'Cada $interval $unit';
+  String repeatEvery(int interval, String frequency) {
+    String _temp0 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Cada $interval días',
+      one: 'Cada día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Cada $interval semanas',
+      one: 'Cada semana',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Cada $interval meses',
+      one: 'Cada mes',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      interval,
+      locale: localeName,
+      other: 'Cada $interval años',
+      one: 'Cada año',
+    );
+    String _temp4 = intl.Intl.selectLogic(frequency, {
+      'daily': '$_temp0',
+      'weekly': '$_temp1',
+      'monthly': '$_temp2',
+      'other': '$_temp3',
+    });
+    return '$_temp4';
   }
 
   @override
@@ -1076,19 +1102,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get pickDate => 'Elegir una fecha';
 
   @override
-  String get addStepDialog => 'Añadir un paso';
-
-  @override
   String get editStep => 'Editar paso';
-
-  @override
-  String get step => 'Paso';
-
-  @override
-  String get shortStep => 'Añade un paso breve.';
-
-  @override
-  String get keepStep => 'Guardar paso';
 
   @override
   String get repeatingSteps =>
@@ -1104,16 +1118,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get removeStep => 'Eliminar paso';
 
   @override
-  String get addChecklist => 'Añadir lista de pasos';
-
-  @override
   String get addStep => 'Añadir paso';
 
   @override
   String get listUnavailable => 'Proyecto no disponible';
 
   @override
-  String get archived => 'Archivada';
+  String get archived => 'Archivado';
 
   @override
   String get sharedProject => 'Compartido';
@@ -1234,9 +1245,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get keepAsTyped => 'Dejar como está';
 
   @override
-  String get clearDate => 'Quitar fecha';
-
-  @override
   String get optionalTime => 'Hora (opcional)';
 
   @override
@@ -1244,9 +1252,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get skipped => 'Omitida';
-
-  @override
-  String get theDetails => 'Los detalles';
 
   @override
   String get labelLimit =>
@@ -1274,7 +1279,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String checklistSemantics(int done, int total) {
-    return 'Proyecto de pasos, $done de $total completados';
+    return 'Lista de pasos, $done de $total completados';
   }
 
   @override
@@ -1336,6 +1341,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fileRemove => 'Eliminar archivo adjunto';
 
   @override
+  String removeFileNamed(String file) {
+    return 'Quitar $file';
+  }
+
+  @override
   String get fileRemoveQuestion => '¿Eliminar este archivo adjunto?';
 
   @override
@@ -1355,7 +1365,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get syncNow => 'Sincronizar ahora';
 
   @override
+  String get accountSyncing => 'Sincronizando';
+
+  @override
   String get importLocalItems => 'Importar tareas y notas locales';
+
+  @override
+  String get accountImporting => 'Importando tareas y notas';
 
   @override
   String get importLocalItemsQuestion => '¿Importar tareas y notas locales?';
@@ -1392,6 +1408,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get signOut => 'Cerrar sesión';
 
   @override
+  String get accountSigningOut => 'Cerrando sesión';
+
+  @override
   String get signOutQuestion =>
       '¿Cerrar sesión? Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.';
 
@@ -1407,6 +1426,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get authPitch =>
       'Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario.';
+
+  @override
+  String get signInAgainReason =>
+      'Tu sesión se ha cerrado. Vuelve a entrar y seguirás donde lo dejaste.';
 
   @override
   String get recoveryHelp =>
@@ -1602,7 +1625,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get listConflict => 'Cambió en otro dispositivo · elige los detalles';
 
   @override
-  String get archivedListHelp => 'Archivada · tareas y notas disponibles';
+  String get archivedListHelp => 'Archivado · tareas y notas disponibles';
 
   @override
   String listItemCount(int count) {
@@ -1885,10 +1908,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get fileLimit =>
       'Elige un archivo no vacío de hasta 6 MB. Puedes adjuntar hasta 20 archivos por tarea.';
-
-  @override
-  String get fileManageHelp =>
-      'Abre los detalles de la tarea para descargar, subir o eliminar archivos de tu cuenta.';
 
   @override
   String get notificationLoadError =>
@@ -3032,7 +3051,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'configuration':
           'Las suscripciones aún no están disponibles. Inténtalo más tarde.',
       'accountUnavailable':
-          'Conéctate al servidor de TaskFlow para vincular tu suscripción.',
+          'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.',
       'network':
           'No se pudo comprobar tu suscripción. Revisa tu conexión y vuelve a abrir esta pantalla.',
       'notAllowed':

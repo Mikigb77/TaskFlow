@@ -113,7 +113,6 @@ class TaskPlanningControl extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel(l.planning),
         ListTile(
           key: const ValueKey('task-duration'),
           contentPadding: EdgeInsets.zero,
@@ -122,7 +121,7 @@ class TaskPlanningControl extends StatelessWidget {
           subtitle: Text(
             task.durationMinutes == null
                 ? l.durationUnset
-                : '${l.durationMinutes(task.durationMinutes!)}${task.hasTime ? '' : '\n${l.durationEstimateHelp}'}',
+                : l.durationMinutes(task.durationMinutes!),
           ),
           onTap: onChanged == null ? null : () => _duration(context),
           trailing: task.durationMinutes == null
@@ -140,7 +139,6 @@ class TaskPlanningControl extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.flag_outlined),
           title: Text(taskDeadlineLabel(context, task)),
-          subtitle: Text(l.deadlineHelp),
           onTap: onChanged == null ? null : () => _deadline(context),
           trailing: task.deadline == null
               ? const Icon(Icons.add_rounded)

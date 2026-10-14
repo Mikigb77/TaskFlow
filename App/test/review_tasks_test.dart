@@ -549,7 +549,7 @@ void main() {
         find.byKey(const ValueKey('checklist-title')),
         'Renewed passport',
       );
-      await tester.tap(find.text('Keep step'));
+      await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
@@ -1860,6 +1860,64 @@ void main() {
       expect(between.single.bottom, closeTo(row.top, 0.5));
       // No line drawn across the notes field itself.
       expect(dividersBetween(tester, notes.top, notes.bottom), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Round 2 (b8) · P110 (UX-621): a step typed without Enter is saved ----
+
+  /// A spoken result for one task, in Spanish at 1× on 360×740, with
+  /// `Passport` typed in Añadir paso and Enter never pressed.
+  Future<ProviderContainer> typeStepWithoutEnter(WidgetTester tester) async {
+    final (container, _) = await openResultIn(tester, [
+      CaptureDraft(
+        id: 'trip',
+        task: Task(title: 'Renovar pasaporte', priority: 1),
+      ),
+    ], size: const Size(360, 740));
+    await openOptions(tester, 'trip');
+    final add = inResult(find.byKey(const ValueKey('add-checklist-item')));
+    expect(add, findsOneWidget);
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
+    await tester.enterText(add, 'Passport');
+    await tester.pump();
+    expect(focused(tester, add), isTrue, reason: 'Enter was never pressed');
+    await tester.ensureVisible(button());
+    await tester.pumpAndSettle();
+    expect(focused(tester, add), isTrue);
+    return container;
+  }
+
+  List<Task> savedTrips(ProviderContainer container) => container
+      .read(taskProvider)
+      .requireValue
+      .where((task) => task.title == 'Renovar pasaporte')
+      .toList();
+
+  testWidgets(
+    'UX-621: on a result card, a step typed in Añadir paso without Enter is saved with the task by Añadir al calendario',
+    (tester) async {
+      final container = await typeStepWithoutEnter(tester);
+      await tester.tap(button());
+      await tester.pumpAndSettle();
+      final saved = savedTrips(container);
+      expect(saved, hasLength(1));
+      expect(saved.single.checklist.map((step) => step.title), ['Passport']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-621: two quick taps on Añadir al calendario with a step typed without Enter save the task once, with the step',
+    (tester) async {
+      final container = await typeStepWithoutEnter(tester);
+      await tester.tap(button());
+      await tester.tap(button(), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      final saved = savedTrips(container);
+      expect(saved, hasLength(1));
+      expect(saved.single.checklist.map((step) => step.title), ['Passport']);
       expect(tester.takeException(), isNull);
     },
   );

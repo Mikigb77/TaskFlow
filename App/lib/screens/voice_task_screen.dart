@@ -2119,6 +2119,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
+    // Leaving the step field keeps a step typed without Enter; focus
+    // changes land in a microtask, so wait for that one first.
+    _saving = true;
+    FocusScope.of(context).unfocus();
+    await Future<void>.microtask(() {});
+    _saving = false;
+    if (!mounted) return;
     final ready = _items.where((d) => d.ready).toList();
     if (_saving || ready.isEmpty) return;
     final saveWatch = Stopwatch()..start();

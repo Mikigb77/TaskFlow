@@ -16,7 +16,11 @@ import 'package:agenda/widgets/language_selector.dart';
 enum _Field { email, password }
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.signInAgain = false});
+
+  /// Shown over the open screens after the server ended the session: says why,
+  /// and keeps the account's email.
+  final bool signInAgain;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -46,6 +50,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void initState() {
     super.initState();
     _server = TextEditingController(text: ref.read(apiClientProvider).baseUrl);
+    if (widget.signInAgain) {
+      _email.text = ref.read(authProvider).account?.email ?? '';
+    }
   }
 
   @override
@@ -247,7 +254,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final google = ref.watch(googleSignInServiceProvider);
     final colors = Theme.of(context).colorScheme;
     final busy = _busy || auth.loading;
-    final error = _error ?? auth.error;
+    // Sign-in again already says why it appeared; the expiry's own error
+    // would say it twice.
+    final expiry =
+        widget.signInAgain &&
+        _error == null &&
+        auth.error != null &&
+        requestProblem(auth.error!) == 'session';
+    final error = _error ?? (expiry ? null : auth.error);
     final field = _fieldFor(error);
     final problem = error == null
         ? null
@@ -277,7 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return PopScope(
       canPop: !_register && !_recover,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !busy) _mode();
+        if (!didPop && !busy && (_register || _recover)) _mode();
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: Theme.of(context).appBarTheme.systemOverlayStyle!,
@@ -335,6 +349,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             Text(
                               _recover
                                   ? strings.recoveryHelp
+                                  : widget.signInAgain
+                                  ? strings.signInAgainReason
                                   : strings.authPitch,
                               style: TextStyle(
                                 color: colors.onSurfaceVariant,

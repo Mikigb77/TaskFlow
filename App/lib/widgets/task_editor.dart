@@ -36,6 +36,9 @@ class TaskEditor extends ConsumerStatefulWidget {
 
 class _TaskEditorState extends ConsumerState<TaskEditor> {
   final _form = GlobalKey<FormState>();
+  // The steps show in both the short and the full form; one key keeps a
+  // half-typed step across `Más detalles`.
+  final _steps = GlobalKey();
   late final TextEditingController _title;
   late final TextEditingController _notes;
   late final TextEditingController _labels;
@@ -182,26 +185,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     '.webp',
   ].contains(path.extension(file).toLowerCase());
 
-  void _quickDate(DateTime? date) => setState(() {
-    if (date == null) {
-      _dueDate = null;
-      _hasTime = false;
-      _recurrence = 'none';
-      _repeatUntil = null;
-    } else {
-      _dueDate = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        _hasTime ? _dueDate!.hour : 0,
-        _hasTime ? _dueDate!.minute : 0,
-      );
-      if (_repeatUntil != null && _repeatUntil!.isBefore(Task.day(date))) {
-        _repeatUntil = null;
-      }
-    }
-  });
-
   bool get _ruleChanged {
     final before = widget.task;
     return before.dueDate != _dueDate ||
@@ -274,11 +257,17 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
 
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
+    // Leaving the step field keeps a step typed without Enter; focus
+    // changes land in a microtask, so wait for that one first.
+    _saving = true;
+    FocusScope.of(context).unfocus();
+    await Future<void>.microtask(() {});
+    _saving = false;
+    if (!mounted) return;
     if (const DeepCollectionEquality().equals(_edited().toMap(), _unchanged)) {
       Navigator.pop(context);
       return;
     }
-    FocusScope.of(context).unfocus();
     final before = widget.task;
     if (_ruleChanged && _exceptions.isNotEmpty) {
       final confirmed = await showDialog<bool>(
@@ -443,36 +432,34 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _isNote
-                            ? context.l10n.noteTitle
-                            : context.l10n.fineTunePlan,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _isNote
-                            ? context.l10n.notesHelp
-                            : widget.task.isRecurring
-                            ? context.l10n.seriesEdits
-                            : context.l10n.giveName,
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
-                      const SizedBox(height: 16),
-                      TaskAssignmentPicker(
-                        compact: true,
-                        task: _responsibility,
-                        lockShared: true,
-                        onChanged: _saving
-                            ? null
-                            : (value) => setState(() {
-                                _listId = value.listId;
-                                _assignment = value.assignment;
-                                _assigneeId = value.assigneeId;
-                                _assigneeName = value.assigneeName;
-                              }),
-                      ),
-                      const SizedBox(height: 16),
+                      // The title comes first. Only a repeating task says
+                      // that an edit changes the whole series.
+                      if (widget.task.isRecurring) ...[
+                        Text(
+                          context.l10n.seriesEdits,
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      // Projects show once there is one to choose.
+                      if (_listId != null ||
+                          (ref.watch(taskListsProvider).valueOrNull ?? const [])
+                              .isNotEmpty) ...[
+                        TaskAssignmentPicker(
+                          compact: true,
+                          task: _responsibility,
+                          lockShared: true,
+                          onChanged: _saving
+                              ? null
+                              : (value) => setState(() {
+                                  _listId = value.listId;
+                                  _assignment = value.assignment;
+                                  _assigneeId = value.assigneeId;
+                                  _assigneeName = value.assigneeName;
+                                }),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       TextFormField(
                         key: const ValueKey('task-title'),
                         controller: _title,
@@ -542,11 +529,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: _pickDate,
                         ),
-                        if (_dueDate != null)
-                          TextButton(
-                            onPressed: () => _quickDate(null),
-                            child: Text(context.l10n.clearDate),
-                          ),
                       ],
                       if (suggestTextEncodingRepair(_title.text) != null ||
                           suggestTextEncodingRepair(_notes.text) != null) ...[
@@ -566,9 +548,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                       ],
                       TextButton.icon(
                         key: const ValueKey('task-more-details'),
-                        onPressed: () => setState(
-                          () => _detailsExpanded = !_detailsExpanded,
-                        ),
+                        onPressed: () async {
+                          final expand = !_detailsExpanded;
+                          if (!expand) {
+                            // Keeps a step typed without Enter, as in _save.
+                            FocusScope.of(context).unfocus();
+                            await Future<void>.microtask(() {});
+                            if (!mounted) return;
+                          }
+                          setState(() => _detailsExpanded = expand);
+                        },
                         icon: Icon(
                           _detailsExpanded
                               ? Icons.expand_less_rounded
@@ -581,114 +570,39 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         ),
                       ),
                       if (!_detailsExpanded) ...[
-                        if (_deadline != null)
-                          Text(taskDeadlineLabel(context, _planningTask)),
-                        if (_priority > 1 ||
+                        // What Más detalles holds, as plain text.
+                        if (_deadline != null ||
+                            _priority > 1 ||
                             _recurrence != 'none' ||
                             _durationMinutes != null)
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              if (_priority > 1)
-                                Chip(
-                                  label: Text(
-                                    context.l10n.priorityValue(
-                                      context.priorityName(_priority),
-                                    ),
-                                  ),
-                                ),
+                          Text(
+                            [
                               if (_recurrence != 'none')
-                                Chip(
-                                  label: Text(
-                                    context.repeatLabel(_planningTask),
-                                  ),
-                                ),
+                                context.repeatLabel(_repeatTask),
                               if (_durationMinutes != null)
-                                Chip(
-                                  label: Text(
-                                    context.l10n.durationMinutes(
-                                      _durationMinutes!,
-                                    ),
-                                  ),
+                                context.l10n.durationMinutes(_durationMinutes!),
+                              if (_deadline != null)
+                                taskDeadlineLabel(context, _planningTask),
+                              if (_priority > 1)
+                                context.l10n.priorityValue(
+                                  context.priorityName(_priority),
                                 ),
-                            ],
+                            ].join(' · '),
+                            style: TextStyle(color: colors.onSurfaceVariant),
                           ),
                         if (_checklist.isNotEmpty)
                           ChecklistEditor(
+                            key: _steps,
                             items: _checklist,
                             recurring: !_isNote && _recurrence != 'none',
                             onChanged: (items) =>
                                 setState(() => _checklist = items),
                           ),
                       ],
+                      // Most used first: reminder, repeat and steps; then
+                      // duration, deadline, priority, labels and files.
                       if (_detailsExpanded) ...[
                         if (!_isNote) ...[
-                          TaskPlanningControl(
-                            task: _planningTask,
-                            onChanged: (task) => setState(() {
-                              _deadline = task.deadline;
-                              _deadlineHasTime = task.deadlineHasTime;
-                              _durationMinutes = task.durationMinutes;
-                              _reminderAnchor = task.reminderAnchor;
-                            }),
-                          ),
-                          if (_dueDate != null) ...[
-                            const SizedBox(height: 16),
-                            ListTile(
-                              key: const ValueKey('task-repeat'),
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.repeat_rounded),
-                              title: Text(context.l10n.repeat),
-                              subtitle: Text(
-                                [
-                                  _recurrence == 'none'
-                                      ? context.repeatName(_recurrence)
-                                      : context.repeatLabel(_repeatTask),
-                                  if (_recurrence != 'none' &&
-                                      _repeatUntil != null)
-                                    context.l10n.untilDate(
-                                      context.shortDate(_repeatUntil!),
-                                    ),
-                                ].join(' · '),
-                              ),
-                              trailing: const Icon(Icons.chevron_right_rounded),
-                              onTap: _editRepeat,
-                            ),
-                            if (_exceptions.isNotEmpty)
-                              ExpansionTile(
-                                tilePadding: EdgeInsets.zero,
-                                title: Text(
-                                  context.l10n.individualDateChanges(
-                                    _exceptions.length,
-                                  ),
-                                ),
-                                subtitle: Text(context.l10n.resetDateHelp),
-                                children: [
-                                  for (final exception in _exceptions)
-                                    ListTile(
-                                      title: Text(
-                                        context.fullDate(
-                                          DateTime.parse(
-                                            exception.originalDate,
-                                          ),
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        exception.skipped
-                                            ? context.l10n.skipped
-                                            : '${context.l10n.movedOccurrenceDate(context.fullDate(exception.date!))}${exception.hasTime ? ' · ${context.clockTime(exception.date!)}' : ''}',
-                                      ),
-                                      trailing: TextButton(
-                                        onPressed: () => setState(
-                                          () => _exceptions.remove(exception),
-                                        ),
-                                        child: Text(context.l10n.reset),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                          ],
-                          const SizedBox(height: 24),
                           ReminderControl(
                             hasDate: _planningTask.reminderDate != null,
                             hasTime: _planningTask.reminderHasTime,
@@ -698,6 +612,80 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 setState(() => _reminderMinutes = value),
                             onTime: (value) =>
                                 setState(() => _reminderTime = value),
+                          ),
+                          ListTile(
+                            key: const ValueKey('task-repeat'),
+                            contentPadding: EdgeInsets.zero,
+                            enabled: _dueDate != null,
+                            leading: const Icon(Icons.repeat_rounded),
+                            title: Text(context.l10n.repeat),
+                            subtitle: Text(
+                              _dueDate == null
+                                  ? context.l10n.repeatNeedsDate
+                                  : [
+                                      _recurrence == 'none'
+                                          ? context.repeatName(_recurrence)
+                                          : context.repeatLabel(_repeatTask),
+                                      if (_recurrence != 'none' &&
+                                          _repeatUntil != null)
+                                        context.l10n.untilDate(
+                                          context.shortDate(_repeatUntil!),
+                                        ),
+                                    ].join(' · '),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: _editRepeat,
+                          ),
+                          if (_dueDate != null && _exceptions.isNotEmpty)
+                            ExpansionTile(
+                              tilePadding: EdgeInsets.zero,
+                              title: Text(
+                                context.l10n.individualDateChanges(
+                                  _exceptions.length,
+                                ),
+                              ),
+                              subtitle: Text(context.l10n.resetDateHelp),
+                              children: [
+                                for (final exception in _exceptions)
+                                  ListTile(
+                                    title: Text(
+                                      context.fullDate(
+                                        DateTime.parse(exception.originalDate),
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      exception.skipped
+                                          ? context.l10n.skipped
+                                          : '${context.l10n.movedOccurrenceDate(context.fullDate(exception.date!))}${exception.hasTime ? ' · ${context.clockTime(exception.date!)}' : ''}',
+                                    ),
+                                    trailing: TextButton(
+                                      onPressed: () => setState(
+                                        () => _exceptions.remove(exception),
+                                      ),
+                                      child: Text(context.l10n.reset),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          const SizedBox(height: 8),
+                        ],
+                        ChecklistEditor(
+                          key: _steps,
+                          items: _checklist,
+                          recurring: !_isNote && _recurrence != 'none',
+                          onChanged: (items) =>
+                              setState(() => _checklist = items),
+                        ),
+                        if (!_isNote) ...[
+                          const SizedBox(height: 16),
+                          TaskPlanningControl(
+                            task: _planningTask,
+                            onChanged: (task) => setState(() {
+                              _deadline = task.deadline;
+                              _deadlineHasTime = task.deadlineHasTime;
+                              _durationMinutes = task.durationMinutes;
+                              _reminderAnchor = task.reminderAnchor;
+                            }),
                           ),
                           const SizedBox(height: 16),
                           SectionLabel(context.l10n.priority),
@@ -723,9 +711,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 24),
-                          SectionLabel(context.l10n.theDetails),
                         ],
+                        const SizedBox(height: 24),
                         TextFormField(
                           key: const ValueKey('task-labels'),
                           controller: _labels,
@@ -745,15 +732,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 : null;
                           },
                         ),
-                        const SizedBox(height: 16),
-                        ChecklistEditor(
-                          items: _checklist,
-                          recurring: !_isNote && _recurrence != 'none',
-                          onChanged: (items) =>
-                              setState(() => _checklist = items),
-                        ),
-                        const SizedBox(height: 12),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
                         if (_attachments.isNotEmpty) ...[
                           SectionLabel(context.l10n.attachments),
                           for (var i = 0; i < _attachments.length; i++)
@@ -791,8 +770,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                       ),
                                     ),
                                     IconButton(
-                                      tooltip:
-                                          'Remove ${path.basename(_attachments[i])}',
+                                      tooltip: context.l10n.removeFileNamed(
+                                        path.basename(_attachments[i]),
+                                      ),
                                       onPressed: () => setState(
                                         () => _attachments.removeAt(i),
                                       ),
@@ -810,19 +790,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           onPressed: _pickingFile || _saving ? null : _attach,
                           icon: const Icon(Icons.attach_file_rounded, size: 20),
                           label: Text(context.l10n.addAttachment),
-                        ),
-                        Text(
-                          ref.watch(taskRepositoryProvider).ownerKey == 'local'
-                              ? context.l10n.fileLocalHelp
-                              : context.l10n.fileUploadHelp,
-                          style: TextStyle(
-                            color: colors.onSurfaceVariant,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(context.l10n.fileManageHelp),
                         ),
                       ],
                     ],

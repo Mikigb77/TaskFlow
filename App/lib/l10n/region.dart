@@ -72,13 +72,7 @@ extension TaskFlowLocale on BuildContext {
     if (task.repeatInterval == 1 && task.repeatWeekdays.isEmpty) {
       return repeatName(task.recurrence);
     }
-    final unit = switch (task.recurrence) {
-      'daily' => l10n.days,
-      'weekly' => l10n.weeks,
-      'monthly' => l10n.months,
-      _ => l10n.years,
-    };
-    final interval = l10n.repeatEvery(task.repeatInterval, unit);
+    final interval = l10n.repeatEvery(task.repeatInterval, task.recurrence);
     if (task.repeatWeekdays.isEmpty) return interval;
     final days = task.repeatWeekdays
         .map((day) => DateFormat.E(localeName).format(DateTime(2024, 1, day)))

@@ -42,6 +42,9 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     text: widget.draft.task.notes ?? '',
   );
   final _notesFocus = FocusNode();
+  // The steps move up out of Opciones once there is one; one key keeps the
+  // add-step field focused across the move.
+  final _steps = GlobalKey();
   bool _options = false;
   // The notes field shows once the task has notes, or once `Añadir notas`
   // opened it; then it stays for this card even if emptied again.
@@ -557,6 +560,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
           ],
           if (task.checklist.isNotEmpty)
             ChecklistEditor(
+              key: _steps,
               items: task.checklist,
               recurring: task.isRecurring,
               onChanged: !widget.enabled
@@ -663,6 +667,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             ],
             if (task.checklist.isEmpty)
               ChecklistEditor(
+                key: _steps,
                 items: task.checklist,
                 recurring: task.isRecurring,
                 onChanged: !widget.enabled

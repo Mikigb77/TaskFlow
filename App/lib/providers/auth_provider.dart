@@ -14,11 +14,16 @@ class AuthState {
   final Account? account;
   final bool loading;
   final bool restoring;
+
+  /// The server ended this [account]'s session. Sign-in shows over the open
+  /// screens, which keep what was typed until the same account signs back in.
+  final bool expired;
   final Object? error;
   const AuthState({
     this.account,
     this.loading = false,
     this.restoring = false,
+    this.expired = false,
     this.error,
   });
 }
@@ -33,14 +38,26 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient api;
   final GoogleSignInService? google;
+
+  /// Points reminders at an account, or at no one ('signed-out').
+  final Future<void> Function(String owner) activateReminders;
   late final StreamSubscription<void> _sessionInvalidated;
   late final StreamSubscription<void> _accountUpdated;
-  AuthNotifier(this.api, {this.google})
-    : super(const AuthState(loading: true, restoring: true)) {
+  Future<void> _reminders = Future.value();
+  AuthNotifier(
+    this.api, {
+    this.google,
+    this.activateReminders = TaskReminders.activate,
+  }) : super(const AuthState(loading: true, restoring: true)) {
     _sessionInvalidated = api.sessionInvalidated.listen((_) {
       if (!mounted || api.account != null) return;
-      state = AuthState(error: ApiException(401, 'Please sign in again.'));
-      unawaited(TaskReminders.activate('signed-out'));
+      final account = state.restoring ? null : state.account;
+      state = AuthState(
+        account: account,
+        expired: account != null,
+        error: ApiException(401, 'Please sign in again.'),
+      );
+      _remind('signed-out');
     });
     // A dictation's answer or a refused upload updated the saved account.
     _accountUpdated = api.accountUpdated.listen((_) {
@@ -68,19 +85,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
       account: state.account,
       loading: state.loading,
       restoring: state.restoring,
+      expired: state.expired,
     );
+  }
+
+  String get _owner => api.account == null
+      ? 'signed-out'
+      : '${api.baseUrl}/users/${api.account!.id}';
+
+  /// Sets up reminders for [owner] in the background, one change at a time:
+  /// reconciling can wait seconds for another job, and nobody waits for it.
+  void _remind(String owner, {bool launch = false}) {
+    _reminders = _reminders
+        .then((_) async {
+          await activateReminders(owner);
+          // Opened from a reminder: act on it once its account is active.
+          if (launch) await TaskReminders.handleLaunch();
+        })
+        .catchError((Object _) {});
   }
 
   Future<void> restore() async {
     try {
       await api.restore();
-      await TaskReminders.activate(
-        api.account == null
-            ? 'signed-out'
-            : '${api.baseUrl}/users/${api.account!.id}',
-      );
       if (mounted) state = AuthState(account: api.account);
-      await TaskReminders.handleLaunch();
+      _remind(_owner, launch: true);
       await refreshAccount();
     } catch (_) {
       if (mounted) {
@@ -92,7 +121,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> refreshAccount() async {
-    if (state.loading || state.account == null) return;
+    if (state.loading || state.expired || state.account == null) return;
     try {
       final account = await api.refreshAccount();
       if (mounted && !state.loading && state.account?.id == account.id) {
@@ -110,14 +139,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     bool register = false,
     String timezone = 'UTC',
   }) async {
-    state = AuthState(account: state.account, loading: true);
+    state = AuthState(
+      account: state.account,
+      loading: true,
+      expired: state.expired,
+    );
     try {
       await api.signIn(email, password, register: register, timezone: timezone);
-      await TaskReminders.activate('${api.baseUrl}/users/${api.account!.id}');
       if (mounted) state = AuthState(account: api.account);
+      _remind(_owner);
     } catch (error) {
       if (mounted) {
-        state = AuthState(account: state.account, error: error);
+        state = AuthState(
+          account: state.account,
+          expired: state.expired,
+          error: error,
+        );
       }
     }
   }
@@ -125,18 +162,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signOut() async {
     await api.signOut();
     await google?.signOut();
-    await TaskReminders.activate('signed-out');
     if (mounted) state = const AuthState();
+    _remind('signed-out');
   }
 
   Future<void> signInWithGoogle(String token, {String timezone = 'UTC'}) async {
-    state = AuthState(account: state.account, loading: true);
+    state = AuthState(
+      account: state.account,
+      loading: true,
+      expired: state.expired,
+    );
     try {
       await api.signInWithGoogle(token, timezone: timezone);
-      await TaskReminders.activate('${api.baseUrl}/users/${api.account!.id}');
       if (mounted) state = AuthState(account: api.account);
+      _remind(_owner);
     } catch (error) {
-      if (mounted) state = AuthState(account: state.account, error: error);
+      if (mounted) {
+        state = AuthState(
+          account: state.account,
+          expired: state.expired,
+          error: error,
+        );
+      }
     }
   }
 

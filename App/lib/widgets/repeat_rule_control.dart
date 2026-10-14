@@ -30,7 +30,7 @@ class RepeatRuleControl extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ListTile(
           contentPadding: EdgeInsets.zero,
-          title: Text(context.l10n.repeatEvery(interval, unit)),
+          title: Text(context.l10n.repeatEvery(interval, recurrence)),
           subtitle: Text(context.l10n.repeatInterval),
           trailing: const Icon(Icons.edit_outlined),
           onTap: () async {

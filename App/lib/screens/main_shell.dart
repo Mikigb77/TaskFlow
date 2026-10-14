@@ -29,6 +29,17 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   late int _index = widget.initialIndex;
+
+  void _select(int index) {
+    if (index != _index) {
+      ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(shellTabSwitchesProvider.notifier).state++;
+    }
+    setState(() => _index = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Tasks saved from the pending list land on Calendar.
@@ -59,15 +70,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final navigationBar = NavigationBar(
       labelTextStyle: labelTextStyle,
       selectedIndex: _index,
-      onDestinationSelected: (index) {
-        if (index != _index) {
-          ProviderScope.containerOf(
-            context,
-            listen: false,
-          ).read(shellTabSwitchesProvider.notifier).state++;
-        }
-        setState(() => _index = index);
-      },
+      onDestinationSelected: _select,
       destinations: [
         NavigationDestination(
           icon: const Icon(Icons.calendar_month_outlined),
@@ -91,39 +94,48 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
       ],
     );
-    return Column(
-      children: [
-        Expanded(
-          // Each tab owns its Scaffold so feedback sits above its capture
-          // controls. The navigation bar below consumes the bottom safe area.
-          child: MediaQuery.removePadding(
-            context: context,
-            removeBottom: true,
-            child: IndexedStack(
-              index: _index,
-              children: [
-                for (final (index, screen) in const [
-                  CalendarScreen(),
-                  HomeScreen(),
-                  NotesScreen(),
-                  SettingsScreen(),
-                ].indexed)
-                  HeroMode(enabled: index == _index, child: screen),
-              ],
-            ),
-          ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
+    // Back on another tab returns to Calendar; Back on Calendar leaves.
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _select(0);
+      },
+      child: Column(
+        children: [
+          Expanded(
+            // Each tab owns its Scaffold so feedback sits above its capture
+            // controls. The navigation bar below consumes the bottom safe area.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeBottom: true,
+              child: IndexedStack(
+                index: _index,
+                children: [
+                  for (final (index, screen) in const [
+                    CalendarScreen(),
+                    HomeScreen(),
+                    NotesScreen(),
+                    SettingsScreen(),
+                  ].indexed)
+                    HeroMode(enabled: index == _index, child: screen),
+                ],
               ),
             ),
           ),
-          child: navigationBar,
-        ),
-      ],
+          DecoratedBox(
+            // In front: the bar's opaque surface would hide a border behind it.
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+            ),
+            child: navigationBar,
+          ),
+        ],
+      ),
     );
   }
 }

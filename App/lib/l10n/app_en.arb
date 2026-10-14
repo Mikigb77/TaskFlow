@@ -95,10 +95,8 @@
   "noteLinks": "Links",
   "plannedFor": "Planned for",
   "plannedForHelp": "When you intend to do this task. A deadline can be set separately in More details.",
-  "planning": "Duration & deadline",
   "duration": "Duration",
   "durationUnset": "No duration set",
-  "durationEstimateHelp": "An estimate until you choose a planned start time.",
   "durationMinutes": "{minutes} min",
   "@durationMinutes": {
     "placeholders": {
@@ -112,7 +110,6 @@
   "removeDuration": "Remove duration",
   "deadline": "Deadline",
   "deadlineUnset": "No deadline",
-  "deadlineHelp": "Must be finished by this date. Moving the planned start keeps this deadline.",
   "deadlineTime": "Deadline time",
   "deadlineEndDay": "By the end of the day",
   "removeDeadline": "Remove deadline",
@@ -132,11 +129,9 @@
   "dayTimeline": "Day timeline",
   "timelineFirstPlan": "Jump to first timed item",
   "timelineLimit": "Showing the first 200 timed items. Use the agenda to see every task.",
-  "timelineHelp": "Planned work and phone events. Deadlines mark when something must be finished.",
   "timelineUnblocked": "Without a time block",
   "timelineNoBlocks": "No timed plans for this day. Add a start time and duration to reserve a block.",
   "timelinePoint": "No duration · time only",
-  "timelineShortBlocks": "Short events have larger tap targets; the accent bar shows their actual duration.",
   "timelineHours": "{hours} hours in this day",
   "@timelineHours": {
     "placeholders": {
@@ -224,6 +219,7 @@
   "date": "Date",
   "time": "Time",
   "repeat": "Repeat",
+  "repeatNeedsDate": "Add a date to repeat",
   "neverRepeat": "Does not repeat",
   "daily": "Daily",
   "weekly": "Weekly",
@@ -304,6 +300,8 @@
   "day": "Day",
   "previousPeriod": "Previous month or week",
   "nextPeriod": "Next month or week",
+  "previousDay": "Previous day",
+  "nextDay": "Next day",
   "licenses": "Open-source licences",
   "todayAgenda": "Today’s agenda",
   "breathingRoom": "A little breathing room.",
@@ -336,9 +334,7 @@
   "inboxEmpty": "Keep ideas and to-dos here until you choose a date.\nStart with Add a task.",
   "savedOnDevice": "Your saved tasks are still on your device.",
   "checkCaptures": "Check unfinished captures",
-  "fineTunePlan": "Fine-tune your plan.",
   "seriesEdits": "Edits apply to the whole repeating task.",
-  "giveName": "Give it a name. Add a date whenever you’re ready.",
   "checkBeforeAdd": "Check the details before adding it to your calendar.",
   "titleRequired": "Please enter a task title.",
   "nameTask": "What would you like to do?",
@@ -451,13 +447,14 @@
       }
     }
   },
-  "repeatEvery": "Every {interval} {unit}",
+  "repeatEvery": "{frequency, select, daily{{interval, plural, one{Every day} other{Every {interval} days}}} weekly{{interval, plural, one{Every week} other{Every {interval} weeks}}} monthly{{interval, plural, one{Every month} other{Every {interval} months}}} other{{interval, plural, one{Every year} other{Every {interval} years}}}}",
   "@repeatEvery": {
+    "description": "How often a task repeats. frequency is the internal rule: daily, weekly, monthly or yearly.",
     "placeholders": {
       "interval": {
         "type": "int"
       },
-      "unit": {
+      "frequency": {
         "type": "String"
       }
     }
@@ -487,16 +484,11 @@
     }
   },
   "pickDate": "Pick a date",
-  "addStepDialog": "Add a step",
   "editStep": "Edit step",
-  "step": "Step",
-  "shortStep": "Add a short step.",
-  "keepStep": "Keep step",
   "repeatingSteps": "These steps repeat with the task. Check them off from an occurrence’s details.",
   "moveUp": "Move up",
   "moveDown": "Move down",
   "removeStep": "Remove step",
-  "addChecklist": "Add checklist",
   "addStep": "Add step",
   "listUnavailable": "Project unavailable",
   "archived": "Archived",
@@ -549,12 +541,10 @@
   "@keepAsTyped": {
     "description": "Text button: the typed words become the title again, without the date read from them."
   },
-  "clearDate": "Clear date",
   "optionalTime": "Time (optional)",
   "resetDateHelp": "Reset a date, then save your changes.",
   "skipped": "Skipped",
-  "theDetails": "The details",
-  "labelLimit": "Use up to 10 labels, each under 33 characters.",
+  "labelLimit": "Use up to 10 labels, each up to 32 characters.",
   "notesHint": "Anything you’d like to remember…",
   "addAttachment": "Add attachment",
   "localAttachments": "Attachments stay on this device.",
@@ -607,13 +597,24 @@
   "fileOpen": "Open",
   "fileRetry": "Retry transfer",
   "fileRemove": "Remove attachment",
+  "removeFileNamed": "Remove {file}",
+  "@removeFileNamed": {
+    "description": "Tooltip on the remove button next to an attached file. file is the file name.",
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
   "fileRemoveQuestion": "Remove this attachment?",
   "fileRemoveHelp": "This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.",
   "yourAccount": "Your account",
   "accountHeading": "Your own little space.",
   "accountSaved": "Saved to your account",
   "syncNow": "Sync now",
+  "accountSyncing": "Syncing",
   "importLocalItems": "Import local tasks and notes",
+  "accountImporting": "Importing tasks and notes",
   "importLocalItemsQuestion": "Import local tasks and notes?",
   "importLocalItemsHelp": "{count, plural, =1{Move 1 item from this phone into your account} other{Move {count} items from this phone into your account}} to back up your tasks and notes. Attachments stay on this phone until you choose Upload in item details.",
   "@importLocalItemsHelp": {
@@ -634,11 +635,16 @@
   },
   "connectionDetails": "Connection details",
   "signOut": "Sign out",
+  "accountSigningOut": "Signing out",
   "signOutQuestion": "Sign out? Reminders on this phone stop until you sign in again.",
   "recoveryHeading": "Reset your password",
   "registerHeading": "Create your account",
   "signInHeading": "Sign in",
   "authPitch": "Note down what you need to do, and TaskFlow puts it on your calendar.",
+  "signInAgainReason": "You were signed out. Sign in again to pick up where you left off.",
+  "@signInAgainReason": {
+    "description": "Shown above the sign-in form when the session ended while the app was open."
+  },
   "recoveryHelp": "Request a recovery email, then use the code to set a new password.",
   "email": "Email",
   "enterEmail": "Enter your email",
@@ -920,7 +926,6 @@
   "fileUploadHelp": "New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.",
   "fileLocalHelp": "Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.",
   "fileLimit": "Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.",
-  "fileManageHelp": "Open task details to download, upload, or remove account attachments.",
   "@reminderValue": {
     "placeholders": {
       "value": {
@@ -1365,7 +1370,7 @@
       }
     }
   },
-  "captureKeptForReview": "{count} kept for review",
+  "captureKeptForReview": "{count, plural, one{1 kept for review} other{{count} kept for review}}",
   "@captureKeptForReview": {
     "placeholders": {
       "count": {
@@ -1538,7 +1543,7 @@
   "billingRestore": "Restore purchases",
   "billingManage": "Manage subscription",
   "billingRestoreHelp": "Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.",
-  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Connect to the TaskFlow server to link your subscription.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
+  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
   "billingResult": "{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}",
   "@billingStatus": {
     "placeholders": {

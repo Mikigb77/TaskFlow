@@ -159,7 +159,7 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
               IconButton(
-                  tooltip: l.previousPeriod,
+                  tooltip: l.previousDay,
                   onPressed: () => _changeDay(-1),
                   icon: const Icon(Icons.chevron_left_rounded)),
               Expanded(
@@ -167,7 +167,7 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleMedium)),
               IconButton(
-                  tooltip: l.nextPeriod,
+                  tooltip: l.nextDay,
                   onPressed: () => _changeDay(1),
                   icon: const Icon(Icons.chevron_right_rounded)),
             ])),
@@ -185,7 +185,6 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                      Text(l.timelineHelp),
                       if (tasks.isLoading || eventRead?.isLoading == true)
                         const LinearProgressIndicator(),
                       if (tasks.hasError)
@@ -248,8 +247,6 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                             },
                             icon: const Icon(Icons.schedule_outlined),
                             label: Text(l.timelineFirstPlan)),
-                      Text(l.timelineShortBlocks,
-                          style: Theme.of(context).textTheme.bodySmall),
                       if (data.window.minutes != 1440)
                         Text(l.timelineHours(data.window.minutes ~/ 60)),
                       const SizedBox(height: 16),

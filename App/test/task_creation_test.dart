@@ -135,7 +135,14 @@ void main() {
   testWidgets('clearing the date moves the task to Inbox', (tester) async {
     final repository = await _pumpApp(tester);
     await _openCalendarTask(tester);
-    await tester.tap(find.text('Clear date'));
+    // The date sheet's No date clears it; the form has no Clear date.
+    expect(find.text('Clear date'), findsNothing);
+    await tester.tap(_dueDateField());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No date'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('schedule-done')));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Someday');
     await _saveTask(tester);
     expect((await repository.getAllTasks()).single.dueDate, isNull);

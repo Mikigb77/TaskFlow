@@ -444,8 +444,14 @@ void main() {
     expect(es.attachments, 'Archivos');
     expect(find.text('ADJUNTOS'), findsNothing);
 
+    // The upload help sits in the attach sheet, not in the form.
     final help = find.text(es.fileUploadHelp);
-    await tester.scrollUntilVisible(help, 200, scrollable: scroll);
+    expect(help, findsNothing);
+    final attach = find.text(es.addAttachment);
+    await tester.scrollUntilVisible(attach, 200, scrollable: scroll);
+    await tester.pumpAndSettle();
+    await tester.tap(attach);
+    await tester.pumpAndSettle();
     expect(help, findsOneWidget);
     expect(
         es.fileUploadHelp,
@@ -552,9 +558,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(more);
       await tester.pumpAndSettle();
+      // The file help shows in the attach sheet, not in the form.
       final help =
           find.text(signedIn ? es.fileUploadHelp : es.fileLocalHelp);
-      await tester.scrollUntilVisible(help, 200, scrollable: scroll);
+      expect(help, findsNothing);
+      final attach = find.text(es.addAttachment);
+      await tester.scrollUntilVisible(attach, 200, scrollable: scroll);
+      await tester.pumpAndSettle();
+      await tester.tap(attach);
       await tester.pumpAndSettle();
       expect(help, findsOneWidget);
       final shown = tester.widget<Text>(help).data!;
