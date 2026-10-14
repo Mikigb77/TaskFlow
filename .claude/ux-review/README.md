@@ -54,6 +54,10 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
 | `KNOWN_FAILURES.md` | Checks that were already failing before the loop started. |
 | `runs/<run id>/` | One run: `review-*.md`, `plan.md`, `plan.json`, `verify-*.md`, `report.md`. |
 | `ux.sh` | The snapshot helper (`refs/ux-review/last`). It never touches your branch or files. |
+| `PHONE_CHECKS.md` | Everything fixed in code that still needs a real phone, with steps, by area. Generated from `ISSUES.md` by `phone_checks.py`; when a check passes, move its line in `ISSUES.md` to Verified and regenerate. |
+| `pkg.py`, `phone_checks.py` | Helpers: print plan packages for the agents; rebuild `PHONE_CHECKS.md`. |
+| `free-tier-plan.md`, `free-tier-backend-notes.md` | The free tier's design and the server's contract for the app. |
+| `speed-review-brief.md` | The brief for the capture-speed review (run `2026-10-14-speed`). |
 
 The other pieces:
 - the agents: `.claude/agents/`;

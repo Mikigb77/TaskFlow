@@ -1,0 +1,205 @@
+# Phone checks
+
+Everything here is fixed in code and covered by widget or unit tests, but only a real phone can confirm it. Generated from the `Device check` section of `ISSUES.md`; when a check passes, move its line there to Verified. Most urgent first within each area.
+
+## A · Capture (voice and typing) (43)
+
+- [ ] **U1** (P0) The mic stops after a ~3 s pause.
+  - Physical Android 13+ phone: a 10-second silent pause mid-sentence doesn't stop listening; a 5-second hesitation before the first word doesn't either; the words before and after the pause end up in one text; 60 seconds of speech continues to the result (U1's done-when). Android 12 (API 31–32): the restart fallback keeps listening across pauses (inferred from the AOSP documentation). Pull down the notification shade for 3 s mid-sentence → it keeps listening. Fresh install: allow the microphone at the first ask and speak at once → it keeps listening (the race after the first permission answer is inferred). Deny the microphone twice, open capture, use `Abrir Ajustes`, allow → back in the app, listening starts.
+- [ ] **U4** (P0) The result isn't in the same sheet, and the date isn't the hero.
+  - UX_REVIEW §7 task 1. 2026-10-14-speed (review A): the three-tap path holds in code; whether a result with nothing to ask should save itself is the owner's question UX-615
+- [ ] **U5** (P0) After saving, the user isn't shown the task.
+  - UX_REVIEW §7 tasks 2 and 3; with "Remove animations" on, a task saved from Tareas sits fully above the message
+- [ ] **U6** (P0) No speech-aware extraction or recognizer biasing (the app side).
+  - on Android 13+, dictate project names, people and days, and they come out right more often. The speech-only repair prompt in `Backend/core/ai.py` is server-side, outside this loop
+- [ ] **U7** (P0) No "Save as written" when the AI is slow or fails. _(needs: TalkBack)_
+  - in airplane mode, dictate "médico el viernes", tap `Guardar tal cual`, and the task is dated Friday. 2026-10-14-speed (review A): works, but the phone's parser misses parts of the day and «pasado mañana»: UX-604 (P104)
+- [ ] **UX-101** (S3) "Saved" bar never leaves; its only button undoes.
+  - With Android's ‘Time to take action’ accessibility setting at 1 minute, the save bar stays about a minute and then goes. After a voice save, start a second capture: no `Deshacer` above `Guardar tarea`.
+- [ ] **UX-102** (S3) Leaving creates phantom "Capturas pendientes", even empty ones.
+  - tap the home-screen widget, press Back, and no pending line appears
+- [ ] **UX-103** (S3) Capture errors show raw English and jargon, out of view.
+  - record silence, see "No te he entendido…", then `Empezar a hablar`, and nothing new in Pendientes
+- [ ] **UX-106** (S3) Without Pro, every way into capture dead-ends.
+  - on a non-Pro account, the widget, both shortcuts and Share each open typing
+- [ ] **UX-437** (S3) Words heard before a speech restart can vanish.
+  - Android 12 phone (the restart fallback), Spanish: say ‘comprar pan’, stay silent until the recognizer restarts, then say ‘y leche’. The field keeps ‘comprar pan y leche’. Android 13+ (segmented session): the same sentence with a long pause ends with both parts once.
+- [ ] **UX-456** (S3) Volver a decirlo discards the result, flush under Añadir.
+  - one-handed, tapping Añadir never hits Volver a decirlo
+- [ ] **UX-497** (S3) Free accounts can't dictate despite 10 free monthly dictations. _(needs: real server)_
+  - on a free account against the real server, dictate and watch the count on the Pro screen drop. Do the same from the home-screen widget and the voice shortcut.
+- [ ] **UX-498** (S3) Running out of free dictations must keep words, offer typing.
+  - open capture from the home-screen widget with 0 left
+- [ ] **UX-601** (S3) Saving waits for a full server sync.
+  - on a slow or dead connection, Guardar closes the sheet and the task shows at once
+- [ ] **UX-602** (S3) A landing re-dates the next undated dictation.
+  - dictate «médico el viernes», then «comprar pan»; the second has no date
+- [ ] **UX-603** (S3) The mic opens late; first words can be lost.
+  - tap the mic and speak at once; «Escuchando» shows quickly and the first word is kept, cold and warm
+- [ ] **U8** (P1) Several creation buttons (3 on an empty day, 4 with the timeline).
+  - a non-Pro account in Spanish; also confirm whether the father's account has Pro
+- [ ] **U9** (P1) Technical options on the capture screen.
+  - fresh install, Spanish, largest text; the first dictation shows "Tus palabras van por internet. Más en Ajustes." once, whole
+- [ ] **UX-109** (S2) TalkBack: listening auto-starts; no cues; mismatched mic labels. _(needs: TalkBack)_
+  - with TalkBack, open capture, hear "Empezar a hablar", start, and hear that it's listening
+- [ ] **UX-114** (S2) Typing entries open a mic-first screen.
+  - the launcher's typing shortcut brings up the keyboard
+- [ ] **UX-115** (S2) Speech language ignores the app; choice forgotten; raw code.
+  - app in Catalan, a Catalan speaker dictates on the phone and gets Catalan words; the Voz choice survives a restart
+- [ ] **UX-119** (S2) Share error messages are English-only.
+  - in Spanish, share over 4,000 characters to TaskFlow and the toast is in Spanish
+- [ ] **UX-120** (S2) Capture diagnostics is a Settings row every user sees.
+  - on a staging build, long-press the version in Otros ajustes; on a release build nothing happens
+- [ ] **UX-121** (S2) Native labels and the stop button use inconsistent, technical names.
+  - in Spanish, the widget picker and the launcher shortcuts show the new names
+- [ ] **UX-441** (S2) TalkBack says "Listo" when the user cancels or types. _(needs: TalkBack)_
+  - with TalkBack, Cancelar with words is silent before the keep-or-discard question, Listo says "Listo", and leaving the app says "En pausa"
+- [ ] **UX-451** (S2) Recognizer errors are silent to TalkBack. _(needs: TalkBack)_
+  - TalkBack reads the error aloud
+- [ ] **UX-460** (S2) Animations off: new Tareas row half under save message.
+  - with "Remove animations" on, save a task from Tareas, and its row sits fully above the message
+- [ ] **UX-461** (S2) Cancel while understanding re-said words leaves two pending.
+  - Back during "Entendiendo…" with real speech, and Pendientes shows one capture. Follow-on wait: UX-464
+- [ ] **UX-466** (S2) From the timeline, a saved task lands out of sight.
+  - from a timeline, add a task for another day, and Calendar shows that day with the task lit. A no-date landing on Calendar can sit under the message: UX-475
+- [ ] **UX-467** (S2) TalkBack isn't told saving as written is possible. _(needs: TalkBack)_
+  - TalkBack says "Está tardando más de lo normal." at about 8 s
+- [ ] **UX-475** (S2) Calendar's lit no-date row sits under the save message.
+  - save a task with no date from Calendar at about 390×844, animations on and off, and the lit Bandeja row shows whole above the message
+- [ ] **UX-491** (S2) First-capture privacy note is a jargon paragraph mid-dictation.
+  - fresh install, Spanish, largest text, first dictation
+- [ ] **UX-493** (S2) Voz speech language doesn't reach online transcription.
+  - set Voz to Català and online transcription, then dictate in Catalan; Catalan words come back.
+- [ ] **UX-502** (S2) Kept recording at 0 left: no next step; Cancelar asks 'keep?'.
+  - a real free account at 0 left; reopen the recording, and no keyboard rises
+- [ ] **UX-605** (S2) Cancelar on a result silently keeps it pending. _(needs: TalkBack)_
+  - Android's back swipe on a result asks; TalkBack reads the question
+- [ ] **UX-609** (S2) At 0 left, a 17-word line tops typing.
+  - in Catalan at 0 dictations left and the largest text, the typing field is visible above the keyboard.
+- [ ] **UX-610** (S2) Device check: the wait between Listo and the result.
+  - read the timing's p50/p95 in diagnostics over about 10 dictations before touching the 4 s cap. The assistant's own wait is UX-616 (decision)
+- [ ] **UX-611** (S2) Device check: widget and shortcuts after a cold start.
+  - frames from the widget tap to «Escuchando», cold and warm
+- [ ] **UX-125** (S1) Both launcher shortcuts use the app icon.
+  - long-press the launcher icon; two different icons, and the launcher's mask doesn't clip them
+- [ ] **UX-458** (S1) Result date line has no "date" name for TalkBack. _(needs: TalkBack)_
+  - TalkBack reads "Fecha y hora: Hoy, botón"
+- [ ] **UX-462** (S1) Date line hides disabled state from TalkBack while saving. _(needs: TalkBack)_
+  - while saving, TalkBack says "desactivado" on the date line
+- [ ] **UX-469** (S1) Reintentar and Guardar tal cual wrap at 1.0× on 360 dp.
+  - Catalan at 360 dp, and "Torna-ho a provar" and "Desa-ho tal com està" each fit on one line
+- [ ] **UX-494** (S1) Empty share says 'Share a shorter text'.
+  - share an empty text to TaskFlow, and the toast says there's no text
+
+## B · Calendar, Tareas and the task form (17)
+
+- [ ] **UX-201** (S4) Unfinished tasks from earlier days vanish from Today.
+  - UX_REVIEW §7 step 4 on the day after step 2: open the app the next morning and find yesterday's ‘comprar pan’ under Atrasadas.
+- [ ] **UX-202** (S3) Today's tasks start below the fold.
+  - Spanish at 1.3× on a phone about 390×844, two of today's tasks fully above the buttons. P38 later frees another 60 dp
+- [ ] **UX-203** (S3) The calendar stays on yesterday after midnight.
+  - leave Calendar on today in recent apps overnight; when reopened, it shows the new day
+- [ ] **UX-208** (S3) Delete can't be undone, and Delete is the dominant button.
+  - on a signed-in account, delete, tap Deshacer, and the task survives the next sync and shows on a second device
+- [ ] **UX-209** (S3) The reminder chip promises a reminder that can't fire.
+  - Android 14 phone or emulator, fresh install: on a timed task tap `Sin recordatorio · Activar` → system dialog → the exact-alarms screen if needed → back; Detalles lists the alert as programado, not aproximado. Revoke the notification permission in Android settings: the chip reads `Sin recordatorio · Activar`.
+- [ ] **UX-500** (S3) No warning near 100 MB cap; refused files re-sent every sync.
+  - a free account near the cap; attach a photo that crosses it; remove a file; tap Reintentar
+- [ ] **UX-621** (S3) Capture result card drops a step typed without Enter.
+  - type a step, tap "Añadir al calendario" without Enter, open the task, and the step is there
+- [ ] **UX-218** (S2) Offline shows a red error about a "server address".
+  - in airplane mode, open Calendar and try to sign in, with no red banner and no "server address"
+- [ ] **UX-223** (S2) Back on a secondary tab closes the app.
+  - on Tareas, Back lands on Calendario and a second Back leaves the app; tap a reminder whose task was deleted, and only the message shows
+- [ ] **UX-225** (S2) Translation slips: "Proyecto de pasos", feminine forms, plurals. _(needs: TalkBack)_
+  - TalkBack on a task's steps says "Lista de pasos"
+- [ ] **UX-452** (S2) Listo seems dead when the a. m./p. m. error is off-screen. _(needs: TalkBack)_
+  - 12-hour clock, large text, type 5 and tap Listo; the keyboard drops, "Elige a. m. o p. m." shows, and TalkBack reads it
+- [ ] **UX-505** (S2) File usage line stays hidden after uploads cross 80%.
+  - a free account at about 75 MB; attach photos past 80%, and "Archivos: N de 100 MB usados" appears
+- [ ] **UX-511** (S2) After an upload, task screen blinks and jumps to top.
+  - on a free account, open a long task, scroll to the bottom and attach a photo; the card never disappears and the view stays put.
+- [ ] **UX-622** (S2) Toggling Más detalles erases a half-typed step.
+  - on a task with no steps, type a step in Más detalles, tap Menos detalles, save, reopen, and the step is there
+- [ ] **UX-436** (S1) Turn-on confirmation over-promises.
+  - Android 14 phone: turn reminders on, then go back from the exact-alarm screen without allowing. The last message asks for «Alarmas y recordatorios»; it doesn't say `Listo`.
+- [ ] **UX-446** (S1) View switcher is read as "Mostrar menú" by TalkBack. _(needs: TalkBack)_
+  - TalkBack reads "Cambiar vista" on the "Semana ▾" button
+- [ ] **UX-472** (S1) New detail tap targets have no spoken action. _(needs: TalkBack)_
+  - TalkBack reads the date row as a button with "Cambiar fecha"
+
+## C · Projects, sharing, groups and invitations (12)
+
+- [ ] **UX-301** (S3) Archive and Mute silently switch off a project's reminders.
+  - archive a project with a dated task, tap Deshacer, and the reminder still fires
+- [ ] **UX-305** (S3) Sharing is hidden behind ⋮ and missing from the project.
+  - "Share this list with your wife", starting inside a project. One sharing door (D15a) not now
+- [ ] **UX-306** (S3) Invitees can't find invitations, then hit an unexplained code. _(needs: two accounts)_
+  - with a second account, the card is on Calendar; paste the code and land on the project. Joining without the code for Google accounts (D14) needs a server change first
+- [ ] **UX-476** (S3) Delete or leave lands on a ghost project page.
+  - delete an owned project from its own page; you land on Projects with "Proyecto eliminado", and Back doesn't return to an empty "Proyecto" page
+- [ ] **UX-321** (S2) Activity rows put who did what last. _(needs: TalkBack)_
+  - with TalkBack on, an unread Activity row says who, what, the project and that it is unread
+- [ ] **UX-326** (S2) Invitation review copy; "Cancel" reads like reject. _(needs: two accounts)_
+  - a real second account invites you, and the card and the review name the sender. A sender with no full name shows the email's local part (server-side, as elsewhere in sharing)
+- [ ] **UX-429** (S2) The project sheet leaves no room for the keyboard.
+  - open the project picker, type a search with the keyboard up, and the field and the results stay visible
+- [ ] **UX-478** (S2) Unirme shows no progress; a wrong code is lost. _(needs: two accounts)_
+  - second account on a slow connection; the spinner stays until the project opens, and a wrong code keeps both the dialog and the code
+- [ ] **UX-487** (S2) 'Ahora no' on an invitation reopens it at every cold start.
+  - Ahora no, force-stop, reopen; Calendar with the card, no review screen
+- [ ] **UX-626** (S2) A new project's page can flash "solo lectura".
+  - tap Nuevo proyecto, save, and the new page's bottom bar shows Añadir tarea throughout, never "Este proyecto es de solo lectura"
+- [ ] **UX-426** (S1) Empty search still folds every text on each rebuild.
+  - Profile build on a low-end Android phone with about 300 notes of about 1,500 characters each: complete a task on Calendar, then type in the Notas search; neither causes a frame over 16 ms. Inferred from code.
+- [ ] **UX-630** (S1) A gone project's page offers adding, task lands elsewhere. _(needs: two accounts)_
+  - While a member has a shared project's page open, remove them from the project. Their page should show the read-only line and "Este proyecto aún no tiene tareas.", with no Añadir tarea. On the same two-account setup, accept an invitation while the refresh fails: the joined project shows read-only until the next sync, which is expected.
+
+## D · Sign-in, settings, notifications and the rest (23)
+
+- [ ] **UX-401** (S4) Reminders off by default; nothing asks to turn them on. _(needs: TalkBack)_
+  - TalkBack reads the question once; after "Sí", the Android 13+ notification dialog appears; the reminder arrives on time
+- [ ] **UX-402** (S3) Signing in without an account is a dead end. _(needs: real server)_
+  - UX-402 (inferred): against the real server, sign in with an email that has no account. The error offers "create an account with this email", and the email is kept.
+- [ ] **U12** (P1) No learn-by-doing first run; notification permission timing.
+  - the §7 newcomer check
+- [ ] **UX-406** (S2) The theme toggle is on 23 surfaces.
+  - at 320 dp and 2× text, the app bars fit their titles without the toggle
+- [ ] **UX-409** (S2) Notification bodies are relative and go stale.
+  - a real Posponer about 10 min later, and a late delivery while the phone is idle
+- [ ] **UX-411** (S2) "Completar" on a notification can't be undone.
+  - the replacement in the shade, the timeout, and background-isolate latency between the tap and the Undo line
+- [ ] **UX-419** (S2) Session expiry wipes in-progress typing. _(needs: real server)_
+  - a session expired by the real server while typing a task, and the task is still there after signing in
+- [ ] **UX-427** (S2) Spanish "Calendario" tab label breaks mid-word at 320 dp.
+  - Spanish, Android font size at its largest, on a phone narrower than 360 dp (or a 360 dp phone with Display size raised): every tab label sits on one line and the tab icons stay inside the bar. Inferred from font metrics; the widget test covers the layout.
+- [ ] **UX-439** (S2) First dated save: reminders sheet hides the landing and Undo.
+  - on a fresh account, at the first dated save, the row lights up and Deshacer can be tapped before the question opens
+- [ ] **UX-481** (S2) Recordatorios says Activados when the phone blocks alerts.
+  - on Android 13+, revoke notifications, return to Ajustes, and the row says blocked
+- [ ] **UX-484** (S2) Sign-in demands 12 characters, hiding the create-account button. _(needs: real server)_
+  - sign in with a 6-character wrong password. It reaches the server, and the error offers "Crear una cuenta con este correo".
+- [ ] **UX-488** (S2) Email-in-use and wrong-password buttons can loop.
+  - with an account made through Google, the recovery path sends an email even though the account has no password.
+- [ ] **UX-508** (S2) Sign-out shows no progress for up to 12 s. _(needs: TalkBack)_
+  - sign out on a slow network, and the spinner shows in the button until the sign-in screen
+- [ ] **UX-623** (S2) Sign-in-again doesn't say why; Back erases the reason.
+  - the server expires the session while a task is being typed
+- [ ] **UX-631** (S2) Notification Undo ignores the accessibility timeout.
+  - with Tiempo para actuar at 1 minute, `Completada:` with Deshacer stays about a minute
+- [ ] **U14** (P2) Google sign-in first, or local use before sign-in.
+  - Google sign-in completes from the first button. Option 2 (using the app before signing in) is rejected for now (DECISIONS.md: the login stays a hard wall) and comes back after the §7 test
+- [ ] **UX-420** (S1) iOS microphone prompt mentions a "task draft". _(needs: iOS)_
+  - the Spanish microphone prompt shows the new text.
+- [ ] **UX-423** (S1) Long export intro; four extra buttons on the Pro screen.
+  - come back from the store after a purchase, and the status updates without a button
+- [ ] **UX-424** (S1) Startup waits for reminder setup.
+  - cold-start time to the calendar, from the widget and shortcuts too (UX-611), and opening the app from a reminder still opens the task
+- [ ] **UX-432** (S1) Below 360 dp, tab tooltips lose large text.
+  - Spanish, Android font size at its largest, on a phone narrower than 360 dp (or a 360 dp phone with Display size raised): long-press `Calendario` → its tooltip shows in large text, clearly bigger than the tab label; every tab label still sits on one line, with the icons inside the bar (P45's UX-427 check, still pending). Inferred from the Flutter SDK; the widget tests cover the sizes.
+- [ ] **UX-449** (S1) Reminders question can open on another tab.
+  - make the first dated save on Calendario and switch to Notas within 4 s; no question appears there, and the next dated save asks
+- [ ] **UX-483** (S1) Tapping the current language or theme doesn't close the sheet. _(needs: TalkBack)_
+  - with TalkBack on, the current language is announced as selected, and a double-tap closes the sheet
+- [ ] **UX-513** (S1) The sign-out, Sincronizar and Importar spinners have no TalkBack label. _(needs: TalkBack)_
+  - with TalkBack on, tap Sincronizar, Importar and Cerrar sesión, and each says what it is doing
