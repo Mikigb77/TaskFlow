@@ -1,4 +1,10 @@
+// P44 (UX-408), round 1 of 2026-10-13-app: Account in one line, sign-out
+// asked first, connection details only in debug builds.
+// P96 (UX-508), round 2: sign-out shows progress in its button.
+import 'dart:async';
+
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
@@ -90,6 +96,231 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // ---- P44 · UX-408: Account in one line, fewer buttons ----
+
+  Future<(_SignOutAuth, _LocalItems)> openAccount(WidgetTester tester,
+      {String language = 'es',
+      int localItems = 0,
+      String? syncError,
+      bool debug = false,
+      bool dark = false,
+      double textScale = 1}) async {
+    final api = OfflineApiClient();
+    late _SignOutAuth auth;
+    final repository = _LocalItems(localItems)..syncError = syncError;
+    final container = ProviderContainer(overrides: [
+      apiClientProvider.overrideWithValue(api),
+      authProvider.overrideWith((ref) => auth = _SignOutAuth(api)),
+      taskRepositoryProvider.overrideWithValue(repository),
+      taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+      themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+    ]);
+    addTearDown(container.dispose);
+    addTearDown(api.close);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+            locale: Locale(language),
+            theme: dark ? AppTheme.dark : AppTheme.light,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
+                child: child!),
+            home: AccountScreen(debug: debug))));
+    await tester.pumpAndSettle();
+    container.read(authProvider);
+    return (auth, repository);
+  }
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+        'UX-408: Account says Guardado en tu cuenta with Sincronizar ahora, and no import row without local items ($language, 2x text at 320 dp)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 568));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final l = lookupAppLocalizations(Locale(language));
+      await openAccount(tester, language: language, textScale: 2);
+      for (final text in [l.accountSaved, l.syncNow]) {
+        await tester.scrollUntilVisible(find.text(text), 120,
+            scrollable: find.byType(Scrollable).first);
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(find.text(text));
+        expect(rect.left, greaterThanOrEqualTo(0), reason: text);
+        expect(rect.right, lessThanOrEqualTo(320.5), reason: text);
+      }
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      // The whole screen at once: no import row without local items.
+      await tester.binding.setSurfaceSize(const Size(390, 1600));
+      await openAccount(tester, language: language);
+      expect(find.text(l.accountSaved), findsOneWidget);
+      expect(find.text(l.signOut), findsOneWidget, reason: 'all built');
+      expect(find.text(l.importLocalItems), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('UX-408: with local items, Importar tareas y notas locales shows',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await openAccount(tester, localItems: 3);
+    expect(find.text(es.importLocalItems), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('UX-408: a failed sync says so once, in place of the saved line',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    const error = 'Saved on this phone. Cannot reach the server.';
+    await openAccount(tester, syncError: error);
+    final message = requestProblemText(es, error);
+    expect(find.text(message), findsOneWidget);
+    expect(find.text(es.accountSaved), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-408 (D13): outside debug builds there is no Detalles de conexión; a debug build keeps it',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await openAccount(tester);
+    expect(find.text(es.signOut), findsOneWidget, reason: 'all built');
+    expect(find.text(es.connectionDetails), findsNothing);
+    await openAccount(tester, debug: true);
+    expect(find.text(es.connectionDetails), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-408: Cerrar sesión asks first, saying reminders stop; Cancelar keeps the account, Cerrar sesión in the question signs out',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final (auth, _) = await openAccount(tester);
+    Finder signOutButton() => find.widgetWithText(TextButton, es.signOut);
+    await tester.tap(signOutButton());
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    expect(find.descendant(of: dialog, matching: find.text(es.signOutQuestion)),
+        findsOneWidget);
+    await tester.tap(
+        find.descendant(of: dialog, matching: find.text(es.cancel)));
+    await tester.pumpAndSettle();
+    expect(auth.signOuts, 0);
+    expect(find.byType(AlertDialog), findsNothing);
+
+    await tester.tap(signOutButton());
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, es.signOut)));
+    await tester.pumpAndSettle();
+    expect(auth.signOuts, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---- Round 2 · P96 · UX-508: sign-out shows progress in its button ----
+
+  for (final dark in [false, true]) {
+    testWidgets(
+        'UX-508: while a confirmed sign-out waits on the server, a progress indicator sits inside Cerrar sesión; before confirming there is none (dark=$dark)',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final (auth, _) = await openAccount(tester, dark: dark);
+      auth.hold = Completer<void>();
+      Finder signOutButton() => find.ancestor(
+          of: find.text(es.signOut), matching: find.byType(TextButton));
+      Finder spinnerInButton() => find.descendant(
+          of: signOutButton(), matching: find.byType(CircularProgressIndicator));
+      expect(signOutButton(), findsOneWidget);
+      expect(spinnerInButton(), findsNothing, reason: 'nothing at rest');
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      await tester.tap(signOutButton());
+      await tester.pumpAndSettle();
+      // The question is open: still no indicator in the button.
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.ancestor(
+                  of: find.text(es.signOut).first,
+                  matching: find.byType(TextButton)),
+              matching: find.byType(CircularProgressIndicator)),
+          findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      await tester.tap(find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(FilledButton, es.signOut)));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(auth.signOuts, 1);
+      expect(spinnerInButton(), findsOneWidget,
+          reason: 'progress shows in the button');
+      final colors = Theme.of(tester.element(signOutButton())).colorScheme;
+      expect(
+          tester
+              .widget<CircularProgressIndicator>(spinnerInButton())
+              .color,
+          colors.error);
+      expect(
+          tester.widget<TextButton>(signOutButton()).onPressed, isNull,
+          reason: 'it can’t be pressed twice');
+      expect(tester.takeException(), isNull);
+
+      auth.hold!.complete();
+      await tester.pumpAndSettle();
+      expect(spinnerInButton(), findsNothing);
+    });
+  }
+
+  test('UX-408: the sign-out question names the reminders in EN, ES and CA',
+      () {
+    for (final (language, word) in [
+      ('en', 'Reminders'),
+      ('es', 'recordatorios'),
+      ('ca', 'recordatoris'),
+    ]) {
+      final l = lookupAppLocalizations(Locale(language));
+      expect(l.signOutQuestion, contains(word));
+    }
+  });
+}
+
+final es = lookupAppLocalizations(const Locale('es'));
+
+class _SignOutAuth extends SignedInFixtureAuth {
+  _SignOutAuth(super.api);
+  int signOuts = 0;
+
+  /// When set, sign-out waits for it, as on a slow server.
+  Completer<void>? hold;
+  @override
+  Future<void> signOut() async {
+    signOuts++;
+    await hold?.future;
+  }
+}
+
+/// Tasks and notes kept on this phone before signing in.
+class _LocalItems extends MemoryTasks {
+  _LocalItems(this.count);
+  final int count;
+  @override
+  Future<int> localTaskCount() async => count;
 }
 
 class _GuestAuth extends AuthNotifier {

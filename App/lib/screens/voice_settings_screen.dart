@@ -30,8 +30,9 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
   // The language last checked.
   String? _checked;
   int _checks = 0;
-  // The answer to `Configurar la transcripción local`.
-  String? _setup;
+  // Whether `Configurar la transcripción local` opened the system set-up;
+  // null before any attempt.
+  bool? _setupOpened;
 
   String _language(RegionalPreferences preferences) => speechLanguageTag(
     preferences.speechLanguage,
@@ -64,20 +65,13 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
   }
 
   Future<void> _setUp(String language) async {
-    final l10n = context.l10n;
     bool opened;
     try {
       opened = await ref.read(nativeSpeechProvider).prepareLanguage(language);
     } catch (_) {
       opened = false;
     }
-    if (mounted) {
-      setState(
-        () => _setup = opened
-            ? l10n.voiceSetupRequested
-            : l10n.voiceSetupUnavailable,
-      );
-    }
+    if (mounted) setState(() => _setupOpened = opened);
   }
 
   @override
@@ -90,7 +84,7 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
     if (language != _checked) {
       _checked = language;
       _capability = null;
-      _setup = null;
+      _setupOpened = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _check(language);
       });
@@ -98,6 +92,8 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
     final capability = _capability;
     final usable = capability?.usable;
     final online = preferences.speechOnline || usable == false;
+    // After a failed set-up the banner alone says why speech goes online.
+    final setupFailed = _setupOpened == false;
     return Scaffold(
       appBar: CustomAppBar(title: l10n.voiceSettings),
       body: ListView(
@@ -159,7 +155,7 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
               ],
             ),
           ),
-          if (usable == false)
+          if (usable == false && !setupFailed)
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
               child: Text(
@@ -170,7 +166,10 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
               ),
             ),
           // The recognizer exists but lacks this language: it can be set up.
-          if (capability != null && capability.onDevice && !capability.usable)
+          if (capability != null &&
+              capability.onDevice &&
+              !capability.usable &&
+              !setupFailed)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Wrap(
@@ -187,10 +186,14 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
                 ],
               ),
             ),
-          if (_setup != null)
+          if (_setupOpened != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-              child: MessageBanner(_setup!),
+              child: MessageBanner(
+                setupFailed
+                    ? l10n.voiceSetupUnavailable
+                    : l10n.voiceSetupRequested,
+              ),
             ),
           const Divider(height: 32),
           Padding(

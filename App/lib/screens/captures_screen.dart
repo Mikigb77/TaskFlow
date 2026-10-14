@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/capture_session.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/services/capture_problem.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -15,6 +18,25 @@ class CapturesScreen extends ConsumerWidget {
     if (session.text.trim().isNotEmpty) return session.text.trim();
     if (session.transcript.trim().isNotEmpty) return session.transcript.trim();
     return context.l10n.voiceRecording;
+  }
+
+  /// What happens next. A recording that waits for free dictations says
+  /// when it can be understood.
+  String _help(BuildContext context, WidgetRef ref, CaptureSession session) {
+    final l = context.l10n;
+    if (session.remaining.isNotEmpty) {
+      return l.captureDraftSummary(
+          session.remaining.length, session.ready.length);
+    }
+    if (session.audioPath != null &&
+        session.text.trim().isEmpty &&
+        !ref.watch(voiceAvailableProvider) &&
+        (CaptureProblem.usedUp(session.error) ||
+            ref.watch(freeVoiceLeftProvider) == 0)) {
+      return freeVoiceUsedUpText(l, ref.watch(freeVoiceResetsProvider),
+          recording: true);
+    }
+    return l.captureResumeHelp;
   }
 
   @override
@@ -52,7 +74,7 @@ class CapturesScreen extends ConsumerWidget {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
                                   subtitle: Text(
-                                      '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${session.remaining.isNotEmpty ? context.l10n.captureDraftSummary(session.remaining.length, session.ready.length) : context.l10n.captureResumeHelp}'),
+                                      '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${_help(context, ref, session)}'),
                                   trailing:
                                       const Icon(Icons.chevron_right_rounded),
                                   // Saved tasks land back on Calendar.

@@ -102,8 +102,26 @@ class AttachmentStore {
           {'is_deleted': 1, 'delete_pending': 1, 'error': null},
           where: 'owner_key = ? AND id = ?', whereArgs: [owner, id]);
       await _forgetSource(tx, item);
+      // A removal may make room: the next sync sends refused files again.
+      await _releaseRefused(tx);
     });
   }
+
+  static const _refused = 'error IN (?, ?)';
+  static const _refusedArgs = [
+    TaskAttachment.storageFull,
+    TaskAttachment.storageFullShared
+  ];
+
+  Future<void> _releaseRefused(DatabaseExecutor tx, [String? id]) =>
+      tx.update('task_attachments', {'error': null},
+          where: 'owner_key = ? AND $_refused${id == null ? '' : ' AND id = ?'}',
+          whereArgs: [owner, ..._refusedArgs, if (id != null) id]);
+
+  /// Sync again an upload the server refused for a full file space: one file
+  /// on its Retry, or every one when Pro turns on.
+  Future<void> retryRefused([String? id]) async =>
+      _releaseRefused(await database.database, id);
 
   Future<void> removeLocal(int taskId, String path) async {
     await (await database.database).transaction((tx) async {
@@ -171,11 +189,25 @@ class AttachmentStore {
     } on FileSystemException {/* Retry on a later sync. */}
   }
 
-  String _error(Object error) => error is ApiException
-      ? error.message
-      : error is FormatException
-          ? error.message
-          : 'The file could not be transferred. Your task is saved. Check the file and retry.';
+  String _error(Object error) {
+    // A full file space is kept as a token, never the server's English text.
+    if (_storageFull(error)) {
+      final shared = (error as ApiException).body!['shared'] == true;
+      return shared
+          ? TaskAttachment.storageFullShared
+          : TaskAttachment.storageFull;
+    }
+    return error is ApiException
+        ? error.message
+        : error is FormatException
+            ? error.message
+            : 'The file could not be transferred. Your task is saved. Check the file and retry.';
+  }
+
+  static bool _storageFull(Object error) =>
+      error is ApiException &&
+      error.status == 400 &&
+      error.body?['code'] == 'storage_full';
 
   Future<void> sync(ApiClient api, int accountId) {
     final key = (database, owner);
@@ -192,9 +224,15 @@ class AttachmentStore {
       WHERE owner_key = ? AND is_deleted = 0 AND task_id IN
       (SELECT sync_id FROM tasks WHERE owner_key = ? AND is_deleted = 1)''',
         [owner, owner]);
+    // Removals go first, so the space they free is there for the uploads.
+    await _syncRemovals(db, api, accountId);
+    // An upload refused for a full file space waits for its Retry, a
+    // removal, or Pro, rather than re-sending up to 6 MiB on every sync.
     final queued = await db.query('task_attachments',
-        where: 'owner_key = ? AND upload_pending = 1 AND is_deleted = 0',
-        whereArgs: [owner]);
+        where:
+            'owner_key = ? AND upload_pending = 1 AND is_deleted = 0 AND (error IS NULL OR NOT $_refused)',
+        whereArgs: [owner, ..._refusedArgs]);
+    var uploaded = 0;
     for (final row in queued) {
       var item = await _get(row['id'] as String);
       if (item == null || item.deleted) continue;
@@ -241,11 +279,35 @@ class AttachmentStore {
           'upload_pending': 0,
           'error': null
         });
+        uploaded++;
       } catch (error) {
         await _update(row['id'] as String, {'error': _error(error)});
+        if (_storageFull(error)) {
+          // A refusal of the user's own space carries its usage.
+          await api.rememberStorage((error as ApiException).body!['storage'],
+              accountId: accountId);
+        }
         if (error is ApiException && error.status == 401) rethrow;
       }
     }
+    // A file removed while it uploaded is removed from the server too.
+    if (queued.isNotEmpty) await _syncRemovals(db, api, accountId);
+    await _pullRemote(db, api, accountId);
+    // The uploads took space: refresh the usage line once. This can't loop:
+    // an account update doesn't rebuild the repository or start a sync.
+    final account = api.account;
+    if (uploaded > 0 &&
+        account?.id == accountId &&
+        account!.storage != null &&
+        !account.complimentaryPro) {
+      try {
+        await api.refreshStorage(accountId: accountId);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _syncRemovals(
+      Database db, ApiClient api, int accountId) async {
     final deleted = await db.query('task_attachments',
         where: 'owner_key = ? AND delete_pending = 1', whereArgs: [owner]);
     for (final row in deleted) {
@@ -268,6 +330,9 @@ class AttachmentStore {
         if (error is ApiException && error.status == 401) rethrow;
       }
     }
+  }
+
+  Future<void> _pullRemote(Database db, ApiClient api, int accountId) async {
     var page = 1;
     while (true) {
       final result = Map<String, dynamic>.from(await api.request(

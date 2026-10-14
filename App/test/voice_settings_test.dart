@@ -832,6 +832,98 @@ void main() {
     },
   );
 
+  // ---- P93 · UX-496: one message after a failed set-up ----
+
+  void expectSetUpRow(Finder page, AppLocalizations l, Matcher matcher) {
+    for (final label in [l.setUpSpeech, l.checkAgain]) {
+      expect(
+        find.descendant(of: page, matching: find.text(label)),
+        matcher,
+        reason: label,
+      );
+    }
+  }
+
+  for (final (how, speech) in [
+    ('can’t open', _Speech()..prepares = false),
+    ('throws', _Speech()..prepareError = PlatformException(code: 'x')),
+  ]) {
+    testWidgets(
+      'UX-496: when Android’s set-up $how, Voz shows the set-up banner once, with no onDeviceUnavailable line and no Configurar la transcripción local or Comprobar de nuevo',
+      (tester) async {
+        final page = await trySetUp(
+          tester,
+          es,
+          'es',
+          speech,
+          size: const Size(390, 1600),
+        );
+        expect(
+          find.descendant(
+            of: page,
+            matching: find.text(es.voiceSetupUnavailable),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: page, matching: find.text(es.onDeviceUnavailable)),
+          findsNothing,
+        );
+        expectSetUpRow(page, es, findsNothing);
+        // Said once: no other line on Voz ends the same way.
+        final online = textsUnder(tester, page)
+            .where((text) => text.endsWith('lo hace en línea.'))
+            .toList();
+        expect(online, [es.voiceSetupUnavailable]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-496: before any set-up attempt, Voz shows the onDeviceUnavailable line with Configurar la transcripción local and Comprobar de nuevo, and no banner',
+    (tester) async {
+      await openApp(
+        tester,
+        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _Speech()..installed = false,
+        size: const Size(390, 1600),
+      );
+      await openVoice(tester, es);
+      final page = find.byType(VoiceSettingsScreen);
+      expect(
+        find.descendant(of: page, matching: find.text(es.onDeviceUnavailable)),
+        findsOneWidget,
+      );
+      expectSetUpRow(page, es, findsOneWidget);
+      expect(find.text(es.voiceSetupUnavailable), findsNothing);
+      expect(find.text(es.voiceSetupRequested), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-496: when Android’s set-up opens, Comprobar de nuevo stays for the banner that names it',
+    (tester) async {
+      final page = await trySetUp(
+        tester,
+        es,
+        'es',
+        _Speech()..prepares = true,
+        size: const Size(390, 1600),
+      );
+      expect(
+        find.descendant(of: page, matching: find.text(es.voiceSetupRequested)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: page, matching: find.text(es.checkAgain)),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'UX-491/UX-492: captureSetupUnavailable is used only by the capture messages, voiceSetupUnavailable only by Voz, capturePrivacy only by Voz',
     () {

@@ -15,6 +15,58 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// The free dictations of an account without Pro, this calendar month (UTC).
+class FreeVoice {
+  const FreeVoice({
+    required this.limit,
+    required this.left,
+    required this.resetsAt,
+  });
+  final int limit;
+  final int left;
+  final DateTime resetsAt;
+
+  /// Null when the server sent no block (an older server) or a malformed one.
+  static FreeVoice? fromJson(Object? data) {
+    if (data is! Map) return null;
+    final limit = data['limit'];
+    final left = data['left'];
+    final resetsAt = DateTime.tryParse('${data['resets_at']}');
+    if (limit is! num || left is! num || resetsAt == null) return null;
+    return FreeVoice(
+      limit: limit.toInt(),
+      left: left.toInt(),
+      resetsAt: resetsAt,
+    );
+  }
+
+  /// What is left at [now]: a saved count from before the reset counts as the
+  /// whole new month.
+  int leftAt(DateTime now) => now.isBefore(resetsAt) ? left : limit;
+
+  /// When they come back without a saved date: the next calendar month, in
+  /// UTC, as the server counts them.
+  static DateTime nextReset(DateTime now) {
+    final utc = now.toUtc();
+    return DateTime.utc(utc.year, utc.month + 1);
+  }
+}
+
+/// The account's file space: what its own files use, and the free cap.
+class AccountStorage {
+  const AccountStorage({required this.usedBytes, required this.limitBytes});
+  final int usedBytes;
+  final int limitBytes;
+
+  static AccountStorage? fromJson(Object? data) {
+    if (data is! Map) return null;
+    final used = data['used_bytes'];
+    final limit = data['limit_bytes'];
+    if (used is! num || limit is! num) return null;
+    return AccountStorage(usedBytes: used.toInt(), limitBytes: limit.toInt());
+  }
+}
+
 class Account {
   final int id;
   final String email;
@@ -22,13 +74,20 @@ class Account {
   final String? billingId;
   final bool googleLinked;
   final bool complimentaryPro;
+
+  /// Saved with the session, so both work offline. Null for sessions saved
+  /// before the server sent them.
+  final FreeVoice? freeVoice;
+  final AccountStorage? storage;
   Account.fromJson(Map<String, dynamic> data)
     : id = data['id'] as int,
       email = data['email'] as String,
       timezone = data['timezone'] as String,
       billingId = data['billing_id'] as String?,
       googleLinked = data['google_linked'] == true,
-      complimentaryPro = data['complimentary_pro'] == true;
+      complimentaryPro = data['complimentary_pro'] == true,
+      freeVoice = FreeVoice.fromJson(data['free_voice']),
+      storage = AccountStorage.fromJson(data['storage']);
 }
 
 class ApiClient {
@@ -57,6 +116,12 @@ class ApiClient {
   final _sessionInvalidated = StreamController<void>.broadcast();
 
   Stream<void> get sessionInvalidated => _sessionInvalidated.stream;
+  final _accountUpdated = StreamController<void>.broadcast();
+
+  /// The saved account changed outside a sign-in or refresh: a dictation's
+  /// answer carried the free dictations left, or a refused upload the file
+  /// space used.
+  Stream<void> get accountUpdated => _accountUpdated.stream;
 
   ApiClient({
     http.Client? transport,
@@ -147,6 +212,50 @@ class ApiClient {
       throw ApiException(401, 'The account changed. Please try again.');
     }
     return Account.fromJson(next['user']);
+  }
+
+  /// A dictation's 200 or 402 body carries the free dictations left: write
+  /// them into the saved account at once, for account [accountId] only.
+  Future<void> rememberFreeVoice(Object? block, {required int accountId}) =>
+      FreeVoice.fromJson(block) == null
+      ? Future.value()
+      : _remember('free_voice', block as Map, accountId);
+
+  /// An upload refused for a full file space carries the account's usage.
+  Future<void> rememberStorage(Object? block, {required int accountId}) =>
+      AccountStorage.fromJson(block) == null
+      ? Future.value()
+      : _remember('storage', block as Map, accountId);
+
+  /// After an upload, fetch account [accountId]'s file space usage and save
+  /// it, so the usage line shows the space the upload took.
+  Future<void> refreshStorage({required int accountId}) async {
+    final user = await request('GET', 'auth/me/', accountId: accountId);
+    if (user is Map) await rememberStorage(user['storage'], accountId: accountId);
+  }
+
+  Future<void> _remember(String key, Map block, int accountId) {
+    final generation = _generation;
+    _persisting = _persisting.catchError((_) {}).then((_) async {
+      final session = _session;
+      if (generation != _generation ||
+          session == null ||
+          account?.id != accountId) {
+        return;
+      }
+      final next = {
+        ...session,
+        'user': {
+          ...Map<String, dynamic>.from(session['user']),
+          key: Map<String, dynamic>.from(block),
+        },
+      };
+      await _storage.write(key: 'taskflow.session', value: jsonEncode(next));
+      if (generation != _generation) return;
+      _session = next;
+      if (!_accountUpdated.isClosed) _accountUpdated.add(null);
+    });
+    return _persisting;
   }
 
   Future<void> signInWithGoogle(
@@ -503,5 +612,6 @@ class ApiClient {
   void close() {
     _http.close();
     unawaited(_sessionInvalidated.close());
+    unawaited(_accountUpdated.close());
   }
 }

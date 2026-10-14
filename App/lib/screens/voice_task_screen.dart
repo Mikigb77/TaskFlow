@@ -44,10 +44,11 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 /// selected day, the timeline's day): when it is a later day, a task said or
 /// typed without a date goes there.
 ///
-/// Voice and the assistant are Pro. Without Pro the sheet types, and the
-/// words are understood on the phone. [typing] opens with the keyboard up
+/// The mic comes with Pro, or while free dictations are left; otherwise the
+/// sheet types. Typed words go to the assistant only with Pro; without it
+/// they are understood on the phone. [typing] opens with the keyboard up
 /// (the text shortcut, shared text); [askedToSpeak] marks the ways in that
-/// ask to speak (the widget, the voice shortcut), which say why without Pro.
+/// ask to speak (the widget, the voice shortcut), which say why without it.
 Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
@@ -220,8 +221,8 @@ class _SheetFrameState extends State<_SheetFrame> {
   );
 }
 
-/// The capture sheet's content. Open it with [showCaptureSheet]. Only Pro
-/// creates a recorder; without it every way in types.
+/// The capture sheet's content. Open it with [showCaptureSheet]. A recorder
+/// is created only with the mic; without it every way in types.
 class VoiceTaskScreen extends ConsumerWidget {
   const VoiceTaskScreen({
     super.key,
@@ -242,8 +243,8 @@ class VoiceTaskScreen extends ConsumerWidget {
   final bool askedToSpeak;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pro = ref.watch(hasProProvider);
-    if (!pro && ref.watch(billingLoadingProvider)) {
+    final voice = ref.watch(voiceAvailableProvider);
+    if (!voice && ref.watch(billingLoadingProvider)) {
       // Until billing knows, don't guess between the mic and typing.
       return const Padding(
         padding: EdgeInsets.all(32),
@@ -256,7 +257,7 @@ class VoiceTaskScreen extends ConsumerWidget {
       kind: kind,
       projectId: projectId,
       day: day,
-      voice: pro,
+      voice: voice,
       typing: typing,
       askedToSpeak: askedToSpeak,
     );
@@ -285,8 +286,7 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
   final bool startListening;
   final DateTime? day;
 
-  /// Voice and the assistant (Pro). Without them the sheet only types, and
-  /// the words are understood on the phone.
+  /// The mic: Pro, or free dictations left. Without it the sheet only types.
   final bool voice;
 
   /// Opens typing, with the keyboard up, even with voice.
@@ -300,8 +300,9 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
 
 class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     with WidgetsBindingObserver {
-  // Fixed when the sheet opens; typing alone never creates a recorder.
-  late final bool _voice = widget.voice;
+  // Decided when the sheet opens, and again on `Volver a decirlo`; typing
+  // alone never creates a recorder.
+  late bool _voice = widget.voice;
   AudioRecorder? _recorder;
   final _words = TextEditingController();
   final _wordsFocus = FocusNode();
@@ -471,6 +472,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         final heard = _session!.audioPath != null;
         _error = error == null ? null : _problemFor(error, heard: heard);
         _failed = _session!.status == 'failed';
+        if (_voice && CaptureProblem.usedUp(_error)) {
+          // Free dictations came back, or Pro: trying again works now.
+          _error = null;
+        } else if (!_voice &&
+            (heard || _session!.source == 'speech') &&
+            ref.read(freeVoiceLeftProvider) == 0) {
+          // Spoken words reopened with none left: they wait, or are saved as
+          // written.
+          _error = CaptureProblem.freeVoiceUsedUp;
+        }
         // The server found no speech in its audio: nothing to keep.
         if (heard &&
             _error == CaptureProblem.noSpeech &&
@@ -1086,9 +1097,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       inputKept = true;
+      // Typed words go to the assistant only with Pro; spoken ones go with
+      // free dictations too.
       final session = await CaptureProcessor(_store, api).process(
         attempt!,
-        local: !_voice,
+        local: !ref.read(hasProProvider) && attempt.source != 'speech',
         now: ref.read(calendarClockProvider)(),
       );
       if (superseded()) return;
@@ -1125,7 +1138,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       _showProblem(problem);
-      if (mounted) setState(() => _failed = inputKept);
+      if (mounted) {
+        setState(() {
+          _failed = inputKept;
+          // Free dictations used up: the words stay, to edit or save as
+          // written. Nothing is sent again.
+          if (CaptureProblem.usedUp(problem)) _typing = true;
+        });
+      }
     } finally {
       if (!superseded()) {
         _slowTimer?.cancel();
@@ -1244,6 +1264,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _previousResult = previous;
     _projectId = previous.projectId;
     _saveAtOnce = null;
+    // The last free dictation may have just been used: then it types.
+    _voice = _voice && ref.read(voiceAvailableProvider);
     _words.clear();
     _nativePrefix = '';
     _typedStarted = false;
@@ -1252,18 +1274,55 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _result = null;
       _movedToReview = false;
       _session = null;
-      _typing = false;
+      _typing = !_voice;
       _error = null;
       _failed = false;
       _phase = _CapturePhase.idle;
       _initialized = true;
     });
+    if (!_voice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _typing) _wordsFocus.requestFocus();
+      });
+      return;
+    }
     // With TalkBack, listening waits for `Empezar a hablar`, as on opening.
     if (!MediaQuery.accessibleNavigationOf(context)) _beginRecording();
   }
 
   bool get _hasInput =>
       _words.text.trim().isNotEmpty || _session?.audioPath != null;
+
+  /// Free dictations, as [build] and [_cancel] both see them. [watch] only
+  /// from [build].
+  ({bool usedUp, bool refused, bool waitsForMore}) _freeVoice({
+    bool watch = false,
+  }) {
+    final hasPro = watch ? ref.watch(hasProProvider) : ref.read(hasProProvider);
+    final left = watch
+        ? ref.watch(freeVoiceLeftProvider)
+        : ref.read(freeVoiceLeftProvider);
+    final phase = _startPending ? _CapturePhase.starting : _phase;
+    final resting =
+        phase == _CapturePhase.idle || phase == _CapturePhase.paused;
+    final recorded = _session?.audioPath != null;
+    // This month's free dictations are used up: known from the saved count,
+    // or from the server's refusal.
+    final usedUp = !hasPro && (left == 0 || CaptureProblem.usedUp(_error));
+    // Spoken words the assistant would refuse now: they are saved as written,
+    // or wait for more dictations. Nothing asks again.
+    final refused =
+        usedUp && resting && (recorded || _session?.source == 'speech');
+    // Only a recording, with no words to save: it waits.
+    final waitsForMore = refused && recorded && !_hasWords;
+    return (usedUp: usedUp, refused: refused, waitsForMore: waitsForMore);
+  }
+
+  /// Only a recording waits for more dictations, kept in Capturas pendientes:
+  /// the sheet only closes. After `Volver a decirlo`, Cancel still goes back
+  /// to the result.
+  bool _recordingWaits() =>
+      _freeVoice().waitsForMore && _previousResult == null;
 
   /// `Listo`: stop listening and continue with the words.
   void _done() {
@@ -1296,7 +1355,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       Navigator.pop(context);
       return;
     }
-    if (!_hasInput) {
+    // Nothing to ask: a recording that waits is already kept.
+    if (!_hasInput || _recordingWaits()) {
       Navigator.pop(context);
       return;
     }
@@ -1342,6 +1402,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // While they are understood, go back at once: the running step owns
     // their capture and drops it when it ends.
     if (_phase == _CapturePhase.processing) {
+      // The assistant is told at once, so the dropped words use no free
+      // dictation.
+      final attempt = _session;
+      if (attempt != null && attempt.id != previous.id) {
+        CaptureProcessor(_store, ref.read(apiClientProvider)).cancel(attempt);
+      }
       _returns++;
       _words.clear();
       ref.invalidate(pendingCapturesProvider);
@@ -1487,13 +1553,26 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           phase == _CapturePhase.starting ||
           phase == _CapturePhase.processing,
     );
+    final resting =
+        phase == _CapturePhase.idle || phase == _CapturePhase.paused;
+    final (:usedUp, :refused, :waitsForMore) = _freeVoice(watch: true);
+    // Only a recording waits: the sheet only closes.
+    final recordingWaits = waitsForMore && _previousResult == null;
+    final usedUpLine = usedUp && (!_voice || refused)
+        ? freeVoiceUsedUpText(
+            l10n,
+            ref.watch(freeVoiceResetsProvider),
+            recording: waitsForMore,
+          )
+        : null;
     final status = switch (phase) {
       _CapturePhase.listening => l10n.listeningSeconds(
         '00:${_seconds.toString().padLeft(2, '0')}',
       ),
       _CapturePhase.starting => l10n.captureStarting,
       _CapturePhase.processing => l10n.captureUnderstanding,
-      _ when recorded => l10n.recordingKept,
+      // The used-up line already says the recording is kept.
+      _ when recorded && !waitsForMore => l10n.recordingKept,
       _CapturePhase.paused => l10n.capturePaused,
       _CapturePhase.idle => null,
     };
@@ -1507,8 +1586,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         : _seconds - _wordsAt >= 5
         ? l10n.captureStillListening
         : null;
-    final resting =
-        phase == _CapturePhase.idle || phase == _CapturePhase.paused;
     // Nothing heard and nothing listening (TalkBack, or after a problem): one
     // button starts listening.
     final waiting = resting && !_typing && !_hasInput;
@@ -1532,7 +1609,24 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           onPressed: _busy ? null : _beginRecording,
           child: Text(l10n.captureStartTalking),
         )
-      else if (saveAsWritten) ...[
+      else if (recordingWaits)
+        FilledButton(
+          key: const ValueKey('capture-close'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.captureClose),
+        )
+      else if (refused) ...[
+        if (canContinue)
+          FilledButton.tonal(
+            onPressed: _busy ? null : _beginRecording,
+            child: Text(l10n.captureContinue),
+          ),
+        if (_hasWords)
+          FilledButton(
+            onPressed: () => unawaited(_saveAsWritten()),
+            child: Text(l10n.captureSaveAsWritten),
+          ),
+      ] else if (saveAsWritten) ...[
         if (failed)
           FilledButton.tonal(
             onPressed: _busy ? null : _done,
@@ -1560,7 +1654,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       ],
     ];
     final wordsStyle = theme.textTheme.headlineSmall;
-    final Widget? words = _typing
+    // A recording that waits has no words to type.
+    final Widget? words = _typing && !recordingWaits
         ? TextField(
             key: const ValueKey('capture-words'),
             controller: _words,
@@ -1576,7 +1671,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               // Typed words understood on the phone become one task.
               hintText: _kind == 'note'
                   ? l10n.noteHint
-                  : _voice
+                  : ref.watch(hasProProvider)
                   ? l10n.examplePlan
                   : l10n.exampleTask,
               counterText: '',
@@ -1590,12 +1685,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             style: wordsStyle,
           );
     final banners = <Widget>[
-      // Opened to speak, without voice: say why it types, and where Pro is.
-      if (widget.askedToSpeak && !_voice) ...[
-        Text(
-          l10n.captureSpeakingIsPro,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: colors.onSurfaceVariant,
+      // Free dictations used up: say when more come, and where Pro is.
+      // Without a free count (an older server), opened to speak without
+      // voice: say why it types.
+      if (usedUpLine != null || (widget.askedToSpeak && !_voice)) ...[
+        Semantics(
+          liveRegion: usedUpLine != null,
+          child: Text(
+            usedUpLine ?? l10n.captureSpeakingIsPro,
+            key: usedUpLine == null
+                ? null
+                : const ValueKey('free-voice-used-up'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
           ),
         ),
         Align(
@@ -1623,7 +1726,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       ],
     ];
     // Directly under the status line, read out when it appears.
-    final error = _error == null
+    // A refusal for used-up dictations reads as the line above the words.
+    final error =
+        _error == null || (usedUpLine != null && CaptureProblem.usedUp(_error))
         ? null
         : MessageBanner(
             captureProblemText(l10n, _error!),
@@ -1711,6 +1816,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                 // `Reintentar` and `Guardar tal cual` read in full only
                 // stacked.
                 stack: failed && saveAsWritten,
+                showCancel: !recordingWaits,
                 showType: !_typing && !recorded,
                 onType: working ? null : () => unawaited(_typeInstead()),
               ),
@@ -1759,14 +1865,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     BuildContext context,
     List<Widget> primary, {
     bool stack = false,
+    bool showCancel = true,
     required bool showType,
     VoidCallback? onType,
   }) {
     final l10n = context.l10n;
-    final cancel = TextButton(
-      onPressed: () => unawaited(_cancel()),
-      child: Text(l10n.cancel),
-    );
+    final cancel = showCancel
+        ? TextButton(
+            onPressed: () => unawaited(_cancel()),
+            child: Text(l10n.cancel),
+          )
+        : null;
     final type = showType
         ? IconButton(
             tooltip: l10n.captureTypeInstead,
@@ -1790,8 +1899,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             constraints.maxWidth >= (primary.length > 1 ? 440 : 280)) {
           return Row(
             children: [
-              cancel,
-              const SizedBox(width: 8),
+              if (cancel != null) ...[cancel, const SizedBox(width: 8)],
               Expanded(child: side(primary)),
               if (type != null) ...[const SizedBox(width: 4), type],
             ],
@@ -1808,14 +1916,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               ]
             else
               side(primary),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(child: cancel),
-                ?type,
-              ],
-            ),
+            if (cancel != null || type != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (cancel != null) Flexible(child: cancel),
+                  ?type,
+                ],
+              ),
+            ],
           ],
         );
       },
@@ -2193,6 +2303,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final spoken = _session.source == 'speech' || _session.audioPath != null;
     // With the keyboard up, only the button stays under the result.
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+    // Without Pro, a spoken result says how many free dictations are left,
+    // once only a few are.
+    final freeLeft = spoken ? ref.watch(freeVoiceLeftProvider) : null;
     final label = _saving
         ? l.saving
         : pending.isEmpty
@@ -2290,6 +2403,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                     label: Text(label),
                   ),
                   if (!typing) ...[
+                    if (freeLeft != null && freeLeft <= 3) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l.freeVoiceLeft(freeLeft),
+                        key: const ValueKey('free-voice-left'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _exits(context, spoken: spoken),
                     ExpansionTile(

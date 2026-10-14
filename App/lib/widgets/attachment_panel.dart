@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_attachment.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -134,7 +136,43 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
       if (!mounted) return;
       ref.invalidate(attachmentEntriesProvider(widget.task.id!));
       await ref.read(taskProvider.notifier).loadTasks();
+      // The sync removed it from the server: show the space it freed.
+      if (mounted && entry.item != null) {
+        unawaited(ref.read(authProvider.notifier).refreshAccount());
+      }
     });
+  }
+
+  static const _megabyte = 1024 * 1024;
+
+  /// The usage line, for an account without Pro once its file space is 80%
+  /// used or more; null otherwise.
+  String? _usage() {
+    final storage = ref.watch(authProvider.select((s) => s.account?.storage));
+    if (storage == null ||
+        storage.limitBytes <= 0 ||
+        storage.usedBytes * 5 < storage.limitBytes * 4 ||
+        ref.watch(hasProProvider)) {
+      return null;
+    }
+    return context.l10n.storageUsage(
+      (storage.usedBytes / _megabyte).round(),
+      (storage.limitBytes / _megabyte).round(),
+    );
+  }
+
+  /// Why the server refused this file: the user's own file space is full, or
+  /// a shared project owner's.
+  String _refused(TaskAttachment item) {
+    if (item.error == TaskAttachment.storageFullShared) {
+      return context.l10n.storageFullShared;
+    }
+    final limit = ref.watch(
+      authProvider.select((s) => s.account?.storage?.limitBytes),
+    );
+    return context.l10n.storageFull(
+      ((limit ?? 100 * _megabyte) / _megabyte).round(),
+    );
   }
 
   String _status(AttachmentEntry entry) {
@@ -154,6 +192,7 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
     final local = repository.ownerKey == 'local';
     final colors = Theme.of(context).colorScheme;
     final attachments = ref.watch(attachmentEntriesProvider(widget.task.id!));
+    final usage = attachments.valueOrNull?.isNotEmpty == true ? _usage() : null;
     // A task without files shows no Attachments section at all.
     if (!_busy &&
         _error == null &&
@@ -168,7 +207,17 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
         SectionLabel(context.l10n.attachments),
         if (_busy) const LinearProgressIndicator(),
         if (_error != null) MessageBanner(_error!, isError: true),
+        if (usage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              usage,
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+          ),
         attachments.when(
+              // A sync reloads the list; keep the cards so the screen doesn't jump.
+              skipLoadingOnReload: true,
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,8 +263,16 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text(_status(entry)),
-                            if (entry.item?.error != null)
+                            // A refused file says why instead of "queued".
+                            if (entry.item?.refused == true)
+                              Text(
+                                _refused(entry.item!),
+                                style: TextStyle(color: colors.error),
+                              )
+                            else
+                              Text(_status(entry)),
+                            if (entry.item?.error != null &&
+                                entry.item?.refused != true)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Text(
@@ -308,12 +365,28 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                   TextButton(
                                     onPressed: _busy
                                         ? null
-                                        : () => _run(
-                                              () => ref
+                                        : () => _run(() async {
+                                              if (entry.item!.refused) {
+                                                await repository.attachments
+                                                    .retryRefused(
+                                                  entry.item!.id,
+                                                );
+                                              }
+                                              await ref
                                                   .read(taskProvider.notifier)
-                                                  .loadTasks(),
-                                            ),
+                                                  .loadTasks();
+                                            }),
                                     child: Text(context.l10n.fileRetry),
+                                  ),
+                                if (entry.item?.error ==
+                                        TaskAttachment.storageFull &&
+                                    !ref.watch(hasProProvider))
+                                  TextButton(
+                                    onPressed: () => Navigator.pushNamed(
+                                      context,
+                                      '/subscription',
+                                    ),
+                                    child: Text(context.l10n.voiceProAction),
                                   ),
                                 if (entry.item?.deleted != true &&
                                     ref.watch(

@@ -148,7 +148,7 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
             Text(context.l10n.keepYourTasks,
                 style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 12),
-            Text(context.l10n.archiveContentsHelp),
+            Text(context.l10n.exportImportIntro),
             const SizedBox(height: 16),
             Wrap(spacing: 8, runSpacing: 8, children: [
               FilledButton.icon(

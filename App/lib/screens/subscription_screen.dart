@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
@@ -14,6 +13,8 @@ class SubscriptionScreen extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
+  static const _megabyte = 1024 * 1024;
+
   @override
   void initState() {
     super.initState();
@@ -31,23 +32,6 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     );
   }
 
-  Future<void> _openStore(String url) async {
-    try {
-      final uri = Uri.parse(url);
-      if (uri.scheme != 'https' ||
-          !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        throw StateError('Store could not be opened');
-      }
-    } catch (_) {
-      if (mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.billingStoreOpenError,
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(subscriptionProvider);
@@ -58,7 +42,29 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final colors = Theme.of(context).colorScheme;
     final locale = Localizations.localeOf(context).toLanguageTag();
     final expiration = DateTime.tryParse(state.pro?.expirationDate ?? '');
-    final storeUrl = state.customerInfo?.managementURL;
+    // Without Pro: the free dictations and file space, from the saved account.
+    final free =
+        account != null &&
+        !account.complimentaryPro &&
+        !state.complimentary &&
+        !state.hasPro &&
+        !state.loading;
+    final freeVoice = free ? account.freeVoice : null;
+    final freeVoiceLeft = ref.watch(freeVoiceLeftProvider);
+    final storage = free ? account.storage : null;
+    final freeLines = [
+      if (freeVoice != null && freeVoiceLeft != null)
+        l10n.freeVoiceStatus(
+          freeVoiceLeft,
+          freeVoice.limit,
+          context.shortDate(ref.watch(freeVoiceResetsProvider).toLocal()),
+        ),
+      if (storage != null && storage.limitBytes > 0)
+        l10n.storageUsage(
+          (storage.usedBytes / _megabyte).round(),
+          (storage.limitBytes / _megabyte).round(),
+        ),
+    ];
     return Scaffold(
       appBar: CustomAppBar(title: l10n.taskflowPro),
       body: ListView(
@@ -112,6 +118,13 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                         context,
                       ).formatMediumDate(expiration.toLocal()),
                     ),
+                    style: TextStyle(color: colors.onPrimaryContainer),
+                  ),
+                ],
+                for (final line in freeLines) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    line,
                     style: TextStyle(color: colors.onPrimaryContainer),
                   ),
                 ],
@@ -196,17 +209,6 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               label: Text(l10n.billingManage),
             ),
           ],
-          if (storeUrl != null)
-            TextButton(
-              onPressed: state.busy ? null : () => _openStore(storeUrl),
-              child: Text(l10n.billingOpenStore),
-            ),
-          if (config.issue == null || state.complimentary)
-            TextButton.icon(
-              onPressed: state.busy ? null : controller.refresh,
-              icon: const Icon(Icons.refresh),
-              label: Text(l10n.billingRefresh),
-            ),
           const SizedBox(height: 16),
           if (!state.complimentary)
             Text(

@@ -40,7 +40,7 @@
       }
     }
   },
-  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
+  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
   "@requestError": {
     "description": "Localized account, sync and file error categories. Never display raw server exception text.",
     "placeholders": {
@@ -232,7 +232,7 @@
   "noEndDate": "No end date",
   "notes": "Notes",
   "addNotes": "Add notes",
-  "attachments": "Attachments",
+  "attachments": "Files",
   "checklist": "Checklist",
   "complete": "Complete",
   "reopen": "Reopen",
@@ -611,9 +611,7 @@
   "fileRemoveHelp": "This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.",
   "yourAccount": "Your account",
   "accountHeading": "Your own little space.",
-  "backupHeading": "Your plans, kept close.",
-  "accountBackupHelp": "Tasks and notes are saved on this phone and backed up when connected. New attachments upload after saving; check their status in item details. Older device-only files need an explicit Upload.",
-  "accountUpToDate": "Your tasks and notes are up to date.",
+  "accountSaved": "Saved to your account",
   "syncNow": "Sync now",
   "importLocalItems": "Import local tasks and notes",
   "importLocalItemsQuestion": "Import local tasks and notes?",
@@ -626,7 +624,6 @@
     }
   },
   "importItems": "Import",
-  "noLocalItems": "There are no local tasks or notes to import.",
   "itemsImported": "{count, plural, =1{1 item imported.} other{{count} items imported.}}",
   "@itemsImported": {
     "placeholders": {
@@ -637,6 +634,7 @@
   },
   "connectionDetails": "Connection details",
   "signOut": "Sign out",
+  "signOutQuestion": "Sign out? Reminders on this phone stop until you sign in again.",
   "recoveryHeading": "Reset your password",
   "registerHeading": "Create your account",
   "signInHeading": "Sign in",
@@ -919,9 +917,9 @@
   "fileLoadError": "Could not load attachment status. Please retry.",
   "fileActionError": "Could not complete this action. Your task is saved; please retry.",
   "fileSignInHelp": "Sign in to upload your files and restore them on another device.",
-  "fileUploadHelp": "New files upload to your account after saving: up to 6 MiB each, 64 MiB per account. Older local files stay on this device until you choose Upload in task details.",
-  "fileLocalHelp": "Files stay on this device until you sign in and choose Upload in task details. Up to 6 MiB per file.",
-  "fileLimit": "Choose a non-empty file up to 6 MiB. You can attach up to 20 files per task.",
+  "fileUploadHelp": "New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.",
+  "fileLocalHelp": "Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.",
+  "fileLimit": "Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.",
   "fileManageHelp": "Open task details to download, upload, or remove account attachments.",
   "@reminderValue": {
     "placeholders": {
@@ -981,7 +979,7 @@
   "transferError": "Could not finish. Your existing tasks and notes are unchanged. Please retry.",
   "exportSaved": "Export saved. Keep the file somewhere private.",
   "keepYourTasks": "Keep your tasks with you.",
-  "archiveContentsHelp": "TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal projects. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.",
+  "exportImportIntro": "Save a copy of your tasks to a file, or bring tasks from Todoist.",
   "exportTaskFlowFile": "Export TaskFlow file",
   "chooseImportFile": "Choose import file",
   "chooseImportFileHelp": "Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.",
@@ -1518,7 +1516,7 @@
   "billingComplimentary": "Complimentary Pro access. All Pro features are included, with no payment or renewal.",
   "billingStatus": "{status, select, active{Pro is active} inactive{No active Pro subscription} other{Subscription status unavailable}}",
   "billingUntil": "{kind, select, renews{Renews on {date}} other{Access until {date}}}",
-  "billingTestMode": "Test purchases only. No real payment will be taken. An active test subscription unlocks voice and AI capture in this development build.",
+  "billingTestMode": "Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.",
   "billingGuestHelp": "Sign in to link purchases to your TaskFlow account and recover Pro on your other devices.",
   "billingSignIn": "Sign in to TaskFlow",
   "billingWorking": "Updating subscription",
@@ -1528,12 +1526,9 @@
   "billingTestMonthly": "Test monthly purchase",
   "billingRestore": "Restore purchases",
   "billingManage": "Manage subscription",
-  "billingOpenStore": "Open store subscription settings",
-  "billingRefresh": "Refresh status",
   "billingRestoreHelp": "Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.",
-  "billingStoreOpenError": "Could not open the store. Try again or open your store’s subscription settings.",
-  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Connect to the TaskFlow server to link your subscription, then refresh.} network{Could not update billing. Check your connection and refresh.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
-  "billingResult": "{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro is not active yet; refresh or restore purchases shortly.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}",
+  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Connect to the TaskFlow server to link your subscription.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
+  "billingResult": "{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}",
   "@billingStatus": {
     "placeholders": {
       "status": {
@@ -1665,13 +1660,11 @@
   "activityReopened": "Reopened a task",
   "activityDeleted": "Deleted a task",
   "activitySystem": "TaskFlow",
-  "voiceProRequired": "Voice capture is included with TaskFlow Pro.",
   "captureSpeakingIsPro": "Speaking a task is part of TaskFlow Pro. You can type it here.",
   "@captureSpeakingIsPro": {
     "description": "Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead."
   },
   "voiceProAction": "Explore Pro",
-  "voiceAccessUnavailable": "We could not verify voice access. Your capture is safe; reconnect and try again.",
   "projectsNoneFound": "No matching projects",
   "groupRename": "Rename group",
   "groupRemoveHelp": "Removing this member ends their access to every project in this group. Their tasks stay and will need reassignment.",
@@ -1693,5 +1686,76 @@
   },
   "invitationReviewHelp": "You’ll see its tasks, notes and files.",
   "invitationUnavailable": "This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.",
-  "stagingInviteOnly": "This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address."
+  "stagingInviteOnly": "This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.",
+  "freeVoiceLeft": "{count, plural, =0{No free dictations left this month} =1{1 free dictation left this month} other{{count} free dictations left this month}}",
+  "@freeVoiceLeft": {
+    "description": "Under a spoken capture's result, for an account without Pro, only when 3 or fewer free dictations are left this month.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "freeVoiceUsedUp": "You’ve used this month’s free dictations. You can type it here — more on {date}.",
+  "@freeVoiceUsedUp": {
+    "description": "Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead. {date} is the local short date they come back.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "freeVoiceUsedUpRecording": "Your recording is kept. It can be understood from {date}, or now with Pro.",
+  "@freeVoiceUsedUpRecording": {
+    "description": "For a capture that is only a recording, refused because this month's free dictations are used up: in the capture sheet and in Unfinished captures. {date} is the local short date they come back.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "captureClose": "Close",
+  "@captureClose": {
+    "description": "Closes the capture sheet when only a recording is kept and free dictations are used up"
+  },
+  "freeVoiceStatus": "Free dictations: {left} of {limit} left this month. More on {date}.",
+  "@freeVoiceStatus": {
+    "description": "On the Pro screen, for an account without Pro. {date} is the local short date this month's free dictations come back.",
+    "placeholders": {
+      "left": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "storageUsage": "Files: {used} of {limit} MB used",
+  "@storageUsage": {
+    "description": "Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes.",
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "storageFull": "Your file space is full ({limit} MB). Remove files from other tasks to make room, or get Pro for unlimited space.",
+  "@storageFull": {
+    "description": "Under an attachment the server refused because the user's own free file space is full. Followed by the Explore Pro button. {limit} is the free cap in whole megabytes.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "storageFullShared": "This project’s file space is full. Its owner can remove files to make room.",
+  "@storageFullShared": {
+    "description": "Under an attachment the server refused because the file space of the shared project's owner is full."
+  }
 }

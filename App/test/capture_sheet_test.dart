@@ -554,8 +554,8 @@ void main() {
         findsOneWidget,
       );
       expect(es.voiceProAction, 'Ver Pro');
-      expect(find.text(es.billingRefresh), findsNothing);
-      expect(find.text(es.voiceProRequired), findsNothing);
+      expect(find.text('Actualizar estado'), findsNothing);
+      expect(find.byKey(const ValueKey('free-voice-used-up')), findsNothing);
       await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
       await tester.pumpAndSettle();
 
@@ -569,7 +569,7 @@ void main() {
       );
       expect(find.text(es.captureSpeakingIsPro), findsNothing);
       expect(find.text(es.voiceProAction), findsNothing);
-      expect(find.text(es.billingRefresh), findsNothing);
+      expect(find.text('Actualizar estado'), findsNothing);
       expect(app.speech.starts, 0);
       expect(tester.takeException(), isNull);
     },
@@ -611,7 +611,10 @@ void main() {
         );
         expect(find.text(es.captureSpeakingIsPro), findsNothing);
         expect(find.text(es.voiceProAction), findsNothing);
-        expect(find.text(es.voiceProRequired), findsNothing);
+        expect(
+          find.byKey(const ValueKey('free-voice-used-up')),
+          findsNothing,
+        );
         expect(words(), findsNothing);
         expect(app.speech.starts, 0);
         expect(tester.takeException(), isNull);

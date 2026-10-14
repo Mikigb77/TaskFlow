@@ -1,10 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
-import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/widgets/google_login_button.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -12,20 +12,29 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/screens/login_screen.dart';
 
 class AccountScreen extends ConsumerStatefulWidget {
-  const AccountScreen({super.key});
+  const AccountScreen({super.key, this.debug = kDebugMode});
+
+  /// Only debug builds show the server address here; staging builds reach it
+  /// from the version line in Other settings.
+  final bool debug;
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
 }
 
+enum _Action { sync, import, google, signOut }
+
 class _AccountScreenState extends ConsumerState<AccountScreen> {
-  bool _busy = false;
+  _Action? _running;
   bool _failed = false;
   String? _message;
   Object? _failure;
+  late Future<int> _localItems = ref
+      .read(taskRepositoryProvider)
+      .localTaskCount();
 
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _run(_Action kind, Future<void> Function() action) async {
     setState(() {
-      _busy = true;
+      _running = kind;
       _message = null;
       _failure = null;
       _failed = false;
@@ -40,23 +49,24 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _running = null);
     }
   }
 
+  Future<void> _sync() => _run(
+    _Action.sync,
+    () => ref.read(taskProvider.notifier).loadTasks(),
+  );
+
   Future<void> _import() async {
-    final local = await TaskDatabase().getTasks();
-    if (!mounted) return;
-    if (local.isEmpty) {
-      setState(() => _message = context.l10n.noLocalItems);
-      return;
-    }
+    final count = await _localItems;
+    if (count == 0 || !mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         scrollable: true,
         title: Text(context.l10n.importLocalItemsQuestion),
-        content: Text(context.l10n.importLocalItemsHelp(local.length)),
+        content: Text(context.l10n.importLocalItemsHelp(count)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -70,11 +80,43 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await _run(() async {
-      final count = await ref.read(taskRepositoryProvider).importLocalTasks();
+    await _run(_Action.import, () async {
+      final repository = ref.read(taskRepositoryProvider);
+      final imported = await repository.importLocalTasks();
       await ref.read(taskProvider.notifier).loadTasks();
-      if (mounted) setState(() => _message = context.l10n.itemsImported(count));
+      if (mounted) {
+        setState(() {
+          _message = context.l10n.itemsImported(imported);
+          _localItems = repository.localTaskCount();
+        });
+      }
     });
+  }
+
+  Future<void> _signOut() async {
+    // Signing out cancels every reminder on this phone, so ask first.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        content: Text(context.l10n.signOutQuestion),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.signOut),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _run(
+      _Action.signOut,
+      () => ref.read(authProvider.notifier).signOut(),
+    );
   }
 
   Future<void> _linkGoogle() async {
@@ -85,7 +127,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       builder: (context) => const _GoogleLinkDialog(),
     );
     if (password == null || !mounted) return;
-    await _run(() async {
+    await _run(_Action.google, () async {
       final token = await ref.read(googleSignInServiceProvider).authenticate();
       if (token == null || !mounted) return;
       if (ref.read(authProvider).account?.id != current.id) return;
@@ -97,10 +139,16 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     if (auth.account == null) return const LoginScreen();
-    final busy = _busy || auth.loading;
+    final busy = _running != null || auth.loading;
     final colors = Theme.of(context).colorScheme;
     final google = ref.watch(googleSignInServiceProvider);
     ref.watch(taskProvider);
+    final syncError = ref.read(taskRepositoryProvider).syncError;
+    const progress = SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    );
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.yourAccount),
       body: Center(
@@ -109,111 +157,110 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
             children: [
-              if (auth.account != null) ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: 68,
-                    height: 68,
-                    decoration: BoxDecoration(
-                      color: colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Icon(
-                      Icons.person_outline_rounded,
-                      size: 32,
-                      color: colors.primary,
-                    ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(
+                    Icons.person_outline_rounded,
+                    size: 32,
+                    color: colors.primary,
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  context.l10n.accountHeading,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  auth.account!.email,
-                  style: TextStyle(color: colors.onSurfaceVariant),
-                ),
-                const SizedBox(height: 28),
-                if (auth.account!.googleLinked) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.verified_user_outlined),
-                    title: Text(context.l10n.googleAccountLinked),
-                  ),
-                  const SizedBox(height: 12),
-                ] else if (google.configured) ...[
-                  GoogleLoginButton(
-                    label: context.l10n.linkGoogleAccount,
-                    onPressed: busy ? null : _linkGoogle,
-                  ),
-                  const SizedBox(height: 20),
-                ],
-                AppSurface(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.cloud_done_outlined,
-                        color: colors.primary,
-                        size: 28,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        context.l10n.backupHeading,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        context.l10n.accountBackupHelp,
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: busy
-                              ? null
-                              : () => _run(() async {
-                                  await ref
-                                      .read(taskProvider.notifier)
-                                      .loadTasks();
-                                  if (mounted) {
-                                    setState(() {
-                                      _failure = ref
-                                          .read(taskRepositoryProvider)
-                                          .syncError;
-                                      _failed = _failure != null;
-                                      _message = _failure == null
-                                          ? context.l10n.accountUpToDate
-                                          : null;
-                                    });
-                                  }
-                                }),
-                          icon: const Icon(Icons.sync_rounded, size: 20),
-                          label: Text(context.l10n.syncNow),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: busy ? null : _import,
-                  icon: const Icon(Icons.file_upload_outlined, size: 20),
-                  label: Text(context.l10n.importLocalItems),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                context.l10n.accountHeading,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                auth.account!.email,
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 28),
+              if (auth.account!.googleLinked) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.verified_user_outlined),
+                  title: Text(context.l10n.googleAccountLinked),
                 ),
                 const SizedBox(height: 12),
-                if (ref.read(taskRepositoryProvider).syncError != null)
-                  MessageBanner(
-                    requestProblemText(
-                      context.l10n,
-                      ref.read(taskRepositoryProvider).syncError!,
-                    ),
-                    isError: true,
+              ] else if (google.configured) ...[
+                GoogleLoginButton(
+                  label: context.l10n.linkGoogleAccount,
+                  onPressed: busy ? null : _linkGoogle,
+                ),
+                if (_running == _Action.google) ...[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(),
+                ],
+                const SizedBox(height: 20),
+              ],
+              // The sync state in one line; a failed sync says so here, once.
+              if (syncError == null)
+                ListTile(
+                  key: const ValueKey('account-sync-status'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.cloud_done_outlined,
+                    color: colors.primary,
                   ),
+                  title: Text(context.l10n.accountSaved),
+                )
+              else
+                MessageBanner(
+                  requestProblemText(context.l10n, syncError),
+                  key: const ValueKey('account-sync-status'),
+                  isError: true,
+                ),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: busy ? null : _sync,
+                  icon: _running == _Action.sync
+                      ? progress
+                      : const Icon(Icons.sync_rounded, size: 20),
+                  label: Text(context.l10n.syncNow),
+                ),
+              ),
+              FutureBuilder<int>(
+                future: _localItems,
+                builder: (context, snapshot) {
+                  if ((snapshot.data ?? 0) == 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      onPressed: busy ? null : _import,
+                      icon: _running == _Action.import
+                          ? progress
+                          : const Icon(Icons.file_upload_outlined, size: 20),
+                      label: Text(context.l10n.importLocalItems),
+                    ),
+                  );
+                },
+              ),
+              if (_message != null || _failure != null || auth.error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: MessageBanner(
+                    _message ??
+                        requestProblemText(
+                          context.l10n,
+                          _failure ?? auth.error!,
+                        ),
+                    isError: auth.error != null || _failed,
+                  ),
+                ),
+              if (widget.debug) ...[
+                const SizedBox(height: 12),
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   title: Text(context.l10n.connectionDetails),
@@ -228,36 +275,30 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => _run(
-                          () => ref.read(authProvider.notifier).signOut(),
-                        ),
-                  child: Text(
+              ],
+              const SizedBox(height: 20),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                // Sign-out can wait on the server; show progress in the button,
+                // and nothing at rest.
+                child: TextButton.icon(
+                  onPressed: busy ? null : _signOut,
+                  icon: _running == _Action.signOut
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colors.error,
+                          ),
+                        )
+                      : null,
+                  label: Text(
                     context.l10n.signOut,
                     style: TextStyle(color: colors.error),
                   ),
                 ),
-              ],
-              if (busy)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              if (_message != null || _failure != null || auth.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: MessageBanner(
-                    _message ??
-                        requestProblemText(
-                          context.l10n,
-                          _failure ?? auth.error!,
-                        ),
-                    isError: auth.error != null || _failed,
-                  ),
-                ),
+              ),
             ],
           ),
         ),

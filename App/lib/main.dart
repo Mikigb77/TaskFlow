@@ -288,11 +288,20 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         if (accountId != null) {
           // Clear a recent negative server lookup after purchase or restore.
           // The server independently rechecks the account's RevenueCat identity.
+          // Then send again the files refused for a full file space.
           unawaited(
             ref
                 .read(apiClientProvider)
                 .request('POST', 'billing/access/', accountId: accountId)
-                .then<void>((_) {}, onError: (Object _, StackTrace __) {}),
+                .then<void>((_) {}, onError: (Object _, StackTrace __) {})
+                .then((_) async {
+                  if (!mounted) return;
+                  final repository = ref.read(taskRepositoryProvider);
+                  if (repository.ownerKey == 'local') return;
+                  await repository.attachments.retryRefused();
+                  if (mounted) await ref.read(taskProvider.notifier).loadTasks();
+                })
+                .catchError((Object _) {}),
           );
         }
       }

@@ -252,14 +252,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       <Widget>[Text(context.l10n.notesSavedOnDevice)]),
             ]),
       ),
-      // One button, as on Calendar and Tareas: the mic with Pro, typing
-      // without it.
+      // One button, as on Calendar and Tareas: the mic while it is
+      // available (Pro, or free dictations left), typing without it.
       bottomNavigationBar: SafeArea(
           top: false,
           child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
               child: FilledButton.icon(
-                  icon: Icon(ref.watch(hasProProvider)
+                  icon: Icon(ref.watch(voiceAvailableProvider)
                       ? Icons.mic_none_rounded
                       : Icons.add_rounded),
                   label: Text(context.l10n.addNote),

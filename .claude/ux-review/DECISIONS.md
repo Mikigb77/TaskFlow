@@ -118,4 +118,5 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - archived groups drop out of the daily view, capture and reminders.
 
 ## Open — not decided; anything that depends on these is a decision, not a fix
+- **Finding the tasks that hold files** (from UX-506, b7). When a free account's file space is full, the message asks people to remove files from other tasks, but nothing lists which tasks have files. Whether to add a way to find them is the owner's call: it adds a feature, so the loop doesn't.
 - **The two-tab layout** (U13, D7a): after the UX loop and the owner's tests with his father, family and friends.

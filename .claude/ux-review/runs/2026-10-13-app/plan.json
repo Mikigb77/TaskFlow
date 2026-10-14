@@ -1887,6 +1887,38 @@
    ]
   },
   {
+   "id": "P100",
+   "title": "Account and Pro: spinners speak; plain words when the account can't be reached",
+   "area": "D",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-513",
+    "UX-514"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/account_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/account_regional_ui_test.dart",
+    "App/test/subscription_screen_test.dart"
+   ],
+   "brief": [
+    "UX-513 (b7 report, reviewer's note): the spinners inside the sign-out, Sincronizar and Importar buttons on Account have no semantics label, so TalkBack says nothing while they run. Give each in-button spinner the label of what is happening, reusing existing strings where they fit (for example the button's own label with a 'working' state), in EN, ES and CA.",
+    "UX-514 (b7 report, reviewer's note): `billingError` accountUnavailable says 'Conéctate al servidor de TaskFlow para vincular tu suscripción', which is technical. Say what the person can do instead, for example ES 'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.', with EN and CA to match. Keep UX-509's 'open the screen again' wording."
+   ],
+   "acceptance": [
+    "While signing out, syncing or importing, the spinner in that button has a semantics label naming the action.",
+    "`billingError` accountUnavailable no longer says 'servidor' / 'server' in EN, ES or CA."
+   ],
+   "deviceChecks": [
+    "With TalkBack, tap Sincronizar ahora: TalkBack announces that it is syncing."
+   ],
+   "dependsOn": []
+  },
+  {
    "id": "P21",
    "title": "Task form: the title first, fewer words",
    "area": "B",

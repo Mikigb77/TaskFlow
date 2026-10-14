@@ -13,10 +13,10 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/services/task_database.dart';
 
 final captureOwnerProvider = Provider<String>((ref) {
-  final account = ref.watch(authProvider.select((s) => s.account));
-  return account == null
+  final accountId = ref.watch(authProvider.select((s) => s.account?.id));
+  return accountId == null
       ? 'local'
-      : '${ref.watch(apiClientProvider).baseUrl}/users/${account.id}';
+      : '${ref.watch(apiClientProvider).baseUrl}/users/$accountId';
 });
 final captureStoreProvider = Provider((ref) => CaptureStore(TaskDatabase()));
 final pendingCapturesProvider = FutureProvider<List<CaptureSession>>(

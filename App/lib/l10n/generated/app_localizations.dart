@@ -235,7 +235,7 @@ abstract class AppLocalizations {
   /// Localized account, sync and file error categories. Never display raw server exception text.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
+  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
   String requestError(String reason);
 
   /// No description provided for @languageAutomatic.
@@ -979,7 +979,7 @@ abstract class AppLocalizations {
   /// No description provided for @attachments.
   ///
   /// In en, this message translates to:
-  /// **'Attachments'**
+  /// **'Files'**
   String get attachments;
 
   /// No description provided for @checklist.
@@ -2380,23 +2380,11 @@ abstract class AppLocalizations {
   /// **'Your own little space.'**
   String get accountHeading;
 
-  /// No description provided for @backupHeading.
+  /// No description provided for @accountSaved.
   ///
   /// In en, this message translates to:
-  /// **'Your plans, kept close.'**
-  String get backupHeading;
-
-  /// No description provided for @accountBackupHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Tasks and notes are saved on this phone and backed up when connected. New attachments upload after saving; check their status in item details. Older device-only files need an explicit Upload.'**
-  String get accountBackupHelp;
-
-  /// No description provided for @accountUpToDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Your tasks and notes are up to date.'**
-  String get accountUpToDate;
+  /// **'Saved to your account'**
+  String get accountSaved;
 
   /// No description provided for @syncNow.
   ///
@@ -2428,12 +2416,6 @@ abstract class AppLocalizations {
   /// **'Import'**
   String get importItems;
 
-  /// No description provided for @noLocalItems.
-  ///
-  /// In en, this message translates to:
-  /// **'There are no local tasks or notes to import.'**
-  String get noLocalItems;
-
   /// No description provided for @itemsImported.
   ///
   /// In en, this message translates to:
@@ -2451,6 +2433,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign out'**
   String get signOut;
+
+  /// No description provided for @signOutQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out? Reminders on this phone stop until you sign in again.'**
+  String get signOutQuestion;
 
   /// No description provided for @recoveryHeading.
   ///
@@ -3271,19 +3259,19 @@ abstract class AppLocalizations {
   /// No description provided for @fileUploadHelp.
   ///
   /// In en, this message translates to:
-  /// **'New files upload to your account after saving: up to 6 MiB each, 64 MiB per account. Older local files stay on this device until you choose Upload in task details.'**
+  /// **'New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.'**
   String get fileUploadHelp;
 
   /// No description provided for @fileLocalHelp.
   ///
   /// In en, this message translates to:
-  /// **'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MiB per file.'**
+  /// **'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.'**
   String get fileLocalHelp;
 
   /// No description provided for @fileLimit.
   ///
   /// In en, this message translates to:
-  /// **'Choose a non-empty file up to 6 MiB. You can attach up to 20 files per task.'**
+  /// **'Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.'**
   String get fileLimit;
 
   /// No description provided for @fileManageHelp.
@@ -3580,11 +3568,11 @@ abstract class AppLocalizations {
   /// **'Keep your tasks with you.'**
   String get keepYourTasks;
 
-  /// No description provided for @archiveContentsHelp.
+  /// No description provided for @exportImportIntro.
   ///
   /// In en, this message translates to:
-  /// **'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal projects. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.'**
-  String get archiveContentsHelp;
+  /// **'Save a copy of your tasks to a file, or bring tasks from Todoist.'**
+  String get exportImportIntro;
 
   /// No description provided for @exportTaskFlowFile.
   ///
@@ -4759,7 +4747,7 @@ abstract class AppLocalizations {
   /// No description provided for @billingTestMode.
   ///
   /// In en, this message translates to:
-  /// **'Test purchases only. No real payment will be taken. An active test subscription unlocks voice and AI capture in this development build.'**
+  /// **'Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.'**
   String get billingTestMode;
 
   /// No description provided for @billingGuestHelp.
@@ -4816,40 +4804,22 @@ abstract class AppLocalizations {
   /// **'Manage subscription'**
   String get billingManage;
 
-  /// No description provided for @billingOpenStore.
-  ///
-  /// In en, this message translates to:
-  /// **'Open store subscription settings'**
-  String get billingOpenStore;
-
-  /// No description provided for @billingRefresh.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh status'**
-  String get billingRefresh;
-
   /// No description provided for @billingRestoreHelp.
   ///
   /// In en, this message translates to:
   /// **'Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.'**
   String get billingRestoreHelp;
 
-  /// No description provided for @billingStoreOpenError.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not open the store. Try again or open your store’s subscription settings.'**
-  String get billingStoreOpenError;
-
   /// No description provided for @billingError.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Connect to the TaskFlow server to link your subscription, then refresh.} network{Could not update billing. Check your connection and refresh.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
+  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Connect to the TaskFlow server to link your subscription.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
   String billingError(String reason);
 
   /// No description provided for @billingResult.
   ///
   /// In en, this message translates to:
-  /// **'{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro is not active yet; refresh or restore purchases shortly.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}'**
+  /// **'{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}'**
   String billingResult(String result);
 
   /// No description provided for @continueWithGoogle.
@@ -5278,12 +5248,6 @@ abstract class AppLocalizations {
   /// **'TaskFlow'**
   String get activitySystem;
 
-  /// No description provided for @voiceProRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Voice capture is included with TaskFlow Pro.'**
-  String get voiceProRequired;
-
   /// Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead.
   ///
   /// In en, this message translates to:
@@ -5295,12 +5259,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Explore Pro'**
   String get voiceProAction;
-
-  /// No description provided for @voiceAccessUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'We could not verify voice access. Your capture is safe; reconnect and try again.'**
-  String get voiceAccessUnavailable;
 
   /// No description provided for @projectsNoneFound.
   ///
@@ -5367,6 +5325,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.'**
   String get stagingInviteOnly;
+
+  /// Under a spoken capture's result, for an account without Pro, only when 3 or fewer free dictations are left this month.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No free dictations left this month} =1{1 free dictation left this month} other{{count} free dictations left this month}}'**
+  String freeVoiceLeft(int count);
+
+  /// Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead. {date} is the local short date they come back.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve used this month’s free dictations. You can type it here — more on {date}.'**
+  String freeVoiceUsedUp(String date);
+
+  /// For a capture that is only a recording, refused because this month's free dictations are used up: in the capture sheet and in Unfinished captures. {date} is the local short date they come back.
+  ///
+  /// In en, this message translates to:
+  /// **'Your recording is kept. It can be understood from {date}, or now with Pro.'**
+  String freeVoiceUsedUpRecording(String date);
+
+  /// Closes the capture sheet when only a recording is kept and free dictations are used up
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get captureClose;
+
+  /// On the Pro screen, for an account without Pro. {date} is the local short date this month's free dictations come back.
+  ///
+  /// In en, this message translates to:
+  /// **'Free dictations: {left} of {limit} left this month. More on {date}.'**
+  String freeVoiceStatus(int left, int limit, String date);
+
+  /// Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes.
+  ///
+  /// In en, this message translates to:
+  /// **'Files: {used} of {limit} MB used'**
+  String storageUsage(int used, int limit);
+
+  /// Under an attachment the server refused because the user's own free file space is full. Followed by the Explore Pro button. {limit} is the free cap in whole megabytes.
+  ///
+  /// In en, this message translates to:
+  /// **'Your file space is full ({limit} MB). Remove files from other tasks to make room, or get Pro for unlimited space.'**
+  String storageFull(int limit);
+
+  /// Under an attachment the server refused because the file space of the shared project's owner is full.
+  ///
+  /// In en, this message translates to:
+  /// **'This project’s file space is full. Its owner can remove files to make room.'**
+  String get storageFullShared;
 }
 
 class _AppLocalizationsDelegate

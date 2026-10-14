@@ -138,7 +138,7 @@ class AppLocalizationsCa extends AppLocalizations {
           'Aquest compte no pot fer aquesta acció. Revisa els permisos.',
       'rateLimit':
           'Hi ha massa peticions. Espera una mica abans de tornar-ho a provar.',
-      'fileLimit': 'Tria un fitxer no buit de fins a 6 MiB.',
+      'fileLimit': 'Tria un fitxer no buit de fins a 6 MB.',
       'fileChanged':
           'El fitxer ha canviat o no s’ha pogut verificar. Tria’l de nou o torna’l a baixar.',
       'network':
@@ -1351,14 +1351,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get accountHeading => 'El teu petit espai.';
 
   @override
-  String get backupHeading => 'Els teus plans, ben desats.';
-
-  @override
-  String get accountBackupHelp =>
-      'Les tasques i notes es desen al telèfon i se’n fa una còpia al compte quan hi ha connexió. Els fitxers nous es pugen després de desar; consulta’n l’estat als detalls. Per pujar fitxers locals anteriors, toca Puja.';
-
-  @override
-  String get accountUpToDate => 'Les tasques i notes estan al dia.';
+  String get accountSaved => 'Desat al teu compte';
 
   @override
   String get syncNow => 'Sincronitza ara';
@@ -1385,9 +1378,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get importItems => 'Importa';
 
   @override
-  String get noLocalItems => 'No hi ha tasques ni notes locals per importar.';
-
-  @override
   String itemsImported(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1403,6 +1393,10 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get signOut => 'Tanca la sessió';
+
+  @override
+  String get signOutQuestion =>
+      'Vols tancar la sessió? Deixaràs de rebre recordatoris en aquest telèfon fins que tornis a entrar.';
 
   @override
   String get recoveryHeading => 'Recupera la contrasenya';
@@ -1888,15 +1882,15 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get fileUploadHelp =>
-      'Els fitxers nous es pugen al compte després de desar: fins a 6 MiB cadascun i 64 MiB per compte. Els fitxers locals anteriors es queden al dispositiu fins que triïs Puja als detalls de la tasca.';
+      'Els fitxers nous es pugen al compte després de desar, fins a 6 MB cadascun. Els fitxers locals anteriors es queden al dispositiu fins que triïs Puja als detalls de la tasca.';
 
   @override
   String get fileLocalHelp =>
-      'Els fitxers es queden en aquest dispositiu fins que iniciïs la sessió i triïs Puja als detalls de la tasca. Fins a 6 MiB per fitxer.';
+      'Els fitxers es queden en aquest dispositiu fins que iniciïs la sessió i triïs Puja als detalls de la tasca. Fins a 6 MB per fitxer.';
 
   @override
   String get fileLimit =>
-      'Tria un fitxer no buit de fins a 6 MiB. Pots adjuntar fins a 20 fitxers per tasca.';
+      'Tria un fitxer no buit de fins a 6 MB. Pots adjuntar fins a 20 fitxers per tasca.';
 
   @override
   String get fileManageHelp =>
@@ -2068,8 +2062,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get keepYourTasks => 'Porta les tasques amb tu.';
 
   @override
-  String get archiveContentsHelp =>
-      'Les exportacions de TaskFlow inclouen tasques, notes, planificacions, canvis de dates periòdiques, estat de compleció, passos, etiquetes i projectes personals. S’hi indiquen els noms dels fitxers adjunts; se n’exclouen el contingut, les credencials, les preferències del dispositiu i les captures pendents.';
+  String get exportImportIntro =>
+      'Desa una còpia de les tasques en un fitxer o porta tasques de Todoist.';
 
   @override
   String get exportTaskFlowFile => 'Exporta un fitxer de TaskFlow';
@@ -2981,7 +2975,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Només compres de prova. No es farà cap cobrament real. Una subscripció de prova activa desbloqueja la captura per veu i amb IA en aquesta versió de desenvolupament.';
+      'Només compres de prova. No es farà cap cobrament real. Una subscripció de prova activa dona dictat i espai per a fitxers il·limitats en aquesta versió de desenvolupament.';
 
   @override
   String get billingGuestHelp =>
@@ -3015,18 +3009,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get billingManage => 'Gestiona la subscripció';
 
   @override
-  String get billingOpenStore => 'Obre les subscripcions de la botiga';
-
-  @override
-  String get billingRefresh => 'Actualitza l’estat';
-
-  @override
   String get billingRestoreHelp =>
       'Ja tens una subscripció? Utilitza el mateix compte de la botiga i restaura les compres. Cancel·lar la renovació manté Pro disponible fins que acaba el període pagat.';
-
-  @override
-  String get billingStoreOpenError =>
-      'No s’ha pogut obrir la botiga. Torna-ho a provar o obre la configuració de subscripcions de la botiga.';
 
   @override
   String billingError(String reason) {
@@ -3036,9 +3020,9 @@ class AppLocalizationsCa extends AppLocalizations {
       'configuration':
           'Les subscripcions encara no estan disponibles. Torna-ho a provar més endavant.',
       'accountUnavailable':
-          'Connecta’t al servidor de TaskFlow per vincular la subscripció i actualitza l’estat.',
+          'Connecta’t al servidor de TaskFlow per vincular la subscripció.',
       'network':
-          'No s’ha pogut actualitzar la facturació. Comprova la connexió i actualitza.',
+          'No s’ha pogut comprovar la subscripció. Revisa la connexió i torna a obrir aquesta pantalla.',
       'notAllowed':
           'Les compres estan restringides per a aquest compte de la botiga o dispositiu.',
       'otherAccount':
@@ -3057,7 +3041,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'noPurchases':
           'No s’ha trobat cap compra Pro activa per a aquest compte.',
       'awaitingEntitlement':
-          'Compra rebuda. Pro encara no està actiu; actualitza o restaura les compres d’aquí a un moment.',
+          'Compra rebuda. Pro s’activarà d’aquí a uns moments; si no, toca Restaura les compres.',
       'updated': 'Estat de subscripció actualitzat.',
       'pending':
           'El pagament està pendent. Pro s’activarà quan la botiga el confirmi.',
@@ -3324,19 +3308,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get activitySystem => 'TaskFlow';
 
   @override
-  String get voiceProRequired =>
-      'La captura per veu està inclosa a TaskFlow Pro.';
-
-  @override
   String get captureSpeakingIsPro =>
       'Dictar una tasca forma part de TaskFlow Pro. La pots escriure aquí.';
 
   @override
   String get voiceProAction => 'Descobreix Pro';
-
-  @override
-  String get voiceAccessUnavailable =>
-      'No hem pogut verificar l’accés per veu. La captura està desada; torna a connectar-te i prova-ho de nou.';
 
   @override
   String get projectsNoneFound => 'No s’han trobat projectes';
@@ -3378,4 +3354,54 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get stagingInviteOnly =>
       'Aquesta versió de prova privada és per a persones convidades. Demana al responsable de TaskFlow una invitació a aquest correu.';
+
+  @override
+  String freeVoiceLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Et queden $count dictats gratuïts aquest mes',
+      one: 'Et queda 1 dictat gratuït aquest mes',
+      zero: 'Ja no et queden dictats gratuïts aquest mes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeVoiceUsedUp(String date) {
+    return 'Ja has fet servir els dictats gratuïts d’aquest mes. La pots escriure aquí; el dia $date en tindràs més.';
+  }
+
+  @override
+  String freeVoiceUsedUpRecording(String date) {
+    return 'La gravació es conserva. Es podrà entendre a partir del dia $date, o ara amb Pro.';
+  }
+
+  @override
+  String get captureClose => 'Tanca';
+
+  @override
+  String freeVoiceStatus(int left, int limit, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      left,
+      locale: localeName,
+      other: 'et queden $left',
+      one: 'et queda 1',
+    );
+    return 'Dictats gratuïts: $_temp0 de $limit aquest mes. El dia $date en tindràs més.';
+  }
+
+  @override
+  String storageUsage(int used, int limit) {
+    return 'Fitxers: $used de $limit MB utilitzats';
+  }
+
+  @override
+  String storageFull(int limit) {
+    return 'El teu espai per a fitxers és ple ($limit MB). Treu fitxers d’altres tasques per fer lloc o fes-te Pro per tenir espai il·limitat.';
+  }
+
+  @override
+  String get storageFullShared =>
+      'L’espai per a fitxers d’aquest projecte és ple. El seu propietari pot treure fitxers per fer lloc.';
 }

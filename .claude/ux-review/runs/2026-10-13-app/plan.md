@@ -764,3 +764,77 @@ The owner's free tier (DECISIONS.md, 2026-10-13 late) is done on the server (d40
 - **P90** (UX-498, S3, A): when free dictations run out, the words are kept and the sheet offers typing, with the reset date.
 - **P91** (UX-500, S3, B): a file-space line near the cap; a refused file isn't sent again.
 - **P44**, then **P92** (UX-501, S2, D): the Pro screen shows the free tier's numbers; Pro-only copy goes.
+
+## Round 2 (b7)
+
+Round 1 of batch 7 ran P89, P90, P91, P44, P92 and P93. The reviewers found all nine findings fixed in code: UX-496, UX-497, UX-498, UX-499, UX-500, UX-408, UX-423 and UX-501 (several still need a phone). The round check passed and no test failed. Reviewers A, B and D found nine regressions, now UX-502 to UX-510.
+
+Round 2 has three packages, all S2: P94 (A), P95 (B) and P96 (D). One owner question is new and doesn't block anything. Nothing is escalated.
+
+The briefs are in `plan-b7-r2.json`.
+
+### Question for the owner
+- **Finding files when the space is full** (UX-506). When a free account's file space is full, should the app help people find which tasks hold files, for example a marker on task rows or a list of files? Recommendation: not now. P95 rewords the message to say the files are on other tasks, which needs no new UI. Revisit if free users hit the cap in practice.
+
+### Packages, in run order
+
+#### P94 · Used-up dictations: a kept recording closes with one button; copy fixes · A · M
+- **UX-502** (S2; R1A-1, from P90) A recording with no words, refused at 0 left, showed an empty typing field and only `Cancelar`, which asked "¿Conservar lo que has dicho?". Now there's no field, one FilledButton `Cerrar` / `Close` / `Tanca` that closes the sheet with the capture kept, and no dialog. Back does the same.
+- **UX-503** (S1; R1A-2, from P90/P92) Catalan dates read `el dia {date}` / `a partir del dia {date}` / `Més el dia {date}`, so the 1st no longer reads "el 1 de nov.".
+- **UX-504** (S1; R1A-3, from P89) `freeVoiceLeft` at 0 reads `Ya no te quedan dictados gratis este mes` (EN, CA too).
+
+#### P95 · File space: usage refreshes after uploads; the full message says where · B · M
+- **UX-505** (S2; R1B-1, from P91) After a sync where at least one upload succeeds, the account's storage is refreshed once, so the usage line appears as soon as uploads pass 80%. There's no new UI, and it can't loop.
+- **UX-506** (S2; R1B-2, from P91) `storageFull` now says `Elimina archivos de otras tareas para hacer sitio…` (EN, CA too).
+- **UX-507** (S1; R1B-3, from P91) The `attachments` heading becomes `Files` / `Archivos`, matching the usage line. Catalan `Fitxers adjunts` stays.
+
+#### P96 · Account and Pro: sign-out shows progress; copy points to what exists · D · S
+- **UX-508** (S2; R1D-1, from P44) `Cerrar sesión` shows the 18 dp progress indicator inside the button while signing out.
+- **UX-509** (S2; R1D-2, from P44) Three billing messages no longer say "refresh". They point to reopening the screen, or to `Restaurar compras`.
+- **UX-510** (S2; R1D-3) `fileUploadHelp` drops "64 MiB per account" and says `hasta 6 MB cada uno`. It no longer contradicts the Pro screen's 100 MB.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- P89's implementer: an app left open across the month boundary picks up the reset on its next resume refresh.
+- P90's implementer: the reset date is the first of the month in UTC, so west of UTC it can read as the last day of the month.
+- P44's implementer: someone who bought Pro before but whose Pro isn't active (a lapsed subscriber) sees `Ver suscripción`, `Restaurar compras` and `Gestionar suscripción` together. That rule wasn't changed, and no reviewer flagged it.
+- Reviewer D: the Google-link path's `auth.loading` lost its bottom spinner, but `_Action.google` has its own bar.
+- Reviewer B: removing your own file also releases refused files in shared projects. They are re-sent once and refused again, which costs data but nothing the user sees.
+- Organizer: `billingResult.updated` ("Estado de la suscripción actualizado") may now be unused, since `Actualizar estado` is gone. Check at the next Pro-screen review.
+
+## Round 3 (b7)
+
+Round 2 of batch 7 ran P94, P95 and P96. The reviewers found eight of nine findings fixed in code: UX-502, UX-504, UX-505, UX-506, UX-507, UX-508, UX-509 and UX-510 (UX-502, UX-505 and UX-508 still need a phone). UX-503 was partly fixed: Catalan now says `el dia {date}`, but the date's own full stop doubles the sentence's (`1 de nov..`), and ux-tester's acceptance test fails. That was the round check's only failure (929 pass, 1 fails). Reviewers B and D found two regressions, now UX-511 and UX-512.
+
+Round 3 has three small packages: P97 (B, S2), P98 (A, S1) and P99 (D, S1). There are no new owner questions, and nothing is escalated: UX-503 has failed once.
+
+The briefs are in `plan-b7-r3.json`.
+
+### Packages, in run order
+
+#### P97 · Usage refresh no longer resets the task screens · B · S
+- **UX-511** (S2; R2B-1, from P95) Each upload by a free account refreshed the account, which rebuilt the task repository: task details flashed a spinner and jumped to the top, the calendar briefly showed an empty day. `taskRepositoryProvider` and `captureOwnerProvider` now watch only `account?.id`, so only the usage line repaints and the extra sync goes away. No copy change. Inferred from code; needs a phone.
+
+#### P98 · Catalan free-dictation dates: no doubled full stop · A · S
+- **UX-503** (S1; R1A-2, second attempt) Last time: `dia` was added before the date, but `freeVoiceUsedUp` and `freeVoiceStatus` still ended in `{date}.`, giving `1 de nov..`. Now the date sits mid-sentence: `…; el dia {date} en tindràs més.` and `El dia {date} en tindràs més.` Catalan only; the failing test is updated to match.
+
+#### P99 · File size limit says 6 MB everywhere · D · S
+- **UX-512** (S1; R2D-1, from P96) `fileLocalHelp`, `fileLimit` and `requestError.fileLimit` still said `6 MiB` next to P96's `6 MB`. All three now say `6 MB` in EN, ES and CA. The internal `6 MiB` text that `request_locale.dart` matches stays.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- P96's implementer: the plan's grep for 'actualiza' / 'actualitza' in `billingError` / `billingResult` can't pass, because the kept `updated` and `other` branches use the verb to mean "update". Reviewer D agreed it isn't a defect. Read that check as "no instruction to refresh".
+- P96's implementer: `attachment_files.dart:45` throws `Choose a non-empty file up to 6 MiB.` It never reaches the screen as-is: the task editor shows `fileLimit` for it, and `request_locale.dart:98` maps it to `fileLimit`. P99 leaves it alone.
+- P95's implementer: if `_pullRemote` throws (offline) or a 401 comes back mid-upload, the storage refresh is skipped; the next successful sync with an upload refreshes it.
+- Reviewer D: the sign-out, Sync and Import spinners have no `semanticsLabel`, so TalkBack hears only "Cerrar sesión, disabled". Not worse than before P96.
+- Reviewer B: a code comment at `attachment_panel.dart:196` still says "Attachments section". Not user-facing.

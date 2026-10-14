@@ -13,6 +13,8 @@ abstract final class CaptureProblem {
   static const timeout = 'capture_problem:timeout';
   static const unavailable = 'capture_problem:unavailable';
   static const allowance = 'capture_problem:allowance';
+  static const freeVoiceUsedUp = 'capture_problem:free_voice_used_up';
+  // A refusal from before free dictations: it reads as [freeVoiceUsedUp].
   static const proRequired = 'capture_problem:pro_required';
   static const signIn = 'capture_problem:sign_in';
   static const forbidden = 'capture_problem:forbidden';
@@ -61,6 +63,11 @@ abstract final class CaptureProblem {
     'The retained PCM frame is incomplete.': incompleteAudio,
   };
 
+  /// The server refused spoken words: this month's free dictations are
+  /// used up.
+  static bool usedUp(String? value) =>
+      value == freeVoiceUsedUp || value == proRequired;
+
   static String from(Object error) {
     if (error is ApiException) {
       // A server's own words, and `field: message` details, never reach the
@@ -72,7 +79,11 @@ abstract final class CaptureProblem {
           _ => offline,
         };
       }
-      if (error.status == 402) return proRequired;
+      if (error.status == 402) {
+        return error.body?['code'] == 'free_voice_used_up'
+            ? freeVoiceUsedUp
+            : proRequired;
+      }
       if (error.status == 401) return signIn;
       if (error.status == 403) return forbidden;
       if (error.status == 413) return tooLarge;

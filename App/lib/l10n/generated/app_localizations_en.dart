@@ -136,7 +136,7 @@ class AppLocalizationsEn extends AppLocalizations {
           'This account cannot perform that action. Check your access.',
       'rateLimit':
           'Too many requests. Please wait a little before trying again.',
-      'fileLimit': 'Choose a non-empty file up to 6 MiB.',
+      'fileLimit': 'Choose a non-empty file up to 6 MB.',
       'fileChanged':
           'The file has changed or could not be verified. Choose it again or retry the download.',
       'network': 'No connection. Check Wi-Fi or mobile data and try again.',
@@ -568,7 +568,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addNotes => 'Add notes';
 
   @override
-  String get attachments => 'Attachments';
+  String get attachments => 'Files';
 
   @override
   String get checklist => 'Checklist';
@@ -1329,14 +1329,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountHeading => 'Your own little space.';
 
   @override
-  String get backupHeading => 'Your plans, kept close.';
-
-  @override
-  String get accountBackupHelp =>
-      'Tasks and notes are saved on this phone and backed up when connected. New attachments upload after saving; check their status in item details. Older device-only files need an explicit Upload.';
-
-  @override
-  String get accountUpToDate => 'Your tasks and notes are up to date.';
+  String get accountSaved => 'Saved to your account';
 
   @override
   String get syncNow => 'Sync now';
@@ -1362,9 +1355,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importItems => 'Import';
 
   @override
-  String get noLocalItems => 'There are no local tasks or notes to import.';
-
-  @override
   String itemsImported(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1380,6 +1370,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signOut => 'Sign out';
+
+  @override
+  String get signOutQuestion =>
+      'Sign out? Reminders on this phone stop until you sign in again.';
 
   @override
   String get recoveryHeading => 'Reset your password';
@@ -1859,15 +1853,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileUploadHelp =>
-      'New files upload to your account after saving: up to 6 MiB each, 64 MiB per account. Older local files stay on this device until you choose Upload in task details.';
+      'New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.';
 
   @override
   String get fileLocalHelp =>
-      'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MiB per file.';
+      'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.';
 
   @override
   String get fileLimit =>
-      'Choose a non-empty file up to 6 MiB. You can attach up to 20 files per task.';
+      'Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.';
 
   @override
   String get fileManageHelp =>
@@ -2036,8 +2030,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keepYourTasks => 'Keep your tasks with you.';
 
   @override
-  String get archiveContentsHelp =>
-      'TaskFlow exports include tasks, notes, schedules, recurring date changes, completion, checklists, labels and personal projects. Attachment names are listed; file contents, account credentials, device preferences and unfinished captures are excluded.';
+  String get exportImportIntro =>
+      'Save a copy of your tasks to a file, or bring tasks from Todoist.';
 
   @override
   String get exportTaskFlowFile => 'Export TaskFlow file';
@@ -2930,7 +2924,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Test purchases only. No real payment will be taken. An active test subscription unlocks voice and AI capture in this development build.';
+      'Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.';
 
   @override
   String get billingGuestHelp =>
@@ -2964,18 +2958,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get billingManage => 'Manage subscription';
 
   @override
-  String get billingOpenStore => 'Open store subscription settings';
-
-  @override
-  String get billingRefresh => 'Refresh status';
-
-  @override
   String get billingRestoreHelp =>
       'Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.';
-
-  @override
-  String get billingStoreOpenError =>
-      'Could not open the store. Try again or open your store’s subscription settings.';
 
   @override
   String billingError(String reason) {
@@ -2985,8 +2969,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'configuration':
           'Subscriptions are not available yet. Please try again later.',
       'accountUnavailable':
-          'Connect to the TaskFlow server to link your subscription, then refresh.',
-      'network': 'Could not update billing. Check your connection and refresh.',
+          'Connect to the TaskFlow server to link your subscription.',
+      'network':
+          'Could not check your subscription. Check your connection and open this screen again.',
       'notAllowed':
           'Purchases are restricted for this store account or device.',
       'otherAccount':
@@ -3004,7 +2989,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'restored': 'Your Pro subscription was restored.',
       'noPurchases': 'No active Pro purchase was found for this account.',
       'awaitingEntitlement':
-          'Purchase received. Pro is not active yet; refresh or restore purchases shortly.',
+          'Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.',
       'updated': 'Subscription status updated.',
       'pending':
           'Payment is pending. Pro will activate after the store confirms payment.',
@@ -3269,18 +3254,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activitySystem => 'TaskFlow';
 
   @override
-  String get voiceProRequired => 'Voice capture is included with TaskFlow Pro.';
-
-  @override
   String get captureSpeakingIsPro =>
       'Speaking a task is part of TaskFlow Pro. You can type it here.';
 
   @override
   String get voiceProAction => 'Explore Pro';
-
-  @override
-  String get voiceAccessUnavailable =>
-      'We could not verify voice access. Your capture is safe; reconnect and try again.';
 
   @override
   String get projectsNoneFound => 'No matching projects';
@@ -3321,4 +3299,48 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get stagingInviteOnly =>
       'This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.';
+
+  @override
+  String freeVoiceLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count free dictations left this month',
+      one: '1 free dictation left this month',
+      zero: 'No free dictations left this month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeVoiceUsedUp(String date) {
+    return 'You’ve used this month’s free dictations. You can type it here — more on $date.';
+  }
+
+  @override
+  String freeVoiceUsedUpRecording(String date) {
+    return 'Your recording is kept. It can be understood from $date, or now with Pro.';
+  }
+
+  @override
+  String get captureClose => 'Close';
+
+  @override
+  String freeVoiceStatus(int left, int limit, String date) {
+    return 'Free dictations: $left of $limit left this month. More on $date.';
+  }
+
+  @override
+  String storageUsage(int used, int limit) {
+    return 'Files: $used of $limit MB used';
+  }
+
+  @override
+  String storageFull(int limit) {
+    return 'Your file space is full ($limit MB). Remove files from other tasks to make room, or get Pro for unlimited space.';
+  }
+
+  @override
+  String get storageFullShared =>
+      'This project’s file space is full. Its owner can remove files to make room.';
 }

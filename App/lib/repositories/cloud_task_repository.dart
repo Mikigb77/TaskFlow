@@ -35,6 +35,8 @@ class CloudTaskRepository extends TaskRepository {
       database.restoreTask(task, ownerKey: ownerKey);
   @override
   Future<int> importLocalTasks() => database.importLocalTasks(ownerKey);
+  @override
+  Future<int> localTaskCount() async => (await database.getTasks()).length;
 
   Map<String, dynamic> _payload(Map<String, dynamic> row) => {
     ...Task.fromMap(row).toApi(),

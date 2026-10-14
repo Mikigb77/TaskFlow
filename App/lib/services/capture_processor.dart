@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/models/task.dart';
@@ -6,12 +8,18 @@ import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_problem.dart';
 import 'package:agenda/services/local_capture.dart';
+import 'package:uuid/uuid.dart';
 
 class CaptureProcessor {
   static final Map<String, Future<CaptureSession>> _active = {};
-  // Captures saved as written while the assistant was still asked: its late
-  // answer, or failure, changes nothing.
+  // Captures saved as written, or dropped, while the assistant was still
+  // asked: its late answer, or failure, changes nothing.
   static final Set<String> _written = {};
+  // The capture_id of each request to the assistant still in flight.
+  static final Map<String, String> _asking = {};
+  // Captures whose request was cancelled ask again under a new capture_id:
+  // the server refuses a cancelled one for a while.
+  static final Map<String, String> _renewed = {};
   final CaptureStore store;
   final ApiClient api;
   CaptureProcessor(this.store, this.api);
@@ -50,6 +58,7 @@ class CaptureProcessor {
   }) async {
     final key = _key(session);
     _written.add(key);
+    _cancelRequest(session);
     try {
       final existing = await store.read(session.id, session.ownerKey);
       if (existing == null || existing.terminal) {
@@ -61,6 +70,53 @@ class CaptureProcessor {
     } finally {
       if (!_active.containsKey(key)) _written.remove(key);
     }
+  }
+
+  /// Words dropped while the assistant understands them (Cancel after
+  /// `Volver a decirlo`): the request is cancelled, so it uses no free
+  /// dictation, and its late answer changes nothing.
+  void cancel(CaptureSession session) {
+    final key = _key(session);
+    if (!_active.containsKey(key)) return;
+    _written.add(key);
+    _cancelRequest(session);
+  }
+
+  /// Tells the server, without waiting, that the request in flight for
+  /// [session] is no longer wanted. The refusal that follows is ignored.
+  void _cancelRequest(CaptureSession session) {
+    final key = _key(session);
+    final id = _asking[key];
+    if (id == null) return;
+    _renewed[key] = const Uuid().v4();
+    final account = _accountId(session);
+    if (account == null || !_validId(id)) return;
+    unawaited(
+      api
+          .request('DELETE', 'ai/drafts/$id/', accountId: account)
+          .then<void>((_) {}, onError: (Object _, StackTrace __) {}),
+    );
+  }
+
+  static int? _accountId(CaptureSession session) => session.ownerKey == 'local'
+      ? null
+      : int.tryParse(session.ownerKey.split('/').last);
+
+  static bool _validId(String id) => Uuid.isValidUUID(
+    fromString: id,
+    validationMode: ValidationMode.nonStrict,
+  );
+
+  /// The free dictations left, from a dictation's answer or refusal, go
+  /// into the saved account without holding up the result.
+  void _rememberFreeVoice(Object? block, CaptureSession session) {
+    final account = _accountId(session);
+    if (block == null || account == null) return;
+    unawaited(
+      api
+          .rememberFreeVoice(block, accountId: account)
+          .catchError((Object _) {}),
+    );
   }
 
   static String _key(CaptureSession session) =>
@@ -140,27 +196,41 @@ class CaptureProcessor {
           audioFormat: existing.audioFormat,
         );
       }
-      final raw = await api.request(
-        'POST',
-        'ai/drafts/',
-        audioPath: existing.audioPath,
-        authenticated: existing.ownerKey != 'local',
-        accountId: existing.ownerKey == 'local'
-            ? null
-            : int.parse(existing.ownerKey.split('/').last),
-        data: {
-          'timezone': existing.timezone,
-          if (existing.projectId != null) 'project_id': existing.projectId,
-          'capture_type': existing.kind,
-          'reference_time': existing.capturedAt.toUtc().toIso8601String(),
-          if (existing.audioPath == null) 'text': existing.text,
-          'source': existing.audioPath != null
-              ? 'speech'
-              : existing.source ?? 'typed',
-          if (existing.language != null) 'language': existing.language,
-        },
-      );
+      // Dropped, or saved as written, before the request went out.
+      if (_written.contains(key)) return _latest(existing);
+      // The capture's own ID, so the server can tell a retry from new words
+      // and a cancel can find the request.
+      final captureId = _renewed[key] ?? existing.id;
+      _asking[key] = captureId;
+      final dynamic raw;
+      try {
+        raw = await api.request(
+          'POST',
+          'ai/drafts/',
+          audioPath: existing.audioPath,
+          authenticated: existing.ownerKey != 'local',
+          accountId: existing.ownerKey == 'local'
+              ? null
+              : int.parse(existing.ownerKey.split('/').last),
+          data: {
+            if (_validId(captureId)) 'capture_id': captureId,
+            'timezone': existing.timezone,
+            if (existing.projectId != null) 'project_id': existing.projectId,
+            'capture_type': existing.kind,
+            'reference_time': existing.capturedAt.toUtc().toIso8601String(),
+            if (existing.audioPath == null) 'text': existing.text,
+            'source': existing.audioPath != null
+                ? 'speech'
+                : existing.source ?? 'typed',
+            if (existing.language != null) 'language': existing.language,
+          },
+        );
+      } finally {
+        _asking.remove(key);
+      }
       final response = Map<String, dynamic>.from(raw as Map);
+      // Even when saved as written meanwhile: an answered dictation counts.
+      _rememberFreeVoice(response['free_voice'], existing);
       final transcript = response['transcript'] as String;
       final drafts = (response['tasks'] as List).map((item) {
         final draft = CaptureDraft.fromAI(
@@ -221,6 +291,9 @@ class CaptureProcessor {
       }
       return next;
     } catch (error) {
+      if (error is ApiException) {
+        _rememberFreeVoice(error.body?['free_voice'], existing);
+      }
       // Saved as written meanwhile: the assistant's failure doesn't matter.
       if (_written.contains(key)) return _latest(existing);
       final latest = await store.read(existing.id, existing.ownerKey);

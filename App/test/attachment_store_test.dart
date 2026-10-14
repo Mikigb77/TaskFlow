@@ -9,10 +9,20 @@ import 'package:agenda/services/archive_store.dart';
 import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/services/attachment_store.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'support/design_fixtures.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -266,13 +276,249 @@ void main() {
             Uint8List.fromList([0])),
         throwsFormatException);
   });
+
+  // ---- P91 · UX-500: a file refused for a full file space ----
+
+  const megabyte = 1024 * 1024;
+  Map<String, dynamic> full({bool shared = false}) => {
+        'code': 'storage_full',
+        'shared': shared,
+        if (!shared)
+          'storage': {
+            'used_bytes': 100 * 1024 * 1024,
+            'limit_bytes': 100 * 1024 * 1024
+          },
+      };
+
+  for (final shared in [false, true]) {
+    test(
+        'UX-500: a storage_full answer (shared: $shared) marks the file refused with the ${shared ? 'shared' : 'own'} token, not the server’s text; the next sync doesn’t re-send it; its Retry does',
+        () async {
+      final source = File(p.join(directory.path, 'scan.pdf'));
+      await source.writeAsBytes([1, 2, 3]);
+      final id = await task(source.path);
+      api.storageFull = full(shared: shared);
+      await store.sync(api, 1);
+      var item = (await store.forTask(id)).single;
+      expect(api.uploadIds, hasLength(1));
+      expect(item.refused, isTrue);
+      expect(
+          item.error,
+          shared
+              ? TaskAttachment.storageFullShared
+              : TaskAttachment.storageFull);
+      expect(item.error, isNot(contains('full.')));
+      expect(item.uploadPending, isTrue);
+
+      // A task change syncs again: the refused file is not sent.
+      await store.sync(api, 1);
+      await store.sync(api, 1);
+      expect(api.uploadIds, hasLength(1));
+
+      // Its Retry sends it again.
+      api.storageFull = null;
+      await store.retryRefused(item.id);
+      await store.sync(api, 1);
+      expect(api.uploadIds, hasLength(2));
+      item = (await store.forTask(id)).single;
+      expect(item.refused, isFalse);
+      expect(item.error, isNull);
+      expect(item.remote, isTrue);
+      expect(item.uploadPending, isFalse);
+    });
+  }
+
+  test(
+      'UX-500: removing a file re-sends the refused ones on the next sync, after the removal',
+      () async {
+    final kept = File(p.join(directory.path, 'kept.pdf'));
+    await kept.writeAsBytes([1]);
+    final keptTask = await task(kept.path);
+    await store.sync(api, 1);
+    final uploaded = (await store.forTask(keptTask)).single;
+    expect(uploaded.remote, isTrue);
+
+    final big = File(p.join(directory.path, 'big.pdf'));
+    await big.writeAsBytes([2, 2]);
+    final bigTask = await task(big.path);
+    api.storageFull = full();
+    await store.sync(api, 1);
+    expect((await store.forTask(bigTask)).single.refused, isTrue);
+    expect(api.uploadIds, hasLength(2));
+    await store.sync(api, 1);
+    expect(api.uploadIds, hasLength(2));
+
+    api.storageFull = null;
+    await store.remove(uploaded.id);
+    await store.sync(api, 1);
+    expect(api.records[uploaded.id]!['is_deleted'], isTrue);
+    expect(api.uploadIds, hasLength(3));
+    final sent = (await store.forTask(bigTask)).single;
+    expect(sent.refused, isFalse);
+    expect(sent.remote, isTrue);
+  });
+
+  test('UX-500: when Pro turns on, every refused file is sent again',
+      () async {
+    final ids = <int>[];
+    for (final name in ['one.pdf', 'two.pdf']) {
+      final source = File(p.join(directory.path, name));
+      await source.writeAsBytes([3]);
+      ids.add(await task(source.path));
+    }
+    api.storageFull = full();
+    await store.sync(api, 1);
+    expect(api.uploadIds, hasLength(2));
+    await store.sync(api, 1);
+    expect(api.uploadIds, hasLength(2));
+    api.storageFull = null;
+    // What the app runs when hasPro turns on (main.dart).
+    await store.retryRefused();
+    await store.sync(api, 1);
+    expect(api.uploadIds, hasLength(4));
+    for (final id in ids) {
+      expect((await store.forTask(id)).single.remote, isTrue);
+    }
+  });
+
+  // ---- Round 2 · P95 · UX-505: the usage refreshes after an upload ----
+
+  Map<String, dynamic> usage(int usedMb) =>
+      {'used_bytes': usedMb * megabyte, 'limit_bytes': 100 * megabyte};
+
+  /// A free account saved on the phone at [usedMb] of 100 MB.
+  Future<void> saveAccount(int usedMb) async {
+    FlutterSecureStorage.setMockInitialValues({
+      'taskflow.session': jsonEncode({
+        'access': 'fixture-access',
+        'refresh': 'fixture-refresh',
+        'user': {
+          'id': 1,
+          'email': 'files@example.invalid',
+          'timezone': 'UTC',
+          'storage': usage(usedMb),
+        },
+      }),
+    });
+    api.saved = true;
+    await api.restore();
+    expect(api.account!.storage!.usedBytes, usedMb * megabyte);
+  }
+
+  test(
+      'UX-505: a sync with a successful upload asks auth/me/ once and saves its storage; the sync that follows the account update asks nothing',
+      () async {
+    await saveAccount(78);
+    var updates = 0;
+    final listening = api.accountUpdated.listen((_) => updates++);
+    addTearDown(listening.cancel);
+    api.me = usage(82);
+    final source = File(p.join(directory.path, 'photo.jpg'));
+    await source.writeAsBytes([1, 2, 3]);
+    final id = await task(source.path);
+    await store.sync(api, 1);
+    expect((await store.forTask(id)).single.remote, isTrue);
+    expect(api.meRequests, 1);
+    expect(api.account!.storage!.usedBytes, 82 * megabyte);
+    await Future<void>.delayed(Duration.zero);
+    expect(updates, greaterThanOrEqualTo(1), reason: 'the app hears of it');
+
+    // An account update no longer rebuilds the repository or starts a sync;
+    // a later sync that uploads nothing asks auth/me/ nothing.
+    await store.sync(api, 1);
+    expect(api.meRequests, 1);
+  });
+
+  test(
+      'UX-505: a sync where nothing uploads — nothing queued, or the only file refused — asks auth/me/ nothing',
+      () async {
+    await saveAccount(78);
+    api.me = usage(82);
+    await store.sync(api, 1);
+    expect(api.meRequests, 0, reason: 'nothing queued');
+
+    final source = File(p.join(directory.path, 'big.pdf'));
+    await source.writeAsBytes([4, 5]);
+    final id = await task(source.path);
+    api.storageFull = full();
+    await store.sync(api, 1);
+    expect((await store.forTask(id)).single.refused, isTrue);
+    expect(api.meRequests, 0, reason: 'the only file was refused');
+    await store.sync(api, 1);
+    expect(api.meRequests, 0);
+  });
+
+  testWidgets(
+      'UX-505: after an upload, the attachment panel shows Files: 82 of 100 MB used without reopening the task, from one auth/me/ request',
+      (tester) async {
+    final en = lookupAppLocalizations(const Locale('en'));
+    await tester.runAsync(() => saveAccount(78));
+    api.me = usage(82);
+    final source = File(p.join(directory.path, 'scan.pdf'));
+    final id = (await tester.runAsync(() async {
+      await source.writeAsBytes([7, 8, 9]);
+      return task(source.path);
+    }))!;
+    await tester.pumpWidget(ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          authProvider.overrideWith((ref) => _SavedAuth(api)),
+          hasProProvider.overrideWithValue(false),
+          taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+          attachmentEntriesProvider.overrideWith((ref, taskId) async =>
+              [AttachmentEntry('scan.pdf', source.path, true)]),
+        ],
+        child: MaterialApp(
+            locale: const Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: Scaffold(
+                body: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: AttachmentPanel(
+                        task: Task(
+                            id: id, title: 'Doctor', priority: 3)))))));
+    await tester.pumpAndSettle();
+    expect(find.text('scan.pdf'), findsOneWidget);
+    // 78% is under the line's 80%.
+    expect(find.text(en.storageUsage(78, 100)), findsNothing);
+    expect(find.text(en.storageUsage(82, 100)), findsNothing);
+
+    await tester.runAsync(() => store.sync(api, 1));
+    await tester.pumpAndSettle();
+    expect(find.text(en.storageUsage(82, 100)), findsOneWidget);
+    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
+    expect(api.meRequests, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+}
+
+/// The account restored from the session saved on the phone.
+class _SavedAuth extends AuthNotifier {
+  _SavedAuth(super.api);
+  @override
+  Future<void> restore() async {
+    if (mounted) state = AuthState(account: api.account);
+  }
 }
 
 class _FilesApi extends ApiClient {
   _FilesApi() : super(url: 'http://files.test');
+
+  /// When true, the account is the session saved on the phone (restored
+  /// through the mocked secure storage), as in the app.
+  bool saved = false;
   @override
-  Account get account => Account.fromJson(
-      {'id': 1, 'email': 'files@example.invalid', 'timezone': 'UTC'});
+  Account? get account => saved
+      ? super.account
+      : Account.fromJson(
+          {'id': 1, 'email': 'files@example.invalid', 'timezone': 'UTC'});
+
+  /// Every `GET auth/me/`; it answers [me] as the account's file space.
+  int meRequests = 0;
+  Map<String, dynamic>? me;
   final records = <String, Map<String, dynamic>>{};
   final bytes = <String, Uint8List>{};
   final uploadIds = <String>[];
@@ -283,6 +529,9 @@ class _FilesApi extends ApiClient {
   Completer<void>? uploadWait;
   final uploadStarted = Completer<void>();
 
+  /// When set, every upload is refused with this 400 body.
+  Map<String, dynamic>? storageFull;
+
   @override
   Future<Map<String, dynamic>> uploadAttachment(
       {required String id,
@@ -292,6 +541,10 @@ class _FilesApi extends ApiClient {
       required int accountId}) async {
     expect(accountId, 1);
     uploadIds.add(id);
+    final full = storageFull;
+    if (full != null) {
+      throw ApiException(400, 'Your file space is full.', full);
+    }
     bytes[id] = await File(filePath).readAsBytes();
     records[id] = {
       'id': id,
@@ -324,6 +577,15 @@ class _FilesApi extends ApiClient {
       bool authenticated = true,
       int? accountId}) async {
     expect(accountId, 1);
+    if (method == 'GET' && path == 'auth/me/') {
+      meRequests++;
+      return {
+        'id': 1,
+        'email': 'files@example.invalid',
+        'timezone': 'UTC',
+        if (me != null) 'storage': me,
+      };
+    }
     if (method == 'GET') {
       if (failList) throw ApiException(503, 'Metadata unavailable.');
       return {'results': records.values.toList(), 'next': null};

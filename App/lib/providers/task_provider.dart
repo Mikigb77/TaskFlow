@@ -11,10 +11,11 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/notification_service.dart';
 
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
-  final account = ref.watch(authProvider.select((value) => value.account));
-  if (account == null) return TaskRepository(TaskDatabase());
+  final accountId =
+      ref.watch(authProvider.select((value) => value.account?.id));
+  if (accountId == null) return TaskRepository(TaskDatabase());
   return CloudTaskRepository(
-      TaskDatabase(), ref.read(apiClientProvider), account.id);
+      TaskDatabase(), ref.read(apiClientProvider), accountId);
 });
 
 final taskProvider =

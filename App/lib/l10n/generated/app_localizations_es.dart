@@ -139,7 +139,7 @@ class AppLocalizationsEs extends AppLocalizations {
           'Esta cuenta no puede realizar esa acción. Revisa tus permisos.',
       'rateLimit':
           'Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.',
-      'fileLimit': 'Elige un archivo no vacío de hasta 6 MiB.',
+      'fileLimit': 'Elige un archivo no vacío de hasta 6 MB.',
       'fileChanged':
           'El archivo ha cambiado o no se ha podido verificar. Selecciónalo de nuevo o vuelve a descargarlo.',
       'network':
@@ -574,7 +574,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get addNotes => 'Añadir notas';
 
   @override
-  String get attachments => 'Adjuntos';
+  String get attachments => 'Archivos';
 
   @override
   String get checklist => 'Proyecto de pasos';
@@ -1349,14 +1349,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get accountHeading => 'Tu propio espacio.';
 
   @override
-  String get backupHeading => 'Tus planes, siempre contigo.';
-
-  @override
-  String get accountBackupHelp =>
-      'Las tareas y notas se guardan en este teléfono y se copian a tu cuenta cuando hay conexión. Los archivos nuevos se suben después de guardar; consulta su estado en los detalles. Para subir archivos locales anteriores, pulsa Subir.';
-
-  @override
-  String get accountUpToDate => 'Tus tareas y notas están actualizadas.';
+  String get accountSaved => 'Guardado en tu cuenta';
 
   @override
   String get syncNow => 'Sincronizar ahora';
@@ -1382,9 +1375,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get importItems => 'Importar';
 
   @override
-  String get noLocalItems => 'No hay tareas ni notas locales que importar.';
-
-  @override
   String itemsImported(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1400,6 +1390,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signOut => 'Cerrar sesión';
+
+  @override
+  String get signOutQuestion =>
+      '¿Cerrar sesión? Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.';
 
   @override
   String get recoveryHeading => 'Recupera tu contraseña';
@@ -1882,15 +1876,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get fileUploadHelp =>
-      'Los archivos nuevos se suben a tu cuenta al guardar: hasta 6 MiB por archivo y 64 MiB por cuenta. Los archivos locales anteriores permanecen aquí hasta que elijas Subir en los detalles de la tarea.';
+      'Los archivos nuevos se suben a tu cuenta al guardar, hasta 6 MB cada uno. Los archivos locales anteriores permanecen aquí hasta que elijas Subir en los detalles de la tarea.';
 
   @override
   String get fileLocalHelp =>
-      'Los archivos permanecen en este dispositivo hasta que inicies sesión y elijas Subir en los detalles de la tarea. Hasta 6 MiB por archivo.';
+      'Los archivos permanecen en este dispositivo hasta que inicies sesión y elijas Subir en los detalles de la tarea. Hasta 6 MB por archivo.';
 
   @override
   String get fileLimit =>
-      'Elige un archivo no vacío de hasta 6 MiB. Puedes adjuntar hasta 20 archivos por tarea.';
+      'Elige un archivo no vacío de hasta 6 MB. Puedes adjuntar hasta 20 archivos por tarea.';
 
   @override
   String get fileManageHelp =>
@@ -2059,8 +2053,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get keepYourTasks => 'Llévate tus tareas.';
 
   @override
-  String get archiveContentsHelp =>
-      'Las exportaciones de TaskFlow incluyen tareas, notas, fechas, cambios de repeticiones, progreso, proyectos de pasos, etiquetas y proyectos personales. Se incluyen los nombres de los adjuntos, pero no su contenido, las credenciales de la cuenta, los ajustes del dispositivo ni las capturas sin terminar.';
+  String get exportImportIntro =>
+      'Guarda una copia de tus tareas en un archivo o trae tareas de Todoist.';
 
   @override
   String get exportTaskFlowFile => 'Exportar archivo TaskFlow';
@@ -2990,7 +2984,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Solo compras de prueba. No se realizará ningún cobro real. Una suscripción de prueba activa desbloquea la captura por voz y con IA en esta versión de desarrollo.';
+      'Solo compras de prueba. No se realizará ningún cobro real. Una suscripción de prueba activa da dictado y espacio para archivos ilimitados en esta versión de desarrollo.';
 
   @override
   String get billingGuestHelp =>
@@ -3024,18 +3018,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get billingManage => 'Gestionar suscripción';
 
   @override
-  String get billingOpenStore => 'Abrir suscripciones de la tienda';
-
-  @override
-  String get billingRefresh => 'Actualizar estado';
-
-  @override
   String get billingRestoreHelp =>
       '¿Ya tienes una suscripción? Usa la misma cuenta de la tienda y restaura las compras. Al cancelar la renovación, Pro sigue disponible hasta que termine el periodo pagado.';
-
-  @override
-  String get billingStoreOpenError =>
-      'No se pudo abrir la tienda. Inténtalo de nuevo o abre los ajustes de suscripciones de tu tienda.';
 
   @override
   String billingError(String reason) {
@@ -3045,9 +3029,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'configuration':
           'Las suscripciones aún no están disponibles. Inténtalo más tarde.',
       'accountUnavailable':
-          'Conéctate al servidor de TaskFlow para vincular tu suscripción y actualiza el estado.',
+          'Conéctate al servidor de TaskFlow para vincular tu suscripción.',
       'network':
-          'No se pudo actualizar la facturación. Revisa tu conexión y vuelve a intentarlo.',
+          'No se pudo comprobar tu suscripción. Revisa tu conexión y vuelve a abrir esta pantalla.',
       'notAllowed':
           'Las compras están restringidas para esta cuenta o dispositivo.',
       'otherAccount':
@@ -3065,7 +3049,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'restored': 'Se ha restaurado tu suscripción Pro.',
       'noPurchases': 'No se encontró una compra Pro activa para esta cuenta.',
       'awaitingEntitlement':
-          'Compra recibida. Pro aún no está activo; actualiza o restaura las compras en unos momentos.',
+          'Compra recibida. Pro se activará en unos momentos; si no, pulsa Restaurar compras.',
       'updated': 'Estado de la suscripción actualizado.',
       'pending':
           'El pago está pendiente. Pro se activará cuando la tienda lo confirme.',
@@ -3332,19 +3316,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get activitySystem => 'TaskFlow';
 
   @override
-  String get voiceProRequired =>
-      'La captura por voz está incluida en TaskFlow Pro.';
-
-  @override
   String get captureSpeakingIsPro =>
       'Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.';
 
   @override
   String get voiceProAction => 'Ver Pro';
-
-  @override
-  String get voiceAccessUnavailable =>
-      'No hemos podido verificar el acceso por voz. Tu captura está guardada; vuelve a conectarte e inténtalo otra vez.';
 
   @override
   String get projectsNoneFound => 'No se han encontrado proyectos';
@@ -3385,4 +3361,54 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get stagingInviteOnly =>
       'Esta versión de prueba privada es para personas invitadas. Pide al responsable de TaskFlow una invitación a este correo.';
+
+  @override
+  String freeVoiceLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Te quedan $count dictados gratis este mes',
+      one: 'Te queda 1 dictado gratis este mes',
+      zero: 'Ya no te quedan dictados gratis este mes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeVoiceUsedUp(String date) {
+    return 'Ya has usado los dictados gratis de este mes. Puedes escribirla aquí; tendrás más el $date.';
+  }
+
+  @override
+  String freeVoiceUsedUpRecording(String date) {
+    return 'Tu grabación se conserva. Se podrá entender a partir del $date, o ahora con Pro.';
+  }
+
+  @override
+  String get captureClose => 'Cerrar';
+
+  @override
+  String freeVoiceStatus(int left, int limit, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      left,
+      locale: localeName,
+      other: 'te quedan $left',
+      one: 'te queda 1',
+    );
+    return 'Dictados gratis: $_temp0 de $limit este mes. Más el $date.';
+  }
+
+  @override
+  String storageUsage(int used, int limit) {
+    return 'Archivos: $used de $limit MB usados';
+  }
+
+  @override
+  String storageFull(int limit) {
+    return 'Tu espacio para archivos está lleno ($limit MB). Elimina archivos de otras tareas para hacer sitio o hazte Pro para tener espacio ilimitado.';
+  }
+
+  @override
+  String get storageFullShared =>
+      'El espacio para archivos de este proyecto está lleno. Su propietario puede eliminar archivos para hacer sitio.';
 }

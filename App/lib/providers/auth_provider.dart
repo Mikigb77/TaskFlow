@@ -34,6 +34,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient api;
   final GoogleSignInService? google;
   late final StreamSubscription<void> _sessionInvalidated;
+  late final StreamSubscription<void> _accountUpdated;
   AuthNotifier(this.api, {this.google})
     : super(const AuthState(loading: true, restoring: true)) {
     _sessionInvalidated = api.sessionInvalidated.listen((_) {
@@ -41,12 +42,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(error: ApiException(401, 'Please sign in again.'));
       unawaited(TaskReminders.activate('signed-out'));
     });
+    // A dictation's answer or a refused upload updated the saved account.
+    _accountUpdated = api.accountUpdated.listen((_) {
+      final account = api.account;
+      if (!mounted ||
+          state.loading ||
+          account == null ||
+          state.account?.id != account.id) {
+        return;
+      }
+      state = AuthState(account: account);
+    });
     restore();
   }
 
   @override
   void dispose() {
     _sessionInvalidated.cancel();
+    _accountUpdated.cancel();
     super.dispose();
   }
 

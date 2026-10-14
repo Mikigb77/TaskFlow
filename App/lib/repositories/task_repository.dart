@@ -13,6 +13,9 @@ class TaskRepository {
   Future<void> sync() async {}
   Future<int> importLocalTasks() async => 0;
 
+  /// Tasks and notes saved on this phone before signing in.
+  Future<int> localTaskCount() async => 0;
+
   Future<int> addTask(Task task) async {
     return await _database.insertTask(task);
   }

@@ -54,7 +54,7 @@ class TaskActions extends ConsumerWidget {
               day: day,
             ),
             icon: Icon(
-              ref.watch(hasProProvider)
+              ref.watch(voiceAvailableProvider)
                   ? Icons.mic_none_rounded
                   : Icons.add_rounded,
             ),

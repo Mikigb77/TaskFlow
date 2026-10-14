@@ -197,6 +197,61 @@ void main() {
     expect(store.receipts, isEmpty);
     expect(tester.takeException(), isNull);
   });
+
+  // ---- P44 · UX-423: the export intro in one line ----
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+        'UX-423: Export opens with the one line under its heading, and no inventory of what a file holds ($language, 2x text at 320 dp)',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final parent = designContainer();
+      addTearDown(parent.dispose);
+      final container = ProviderContainer(parent: parent, overrides: [
+        archiveFilesProvider.overrideWithValue(_Files()),
+        archiveStoreProvider.overrideWithValue(_Store()),
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: const TextScaler.linear(2)),
+                  child: child!),
+              home: const DataTransferScreen())));
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(Locale(language));
+      // At 2x text the line may start below the fold: built, in order.
+      final heading = find.text(l.keepYourTasks, skipOffstage: false);
+      final intro = find.text(l.exportImportIntro, skipOffstage: false);
+      expect(intro, findsOneWidget);
+      expect(heading, findsOneWidget);
+      expect(tester.getRect(intro).top,
+          greaterThanOrEqualTo(tester.getRect(heading).bottom));
+      expect(tester.getRect(intro).right, lessThanOrEqualTo(320.5));
+      // The old 45-word inventory (Spanish: 'proyectos de pasos') is gone.
+      for (final word in ['proyectos de pasos', 'etiquetas', 'credentials']) {
+        expect(find.textContaining(word, skipOffstage: false), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('UX-423: the export line is one sentence naming a file and Todoist', () {
+    for (final language in ['en', 'es', 'ca']) {
+      final line = lookupAppLocalizations(Locale(language)).exportImportIntro;
+      expect(line, contains('Todoist'));
+      expect('.'.allMatches(line).length, 1, reason: line);
+      expect(line.split(' ').length, lessThan(20), reason: line);
+    }
+  });
 }
 
 String _fixture() {

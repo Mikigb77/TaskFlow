@@ -1,37 +1,59 @@
+import 'package:intl/intl.dart';
+
 import 'generated/app_localizations.dart';
+import '../services/api_client.dart';
 import '../services/capture_problem.dart';
 
-String captureProblemText(AppLocalizations l, String value) =>
-    switch (CaptureProblem.from(value)) {
-      CaptureProblem.gone => l.captureGone,
-      CaptureProblem.noteLength => l.captureNoteLength,
-      CaptureProblem.noTasks => l.captureNoTasks,
-      CaptureProblem.unsupportedKind => l.captureUnsupportedKind,
-      CaptureProblem.offline => l.captureOffline,
-      CaptureProblem.timeout ||
-      CaptureProblem.unavailable => l.captureUnavailable,
-      CaptureProblem.allowance => l.captureAllowance,
-      CaptureProblem.proRequired => l.voiceProRequired,
-      CaptureProblem.signIn => l.captureSignIn,
-      CaptureProblem.forbidden => l.captureForbidden,
-      CaptureProblem.tooLarge => l.captureTooLarge,
-      CaptureProblem.typedFirst => l.captureTypedFirst,
-      CaptureProblem.microphone => l.captureMicrophone,
-      CaptureProblem.recordingFirst => l.captureRecordingFirst,
-      CaptureProblem.empty => l.captureEmptyInput,
-      CaptureProblem.speechStopped => l.captureSpeechStopped,
-      CaptureProblem.noSpeech => l.captureNoSpeech,
-      CaptureProblem.speechLanguage => l.captureSpeechLanguage,
-      CaptureProblem.speechUnavailable => l.captureSpeechUnavailable,
-      CaptureProblem.speechBusy => l.captureSpeechBusy,
-      CaptureProblem.incompleteAudio => l.captureIncompleteAudio,
-      CaptureProblem.writeFailed => l.captureWriteFailed,
-      CaptureProblem.stopFailed => l.captureStopFailed,
-      CaptureProblem.discardFailed => l.captureDiscardFailed,
-      CaptureProblem.reviewWriteFailed => l.captureReviewWriteFailed,
-      CaptureProblem.saveFailed => l.captureSaveFailed,
-      CaptureProblem.setupRequested => l.captureSetupRequested,
-      CaptureProblem.setupUnavailable => l.captureSetupUnavailable,
-      // Never a server's or the platform's own words.
-      _ => l.captureFailed,
-    };
+/// Free dictations used up, naming the local day more come ([resetsAt]).
+/// [recording]: a capture that is only a recording, kept until then.
+String freeVoiceUsedUpText(
+  AppLocalizations l,
+  DateTime resetsAt, {
+  bool recording = false,
+}) {
+  final date = DateFormat.MMMd(l.localeName).format(resetsAt.toLocal());
+  return recording ? l.freeVoiceUsedUpRecording(date) : l.freeVoiceUsedUp(date);
+}
+
+/// [freeVoiceResets]: when free dictations come back, for a refusal of
+/// spoken words.
+String captureProblemText(
+  AppLocalizations l,
+  String value, {
+  DateTime? freeVoiceResets,
+}) => switch (CaptureProblem.from(value)) {
+  CaptureProblem.gone => l.captureGone,
+  CaptureProblem.noteLength => l.captureNoteLength,
+  CaptureProblem.noTasks => l.captureNoTasks,
+  CaptureProblem.unsupportedKind => l.captureUnsupportedKind,
+  CaptureProblem.offline => l.captureOffline,
+  CaptureProblem.timeout || CaptureProblem.unavailable => l.captureUnavailable,
+  CaptureProblem.allowance => l.captureAllowance,
+  CaptureProblem.freeVoiceUsedUp ||
+  CaptureProblem.proRequired => freeVoiceUsedUpText(
+    l,
+    freeVoiceResets ?? FreeVoice.nextReset(DateTime.now()),
+  ),
+  CaptureProblem.signIn => l.captureSignIn,
+  CaptureProblem.forbidden => l.captureForbidden,
+  CaptureProblem.tooLarge => l.captureTooLarge,
+  CaptureProblem.typedFirst => l.captureTypedFirst,
+  CaptureProblem.microphone => l.captureMicrophone,
+  CaptureProblem.recordingFirst => l.captureRecordingFirst,
+  CaptureProblem.empty => l.captureEmptyInput,
+  CaptureProblem.speechStopped => l.captureSpeechStopped,
+  CaptureProblem.noSpeech => l.captureNoSpeech,
+  CaptureProblem.speechLanguage => l.captureSpeechLanguage,
+  CaptureProblem.speechUnavailable => l.captureSpeechUnavailable,
+  CaptureProblem.speechBusy => l.captureSpeechBusy,
+  CaptureProblem.incompleteAudio => l.captureIncompleteAudio,
+  CaptureProblem.writeFailed => l.captureWriteFailed,
+  CaptureProblem.stopFailed => l.captureStopFailed,
+  CaptureProblem.discardFailed => l.captureDiscardFailed,
+  CaptureProblem.reviewWriteFailed => l.captureReviewWriteFailed,
+  CaptureProblem.saveFailed => l.captureSaveFailed,
+  CaptureProblem.setupRequested => l.captureSetupRequested,
+  CaptureProblem.setupUnavailable => l.captureSetupUnavailable,
+  // Never a server's or the platform's own words.
+  _ => l.captureFailed,
+};

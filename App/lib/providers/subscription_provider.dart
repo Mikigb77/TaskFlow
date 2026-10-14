@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/revenuecat_service.dart';
 
 final billingConfigurationProvider = Provider(
@@ -49,6 +51,35 @@ final subscriptionProvider =
 final hasProProvider = Provider<bool>(
   (ref) => ref.watch(subscriptionProvider).hasPro,
 );
+
+/// The mic: with Pro, or while free dictations are left this month. Read
+/// from the saved account, so it never waits on the network; a saved count
+/// from before the reset counts as the whole new month. A server that sends
+/// no count leaves the mic to Pro.
+final voiceAvailableProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(hasProProvider) || (ref.watch(freeVoiceLeftProvider) ?? 0) > 0,
+);
+
+/// Free dictations left now, for an account without Pro; null with Pro or
+/// when the server sent no count.
+final freeVoiceLeftProvider = Provider<int?>((ref) {
+  if (ref.watch(hasProProvider)) return null;
+  final free = ref.watch(authProvider.select((s) => s.account?.freeVoice));
+  return free?.leftAt(ref.watch(calendarClockProvider)());
+});
+
+/// When free dictations come back: the saved date, else the next calendar
+/// month (UTC), as the server counts them.
+final freeVoiceResetsProvider = Provider<DateTime>((ref) {
+  final now = ref.watch(calendarClockProvider)();
+  final resets = ref.watch(
+    authProvider.select((s) => s.account?.freeVoice?.resetsAt),
+  );
+  return resets != null && now.isBefore(resets)
+      ? resets
+      : FreeVoice.nextReset(now);
+});
 
 /// Whether billing is still finding out if the account has Pro.
 final billingLoadingProvider = Provider<bool>(
