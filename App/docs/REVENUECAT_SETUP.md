@@ -1,6 +1,6 @@
 # RevenueCat in TaskFlow
 
-Implemented on `dev` with `purchases_flutter` and `purchases_ui_flutter` **10.13.2**. Entry point: **Settings → TaskFlow Pro**. The public Test Store SDK key is used for development and private Android staging. Voice capture requires Pro, checked independently by the backend; manual task entry remains available.
+Implemented on `dev` with `purchases_flutter` and `purchases_ui_flutter` **10.13.2**. Entry point: **Settings → TaskFlow Pro**. The public Test Store SDK key is used for development and private Android staging. Accounts without Pro get 10 free dictations a month and 100 MB of file space in total; Pro removes both limits. The backend enforces both independently, and typing tasks is never limited (`.claude/ux-review/DECISIONS.md`, free tier).
 
 ## 1. Install with Pub
 
@@ -235,7 +235,7 @@ Debug builds use the supplied `test_` key unless a platform key is provided. To 
 
 Android production signing, final store identifiers, store credentials/notifications, legal copy and the actual paid benefits must be set before selling. TestFlight and Play testing tracks use release builds: use the real platform SDK key and store sandbox there, not a Test Store key.
 
-Voice capture uses `hasProProvider` for the interface and independent Django authorization for paid AI requests. The backend retrieves verified RevenueCat entitlement data for the authenticated account's `billing_id`; a mobile `hasPro` claim cannot authorize a request. Complimentary access is also granted by the server. Production rejects sandbox entitlements. Real-store launch still needs renewal, expiry, transfer/refund and offline-policy validation; authenticated, idempotent webhooks can complement the current request-time verification.
+Voice capture uses `voiceAvailableProvider` for the interface (Pro, complimentary, or free dictations left in the account's cached `free_voice` block), and Django decides independently whether each AI request is Pro or uses a free dictation. The backend retrieves verified RevenueCat entitlement data for the authenticated account's `billing_id`; a mobile `hasPro` claim cannot authorize a request. Complimentary access is also granted by the server. Production rejects sandbox entitlements. Real-store launch still needs renewal, expiry, transfer/refund and offline-policy validation; authenticated, idempotent webhooks can complement the current request-time verification.
 
 Flutter web and desktop show an unsupported-platform message without calling native billing channels. A future Next.js/Flutter web checkout requires RevenueCat Web Billing/provider configuration and web-specific checkout; these native paywall methods should not be called on the web.
 
