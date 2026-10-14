@@ -41,7 +41,7 @@ I also checked that the concurrency test really guards the account lock: with th
 9. **Extra stale docs fixed:** README line 126, line 169 and the `auth/me/` row, `STAGING.md` line 136, and `ARCHITECTURE.md` line 94. Also removed the `settings` imports that are now unused in `list_views.py` and `group_views.py`.
 10. **Skipped:** the optional cleanup of old months in `maintain_staging`.
 
-**Known gap, not fixed:** if the cancel arrives before its own request has reserved a slot, it deletes nothing and that dictation still counts. That can happen with a slow WAV upload, or a Pro check of up to 6 s when the billing cache is empty. A fix would be a short-lived "cancelled" marker per account and `capture_id`, checked against when the request started.
+**Fixed 2026-10-14: a cancel that arrives first.** A cancel used to delete nothing when it reached the server before its own request had reserved a slot, for example during a slow WAV upload, and that dictation still counted. Now the cancel takes the same per-account lock as the reservation and leaves a 5-minute "cancelled" marker for that account and `capture_id` in the cache. The request then gets 409 `capture_cancelled` without calling the AI. So **the app must use a new `capture_id` for every new attempt after a cancel**; reusing it is refused for 5 minutes.
 
 ## For the app half, as built
 **Account blocks** (on `auth/me/` and the `user` object of login, register and Google):

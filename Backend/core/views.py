@@ -14,7 +14,7 @@ from .models import FreeDictation, User
 from .serializers import DraftRequestSerializer
 from .capture_context import capture_context
 from .billing import BillingUnavailable, has_pro
-from .free_tier import capture_digest, free_voice, reserve_free_dictation
+from .free_tier import cancel_free_dictation, capture_digest, free_voice, reserve_free_dictation
 
 
 def health(request):
@@ -96,6 +96,8 @@ class DraftView(APIView):
         dictation = None
         if not pro:
             dictation, outcome = reserve_free_dictation(request.user, data.get("capture_id"), capture_digest(data))
+            if outcome == "cancelled":
+                return Response({"code": "capture_cancelled", "detail": "This dictation was cancelled."}, status=409)
             if outcome == "in_progress":
                 return Response({"code": "capture_in_progress",
                                  "detail": "This dictation is still being understood."}, status=409)
@@ -145,7 +147,7 @@ class DraftCancelView(APIView):
     throttle_scope = "tasks"
 
     def delete(self, request, capture_id):
-        # Only a dictation still being understood can be cancelled, and its result is
-        # then never returned. Counted dictations stay counted.
-        FreeDictation.objects.filter(user=request.user, capture_id=capture_id, counted=False).delete()
+        # Only a dictation still being understood, or not yet started, can be cancelled,
+        # and its result is then never returned. Counted dictations stay counted.
+        cancel_free_dictation(request.user, capture_id)
         return Response(status=204)

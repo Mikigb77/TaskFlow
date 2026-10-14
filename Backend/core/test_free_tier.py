@@ -194,6 +194,19 @@ class FreeVoiceTests(TestCase):
         self.assertEqual(self.client.delete(f"/api/ai/drafts/{capture}/").status_code, 204)
         self.assertEqual(self.counted(), 1)
 
+    @patch("core.views.ai.make_drafts", return_value=drafts())
+    def test_a_cancel_that_arrives_before_its_dictation_is_remembered(self, ai):
+        # For example, the user cancels while a slow WAV upload is still going.
+        capture = uuid.uuid4()
+        self.assertEqual(self.client.delete(f"/api/ai/drafts/{capture}/").status_code, 204)
+        response = self.dictate(capture_id=capture)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["code"], "capture_cancelled")
+        ai.assert_not_called()
+        self.assertFalse(FreeDictation.objects.exists())
+        self.assertEqual(self.dictate(capture_id=uuid.uuid4()).status_code, 200)
+        self.assertEqual(self.client.get("/api/auth/me/").data["free_voice"]["left"], 9)
+
     @patch("core.views.ai.make_drafts")
     def test_an_account_cannot_cancel_another_accounts_dictation(self, ai):
         intruder = APIClient()

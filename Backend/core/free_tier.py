@@ -7,6 +7,7 @@ import hashlib
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -49,13 +50,15 @@ def capture_digest(data):
 
 def reserve_free_dictation(user, capture_id, digest):
     """Returns (row, outcome): a pending row with "reserved", or None with
-    "retry" (already counted, so free), "in_progress" or "used_up"."""
+    "retry" (already counted, so free), "cancelled", "in_progress" or "used_up"."""
     now = timezone.now()
     period, _ = month(now)
     with transaction.atomic():
         # One decision at a time per account, across all of its devices.
         User.objects.select_for_update().get(pk=user.pk)
         FreeDictation.objects.filter(user=user, counted=False, created_at__lt=now - PENDING_TIMEOUT).delete()
+        if capture_id is not None and cache.get(cancelled_key(user, capture_id)):
+            return None, "cancelled"
         rows = FreeDictation.objects.filter(user=user, period=period)
         # Without the app's capture ID, a request can't be told apart from new words.
         same = rows.filter(capture_id=capture_id, digest=digest).first() if capture_id is not None else None
@@ -65,3 +68,19 @@ def reserve_free_dictation(user, capture_id, digest):
             return None, "used_up"
         return FreeDictation.objects.create(user=user, period=period, capture_id=capture_id,
                                             digest=digest, created_at=now), "reserved"
+
+
+def cancelled_key(user, capture_id):
+    return f"free-voice:cancelled:{user.pk}:{capture_id}"
+
+
+def cancel_free_dictation(user, capture_id):
+    """Discards a dictation that is still being understood. The cancel is also
+    remembered for a while, because it can arrive before its own request has
+    reserved a slot, for example during a slow WAV upload. A new attempt needs a
+    new capture ID. Counted dictations stay counted."""
+    with transaction.atomic():
+        # The same lock as reserve_free_dictation, so the two never interleave.
+        User.objects.select_for_update().get(pk=user.pk)
+        cache.set(cancelled_key(user, capture_id), True, PENDING_TIMEOUT.total_seconds())
+        FreeDictation.objects.filter(user=user, capture_id=capture_id, counted=False).delete()
