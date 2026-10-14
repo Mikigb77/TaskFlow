@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/models/task_group.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -18,6 +19,11 @@ import 'package:agenda/widgets/invitation_cards.dart';
 String groupRoleLabel(BuildContext context, String role) =>
     role == 'admin' ? context.l10n.groupAdmin : context.listRole(role);
 
+/// One text step of a group flow. [action] names the button: what the step
+/// does (`Crear grupo`), or `Siguiente` when another step follows; `Guardar`
+/// by default. With [submit], the dialog stays open while it runs and shows
+/// its error inside, so a failed request keeps what was typed. It closes
+/// once [submit] returns true; false leaves it open without an error.
 Future<String?> groupTextDialog(
   BuildContext context,
   String title, {
@@ -26,60 +32,124 @@ Future<String?> groupTextDialog(
   bool email = false,
   bool allowEmpty = false,
   int maxLength = 80,
+  String? action,
+  Future<bool> Function(String value)? submit,
 }) async {
   final form = GlobalKey<FormState>();
+  var busy = false;
+  Object? error;
   return showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      scrollable: true,
-      title: Text(title),
-      content: Form(
-        key: form,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (help != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(help),
-              ),
-            TextFormField(
-              initialValue: value,
-              autofocus: true,
-              maxLength: maxLength,
-              keyboardType: email
-                  ? TextInputType.emailAddress
-                  : TextInputType.text,
-              decoration: InputDecoration(labelText: title),
-              onChanged: (s) => value = s,
-              validator: (s) =>
-                  (allowEmpty || s?.trim().isNotEmpty == true) &&
-                      (!email ||
-                          RegExp(
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) {
+        Future<void> send() async {
+          if (busy || !form.currentState!.validate()) return;
+          final text = value.trim();
+          if (submit == null) {
+            Navigator.pop(context, text);
+            return;
+          }
+          setState(() {
+            busy = true;
+            error = null;
+          });
+          var done = false;
+          try {
+            done = await submit(text);
+          } catch (failure) {
+            error = failure;
+          }
+          if (!context.mounted) return;
+          if (done) {
+            Navigator.pop(context, text);
+          } else {
+            setState(() => busy = false);
+          }
+        }
+
+        return AlertDialog(
+          scrollable: true,
+          title: Text(title),
+          content: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (help != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(help),
+                  ),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: MessageBanner(
+                      requestProblemText(context.l10n, error!),
+                      isError: true,
+                    ),
+                  ),
+                TextFormField(
+                  initialValue: value,
+                  autofocus: true,
+                  maxLength: maxLength,
+                  keyboardType: email
+                      ? TextInputType.emailAddress
+                      : TextInputType.text,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: title,
+                    errorMaxLines: 3,
+                  ),
+                  onChanged: (s) => value = s,
+                  onFieldSubmitted: (_) => send(),
+                  validator: (s) {
+                    final text = s?.trim() ?? '';
+                    if (email) {
+                      return RegExp(
                             r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                          ).hasMatch(s!.trim()))
-                  ? null
-                  : context.l10n.checkBeforeAdd,
+                          ).hasMatch(text)
+                          ? null
+                          : context.l10n.enterEmailAddress;
+                    }
+                    return allowEmpty || text.isNotEmpty
+                        ? null
+                        : context.l10n.enterName;
+                  },
+                ),
+                if (busy) const LinearProgressIndicator(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.pop(context),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: busy ? null : send,
+              child: Text(action ?? context.l10n.save),
             ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(context.l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (form.currentState!.validate()) {
-              Navigator.pop(context, value.trim());
-            }
-          },
-          child: Text(context.l10n.save),
-        ),
-      ],
+        );
+      },
     ),
+  );
+}
+
+/// What a page says when its data couldn't be fetched, with Retry.
+class LoadFailed extends StatelessWidget {
+  const LoadFailed({super.key, required this.onRetry});
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      MessageBanner(context.l10n.loadFailed, isError: true),
+      const SizedBox(height: 8),
+      TextButton(onPressed: onRetry, child: Text(context.l10n.retry)),
+    ],
   );
 }
 
@@ -122,46 +192,41 @@ class GroupsScreen extends ConsumerStatefulWidget {
 }
 
 class _GroupsScreenState extends ConsumerState<GroupsScreen> {
-  bool _busy = false;
+  /// The name dialog stays open until the server has the group, so a
+  /// failure (offline, say) keeps the typed name and says why.
   Future<void> _create() async {
     final accountId = ref.read(authProvider).account?.id;
-    if (_busy || accountId == null) return;
-    final name = await groupTextDialog(context, context.l10n.groupName);
+    if (accountId == null) return;
+    final api = ref.read(apiClientProvider);
+    String? id;
+    final name = await groupTextDialog(
+      context,
+      context.l10n.groupName,
+      action: context.l10n.createGroup,
+      submit: (name) async {
+        final result =
+            await api.request(
+                  'POST',
+                  'groups/',
+                  data: {'name': name, 'version': 0},
+                  accountId: accountId,
+                )
+                as Map;
+        id = result['id'] as String;
+        return true;
+      },
+    );
+    if (id == null) return;
+    ref.invalidate(groupsProvider);
     if (name == null ||
         !mounted ||
         ref.read(authProvider).account?.id != accountId) {
       return;
     }
-    setState(() => _busy = true);
-    try {
-      final result =
-          await ref
-                  .read(apiClientProvider)
-                  .request(
-                    'POST',
-                    'groups/',
-                    data: {'name': name, 'version': 0},
-                    accountId: accountId,
-                  )
-              as Map;
-      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-      ref.invalidate(groupsProvider);
-      Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => GroupScreen(groupId: result['id']),
-        ),
-      );
-    } catch (_) {
-      if (mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.groupActionError,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => GroupScreen(groupId: id!)),
+    );
   }
 
   @override
@@ -208,15 +273,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ],
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) => Column(
-                  children: [
-                    Text(context.l10n.groupOnline),
-                    TextButton(
-                      onPressed: () => ref.invalidate(groupsProvider),
-                      child: Text(context.l10n.retry),
-                    ),
-                  ],
-                ),
+                error: (_, __) =>
+                    LoadFailed(onRetry: () => ref.invalidate(groupsProvider)),
               ),
         ],
       ),
@@ -225,7 +283,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: FilledButton.icon(
-          onPressed: _busy ? null : _create,
+          onPressed: _create,
           icon: const Icon(Icons.group_add_outlined),
           label: Text(context.l10n.newGroup),
         ),
@@ -243,7 +301,41 @@ class GroupScreen extends ConsumerStatefulWidget {
 
 class _GroupScreenState extends ConsumerState<GroupScreen> {
   bool _busy = false;
-  bool _failed = false;
+  Object? _error;
+
+  /// Runs [work] with the page busy; a failure shows the server's reason
+  /// (already a member, the member limit) above the page.
+  Future<void> _guard(Future<void> Function() work) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await work();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error);
+        ref.invalidate(groupDetailsProvider(widget.groupId));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<Object?> _request(
+    int accountId,
+    String action,
+    Map<String, dynamic> data, {
+    String method = 'POST',
+  }) => ref
+      .read(apiClientProvider)
+      .request(
+        method,
+        'groups/${widget.groupId}/$action',
+        data: data,
+        accountId: accountId,
+      );
+
   Future<void> _run(
     String action,
     Map<String, dynamic> data, {
@@ -254,142 +346,174 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
   }) async {
     final accountId = ref.read(authProvider).account?.id;
     if (_busy || accountId == null) return;
-    setState(() {
-      _busy = true;
-      _failed = false;
+    await _guard(() async {
+      final result = await _request(accountId, action, data, method: method);
+      await _applied(accountId, result, leave: leave, done: done, undo: undo);
     });
-    try {
-      final result = await ref
-          .read(apiClientProvider)
-          .request(
-            method,
-            'groups/${widget.groupId}/$action',
-            data: data,
-            accountId: accountId,
-          );
-      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-      ref.invalidate(groupsProvider);
-      ref.invalidate(groupDetailsProvider(widget.groupId));
-      await ref.read(taskProvider.notifier).loadTasks();
-      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-      ref.invalidate(taskListsProvider);
-      final messenger = ScaffoldMessenger.of(context);
-      if (leave) {
-        Navigator.pop(context);
-        if (done != null) showFeedback(messenger, done);
-        return;
-      }
-      if (done != null) {
-        showFeedback(
-          messenger,
-          done,
-          actionLabel: undo == null ? null : context.l10n.undo,
-          onAction: undo == null ? null : () => undo(result),
-        );
-      }
-      if (result is Map && result['code'] is String) {
-        final code = result['code'] as String;
-        await showDialog<void>(
-          context: context,
-          builder: (context) => Consumer(
-            builder: (context, dialogRef, _) {
-              final sameAccount =
-                  dialogRef.watch(authProvider).account?.id == accountId;
-              return AlertDialog(
-                scrollable: true,
-                title: Text(context.l10n.invitationCode),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (result['email_status'] != null) ...[
-                      Text(
-                        result['email_status'] == 'sent'
-                            ? context.l10n.invitationEmailSent
-                            : context.l10n.invitationEmailPending,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Text(context.l10n.invitationCodeHelp),
+  }
+
+  /// What follows a request the server accepted: fresh data, the message,
+  /// and an invitation's code.
+  Future<void> _applied(
+    int accountId,
+    Object? result, {
+    bool leave = false,
+    String? done,
+    void Function(Object? result)? undo,
+  }) async {
+    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    ref.invalidate(groupsProvider);
+    ref.invalidate(groupDetailsProvider(widget.groupId));
+    await ref.read(taskProvider.notifier).loadTasks();
+    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    ref.invalidate(taskListsProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    if (leave) {
+      Navigator.pop(context);
+      if (done != null) showFeedback(messenger, done);
+      return;
+    }
+    if (done != null) {
+      showFeedback(
+        messenger,
+        done,
+        actionLabel: undo == null ? null : context.l10n.undo,
+        onAction: undo == null ? null : () => undo(result),
+      );
+    }
+    if (result is Map && result['code'] is String) {
+      final code = result['code'] as String;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => Consumer(
+          builder: (context, dialogRef, _) {
+            final sameAccount =
+                dialogRef.watch(authProvider).account?.id == accountId;
+            return AlertDialog(
+              scrollable: true,
+              title: Text(context.l10n.invitationCode),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (result['email_status'] != null) ...[
+                    Text(
+                      result['email_status'] == 'sent'
+                          ? context.l10n.invitationEmailSent
+                          : context.l10n.invitationEmailPending,
+                    ),
                     const SizedBox(height: 16),
-                    SelectableText(
-                      sameAccount ? code : context.l10n.accountChanged,
-                      key: const ValueKey('group-invitation-code'),
-                    ),
                   ],
-                ),
-                actions: [
-                  if (sameAccount)
-                    TextButton(
-                      onPressed: () =>
-                          Clipboard.setData(ClipboardData(text: code)),
-                      child: Text(context.l10n.copyCode),
-                    ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(context.l10n.done),
+                  Text(context.l10n.invitationCodeHelp),
+                  const SizedBox(height: 16),
+                  SelectableText(
+                    sameAccount ? code : context.l10n.accountChanged,
+                    key: const ValueKey('group-invitation-code'),
                   ),
                 ],
-              );
-            },
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _failed = true);
-        ref.invalidate(groupDetailsProvider(widget.groupId));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+              ),
+              actions: [
+                if (sameAccount)
+                  TextButton(
+                    onPressed: () =>
+                        Clipboard.setData(ClipboardData(text: code)),
+                    child: Text(context.l10n.copyCode),
+                  ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(context.l10n.done),
+                ),
+              ],
+            );
+          },
+        ),
+      );
     }
   }
 
+  /// Email, then role; the email dialog stays open until the invitation is
+  /// sent, so a refused or offline invite keeps the typed address.
   Future<void> _invite(TaskGroupInfo group) async {
+    final accountId = ref.read(authProvider).account?.id;
+    if (_busy || accountId == null) return;
+    Object? result;
     final email = await groupTextDialog(
       context,
       context.l10n.inviteeEmail,
       email: true,
       maxLength: 254,
       help: context.l10n.groupInviteHelp,
+      action: context.l10n.nextStep,
+      submit: (email) async {
+        final role = await _chooseRole(group, name: email, canRemove: false);
+        if (role == null) return false;
+        result = await _request(accountId, 'invite/', {
+          'email': email,
+          'role': role,
+        });
+        return true;
+      },
     );
     if (email == null || !mounted) return;
-    final role = await _chooseRole(group, canRemove: false);
-    if (role != null && mounted) {
-      await _run('invite/', {'email': email, 'role': role});
-    }
+    await _guard(() => _applied(accountId, result));
   }
 
-  Future<String?> _chooseRole(TaskGroupInfo group, {required bool canRemove}) =>
-      showModalBottomSheet<String>(
-        context: context,
-        showDragHandle: true,
-        builder: (context) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final role in [
-                'editor',
-                'viewer',
-                if (group.role == 'owner') 'admin',
-              ])
-                ListTile(
-                  title: Text(groupRoleLabel(context, role)),
-                  onTap: () => Navigator.pop(context, role),
+  /// Asks what [name] can do, with their [current] role marked.
+  Future<String?> _chooseRole(
+    TaskGroupInfo group, {
+    required String name,
+    String? current,
+    required bool canRemove,
+  }) => showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  context.l10n.groupRoleQuestion(name),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-              if (canRemove)
-                ListTile(
-                  textColor: Theme.of(context).colorScheme.error,
-                  title: Text(context.l10n.removeAccess),
-                  onTap: () => Navigator.pop(context, 'remove'),
-                ),
-            ],
-          ),
+              ),
+            ),
+            for (final role in [
+              'editor',
+              'viewer',
+              if (group.role == 'owner') 'admin',
+            ])
+              ListTile(
+                selected: role == current,
+                title: Text(groupRoleLabel(context, role)),
+                trailing: role == current ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.pop(context, role),
+              ),
+            if (canRemove)
+              ListTile(
+                textColor: Theme.of(context).colorScheme.error,
+                title: Text(context.l10n.removeAccess),
+                onTap: () => Navigator.pop(context, 'remove'),
+              ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   Future<void> _member(TaskGroupInfo group, ProjectMember person) async {
-    final role = await _chooseRole(group, canRemove: true);
-    if (role == null || !mounted) return;
+    final role = await _chooseRole(
+      group,
+      name: person.name,
+      current: person.role,
+      canRemove: true,
+    );
+    if (role == null || role == person.role || !mounted) return;
     if (role == 'remove' &&
         !await groupConfirm(
           context,
@@ -436,21 +560,50 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
     }
   }
 
+  /// This member's own name for voice assignments. The owner's account name
+  /// serves for them, so the server refuses one for the owner.
+  Future<void> _voiceName(ProjectMember me) async {
+    final name = await groupTextDialog(
+      context,
+      context.l10n.groupVoiceName,
+      help: context.l10n.groupVoiceHelp,
+      value: me.voiceName,
+      allowEmpty: true,
+      maxLength: 60,
+    );
+    if (name != null && mounted) {
+      await _run('profile/', {'voice_name': name});
+    }
+  }
+
+  /// The group's name: from its page or, while that loads, from the list.
+  String _title(BuildContext context) =>
+      (ref.watch(groupDetailsProvider(widget.groupId)).valueOrNull?['group']
+              as Map?)?['name']
+          as String? ??
+      ref
+          .watch(groupsProvider)
+          .valueOrNull
+          ?.where((group) => group.id == widget.groupId)
+          .firstOrNull
+          ?.name ??
+      context.l10n.groups;
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: CustomAppBar(title: context.l10n.groups),
+    appBar: CustomAppBar(title: _title(context)),
     body: ref
         .watch(groupDetailsProvider(widget.groupId))
         .when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => EmptyState(
-            title: context.l10n.groupOnline,
-            message: context.l10n.groupActionError,
-            action: TextButton(
-              onPressed: () =>
-                  ref.invalidate(groupDetailsProvider(widget.groupId)),
-              child: Text(context.l10n.retry),
-            ),
+          error: (_, __) => ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              LoadFailed(
+                onRetry: () =>
+                    ref.invalidate(groupDetailsProvider(widget.groupId)),
+              ),
+            ],
           ),
           data: (details) {
             final group = TaskGroupInfo.fromJson(
@@ -459,6 +612,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
             final me = ref.watch(authProvider).account?.id;
             final projects = (ref.watch(taskListsProvider).valueOrNull ?? [])
                 .where((p) => p.groupId == group.id);
+            final invitations = details['invitations'] as List? ?? [];
             return RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(groupDetailsProvider(widget.groupId));
@@ -467,21 +621,16 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  Text(
-                    group.name,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  Text(groupRoleLabel(context, group.role)),
-                  if (_failed)
+                  if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: MessageBanner(
-                        context.l10n.groupActionError,
+                        requestProblemText(context.l10n, _error!),
                         isError: true,
                       ),
                     ),
                   if (_busy) const LinearProgressIndicator(),
-                  const SizedBox(height: 20),
+                  if (_error != null || _busy) const SizedBox(height: 20),
                   Text(
                     context.l10n.groupMembers,
                     style: Theme.of(context).textTheme.titleMedium,
@@ -492,10 +641,22 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                       leading: const Icon(Icons.person_outline),
                       title: Text(person.name),
                       subtitle: Text(groupRoleLabel(context, person.role)),
-                      trailing:
-                          group.canManage &&
-                              person.id != group.ownerId &&
-                              (group.role == 'owner' || person.role != 'admin')
+                      trailing: person.id == me && person.id != group.ownerId
+                          ? PopupMenuButton<String>(
+                              enabled: !_busy,
+                              tooltip: context.l10n.manageItem(person.name),
+                              itemBuilder: (_) => [
+                                PopupMenuItem(
+                                  value: 'voice',
+                                  child: Text(context.l10n.groupVoiceName),
+                                ),
+                              ],
+                              onSelected: (_) => _voiceName(person),
+                            )
+                          : group.canManage &&
+                                person.id != group.ownerId &&
+                                (group.role == 'owner' ||
+                                    person.role != 'admin')
                           ? IconButton(
                               tooltip: context.l10n.manageItem(person.name),
                               icon: const Icon(Icons.manage_accounts_outlined),
@@ -505,56 +666,38 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                             )
                           : null,
                     ),
-                  if (group.canManage)
+                  if (invitations.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      context.l10n.groupInvited,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    for (final invitation in invitations)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.schedule_send_outlined),
+                        title: Text(invitation['email']),
+                        subtitle: Text(context.l10n.invitationPending),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.close),
+                          color: Theme.of(context).colorScheme.error,
+                          tooltip: context.l10n.revokeInvitation,
+                          onPressed: _busy
+                              ? null
+                              : () => _run('revoke_invite/', {
+                                  'invitation_id': invitation['id'],
+                                }),
+                        ),
+                      ),
+                  ],
+                  if (group.canManage) ...[
+                    const SizedBox(height: 8),
                     OutlinedButton.icon(
                       onPressed: _busy ? null : () => _invite(group),
                       icon: const Icon(Icons.person_add_outlined),
                       label: Text(context.l10n.invitePerson),
                     ),
-                  if (group.role != 'owner')
-                    TextButton.icon(
-                      icon: const Icon(Icons.record_voice_over_outlined),
-                      label: Text(context.l10n.groupVoiceName),
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              final name = await groupTextDialog(
-                                context,
-                                context.l10n.groupVoiceName,
-                                help: context.l10n.groupVoiceHelp,
-                                value:
-                                    group.people
-                                        .where((p) => p.id == me)
-                                        .firstOrNull
-                                        ?.voiceName ??
-                                    '',
-                                allowEmpty: true,
-                                maxLength: 60,
-                              );
-                              if (name != null && mounted) {
-                                await _run('profile/', {'voice_name': name});
-                              }
-                            },
-                    ),
-                  for (final invitation
-                      in (details['invitations'] as List? ?? []))
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(invitation['email']),
-                      subtitle: Text(
-                        groupRoleLabel(context, invitation['role']),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.close),
-                        color: Theme.of(context).colorScheme.error,
-                        tooltip: context.l10n.revokeInvitation,
-                        onPressed: _busy
-                            ? null
-                            : () => _run('revoke_invite/', {
-                                'invitation_id': invitation['id'],
-                              }),
-                      ),
-                    ),
+                  ],
                   const SizedBox(height: 24),
                   Text(
                     context.l10n.groupProjects,
@@ -575,15 +718,16 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                     ),
                   if (group.canManage && !group.archived)
                     TextButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => TaskListsScreen(
-                            groupId: group.id,
-                            createOnOpen: true,
-                          ),
-                        ),
-                      ),
+                      onPressed: () async {
+                        try {
+                          await ref.read(groupsProvider.future);
+                        } catch (_) {
+                          // The form says when the group can't be reached.
+                        }
+                        if (context.mounted) {
+                          await createProject(context, ref, groupId: group.id);
+                        }
+                      },
                       icon: const Icon(Icons.add),
                       label: Text(context.l10n.newList),
                     ),

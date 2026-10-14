@@ -23,6 +23,10 @@ import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
+import 'package:agenda/models/task_group.dart';
+import 'package:agenda/screens/home_screen.dart';
+import 'package:agenda/screens/groups_screen.dart';
 
 void main() {
   testWidgets(
@@ -61,6 +65,9 @@ void main() {
     await tester.tap(find.text('Save project'));
     await tester.pumpAndSettle();
     final id = store.lists.single.id;
+    // Saving opens the new project's page; back to Projects.
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Manage Shopping'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit project'));
@@ -164,7 +171,20 @@ void main() {
       await tester.pumpAndSettle();
       final name = find.byKey(const ValueKey('list-name'));
       await tester.enterText(name, 'My untranslated shopping list');
-      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.tap(find.text('Save project'));
+      await tester.pumpAndSettle();
+      expect(store.lists.single.color, 'teal');
+      // Saving opens the new project's page; back to Projects.
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      // The colour is chosen in Edit project.
+      final edit = find.byTooltip('Manage My untranslated shopping list');
+      await tester.scrollUntilVisible(edit, 180,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit project'));
       await tester.pumpAndSettle();
       final blue = find.widgetWithText(ChoiceChip, 'Blue');
       await tester.ensureVisible(blue);
@@ -173,7 +193,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pumpWidget(app('es'));
       await tester.pumpAndSettle();
-      expect(find.text('My untranslated shopping list'), findsOneWidget);
+      expect(find.text('My untranslated shopping list'), findsWidgets);
       expect(
           tester
               .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Azul'))
@@ -216,6 +236,9 @@ void main() {
             TaskListInfo(id: 'school', name: 'Col·legi'),
             TaskListInfo(id: 'doctor', name: 'Médico'),
             TaskListInfo(id: 'food', name: 'Compras'),
+            // The search box shows from 8 projects.
+            for (final name in ['Casa', 'Trabajo', 'Gimnasio', 'Viajes', 'Lectura'])
+              TaskListInfo(id: name, name: name),
           ];
         final container = ProviderContainer(overrides: [
           apiClientProvider.overrideWith((ref) => OfflineApiClient()),
@@ -329,7 +352,10 @@ void main() {
 
   /// Projects in Spanish, signed in, with [lists] stored on the phone.
   Future<(_Lists, _CountingTasks, _DeleteApi)> openProjects(
-      WidgetTester tester, List<TaskListInfo> lists) async {
+      WidgetTester tester, List<TaskListInfo> lists,
+      {List<Task>? tasks,
+      List<TaskGroupInfo> groups = const [],
+      List<Override> overrides = const []}) async {
     // Messages stay 10 s, long enough to reach Deshacer.
     platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
     addTearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
@@ -337,16 +363,17 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final store = _Lists()..lists = lists;
-    final tasks = _CountingTasks();
+    final counting = _CountingTasks(tasks);
     final api = _DeleteApi();
     final container = ProviderContainer(overrides: [
+      ...overrides,
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
-      taskProvider.overrideWith((ref) => tasks),
+      taskProvider.overrideWith((ref) => counting),
       taskListStoreProvider.overrideWithValue(store),
       pendingInvitationsProvider.overrideWith((ref) async => []),
-      groupsProvider.overrideWith((ref) async => []),
+      groupsProvider.overrideWith((ref) async => groups),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
     ]);
     addTearDown(container.dispose);
@@ -360,7 +387,7 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: const TaskListsScreen())));
     await tester.pumpAndSettle();
-    return (store, tasks, api);
+    return (store, counting, api);
   }
 
   Future<void> openMenu(WidgetTester tester, String name) async {
@@ -545,6 +572,269 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+
+  // ---- Round 1 (b9) · P26: Projects with less noise ----
+
+  Finder pageFor(String id) =>
+      find.byWidgetPredicate((w) => w is HomeScreen && w.listId == id);
+
+  bool isCurrent(WidgetTester tester, Finder finder) =>
+      ModalRoute.of(tester.element(finder))!.isCurrent;
+
+  testWidgets(
+      'UX-327: saving a new project from Projects lands on its page',
+      (tester) async {
+    final (store, _, _) = await openProjects(tester, []);
+    await tester.tap(find.byKey(const ValueKey('new-list')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Huerto');
+    await tester.tap(find.widgetWithText(FilledButton, es.saveList));
+    await tester.pumpAndSettle();
+    final id = store.lists.single.id;
+    expect(pageFor(id), findsOneWidget);
+    expect(isCurrent(tester, pageFor(id)), isTrue);
+    expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('Huerto')),
+        findsOneWidget);
+    // Its empty state says what to do next.
+    expect(find.text(es.listEmpty), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-327: saving a new project from a group page lands on its page, not on Projects filtered to the group',
+      (tester) async {
+    const group = TaskGroupInfo(
+        id: 'master', name: 'Máster', ownerId: 1, version: 1, role: 'owner');
+    final (store, _, _) = await openProjects(tester, [], groups: [
+      group
+    ], overrides: [
+      groupDetailsProvider('master').overrideWith((ref) async => {
+            'group': {
+              'id': 'master',
+              'name': 'Máster',
+              'owner_id': 1,
+              'version': 1,
+              'role': 'owner',
+              'project_count': 0,
+              'people': [
+                {'user_id': 1, 'name': 'Yo', 'role': 'owner'},
+              ],
+            },
+            'invitations': [],
+          }),
+    ]);
+    tester.state<NavigatorState>(find.byType(Navigator)).push(
+        MaterialPageRoute<void>(
+            builder: (_) => const GroupScreen(groupId: 'master')));
+    await tester.pumpAndSettle();
+    final add = find.widgetWithText(TextButton, es.newList);
+    await tester.scrollUntilVisible(add, 120,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Tesis');
+    await tester.tap(find.widgetWithText(FilledButton, es.saveList));
+    await tester.pumpAndSettle();
+    final saved = store.lists.single;
+    expect(saved.groupId, 'master');
+    expect(pageFor(saved.id), findsOneWidget);
+    expect(isCurrent(tester, pageFor(saved.id)), isTrue);
+    expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('Tesis')),
+        findsOneWidget);
+    // Back goes to the group page.
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(isCurrent(tester, find.byType(GroupScreen)), isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-329: a new account’s Projects screen has no headline, help line, refresh button or search box: Grupos and Nuevo proyecto are its only buttons',
+      (tester) async {
+    await openProjects(tester, []);
+    final screen = find.byType(TaskListsScreen);
+    Finder inScreen(Finder finder) =>
+        find.descendant(of: screen, matching: finder);
+    expect(inScreen(find.text(es.lists)), findsOneWidget,
+        reason: 'only the app bar title');
+    expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text(es.lists)),
+        findsOneWidget);
+    expect(inScreen(find.byType(TextField)), findsNothing);
+    expect(inScreen(find.byIcon(Icons.refresh)), findsNothing);
+    expect(inScreen(find.byIcon(Icons.refresh_rounded)), findsNothing);
+    expect(inScreen(find.textContaining('Actualizar')), findsNothing);
+    expect(inScreen(find.textContaining('Crea proyectos personales')),
+        findsNothing);
+    // The empty state says it once.
+    expect(inScreen(find.text(es.listsEmptyTitle)), findsOneWidget);
+    expect(inScreen(find.text(es.listsEmptyHelp)), findsOneWidget);
+    final buttons = tester
+        .widgetList(inScreen(find.byWidgetPredicate(
+            (w) => w is ButtonStyleButton || w is IconButton)))
+        .toList();
+    expect(buttons, hasLength(2), reason: '$buttons');
+    expect(inScreen(find.widgetWithText(TextButton, es.groups)), findsOneWidget);
+    expect(find.byKey(const ValueKey('new-list')), findsOneWidget);
+    expect(inScreen(find.byType(LinearProgressIndicator)), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-329: the search box shows from 8 projects, not with 7',
+      (tester) async {
+    await openProjects(tester, [
+      for (var i = 1; i <= 7; i++) TaskListInfo(id: 'p$i', name: 'Proyecto $i'),
+    ]);
+    expect(find.widgetWithText(TextField, es.projectsFind), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await openProjects(tester, [
+      for (var i = 1; i <= 8; i++) TaskListInfo(id: 'p$i', name: 'Proyecto $i'),
+    ]);
+    expect(find.widgetWithText(TextField, es.projectsFind), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-430: with 8 projects, typing zzz in the Proyectos search shows No se han encontrado proyectos',
+      (tester) async {
+    expect(es.projectsNoneFound, 'No se han encontrado proyectos');
+    await openProjects(tester, [
+      for (final name in [
+        'Casa',
+        'Trabajo',
+        'Compras',
+        'Gimnasio',
+        'Viajes',
+        'Lectura',
+        'Jardín',
+        'Coche',
+      ])
+        TaskListInfo(id: name, name: name),
+    ]);
+    final search = find.widgetWithText(TextField, es.projectsFind);
+    await tester.enterText(search, 'zzz');
+    await tester.pumpAndSettle();
+    expect(find.text(es.projectsNoneFound), findsOneWidget);
+    expect(find.text('Casa'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-332: the create dialog has no colour chips and new projects are teal; Editar proyecto still has the five colours',
+      (tester) async {
+    final (store, _, _) = await openProjects(tester, [
+      TaskListInfo(id: 'casa', name: 'Casa', color: 'blue', version: 2),
+    ]);
+    await tester.tap(find.byKey(const ValueKey('new-list')));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    expect(find.descendant(of: dialog, matching: find.byType(ChoiceChip)),
+        findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, es.cancel));
+    await tester.pumpAndSettle();
+
+    await openMenu(tester, 'Casa');
+    await tester.tap(find.text(es.editList));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: dialog, matching: find.byType(ChoiceChip)),
+        findsNWidgets(5));
+    await tester.tap(find.widgetWithText(TextButton, es.cancel));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('new-list')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Huerto');
+    await tester.tap(find.widgetWithText(FilledButton, es.saveList));
+    await tester.pumpAndSettle();
+    expect(store.lists.singleWhere((l) => l.name == 'Huerto').color, 'teal');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-334: a pinned row is announced Fijado with a pin icon, not ★; a directly shared row reads Compartido · Editor; counts exclude completed items',
+      (tester) async {
+    expect(es.projectPinned, 'Fijado');
+    expect(es.projectSharedRole(es.roleEditor), 'Compartido · Editor');
+    final handle = tester.ensureSemantics();
+    await openProjects(tester, [
+      TaskListInfo(id: 'casa', name: 'Casa', version: 2, pinned: true),
+      TaskListInfo(
+          id: 'obra', name: 'Obra', version: 2, shared: true, role: 'editor'),
+    ], tasks: [
+      Task(id: 1, title: 'Barrer', priority: 1, listId: 'casa'),
+      Task(id: 2, title: 'Fregar', priority: 1, listId: 'casa'),
+      Task(
+          id: 3,
+          title: 'Tender',
+          priority: 1,
+          listId: 'casa',
+          isCompleted: true),
+    ]);
+    final casa = find.widgetWithText(ListTile, 'Casa');
+    expect(find.textContaining('★'), findsNothing);
+    expect(
+        find.descendant(
+            of: casa, matching: find.byIcon(Icons.push_pin_outlined)),
+        findsOneWidget);
+    expect(tester.getSemantics(casa).label, contains(es.projectPinned));
+    expect(find.descendant(of: casa, matching: find.text(es.listItemCount(2))),
+        findsOneWidget,
+        reason: 'two open tasks; the completed one is not counted');
+    final obra = find.widgetWithText(ListTile, 'Obra');
+    expect(
+        find.descendant(
+            of: obra, matching: find.text('Compartido · Editor')),
+        findsOneWidget);
+    expect(find.textContaining(es.projectsShared), findsNothing);
+    handle.dispose();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-329: at 320 dp and 2× text in Spanish, Proyectos and Grupos each stay on one line, unbroken, with no overflow',
+      (tester) async {
+    await openProjects(tester, [TaskListInfo(id: 'casa', name: 'Casa')]);
+    tester.view.physicalSize = const Size(320, 568);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull, reason: 'no overflow');
+    for (final word in [es.lists, es.groups]) {
+      final text = find.text(word).first;
+      final paragraph = tester.renderObject<RenderParagraph>(text);
+      final line = paragraph.getFullHeightForCaret(const TextPosition(offset: 0));
+      expect(paragraph.size.height, lessThan(line * 1.5),
+          reason: '$word fits on one line');
+      final rect = tester.getRect(text);
+      expect(rect.left, greaterThanOrEqualTo(0), reason: word);
+      expect(rect.right, lessThanOrEqualTo(320), reason: word);
+    }
+  });
+  testWidgets(
+      'UX-338: choosing a group under ¿Dónde va este proyecto? says Todos en Máster lo verán.',
+      (tester) async {
+    expect(es.projectGroupSees('Máster'), 'Todos en Máster lo verán.');
+    await openProjects(tester, [], groups: const [
+      TaskGroupInfo(
+          id: 'master', name: 'Máster', ownerId: 1, version: 1, role: 'owner'),
+    ]);
+    await tester.tap(find.byKey(const ValueKey('new-list')));
+    await tester.pumpAndSettle();
+    expect(find.text('Todos en Máster lo verán.'), findsNothing);
+    await tester.tap(find.text(es.projectsPersonal));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Máster').last);
+    await tester.pumpAndSettle();
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text('Todos en Máster lo verán.')),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _Lists extends TaskListStore {
@@ -567,10 +857,18 @@ class _Lists extends TaskListStore {
 /// Counts how often the tasks are loaded again; in the app, each load
 /// reschedules the reminders.
 class _CountingTasks extends DesignTaskNotifier {
+  _CountingTasks([this.given]);
+
+  /// The tasks on the phone; the design samples when null.
+  final List<Task>? given;
   int loads = 0;
   @override
   Future<void> loadTasks() {
     loads++;
+    if (given != null && !state.hasValue) {
+      state = AsyncData(given!);
+      return Future.value();
+    }
     return super.loadTasks();
   }
 }

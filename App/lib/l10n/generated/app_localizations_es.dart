@@ -169,7 +169,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sharedCaptureRetained =>
-      'La captura compartida se ha conservado. Vuelve a abrir TaskFlow para intentarlo de nuevo.';
+      'Lo que has compartido se ha conservado. Vuelve a abrir TaskFlow para intentarlo de nuevo.';
 
   @override
   String get note => 'Nota';
@@ -448,11 +448,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settings => 'Ajustes';
 
   @override
-  String get inbox => 'Bandeja de entrada';
+  String get inbox => 'Sin fecha';
 
   @override
   String inboxCount(int count) {
-    return 'Bandeja · $count';
+    return 'Sin fecha · $count';
   }
 
   @override
@@ -492,7 +492,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get typeTasks => 'Escribir tareas';
 
   @override
-  String get unfinishedCaptures => 'Capturas pendientes';
+  String get unfinishedCaptures => 'Sin guardar';
 
   @override
   String get captureDiagnostics => 'Diagnóstico de captura';
@@ -504,7 +504,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get labels => 'Etiquetas';
 
   @override
-  String get noList => 'Bandeja personal';
+  String get noList => 'Sin proyecto';
 
   @override
   String get priority => 'Prioridad';
@@ -759,16 +759,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get archivedList => 'Proyecto archivado';
 
   @override
-  String get yourList => 'Tu proyecto';
-
-  @override
   String get yourTasks => 'Tus tareas';
-
-  @override
-  String get everythingToDo => 'Todo lo que quieres hacer';
-
-  @override
-  String get noDateNeeded => 'No hace falta una fecha';
 
   @override
   String get findTask => 'Buscar una tarea…';
@@ -799,26 +790,25 @@ class AppLocalizationsEs extends AppLocalizations {
       'Añade una tarea a este proyecto. Tú eliges la fecha y el recordatorio.';
 
   @override
+  String get readOnlyListEmpty => 'Este proyecto aún no tiene tareas.';
+
+  @override
   String get tasksEmpty =>
       'Toca Añadir tarea para añadir una. La fecha es opcional.';
 
   @override
   String get inboxEmpty =>
-      'Guarda aquí ideas y tareas hasta que elijas una fecha.\nEmpieza con Añadir tarea.';
+      'Las tareas sin fecha esperan aquí hasta que elijas una.\nEmpieza con Añadir tarea.';
 
   @override
   String get savedOnDevice => 'Tus tareas guardadas siguen en tu dispositivo.';
 
   @override
-  String get checkCaptures => 'Ver capturas pendientes';
+  String get checkCaptures => 'Ver lo que falta por guardar';
 
   @override
   String get seriesEdits =>
       'Los cambios se aplican a toda la tarea recurrente.';
-
-  @override
-  String get checkBeforeAdd =>
-      'Revisa los detalles antes de añadirla al calendario.';
 
   @override
   String get titleRequired => 'Introduce un título para la tarea.';
@@ -922,9 +912,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get starts => 'Comienza';
 
   @override
-  String get inboxDate => 'Sin fecha · Bandeja de entrada';
-
-  @override
   String get updateReminderError =>
       'No se pudo actualizar el recordatorio. Inténtalo de nuevo.';
 
@@ -989,7 +976,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. La extracción de tareas con IA necesita internet y envía tus palabras a Google. El audio guardado se transcribe en línea. Las capturas pendientes permanecen en este teléfono hasta que las guardes o descartes.';
+      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. La extracción de tareas con IA necesita internet y envía tus palabras a Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
 
   @override
   String get capturePrivacyLine =>
@@ -1040,7 +1027,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String pendingCaptureCount(int count) {
-    return 'Capturas pendientes · $count';
+    return 'Sin guardar · $count';
   }
 
   @override
@@ -1121,6 +1108,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get addStep => 'Añadir paso';
 
   @override
+  String get stepLimit =>
+      'Una tarea puede tener hasta 50 pasos. Elimina uno para añadir este.';
+
+  @override
   String get listUnavailable => 'Proyecto no disponible';
 
   @override
@@ -1149,7 +1140,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get originalRestored => 'Fecha original restaurada';
 
   @override
-  String get movedInbox => 'Movida a la bandeja de entrada';
+  String get movedInbox => 'Se ha quitado la fecha';
 
   @override
   String get scheduleChangedAgain =>
@@ -1207,7 +1198,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get resetSave => 'Restablecer y guardar';
 
   @override
-  String get taskSavedInbox => 'Tarea guardada en la bandeja de entrada';
+  String get taskSavedInbox => 'Añadida sin fecha';
 
   @override
   String taskAddedOn(String date) {
@@ -1530,7 +1521,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get listName => 'Nombre';
 
   @override
-  String get listNameHint => 'Trabajo, Personal, Compras…';
+  String get listNameHint => 'Casa, Trabajo, Compras…';
 
   @override
   String get listNameRequired => 'Pon un nombre a tu proyecto.';
@@ -1594,18 +1585,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get retryLists => 'Reintentar proyectos';
 
   @override
-  String get refreshLists => 'Actualizar proyectos e invitaciones';
-
-  @override
-  String get listsHelp =>
-      'Un lugar para cada parte de tu vida. Crea proyectos personales o compártelos con un grupo.';
-
-  @override
   String get listsEmptyTitle => 'Un lugar para cada parte de tu vida';
 
   @override
   String get listsEmptyHelp =>
-      'Empieza con Trabajo, Personal o Compras. Puedes mover las tareas cuando quieras.';
+      'Empieza con Casa, Trabajo o Compras. Puedes mover las tareas cuando quieras.';
 
   @override
   String get roleOwner => 'Propietario';
@@ -2361,7 +2345,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get archivePersonalCopies =>
-      'La importación crea copias personales nuevas. No incluye el acceso a cuentas, los archivos, los ajustes de notificaciones ni las capturas sin terminar.';
+      'La importación crea copias personales nuevas. No incluye el acceso a cuentas, los archivos, los ajustes de notificaciones ni lo que aún no has guardado.';
 
   @override
   String get archiveCsvPriorities =>
@@ -2377,7 +2361,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get archiveReviewSchedule =>
-      'La fecha original necesita revisión; esta tarea irá a la Bandeja de entrada.';
+      'La fecha original necesita revisión; esta tarea quedará sin fecha.';
 
   @override
   String get archiveFlattenedSubtasks =>
@@ -2523,7 +2507,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get notificationSnoozed => 'Tu tarea pospuesta.';
 
   @override
-  String get captureGone => 'Esta captura ya no está disponible.';
+  String get captureGone => 'Tus palabras ya no están disponibles.';
 
   @override
   String get captureNoteLength =>
@@ -2531,11 +2515,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureNoTasks =>
-      'No se encontraron tareas. Tu captura se conserva.';
+      'No se encontraron tareas. Tus palabras se conservan.';
 
   @override
   String get captureUnsupportedKind =>
-      'Este servidor no admite el tipo de captura seleccionado. Tu contenido se conserva.';
+      'Este servidor no admite esta forma de añadir tareas. Tus palabras se conservan.';
 
   @override
   String get captureOffline =>
@@ -2551,11 +2535,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureSignIn =>
-      'Vuelve a iniciar sesión para procesar la captura de esta cuenta.';
+      'Vuelve a iniciar sesión para convertir tus palabras en tareas.';
 
   @override
   String get captureForbidden =>
-      'Esta cuenta no puede procesar la captura. Comprueba tu acceso e inténtalo de nuevo.';
+      'Esta cuenta no puede convertir tus palabras en tareas. Comprueba tu acceso e inténtalo de nuevo.';
 
   @override
   String get captureTooLarge =>
@@ -2563,7 +2547,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureTypedFirst =>
-      'Guarda o descarta esta captura escrita antes de iniciar una grabación.';
+      'Guarda o descarta lo que has escrito antes de iniciar una grabación.';
 
   @override
   String get captureMicrophone =>
@@ -2646,7 +2630,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureDiscardFailed =>
-      'No se ha podido descartar esta captura. Sigue conservada.';
+      'No se han podido descartar tus palabras. Siguen conservadas.';
 
   @override
   String get captureReviewWriteFailed =>
@@ -2654,7 +2638,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureSaveFailed =>
-      'No se ha podido terminar de guardar. Tu captura se conserva; al reintentar no se duplicarán las tareas guardadas.';
+      'No se ha podido terminar de guardar. Tus palabras se conservan; al reintentar no se duplicarán las tareas guardadas.';
 
   @override
   String get captureSetupRequested =>
@@ -2674,9 +2658,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get voiceRecording => 'Grabación de voz';
-
-  @override
-  String get retryCaptures => 'Volver a cargar las capturas';
 
   @override
   String get capturesCaughtUp => 'Todo al día';
@@ -3279,14 +3260,34 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se ha podido guardar el cambio. Comprueba la conexión y actualiza; los permisos pueden haber cambiado.';
 
   @override
-  String get groupVoiceName => 'Tu nombre para voz';
+  String get groupVoiceName => 'Nombre para asignarte por voz';
 
   @override
   String get groupVoiceHelp =>
       'Un nombre opcional que otros pueden usar para asignarte tareas por voz.';
 
   @override
-  String get groupOnline => 'Conéctate para gestionar miembros e invitaciones.';
+  String get createGroup => 'Crear grupo';
+
+  @override
+  String get nextStep => 'Siguiente';
+
+  @override
+  String get enterName => 'Escribe un nombre.';
+
+  @override
+  String groupRoleQuestion(String name) {
+    return '¿Qué puede hacer $name?';
+  }
+
+  @override
+  String get groupInvited => 'Invitados';
+
+  @override
+  String get invitationPending => 'Pendiente';
+
+  @override
+  String get loadFailed => 'No se ha podido cargar. Revisa la conexión.';
 
   @override
   String get projectDestination => '¿Dónde va este proyecto?';
@@ -3336,6 +3337,27 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get activitySystem => 'TaskFlow';
+
+  @override
+  String get groupActivity => 'Actividad del grupo';
+
+  @override
+  String get activityUnread => 'No leída';
+
+  @override
+  String activityEntry(String action, String actor, String title) {
+    String _temp0 = intl.Intl.selectLogic(action, {
+      'created': '$actor ha creado: $title',
+      'assigned': '$actor ha cambiado el responsable de: $title',
+      'unassigned': '$actor ha quitado el responsable de: $title',
+      'completed': '$actor ha completado: $title',
+      'reopened': '$actor ha reabierto: $title',
+      'deleted': '$actor ha eliminado: $title',
+      'shared': '$actor ha compartido: $title',
+      'other': '$actor ha actualizado: $title',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get captureSpeakingIsPro =>
@@ -3433,4 +3455,17 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get storageFullShared =>
       'El espacio para archivos de este proyecto está lleno. Su propietario puede eliminar archivos para hacer sitio.';
+
+  @override
+  String get projectPinned => 'Fijado';
+
+  @override
+  String projectSharedRole(String role) {
+    return 'Compartido · $role';
+  }
+
+  @override
+  String projectGroupSees(String group) {
+    return 'Todos en $group lo verán.';
+  }
 }

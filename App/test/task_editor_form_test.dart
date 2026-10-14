@@ -96,7 +96,7 @@ void main() {
       for (final gone in [
         'Ajusta tu plan.',
         'Ponle un nombre. Añade una fecha cuando quieras.',
-        es.checkBeforeAdd,
+        'Revisa los detalles antes de añadirla al calendario.',
         es.notesHelp,
         es.seriesEdits,
       ]) {
@@ -583,6 +583,97 @@ void main() {
         findsOneWidget,
         reason: 'the form is collapsed',
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Round 1 (b9) · P113 (UX-624): a typed step is never lost ----
+
+  testWidgets(
+    'UX-624: removing the last step through ⋮ in the short form keeps the text typed in Añadir paso',
+    (tester) async {
+      await openEditor(
+        tester,
+        Task(
+          id: 13,
+          title: 'Salir',
+          priority: 1,
+          dueDate: dated,
+          checklist: [ChecklistItem(title: 'Pasaporte')],
+        ),
+        size: const Size(360, 740),
+      );
+      expect(
+        find.descendant(of: moreButton(), matching: find.text(es.moreDetails)),
+        findsOneWidget,
+        reason: 'the short form',
+      );
+      expect(addField(), findsOneWidget, reason: 'one step: Añadir paso shows');
+      await tester.ensureVisible(addField());
+      await tester.pumpAndSettle();
+      await tester.enterText(addField(), 'Coat');
+      await tester.pump();
+
+      final menu = find.byTooltip(es.editCaptureItem('Pasaporte'));
+      await tester.ensureVisible(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.removeStep));
+      await tester.pumpAndSettle();
+
+      expect(inEditor(find.text('Pasaporte')), findsNothing);
+      final inField =
+          addField().evaluate().isNotEmpty && addFieldText(tester) == 'Coat';
+      expect(
+        inField || coatSteps() == 1,
+        isTrue,
+        reason: 'Coat is kept, as a step or in the field',
+      );
+      expect(coatSteps(), lessThanOrEqualTo(1), reason: 'never twice');
+      if (coatSteps() == 1 && addField().evaluate().isNotEmpty) {
+        expect(addFieldText(tester), isEmpty, reason: 'not both');
+      }
+
+      // Opening Más detalles still shows it once.
+      await tapMore(tester);
+      final kept =
+          coatSteps() +
+          (addField().evaluate().isNotEmpty && addFieldText(tester) == 'Coat'
+              ? 1
+              : 0);
+      expect(kept, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-624: on a task with 50 steps, Más detalles opens and closes without an Añadir paso field that could drop text, and all 50 steps stay',
+    (tester) async {
+      await openEditor(
+        tester,
+        Task(
+          id: 14,
+          title: 'Mudanza',
+          priority: 1,
+          dueDate: dated,
+          checklist: [
+            for (var i = 1; i <= 50; i++) ChecklistItem(title: 'Caja $i'),
+          ],
+        ),
+        size: const Size(390, 12000),
+      );
+      // Nothing can be typed at the limit, so nothing typed can vanish.
+      expect(addField(), findsNothing);
+      await showDetails(tester);
+      expect(addField(), findsNothing);
+      await tapMore(tester);
+      expect(
+        find.descendant(of: moreButton(), matching: find.text(es.moreDetails)),
+        findsOneWidget,
+      );
+      expect(inEditor(find.text('Caja 50')), findsOneWidget);
+      expect(inEditor(find.text('Caja 1')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

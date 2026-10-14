@@ -24,6 +24,8 @@ class ChecklistEditor extends StatefulWidget {
 }
 
 class _ChecklistEditorState extends State<ChecklistEditor> {
+  static const _maxSteps = 50;
+
   final _add = TextEditingController();
   final _addFocus = FocusNode();
   final _rename = TextEditingController();
@@ -59,12 +61,13 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
   }
 
   /// Adds the typed step. With [next], the field stays focused for another;
-  /// Enter on an empty field closes the keyboard.
+  /// Enter on an empty field closes the keyboard. At the step limit the text
+  /// stays in the field, which says why.
   void _addStep({bool next = true}) {
     // A disabled editor never throws typed text away.
     if (widget.onChanged == null) return;
     final title = _add.text.trim();
-    if (title.isEmpty || widget.items.length >= 50) {
+    if (title.isEmpty || widget.items.length >= _maxSteps) {
       if (next) _addFocus.unfocus();
       return;
     }
@@ -203,10 +206,21 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
                       _startRename(items[index]);
                       return;
                     }
-                    final changed = [...items];
-                    final item = changed.removeAt(index);
+                    final changed = [...widget.items];
+                    final at = changed.indexWhere(
+                      (item) => item.id == items[index].id,
+                    );
+                    if (at < 0) return;
+                    final item = changed.removeAt(at);
                     if (action != 'remove') {
-                      changed.insert(index + (action == 'up' ? -1 : 1), item);
+                      changed.insert(at + (action == 'up' ? -1 : 1), item);
+                    }
+                    // A step typed but not added yet is kept, even when the
+                    // last step goes and the host hides this editor.
+                    final typed = _add.text.trim();
+                    if (typed.isNotEmpty && changed.length < _maxSteps) {
+                      _add.clear();
+                      changed.add(ChecklistItem(title: typed));
                     }
                     onChanged?.call(changed);
                   },
@@ -214,7 +228,8 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
               ],
             ),
         ],
-        if (items.length < 50)
+        // At the limit the field stays while it holds text, so none is lost.
+        if (items.length < _maxSteps || _add.text.isNotEmpty)
           TextField(
             key: const ValueKey('add-checklist-item'),
             controller: _add,
@@ -227,7 +242,15 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
               labelText: context.l10n.addStep,
               prefixIcon: const Icon(Icons.playlist_add_rounded),
               counterText: '',
+              errorText: items.length >= _maxSteps
+                  ? context.l10n.stepLimit
+                  : null,
+              errorMaxLines: 5,
             ),
+            // At the limit, clearing the text hides the field.
+            onChanged: items.length >= _maxSteps
+                ? (_) => setState(() {})
+                : null,
             // Enter adds the step and keeps the keyboard up for the next one.
             onEditingComplete: () {},
             onSubmitted: (_) => _addStep(),

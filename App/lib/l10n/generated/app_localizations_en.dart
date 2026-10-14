@@ -165,7 +165,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharedCaptureRetained =>
-      'Your shared capture is retained. Reopen TaskFlow to try again.';
+      'What you shared is kept. Open TaskFlow again to try again.';
 
   @override
   String get note => 'Note';
@@ -442,11 +442,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
-  String get inbox => 'Inbox';
+  String get inbox => 'No date';
 
   @override
   String inboxCount(int count) {
-    return 'Inbox · $count';
+    return 'No date · $count';
   }
 
   @override
@@ -486,7 +486,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get typeTasks => 'Type tasks';
 
   @override
-  String get unfinishedCaptures => 'Unfinished captures';
+  String get unfinishedCaptures => 'Not saved yet';
 
   @override
   String get captureDiagnostics => 'Capture diagnostics';
@@ -498,7 +498,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labels => 'Labels';
 
   @override
-  String get noList => 'Personal inbox';
+  String get noList => 'No project';
 
   @override
   String get priority => 'Priority';
@@ -735,7 +735,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeCaptureInstructions =>
-      'On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.';
+      'On Android, long-press the TaskFlow icon for its shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.';
 
   @override
   String get widgetPickerHelp =>
@@ -751,16 +751,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get archivedList => 'Archived project';
 
   @override
-  String get yourList => 'Your project';
-
-  @override
   String get yourTasks => 'Your tasks';
-
-  @override
-  String get everythingToDo => 'Everything you want to do';
-
-  @override
-  String get noDateNeeded => 'No date needed';
 
   @override
   String get findTask => 'Find a task…';
@@ -791,24 +782,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add a task to this project. Its date and reminder are yours to choose.';
 
   @override
+  String get readOnlyListEmpty => 'No tasks in this project yet.';
+
+  @override
   String get tasksEmpty => 'Tap Add a task to add one. A date is optional.';
 
   @override
   String get inboxEmpty =>
-      'Keep ideas and to-dos here until you choose a date.\nStart with Add a task.';
+      'Tasks without a date wait here until you choose one.\nStart with Add a task.';
 
   @override
   String get savedOnDevice => 'Your saved tasks are still on your device.';
 
   @override
-  String get checkCaptures => 'Check unfinished captures';
+  String get checkCaptures => 'See what’s not saved yet';
 
   @override
   String get seriesEdits => 'Edits apply to the whole repeating task.';
-
-  @override
-  String get checkBeforeAdd =>
-      'Check the details before adding it to your calendar.';
 
   @override
   String get titleRequired => 'Please enter a task title.';
@@ -910,9 +900,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get starts => 'Starts';
 
   @override
-  String get inboxDate => 'No date · Inbox';
-
-  @override
   String get updateReminderError =>
       'Could not update the reminder. Please retry.';
 
@@ -977,7 +964,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.';
+      'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.';
 
   @override
   String get capturePrivacyLine => 'Your words go online. More in Settings.';
@@ -1014,7 +1001,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String pendingCaptureCount(int count) {
-    return 'Unfinished captures · $count';
+    return 'Not saved yet · $count';
   }
 
   @override
@@ -1095,6 +1082,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addStep => 'Add step';
 
   @override
+  String get stepLimit =>
+      'A task can have up to 50 steps. Remove a step to add this one.';
+
+  @override
   String get listUnavailable => 'Project unavailable';
 
   @override
@@ -1122,7 +1113,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get originalRestored => 'Original date restored';
 
   @override
-  String get movedInbox => 'Moved to Inbox';
+  String get movedInbox => 'Date removed';
 
   @override
   String get scheduleChangedAgain =>
@@ -1178,7 +1169,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetSave => 'Reset and save';
 
   @override
-  String get taskSavedInbox => 'Task saved to Inbox';
+  String get taskSavedInbox => 'Added with no date';
 
   @override
   String taskAddedOn(String date) {
@@ -1497,7 +1488,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listName => 'Name';
 
   @override
-  String get listNameHint => 'Work, Personal, Shopping…';
+  String get listNameHint => 'Home, Work, Shopping…';
 
   @override
   String get listNameRequired => 'Name your project.';
@@ -1559,18 +1550,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get retryLists => 'Retry projects';
 
   @override
-  String get refreshLists => 'Refresh projects and invitations';
-
-  @override
-  String get listsHelp =>
-      'A clear place for every part of life. Keep projects personal or share them with a group.';
-
-  @override
   String get listsEmptyTitle => 'A place for each part of life';
 
   @override
   String get listsEmptyHelp =>
-      'Start with Work, Personal or Shopping. Tasks can move whenever you like.';
+      'Start with Home, Work or Shopping. Tasks can move whenever you like.';
 
   @override
   String get roleOwner => 'Owner';
@@ -2304,7 +2288,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get archivePersonalCopies =>
-      'Imports create new personal copies. Account access, files, notification preferences and unfinished captures are not included.';
+      'Imports create new personal copies. Account access, files, notification preferences and anything not saved yet are not included.';
 
   @override
   String get archiveCsvPriorities =>
@@ -2320,7 +2304,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get archiveReviewSchedule =>
-      'The original schedule needs review; this task will go to Inbox.';
+      'The original schedule needs review; this task will have no date.';
 
   @override
   String get archiveFlattenedSubtasks => 'Subtask nesting will be flattened.';
@@ -2464,17 +2448,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationSnoozed => 'Your snoozed task.';
 
   @override
-  String get captureGone => 'This capture is no longer available.';
+  String get captureGone => 'Your words are no longer available.';
 
   @override
   String get captureNoteLength => 'A note needs 1 to 8000 characters.';
 
   @override
-  String get captureNoTasks => 'No tasks were found. Your capture is kept.';
+  String get captureNoTasks => 'No tasks were found. Your words are kept.';
 
   @override
   String get captureUnsupportedKind =>
-      'This server does not support the selected capture type. Your input is kept.';
+      'This server does not support this way of adding tasks. Your words are kept.';
 
   @override
   String get captureOffline =>
@@ -2489,12 +2473,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'You’ve reached today’s limit. Type the task, or try again tomorrow.';
 
   @override
-  String get captureSignIn =>
-      'Sign in again to process this account’s capture.';
+  String get captureSignIn => 'Sign in again to turn your words into tasks.';
 
   @override
   String get captureForbidden =>
-      'This account cannot process the capture. Check your access and try again.';
+      'This account can’t turn your words into tasks. Check your access and try again.';
 
   @override
   String get captureTooLarge =>
@@ -2502,7 +2485,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureTypedFirst =>
-      'Save or discard this typed capture before starting a recording.';
+      'Save or discard what you typed before starting a recording.';
 
   @override
   String get captureMicrophone =>
@@ -2583,7 +2566,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureDiscardFailed =>
-      'Could not discard this capture. It is still kept.';
+      'Could not discard your words. They are still kept.';
 
   @override
   String get captureReviewWriteFailed =>
@@ -2591,7 +2574,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureSaveFailed =>
-      'Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.';
+      'Could not finish saving. Your words are kept; retry will not duplicate saved tasks.';
 
   @override
   String get captureSetupRequested =>
@@ -2611,9 +2594,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceRecording => 'Voice recording';
-
-  @override
-  String get retryCaptures => 'Retry loading captures';
 
   @override
   String get capturesCaughtUp => 'All caught up';
@@ -3211,14 +3191,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'This change could not be saved. Check your connection and refresh; permissions may have changed.';
 
   @override
-  String get groupVoiceName => 'Your spoken name';
+  String get groupVoiceName => 'Name for voice assignments';
 
   @override
   String get groupVoiceHelp =>
       'An optional name others can use when assigning tasks by voice.';
 
   @override
-  String get groupOnline => 'Connect to manage group members and invitations.';
+  String get createGroup => 'Create group';
+
+  @override
+  String get nextStep => 'Next';
+
+  @override
+  String get enterName => 'Enter a name.';
+
+  @override
+  String groupRoleQuestion(String name) {
+    return 'What can $name do?';
+  }
+
+  @override
+  String get groupInvited => 'Invited';
+
+  @override
+  String get invitationPending => 'Pending';
+
+  @override
+  String get loadFailed => 'Couldn’t load. Check your connection.';
 
   @override
   String get projectDestination => 'Where does this project belong?';
@@ -3268,6 +3268,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get activitySystem => 'TaskFlow';
+
+  @override
+  String get groupActivity => 'Group activity';
+
+  @override
+  String get activityUnread => 'Unread';
+
+  @override
+  String activityEntry(String action, String actor, String title) {
+    String _temp0 = intl.Intl.selectLogic(action, {
+      'created': '$actor created: $title',
+      'assigned': '$actor changed who’s responsible for: $title',
+      'unassigned': '$actor removed the assignee of: $title',
+      'completed': '$actor completed: $title',
+      'reopened': '$actor reopened: $title',
+      'deleted': '$actor deleted: $title',
+      'shared': '$actor shared: $title',
+      'other': '$actor updated: $title',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get captureSpeakingIsPro =>
@@ -3359,4 +3380,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get storageFullShared =>
       'This project’s file space is full. Its owner can remove files to make room.';
+
+  @override
+  String get projectPinned => 'Pinned';
+
+  @override
+  String projectSharedRole(String role) {
+    return 'Shared · $role';
+  }
+
+  @override
+  String projectGroupSees(String group) {
+    return 'Everyone in $group will see it.';
+  }
 }

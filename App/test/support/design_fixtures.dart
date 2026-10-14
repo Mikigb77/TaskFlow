@@ -12,6 +12,7 @@ import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/services/invitation_links.dart';
@@ -181,12 +182,16 @@ ProviderContainer designContainer({
   RegionalPreferenceStore? regionalStore,
   TaskNotifier Function()? tasks,
   List<TaskListInfo>? projects,
+  // Loads the projects instead of [projects], e.g. to keep a reload pending.
+  Future<List<TaskListInfo>> Function()? loadProjects,
   // Extra stand-ins a test needs, e.g. reminder storage or the phone's side.
   List<Override> overrides = const [],
   // Without Pro, `Añadir tarea` opens typing, understood on the phone.
   bool pro = true,
   // A stand-in server; by default every request goes nowhere.
   ApiClient? api,
+  // What was said or typed but not saved yet; none by default.
+  List<CaptureSession> pendingCaptures = const [],
 }) => ProviderContainer(
   overrides: [
     ...overrides,
@@ -202,8 +207,12 @@ ProviderContainer designContainer({
     regionalStoreProvider.overrideWithValue(
       regionalStore ?? MemoryRegionalStore(),
     ),
-    pendingCapturesProvider.overrideWith((ref) async => []),
-    taskListsProvider.overrideWith((ref) async => projects ?? []),
+    pendingCapturesProvider.overrideWith((ref) async => pendingCaptures),
+    taskListsProvider.overrideWith(
+      loadProjects != null
+          ? (ref) => loadProjects()
+          : (ref) async => projects ?? [],
+    ),
     apiClientProvider.overrideWith((ref) {
       final client = api ?? OfflineApiClient();
       ref.onDispose(client.close);

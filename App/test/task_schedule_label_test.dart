@@ -63,13 +63,13 @@ void main() {
         );
         // A date without a time.
         expect(label(on(1), hasTime: false), '${l.tomorrow} · ${l.anyTime}');
-        // Undated tasks keep their inbox label (renaming it waits on D6).
+        // An undated task just reads `Sin fecha` (D6a).
         expect(
           taskScheduleLabel(
             Task(title: 'Algún día', priority: 1),
             context: context,
           ),
-          '${l.inbox} · ${l.noDate}',
+          l.noDate,
         );
       },
     );

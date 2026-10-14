@@ -765,7 +765,7 @@ void main() {
   // ---- P61 (UX-453, UX-454): Sin fecha moves at once; honest help ----
 
   testWidgets(
-    'UX-453: swiping a dated task that doesn’t repeat and tapping Sin fecha moves it at once, says Movida a la bandeja de entrada, and Deshacer restores the date',
+    'UX-453: swiping a dated task that doesn’t repeat and tapping Sin fecha moves it at once, says Se ha quitado la fecha, and Deshacer restores the date',
     (tester) async {
       platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
       final now = DateTime.now();
@@ -802,13 +802,18 @@ void main() {
         reason: '$swipe',
       );
       expect(find.byType(BottomSheet), findsOneWidget);
-      await tester.tap(find.widgetWithText(ChoiceChip, l.noDate));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(ChoiceChip, l.noDate),
+        ),
+      );
       await tester.pumpAndSettle();
       // No Listo needed.
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
       expect(repository.task.dueDate, isNull);
-      expect(l.movedInbox, 'Movida a la bandeja de entrada');
+      expect(l.movedInbox, 'Se ha quitado la fecha');
       expect(find.text(l.movedInbox), findsOneWidget);
       expect(find.text(l.undo), findsOneWidget);
       await tester.tap(find.text(l.undo));
@@ -917,10 +922,15 @@ void main() {
   }
 
   testWidgets(
-    'UX-463: in Cambiar fecha with Añadir hora on and the hour empty, one tap on Sin fecha closes the sheet, says Movida a la bandeja de entrada and leaves the task undated',
+    'UX-463: in Cambiar fecha with Añadir hora on and the hour empty, one tap on Sin fecha closes the sheet, says Se ha quitado la fecha and leaves the task undated',
     (tester) async {
       final (repository, l) = await moveWithEmptyHour(tester);
-      await tester.tap(find.widgetWithText(ChoiceChip, l.noDate));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(ChoiceChip, l.noDate),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
@@ -2316,6 +2326,46 @@ void main() {
       },
     );
   });
+
+  // ---- Round 1 (b9) · P43 (U11): Sin fecha replaces Bandeja ----
+
+  for (final (language, label) in [
+    ('es', 'Sin fecha · 2'),
+    ('ca', 'Sense data · 2'),
+    ('en', 'No date · 2'),
+  ]) {
+    testWidgets(
+      'U11: Calendar shows $label for two undated tasks, and it opens the Sin fecha page ($language)',
+      (tester) async {
+        final now = DateTime.now();
+        await openCalendar(tester, language: language, [
+          Task(
+            id: 1,
+            title: 'Revisar el informe',
+            priority: 1,
+            dueDate: DateTime(now.year, now.month, now.day, 10),
+          ),
+          Task(id: 2, title: 'Algún día', priority: 1),
+          Task(id: 3, title: 'Pintar la valla', priority: 1),
+        ]);
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(l.inboxCount(2), label);
+        final inbox = find.text(label);
+        await reveal(tester, inbox);
+        expect(inbox, findsOneWidget);
+        expect(find.textContaining('Bandeja'), findsNothing);
+        expect(find.textContaining('Inbox'), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('calendar-inbox')));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: find.byType(AppBar), matching: find.text(l.inbox)),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(TaskTile, 'Algún día'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 /// Phone calendars whose reads can fail with an ordinary (not permission)

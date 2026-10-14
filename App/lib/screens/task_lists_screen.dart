@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/text_search.dart';
@@ -20,9 +22,7 @@ import 'package:agenda/widgets/invitation_cards.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskListsScreen extends ConsumerStatefulWidget {
-  const TaskListsScreen({super.key, this.groupId, this.createOnOpen = false});
-  final String? groupId;
-  final bool createOnOpen;
+  const TaskListsScreen({super.key});
   @override
   ConsumerState<TaskListsScreen> createState() => _TaskListsScreenState();
 }
@@ -33,23 +33,22 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.createOnOpen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          await ref.read(groupsProvider.future);
-        } catch (_) {
-          // The form explains when this group's directory is unavailable.
-        }
-        if (mounted) await _edit(context, ref);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_refresh());
+    });
+  }
+
+  Future<void> _refresh() async {
+    ref.invalidate(pendingInvitationsProvider);
+    await ref.read(taskProvider.notifier).loadTasks();
+    if (mounted) ref.invalidate(taskListsProvider);
   }
 
   Future<void> _edit(
     BuildContext context,
     WidgetRef ref, [
     TaskListInfo? list,
-  ]) => editTaskList(context, ref, list: list, groupId: widget.groupId);
+  ]) => editTaskList(context, ref, list: list);
 
   Future<void> _archive(
     BuildContext context,
@@ -204,7 +203,10 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       appBar: CustomAppBar(title: context.l10n.lists),
       body: ref
           .watch(taskListsProvider)
+          // Refreshing keeps the list on screen; the spinner shows only
+          // while there's nothing to show yet.
           .when(
+            skipLoadingOnReload: true,
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => Center(
               child: TextButton(
@@ -212,182 +214,63 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                 child: Text(context.l10n.retryLists),
               ),
             ),
-            data: (lists) => ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                Row(
+            data: (lists) {
+              final shown = lists
+                  .where(
+                    (p) =>
+                        matchesSearch('${p.name} ${p.groupName ?? ''}', _query),
+                  )
+                  .toList();
+              return RefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView(
+                  padding: const EdgeInsets.all(24),
                   children: [
-                    Expanded(
-                      child: Text(
-                        context.l10n.lists,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const GroupsScreen(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.groups_outlined),
-                      label: Text(context.l10n.groups),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: context.l10n.projectsFind,
-                    prefixIcon: const Icon(Icons.search),
-                  ),
-                  onChanged: (value) => setState(() => _query = value.trim()),
-                ),
-                const SizedBox(height: 12),
-                const PendingInvitations(),
-                TextButton.icon(
-                  onPressed: () async {
-                    ref.invalidate(pendingInvitationsProvider);
-                    await ref.read(taskProvider.notifier).loadTasks();
-                    ref.invalidate(taskListsProvider);
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: Text(context.l10n.refreshLists),
-                ),
-                Text(context.l10n.listsHelp),
-                const SizedBox(height: 20),
-                if (lists.isEmpty)
-                  EmptyState(
-                    title: context.l10n.listsEmptyTitle,
-                    message: context.l10n.listsEmptyHelp,
-                  ),
-                for (final list in lists.where(
-                  (p) =>
-                      (widget.groupId == null || p.groupId == widget.groupId) &&
-                      matchesSearch('${p.name} ${p.groupName ?? ''}', _query),
-                )) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      list.archived
-                          ? Icons.inventory_2_outlined
-                          : list.shared
-                          ? Icons.group_outlined
-                          : Icons.folder_outlined,
-                      color: taskListColor(list.color),
-                    ),
-                    title: Text('${list.pinned ? '★ ' : ''}${list.name}'),
-                    subtitle: Text(
-                      list.shared
-                          ? '${list.groupName ?? context.l10n.projectsShared} · ${context.listRole(list.role)}${list.archived ? ' · ${context.l10n.archived}' : ''}'
-                          : list.conflict != null
-                          ? context.l10n.listConflict
-                          : list.archived
-                          ? context.l10n.archivedListHelp
-                          : context.l10n.listItemCount(
-                              (ref.watch(taskProvider).valueOrNull ?? [])
-                                  .where((task) => task.listId == list.id)
-                                  .length,
-                            ),
-                    ),
-                    onTap: () => list.conflict != null
-                        ? _resolve(context, ref, list)
-                        : Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  HomeScreen(isRoot: false, listId: list.id),
-                            ),
-                          ),
-                    trailing: PopupMenuButton<String>(
-                      tooltip: context.l10n.manageItem(list.name),
-                      itemBuilder: (_) => [
-                        PopupMenuItem(
-                          value: 'pin',
-                          child: Text(
-                            list.pinned
-                                ? context.l10n.unpinProject
-                                : context.l10n.pinProject,
-                          ),
-                        ),
-                        if (list.shared)
-                          PopupMenuItem(
-                            value: 'notifications',
-                            child: Text(context.l10n.projectNotifications),
-                          ),
-                        if (list.canManage)
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Text(context.l10n.editList),
-                          ),
-                        if (list.canManage)
-                          PopupMenuItem(
-                            value: 'archive',
-                            child: Text(
-                              list.archived
-                                  ? context.l10n.restoreList
-                                  : context.l10n.archiveList,
-                            ),
-                          ),
-                        if (ref.read(authProvider).account != null)
-                          // Everyone can see the members and leave here;
-                          // only those who can invite are told “Share”.
-                          PopupMenuItem(
-                            value: 'sharing',
-                            child: Text(
-                              list.canManage
-                                  ? context.l10n.shareProject
-                                  : context.l10n.people,
-                            ),
-                          ),
-                        if (list.conflict != null && list.canManage)
-                          PopupMenuItem(
-                            value: 'resolve',
-                            child: Text(context.l10n.chooseDetails),
-                          ),
-                        // The server deletes it, so only a project it knows.
-                        if (list.groupId == null &&
-                            list.role == 'owner' &&
-                            list.version > 0 &&
-                            ref.read(authProvider).account != null)
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Text(
-                              list.shared
-                                  ? context.l10n.deleteListForEveryone
-                                  : context.l10n.deleteList,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            ),
-                          ),
-                      ],
-                      onSelected: (action) => switch (action) {
-                        'pin' => _pin(list),
-                        'notifications' => showProjectPreferences(
-                          context,
-                          ref,
-                          list,
-                        ),
-                        'edit' => _edit(context, ref, list),
-                        'resolve' => _resolve(context, ref, list),
-                        'delete' => _delete(list),
-                        'sharing' => Navigator.push(
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute<void>(
-                            builder: (_) => list.groupId == null
-                                ? ListSharingScreen(listId: list.id)
-                                : GroupScreen(groupId: list.groupId!),
+                            builder: (_) => const GroupsScreen(),
                           ),
                         ),
-                        _ => _archive(context, ref, list),
-                      },
+                        icon: const Icon(Icons.groups_outlined),
+                        label: Text(context.l10n.groups),
+                      ),
                     ),
-                  ),
-                  const Divider(),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 12),
+                    // Worth searching only once there are many projects.
+                    if (lists.length >= 8 || _query.isNotEmpty) ...[
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: context.l10n.projectsFind,
+                          prefixIcon: const Icon(Icons.search),
+                        ),
+                        onChanged: (value) =>
+                            setState(() => _query = value.trim()),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    const PendingInvitations(),
+                    if (lists.isEmpty)
+                      EmptyState(
+                        title: context.l10n.listsEmptyTitle,
+                        message: context.l10n.listsEmptyHelp,
+                      )
+                    else if (shown.isEmpty)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(context.l10n.projectsNoneFound),
+                      ),
+                    for (final list in shown) ...[
+                      _projectRow(context, list),
+                      const Divider(),
+                    ],
+                  ],
+                ),
+              );
+            },
           ),
       bottomNavigationBar: SafeArea(
         top: false,
@@ -395,7 +278,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
           padding: const EdgeInsets.all(24),
           child: FilledButton.icon(
             key: const ValueKey('new-list'),
-            onPressed: () => _edit(context, ref),
+            onPressed: () => createProject(context, ref),
             icon: const Icon(Icons.add_rounded),
             label: Text(context.l10n.newList),
           ),
@@ -403,6 +286,146 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       ),
     );
   }
+
+  Widget _projectRow(BuildContext context, TaskListInfo list) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(
+      list.archived
+          ? Icons.inventory_2_outlined
+          : list.shared
+          ? Icons.group_outlined
+          : Icons.folder_outlined,
+      color: taskListColor(list.color),
+    ),
+    title: Row(
+      children: [
+        if (list.pinned) ...[
+          Icon(
+            Icons.push_pin_outlined,
+            size: 18,
+            semanticLabel: context.l10n.projectPinned,
+          ),
+          const SizedBox(width: 6),
+        ],
+        Flexible(child: Text(list.name)),
+      ],
+    ),
+    subtitle: Text(
+      list.shared
+          ? [
+              // A group project names its group; a direct share says so.
+              list.groupName == null
+                  ? context.l10n.projectSharedRole(context.listRole(list.role))
+                  : '${list.groupName} · ${context.listRole(list.role)}',
+              if (list.archived) context.l10n.archived,
+            ].join(' · ')
+          : list.conflict != null
+          ? context.l10n.listConflict
+          : list.archived
+          ? context.l10n.archivedListHelp
+          : context.l10n.listItemCount(
+              (ref.watch(taskProvider).valueOrNull ?? [])
+                  .where((task) => task.listId == list.id && !task.isCompleted)
+                  .length,
+            ),
+    ),
+    onTap: () => list.conflict != null
+        ? _resolve(context, ref, list)
+        : Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => HomeScreen(isRoot: false, listId: list.id),
+            ),
+          ),
+    trailing: PopupMenuButton<String>(
+      tooltip: context.l10n.manageItem(list.name),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'pin',
+          child: Text(
+            list.pinned ? context.l10n.unpinProject : context.l10n.pinProject,
+          ),
+        ),
+        if (list.shared)
+          PopupMenuItem(
+            value: 'notifications',
+            child: Text(context.l10n.projectNotifications),
+          ),
+        if (list.canManage)
+          PopupMenuItem(value: 'edit', child: Text(context.l10n.editList)),
+        if (list.canManage)
+          PopupMenuItem(
+            value: 'archive',
+            child: Text(
+              list.archived
+                  ? context.l10n.restoreList
+                  : context.l10n.archiveList,
+            ),
+          ),
+        if (ref.read(authProvider).account != null)
+          // Everyone can see the members and leave here;
+          // only those who can invite are told “Share”.
+          PopupMenuItem(
+            value: 'sharing',
+            child: Text(
+              list.canManage ? context.l10n.shareProject : context.l10n.people,
+            ),
+          ),
+        if (list.conflict != null && list.canManage)
+          PopupMenuItem(
+            value: 'resolve',
+            child: Text(context.l10n.chooseDetails),
+          ),
+        // The server deletes it, so only a project it knows.
+        if (list.groupId == null &&
+            list.role == 'owner' &&
+            list.version > 0 &&
+            ref.read(authProvider).account != null)
+          PopupMenuItem(
+            value: 'delete',
+            child: Text(
+              list.shared
+                  ? context.l10n.deleteListForEveryone
+                  : context.l10n.deleteList,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+      ],
+      onSelected: (action) => switch (action) {
+        'pin' => _pin(list),
+        'notifications' => showProjectPreferences(context, ref, list),
+        'edit' => _edit(context, ref, list),
+        'resolve' => _resolve(context, ref, list),
+        'delete' => _delete(list),
+        'sharing' => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => list.groupId == null
+                ? ListSharingScreen(listId: list.id)
+                : GroupScreen(groupId: list.groupId!),
+          ),
+        ),
+        _ => _archive(context, ref, list),
+      },
+    ),
+  );
+}
+
+/// Asks for a new project's name, then opens the saved project's page, whose
+/// empty state says what to do next. [groupId] puts it in that group.
+Future<void> createProject(
+  BuildContext context,
+  WidgetRef ref, {
+  String? groupId,
+}) async {
+  final saved = await editTaskList(context, ref, groupId: groupId);
+  if (saved == null || !context.mounted) return;
+  await Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => HomeScreen(isRoot: false, listId: saved.id),
+    ),
+  );
 }
 
 /// Opens the project name dialog. Returns the project once it's saved.
@@ -477,29 +500,40 @@ Future<TaskListInfo?> editTaskList(
                     () => group = groups.where((g) => g.id == id).firstOrNull,
                   ),
                 ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final choice in [
-                    'teal',
-                    'blue',
-                    'violet',
-                    'amber',
-                    'rose',
-                  ])
-                    ChoiceChip(
-                      label: Text(context.listColorName(choice)),
-                      avatar: Icon(
-                        Icons.circle,
-                        size: 14,
-                        color: taskListColor(choice),
+              if (list == null && groupId == null && group != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(context.l10n.projectGroupSees(group!.name)),
+                  ),
+                ),
+              // New projects start teal; the colour changes in Edit project.
+              if (list != null) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final choice in [
+                      'teal',
+                      'blue',
+                      'violet',
+                      'amber',
+                      'rose',
+                    ])
+                      ChoiceChip(
+                        label: Text(context.listColorName(choice)),
+                        avatar: Icon(
+                          Icons.circle,
+                          size: 14,
+                          color: taskListColor(choice),
+                        ),
+                        selected: color == choice,
+                        onSelected: (_) => setState(() => color = choice),
                       ),
-                      selected: color == choice,
-                      onSelected: (_) => setState(() => color = choice),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

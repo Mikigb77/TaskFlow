@@ -390,4 +390,119 @@ void main() {
     expect(en.captureKeptForReview(3), '3 kept for review');
     expect(es.captureKeptForReview(1), '1 pendiente de revisar');
   });
+
+  // ---- Round 1 (b9) · P43 (U11): no Bandeja, captura or Inbox ----
+
+  // Developer and staging strings keep their technical words.
+  const technical = {
+    'captureDiagnostics',
+    'diagnosticsHelp',
+    'diagnosticsEvent',
+    'diagnosticsMeasurementHelp',
+    'billingTestMode',
+  };
+
+  /// Keys of [language]'s catalog whose user-facing text matches [banned].
+  List<String> offending(String language, RegExp banned) {
+    final catalog = jsonDecode(
+      File('${directory.path}/app_$language.arb').readAsStringSync(),
+    ) as Map<String, dynamic>;
+    return [
+      for (final entry in catalog.entries)
+        if (!entry.key.startsWith('@') &&
+            !technical.contains(entry.key) &&
+            entry.value is String &&
+            banned.hasMatch(entry.value as String))
+          '${entry.key}: ${entry.value}',
+    ];
+  }
+
+  test(
+    'U11: the Spanish catalog has no Bandeja, Capturas pendientes, captura or Lista para cuando in user-facing text',
+    () {
+      expect(
+        offending('es', RegExp(r'Bandeja|Capturas pendientes|captura|Lista para cuando', caseSensitive: false)),
+        isEmpty,
+      );
+    },
+  );
+
+  test('U11: the English catalog has no Inbox or capture in user-facing text', () {
+    expect(offending('en', RegExp(r'inbox|captur', caseSensitive: false)), isEmpty);
+  });
+
+  test('U11: the Catalan catalog has no Safata or captura in user-facing text', () {
+    expect(offending('ca', RegExp(r'safata|captura', caseSensitive: false)), isEmpty);
+  });
+
+  test('U11: Sin fecha, Sin proyecto and Sin guardar read as decided in each language', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    for (final (l, inbox, count, saved, moved, noList, notSaved, notSavedCount, remove) in [
+      (en, 'No date', 'No date · 2', 'Added with no date', 'Date removed', 'No project', 'Not saved yet', 'Not saved yet · 1', 'Remove'),
+      (es, 'Sin fecha', 'Sin fecha · 2', 'Añadida sin fecha', 'Se ha quitado la fecha', 'Sin proyecto', 'Sin guardar', 'Sin guardar · 1', 'Quitar'),
+      (ca, 'Sense data', 'Sense data · 2', 'Afegida sense data', 'S’ha tret la data', 'Sense projecte', 'Sense desar', 'Sense desar · 1', 'Treu'),
+    ]) {
+      expect(l.inbox, inbox);
+      expect(l.inboxCount(2), count);
+      expect(l.taskSavedInbox, saved);
+      expect(l.movedInbox, moved);
+      expect(l.noList, noList);
+      expect(l.unfinishedCaptures, notSaved);
+      expect(l.pendingCaptureCount(1), notSavedCount);
+      expect(l.reviewRemove, remove);
+    }
+    expect(es.inboxEmpty, startsWith('Las tareas sin fecha esperan aquí hasta que elijas una.'));
+    expect(en.inboxEmpty, startsWith('Tasks without a date wait here until you choose one.'));
+    expect(ca.inboxEmpty, startsWith('Les tasques sense data esperen aquí fins que en triïs una.'));
+    expect(es.checkCaptures, 'Ver lo que falta por guardar');
+    expect(ca.checkCaptures, 'Mostra el que falta per desar');
+    expect(en.checkCaptures, 'See what’s not saved yet');
+    expect(es.sharedCaptureRetained,
+        'Lo que has compartido se ha conservado. Vuelve a abrir TaskFlow para intentarlo de nuevo.');
+    expect(en.sharedCaptureRetained, 'What you shared is kept. Open TaskFlow again to try again.');
+    expect(ca.sharedCaptureRetained,
+        'El que has compartit s’ha conservat. Torna a obrir TaskFlow per tornar-ho a provar.');
+    expect(es.capturePrivacy,
+        endsWith('Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.'));
+    expect(en.capturePrivacy,
+        endsWith('Anything not saved yet stays on this phone until you save or discard it.'));
+    expect(ca.capturePrivacy,
+        endsWith('El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.'));
+    // retryCaptures is gone; the Sin guardar list retries with tryAgain.
+    expect(keys.contains('retryCaptures'), isFalse);
+  });
+
+  test('P25–P27: the new Projects, Groups and Activity copy reads as the plan wrote it in EN / ES / CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    // The catalogs write apostrophes as ’; the plan's straight ones match.
+    String plain(String text) => text.replaceAll('’', "'");
+    for (final (l, expected) in [
+      (en, [
+        'Group activity', 'Unread', 'Pinned', 'Shared · Editor', 'Everyone in Máster will see it.',
+        'Create group', 'Next', 'Enter a name.', 'What can Ana do?',
+        "Couldn't load. Check your connection.", 'Invited', 'Pending', 'Name for voice assignments',
+      ]),
+      (es, [
+        'Actividad del grupo', 'No leída', 'Fijado', 'Compartido · Editor', 'Todos en Máster lo verán.',
+        'Crear grupo', 'Siguiente', 'Escribe un nombre.', '¿Qué puede hacer Ana?',
+        'No se ha podido cargar. Revisa la conexión.', 'Invitados', 'Pendiente', 'Nombre para asignarte por voz',
+      ]),
+      (ca, [
+        'Activitat del grup', 'No llegida', 'Fixat', 'Compartit · Editor', 'Tothom a Máster el veurà.',
+        'Crea el grup', 'Següent', 'Escriu un nom.', 'Què pot fer Ana?',
+        "No s'ha pogut carregar. Revisa la connexió.", 'Convidats', 'Pendent', 'Nom per assignar-te per veu',
+      ]),
+    ]) {
+      final actual = [
+        l.groupActivity, l.activityUnread, l.projectPinned, l.projectSharedRole('Editor'),
+        l.projectGroupSees('Máster'), l.createGroup, l.nextStep, l.enterName,
+        l.groupRoleQuestion('Ana'), l.loadFailed, l.groupInvited, l.invitationPending, l.groupVoiceName,
+      ].map(plain).toList();
+      expect(actual, expected, reason: l.localeName);
+    }
+  });
 }

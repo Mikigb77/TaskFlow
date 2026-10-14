@@ -92,7 +92,7 @@ void main() {
       expect(find.text('Visible to everyone in Master'), findsOneWidget);
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Personal inbox'));
+      await tester.tap(find.text('No project'));
       await tester.pumpAndSettle();
       expect(task.assignment, 'personal');
       expect(task.assigneeId, isNull);
@@ -507,4 +507,78 @@ void main() {
       },
     );
   }
+
+  // ---- Round 1 (b9) · P43 (U11, UX-311): plain names ----
+
+  for (final (language, none) in [
+    ('es', 'Sin proyecto'),
+    ('ca', 'Sense projecte'),
+    ('en', 'No project'),
+  ]) {
+    testWidgets(
+      'U11: the project picker’s first row reads $none, not Bandeja personal ($language)',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        expect(l.noList, none);
+        final home = TaskListInfo(id: 'home', name: 'Casa');
+        final api = OfflineApiClient();
+        addTearDown(api.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              apiClientProvider.overrideWithValue(api),
+              authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+              taskListsProvider.overrideWith((ref) async => [home, shared]),
+            ],
+            child: localized(
+              Scaffold(body: TaskListPicker(listId: 'home', onChanged: (_) {})),
+              language: language,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ActionChip, 'Casa'));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        final choices = tester
+            .widgetList<ListTile>(
+              find.descendant(of: sheet, matching: find.byType(ListTile)),
+            )
+            .where((tile) => tile.onTap != null)
+            .map((tile) => (tile.title as Text).data)
+            .toList();
+        expect(choices.first, none);
+        expect(
+          find.descendant(of: sheet, matching: find.textContaining('Bandeja')),
+          findsNothing,
+        );
+        expect(
+          find.descendant(of: sheet, matching: find.textContaining('inbox')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test('UX-311: project-name examples read Casa, Trabajo, Compras in each language', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(es.listNameHint, 'Casa, Trabajo, Compras…');
+    expect(en.listNameHint, 'Home, Work, Shopping…');
+    expect(ca.listNameHint, 'Casa, Feina, Compres…');
+    expect(
+      es.listsEmptyHelp,
+      'Empieza con Casa, Trabajo o Compras. Puedes mover las tareas cuando quieras.',
+    );
+    expect(
+      en.listsEmptyHelp,
+      'Start with Home, Work or Shopping. Tasks can move whenever you like.',
+    );
+    expect(
+      ca.listsEmptyHelp,
+      'Comença amb Casa, Feina o Compres. Pots moure les tasques quan vulguis.',
+    );
+  });
 }

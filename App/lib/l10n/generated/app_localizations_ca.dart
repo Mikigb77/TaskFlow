@@ -169,7 +169,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get sharedCaptureRetained =>
-      'La captura compartida s’ha conservat. Torna a obrir TaskFlow per tornar-ho a provar.';
+      'El que has compartit s’ha conservat. Torna a obrir TaskFlow per tornar-ho a provar.';
 
   @override
   String get note => 'Nota';
@@ -448,11 +448,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get settings => 'Configuració';
 
   @override
-  String get inbox => 'Safata d’entrada';
+  String get inbox => 'Sense data';
 
   @override
   String inboxCount(int count) {
-    return 'Safata d’entrada · $count';
+    return 'Sense data · $count';
   }
 
   @override
@@ -492,7 +492,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get typeTasks => 'Escriu tasques';
 
   @override
-  String get unfinishedCaptures => 'Captures pendents';
+  String get unfinishedCaptures => 'Sense desar';
 
   @override
   String get captureDiagnostics => 'Diagnòstic de captures';
@@ -504,7 +504,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get labels => 'Etiquetes';
 
   @override
-  String get noList => 'Safata personal';
+  String get noList => 'Sense projecte';
 
   @override
   String get priority => 'Prioritat';
@@ -742,7 +742,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get homeCaptureInstructions =>
-      'A Android, mantén premuda la icona de TaskFlow per veure les dreceres de captura o afegeix el giny Dicta una tasca des de la pantalla d’inici. També pots compartir text amb TaskFlow des d’una altra aplicació.';
+      'A Android, mantén premuda la icona de TaskFlow per veure’n les dreceres o afegeix el giny Dicta una tasca des de la pantalla d’inici. També pots compartir text amb TaskFlow des d’una altra aplicació.';
 
   @override
   String get widgetPickerHelp =>
@@ -759,16 +759,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get archivedList => 'Projecte arxivat';
 
   @override
-  String get yourList => 'El teu projecte';
-
-  @override
   String get yourTasks => 'Les teves tasques';
-
-  @override
-  String get everythingToDo => 'Tot allò que vols fer';
-
-  @override
-  String get noDateNeeded => 'No cal posar-hi data';
 
   @override
   String get findTask => 'Cerca una tasca…';
@@ -799,25 +790,24 @@ class AppLocalizationsCa extends AppLocalizations {
       'Afegeix una tasca a aquest projecte. Tu tries la data i el recordatori.';
 
   @override
+  String get readOnlyListEmpty => 'Aquest projecte encara no té tasques.';
+
+  @override
   String get tasksEmpty =>
       'Toca Afegeix una tasca per afegir-ne una. La data és opcional.';
 
   @override
   String get inboxEmpty =>
-      'Desa-hi idees i coses per fer fins que en triïs la data.\nComença amb Afegeix una tasca.';
+      'Les tasques sense data esperen aquí fins que en triïs una.\nComença amb Afegeix una tasca.';
 
   @override
   String get savedOnDevice => 'Les tasques desades continuen al dispositiu.';
 
   @override
-  String get checkCaptures => 'Revisa les captures pendents';
+  String get checkCaptures => 'Mostra el que falta per desar';
 
   @override
   String get seriesEdits => 'Els canvis s’apliquen a tota la tasca periòdica.';
-
-  @override
-  String get checkBeforeAdd =>
-      'Revisa els detalls abans d’afegir-la al calendari.';
 
   @override
   String get titleRequired => 'Introdueix un títol per a la tasca.';
@@ -923,9 +913,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get starts => 'Comença';
 
   @override
-  String get inboxDate => 'Sense data · Safata d’entrada';
-
-  @override
   String get updateReminderError =>
       'No s’ha pogut actualitzar el recordatori. Torna-ho a provar.';
 
@@ -990,7 +977,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. L’extracció de tasques amb IA necessita internet i envia les teves paraules a Google. L’àudio desat es transcriu en línia. Les captures pendents es queden al telèfon fins que les desis o descartis.';
+      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. L’extracció de tasques amb IA necessita internet i envia les teves paraules a Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
 
   @override
   String get capturePrivacyLine =>
@@ -1036,7 +1023,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String pendingCaptureCount(int count) {
-    return 'Captures pendents · $count';
+    return 'Sense desar · $count';
   }
 
   @override
@@ -1117,6 +1104,10 @@ class AppLocalizationsCa extends AppLocalizations {
   String get addStep => 'Afegeix un pas';
 
   @override
+  String get stepLimit =>
+      'Una tasca pot tenir fins a 50 passos. Treu-ne un per afegir aquest.';
+
+  @override
   String get listUnavailable => 'Projecte no disponible';
 
   @override
@@ -1145,7 +1136,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get originalRestored => 'Data original restablerta';
 
   @override
-  String get movedInbox => 'S’ha mogut a la safata d’entrada';
+  String get movedInbox => 'S’ha tret la data';
 
   @override
   String get scheduleChangedAgain =>
@@ -1202,7 +1193,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get resetSave => 'Restableix i desa';
 
   @override
-  String get taskSavedInbox => 'Tasca desada a la safata d’entrada';
+  String get taskSavedInbox => 'Afegida sense data';
 
   @override
   String taskAddedOn(String date) {
@@ -1527,7 +1518,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get listName => 'Nom';
 
   @override
-  String get listNameHint => 'Feina, Personal, Compres…';
+  String get listNameHint => 'Casa, Feina, Compres…';
 
   @override
   String get listNameRequired => 'Posa un nom al projecte.';
@@ -1591,18 +1582,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get retryLists => 'Torna a carregar els projectes';
 
   @override
-  String get refreshLists => 'Actualitza projectes i invitacions';
-
-  @override
-  String get listsHelp =>
-      'Un lloc per a cada part de la teva vida. Crea projectes personals o comparteix-los amb un grup.';
-
-  @override
   String get listsEmptyTitle => 'Un espai per a cada part de la vida';
 
   @override
   String get listsEmptyHelp =>
-      'Comença amb Feina, Personal o Compres. Pots moure les tasques quan vulguis.';
+      'Comença amb Casa, Feina o Compres. Pots moure les tasques quan vulguis.';
 
   @override
   String get roleOwner => 'Propietari';
@@ -2354,7 +2338,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get archivePersonalCopies =>
-      'Les importacions creen còpies personals noves. No s’hi inclouen l’accés al compte, els fitxers, les preferències de notificació ni les captures pendents.';
+      'Les importacions creen còpies personals noves. No s’hi inclouen l’accés al compte, els fitxers, les preferències de notificació ni el que encara no has desat.';
 
   @override
   String get archiveCsvPriorities =>
@@ -2370,7 +2354,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get archiveReviewSchedule =>
-      'Cal revisar la planificació original; aquesta tasca anirà a la safata d’entrada.';
+      'Cal revisar la planificació original; aquesta tasca quedarà sense data.';
 
   @override
   String get archiveFlattenedSubtasks =>
@@ -2516,7 +2500,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get notificationSnoozed => 'La teva tasca ajornada.';
 
   @override
-  String get captureGone => 'Aquesta captura ja no està disponible.';
+  String get captureGone => 'Les teves paraules ja no estan disponibles.';
 
   @override
   String get captureNoteLength =>
@@ -2524,11 +2508,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureNoTasks =>
-      'No s’ha trobat cap tasca. La captura es conserva.';
+      'No s’ha trobat cap tasca. Les teves paraules es conserven.';
 
   @override
   String get captureUnsupportedKind =>
-      'Aquest servidor no admet el tipus de captura seleccionat. El contingut es conserva.';
+      'Aquest servidor no admet aquesta manera d’afegir tasques. Les teves paraules es conserven.';
 
   @override
   String get captureOffline =>
@@ -2544,11 +2528,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureSignIn =>
-      'Torna a iniciar la sessió per processar la captura d’aquest compte.';
+      'Torna a iniciar la sessió per convertir les teves paraules en tasques.';
 
   @override
   String get captureForbidden =>
-      'Aquest compte no pot processar la captura. Revisa els permisos i torna-ho a provar.';
+      'Aquest compte no pot convertir les teves paraules en tasques. Revisa els permisos i torna-ho a provar.';
 
   @override
   String get captureTooLarge =>
@@ -2556,7 +2540,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureTypedFirst =>
-      'Desa o descarta aquesta captura escrita abans de començar una gravació.';
+      'Desa o descarta el que has escrit abans de començar una gravació.';
 
   @override
   String get captureMicrophone =>
@@ -2636,7 +2620,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureDiscardFailed =>
-      'No s’ha pogut descartar aquesta captura. Es continua conservant.';
+      'No s’han pogut descartar les teves paraules. Es continuen conservant.';
 
   @override
   String get captureReviewWriteFailed =>
@@ -2644,7 +2628,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureSaveFailed =>
-      'No s’ha pogut acabar de desar. La captura es conserva; tornar-ho a provar no duplicarà les tasques desades.';
+      'No s’ha pogut acabar de desar. Les teves paraules es conserven; tornar-ho a provar no duplicarà les tasques desades.';
 
   @override
   String get captureSetupRequested =>
@@ -2664,9 +2648,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get voiceRecording => 'Gravació de veu';
-
-  @override
-  String get retryCaptures => 'Torna a carregar les captures';
 
   @override
   String get capturesCaughtUp => 'Tot al dia';
@@ -3271,14 +3252,34 @@ class AppLocalizationsCa extends AppLocalizations {
       'No s’ha pogut desar el canvi. Comprova la connexió i actualitza; els permisos poden haver canviat.';
 
   @override
-  String get groupVoiceName => 'El teu nom per a la veu';
+  String get groupVoiceName => 'Nom per assignar-te per veu';
 
   @override
   String get groupVoiceHelp =>
       'Un nom opcional que els altres poden fer servir per assignar-te tasques per veu.';
 
   @override
-  String get groupOnline => 'Connecta’t per gestionar membres i invitacions.';
+  String get createGroup => 'Crea el grup';
+
+  @override
+  String get nextStep => 'Següent';
+
+  @override
+  String get enterName => 'Escriu un nom.';
+
+  @override
+  String groupRoleQuestion(String name) {
+    return 'Què pot fer $name?';
+  }
+
+  @override
+  String get groupInvited => 'Convidats';
+
+  @override
+  String get invitationPending => 'Pendent';
+
+  @override
+  String get loadFailed => 'No s’ha pogut carregar. Revisa la connexió.';
 
   @override
   String get projectDestination => 'On va aquest projecte?';
@@ -3328,6 +3329,27 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get activitySystem => 'TaskFlow';
+
+  @override
+  String get groupActivity => 'Activitat del grup';
+
+  @override
+  String get activityUnread => 'No llegida';
+
+  @override
+  String activityEntry(String action, String actor, String title) {
+    String _temp0 = intl.Intl.selectLogic(action, {
+      'created': '$actor ha creat: $title',
+      'assigned': '$actor ha canviat el responsable de: $title',
+      'unassigned': '$actor ha tret el responsable de: $title',
+      'completed': '$actor ha completat: $title',
+      'reopened': '$actor ha reobert: $title',
+      'deleted': '$actor ha suprimit: $title',
+      'shared': '$actor ha compartit: $title',
+      'other': '$actor ha actualitzat: $title',
+    });
+    return '$_temp0';
+  }
 
   @override
   String get captureSpeakingIsPro =>
@@ -3426,4 +3448,17 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get storageFullShared =>
       'L’espai per a fitxers d’aquest projecte és ple. El seu propietari pot treure fitxers per fer lloc.';
+
+  @override
+  String get projectPinned => 'Fixat';
+
+  @override
+  String projectSharedRole(String role) {
+    return 'Compartit · $role';
+  }
+
+  @override
+  String projectGroupSees(String group) {
+    return 'Tothom a $group el veurà.';
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
@@ -130,4 +131,69 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Round 1 (b9) · P113 (UX-624): at 50 steps typed text stays ----
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-624: with 50 steps, text typed in Añadir paso stays in the field when it loses focus (as Menos detalles does), and the field says the limit ($language)',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        var items = [
+          for (var i = 1; i <= 49; i++) ChecklistItem(title: 'Caja $i'),
+        ];
+        late StateSetter rebuild;
+        await tester.pumpWidget(MaterialApp(
+            locale: Locale(language),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+                body: StatefulBuilder(builder: (context, setState) {
+              rebuild = setState;
+              return SingleChildScrollView(
+                  child: ChecklistEditor(
+                      items: items,
+                      onChanged: (next) => setState(() => items = next)));
+            }))));
+        final add = find.byKey(const ValueKey('add-checklist-item'));
+        String fieldText() => tester
+            .widget<EditableText>(
+                find.descendant(of: add, matching: find.byType(EditableText)))
+            .controller
+            .text;
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.enterText(add, 'Abrigo');
+        await tester.pump();
+
+        // The 50th step arrives while the person types (from the same task
+        // on another device): the task is now at the limit.
+        rebuild(() => items = [...items, ChecklistItem(title: 'Caja 50')]);
+        await tester.pump();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+
+        expect(items.length, 50, reason: 'no 51st step');
+        expect(add, findsOneWidget, reason: 'the field stays while it has text');
+        expect(fieldText(), 'Abrigo', reason: 'the typed text is kept');
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        expect(find.text(l.stepLimit), findsOneWidget,
+            reason: 'the person sees why it was not added');
+
+        // Enter at the limit adds nothing and still keeps the text.
+        await tester.tap(add);
+        await tester.pump();
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(items.length, 50);
+        expect(fieldText(), 'Abrigo');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/groups_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -23,13 +26,19 @@ class ActivityButton extends ConsumerWidget {
   const ActivityButton({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Only people who share something have group activity: the same
+    // condition shows the `Para mí` / `Todas` chips.
+    final shares = (ref.watch(taskListsProvider).valueOrNull ?? []).any(
+      (project) => project.shared && !project.inactive,
+    );
+    if (!shares) return const SizedBox.shrink();
     final count = ref.watch(collaborationUnreadProvider).valueOrNull ?? 0;
     return IconButton(
-      tooltip: context.l10n.activity,
+      tooltip: context.l10n.groupActivity,
       icon: Badge(
         isLabelVisible: count > 0,
         label: Text(count > 99 ? '99+' : '$count'),
-        child: const Icon(Icons.notifications_none_rounded),
+        child: const Icon(Icons.groups_outlined),
       ),
       onPressed: () async {
         await Navigator.push(
@@ -85,11 +94,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         showFeedback(
           ScaffoldMessenger.of(context),
-          context.l10n.groupActionError,
+          requestProblemText(context.l10n, error),
         );
       }
     } finally {
@@ -99,18 +108,18 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: CustomAppBar(title: context.l10n.activity),
+    appBar: CustomAppBar(title: context.l10n.groupActivity),
     body: ref
         .watch(collaborationActivityProvider)
         .when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => EmptyState(
-            title: context.l10n.groupOnline,
-            message: context.l10n.groupActionError,
-            action: TextButton(
-              onPressed: () => ref.invalidate(collaborationActivityProvider),
-              child: Text(context.l10n.retry),
-            ),
+          error: (_, __) => ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              LoadFailed(
+                onRetry: () => ref.invalidate(collaborationActivityProvider),
+              ),
+            ],
           ),
           data: (items) => RefreshIndicator(
             onRefresh: () async {
@@ -120,35 +129,22 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                Text(context.l10n.activityHelp),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _busy || items.every((i) => i['read_at'] != null)
-                        ? null
-                        : _read,
-                    child: Text(context.l10n.activityMarkRead),
+                if (items.any((i) => i['read_at'] == null))
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _busy ? null : _read,
+                      child: Text(context.l10n.activityMarkRead),
+                    ),
                   ),
-                ),
                 if (items.isEmpty)
                   EmptyState(
                     title: context.l10n.activityEmpty,
                     message: context.l10n.activityHelp,
                   ),
                 for (final item in items)
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                    leading: Icon(
-                      item['read_at'] == null
-                          ? Icons.circle
-                          : Icons.check_circle_outline,
-                      size: 16,
-                    ),
-                    title: Text(item['task_title']),
-                    subtitle: Text(
-                      '${item['project_name']} · ${item['actor_name'] ?? context.l10n.activitySystem}\n${activityLabel(context, item['action'])} · ${context.shortDate(DateTime.parse(item['created_at']).toLocal())}',
-                    ),
-                    isThreeLine: true,
+                  _ActivityRow(
+                    item: item,
                     onTap: _busy ? null : () => _read(item),
                   ),
               ],
@@ -156,6 +152,40 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           ),
         ),
   );
+}
+
+/// Who did what first, then where and when. Unread rows are bold and say so
+/// to TalkBack.
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.item, required this.onTap});
+  final Map<String, dynamic> item;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    final unread = item['read_at'] == null;
+    final date = context.shortDate(
+      DateTime.parse(item['created_at'] as String).toLocal(),
+    );
+    final project = item['project_name'] as String?;
+    return MergeSemantics(
+      child: Semantics(
+        label: unread ? context.l10n.activityUnread : null,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
+          title: Text(
+            context.l10n.activityEntry(
+              item['action'] as String? ?? '',
+              item['actor_name'] as String? ?? context.l10n.activitySystem,
+              item['task_title'] as String? ?? '',
+            ),
+            style: unread ? const TextStyle(fontWeight: FontWeight.w700) : null,
+          ),
+          subtitle: Text(project == null ? date : '$project · $date'),
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
 }
 
 final taskHistoryProvider = FutureProvider.autoDispose

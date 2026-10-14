@@ -1,12 +1,14 @@
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/project_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,11 +44,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     if (_busy) return;
     final account = ref.read(authProvider).account;
     if (account == null) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
+    await _guard(() async {
       final result = await ref
           .read(apiClientProvider)
           .request(
@@ -55,61 +53,25 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
             data: data,
             accountId: account.id,
           );
-      if (!mounted || ref.read(authProvider).account?.id != account.id) return;
-      await ref.read(taskProvider.notifier).loadTasks();
-      if (!mounted || ref.read(authProvider).account?.id != account.id) return;
-      ref.invalidate(taskListsProvider);
-      ref.invalidate(listSharingProvider(widget.listId));
-      if (action == 'invite/' && result is Map && result['code'] is String) {
-        final code = result['code'] as String;
-        // The work is done: no progress bar under “Invitation sent”.
-        setState(() => _busy = false);
-        await showDialog<void>(
-          context: context,
-          builder: (context) => Consumer(
-            builder: (context, dialogRef, _) {
-              final sameAccount =
-                  dialogRef.watch(authProvider).account?.id == account.id;
-              return AlertDialog(
-                scrollable: true,
-                title: Text(context.l10n.invitationSent),
-                content: sameAccount
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(context.l10n.invitationCodeFallback),
-                          const SizedBox(height: 16),
-                          SelectableText(
-                            code,
-                            key: const ValueKey('invitation-code'),
-                          ),
-                        ],
-                      )
-                    : Text(context.l10n.accountChanged),
-                actions: [
-                  if (sameAccount)
-                    TextButton(
-                      onPressed: () =>
-                          Clipboard.setData(ClipboardData(text: code)),
-                      child: Text(context.l10n.copyCode),
-                    ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(context.l10n.done),
-                  ),
-                ],
-              );
-            },
-          ),
-        );
-      }
-      if (mounted && (deleting || leave)) {
-        final messenger = ScaffoldMessenger.of(context);
-        // True tells the project page under this one to close as well.
-        Navigator.pop(context, true);
-        if (done != null) showFeedback(messenger, done);
-      }
+      await _applied(
+        account.id,
+        action,
+        result,
+        deleting: deleting,
+        leave: leave,
+        done: done,
+      );
+    });
+  }
+
+  /// Runs [work] with the page busy; a failure shows above the page.
+  Future<void> _guard(Future<void> Function() work) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await work();
     } catch (error) {
       if (mounted) {
         setState(() => _error = error);
@@ -119,62 +81,174 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     }
   }
 
+  /// What follows a request the server accepted: fresh data, an
+  /// invitation's code, or closing the page.
+  Future<void> _applied(
+    int accountId,
+    String action,
+    Object? result, {
+    bool deleting = false,
+    bool leave = false,
+    String? done,
+  }) async {
+    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    await ref.read(taskProvider.notifier).loadTasks();
+    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    ref.invalidate(taskListsProvider);
+    ref.invalidate(listSharingProvider(widget.listId));
+    if (action == 'invite/' && result is Map && result['code'] is String) {
+      final code = result['code'] as String;
+      // The work is done: no progress bar under “Invitation sent”.
+      setState(() => _busy = false);
+      await showDialog<void>(
+        context: context,
+        builder: (context) => Consumer(
+          builder: (context, dialogRef, _) {
+            final sameAccount =
+                dialogRef.watch(authProvider).account?.id == accountId;
+            return AlertDialog(
+              scrollable: true,
+              title: Text(context.l10n.invitationSent),
+              content: sameAccount
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(context.l10n.invitationCodeFallback),
+                        const SizedBox(height: 16),
+                        SelectableText(
+                          code,
+                          key: const ValueKey('invitation-code'),
+                        ),
+                      ],
+                    )
+                  : Text(context.l10n.accountChanged),
+              actions: [
+                if (sameAccount)
+                  TextButton(
+                    onPressed: () =>
+                        Clipboard.setData(ClipboardData(text: code)),
+                    child: Text(context.l10n.copyCode),
+                  ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(context.l10n.done),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+    if (mounted && (deleting || leave)) {
+      final messenger = ScaffoldMessenger.of(context);
+      // True tells the project page under this one to close as well.
+      Navigator.pop(context, true);
+      if (done != null) showFeedback(messenger, done);
+    }
+  }
+
   /// Everyone joins as an editor; the owner can make them a viewer on
   /// their row.
   Future<void> _invite(String project) async {
+    final account = ref.read(authProvider).account;
+    if (_busy || account == null) return;
     var email = '';
+    var sending = false;
+    Object? error;
+    Object? result;
     final form = GlobalKey<FormState>();
-    final confirmed = await showDialog<bool>(
+    // The dialog stays open until the invitation is sent, so a refused or
+    // offline invite keeps the typed address and says why.
+    final sent = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        void send() {
-          if (form.currentState!.validate()) Navigator.pop(context, true);
-        }
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> send() async {
+            if (sending || !form.currentState!.validate()) return;
+            setState(() {
+              sending = true;
+              error = null;
+            });
+            try {
+              result = await ref
+                  .read(apiClientProvider)
+                  .request(
+                    'POST',
+                    'lists/${widget.listId}/invite/',
+                    data: {'email': email, 'role': 'editor'},
+                    accountId: account.id,
+                  );
+            } catch (failure) {
+              if (context.mounted) {
+                setState(() {
+                  sending = false;
+                  error = failure;
+                });
+              }
+              return;
+            }
+            if (context.mounted) Navigator.pop(context, true);
+          }
 
-        return AlertDialog(
-          scrollable: true,
-          title: Text(context.l10n.shareProjectTitle(project)),
-          content: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  key: const ValueKey('invite-email'),
-                  autofocus: true,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.send,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.theirEmail,
-                    errorMaxLines: 3,
+          return AlertDialog(
+            scrollable: true,
+            title: Text(context.l10n.shareProjectTitle(project)),
+            content: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: MessageBanner(
+                        requestProblemText(context.l10n, error!),
+                        isError: true,
+                      ),
+                    ),
+                  TextFormField(
+                    key: const ValueKey('invite-email'),
+                    initialValue: email,
+                    autofocus: true,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.send,
+                    decoration: InputDecoration(
+                      labelText: context.l10n.theirEmail,
+                      errorMaxLines: 3,
+                    ),
+                    onChanged: (value) => email = value.trim(),
+                    onFieldSubmitted: (_) => send(),
+                    validator: (value) => value?.contains('@') == true
+                        ? null
+                        : context.l10n.enterEmailAddress,
                   ),
-                  onChanged: (value) => email = value.trim(),
-                  onFieldSubmitted: (_) => send(),
-                  validator: (value) => value?.contains('@') == true
-                      ? null
-                      : context.l10n.enterEmailAddress,
-                ),
-                const SizedBox(height: 12),
-                Text(context.l10n.shareProjectHelp(project)),
-              ],
+                  const SizedBox(height: 12),
+                  Text(context.l10n.shareProjectHelp(project)),
+                  if (sending) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                  ],
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: send,
-              child: Text(context.l10n.sendInvitation),
-            ),
-          ],
-        );
-      },
+            actions: [
+              TextButton(
+                onPressed: sending ? null : () => Navigator.pop(context),
+                child: Text(context.l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: sending ? null : send,
+                child: Text(context.l10n.sendInvitation),
+              ),
+            ],
+          );
+        },
+      ),
     );
-    if (confirmed == true && mounted) {
-      await _run('invite/', {'email': email, 'role': 'editor'});
+    if (sent == true && mounted) {
+      await _guard(() => _applied(account.id, 'invite/', result));
     }
   }
 
@@ -199,10 +273,77 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     }
     // Same flag as Projects ⋮, so both doors use the same words. A project
     // missing from the provider gets the cautious, shared wording.
-    return _sharing(context, shared: local?.shared ?? true);
+    return _sharing(context, shared: local?.shared ?? true, local: local);
   }
 
-  Widget _sharing(BuildContext context, {required bool shared}) => Scaffold(
+  /// A person with access: their name first, when the project knows it,
+  /// then their email and role.
+  Widget _memberRow(BuildContext context, Map member, String? name) {
+    final email = member['user__email'] as String;
+    final access = context.listRole(member['role'] as String);
+    final danger = Theme.of(context).colorScheme.error;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(name ?? email),
+      subtitle: Text(
+        name == null || name == email ? access : '$email · $access',
+      ),
+      trailing: PopupMenuButton<String>(
+        enabled: !_busy,
+        tooltip: context.l10n.manageItem(name ?? email),
+        itemBuilder: (_) => [
+          PopupMenuItem(value: 'editor', child: Text(context.l10n.makeEditor)),
+          PopupMenuItem(value: 'viewer', child: Text(context.l10n.makeViewer)),
+          PopupMenuItem(
+            value: 'remove',
+            child: Text(
+              context.l10n.removeAccess,
+              style: TextStyle(color: danger),
+            ),
+          ),
+        ],
+        onSelected: (role) async {
+          if (role == 'remove' &&
+              !await groupConfirm(
+                context,
+                context.l10n.removeAccess,
+                context.l10n.removeAccessHelp,
+                destructive: true,
+              )) {
+            return;
+          }
+          if (mounted) {
+            await _run('member/', {'user_id': member['user_id'], 'role': role});
+          }
+        },
+      ),
+    );
+  }
+
+  /// A shared project's own update choice, as a labelled row. A group's
+  /// projects keep it in Projects ⋮.
+  Widget? _updates(BuildContext context, TaskListInfo? project) {
+    if (project == null || !project.shared || project.groupId != null) {
+      return null;
+    }
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(context.l10n.projectNotifications),
+      subtitle: Text(switch (project.notifications) {
+        'all' => context.l10n.updatesAll,
+        'muted' => context.l10n.updatesMuted,
+        _ => context.l10n.updatesAssigned,
+      }),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: _busy ? null : () => showProjectPreferences(context, ref, project),
+    );
+  }
+
+  Widget _sharing(
+    BuildContext context, {
+    required bool shared,
+    TaskListInfo? local,
+  }) => Scaffold(
     appBar: CustomAppBar(title: context.l10n.listSharing),
     body: ref
         .watch(listSharingProvider(widget.listId))
@@ -232,6 +373,13 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
               foregroundColor: danger,
               side: BorderSide(color: danger),
             );
+            final updates = _updates(context, local);
+            // The sharing endpoint only knows emails; the project's people
+            // know names.
+            final names = {
+              for (final person in local?.people ?? const <ProjectMember>[])
+                person.id: person.name,
+            };
             return ListView(
               padding: const EdgeInsets.all(24),
               children: [
@@ -270,52 +418,10 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   if ((data['members'] as List).isEmpty)
                     Text(context.l10n.noOtherMembers),
                   for (final member in data['members'] as List)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(member['user__email'] as String),
-                      subtitle: Text(
-                        context.listRole(member['role'] as String),
-                      ),
-                      trailing: PopupMenuButton<String>(
-                        enabled: !_busy,
-                        tooltip: context.l10n.manageItem(
-                          member['user__email'] as String,
-                        ),
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'editor',
-                            child: Text(context.l10n.makeEditor),
-                          ),
-                          PopupMenuItem(
-                            value: 'viewer',
-                            child: Text(context.l10n.makeViewer),
-                          ),
-                          PopupMenuItem(
-                            value: 'remove',
-                            child: Text(
-                              context.l10n.removeAccess,
-                              style: TextStyle(color: danger),
-                            ),
-                          ),
-                        ],
-                        onSelected: (role) async {
-                          if (role == 'remove' &&
-                              !await groupConfirm(
-                                context,
-                                context.l10n.removeAccess,
-                                context.l10n.removeAccessHelp,
-                                destructive: true,
-                              )) {
-                            return;
-                          }
-                          if (mounted) {
-                            await _run('member/', {
-                              'user_id': member['user_id'],
-                              'role': role,
-                            });
-                          }
-                        },
-                      ),
+                    _memberRow(
+                      context,
+                      member as Map,
+                      names[member['user_id']],
                     ),
                   if ((data['invitations'] as List).isNotEmpty)
                     SectionLabel(context.l10n.pendingInvitations),
@@ -356,6 +462,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                               }),
                       ),
                     ),
+                  if (updates != null) updates,
                   ExpansionTile(
                     title: Text(context.l10n.howSharingWorks),
                     tilePadding: EdgeInsets.zero,
@@ -400,7 +507,8 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                           : context.l10n.deleteList,
                     ),
                   ),
-                ] else
+                ] else ...[
+                  if (updates != null) ...[updates, const SizedBox(height: 16)],
                   OutlinedButton(
                     style: dangerButton,
                     onPressed: _busy
@@ -427,6 +535,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                           },
                     child: Text(context.l10n.leaveList),
                   ),
+                ],
               ],
             );
           },

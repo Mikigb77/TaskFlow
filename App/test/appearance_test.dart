@@ -274,7 +274,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     // Moving: No date applies at once, like Today and Tomorrow.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'No date'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.widgetWithText(ChoiceChip, 'No date'),
+      ),
+    );
     await tester.pumpAndSettle();
     final moved = container
         .read(taskProvider)
@@ -303,7 +308,7 @@ void main() {
       expect(find.byKey(const ValueKey('calendar-inbox')), findsNothing);
       tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/inbox');
       await tester.pumpAndSettle();
-      expect(find.text('NO DATE NEEDED'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'No date'), findsOneWidget);
       expect(find.widgetWithText(ChoiceChip, 'All tasks'), findsNothing);
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();

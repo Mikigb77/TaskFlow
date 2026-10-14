@@ -176,4 +176,78 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // ---- Round 1 (b9) · P24 (UX-429): the sheet stays above the keyboard ----
+
+  for (final language in ['es', 'ca']) {
+    for (final dark in [false, true]) {
+      testWidgets(
+          'UX-429: at 320×568, 2× text and a 280 dp keyboard, typing a project’s name in Todos los proyectos leaves its row and the search above the keyboard ($language, dark=$dark)',
+          (tester) async {
+        final l10n = lookupAppLocalizations(Locale(language));
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+        addTearDown(tester.view.reset);
+        final container = ProviderContainer(overrides: [
+          taskListsProvider.overrideWith((ref) async => [
+                for (final name in [
+                  'Casa',
+                  'Trabajo',
+                  'Compras',
+                  'Gimnasio',
+                  'Viajes',
+                  'Lectura',
+                  'Col·legi',
+                  'Jardín',
+                  'Coche',
+                  'Médico',
+                ])
+                  TaskListInfo(id: name, name: name),
+              ]),
+        ]);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+                locale: Locale(language),
+                theme: dark ? AppTheme.dark : AppTheme.light,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: const TextScaler.linear(2)),
+                    child: child!),
+                home: const Scaffold(
+                    resizeToAvoidBottomInset: false,
+                    body: SafeArea(child: ProjectScopeControl())))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ActionChip, l10n.projectsAll));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        final search = find.descendant(
+            of: sheet, matching: find.widgetWithText(TextField, l10n.projectsFind));
+        expect(search, findsOneWidget);
+        await tester.enterText(search, 'medico');
+        await tester.pumpAndSettle();
+        const keyboardTop = 568.0 - 280;
+        final row = find.descendant(
+            of: sheet, matching: find.widgetWithText(ListTile, 'Médico'));
+        expect(row, findsOneWidget);
+        final rowRect = tester.getRect(row);
+        final searchRect = tester.getRect(search);
+        expect(searchRect.top, greaterThanOrEqualTo(0));
+        expect(searchRect.bottom, lessThanOrEqualTo(keyboardTop),
+            reason: 'the search shows above the keyboard: $searchRect');
+        expect(rowRect.top, greaterThanOrEqualTo(0));
+        expect(rowRect.bottom, lessThanOrEqualTo(keyboardTop),
+            reason: 'the match shows above the keyboard: $rowRect');
+        expect(row.hitTestable(), findsOneWidget);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        expect(container.read(projectScopeProvider).projectId, 'Médico');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 }

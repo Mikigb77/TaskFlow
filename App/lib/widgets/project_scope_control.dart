@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:agenda/models/task_list_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,8 +14,15 @@ class ProjectScopeControl extends ConsumerWidget {
     super.key,
     this.fixedProjectId,
     this.padding = EdgeInsets.zero,
+    this.team,
+    this.onTeamChanged,
   });
   final String? fixedProjectId;
+
+  /// A page's own `Para mí` / `Todas` choice, kept apart from Calendar's.
+  /// Without it, the chips change the app-wide scope.
+  final bool? team;
+  final ValueChanged<bool>? onTeamChanged;
 
   /// Applied only when the control draws something, so an empty one takes
   /// no room.
@@ -23,6 +32,13 @@ class ProjectScopeControl extends ConsumerWidget {
     final scope = ref.watch(projectScopeProvider);
     final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
     final selectedId = fixedProjectId ?? scope.projectId;
+    final team = this.team ?? scope.team;
+    void setTeam(bool value) => onTeamChanged != null
+        ? onTeamChanged!(value)
+        : ref.read(projectScopeProvider.notifier).state = ProjectScope(
+            projectId: scope.projectId,
+            team: value,
+          );
     final selected = projects.where((p) => p.id == selectedId).firstOrNull;
     final shared =
         selected?.shared ?? projects.any((p) => p.shared && !p.inactive);
@@ -59,52 +75,75 @@ class ProjectScopeControl extends ConsumerWidget {
                 final choice = await showModalBottomSheet<String>(
                   context: context,
                   isScrollControlled: true,
+                  useSafeArea: true,
                   showDragHandle: true,
                   builder: (context) => StatefulBuilder(
-                    builder: (context, change) => SafeArea(
-                      child: SizedBox(
-                        height: MediaQuery.sizeOf(context).height * .7,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                              ),
-                              child: TextField(
-                                decoration: InputDecoration(
-                                  hintText: context.l10n.projectsFind,
-                                  prefixIcon: const Icon(Icons.search),
-                                ),
-                                onChanged: (s) =>
-                                    change(() => query = s.trim()),
-                              ),
+                    // Above the keyboard, in the room it leaves, so the
+                    // search and the first match show while typing.
+                    builder: (context, change) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.viewInsetsOf(context).bottom,
+                      ),
+                      child: SafeArea(
+                        child: LayoutBuilder(
+                          builder: (context, space) => SizedBox(
+                            height: math.min(
+                              MediaQuery.sizeOf(context).height * .7,
+                              space.maxHeight,
                             ),
-                            Expanded(
-                              child: ListView(
-                                children: [
-                                  ListTile(
-                                    leading: const Icon(
-                                      Icons.calendar_month_outlined,
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                  ),
+                                  child: TextField(
+                                    decoration: InputDecoration(
+                                      hintText: context.l10n.projectsFind,
+                                      prefixIcon: const Icon(Icons.search),
                                     ),
-                                    title: Text(context.l10n.projectsAll),
-                                    selected: selectedId == null,
-                                    onTap: () => Navigator.pop(context, ''),
+                                    onChanged: (s) =>
+                                        change(() => query = s.trim()),
                                   ),
-                                  ..._projectChoices(
-                                    context,
-                                    projects,
-                                    query,
-                                    selectedId,
+                                ),
+                                Expanded(
+                                  child: ListView(
+                                    // Rows scroll together, so a match
+                                    // shows first in the room left.
+                                    children: [
+                                      if (matchesSearch(
+                                        context.l10n.projectsAll,
+                                        query,
+                                      ))
+                                        ListTile(
+                                          leading: const Icon(
+                                            Icons.calendar_month_outlined,
+                                          ),
+                                          title: Text(context.l10n.projectsAll),
+                                          selected: selectedId == null,
+                                          onTap: () =>
+                                              Navigator.pop(context, ''),
+                                        ),
+                                      ..._projectChoices(
+                                        context,
+                                        projects,
+                                        query,
+                                        selectedId,
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.tune),
+                                        title: Text(
+                                          context.l10n.projectsManage,
+                                        ),
+                                        onTap: () =>
+                                            Navigator.pop(context, 'manage'),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                            ListTile(
-                              leading: const Icon(Icons.tune),
-                              title: Text(context.l10n.projectsManage),
-                              onTap: () => Navigator.pop(context, 'manage'),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -124,15 +163,13 @@ class ProjectScopeControl extends ConsumerWidget {
           if (shared) ...[
             ChoiceChip(
               label: Text(context.l10n.forMe),
-              selected: !scope.team,
-              onSelected: (_) => ref.read(projectScopeProvider.notifier).state =
-                  ProjectScope(projectId: scope.projectId),
+              selected: !team,
+              onSelected: (_) => setTeam(false),
             ),
             ChoiceChip(
               label: Text(context.l10n.forTeam),
-              selected: scope.team,
-              onSelected: (_) => ref.read(projectScopeProvider.notifier).state =
-                  ProjectScope(projectId: scope.projectId, team: true),
+              selected: team,
+              onSelected: (_) => setTeam(true),
             ),
           ],
         ],
@@ -186,13 +223,16 @@ Iterable<Widget> _projectChoices(
       return order != 0 ? order : (names[a] ?? a).compareTo(names[b] ?? b);
     });
   for (final section in keys) {
-    yield Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-      child: Text(
-        names[section]!,
-        style: Theme.of(context).textTheme.labelLarge,
-      ),
-    );
+    // While searching, matches come first, without section titles.
+    if (query.isEmpty) {
+      yield Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+        child: Text(
+          names[section]!,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+      );
+    }
     for (final project in sections[section]!) {
       yield ListTile(
         leading: Icon(
@@ -204,7 +244,8 @@ Iterable<Widget> _projectChoices(
           color: taskListColor(project.color),
         ),
         title: Text(project.name),
-        subtitle: project.pinned && project.groupName != null
+        subtitle:
+            (project.pinned || query.isNotEmpty) && project.groupName != null
             ? Text(project.groupName!)
             : null,
         selected: project.id == selectedId,

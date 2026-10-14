@@ -46,7 +46,7 @@ class CapturesScreen extends ConsumerWidget {
             error: (_, __) => Center(
                 child: FilledButton(
                     onPressed: () => ref.invalidate(pendingCapturesProvider),
-                    child: Text(context.l10n.retryCaptures))),
+                    child: Text(context.l10n.tryAgain))),
             data: (sessions) => RefreshIndicator(
                 onRefresh: () async {
                   ref.invalidate(pendingCapturesProvider);

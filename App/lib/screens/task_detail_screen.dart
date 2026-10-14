@@ -246,7 +246,7 @@ class TaskDetailScreen extends ConsumerWidget {
                             Icons.calendar_today_outlined,
                             context.l10n.plannedFor,
                             task.displayDate == null
-                                ? context.l10n.inboxDate
+                                ? context.l10n.noDate
                                 : context.fullDate(task.displayDate!),
                             onTap: canEdit ? reschedule : null,
                             tapHint: context.l10n.reschedule,

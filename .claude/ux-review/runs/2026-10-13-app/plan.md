@@ -891,3 +891,64 @@ None.
 ### Noted, not planned
 - Reviewer B: in the short form, removing the last step through ⋮ hides the steps section, and any text in `Añadir paso` goes with it. It predates this run and is rare, so it's only noted.
 - Reviewer D: on the sign-in-again route, system Back does nothing and gives no feedback. That's P30's intended `PopScope(canPop: false)`; the new reason line explains the screen.
+
+## Round 2 (b9)
+
+Round 1 of batch 9 ran P113, P24, P25, P26, P27 and P43. The reviewers found every finding fixed in code (UX-624 in area B; 21 findings in area C, with UX-429 and UX-321 still needing a phone). No test failed and the round check passed. Reviewer C found four small regressions on the project, group and Activity pages, now UX-625 to UX-628.
+
+Round 2 has two small packages in area C: P114 (S2) and P115 (S1). P114 also takes one older problem that reviewer C noted in the same lines (UX-629). There are no new owner questions, and nothing is escalated.
+
+The briefs are in `plan-b9-r2.json`.
+
+### Packages, in run order
+
+#### P114 · Project page says read-only only when it is, and says it once · C · S
+- **UX-626** (S2; R1C-2, from P24) Right after `Nuevo proyecto`, the new page could show `Este proyecto es de solo lectura` until the projects list reloaded, because an unknown project counted as read-only. Now the page says read-only only once the project is known and the user can't edit it. Inferred from code; needs a phone.
+- **UX-625** (S2; R1C-1, from P24) An empty view-only project said `Añade una tarea a este proyecto…` above a bar with no button. It now says `Este proyecto aún no tiene tareas.` (EN `No tasks in this project yet.`, CA `Aquest projecte encara no té tasques.`). One new key, `readOnlyListEmpty`.
+- **UX-629** (S1; reviewer C's note, older than this run) `Para mí` on a shared project with nothing for you showed `Un nuevo comienzo`, as if the project were empty. It now shows `No hay tareas que coincidan` like any other filter.
+
+#### P115 · Group page drops the lone role word; Activity has one name · C · S
+- **UX-627** (S1; R1C-3, from P27) With the group-name headline gone, the group page opened with a lone `Editor` or `Propietario`. The line goes; the user's own row under `Miembros` already shows their role.
+- **UX-628** (S1; R1C-4, from P25) The button said `Actividad del grupo` and the screen it opens said `Actividad`. The screen is now titled `Actividad del grupo` (EN `Group activity`, CA `Activitat del grup`, existing key).
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- Reviewer C: the sharing screen's pending list uses the uppercase `pendingInvitations` label, while the group page now says `Invitados` / `Pendiente`. Which wording both should use is a choice the reports don't settle; worth aligning in a later pass.
+- Reviewer C: the group invite role sheet is titled with the email ("¿Qué puede hacer ana@…?"). The reviewer finds it acceptable.
+- P27's implementer: the group invitation code dialog still uses the long version (P13 shortened only the project one), and a group's pending invitation is revoked at once with an X, without the ⋮ menu (`Reenviar` / `Anular invitación`) that project invitations got. No reviewer has reported these; the next review of the group page should look at both.
+- P26's implementer: `integration_test/regional_flow_test.dart` was already stale (it looks for `Guardar lista` and `Archivar lista`) and also picks the `Azul` chip that P26 removed. Update it the next time it runs on a device. This is test upkeep, not a UX finding.
+- With P114, while a new project is still unknown to the projects list, `Añadir tarea` shows but `TaskActions` gets no project id for that moment (unchanged behaviour). The reload is local and fast, so this isn't planned; the P114 device check would show it if it matters.
+- Reviewer B: opening ⋮ in the steps editor commits typed text as a step even if the menu is dismissed (P112's "leaving the field keeps it"), and at the 50-step limit Save discards text still in the field after `stepLimit` has been shown. Both are noted by the reviewer as acceptable.
+
+## Round 3 (b9)
+
+Round 2 of batch 9 ran P114 and P115. Reviewer C found all five findings fixed in code (UX-625, UX-626, UX-629, UX-627, UX-628; verify-b9-r2-C.md). No test failed, and the round check passed. One new edge case came from P114's `readOnly` line: UX-630 (R2C-1, S1).
+
+Round 3 has one small package in area C, P116. It fixes UX-630 in the same line. The workflow reported the five round-2 findings as not checked, so P116 lists them again for the reviewer, with no code change to them. UX-626 needs re-checking anyway, because P116 changes its fix. There are no new owner questions, and nothing is escalated.
+
+The briefs are in `plan-b9-r3.json`.
+
+### Packages, in run order
+
+#### P116 · A project that's gone shows read-only again; round 2 re-checked · C · S
+- **UX-630** (S1; R2C-1, from P114) If a project is still missing after the projects list has loaded (you were removed from a shared project, or it was deleted on another device), its page showed `Añadir tarea`, and the task was saved outside the project. Now, once the lists have loaded, a missing project shows the read-only line (`Este proyecto es de solo lectura`) and `Este proyecto aún no tiene tareas.` again. Inferred from code; checking it on a device needs two accounts.
+- **UX-626** (S2; R1C-2) Re-checked, and its fix narrows: a project the lists don't hold yet counts as "not known yet" only while the lists are reloading, which covers the moment just after `Nuevo proyecto`. One existing test changes its starting state to match. A phone check is still needed.
+- **UX-625** (S2; R1C-1) Re-check only: an empty view-only project says `Este proyecto aún no tiene tareas.`
+- **UX-629** (S1) Re-check only: `Para mí` with nothing for you says `No hay tareas que coincidan`.
+- **UX-627** (S1; R1C-3) Re-check only: the group page shows no lone role word.
+- **UX-628** (S1; R1C-4) Re-check only: the Activity screen is titled `Actividad del grupo`.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- Reviewer C's other option for UX-630 was to close a gone project's page, as the sharing screen does. It isn't planned: going back to the read-only state needs no new behaviour.
+- With P116, the projects list reloads whenever tasks reload. On a gone project's page, the bottom bar can show `Añadir tarea` for the moment of each reload. The page is rare, and the reload is local, so this is accepted.

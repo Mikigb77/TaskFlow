@@ -222,9 +222,14 @@ void main() {
     expect(find.widgetWithText(TextButton, es.projectMembersCount(2)),
         findsOneWidget);
     expect(find.widgetWithText(TextButton, es.shareProject), findsNothing);
-    final bell = find.byTooltip(es.projectNotifications);
-    await tester.ensureVisible(bell);
-    await tester.tap(bell);
+    // Project updates live on the sharing screen, not behind a bell (UX-322).
+    final members = find.widgetWithText(TextButton, es.projectMembersCount(2));
+    await tester.ensureVisible(members);
+    await tester.tap(members);
+    await tester.pumpAndSettle();
+    final updates = find.text(es.projectNotifications);
+    await tester.ensureVisible(updates);
+    await tester.tap(updates);
     await tester.pumpAndSettle();
     expect(es.updatesMuted, 'Silenciado: sin novedades ni recordatorios');
     expect(
@@ -758,6 +763,88 @@ void main() {
             .widget<CheckboxListTile>(find.byType(CheckboxListTile))
             .onChanged,
         isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---- Round 1 (b9) · P25 (UX-322) and P27 (UX-330) ----
+
+  testWidgets(
+      'UX-322: a shared project’s page has no bell; its sharing screen has Novedades del proyecto, which opens the update choice',
+      (tester) async {
+    expect(es.projectNotifications, 'Novedades del proyecto');
+    await openProjectPage(
+        tester,
+        TaskListInfo(
+            id: 'casa',
+            name: 'Casa',
+            version: 3,
+            shared: true,
+            ownerId: 1,
+            people: const [owner, ana]));
+    expect(find.byTooltip(es.projectNotifications), findsNothing);
+    expect(find.byIcon(Icons.notifications_outlined), findsNothing);
+    expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
+    expect(find.text(es.projectNotifications), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox());
+    await _SharingApp.open(tester, {
+      'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+      'members': [],
+      'invitations': []
+    }, projects: [
+      TaskListInfo(
+          id: 'casa',
+          name: 'Casa',
+          version: 1,
+          shared: true,
+          ownerId: 1,
+          people: const [owner, ana])
+    ]);
+    final row = find.widgetWithText(ListTile, es.projectNotifications);
+    await tester.scrollUntilVisible(row, 120,
+        scrollable: find.byType(Scrollable).last);
+    expect(row, findsOneWidget);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(
+        find.descendant(
+            of: find.byType(BottomSheet), matching: find.text(es.updatesMuted)),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-330: ListSharingScreen shows each person’s name first and the email second, falling back to the email',
+      (tester) async {
+    await _SharingApp.open(tester, {
+      'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+      'members': [
+        {'user_id': 2, 'user__email': 'ana@example.invalid', 'role': 'editor'},
+        {'user_id': 7, 'user__email': 'luis@example.invalid', 'role': 'viewer'},
+      ],
+      'invitations': []
+    }, projects: [
+      TaskListInfo(
+          id: 'casa',
+          name: 'Casa',
+          version: 1,
+          shared: true,
+          ownerId: 1,
+          people: const [owner, ana])
+    ]);
+    final anaRow = find.widgetWithText(ListTile, 'Ana');
+    await tester.scrollUntilVisible(anaRow, 120,
+        scrollable: find.byType(Scrollable).last);
+    final tile = tester.widget<ListTile>(anaRow);
+    expect((tile.title as Text).data, 'Ana');
+    expect((tile.subtitle as Text).data, 'ana@example.invalid · ${es.roleEditor}');
+    // Someone the project doesn't name yet: their email.
+    final luis = find.widgetWithText(ListTile, 'luis@example.invalid');
+    await tester.scrollUntilVisible(luis, 120,
+        scrollable: find.byType(Scrollable).last);
+    expect((tester.widget<ListTile>(luis).title as Text).data,
+        'luis@example.invalid');
     expect(tester.takeException(), isNull);
   });
 }

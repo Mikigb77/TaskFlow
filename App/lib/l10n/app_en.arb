@@ -63,7 +63,7 @@
     }
   },
   "regionalFormats": "Time & region",
-  "sharedCaptureRetained": "Your shared capture is retained. Reopen TaskFlow to try again.",
+  "sharedCaptureRetained": "What you shared is kept. Open TaskFlow again to try again.",
   "note": "Note",
   "editNote": "Edit note",
   "noteTitle": "Note title",
@@ -182,8 +182,8 @@
   "calendar": "Calendar",
   "tasks": "Tasks",
   "settings": "Settings",
-  "inbox": "Inbox",
-  "inboxCount": "Inbox · {count}",
+  "inbox": "No date",
+  "inboxCount": "No date · {count}",
   "@inboxCount": {
     "placeholders": {
       "count": {
@@ -206,11 +206,11 @@
     "description": "The one button that adds a task: it opens the capture sheet."
   },
   "typeTasks": "Type tasks",
-  "unfinishedCaptures": "Unfinished captures",
+  "unfinishedCaptures": "Not saved yet",
   "captureDiagnostics": "Capture diagnostics",
   "lists": "Projects",
   "labels": "Labels",
-  "noList": "Personal inbox",
+  "noList": "No project",
   "priority": "Priority",
   "low": "Low",
   "medium": "Medium",
@@ -312,15 +312,12 @@
   "calendarEmpty": "Nothing planned for this day.",
   "planTask": "Plan a task",
   "homeCapture": "Mic button on your home screen",
-  "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.",
+  "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for its shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.",
   "widgetPickerHelp": "Add the TaskFlow widget from your launcher’s widget picker.",
   "appearanceError": "Could not save your appearance preference.",
   "list": "Project",
   "archivedList": "Archived project",
-  "yourList": "Your project",
   "yourTasks": "Your tasks",
-  "everythingToDo": "Everything you want to do",
-  "noDateNeeded": "No date needed",
   "findTask": "Find a task…",
   "allTasks": "All tasks",
   "highPriority": "High priority",
@@ -330,12 +327,15 @@
   "freshStart": "A fresh start",
   "differentFilter": "Try a different word or filter.",
   "listEmpty": "Add a task to this project. Its date and reminder are yours to choose.",
+  "readOnlyListEmpty": "No tasks in this project yet.",
+  "@readOnlyListEmpty": {
+    "description": "Empty-state message on a project page the user can only view; there is no add button there."
+  },
   "tasksEmpty": "Tap Add a task to add one. A date is optional.",
-  "inboxEmpty": "Keep ideas and to-dos here until you choose a date.\nStart with Add a task.",
+  "inboxEmpty": "Tasks without a date wait here until you choose one.\nStart with Add a task.",
   "savedOnDevice": "Your saved tasks are still on your device.",
-  "checkCaptures": "Check unfinished captures",
+  "checkCaptures": "See what’s not saved yet",
   "seriesEdits": "Edits apply to the whole repeating task.",
-  "checkBeforeAdd": "Check the details before adding it to your calendar.",
   "titleRequired": "Please enter a task title.",
   "nameTask": "What would you like to do?",
   "reminder": "Reminder",
@@ -368,7 +368,6 @@
   "moveError": "Could not move this task. Please retry.",
   "occurrence": "Occurrence",
   "starts": "Starts",
-  "inboxDate": "No date · Inbox",
   "updateReminderError": "Could not update the reminder. Please retry.",
   "thisOccurrence": "This occurrence",
   "wholeSeries": "Whole series",
@@ -401,7 +400,7 @@
   },
   "discard": "Discard",
   "keep": "Keep",
-  "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.",
+  "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.",
   "capturePrivacyLine": "Your words go online. More in Settings.",
   "@capturePrivacyLine": {
     "description": "One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings."
@@ -431,7 +430,7 @@
       }
     }
   },
-  "pendingCaptureCount": "Unfinished captures · {count}",
+  "pendingCaptureCount": "Not saved yet · {count}",
   "@pendingCaptureCount": {
     "placeholders": {
       "count": {
@@ -490,6 +489,10 @@
   "moveDown": "Move down",
   "removeStep": "Remove step",
   "addStep": "Add step",
+  "stepLimit": "A task can have up to 50 steps. Remove a step to add this one.",
+  "@stepLimit": {
+    "description": "Under the Add step field when a task already has 50 steps; the typed text stays in the field."
+  },
   "listUnavailable": "Project unavailable",
   "archived": "Archived",
   "sharedProject": "Shared",
@@ -499,7 +502,7 @@
   "taskUpdateError": "Could not update this task. Please try again.",
   "occurrenceSkippedNotice": "Occurrence skipped",
   "originalRestored": "Original date restored",
-  "movedInbox": "Moved to Inbox",
+  "movedInbox": "Date removed",
   "scheduleChangedAgain": "The schedule changed again. Open the task to review it.",
   "scheduleError": "Could not change the schedule. Please try again.",
   "rescheduleRepeating": "Reschedule repeating task",
@@ -516,7 +519,7 @@
   "changeSeriesHelp": "This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.",
   "keepEditing": "Keep editing",
   "resetSave": "Reset and save",
-  "taskSavedInbox": "Task saved to Inbox",
+  "taskSavedInbox": "Added with no date",
   "taskAddedOn": "Added to {date}",
   "@taskAddedOn": {
     "description": "After saving a new task with a date. The date is a weekday and date such as Fri, Oct 17, never Today or Tomorrow.",
@@ -676,7 +679,7 @@
   "newList": "New project",
   "editList": "Edit project",
   "listName": "Name",
-  "listNameHint": "Work, Personal, Shopping…",
+  "listNameHint": "Home, Work, Shopping…",
   "listNameRequired": "Name your project.",
   "colorTeal": "Teal",
   "colorBlue": "Blue",
@@ -712,10 +715,8 @@
   "useThisPhone": "Use this phone",
   "listResolveError": "Could not resolve this project. Please retry.",
   "retryLists": "Retry projects",
-  "refreshLists": "Refresh projects and invitations",
-  "listsHelp": "A clear place for every part of life. Keep projects personal or share them with a group.",
   "listsEmptyTitle": "A place for each part of life",
-  "listsEmptyHelp": "Start with Work, Personal or Shopping. Tasks can move whenever you like.",
+  "listsEmptyHelp": "Start with Home, Work or Shopping. Tasks can move whenever you like.",
   "roleOwner": "Owner",
   "roleEditor": "Editor",
   "roleViewer": "Viewer",
@@ -1120,11 +1121,11 @@
   "archiveNotesTooLong": "Task and comments exceed 8,000 note characters.",
   "archiveInvalidFile": "The file is not valid JSON or UTF-8 text.",
   "archiveUnknownFields": "Unrecognized task fields will be omitted.",
-  "archivePersonalCopies": "Imports create new personal copies. Account access, files, notification preferences and unfinished captures are not included.",
+  "archivePersonalCopies": "Imports create new personal copies. Account access, files, notification preferences and anything not saved yet are not included.",
   "archiveCsvPriorities": "Todoist priorities 3 and 4 both become Low. Subtasks become separate tasks.",
   "archiveCsvDates": "Only ISO calendar dates and times with explicit timezone offsets are scheduled. Other date expressions are kept in notes for you to review.",
   "archiveCsvPersonalCopies": "This creates personal copies. Assignments, files and sharing access are not transferred. Todoist project CSV exports may omit completed tasks.",
-  "archiveReviewSchedule": "The original schedule needs review; this task will go to Inbox.",
+  "archiveReviewSchedule": "The original schedule needs review; this task will have no date.",
   "archiveFlattenedSubtasks": "Subtask nesting will be flattened.",
   "archiveInlineLabels": "Inline @labels remain in the title.",
   "archiveAttachmentsOmitted": "{count, plural, =1{1 attachment file is} other{{count} attachment files are}} not included.",
@@ -1253,17 +1254,17 @@
       }
     }
   },
-  "captureGone": "This capture is no longer available.",
+  "captureGone": "Your words are no longer available.",
   "captureNoteLength": "A note needs 1 to 8000 characters.",
-  "captureNoTasks": "No tasks were found. Your capture is kept.",
-  "captureUnsupportedKind": "This server does not support the selected capture type. Your input is kept.",
+  "captureNoTasks": "No tasks were found. Your words are kept.",
+  "captureUnsupportedKind": "This server does not support this way of adding tasks. Your words are kept.",
   "captureOffline": "No internet. Your words are saved — try again when you’re online.",
   "captureUnavailable": "Couldn’t reach the assistant — your words are kept.",
   "captureAllowance": "You’ve reached today’s limit. Type the task, or try again tomorrow.",
-  "captureSignIn": "Sign in again to process this account’s capture.",
-  "captureForbidden": "This account cannot process the capture. Check your access and try again.",
+  "captureSignIn": "Sign in again to turn your words into tasks.",
+  "captureForbidden": "This account can’t turn your words into tasks. Check your access and try again.",
   "captureTooLarge": "This recording exceeds the service limit. Keep it for later or use a shorter typed description.",
-  "captureTypedFirst": "Save or discard this typed capture before starting a recording.",
+  "captureTypedFirst": "Save or discard what you typed before starting a recording.",
   "captureMicrophone": "Allow microphone access to record, or type below.",
   "captureMicrophoneBlocked": "Microphone is off for TaskFlow. Turn it on in Settings, or type instead.",
   "@captureMicrophoneBlocked": {
@@ -1319,9 +1320,9 @@
   "captureIncompleteAudio": "The retained audio is incomplete and cannot be processed. It is still kept on this phone.",
   "captureWriteFailed": "Couldn’t keep this on your phone. Try again before leaving.",
   "captureStopFailed": "Could not finish recording. Previously retained input is kept.",
-  "captureDiscardFailed": "Could not discard this capture. It is still kept.",
+  "captureDiscardFailed": "Could not discard your words. They are still kept.",
   "captureReviewWriteFailed": "Could not keep these changes. Please try again before leaving.",
-  "captureSaveFailed": "Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.",
+  "captureSaveFailed": "Could not finish saving. Your words are kept; retry will not duplicate saved tasks.",
   "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
   "voiceSetupRequested": "Follow Android’s steps, then tap Check again.",
   "@voiceSetupRequested": {
@@ -1333,7 +1334,6 @@
   },
   "captureSetupUnavailable": "Speech setup is unavailable here. Use saved audio or type.",
   "voiceRecording": "Voice recording",
-  "retryCaptures": "Retry loading captures",
   "capturesCaughtUp": "All caught up",
   "capturesEmptyHelp": "Recordings and tasks you leave unfinished are kept here.",
   "captureResumeHelp": "Kept on this phone · Tap to resume",
@@ -1657,9 +1657,22 @@
   },
   "groupDeleteHelp": "Only an empty group can be deleted. Archive a group to keep its projects and content.",
   "groupActionError": "This change could not be saved. Check your connection and refresh; permissions may have changed.",
-  "groupVoiceName": "Your spoken name",
+  "groupVoiceName": "Name for voice assignments",
   "groupVoiceHelp": "An optional name others can use when assigning tasks by voice.",
-  "groupOnline": "Connect to manage group members and invitations.",
+  "createGroup": "Create group",
+  "nextStep": "Next",
+  "enterName": "Enter a name.",
+  "groupRoleQuestion": "What can {name} do?",
+  "@groupRoleQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupInvited": "Invited",
+  "invitationPending": "Pending",
+  "loadFailed": "Couldn’t load. Check your connection.",
   "projectDestination": "Where does this project belong?",
   "projectNotifications": "Project updates",
   "updatesAll": "All changes",
@@ -1676,6 +1689,29 @@
   "activityReopened": "Reopened a task",
   "activityDeleted": "Deleted a task",
   "activitySystem": "TaskFlow",
+  "groupActivity": "Group activity",
+  "@groupActivity": {
+    "description": "Tooltip of the header button (people icon) that opens activity from shared projects and groups."
+  },
+  "activityUnread": "Unread",
+  "@activityUnread": {
+    "description": "Spoken by TalkBack before an unread activity row."
+  },
+  "activityEntry": "{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}",
+  "@activityEntry": {
+    "description": "One activity row: who did what to which task. action is an internal code; actor is a person’s name; title is the task title.",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "actor": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "captureSpeakingIsPro": "Speaking a task is part of TaskFlow Pro. You can type it here.",
   "@captureSpeakingIsPro": {
     "description": "Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead."
@@ -1773,5 +1809,27 @@
   "storageFullShared": "This project’s file space is full. Its owner can remove files to make room.",
   "@storageFullShared": {
     "description": "Under an attachment the server refused because the file space of the shared project's owner is full."
+  },
+  "projectPinned": "Pinned",
+  "@projectPinned": {
+    "description": "Spoken label of the pin icon before a pinned project's name in Projects."
+  },
+  "projectSharedRole": "Shared · {role}",
+  "@projectSharedRole": {
+    "description": "Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor.",
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "projectGroupSees": "Everyone in {group} will see it.",
+  "@projectGroupSees": {
+    "description": "Under 'Where does this project belong?' in the new-project dialog, once a group is chosen. {group} is the group's name.",
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
   }
 }

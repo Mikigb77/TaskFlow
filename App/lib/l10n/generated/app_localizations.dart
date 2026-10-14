@@ -259,7 +259,7 @@ abstract class AppLocalizations {
   /// No description provided for @sharedCaptureRetained.
   ///
   /// In en, this message translates to:
-  /// **'Your shared capture is retained. Reopen TaskFlow to try again.'**
+  /// **'What you shared is kept. Open TaskFlow again to try again.'**
   String get sharedCaptureRetained;
 
   /// No description provided for @note.
@@ -739,13 +739,13 @@ abstract class AppLocalizations {
   /// No description provided for @inbox.
   ///
   /// In en, this message translates to:
-  /// **'Inbox'**
+  /// **'No date'**
   String get inbox;
 
   /// No description provided for @inboxCount.
   ///
   /// In en, this message translates to:
-  /// **'Inbox · {count}'**
+  /// **'No date · {count}'**
   String inboxCount(int count);
 
   /// No description provided for @today.
@@ -823,7 +823,7 @@ abstract class AppLocalizations {
   /// No description provided for @unfinishedCaptures.
   ///
   /// In en, this message translates to:
-  /// **'Unfinished captures'**
+  /// **'Not saved yet'**
   String get unfinishedCaptures;
 
   /// No description provided for @captureDiagnostics.
@@ -847,7 +847,7 @@ abstract class AppLocalizations {
   /// No description provided for @noList.
   ///
   /// In en, this message translates to:
-  /// **'Personal inbox'**
+  /// **'No project'**
   String get noList;
 
   /// No description provided for @priority.
@@ -1303,7 +1303,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeCaptureInstructions.
   ///
   /// In en, this message translates to:
-  /// **'On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.'**
+  /// **'On Android, long-press the TaskFlow icon for its shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.'**
   String get homeCaptureInstructions;
 
   /// No description provided for @widgetPickerHelp.
@@ -1330,29 +1330,11 @@ abstract class AppLocalizations {
   /// **'Archived project'**
   String get archivedList;
 
-  /// No description provided for @yourList.
-  ///
-  /// In en, this message translates to:
-  /// **'Your project'**
-  String get yourList;
-
   /// No description provided for @yourTasks.
   ///
   /// In en, this message translates to:
   /// **'Your tasks'**
   String get yourTasks;
-
-  /// No description provided for @everythingToDo.
-  ///
-  /// In en, this message translates to:
-  /// **'Everything you want to do'**
-  String get everythingToDo;
-
-  /// No description provided for @noDateNeeded.
-  ///
-  /// In en, this message translates to:
-  /// **'No date needed'**
-  String get noDateNeeded;
 
   /// No description provided for @findTask.
   ///
@@ -1408,6 +1390,12 @@ abstract class AppLocalizations {
   /// **'Add a task to this project. Its date and reminder are yours to choose.'**
   String get listEmpty;
 
+  /// Empty-state message on a project page the user can only view; there is no add button there.
+  ///
+  /// In en, this message translates to:
+  /// **'No tasks in this project yet.'**
+  String get readOnlyListEmpty;
+
   /// No description provided for @tasksEmpty.
   ///
   /// In en, this message translates to:
@@ -1417,7 +1405,7 @@ abstract class AppLocalizations {
   /// No description provided for @inboxEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Keep ideas and to-dos here until you choose a date.\nStart with Add a task.'**
+  /// **'Tasks without a date wait here until you choose one.\nStart with Add a task.'**
   String get inboxEmpty;
 
   /// No description provided for @savedOnDevice.
@@ -1429,7 +1417,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkCaptures.
   ///
   /// In en, this message translates to:
-  /// **'Check unfinished captures'**
+  /// **'See what’s not saved yet'**
   String get checkCaptures;
 
   /// No description provided for @seriesEdits.
@@ -1437,12 +1425,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edits apply to the whole repeating task.'**
   String get seriesEdits;
-
-  /// No description provided for @checkBeforeAdd.
-  ///
-  /// In en, this message translates to:
-  /// **'Check the details before adding it to your calendar.'**
-  String get checkBeforeAdd;
 
   /// No description provided for @titleRequired.
   ///
@@ -1636,12 +1618,6 @@ abstract class AppLocalizations {
   /// **'Starts'**
   String get starts;
 
-  /// No description provided for @inboxDate.
-  ///
-  /// In en, this message translates to:
-  /// **'No date · Inbox'**
-  String get inboxDate;
-
   /// No description provided for @updateReminderError.
   ///
   /// In en, this message translates to:
@@ -1765,7 +1741,7 @@ abstract class AppLocalizations {
   /// No description provided for @capturePrivacy.
   ///
   /// In en, this message translates to:
-  /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.'**
+  /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.'**
   String get capturePrivacy;
 
   /// One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings.
@@ -1819,7 +1795,7 @@ abstract class AppLocalizations {
   /// No description provided for @pendingCaptureCount.
   ///
   /// In en, this message translates to:
-  /// **'Unfinished captures · {count}'**
+  /// **'Not saved yet · {count}'**
   String pendingCaptureCount(int count);
 
   /// No description provided for @listeningSeconds.
@@ -1894,6 +1870,12 @@ abstract class AppLocalizations {
   /// **'Add step'**
   String get addStep;
 
+  /// Under the Add step field when a task already has 50 steps; the typed text stays in the field.
+  ///
+  /// In en, this message translates to:
+  /// **'A task can have up to 50 steps. Remove a step to add this one.'**
+  String get stepLimit;
+
   /// No description provided for @listUnavailable.
   ///
   /// In en, this message translates to:
@@ -1951,7 +1933,7 @@ abstract class AppLocalizations {
   /// No description provided for @movedInbox.
   ///
   /// In en, this message translates to:
-  /// **'Moved to Inbox'**
+  /// **'Date removed'**
   String get movedInbox;
 
   /// No description provided for @scheduleChangedAgain.
@@ -2053,7 +2035,7 @@ abstract class AppLocalizations {
   /// No description provided for @taskSavedInbox.
   ///
   /// In en, this message translates to:
-  /// **'Task saved to Inbox'**
+  /// **'Added with no date'**
   String get taskSavedInbox;
 
   /// After saving a new task with a date. The date is a weekday and date such as Fri, Oct 17, never Today or Tomorrow.
@@ -2617,7 +2599,7 @@ abstract class AppLocalizations {
   /// No description provided for @listNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Work, Personal, Shopping…'**
+  /// **'Home, Work, Shopping…'**
   String get listNameHint;
 
   /// No description provided for @listNameRequired.
@@ -2728,18 +2710,6 @@ abstract class AppLocalizations {
   /// **'Retry projects'**
   String get retryLists;
 
-  /// No description provided for @refreshLists.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh projects and invitations'**
-  String get refreshLists;
-
-  /// No description provided for @listsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'A clear place for every part of life. Keep projects personal or share them with a group.'**
-  String get listsHelp;
-
   /// No description provided for @listsEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -2749,7 +2719,7 @@ abstract class AppLocalizations {
   /// No description provided for @listsEmptyHelp.
   ///
   /// In en, this message translates to:
-  /// **'Start with Work, Personal or Shopping. Tasks can move whenever you like.'**
+  /// **'Start with Home, Work or Shopping. Tasks can move whenever you like.'**
   String get listsEmptyHelp;
 
   /// No description provided for @roleOwner.
@@ -3937,7 +3907,7 @@ abstract class AppLocalizations {
   /// No description provided for @archivePersonalCopies.
   ///
   /// In en, this message translates to:
-  /// **'Imports create new personal copies. Account access, files, notification preferences and unfinished captures are not included.'**
+  /// **'Imports create new personal copies. Account access, files, notification preferences and anything not saved yet are not included.'**
   String get archivePersonalCopies;
 
   /// No description provided for @archiveCsvPriorities.
@@ -3961,7 +3931,7 @@ abstract class AppLocalizations {
   /// No description provided for @archiveReviewSchedule.
   ///
   /// In en, this message translates to:
-  /// **'The original schedule needs review; this task will go to Inbox.'**
+  /// **'The original schedule needs review; this task will have no date.'**
   String get archiveReviewSchedule;
 
   /// No description provided for @archiveFlattenedSubtasks.
@@ -4117,7 +4087,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureGone.
   ///
   /// In en, this message translates to:
-  /// **'This capture is no longer available.'**
+  /// **'Your words are no longer available.'**
   String get captureGone;
 
   /// No description provided for @captureNoteLength.
@@ -4129,13 +4099,13 @@ abstract class AppLocalizations {
   /// No description provided for @captureNoTasks.
   ///
   /// In en, this message translates to:
-  /// **'No tasks were found. Your capture is kept.'**
+  /// **'No tasks were found. Your words are kept.'**
   String get captureNoTasks;
 
   /// No description provided for @captureUnsupportedKind.
   ///
   /// In en, this message translates to:
-  /// **'This server does not support the selected capture type. Your input is kept.'**
+  /// **'This server does not support this way of adding tasks. Your words are kept.'**
   String get captureUnsupportedKind;
 
   /// No description provided for @captureOffline.
@@ -4159,13 +4129,13 @@ abstract class AppLocalizations {
   /// No description provided for @captureSignIn.
   ///
   /// In en, this message translates to:
-  /// **'Sign in again to process this account’s capture.'**
+  /// **'Sign in again to turn your words into tasks.'**
   String get captureSignIn;
 
   /// No description provided for @captureForbidden.
   ///
   /// In en, this message translates to:
-  /// **'This account cannot process the capture. Check your access and try again.'**
+  /// **'This account can’t turn your words into tasks. Check your access and try again.'**
   String get captureForbidden;
 
   /// No description provided for @captureTooLarge.
@@ -4177,7 +4147,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureTypedFirst.
   ///
   /// In en, this message translates to:
-  /// **'Save or discard this typed capture before starting a recording.'**
+  /// **'Save or discard what you typed before starting a recording.'**
   String get captureTypedFirst;
 
   /// No description provided for @captureMicrophone.
@@ -4315,7 +4285,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureDiscardFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not discard this capture. It is still kept.'**
+  /// **'Could not discard your words. They are still kept.'**
   String get captureDiscardFailed;
 
   /// No description provided for @captureReviewWriteFailed.
@@ -4327,7 +4297,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureSaveFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.'**
+  /// **'Could not finish saving. Your words are kept; retry will not duplicate saved tasks.'**
   String get captureSaveFailed;
 
   /// No description provided for @captureSetupRequested.
@@ -4359,12 +4329,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice recording'**
   String get voiceRecording;
-
-  /// No description provided for @retryCaptures.
-  ///
-  /// In en, this message translates to:
-  /// **'Retry loading captures'**
-  String get retryCaptures;
 
   /// No description provided for @capturesCaughtUp.
   ///
@@ -5095,7 +5059,7 @@ abstract class AppLocalizations {
   /// No description provided for @groupVoiceName.
   ///
   /// In en, this message translates to:
-  /// **'Your spoken name'**
+  /// **'Name for voice assignments'**
   String get groupVoiceName;
 
   /// No description provided for @groupVoiceHelp.
@@ -5104,11 +5068,47 @@ abstract class AppLocalizations {
   /// **'An optional name others can use when assigning tasks by voice.'**
   String get groupVoiceHelp;
 
-  /// No description provided for @groupOnline.
+  /// No description provided for @createGroup.
   ///
   /// In en, this message translates to:
-  /// **'Connect to manage group members and invitations.'**
-  String get groupOnline;
+  /// **'Create group'**
+  String get createGroup;
+
+  /// No description provided for @nextStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get nextStep;
+
+  /// No description provided for @enterName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get enterName;
+
+  /// No description provided for @groupRoleQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'What can {name} do?'**
+  String groupRoleQuestion(String name);
+
+  /// No description provided for @groupInvited.
+  ///
+  /// In en, this message translates to:
+  /// **'Invited'**
+  String get groupInvited;
+
+  /// No description provided for @invitationPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get invitationPending;
+
+  /// No description provided for @loadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load. Check your connection.'**
+  String get loadFailed;
 
   /// No description provided for @projectDestination.
   ///
@@ -5205,6 +5205,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'TaskFlow'**
   String get activitySystem;
+
+  /// Tooltip of the header button (people icon) that opens activity from shared projects and groups.
+  ///
+  /// In en, this message translates to:
+  /// **'Group activity'**
+  String get groupActivity;
+
+  /// Spoken by TalkBack before an unread activity row.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread'**
+  String get activityUnread;
+
+  /// One activity row: who did what to which task. action is an internal code; actor is a person’s name; title is the task title.
+  ///
+  /// In en, this message translates to:
+  /// **'{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}'**
+  String activityEntry(String action, String actor, String title);
 
   /// Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead.
   ///
@@ -5331,6 +5349,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This project’s file space is full. Its owner can remove files to make room.'**
   String get storageFullShared;
+
+  /// Spoken label of the pin icon before a pinned project's name in Projects.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get projectPinned;
+
+  /// Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared · {role}'**
+  String projectSharedRole(String role);
+
+  /// Under 'Where does this project belong?' in the new-project dialog, once a group is chosen. {group} is the group's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone in {group} will see it.'**
+  String projectGroupSees(String group);
 }
 
 class _AppLocalizationsDelegate
