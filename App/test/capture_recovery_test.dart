@@ -266,11 +266,11 @@ void main() {
       final beforeLanguage = jsonEncode(failed.toJson());
       expect(
         captureProblemText(AppLocalizationsEn(), failed.error!),
-        contains('unavailable'),
+        AppLocalizationsEn().captureUnavailable,
       );
       expect(
         captureProblemText(AppLocalizationsEs(), failed.error!),
-        contains('no está disponible'),
+        AppLocalizationsEs().captureUnavailable,
       );
       expect(
         jsonEncode((await store.read(session.id, 'local'))!.toJson()),
@@ -626,6 +626,35 @@ void main() {
         (await diagnostics.summary()).every((r) => r['samples'] == 0),
         isTrue,
       );
+    },
+  );
+
+  test(
+    'UX-102: an empty stored capture is dropped when the pending list loads; one with words, audio or a shared text stays',
+    () async {
+      final empty = await store.create('local', 'Europe/Madrid');
+      final typed = await store.create(
+        'local',
+        'Europe/Madrid',
+        text: 'Comprar pan',
+      );
+      final shared = await store.acceptEntry(
+        '3b9d0032-1fe0-41fa-a1b8-fb71fba4e84a',
+        'local',
+        'Europe/Madrid',
+        text: 'Buy coffee',
+        capturedAt: DateTime.utc(2026, 9, 22),
+      );
+      final pending = await store.pending('local');
+      expect(pending.map((s) => s.id).toSet(), {typed.id, shared!.id});
+      expect(await store.read(empty.id, 'local'), isNull);
+      // Closed and opened again: still gone, the others still there.
+      await database.close();
+      await reopen();
+      expect((await store.pending('local')).map((s) => s.id).toSet(), {
+        typed.id,
+        shared.id,
+      });
     },
   );
 }

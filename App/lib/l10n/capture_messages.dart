@@ -8,7 +8,7 @@ String captureProblemText(AppLocalizations l, String value) =>
       CaptureProblem.noTasks => l.captureNoTasks,
       CaptureProblem.unsupportedKind => l.captureUnsupportedKind,
       CaptureProblem.offline => l.captureOffline,
-      CaptureProblem.timeout => l.captureTimeout,
+      CaptureProblem.timeout ||
       CaptureProblem.unavailable => l.captureUnavailable,
       CaptureProblem.allowance => l.captureAllowance,
       CaptureProblem.proRequired => l.voiceProRequired,
@@ -32,5 +32,6 @@ String captureProblemText(AppLocalizations l, String value) =>
       CaptureProblem.saveFailed => l.captureSaveFailed,
       CaptureProblem.setupRequested => l.captureSetupRequested,
       CaptureProblem.setupUnavailable => l.captureSetupUnavailable,
-      _ => value,
+      // Never a server's or the platform's own words.
+      _ => l.captureFailed,
     };

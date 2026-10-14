@@ -31,6 +31,9 @@ class CloudTaskRepository extends TaskRepository {
   @override
   Future<int> deleteTask(int id) => database.deleteTask(id, ownerKey: ownerKey);
   @override
+  Future<int> restoreTask(Task task) =>
+      database.restoreTask(task, ownerKey: ownerKey);
+  @override
   Future<int> importLocalTasks() => database.importLocalTasks(ownerKey);
 
   Map<String, dynamic> _payload(Map<String, dynamic> row) => {

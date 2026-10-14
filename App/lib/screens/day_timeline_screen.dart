@@ -11,6 +11,7 @@ import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/device_calendar_events.dart';
+import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +28,15 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
   late DateTime _day = Task.day(widget.day);
   final _scroll = ScrollController();
   final _firstItem = GlobalKey();
+  final _landedRow = GlobalKey();
   Timer? _clock;
+
+  /// Tasks just saved from this timeline, for this day: lit until
+  /// [_highlightTimer] fires.
+  Set<int> _landingIds = {};
+  Set<int> _landedIds = {};
+  bool _highlight = false;
+  Timer? _highlightTimer;
   @override
   void initState() {
     super.initState();
@@ -41,6 +50,7 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _clock?.cancel();
+    _highlightTimer?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -48,6 +58,44 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
   void _changeDay(int offset) {
     setState(() => _day = DateTime(_day.year, _day.month, _day.day + offset));
     if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  /// After a save from this timeline. Tasks for this day light up here;
+  /// any other (no date, another day) shows on Calendar, as after saving from
+  /// the pending list.
+  void _land(CalendarFocus focus) {
+    final day = focus.day;
+    if (day != null && Task.dateKey(day) == Task.dateKey(_day)) {
+      setState(() {
+        _landingIds = focus.taskIds;
+        _landedIds = {};
+        _highlight = false;
+        _highlightTimer?.cancel();
+      });
+      return;
+    }
+    final calendarFocus = ref.read(calendarFocusProvider.notifier);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Once this focus has reached every listener.
+    scheduleMicrotask(() => calendarFocus.state =
+        CalendarFocus(day, focus.taskIds, showCalendar: true));
+  }
+
+  /// Brings the first saved row into view, then lets the highlight fade.
+  Future<void> _reveal() async {
+    final row = _landedRow.currentContext;
+    if (row != null) {
+      await Scrollable.ensureVisible(row,
+          alignment: .15,
+          duration: MediaQuery.disableAnimationsOf(row)
+              ? Duration.zero
+              : const Duration(milliseconds: 250));
+    }
+    if (!mounted) return;
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _highlight = false);
+    });
   }
 
   @override
@@ -67,6 +115,10 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
       ]);
   @override
   Widget build(BuildContext context) {
+    // Capture opened here shows what it saved here (or on Calendar).
+    ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
+      if (focus != null && identical(focus.page, this)) _land(focus);
+    });
     final l = context.l10n;
     final colors = Theme.of(context).colorScheme;
     final tasks = ref.watch(taskProvider);
@@ -86,6 +138,20 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
         data.entries.take(200).toList(), data.window,
         minimumHeight: minimumHeight);
     final first = layout.items.firstOrNull;
+    if (_landingIds.isNotEmpty &&
+        (data.unblocked.any((task) => _landingIds.contains(task.id)) ||
+            layout.items
+                .any((item) => _landingIds.contains(item.entry.task?.id)))) {
+      _landedIds = _landingIds;
+      _landingIds = {};
+      _highlight = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
+    bool saved(Task? task) => task != null && _landedIds.contains(task.id);
+    final landedTask = data.unblocked.where(saved).firstOrNull;
+    final landedItem = landedTask == null
+        ? layout.items.where((item) => saved(item.entry.task)).firstOrNull
+        : null;
     return Scaffold(
       appBar: CustomAppBar(title: l.dayTimeline),
       body: Column(children: [
@@ -108,12 +174,17 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
         Expanded(
             child: RefreshIndicator(
                 onRefresh: _refresh,
-                child: ListView(
+                // All of it is built, so `Ir al primer elemento con hora`
+                // reaches the timeline however short the view is above the
+                // add button.
+                child: SingleChildScrollView(
                     key: const ValueKey('timeline-scroll'),
                     controller: _scroll,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    children: [
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                       Text(l.timelineHelp),
                       if (tasks.isLoading || eventRead?.isLoading == true)
                         const LinearProgressIndicator(),
@@ -147,8 +218,16 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                                   context, _day, event)),
                         for (final task in data.unblocked)
                           Padding(
+                              key: identical(task, landedTask)
+                                  ? _landedRow
+                                  : null,
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: TaskTile(task: task, showDate: true)),
+                              child: saved(task)
+                                  ? LandedTaskTile(
+                                      task: task,
+                                      showDate: true,
+                                      lit: _highlight)
+                                  : TaskTile(task: task, showDate: true)),
                       ],
                       if (data.entries.isEmpty)
                         Padding(
@@ -230,33 +309,37 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                                         left: ruler + item.lane * laneWidth + 4,
                                         width: laneWidth - 8,
                                         height: item.height,
-                                        child: _TimelineBlock(
-                                            key: identical(item, first)
-                                                ? _firstItem
-                                                : ValueKey(item.entry.id),
-                                            item: item,
-                                            day: _day)),
+                                        child: KeyedSubtree(
+                                            key: identical(item, landedItem)
+                                                ? _landedRow
+                                                : null,
+                                            child: _TimelineBlock(
+                                                key: identical(item, first)
+                                                    ? _firstItem
+                                                    : ValueKey(item.entry.id),
+                                                item: item,
+                                                day: _day,
+                                                lit: _highlight &&
+                                                    saved(item.entry.task)))),
                                 ])));
                       }),
-                    ]))),
+                    ])))),
       ]),
-      floatingActionButton: FloatingActionButton(
-          tooltip: l.newTask,
-          onPressed: () {
-            // Never pre-fill a day that has already gone.
-            final today = Task.day(ref.read(calendarClockProvider)());
-            Navigator.pushNamed(context, '/createTask',
-                arguments: _day.isBefore(today) ? today : _day);
-          },
-          child: const Icon(Icons.add_rounded)),
+      // The same one button as Calendar, for this day.
+      bottomNavigationBar:
+          SafeArea(top: false, child: TaskActions(day: _day, page: this)),
     );
   }
 }
 
 class _TimelineBlock extends StatelessWidget {
-  const _TimelineBlock({super.key, required this.item, required this.day});
+  const _TimelineBlock(
+      {super.key, required this.item, required this.day, this.lit = false});
   final TimelinePlacement item;
   final DateTime day;
+
+  /// Just saved: drawn as LandedTaskTile draws a saved task.
+  final bool lit;
   @override
   Widget build(BuildContext context) {
     final entry = item.entry;
@@ -304,9 +387,16 @@ class _TimelineBlock extends StatelessWidget {
         excludeSemantics: true,
         child: Tooltip(
             message: label,
-            child: Material(
-              color: colors.surfaceContainer,
-              borderRadius: BorderRadius.circular(8),
+            child: TweenAnimationBuilder<Color?>(
+              tween: ColorTween(
+                  end: lit ? colors.primaryContainer : colors.surfaceContainer),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 600),
+              builder: (context, background, child) => Material(
+                  color: background,
+                  borderRadius: BorderRadius.circular(8),
+                  child: child),
               child: InkWell(
                   onTap: open,
                   borderRadius: BorderRadius.circular(8),

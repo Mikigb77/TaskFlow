@@ -543,6 +543,63 @@ class TaskDatabase {
     });
   }
 
+  /// Undoes [deleteTask] with [task] as it was before. An account's row comes
+  /// back as the same task, sent as not deleted on the next sync (the server
+  /// accepts it at the current version). The local owner's row was removed,
+  /// so it is inserted again, keeping its id when it is still free.
+  Future<int> restoreTask(Task task, {String ownerKey = 'local'}) async {
+    return (await database).transaction((tx) async {
+      final rows = await tx.query(
+        'tasks',
+        where: 'id = ? AND owner_key = ? AND is_deleted = 1',
+        whereArgs: [task.id, ownerKey],
+      );
+      if (rows.isNotEmpty) {
+        final paths = task.toMap();
+        await tx.rawUpdate(
+          '''UPDATE tasks SET is_deleted = 0, sync_pending = ?, revision = revision + 1,
+          filePaths = ?, imagePaths = ? WHERE id = ? AND owner_key = ?''',
+          [
+            ownerKey == 'local' ? 0 : 1,
+            paths['filePaths'],
+            paths['imagePaths'],
+            task.id,
+            ownerKey,
+          ],
+        );
+        // Files the deletion already let go of are uploaded again.
+        await stageAttachments(
+          tx,
+          ownerKey,
+          rows.single['sync_id'] as String,
+          task,
+          before: Task.fromMap(rows.single),
+        );
+        return task.id!;
+      }
+      task = await normalizeResponsibility(tx, task, ownerKey);
+      final values = task.toMap();
+      final taken =
+          task.id == null ||
+          (await tx.query(
+            'tasks',
+            columns: ['id'],
+            where: 'id = ?',
+            whereArgs: [task.id],
+          )).isNotEmpty;
+      if (taken) values.remove('id');
+      final syncId = const Uuid().v4();
+      final id = await tx.insert('tasks', {
+        ...values,
+        'owner_key': ownerKey,
+        'sync_id': syncId,
+        'sync_pending': ownerKey == 'local' ? 0 : 1,
+      });
+      await stageAttachments(tx, ownerKey, syncId, task);
+      return id;
+    });
+  }
+
   Future<List<Map<String, dynamic>>> pending(String ownerKey) async =>
       (await database).query(
         'tasks',

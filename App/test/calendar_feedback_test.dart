@@ -18,6 +18,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
@@ -25,8 +26,9 @@ import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
-import 'package:agenda/screens/create_task_screen.dart';
 import 'package:agenda/screens/day_timeline_screen.dart';
+import 'package:agenda/screens/voice_task_screen.dart';
+import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/device_calendars.dart';
@@ -194,11 +196,7 @@ void main() {
             lessThanOrEqualTo(tester.getRect(find.byType(TaskActions)).top),
           );
           expect(find.text(l.undo).hitTestable(), findsOneWidget);
-          expect(
-            find.byTooltip(l.createTaskTooltip).hitTestable(),
-            findsOneWidget,
-          );
-          expect(find.text(l.sayTask).hitTestable(), findsOneWidget);
+          expect(find.text(l.addTask).hitTestable(), findsOneWidget);
           expect(tester.takeException(), isNull);
           if (const bool.fromEnvironment('WRITE_CALENDAR_PREVIEWS') &&
               language == 'es') {
@@ -260,6 +258,8 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     bool settle = true,
+    // Typing in the capture sheet without Pro, saved in memory.
+    MemoryCaptures? captures,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -274,8 +274,13 @@ void main() {
         RegionalPreferences(language: language),
       ),
       tasks: () => _GivenTasks(tasks),
-      overrides: overrides,
+      pro: captures == null,
+      overrides: [
+        ...overrides,
+        if (captures != null) captureStoreProvider.overrideWithValue(captures),
+      ],
     );
+    captures?.tasks = container;
     addTearDown(container.dispose);
     // What the last sync left, as the repository reports it.
     container.read(taskRepositoryProvider).syncError = syncError;
@@ -1443,7 +1448,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-205: a Friday task typed from Calendario selects Friday, shows and highlights its row, says Añadida al vie, … with Deshacer, and Undo removes it',
+    'UX-205: a Friday task typed in the sheet from Calendario selects Friday, shows and highlights its row, says Añadida al vie, … with Deshacer, and Undo removes it',
     (tester) async {
       platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
       final now = DateTime.now();
@@ -1458,42 +1463,18 @@ void main() {
           priority: 1,
           dueDate: DateTime(now.year, now.month, now.day, 9),
         ),
-      ]);
+      ], captures: MemoryCaptures());
       final calendar = tester.element(find.byType(CalendarScreen));
       final l = calendar.l10n;
       expect(find.text(l.todayAgenda), findsOneWidget);
-      await tester.tap(find.text(l.newTask).hitTestable());
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('task-title')),
-        'Llevar el coche al taller',
+      await typeCapture(
+        tester,
+        l.addTask,
+        'Llevar el coche al taller el próximo viernes',
       );
-      final date = find.byKey(const ValueKey('task-date'));
-      await tester.ensureVisible(date);
-      await tester.tap(date);
-      await tester.pumpAndSettle();
-      final picker = find.byType(CalendarDatePicker);
-      if (friday.month != now.month) {
-        await tester.tap(
-          find.descendant(
-            of: picker,
-            matching: find.byTooltip(
-              MaterialLocalizations.of(tester.element(picker)).nextMonthTooltip,
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-      }
-      await tester.tap(
-        find.descendant(of: picker, matching: find.text('${friday.day}')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('schedule-done')));
-      await tester.pumpAndSettle();
-      final save = find.text(l.createTask);
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.pumpAndSettle();
+      expect(find.text('Llevar el coche al taller'), findsOneWidget);
+      expect(find.text(l.fromYourWords), findsOneWidget);
+      await saveCapture(tester);
 
       // Friday is selected.
       expect(
@@ -1538,29 +1519,17 @@ void main() {
   );
 
   testWidgets(
-    'UX-205: an undated task typed from Calendario says it went to the inbox and offers Deshacer',
+    'UX-205: an undated task typed in the sheet from Calendario says it went to the inbox and offers Deshacer',
     (tester) async {
       platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
-      final container = await openCalendar(tester, []);
-      final l = tester.element(find.byType(CalendarScreen)).l10n;
-      await tester.tap(find.text(l.newTask).hitTestable());
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('task-title')),
-        'Algún día',
+      final container = await openCalendar(
+        tester,
+        [],
+        captures: MemoryCaptures(),
       );
-      final date = find.byKey(const ValueKey('task-date'));
-      await tester.ensureVisible(date);
-      await tester.tap(date);
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, l.noDate));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('schedule-done')));
-      await tester.pumpAndSettle();
-      final save = find.text(l.createTask);
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.pumpAndSettle();
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      await typeCapture(tester, l.addTask, 'Algún día');
+      await saveCapture(tester);
       expect(find.text(l.taskSavedInbox), findsOneWidget);
       expect(find.text(l.todayAgenda), findsOneWidget);
       await tester.tap(find.text(l.undo));
@@ -1633,13 +1602,15 @@ void main() {
   });
 
   testWidgets(
-    'UX-203: Nueva tarea and the day timeline’s + never pre-fill a past day',
+    'UX-203: Añadir tarea, from Calendar and from the day timeline, never gives a past day',
     (tester) async {
       final today = DateTime(2030, 3, 14, 11);
+      final captures = MemoryCaptures();
       await openCalendar(
         tester,
         [],
         overrides: [calendarClockProvider.overrideWithValue(() => today)],
+        captures: captures,
       );
       final calendar = tester.element(find.byType(CalendarScreen));
       final l = calendar.l10n;
@@ -1649,39 +1620,32 @@ void main() {
         find.text(DateFormat.MMMMEEEEd('es').format(past)),
         findsOneWidget,
       );
-      Future<void> expectToday() async {
-        expect(find.byType(CreateTaskScreen), findsOneWidget);
-        final date = find.byKey(const ValueKey('task-date'));
+      Future<void> expectNoDay() async {
+        await typeCapture(tester, l.addTask, 'Comprar pan');
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(captures.current!.drafts.single.task.dueDate, isNull);
         expect(
           find.descendant(
-            of: date,
-            matching: find.textContaining(calendar.weekdayDate(today)),
+            of: find.byType(CaptureResult),
+            matching: find.text(l.noDate),
           ),
           findsOneWidget,
         );
-        expect(
-          find.descendant(
-            of: date,
-            matching: find.textContaining(calendar.weekdayDate(past)),
-          ),
-          findsNothing,
-        );
-        await tester.binding.handlePopRoute();
+        await tester.tap(find.widgetWithText(TextButton, l.cancel));
         await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsNothing);
       }
 
-      await tester.tap(find.text(l.newTask).hitTestable());
-      await tester.pumpAndSettle();
-      await expectToday();
+      await expectNoDay();
 
       await tester.tap(find.byKey(const ValueKey('calendar-format')));
       await tester.pumpAndSettle();
       await tester.tap(find.text(l.day).last);
       await tester.pumpAndSettle();
       expect(find.byType(DayTimelineScreen), findsOneWidget);
-      await tester.tap(find.byTooltip(l.newTask));
-      await tester.pumpAndSettle();
-      await expectToday();
+      // The timeline has the same one button, and no +.
+      expect(find.byType(FloatingActionButton), findsNothing);
+      await expectNoDay();
       expect(tester.takeException(), isNull);
     },
   );

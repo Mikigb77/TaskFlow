@@ -238,7 +238,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await binding.takeScreenshot('notes-detail-dark');
-      await tester.tap(find.byTooltip('Edit note'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Edit note'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('task-date')), findsNothing);
       await tester.enterText(

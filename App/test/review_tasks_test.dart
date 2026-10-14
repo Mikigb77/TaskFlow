@@ -518,7 +518,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final l = lookupAppLocalizations(const Locale('es'));
-      await tester.tap(find.text(l.sayTask).hitTestable());
+      await tester.tap(find.text(l.addTask).hitTestable());
       await tester.pumpAndSettle();
       expect(speech.starts, 1);
       speech.send('ready');
@@ -760,6 +760,32 @@ void main() {
         find.descendant(of: line, matching: find.textContaining('17:00')),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-465: an assistant AM/PM question keeps its own words, not ¿A qué hora?',
+    (tester) async {
+      final day = nextWeekday(DateTime.friday);
+      const question = '¿A las 5 de la mañana o de la tarde?';
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(title: 'Médico', priority: 1, dueDate: day),
+          confirmed: false,
+          clarifications: const [
+            CaptureClarification(
+              question: question,
+              field: 'schedule',
+              times: ['05:00', '17:00'],
+            ),
+          ],
+        ),
+      ]);
+      expect(find.text(question), findsOneWidget);
+      expect(es.captureWhatTime, '¿A qué hora?');
+      expect(find.text(es.captureWhatTime), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1366,6 +1392,8 @@ class _ListeningStore extends CaptureStore {
     String kind = 'task',
     String? projectId,
     String? source,
+    DateTime? day,
+    String? id,
   }) async => session = CaptureSession(
     id: 'preview-capture',
     ownerKey: ownerKey,
@@ -1375,6 +1403,7 @@ class _ListeningStore extends CaptureStore {
     kind: kind,
     projectId: projectId,
     source: source,
+    day: day,
   );
   @override
   Future<void> update(CaptureSession value) async => session = value;

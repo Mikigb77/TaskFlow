@@ -15,6 +15,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/widgets/task_editor.dart';
 import 'package:flutter/services.dart';
 import 'support/design_fixtures.dart';
 import 'support/reminder_fixtures.dart';
@@ -422,7 +423,23 @@ void main() {
           UncontrolledProviderScope(container: container, child: const MyApp()),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip(es.createTaskTooltip));
+        // The form edits a saved task; this one is date-only.
+        final now = DateTime.now();
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .push(
+              MaterialPageRoute<void>(
+                builder: (_) => TaskEditor(
+                  task: Task(
+                    id: 1,
+                    title: 'Comprar pan',
+                    priority: 1,
+                    dueDate: DateTime(now.year, now.month, now.day),
+                    hasTime: false,
+                  ),
+                ),
+              ),
+            );
         await tester.pumpAndSettle();
         final more = find.byKey(const ValueKey('task-more-details'));
         await tester.ensureVisible(more);

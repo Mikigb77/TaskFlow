@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:agenda/main.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import '../test/support/design_fixtures.dart';
 
@@ -26,7 +27,9 @@ void main() {
       await tester.tap(find.text('Month').last);
       await tester.pumpAndSettle();
       await binding.takeScreenshot('agenda-${mode.name}');
-      await tester.tap(find.byTooltip('Create task'));
+      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(
+          '/editTask',
+          arguments: container.read(taskProvider).requireValue.first.id);
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const ValueKey('task-title')), 'Plan something good');

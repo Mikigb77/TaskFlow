@@ -115,7 +115,7 @@ void main() {
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     for (final route in [
       '/calendar',
-      '/createTask',
+      '/captures',
       '/taskDetails',
       '/voiceTask',
       '/settings',
@@ -138,7 +138,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(CalendarScreen), findsOneWidget);
       final previous = tester.state<NavigatorState>(find.byType(Navigator));
-      previous.pushNamed('/createTask');
+      previous.pushNamed('/captures');
       await tester.pumpAndSettle();
       expect(previous.canPop(), isTrue);
       await auth.signOut();

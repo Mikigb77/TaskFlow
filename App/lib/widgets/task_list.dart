@@ -10,6 +10,7 @@ class TaskList extends StatelessWidget {
     this.landedIds = const {},
     this.lit = false,
     this.landedRow,
+    this.bottomPadding = 100,
   });
   final List<Task> tasks;
 
@@ -21,6 +22,9 @@ class TaskList extends StatelessWidget {
   final Set<int> landedIds;
   final bool lit;
   final Key? landedRow;
+
+  /// Empty space after the last row.
+  final double bottomPadding;
   @override
   Widget build(BuildContext context) {
     final sorted = [...tasks]
@@ -34,7 +38,7 @@ class TaskList extends StatelessWidget {
     final first = sorted.indexWhere((task) => landedIds.contains(task.id));
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPadding),
       itemCount: sorted.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (_, index) {

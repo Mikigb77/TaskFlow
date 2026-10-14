@@ -153,6 +153,14 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
     final repository = ref.watch(taskRepositoryProvider);
     final local = repository.ownerKey == 'local';
     final colors = Theme.of(context).colorScheme;
+    final attachments = ref.watch(attachmentEntriesProvider(widget.task.id!));
+    // A task without files shows no Attachments section at all.
+    if (!_busy &&
+        _error == null &&
+        !attachments.hasError &&
+        (attachments.valueOrNull?.isEmpty ?? true)) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -160,7 +168,7 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
         SectionLabel(context.l10n.attachments),
         if (_busy) const LinearProgressIndicator(),
         if (_error != null) MessageBanner(_error!, isError: true),
-        ref.watch(attachmentEntriesProvider(widget.task.id!)).when(
+        attachments.when(
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,13 +185,6 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
               data: (entries) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (entries.isEmpty)
-                    Text(
-                      ref.watch(listCanEditProvider(widget.task.listId))
-                          ? context.l10n.fileEmpty
-                          : context.l10n.fileNone,
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
                   for (final entry in entries)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),

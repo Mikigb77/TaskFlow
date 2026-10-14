@@ -423,6 +423,43 @@ void main() {
       expect(await database.pending(repository.ownerKey), isEmpty);
     },
   );
+
+  test(
+    'UX-208: a soft-deleted task restored before sync goes out as not deleted, at the same id, with its date, reminder and steps',
+    () async {
+      final full = task.copyWith(
+        reminderMinutes: 30,
+        checklist: [ChecklistItem(id: 'a', title: 'Llevar la tarjeta')],
+      );
+      final id = await repository.addTask(full);
+      await repository.sync();
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      final before = (await repository.getAllTasks()).single;
+
+      await repository.deleteTask(id);
+      expect(await repository.getAllTasks(), isEmpty);
+      expect(
+        (await database.pending(repository.ownerKey)).single['is_deleted'],
+        1,
+      );
+
+      await repository.restoreTask(before);
+      final pending = (await database.pending(repository.ownerKey)).single;
+      expect(pending['is_deleted'], 0);
+      expect(pending['id'], id);
+      final back = (await repository.getAllTasks()).single;
+      expect(back.id, id);
+      expect(back.dueDate, full.dueDate);
+      expect(back.reminderMinutes, 30);
+      expect(back.checklist.single.title, 'Llevar la tarjeta');
+
+      await repository.sync();
+      expect(api.lastUpload!['is_deleted'], isFalse);
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      expect(api.remote.single['is_deleted'], isFalse);
+      expect((await repository.getAllTasks()).single.title, task.title);
+    },
+  );
 }
 
 class _Api extends ApiClient {

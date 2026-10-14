@@ -1,0 +1,43 @@
+{
+  "runId": "2026-10-13-app",
+  "mode": "app",
+  "round": "b4-r3",
+  "packages": [
+    {
+      "id": "P71",
+      "title": "Edit form: Save on an untouched form just closes",
+      "area": "B",
+      "size": "S",
+      "severity": 1,
+      "findings": [
+        "UX-474"
+      ],
+      "aliases": {
+        "UX-474": "R2B-1"
+      },
+      "files": [
+        "App/lib/widgets/task_editor.dart"
+      ],
+      "brief": [
+        "Context: P70 (b4 round 2, UX-473) removed `_save`'s `undo` parameter, so every save now shows `Cambios guardados · Deshacer`. That part was verified and stays. But the unchanged-form check lives only in `_back` (task_editor.dart ~269-276: `if (const DeepCollectionEquality().equals(_edited().toMap(), _unchanged)) { Navigator.pop(context); return; }`). The `Guardar cambios` button (~840: `onPressed: _saving || _pickingFile ? null : _save`) is always enabled and calls `_save()` directly, so on an untouched form it writes the same task and shows `Cambios guardados · Deshacer`, and Deshacer writes the same task again. P70's implementer noted this and left it because the brief only kept D12's 'unchanged closes' for Back. Back and Save must behave the same on an untouched form.",
+        "UX-474 (R2B-1, S1): in `Future<void> _save()` (~278), right after the first line `if (_saving || !_form.currentState!.validate()) return;`, add the unchanged check moved from `_back`: if `const DeepCollectionEquality().equals(_edited().toMap(), _unchanged)`, call `Navigator.pop(context)` and return. It must sit before `FocusScope.of(context).unfocus()`, the series dialog (`_ruleChanged && _exceptions.isNotEmpty`), `setState(() => _saving = true)` and `notifier.updateTask`. So an untouched form makes no write, shows no snackbar and doesn't call `askAboutRemindersAfterSave`.",
+        "Then `_back` (~269) keeps only `if (_saving) return; await _save();` (or just `await _save();`, since `_save` already checks `_saving`), and drop the moved check from it. Update its doc comment to say that Back and Save both close an unchanged form and save changes with Undo. Keep the PopScope wiring (~422-425: `onPopInvokedWithResult` → `_back()`) as it is.",
+        "Order matters for D12: `validate()` still runs first, so an emptied title shows its error and stays, for both Back and Save. The comparison is the same `_edited().toMap()` vs `_unchanged` (set at ~145) that Back already uses, so a title typed and then put back counts as unchanged. Don't change `_unchanged` or `_edited()`.",
+        "No new copy and no ARB changes. The strings involved already exist: `saveChangesSentence` (EN `Save changes` / ES `Guardar cambios` / CA `Desa els canvis`), `changesSaved` (EN `Changes saved` / ES `Cambios guardados` / CA `Canvis desats`).",
+        "Existing tests: every test that taps `Save changes` / `Guardar cambios` (appearance_test.dart:98 and :145, task_creation_test.dart `_saveTask`, task_lists_widget_test.dart:96, task_detail_test.dart:466, integration_test/attachment_flow_test.dart:97) changes something before it saves, so none should break. If one does, it saved an untouched form: report it rather than weakening the check.",
+        "Don't touch: the Undo action and its `undoError` path (~312-329), the save button's enabled/disabled logic and its `Guardando…` state, task_detail_screen.dart (P70's rows and Semantics are verified), the delete flow (P42), AttachmentPanel."
+      ],
+      "acceptance": [
+        "Widget test, Spanish: open the edit form (/editTask) for an existing task, change nothing, tap `Guardar cambios`: the form closes, no SnackBar shows (neither `Cambios guardados` nor `Deshacer` is found), and the repository records no update for that task (updateTask isn't called).",
+        "Widget test, Spanish: open the edit form, empty the title, tap `Guardar cambios`: the form stays open, the title's error shows, no SnackBar shows and nothing is written.",
+        "The existing tests still pass unchanged: `UX-211: with no change, Back just closes the form, with no message`, `UX-211: change the title and press Back → … Cambios guardados · Deshacer`, `UX-211: with the title emptied, Back shows the field’s error and stays`, and `UX-473: change the title and tap Guardar cambios → Cambios guardados · Deshacer; Deshacer restores the old title` (App/test/task_detail_test.dart).",
+        "Code: the DeepCollectionEquality unchanged check appears once in task_editor.dart, inside `_save` after `validate()` and before any `updateTask` call; `_back` has no comparison of its own."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": [],
+  "escalated": []
+}

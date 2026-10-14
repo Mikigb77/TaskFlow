@@ -6,7 +6,6 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
-import 'package:agenda/screens/create_task_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
@@ -53,19 +52,30 @@ void main() {
     Size size = const Size(390, 844),
     double textScale = 1,
     List<Override> overrides = const [],
+    // Captures are typed without Pro and saved in memory, unless a test
+    // brings its own store.
+    CaptureStore? captureStore,
+    bool pro = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = textScale;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final captures = MemoryCaptures();
     final container = designContainer(
       regionalStore: MemoryRegionalStore(
         RegionalPreferences(language: language),
       ),
       tasks: () => _GivenTasks(tasks),
-      overrides: [...reminderOverrides(store, access), ...overrides],
+      pro: pro,
+      overrides: [
+        ...reminderOverrides(store, access),
+        captureStoreProvider.overrideWithValue(captureStore ?? captures),
+        ...overrides,
+      ],
     );
+    captures.tasks = container;
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const MyApp()),
@@ -78,23 +88,32 @@ void main() {
     Localizations.localeOf(tester.element(find.byType(CalendarScreen))),
   );
 
-  Finder sheet() => find.byType(BottomSheet);
+  // The reminder question's sheet. Capture opens as a bottom sheet too.
+  Finder sheet() {
+    final capture = find
+        .ancestor(
+          of: find.byType(VoiceTaskScreen),
+          matching: find.byType(BottomSheet),
+        )
+        .evaluate()
+        .map((element) => element.widget)
+        .toSet();
+    return find.byWidgetPredicate(
+      (widget) => widget is BottomSheet && !capture.contains(widget),
+    );
+  }
+
   Finder question(AppLocalizations l) => find.text(l.reminderAskQuestion);
 
-  /// Types a task from Calendar's `Nueva tarea`: it gets the selected day.
+  /// Types [title] and today's word in the capture sheet from Calendar's
+  /// `Añadir tarea`, and adds it: a task dated today.
   Future<void> typeDatedTask(WidgetTester tester, String title) async {
     final l = strings(tester);
-    await tester.tap(find.text(l.newTask).hitTestable());
-    await tester.pumpAndSettle();
-    expect(find.byType(CreateTaskScreen), findsOneWidget);
-    await tester.enterText(find.byKey(const ValueKey('task-title')), title);
-    await tester.pumpAndSettle();
-    // The unsaved form is never covered by the question.
+    final today = {'es': 'hoy', 'ca': 'avui'}[l.localeName] ?? 'today';
+    await typeCapture(tester, l.addTask, '$title $today');
+    // The result not yet added is never covered by the question.
     expect(question(l), findsNothing);
-    final save = find.text(l.createTask);
-    await tester.ensureVisible(save);
-    await tester.tap(save);
-    await tester.pumpAndSettle();
+    await saveCapture(tester);
   }
 
   /// The question waits for the save message to close (UX-439).
@@ -106,19 +125,10 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   }
 
-  /// Types a task with no date, the way the Tareas tab opens the form.
+  /// Types a task with no date: with today selected, it gets none.
   Future<void> typeUndatedTask(WidgetTester tester, String title) async {
-    final l = strings(tester);
-    tester
-        .state<NavigatorState>(find.byType(Navigator))
-        .pushNamed('/createTask');
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('task-title')), title);
-    await tester.pumpAndSettle();
-    final save = find.text(l.createTask);
-    await tester.ensureVisible(save);
-    await tester.tap(save);
-    await tester.pumpAndSettle();
+    await typeCapture(tester, strings(tester).addTask, title);
+    await saveCapture(tester);
   }
 
   testWidgets(
@@ -129,8 +139,8 @@ void main() {
       final container = await openApp(tester, store, access);
       final l = strings(tester);
       await typeDatedTask(tester, 'Comprar pan');
-      // Saved and shown first: the form is gone and the save message is up.
-      expect(find.byType(CreateTaskScreen), findsNothing);
+      // Saved and shown first: the sheet is gone and the save message is up.
+      expect(find.byType(VoiceTaskScreen), findsNothing);
       expect(
         container.read(taskProvider).requireValue.map((t) => t.title),
         contains('Comprar pan'),
@@ -245,10 +255,9 @@ void main() {
         tester,
         store,
         access,
-        overrides: [
-          captureStoreProvider.overrideWithValue(captures),
-          ...captureSheetOverrides(),
-        ],
+        captureStore: captures,
+        pro: true,
+        overrides: captureSheetOverrides(),
       );
       final l = strings(tester);
       final now = DateTime.now();
@@ -407,20 +416,6 @@ void main() {
   group('UX-439: the question waits for the save message', () {
     Finder row(String title) => find.widgetWithText(TaskTile, title);
 
-    /// Fills and saves the form already open from Calendar's `Nueva tarea`.
-    Future<void> saveOpenForm(
-      WidgetTester tester,
-      AppLocalizations l,
-      String title,
-    ) async {
-      await tester.enterText(find.byKey(const ValueKey('task-title')), title);
-      await tester.pumpAndSettle();
-      final save = find.text(l.createTask);
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.pumpAndSettle();
-    }
-
     testWidgets(
       'UX-439: right after a dated save, Añadida al …, Deshacer and the lit row show with no sheet; the sheet comes after the message’s timeout',
       (tester) async {
@@ -429,7 +424,7 @@ void main() {
         await openApp(tester, store, access);
         final l = strings(tester);
         await typeDatedTask(tester, 'Comprar pan');
-        expect(find.byType(CreateTaskScreen), findsNothing);
+        expect(find.byType(VoiceTaskScreen), findsNothing);
         final calendar = tester.element(find.byType(CalendarScreen));
         final message = find.text(
           l.taskAddedOn(calendar.weekdayDate(DateTime.now())),
@@ -481,6 +476,11 @@ void main() {
           container.read(taskProvider).requireValue.map((t) => t.title),
           isNot(contains('Comprar pan')),
         );
+        // Deshacer reopens the capture on its result; leave it for later.
+        expect(find.byType(CaptureResult), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, l.cancel));
+        await tester.pumpAndSettle();
+        expect(find.byType(VoiceTaskScreen), findsNothing);
         await tester.pump(FeedbackTimeout.defaultDuration * 2);
         await tester.pumpAndSettle();
         expect(sheet(), findsNothing);
@@ -495,7 +495,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-439: opening Nueva tarea before the message closes never covers it with the sheet; the next dated save asks',
+      'UX-439: opening Añadir tarea before the message closes never covers it with the sheet; the next dated save asks',
       (tester) async {
         final store = MemoryReminderStore();
         final access = FakeReminderAccess();
@@ -503,17 +503,24 @@ void main() {
         final l = strings(tester);
         await typeDatedTask(tester, 'Comprar pan');
         expect(find.byType(SnackBar), findsOneWidget);
-        await tester.tap(find.text(l.newTask).hitTestable());
+        await tester.tap(find.text(l.addTask).hitTestable());
         await tester.pumpAndSettle();
-        expect(find.byType(CreateTaskScreen), findsOneWidget);
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
         await tester.pump(FeedbackTimeout.defaultDuration * 2);
         await tester.pumpAndSettle();
-        expect(find.byType(CreateTaskScreen), findsOneWidget);
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
         expect(sheet(), findsNothing);
         expect(question(l), findsNothing);
         expect(store.value.asked, isFalse);
 
-        await saveOpenForm(tester, l, 'Llamar a mamá');
+        await tester.enterText(
+          find.byKey(const ValueKey('capture-words')),
+          'Llamar a mamá hoy',
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, l.done));
+        await tester.pumpAndSettle();
+        await saveCapture(tester);
         await letSaveMessageClose(tester);
         expect(question(l), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -567,10 +574,9 @@ void main() {
           tester,
           store,
           access,
-          overrides: [
-            captureStoreProvider.overrideWithValue(captures),
-            ...captureSheetOverrides(),
-          ],
+          captureStore: captures,
+          pro: true,
+          overrides: captureSheetOverrides(),
         );
         final l = strings(tester);
         final now = DateTime.now();

@@ -3,6 +3,7 @@
 // printed marker, then creates the printed app-private resume file with run-as.
 import 'dart:io';
 import 'package:agenda/main.dart';
+import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -70,11 +71,15 @@ void main() {
     await tester.pumpWidget(
         UncontrolledProviderScope(container: container, child: const MyApp()));
     await tester.pumpAndSettle();
+    // New tasks come from the capture sheet; the form attaches files to a
+    // saved one.
+    final created = await container.read(taskProvider.notifier).addTask(
+        Task(title: 'Attachment restoration fixture', priority: 1));
+    final draft = (await repository.getAllTasks())
+        .singleWhere((task) => task.id == created);
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
-    navigator.push(MaterialPageRoute(builder: (_) => const TaskEditor()));
+    navigator.push(MaterialPageRoute(builder: (_) => TaskEditor(task: draft)));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('task-title')),
-        'Attachment restoration fixture');
     await tester.tap(find.byKey(const ValueKey('task-more-details')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Add attachment'), 240,
@@ -89,9 +94,9 @@ void main() {
     debugPrint('ATTACHMENT_WAIT_PICK_DIALOG: $fixture');
     await _until(tester, () async => find.text(fixture).evaluate().isNotEmpty);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create Task'));
-    await _until(
-        tester, () async => (await repository.getAllTasks()).isNotEmpty);
+    await tester.tap(find.text('Save changes'));
+    await _until(tester,
+        () async => (await repository.attachments.forTask(created)).isNotEmpty);
     await container.read(taskProvider.notifier).loadTasks();
     final task = (await repository.getAllTasks()).single;
     final saved = (await repository.attachments.forTask(task.id!)).single;

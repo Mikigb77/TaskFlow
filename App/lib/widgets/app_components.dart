@@ -134,24 +134,27 @@ class MessageBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return AppSurface(
-        color: isError ? colors.errorContainer : colors.primaryContainer,
-        padding: const EdgeInsets.all(16),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(
-              icon ??
-                  (isError ? Icons.info_outline : Icons.check_circle_outline),
-              size: 20,
-              color: isError
-                  ? colors.onErrorContainer
-                  : colors.onPrimaryContainer),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(message,
-                  style: TextStyle(
-                      color: isError
-                          ? colors.onErrorContainer
-                          : colors.onPrimaryContainer))),
-        ]));
+    // An error is read out as soon as it appears or changes.
+    return Semantics(
+        liveRegion: isError,
+        child: AppSurface(
+            color: isError ? colors.errorContainer : colors.primaryContainer,
+            padding: const EdgeInsets.all(16),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(
+                  icon ??
+                      (isError ? Icons.info_outline : Icons.check_circle_outline),
+                  size: 20,
+                  color: isError
+                      ? colors.onErrorContainer
+                      : colors.onPrimaryContainer),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(message,
+                      style: TextStyle(
+                          color: isError
+                              ? colors.onErrorContainer
+                              : colors.onPrimaryContainer))),
+            ])));
   }
 }

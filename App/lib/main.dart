@@ -13,7 +13,6 @@ import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
-import 'package:agenda/screens/create_task_screen.dart';
 import 'package:agenda/screens/edit_task_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/account_screen.dart';
@@ -26,6 +25,7 @@ import 'package:agenda/screens/task_lists_screen.dart';
 import 'package:agenda/screens/data_transfer_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/screens/day_timeline_screen.dart';
@@ -146,36 +146,48 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         }
         final entry = pending.first;
         final owner = ref.read(captureOwnerProvider);
-        await ref.read(regionalProvider.notifier).ready;
-        final zone = await CaptureTimezone.resolve(
-          ref.read(regionalProvider),
-          accountTimezone: ref.read(authProvider).account?.timezone,
-        );
-        if (!mounted ||
-            ref.read(authProvider).account == null ||
-            owner != ref.read(captureOwnerProvider)) {
-          break;
+        // Only shared text brings words to keep. The widget and the shortcuts
+        // open an empty sheet, which keeps nothing until something is said or
+        // typed.
+        final shared = entry.kind == 'share';
+        CaptureSession? session;
+        if (shared) {
+          await ref.read(regionalProvider.notifier).ready;
+          final zone = await CaptureTimezone.resolve(
+            ref.read(regionalProvider),
+            accountTimezone: ref.read(authProvider).account?.timezone,
+          );
+          if (!mounted ||
+              ref.read(authProvider).account == null ||
+              owner != ref.read(captureOwnerProvider)) {
+            break;
+          }
+          session = await ref
+              .read(captureStoreProvider)
+              .acceptEntry(
+                entry.id,
+                owner,
+                zone.identifier,
+                text: entry.text,
+                capturedAt: entry.capturedAt,
+              );
         }
-        final session = await ref
-            .read(captureStoreProvider)
-            .acceptEntry(
-              entry.id,
-              owner,
-              zone.identifier,
-              text: entry.text,
-              capturedAt: entry.capturedAt,
-            );
         await entries.acknowledge(entry.id);
         if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
-        ref.invalidate(pendingCapturesProvider);
-        if (session == null || session.terminal) continue;
+        if (shared) {
+          ref.invalidate(pendingCapturesProvider);
+          if (session == null || session.terminal) continue;
+        }
         await CaptureInterruption.stop();
         if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
+        final voice = entry.kind == 'voice';
         unawaited(
           showCaptureSheet(
             _navigator.currentContext!,
-            captureId: session.id,
-            startListening: entry.kind == 'voice',
+            captureId: session?.id,
+            startListening: voice,
+            askedToSpeak: voice,
+            typing: !voice,
           ),
         );
       }
@@ -355,7 +367,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               '/notes': (_) => const MainShell(initialIndex: 2),
               '/settings': (_) => const MainShell(initialIndex: 3),
               '/completedTasks': (_) => const CompletedTasksScreen(),
-              '/createTask': (_) => const CreateTaskScreen(),
               '/account': (_) => const AccountScreen(),
               '/subscription': (_) => const SubscriptionScreen(),
               '/captures': (_) => const CapturesScreen(),

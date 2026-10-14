@@ -40,15 +40,15 @@ void main() {
   });
 
   test(
-    'capture failures keep unknown details and translate recognized failures',
+    'capture failures translate recognized failures and hide unknown details',
     () {
       final en = AppLocalizationsEn();
       final es = AppLocalizationsEs();
       final problem = CaptureProblem.from(
         ApiException(503, 'Service unavailable'),
       );
-      expect(captureProblemText(en, problem), contains('unavailable'));
-      expect(captureProblemText(es, problem), contains('no está disponible'));
+      expect(captureProblemText(en, problem), en.captureUnavailable);
+      expect(captureProblemText(es, problem), es.captureUnavailable);
       expect(
         CaptureProblem.from(
           ApiException(
@@ -71,7 +71,7 @@ void main() {
       );
       expect(
         captureProblemText(es, CaptureProblem.from(custom)),
-        custom.message,
+        es.captureFailed,
       );
       expect(
         CaptureProblem.from(PlatformException(code: 'permission')),
@@ -167,7 +167,6 @@ void main() {
       await tester.ensureVisible(message);
       await tester.pumpAndSettle();
       expect(message, findsOneWidget);
-      expect(find.textContaining(l.captureKept), findsNothing);
     }
     expect(store.session!.text, 'Already kept');
     expect(api.requests, 0);
@@ -180,8 +179,11 @@ void main() {
     'during-start',
     'stop-during-start',
   ]) {
+    final early = interruption.contains('during-start');
     testWidgets(
-      'audio $interruption keeps the foreground capture without sending',
+      early
+          ? 'audio $interruption, before any audio, keeps nothing and sends nothing'
+          : 'audio $interruption keeps the foreground capture without sending',
       (tester) async {
         final speech = _Speech()..installed = false;
         final recorder = _Recorder()
@@ -190,19 +192,38 @@ void main() {
         final store = _Captures();
         final api = _OfflineExtraction();
         await _open(tester, speech, store, api, recorder: recorder);
+        if (early) {
+          // Cut off before the first audio: no capture, and its file goes.
+          await tester.pumpAndSettle();
+          expect(store.session, isNull);
+          expect(store.removedAudio, hasLength(1));
+          expect(recorder.stops, 1);
+          expect(api.requests, 0);
+          expect(find.textContaining('Listening ·'), findsNothing);
+          expect(tester.takeException(), isNull);
+          tester.state<NavigatorState>(find.byType(Navigator)).pop();
+          await tester.pumpAndSettle();
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+          expect(recorder.disposed, isTrue);
+          return;
+        }
+        // Listening alone keeps nothing; the first audio keeps the capture.
+        expect(store.session, isNull);
+        recorder.amplitudes.add(Amplitude(current: -20, max: 0));
+        await tester.pump();
+        await tester.pump();
         final id = store.session!.id;
         final capturedAt = store.session!.capturedAt;
-        if (!interruption.contains('during-start')) {
-          expect(store.session!.status, 'recording');
-          await tester.runAsync(() async {
-            recorder.states.add(
-              interruption == 'pause' ? RecordState.pause : RecordState.stop,
-            );
-            // Stream cancellation may complete outside the fake frame clock.
-            await Future<void>.delayed(Duration.zero);
-          });
-          await tester.pumpAndSettle();
-        }
+        expect(store.session!.status, 'recording');
+        await tester.runAsync(() async {
+          recorder.states.add(
+            interruption == 'pause' ? RecordState.pause : RecordState.stop,
+          );
+          // Stream cancellation may complete outside the fake frame clock.
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pumpAndSettle();
         expect(tester.binding.lifecycleState, AppLifecycleState.resumed);
         expect(store.session!.status, 'editing');
         expect(store.session!.id, id);
@@ -942,7 +963,7 @@ void main() {
         // twice.
         expect(
           find.ancestor(
-            of: find.text(es.sayTask),
+            of: find.text(es.addTask),
             matching: find.byType(Tooltip),
           ),
           findsNothing,
@@ -961,7 +982,7 @@ void main() {
     );
 
     testWidgets(
-      'U3: Notas’ Dictar una nota opens the same sheet over Notes, and the capture is a note',
+      'U3: Notas’ Añadir nota opens the same sheet over Notes, and the capture is a note',
       (tester) async {
         final bridge = _Bridge(tester);
         final store = _Captures();
@@ -975,7 +996,7 @@ void main() {
         );
         await tester.tap(find.text(es.notes).last);
         await tester.pumpAndSettle();
-        await tester.tap(find.text(es.recordNote).hitTestable());
+        await tester.tap(find.text(es.addNote).hitTestable());
         await tester.pumpAndSettle();
         expect(sheet(), findsOneWidget);
         expect(inSheet(find.byType(VoiceTaskScreen)), findsOneWidget);
@@ -1677,7 +1698,7 @@ Future<ProviderContainer> _open(
   if (!open) return container;
   if (fromButton) {
     final l = lookupAppLocalizations(Locale(language));
-    await tester.tap(find.text(l.sayTask).hitTestable());
+    await tester.tap(find.text(l.addTask).hitTestable());
   } else {
     unawaited(
       showCaptureSheet(
@@ -1764,10 +1785,13 @@ class _Captures extends CaptureStore {
     String kind = 'task',
     String? projectId,
     String? source,
+    DateTime? day,
+    String? id,
   }) async => session = CaptureSession(
     id: 'test-capture',
     projectId: projectId,
     source: source,
+    day: day,
     kind: kind,
     ownerKey: ownerKey,
     timezone: timezone,
@@ -1786,6 +1810,13 @@ class _Captures extends CaptureStore {
       session?.id == id && session?.ownerKey == ownerKey ? session : null;
   @override
   Future<void> cleanFinished(String ownerKey) async {}
+  @override
+  Future<String> audioPathForId(String id) async => '/synthetic/capture.wav';
+
+  /// Audio files dropped because no audio arrived.
+  final removedAudio = <String>[];
+  @override
+  Future<void> removeAudioFile(String id) async => removedAudio.add(id);
 
   /// Ids discarded through the store, as Descartar does.
   final discarded = <String>[];

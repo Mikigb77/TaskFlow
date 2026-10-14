@@ -1175,6 +1175,33 @@
    ]
   },
   {
+   "id": "P72",
+   "title": "Calendar: a task saved without a date lands clear of the save message",
+   "area": "B",
+   "size": "S",
+   "severity": 3,
+   "findings": [
+    "UX-475"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/calendar_screen.dart",
+    "App/test/capture_landing_test.dart"
+   ],
+   "brief": [
+    "UX-475 (found in b4 round 2, verify-b4-r2-B.md): when a task with no date is saved, Calendar lights its Bandeja row, but at 390x844 the row sits almost entirely under the save message, and Calendar's content is too short to scroll it clear.",
+    "Fix as P65 did for Tareas: while a landing is active, add a bottom inset equal to the save message's final height plus 8, so the highlighted row can scroll fully above the message. Remove the inset when the landing ends. Don't change Tareas, or dated landings, which already pass."
+   ],
+   "acceptance": [
+    "Saving a task without a date from Calendar at 390x844 leaves its highlighted row fully above the save message, with animations on and with animations off.",
+    "Dated landings on Calendar and Tareas still pass their existing tests."
+   ],
+   "deviceChecks": [
+    "Save a task without a date from Calendar on a ~390x844 phone; the highlighted row is fully visible above the save message."
+   ],
+   "dependsOn": []
+  },
+  {
    "id": "P13",
    "title": "Share from the project page; shorter invitations",
    "area": "C",

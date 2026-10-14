@@ -2,7 +2,8 @@ import 'package:flutter/services.dart';
 import 'api_client.dart';
 
 /// Locale-independent values in retained captures; old English values still
-/// resolve at display time. Unknown server/platform details are left intact.
+/// resolve at display time. Unknown details are stored as they are, for
+/// diagnostics, and shown as one plain message.
 abstract final class CaptureProblem {
   static const gone = 'capture_problem:gone';
   static const noteLength = 'capture_problem:note_length';
@@ -33,6 +34,7 @@ abstract final class CaptureProblem {
   static const saveFailed = 'capture_problem:save_failed';
   static const setupRequested = 'capture_problem:setup_requested';
   static const setupUnavailable = 'capture_problem:setup_unavailable';
+  static const failed = 'capture_problem:failed';
 
   static const _legacy = {
     'This capture is no longer available.': gone,
@@ -61,18 +63,24 @@ abstract final class CaptureProblem {
 
   static String from(Object error) {
     if (error is ApiException) {
-      if (error.status == 0 &&
-          error.message ==
-              'The server took too long to respond. Your local tasks are safe.') {
-        return timeout;
+      // A server's own words, and `field: message` details, never reach the
+      // capture: each status has its plain message.
+      if (error.status == 0) {
+        return switch (error.message) {
+          ApiClient.timeoutMessage => timeout,
+          ApiClient.unreachableMessage => unavailable,
+          _ => offline,
+        };
       }
-      if (error.status == 0) return offline;
       if (error.status == 402) return proRequired;
       if (error.status == 401) return signIn;
       if (error.status == 403) return forbidden;
       if (error.status == 413) return tooLarge;
+      // Short or silent audio.
+      if (error.status == 422) return noSpeech;
       if (error.status == 429) return allowance;
       if (error.status >= 500 && error.status < 600) return unavailable;
+      return failed;
     }
     if (error is PlatformException) {
       final known = switch (error.code) {

@@ -7,13 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/text_search.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
-import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/services/capture_store.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
@@ -252,29 +252,20 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       <Widget>[Text(context.l10n.notesSavedOnDevice)]),
             ]),
       ),
+      // One button, as on Calendar and Tareas: the mic with Pro, typing
+      // without it.
       bottomNavigationBar: SafeArea(
           top: false,
           child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-              child: Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    FilledButton.icon(
-                        icon: const Icon(Icons.edit_note_rounded),
-                        label: Text(context.l10n.newNote),
-                        onPressed: () => _add(() => Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                                builder: (_) => TaskEditor(
-                                    kind: 'note', initialListId: _saveTo))))),
-                    OutlinedButton.icon(
-                        icon: const Icon(Icons.mic_none_rounded),
-                        label: Text(context.l10n.recordNote),
-                        onPressed: () => _add(() => showCaptureSheet(context,
-                            kind: 'note', projectId: _saveTo))),
-                  ]))),
+              child: FilledButton.icon(
+                  icon: Icon(ref.watch(hasProProvider)
+                      ? Icons.mic_none_rounded
+                      : Icons.add_rounded),
+                  label: Text(context.l10n.addNote),
+                  onPressed: () => _add(() => showCaptureSheet(context,
+                      kind: 'note',
+                      projectId: _saveTo))))),
     );
   }
 

@@ -50,6 +50,11 @@ final hasProProvider = Provider<bool>(
   (ref) => ref.watch(subscriptionProvider).hasPro,
 );
 
+/// Whether billing is still finding out if the account has Pro.
+final billingLoadingProvider = Provider<bool>(
+  (ref) => ref.watch(subscriptionProvider).loading,
+);
+
 enum BillingResult {
   active,
   restored,
@@ -93,6 +98,10 @@ class SubscriptionState {
   }
 
   bool get canPurchase => ready && !busy && customerInfo != null && !hasPro;
+
+  /// Billing hasn't said yet whether this account has Pro. [hasPro] reads
+  /// false meanwhile, so capture waits instead of guessing.
+  bool get loading => !ready && issue == null;
   SubscriptionState copyWith({
     CustomerInfo? customerInfo,
     Offering? offering,

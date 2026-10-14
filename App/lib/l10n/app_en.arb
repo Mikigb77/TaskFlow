@@ -14,6 +14,10 @@
   "reviewRepairHelp": "This text may have been saved with damaged accents. Review the correction before saving.",
   "reviewConfirmDetail": "That’s right",
   "reviewNoTime": "No time",
+  "captureWhatTime": "What time?",
+  "@captureWhatTime": {
+    "description": "The time question for a result made on the phone, above the morning and evening time chips. Neutral between morning and evening; in Spanish it avoids `mañana`, which also means tomorrow."
+  },
   "reviewEditDetail": "Change this detail",
   "reviewResolved": "Reviewed",
   "reviewResolve": "Check this detail",
@@ -63,9 +67,6 @@
   "regionalFormatsHelp": "Clock, first day of the week and capture timezone",
   "sharedCaptureRetained": "Your shared capture is retained. Reopen TaskFlow to try again.",
   "note": "Note",
-  "noteEmptyBody": "No text added.",
-  "fileNone": "No attachments.",
-  "newNote": "New note",
   "editNote": "Edit note",
   "noteTitle": "Note title",
   "noteBody": "Your note",
@@ -75,7 +76,10 @@
   "findNote": "Search notes",
   "saveNote": "Save note",
   "noteSaved": "Note saved",
-  "recordNote": "Dictate a note",
+  "addNote": "Add a note",
+  "@addNote": {
+    "description": "The one button on Notes that adds a note: it opens the capture sheet."
+  },
   "noteHint": "Ideas, meeting details, useful links…",
   "noteTitleHint": "e.g. Wi-Fi password",
   "@noteTitleHint": {
@@ -88,8 +92,6 @@
   "@allNotes": {
     "description": "Option of the Notes project filter that shows the notes of every project."
   },
-  "deleteNoteQuestion": "Delete this note?",
-  "keepNote": "Keep note",
   "viewOnlyNote": "View-only note. The project owner manages editing access.",
   "linkOpenError": "Could not open this link. You can copy it from the note.",
   "noteLinks": "Links",
@@ -200,15 +202,16 @@
   "tomorrow": "Tomorrow",
   "all": "All",
   "upcoming": "Upcoming",
-  "completed": "Completed",
   "noDate": "No date",
   "anyTime": "Any time",
   "addTime": "Add time",
   "removeDate": "Remove date",
-  "newTask": "New task",
   "editTask": "Edit task",
   "taskDetails": "Task details",
-  "sayTask": "Say a task",
+  "addTask": "Add a task",
+  "@addTask": {
+    "description": "The one button that adds a task: it opens the capture sheet."
+  },
   "typeTasks": "Type tasks",
   "unfinishedCaptures": "Unfinished captures",
   "captureDiagnostics": "Capture diagnostics",
@@ -241,7 +244,6 @@
   "save": "Save",
   "delete": "Delete",
   "keepChanges": "Keep changes",
-  "createTask": "Create Task",
   "saveChanges": "Save Changes",
   "taskTitle": "Task title",
   "additionalNotes": "Additional Notes",
@@ -299,7 +301,7 @@
   "refreshCalendar": "Try refreshing your calendar.",
   "tryAgain": "Try again",
   "rememberPrompt": "What would you like to remember?",
-  "calendarEmpty": "Tap Say a task and speak naturally, or New task to type. Dates are optional; unscheduled tasks go to Inbox.",
+  "calendarEmpty": "Nothing planned for this day.",
   "planTask": "Plan a task",
   "homeCapture": "Capture from your home screen",
   "homeCaptureHelp": "Android mic widget, app shortcuts and text sharing",
@@ -326,15 +328,11 @@
   "freshStart": "A fresh start",
   "differentFilter": "Try a different word or filter.",
   "listEmpty": "Add a task to this project. Its date and reminder are yours to choose.",
-  "tasksEmpty": "Use Say a task to speak, or New task to type.\nAdd a date now or leave it for later.",
-  "inboxEmpty": "Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.",
+  "tasksEmpty": "Tap Add a task to add one. A date is optional.",
+  "inboxEmpty": "Keep ideas and to-dos here until you choose a date.\nStart with Add a task.",
   "savedOnDevice": "Your saved tasks are still on your device.",
   "checkCaptures": "Check unfinished captures",
-  "createTaskTooltip": "Create task",
-  "reviewTask": "Review task",
   "fineTunePlan": "Fine-tune your plan.",
-  "onYourMind": "What’s on your mind?",
-  "wordsPlan": "Your words, a clear plan.",
   "seriesEdits": "Edits apply to the whole repeating task.",
   "giveName": "Give it a name. Add a date whenever you’re ready.",
   "checkBeforeAdd": "Check the details before adding it to your calendar.",
@@ -356,9 +354,10 @@
   "months": "months",
   "years": "years",
   "deleteTask": "Delete task",
-  "deleteTaskQuestion": "Delete task?",
   "keepTask": "Keep task",
   "deleteTaskError": "Could not delete this task. Please try again.",
+  "taskDeleted": "Task deleted",
+  "noteDeleted": "Note deleted",
   "attachmentUnavailable": "This attachment is not available on this device.",
   "attachmentOpenError": "Could not open this attachment.",
   "taskUnavailable": "Task unavailable",
@@ -366,7 +365,6 @@
   "taskRemoved": "This task may have been removed.",
   "occurrenceSkipped": "This date is skipped or no longer part of the repeating schedule.",
   "editRepeating": "Edit repeating task",
-  "nextStep": "Your next step",
   "moveError": "Could not move this task. Please retry.",
   "occurrence": "Occurrence",
   "starts": "Starts",
@@ -385,6 +383,10 @@
   "setUpSpeech": "Set up on-device speech",
   "checkAgain": "Check again",
   "examplePlan": "Doctor Friday at 5 p.m. Bring my results. Also buy coffee.",
+  "exampleTask": "Doctor Friday at 5 p.m.",
+  "@exampleTask": {
+    "description": "Hint in the empty typing field of the capture sheet when typed words are understood on the phone, as one task: a short task with a day and a time the app reads."
+  },
   "discard": "Discard",
   "keep": "Keep",
   "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Unfinished input stays on this phone until you save or discard it.",
@@ -465,7 +467,6 @@
     }
   },
   "pickDate": "Pick a date",
-  "typeTask": "Type a task",
   "addStepDialog": "Add a step",
   "editStep": "Edit step",
   "step": "Step",
@@ -499,7 +500,6 @@
   "progressHeading": "Look how far you’ve come.",
   "completedLoadError": "Couldn’t load completed tasks",
   "tryLater": "Please try again in a moment.",
-  "suggestionApplied": "Schedule suggestion applied",
   "changeSeriesQuestion": "Change the repeating schedule?",
   "changeSeriesHelp": "This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.",
   "keepEditing": "Keep editing",
@@ -520,10 +520,15 @@
   "choosePhoto": "Choose a photo",
   "attachFile": "Attach a file",
   "attachError": "Could not attach that file. Please try again.",
-  "capturedWords": "Captured from your words",
   "titleRequiredField": "Please enter a task title",
-  "keepAsTitle": "Keep as title",
-  "ambiguousTimeHelp": "Choose AM/PM or add the time yourself. No hour has been inferred.",
+  "fromYourWords": "From your words",
+  "@fromYourWords": {
+    "description": "Under a date read from typed words, before the Keep as typed button."
+  },
+  "keepAsTyped": "Keep as typed",
+  "@keepAsTyped": {
+    "description": "Text button: the typed words become the title again, without the date read from them."
+  },
   "clearDate": "Clear date",
   "optionalTime": "Time (optional)",
   "resetDateHelp": "Reset a date, then save your changes.",
@@ -535,14 +540,6 @@
   "localAttachments": "Attachments stay on this device.",
   "saving": "Saving…",
   "saveChangesSentence": "Save changes",
-  "useSchedule": "Use {schedule}",
-  "@useSchedule": {
-    "placeholders": {
-      "schedule": {
-        "type": "String"
-      }
-    }
-  },
   "checklistCount": "Checklist · {done}/{total}",
   "@checklistCount": {
     "placeholders": {
@@ -785,7 +782,6 @@
   },
   "acceptInvitation": "Accept invitation",
   "decline": "Decline",
-  "fileEmpty": "No attachments. Add a file when editing.",
   "fileLoadError": "Could not load attachment status. Please retry.",
   "fileActionError": "Could not complete this action. Your task is saved; please retry.",
   "fileSignInHelp": "Sign in to upload your files and restore them on another device.",
@@ -1124,10 +1120,9 @@
   "captureNoteLength": "A note needs 1 to 8000 characters.",
   "captureNoTasks": "No tasks were found. Your capture is kept.",
   "captureUnsupportedKind": "This server does not support the selected capture type. Your input is kept.",
-  "captureOffline": "Cannot reach the server. Check your connection and server address, then retry.",
-  "captureTimeout": "The server took too long to respond. You can retry this capture.",
-  "captureUnavailable": "The processing service is unavailable. Retry this capture later.",
-  "captureAllowance": "The service request limit was reached. Retry later.",
+  "captureOffline": "No internet. Your words are saved — try again when you’re online.",
+  "captureUnavailable": "Couldn’t reach the assistant — your words are kept.",
+  "captureAllowance": "You’ve reached today’s limit. Type the task, or try again tomorrow.",
   "captureSignIn": "Sign in again to process this account’s capture.",
   "captureForbidden": "This account cannot process the capture. Check your access and try again.",
   "captureTooLarge": "This recording exceeds the service limit. Keep it for later or use a shorter typed description.",
@@ -1183,8 +1178,8 @@
   },
   "captureRecordingFirst": "Retry this recording or discard it before recording another.",
   "captureEmptyInput": "Say or type what you need to do first.",
-  "captureSpeechStopped": "Speech stopped. Your retained words are safe; record audio or type to continue.",
-  "captureNoSpeech": "No clear speech was detected. Retained words are still available.",
+  "captureSpeechStopped": "Listening stopped. You can talk again, or type.",
+  "captureNoSpeech": "I didn’t catch that. Try again, or type it.",
   "captureSpeechLanguage": "On-device speech is not installed for this language. Choose another language, record audio, or type.",
   "captureSpeechUnavailable": "On-device speech is unavailable. Record audio or type instead.",
   "captureSpeechBusy": "A microphone request is already open. Finish it before trying again.",
@@ -1196,7 +1191,6 @@
   "captureSaveFailed": "Could not finish saving. Your capture is kept; retry will not duplicate saved tasks.",
   "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
   "captureSetupUnavailable": "Speech setup is unavailable here. Use saved audio or type.",
-  "captureKept": "Your capture is kept on this phone.",
   "voiceRecording": "Voice recording",
   "retryCaptures": "Retry loading captures",
   "capturesCaughtUp": "All caught up",
@@ -1253,6 +1247,9 @@
   "captureReviewRetainedHelp": "Unfinished drafts are kept on this phone. You can return from Unfinished captures.",
   "captureCheckDetails": "Check the details above",
   "captureUnderstanding": "Understanding…",
+  "captureFailed": "That didn’t work. Your words are saved here — try again.",
+  "captureSlow": "Taking longer than usual.",
+  "captureSaveAsWritten": "Save as written",
   "captureThingsToAdd": "{count, plural, one{1 thing to add} other{{count} things to add}}",
   "@captureThingsToAdd": {
     "placeholders": {
@@ -1306,7 +1303,6 @@
   "listEditingAccessHelp": "The project owner manages editing access.",
   "loadTaskError": "Couldn’t load this task",
   "deleteSeriesHelp": "“{title}” and all its occurrences will be removed.",
-  "deleteItemHelp": "“{title}” will be removed.",
   "viewOnlyTask": "View-only shared task. The project owner manages editing access.",
   "stepUpdateError": "Could not update this step. Please retry.",
   "checklistCompletionHelp": "Completing the checklist does not complete the task. Use Complete when you are finished.",
@@ -1334,13 +1330,6 @@
     }
   },
   "@deleteSeriesHelp": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
-  "@deleteItemHelp": {
     "placeholders": {
       "title": {
         "type": "String"
@@ -1530,6 +1519,10 @@
   "activityDeleted": "Deleted a task",
   "activitySystem": "TaskFlow",
   "voiceProRequired": "Voice capture is included with TaskFlow Pro.",
+  "captureSpeakingIsPro": "Speaking a task is part of TaskFlow Pro. You can type it here.",
+  "@captureSpeakingIsPro": {
+    "description": "Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead."
+  },
   "voiceProAction": "Explore Pro",
   "voiceAccessUnavailable": "We could not verify voice access. Your capture is safe; reconnect and try again.",
   "projectsNoneFound": "No matching projects",

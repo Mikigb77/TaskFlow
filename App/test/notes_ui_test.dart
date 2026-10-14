@@ -1,4 +1,6 @@
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/main.dart';
+import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
@@ -13,6 +15,7 @@ import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
+import 'package:agenda/widgets/task_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:agenda/services/native_speech.dart';
@@ -37,6 +40,19 @@ Widget app(ProviderContainer container, Widget home,
                 child: child!),
             home: home));
 
+/// Notes typed in the capture sheet, without Pro, and saved in memory.
+ProviderContainer typingContainer(
+    {TaskNotifier Function()? tasks, List<TaskListInfo>? projects}) {
+  final captures = MemoryCaptures();
+  final container = designContainer(
+      tasks: tasks,
+      projects: projects,
+      pro: false,
+      overrides: [captureStoreProvider.overrideWithValue(captures)]);
+  captures.tasks = container;
+  return container;
+}
+
 void main() {
   testWidgets(
       'note create, search and links work at 2x text in light/dark and English/Spanish',
@@ -45,32 +61,35 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     for (final language in ['en', 'es']) {
       for (final dark in [false, true]) {
-        final container = designContainer();
+        final container = typingContainer();
         await tester.pumpWidget(app(container, const NotesScreen(),
             dark: dark, language: language));
         await tester.pumpAndSettle();
         expect(find.text('Doctor appointment'), findsNothing);
-        await tester.tap(find.widgetWithText(
-            FilledButton, language == 'en' ? 'New note' : 'Nueva nota'));
-        await tester.pumpAndSettle();
-        await tester.enterText(find.byKey(const ValueKey('task-title')),
-            'Reference Friday at 17:00');
-        await tester.ensureVisible(find.byKey(const ValueKey('note-body')));
-        await tester.enterText(find.byKey(const ValueKey('note-body')),
-            'Opening hours and directions https://example.org/long-reference-information-for-visiting');
-        expect(find.byKey(const ValueKey('task-date')), findsNothing);
-        expect(find.byKey(const ValueKey('schedule-suggestion')), findsNothing);
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byType(ElevatedButton));
-        await tester.pumpAndSettle();
+        // Its date words stay words: a note never gets a date.
+        await typeCapture(
+            tester,
+            language == 'en' ? 'Add a note' : 'Añadir nota',
+            'Reference Friday at 17:00\n'
+                'Opening hours and directions https://example.org/long-reference-information-for-visiting');
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(
+            find.descendant(
+                of: find.byType(CaptureResult),
+                matching: find.byIcon(Icons.calendar_today_outlined)),
+            findsNothing);
+        await saveCapture(tester);
         final note = container
             .read(taskProvider)
             .requireValue
             .singleWhere((item) => item.isNote);
         expect(note.dueDate, isNull);
-        expect(note.reminderMinutes, -1);
+        expect(note.title, 'Reference Friday at 17:00');
         expect(find.byType(NotesScreen), findsOneWidget);
+        // The save message, with its Deshacer, is done with.
+        ScaffoldMessenger.of(tester.element(find.byType(NotesScreen)))
+            .removeCurrentSnackBar();
+        await tester.pumpAndSettle();
         // The new note was brought into view; the search is back up.
         await tester.scrollUntilVisible(
             find.byKey(const ValueKey('note-search')), -200,
@@ -288,7 +307,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final l10n = lookupAppLocalizations(const Locale('es'));
-    final container = designContainer(tasks: _ManyNotes.new);
+    final container = typingContainer(tasks: _ManyNotes.new);
     addTearDown(container.dispose);
     await tester.pumpWidget(app(container, const NotesScreen(), language: 'es'));
     await tester.pumpAndSettle();
@@ -303,12 +322,8 @@ void main() {
       // Scrolled down the list, as after looking for something.
       await tester.drag(list, const Offset(0, -3000));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, l10n.newNote));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey('task-title')), title);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(ElevatedButton));
-      await tester.pumpAndSettle();
+      await typeCapture(tester, l10n.addNote, title);
+      await saveCapture(tester);
       expect(find.byType(NotesScreen), findsOneWidget);
       final saved = find.ancestor(
           of: find.text(title), matching: find.byType(ListTile));
@@ -342,7 +357,7 @@ void main() {
 
   // ---- P62 (UX-459): a new note the list doesn't show leaves it alone ----
 
-  /// Notas scrolled down, then `Nueva nota` saves [title]: returns the
+  /// Notas scrolled down, then `Añadir nota` saves [title]: returns the
   /// list's scroll offset before and after.
   Future<(double, double)> saveScrolledDown(
       WidgetTester tester, String title) async {
@@ -352,12 +367,8 @@ void main() {
     await tester.pumpAndSettle();
     final before = tester.state<ScrollableState>(list).position.pixels;
     expect(before, greaterThan(0), reason: 'scrolled down');
-    await tester.tap(find.widgetWithText(FilledButton, l10n.newNote));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('task-title')), title);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(ElevatedButton));
-    await tester.pumpAndSettle();
+    await typeCapture(tester, l10n.addNote, title);
+    await saveCapture(tester);
     expect(find.byType(NotesScreen), findsOneWidget);
     final after = tester
         .state<ScrollableState>(find.byType(Scrollable).first)
@@ -378,11 +389,11 @@ void main() {
   }
 
   testWidgets(
-      'UX-459: on Notas filtered to a view-only project, scrolled down, a note saved with Nueva nota (to Personal) leaves the scroll where it was and lights no row',
+      'UX-459: on Notas filtered to a view-only project, scrolled down, a note saved with Añadir nota (to Personal) leaves the scroll where it was and lights no row',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final container = designContainer(tasks: _ProjectNotes.new, projects: [
+    final container = typingContainer(tasks: _ProjectNotes.new, projects: [
       TaskListInfo(id: 'group', name: 'Recetas', role: 'viewer', shared: true)
     ]);
     addTearDown(container.dispose);
@@ -410,7 +421,7 @@ void main() {
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final container = designContainer(tasks: _ManyNotes.new);
+    final container = typingContainer(tasks: _ManyNotes.new);
     addTearDown(container.dispose);
     await tester.pumpWidget(app(container, const NotesScreen(), language: 'es'));
     await tester.pumpAndSettle();
@@ -431,7 +442,7 @@ void main() {
   });
 
   testWidgets(
-      'UX-313: in a project’s notes, Dictar una nota opens capture with that projectId',
+      'UX-313: in a project’s notes, Añadir nota opens capture with that projectId',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -440,7 +451,7 @@ void main() {
     messenger.setMockMethodCallHandler(timezone, (_) async => 'Europe/Madrid');
     addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
     final l10n = lookupAppLocalizations(const Locale('es'));
-    expect(l10n.recordNote, 'Dictar una nota');
+    expect(l10n.addNote, 'Añadir nota');
     final captures = MemoryCaptures();
     final container = designContainer(
       tasks: _AccentNotes.new,
@@ -456,7 +467,7 @@ void main() {
         container, const NotesScreen(listId: 'casa', isRoot: false),
         language: 'es'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(OutlinedButton, l10n.recordNote));
+    await tester.tap(find.widgetWithText(FilledButton, l10n.addNote));
     await tester.pumpAndSettle();
     final capture = tester.widget<VoiceTaskScreen>(find.byType(VoiceTaskScreen));
     expect(capture.kind, 'note');
@@ -528,9 +539,16 @@ void main() {
     addTearDown(container.dispose);
     await tester.pumpWidget(app(container, const NotesScreen(), language: 'es'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, l10n.newNote));
+    // The form edits a saved note: emptied, its title asks in note words.
+    Navigator.of(tester.element(find.byType(NotesScreen))).push(
+        MaterialPageRoute<void>(
+            builder: (_) => TaskEditor(
+                task: Task(
+                    id: 99, kind: 'note', title: 'Clave', priority: 1))));
     await tester.pumpAndSettle();
     final title = find.byKey(const ValueKey('task-title'));
+    await tester.enterText(title, '');
+    await tester.pumpAndSettle();
     expect(find.descendant(of: title, matching: find.text(l10n.noteTitleHint)),
         findsOneWidget);
     await tester.tap(find.byType(ElevatedButton));
@@ -579,6 +597,104 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Médico'), findsOneWidget);
     expect(find.text(l10n.notesHelp, skipOffstage: false), findsNothing);
+  });
+
+  // ---- P38 (UX-118) and P10 (UX-309) ----
+
+  for (final pro in [true, false]) {
+    testWidgets(
+        'UX-118: ${pro ? 'with' : 'without'} Pro, Notas shows one Añadir nota button (${pro ? 'mic' : 'add'} icon) and no Dictar una nota or Nueva nota',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final l10n = lookupAppLocalizations(const Locale('es'));
+      final container = designContainer(tasks: _AccentNotes.new, pro: pro);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(app(container, const NotesScreen(), language: 'es'));
+      await tester.pumpAndSettle();
+      expect(l10n.addNote, 'Añadir nota');
+      final add = find.widgetWithText(FilledButton, l10n.addNote);
+      expect(add.hitTestable(), findsOneWidget);
+      expect(
+          find.descendant(
+              of: add,
+              matching:
+                  find.byIcon(pro ? Icons.mic_none_rounded : Icons.add_rounded)),
+          findsOneWidget);
+      expect(find.text('Dictar una nota'), findsNothing);
+      expect(find.text('Nueva nota'), findsNothing);
+      expect(find.byType(FloatingActionButton), findsNothing);
+      // One way to add a note: no second mic or add button.
+      final adds = find.byWidgetPredicate((w) =>
+          w is Icon &&
+          [Icons.mic_none_rounded, Icons.add_rounded, Icons.edit_note_rounded]
+              .contains(w.icon));
+      expect(adds.hitTestable(), findsOneWidget,
+          reason: 'one way to add a note');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  /// The app in Spanish, on the detail of one note with a body.
+  Future<ProviderContainer> openNote(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = designContainer(
+        tasks: _OneNote.new,
+        regionalStore:
+            MemoryRegionalStore(const RegionalPreferences(language: 'es')));
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()));
+    await tester.pumpAndSettle();
+    tester
+        .state<NavigatorState>(find.byType(Navigator).first)
+        .pushNamed('/taskDetails', arguments: 1);
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskDetailScreen), findsOneWidget);
+    return container;
+  }
+
+  testWidgets('UX-309: tapping a note’s body opens the note editor',
+      (tester) async {
+    final l10n = lookupAppLocalizations(const Locale('es'));
+    await openNote(tester);
+    await tester.tap(find.textContaining('Abre de 9 a 14'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditor), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text(l10n.editNote)),
+        findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-309: a note’s detail has Editar nota at the bottom, which opens the editor, and no ✏ in the app bar; Eliminar stays there',
+      (tester) async {
+    final l10n = lookupAppLocalizations(const Locale('es'));
+    await openNote(tester);
+    expect(l10n.editNote, 'Editar nota');
+    final edit = find.widgetWithText(FilledButton, l10n.editNote);
+    expect(edit.hitTestable(), findsOneWidget);
+    final bar = find.byType(AppBar);
+    expect(find.descendant(of: bar, matching: find.byIcon(Icons.edit_outlined)),
+        findsNothing);
+    expect(
+        find.descendant(of: bar, matching: find.byTooltip(l10n.editNote)),
+        findsNothing);
+    expect(find.descendant(of: bar, matching: find.byTooltip(l10n.delete)),
+        findsOneWidget);
+    // At the bottom: under the note's body, in the screen's lower part.
+    final screen = tester.getRect(find.byType(TaskDetailScreen));
+    expect(tester.getRect(edit).top,
+        greaterThan(tester.getRect(find.textContaining('Abre de 9 a 14')).bottom));
+    expect(tester.getRect(edit).center.dy, greaterThan(screen.height * 0.75));
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditor), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 
@@ -658,6 +774,21 @@ class _Viewer extends DesignTaskNotifier {
           priority: 1,
           listId: 'group',
           notes: 'Information')
+    ]);
+  }
+}
+
+class _OneNote extends DesignTaskNotifier {
+  @override
+  Future<void> loadTasks() async {
+    if (state.hasValue) return;
+    state = AsyncData([
+      Task(
+          id: 1,
+          kind: 'note',
+          title: 'Horario del centro de salud',
+          priority: 1,
+          notes: 'Abre de 9 a 14 entre semana.'),
     ]);
   }
 }

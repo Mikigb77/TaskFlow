@@ -218,10 +218,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // The time zone lookup gives up after 5 s.
+      await tester.pump(const Duration(seconds: 6));
+      // Without Pro the sheet types: no Pro wall, and no recorder.
       expect(
         find.text('Voice capture is included with TaskFlow Pro.'),
-        findsOneWidget,
+        findsNothing,
       );
+      expect(find.byKey(const ValueKey('capture-words')), findsOneWidget);
       expect(recorderCreated, isFalse);
       expect(tester.takeException(), isNull);
     },

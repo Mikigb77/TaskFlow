@@ -333,7 +333,7 @@ void main() {
       final app = await _App.open(tester);
       app.api.found = [_found('Comprar pan')];
       app.api.hold = Completer<void>();
-      await tester.tap(find.text(es.sayTask).hitTestable());
+      await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
       app.speech.send('ready');
       app.speech.send('segment', text: 'Comprar pan');
@@ -371,6 +371,99 @@ void main() {
       expect(app.store.pendingIds, hasLength(1));
       expect(app.store.pendingIds.single, isNot(original));
       expect(app.store.sessions[original]!.status, 'discarded');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P66 (UX-464): going back during Entendiendo… never leaves the sheet
+  // waiting on the abandoned step ----
+
+  /// The sheet's keyboard button, `Escribir`.
+  IconButton typeButton(WidgetTester tester) => tester.widget<IconButton>(
+    find.ancestor(
+      of: find.byIcon(Icons.keyboard_outlined),
+      matching: find.byType(IconButton),
+    ),
+  );
+
+  testWidgets(
+    'UX-464: after Cancelar during Entendiendo…, Volver a decirlo listens at once and Escribir is enabled while the abandoned step is still held; Cancelar there brings the result back at once; the late answer changes nothing',
+    (tester) async {
+      final (app, original) = await sayAgainHeld(tester);
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await tester.pump();
+      expectPreviousBack(tester);
+      expect(app.speech.starts, 2);
+
+      // The understanding step is still held: nothing here waits for it.
+      await tester.tap(resultButton(es.captureSayAgain));
+      await frames(tester);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(app.speech.starts, 3, reason: 'listening started again at once');
+      app.speech.send('ready');
+      await frames(tester);
+      expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);
+      expect(typeButton(tester).onPressed, isNotNull, reason: 'Escribir');
+
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await frames(tester);
+      expectPreviousBack(tester);
+
+      // The abandoned step answers late: the sheet stays as it is.
+      app.api.hold!.complete();
+      await tester.pumpAndSettle();
+      expectOnlyOriginal(tester, app, original);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-464: with TalkBack, after Cancelar during Entendiendo…, Volver a decirlo shows Empezar a hablar and Escribir enabled; both work before the abandoned step answers, Cancelar brings the result back, and the late answer changes nothing',
+    (tester) async {
+      final (app, original) = await sayAgainHeld(tester);
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await tester.pump();
+      expectPreviousBack(tester);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(accessibleNavigation: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await frames(tester);
+
+      await tester.tap(resultButton(es.captureSayAgain));
+      await frames(tester);
+      final start = find.widgetWithText(FilledButton, es.captureStartTalking);
+      expect(start, findsOneWidget);
+      expect(tester.widget<FilledButton>(start).onPressed, isNotNull);
+      expect(typeButton(tester).onPressed, isNotNull, reason: 'Escribir');
+
+      await tester.tap(start);
+      await frames(tester);
+      expect(app.speech.starts, 3, reason: 'Empezar a hablar listens at once');
+      app.speech.send('ready');
+      await frames(tester);
+      expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);
+
+      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await frames(tester);
+      final field = find.byKey(const ValueKey('capture-words'));
+      expect(field, findsOneWidget);
+      expect(tester.widget<TextField>(field).readOnly, isFalse);
+      await tester.enterText(field, 'Comprar leche');
+      await frames(tester);
+
+      // The abandoned step answers while typing: the words stay as typed.
+      app.api.hold!.complete();
+      await frames(tester);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(tester.widget<TextField>(field).controller!.text, 'Comprar leche');
+      expect(find.byType(MessageBanner), findsNothing);
+
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await tester.pumpAndSettle();
+      expectPreviousBack(tester);
+      expect(app.store.pendingIds, [original]);
       expect(tester.takeException(), isNull);
     },
   );
@@ -501,7 +594,7 @@ class _App {
 
   /// `Dictar una tarea`, the recognizer hears [words], then `Listo`.
   Future<void> speak(WidgetTester tester, String words) async {
-    await tester.tap(find.text(es.sayTask).hitTestable());
+    await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
     speech.send('ready');
     speech.send('segment', text: words);
@@ -512,7 +605,7 @@ class _App {
 
   /// `Dictar una tarea`, `Escribir`, [words], then `Listo`.
   Future<void> type(WidgetTester tester, String words) async {
-    await tester.tap(find.text(es.sayTask).hitTestable());
+    await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip(es.captureTypeInstead));
     await tester.pumpAndSettle();
@@ -597,6 +690,8 @@ class _Captures extends CaptureStore {
     String kind = 'task',
     String? projectId,
     String? source,
+    DateTime? day,
+    String? id,
   }) async {
     final session = CaptureSession(
       id: 'capture-${_next++}',
@@ -607,6 +702,7 @@ class _Captures extends CaptureStore {
       kind: kind,
       projectId: projectId,
       source: source,
+      day: day,
     );
     return sessions[session.id] = session;
   }

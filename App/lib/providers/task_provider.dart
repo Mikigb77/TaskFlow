@@ -219,9 +219,25 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         if (mounted) await loadTasks();
       });
 
-  Future<void> deleteTask(int id) async {
+  /// With [sync] false the deletion stays on this phone until the next sync,
+  /// so an Undo can still bring back everything, files included.
+  Future<void> deleteTask(int id, {bool sync = true}) async {
     await _repository.deleteTask(id);
     if (!mounted) return;
-    unawaited(loadTasks());
+    // A load already running would show its older list after this one.
+    if (sync || _loading != null) {
+      unawaited(loadTasks());
+      return;
+    }
+    final local = await _repository.getAllTasks();
+    if (!mounted) return;
+    state = AsyncValue.data(local);
+    unawaited(TaskReminders.sync(local, ownerKey: _repository.ownerKey));
   }
+
+  /// Undoes [deleteTask] with the task as it was.
+  Future<void> restoreTask(Task task) => _mutate(() async {
+        await _repository.restoreTask(task);
+        if (mounted) await loadTasks();
+      });
 }

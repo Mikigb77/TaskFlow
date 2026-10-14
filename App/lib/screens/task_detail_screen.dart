@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/screens/activity_screen.dart';
 import 'package:agenda/widgets/task_planning_control.dart';
@@ -27,45 +28,67 @@ class TaskDetailScreen extends ConsumerWidget {
   final DateTime? occurrenceDate;
   final String? occurrenceKey;
 
+  /// Deletes at once, with Undo. Only a whole repeating series asks first.
   Future<void> _delete(BuildContext context, WidgetRef ref, Task task) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          task.isNote
-              ? context.l10n.deleteNoteQuestion
-              : context.l10n.deleteTaskQuestion,
-        ),
-        content: Text(
-          task.isRecurring
-              ? context.l10n.deleteSeriesHelp(task.title)
-              : context.l10n.deleteItemHelp(task.title),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              task.isNote ? context.l10n.keepNote : context.l10n.keepTask,
+    if (task.isRecurring) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          content: Text(context.l10n.deleteSeriesHelp(task.title)),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.l10n.delete),
             ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.delete),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
+            FilledButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(context.l10n.keepTask),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    final notifier = ref.read(taskProvider.notifier);
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
+    // The stored task, not an occurrence, is what Undo puts back.
+    final saved = ref
+        .read(taskProvider)
+        .valueOrNull
+        ?.firstWhereOrNull((item) => item.id == taskId);
     try {
-      await ref.read(taskProvider.notifier).deleteTask(taskId);
-      if (context.mounted) Navigator.pop(context);
+      // Sent once Undo is no longer offered.
+      await notifier.deleteTask(taskId, sync: saved == null);
     } catch (_) {
-      if (context.mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.deleteTaskError,
-        );
-      }
+      if (messenger.mounted) showFeedback(messenger, strings.deleteTaskError);
+      return;
+    }
+    if (context.mounted) Navigator.pop(context);
+    if (saved == null) return;
+    bool current() =>
+        messenger.mounted &&
+        identical(container.read(taskProvider.notifier), notifier);
+    final feedback = await showFeedback(
+      messenger,
+      task.isNote ? strings.noteDeleted : strings.taskDeleted,
+      actionLabel: strings.undo,
+      onAction: () async {
+        if (!current()) return;
+        try {
+          await notifier.restoreTask(saved);
+        } catch (_) {
+          if (messenger.mounted) showFeedback(messenger, strings.undoError);
+        }
+      },
+    );
+    final reason = await feedback?.closed;
+    if (reason != SnackBarClosedReason.action && notifier.mounted) {
+      unawaited(notifier.loadTasks());
     }
   }
 
@@ -116,22 +139,23 @@ class TaskDetailScreen extends ConsumerWidget {
               );
             }
             final canEdit = ref.watch(listCanEditProvider(task.listId));
+            final hasProjects =
+                ref.watch(taskListsProvider).valueOrNull?.isNotEmpty == true;
+            final hasBody = task.notes?.trim().isNotEmpty == true;
+            void edit() =>
+                Navigator.pushNamed(context, '/editTask', arguments: taskId);
+            void reschedule() =>
+                TaskInteractions.reschedule(context, ref, task);
             return Scaffold(
               appBar: CustomAppBar(
                 title: task.isNote
                     ? context.l10n.note
                     : context.l10n.taskDetails,
                 actions: [
-                  if (canEdit)
+                  if (canEdit && !task.isNote)
                     IconButton(
-                      tooltip: task.isNote
-                          ? context.l10n.editNote
-                          : context.l10n.editTask,
-                      onPressed: () => Navigator.pushNamed(
-                        context,
-                        '/editTask',
-                        arguments: taskId,
-                      ),
+                      tooltip: context.l10n.editTask,
+                      onPressed: edit,
                       icon: const Icon(Icons.edit_outlined),
                     ),
                   if (canEdit)
@@ -150,16 +174,21 @@ class TaskDetailScreen extends ConsumerWidget {
               body: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                 children: [
-                  SectionLabel(
-                    task.isNote
-                        ? context.l10n.note
-                        : task.isCompleted
-                        ? context.l10n.completed
-                        : context.l10n.nextStep,
-                  ),
-                  Text(
-                    task.title,
-                    style: Theme.of(context).textTheme.headlineLarge,
+                  if (task.isCompleted && !task.isNote)
+                    SectionLabel(context.l10n.taskCompleted),
+                  Semantics(
+                    button: canEdit,
+                    onTapHint: task.isNote
+                        ? context.l10n.editNote
+                        : context.l10n.editTask,
+                    child: InkWell(
+                      onTap: canEdit ? edit : null,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Text(
+                        task.title,
+                        style: Theme.of(context).textTheme.headlineLarge,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   if (!canEdit)
@@ -169,29 +198,30 @@ class TaskDetailScreen extends ConsumerWidget {
                           : context.l10n.viewOnlyTask,
                       icon: Icons.visibility_outlined,
                     ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TaskAssignmentPicker(
-                      lockShared: true,
-                      task: task,
-                      onChanged: !canEdit
-                          ? null
-                          : (changed) async {
-                              try {
-                                await ref
-                                    .read(taskProvider.notifier)
-                                    .updateTask(changed);
-                              } catch (_) {
-                                if (context.mounted) {
-                                  showFeedback(
-                                    ScaffoldMessenger.of(context),
-                                    context.l10n.moveError,
-                                  );
+                  if (task.listId != null || hasProjects)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TaskAssignmentPicker(
+                        lockShared: true,
+                        task: task,
+                        onChanged: !canEdit
+                            ? null
+                            : (changed) async {
+                                try {
+                                  await ref
+                                      .read(taskProvider.notifier)
+                                      .updateTask(changed);
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    showFeedback(
+                                      ScaffoldMessenger.of(context),
+                                      context.l10n.moveError,
+                                    );
+                                  }
                                 }
-                              }
-                            },
+                              },
+                      ),
                     ),
-                  ),
                   if (task.assignment != 'personal')
                     TaskActivity(taskId: task.id!),
                   if (task.labels.isNotEmpty)
@@ -218,6 +248,8 @@ class TaskDetailScreen extends ConsumerWidget {
                             task.displayDate == null
                                 ? context.l10n.inboxDate
                                 : context.fullDate(task.displayDate!),
+                            onTap: canEdit ? reschedule : null,
+                            tapHint: context.l10n.reschedule,
                           ),
                           const Divider(),
                           _detail(
@@ -227,6 +259,8 @@ class TaskDetailScreen extends ConsumerWidget {
                             task.hasTime
                                 ? context.clockTime(task.displayDate!)
                                 : context.l10n.anyTime,
+                            onTap: canEdit ? reschedule : null,
+                            tapHint: context.l10n.reschedule,
                           ),
                           if (task.durationMinutes != null) ...[
                             const Divider(),
@@ -235,6 +269,8 @@ class TaskDetailScreen extends ConsumerWidget {
                               Icons.timelapse_outlined,
                               context.l10n.duration,
                               '${context.l10n.durationMinutes(task.durationMinutes!)}${task.plannedEnd == null ? '' : ' · ${context.clockTime(task.displayDate!)} – ${context.shortDate(task.plannedEnd!)} ${context.clockTime(task.plannedEnd!)}'}',
+                              onTap: canEdit ? edit : null,
+                              tapHint: context.l10n.editTask,
                             ),
                           ],
                           if (task.deadline != null) ...[
@@ -247,6 +283,8 @@ class TaskDetailScreen extends ConsumerWidget {
                               color: task.deadlinePassed(DateTime.now())
                                   ? colors.error
                                   : null,
+                              onTap: canEdit ? edit : null,
+                              tapHint: context.l10n.editTask,
                             ),
                             if (task.plannedAfterDeadline)
                               MessageBanner(
@@ -261,19 +299,26 @@ class TaskDetailScreen extends ConsumerWidget {
                               Icons.repeat_rounded,
                               context.l10n.repeat,
                               '${context.repeatLabel(task)}${task.repeatUntil == null ? '' : ' · ${context.l10n.untilDate(context.shortDate(task.repeatUntil!))}'}',
+                              onTap: canEdit ? edit : null,
+                              tapHint: context.l10n.editTask,
                             ),
                           ],
-                          const Divider(),
-                          _detail(
-                            context,
-                            Icons.flag_outlined,
-                            context.l10n.priority,
-                            context.priorityName(task.priority),
-                            color: AppTheme.priorityColor(
+                          // The default (low) priority goes unsaid.
+                          if (task.priority > 1) ...[
+                            const Divider(),
+                            _detail(
                               context,
-                              task.priority,
+                              Icons.flag_outlined,
+                              context.l10n.priority,
+                              context.priorityName(task.priority),
+                              color: AppTheme.priorityColor(
+                                context,
+                                task.priority,
+                              ),
+                              onTap: canEdit ? edit : null,
+                              tapHint: context.l10n.editTask,
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -308,8 +353,8 @@ class TaskDetailScreen extends ConsumerWidget {
                       ),
                     ),
                   if (!task.isNote) const SizedBox(height: 16),
-                  if (task.isNote) ...[
-                    _body(context, task),
+                  if (task.isNote && hasBody) ...[
+                    _body(context, task, onTap: canEdit ? edit : null),
                     const SizedBox(height: 24),
                   ],
                   if (task.checklist.isNotEmpty) ...[
@@ -366,12 +411,27 @@ class TaskDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 24),
                   ],
-                  if (!task.isNote) _body(context, task),
+                  if (!task.isNote && hasBody) _body(context, task),
                   AttachmentPanel(task: task),
                 ],
               ),
-              bottomNavigationBar: !canEdit || task.isNote
+              bottomNavigationBar: !canEdit
                   ? null
+                  : task.isNote
+                  ? SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                        child: Center(
+                          heightFactor: 1,
+                          child: FilledButton.icon(
+                            onPressed: edit,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: Text(context.l10n.editNote),
+                          ),
+                        ),
+                      ),
+                    )
                   : SafeArea(
                       top: false,
                       child: Padding(
@@ -396,11 +456,7 @@ class TaskDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             OutlinedButton.icon(
-                              onPressed: () => TaskInteractions.reschedule(
-                                context,
-                                ref,
-                                task,
-                              ),
+                              onPressed: reschedule,
                               icon: const Icon(Icons.event_outlined),
                               label: Text(context.l10n.reschedule),
                             ),
@@ -428,9 +484,11 @@ class TaskDetailScreen extends ConsumerWidget {
     String label,
     String value, {
     Color? color,
+    VoidCallback? onTap,
+    String? tapHint,
   }) {
     final colors = Theme.of(context).colorScheme;
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
@@ -460,22 +518,35 @@ class TaskDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+    return onTap == null
+        ? row
+        : Semantics(
+            button: true,
+            onTapHint: tapHint,
+            child: InkWell(onTap: onTap, child: row),
+          );
   }
 
-  Widget _body(BuildContext context, Task task) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SectionLabel(task.isNote ? context.l10n.noteBody : context.l10n.notes),
-      AppSurface(
-        child: SizedBox(
-          width: double.infinity,
-          child: NoteText(
-            task.notes?.trim().isNotEmpty == true
-                ? task.notes!
-                : context.l10n.noteEmptyBody,
+  Widget _body(BuildContext context, Task task, {VoidCallback? onTap}) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionLabel(
+            task.isNote ? context.l10n.noteBody : context.l10n.notes,
           ),
-        ),
-      ),
-    ],
-  );
+          AppSurface(
+            padding: EdgeInsets.zero,
+            child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: NoteText(task.notes!, onTap: onTap),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
 }

@@ -56,6 +56,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reviewNoTime => 'Sin hora';
 
   @override
+  String get captureWhatTime => '¿A qué hora?';
+
+  @override
   String get reviewEditDetail => 'Cambiar este dato';
 
   @override
@@ -180,15 +183,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get note => 'Nota';
 
   @override
-  String get noteEmptyBody => 'Sin texto añadido.';
-
-  @override
-  String get fileNone => 'No hay archivos adjuntos.';
-
-  @override
-  String get newNote => 'Nueva nota';
-
-  @override
   String get editNote => 'Editar nota';
 
   @override
@@ -218,7 +212,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noteSaved => 'Nota guardada';
 
   @override
-  String get recordNote => 'Dictar una nota';
+  String get addNote => 'Añadir nota';
 
   @override
   String get noteHint => 'Ideas, detalles de reuniones, enlaces útiles…';
@@ -237,12 +231,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get allNotes => 'Todas las notas';
-
-  @override
-  String get deleteNoteQuestion => '¿Eliminar esta nota?';
-
-  @override
-  String get keepNote => 'Conservar nota';
 
   @override
   String get viewOnlyNote =>
@@ -507,9 +495,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get upcoming => 'Próximas';
 
   @override
-  String get completed => 'Completadas';
-
-  @override
   String get noDate => 'Sin fecha';
 
   @override
@@ -522,16 +507,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get removeDate => 'Quitar fecha';
 
   @override
-  String get newTask => 'Nueva tarea';
-
-  @override
   String get editTask => 'Editar tarea';
 
   @override
   String get taskDetails => 'Detalles de la tarea';
 
   @override
-  String get sayTask => 'Dictar una tarea';
+  String get addTask => 'Añadir tarea';
 
   @override
   String get typeTasks => 'Escribir tareas';
@@ -628,9 +610,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get keepChanges => 'Guardar cambios';
-
-  @override
-  String get createTask => 'Crear tarea';
 
   @override
   String get saveChanges => 'Guardar cambios';
@@ -791,8 +770,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get rememberPrompt => '¿Qué quieres recordar?';
 
   @override
-  String get calendarEmpty =>
-      'Pulsa Dictar una tarea y habla con naturalidad, o Nueva tarea para escribir. Las fechas son opcionales; las tareas sin fecha van a la bandeja de entrada.';
+  String get calendarEmpty => 'Nada previsto para este día.';
 
   @override
   String get planTask => 'Planificar una tarea';
@@ -881,11 +859,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tasksEmpty =>
-      'Usa Dictar una tarea para hablar o Nueva tarea para escribir.\nAñade una fecha ahora o déjala para después.';
+      'Toca Añadir tarea para añadir una. La fecha es opcional.';
 
   @override
   String get inboxEmpty =>
-      'Guarda aquí ideas y tareas hasta que elijas una fecha.\nEmpieza con Dictar una tarea o Nueva tarea.';
+      'Guarda aquí ideas y tareas hasta que elijas una fecha.\nEmpieza con Añadir tarea.';
 
   @override
   String get savedOnDevice => 'Tus tareas guardadas siguen en tu dispositivo.';
@@ -894,19 +872,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get checkCaptures => 'Ver capturas pendientes';
 
   @override
-  String get createTaskTooltip => 'Crear una tarea';
-
-  @override
-  String get reviewTask => 'Revisar tarea';
-
-  @override
   String get fineTunePlan => 'Ajusta tu plan.';
-
-  @override
-  String get onYourMind => '¿Qué tienes en mente?';
-
-  @override
-  String get wordsPlan => 'Tus palabras, un plan claro.';
 
   @override
   String get seriesEdits =>
@@ -976,14 +942,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deleteTask => 'Eliminar tarea';
 
   @override
-  String get deleteTaskQuestion => '¿Eliminar la tarea?';
-
-  @override
   String get keepTask => 'Conservar tarea';
 
   @override
   String get deleteTaskError =>
       'No se pudo eliminar esta tarea. Inténtalo de nuevo.';
+
+  @override
+  String get taskDeleted => 'Tarea eliminada';
+
+  @override
+  String get noteDeleted => 'Nota eliminada';
 
   @override
   String get attachmentUnavailable =>
@@ -1007,9 +976,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get editRepeating => 'Editar la tarea recurrente';
-
-  @override
-  String get nextStep => 'Tu próximo paso';
 
   @override
   String get moveError => 'No se pudo mover esta tarea. Inténtalo de nuevo.';
@@ -1067,6 +1033,9 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get examplePlan =>
       'Médico el viernes a las 17:00. Llevar mis resultados. También comprar café.';
+
+  @override
+  String get exampleTask => 'Médico el viernes a las 17:00';
 
   @override
   String get discard => 'Descartar';
@@ -1141,9 +1110,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get pickDate => 'Elegir una fecha';
-
-  @override
-  String get typeTask => 'Escribir una tarea';
 
   @override
   String get addStepDialog => 'Añadir un paso';
@@ -1253,9 +1219,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tryLater => 'Inténtalo de nuevo en un momento.';
 
   @override
-  String get suggestionApplied => 'Sugerencia de fecha aplicada';
-
-  @override
   String get changeSeriesQuestion => '¿Cambiar la programación recurrente?';
 
   @override
@@ -1298,17 +1261,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo adjuntar ese archivo. Inténtalo de nuevo.';
 
   @override
-  String get capturedWords => 'Capturada a partir de tus palabras';
-
-  @override
   String get titleRequiredField => 'Introduce un título para la tarea';
 
   @override
-  String get keepAsTitle => 'Conservar como título';
+  String get fromYourWords => 'Según lo que has escrito';
 
   @override
-  String get ambiguousTimeHelp =>
-      'Elige a. m./p. m. o añade la hora. No se ha supuesto ninguna hora.';
+  String get keepAsTyped => 'Dejar como está';
 
   @override
   String get clearDate => 'Quitar fecha';
@@ -1343,11 +1302,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get saveChangesSentence => 'Guardar cambios';
-
-  @override
-  String useSchedule(String schedule) {
-    return 'Usar $schedule';
-  }
 
   @override
   String checklistCount(int done, int total) {
@@ -1865,10 +1819,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get decline => 'Rechazar';
-
-  @override
-  String get fileEmpty =>
-      'No hay archivos adjuntos. Añade un archivo al editar.';
 
   @override
   String get fileLoadError =>
@@ -2528,19 +2478,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'No se puede conectar con el servidor. Comprueba la conexión y la dirección del servidor e inténtalo de nuevo.';
-
-  @override
-  String get captureTimeout =>
-      'El servidor ha tardado demasiado en responder. Puedes reintentar esta captura.';
+      'Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.';
 
   @override
   String get captureUnavailable =>
-      'El servicio de procesamiento no está disponible. Reintenta esta captura más tarde.';
+      'No he podido contactar con el asistente; tus palabras se conservan.';
 
   @override
   String get captureAllowance =>
-      'Se ha alcanzado el límite de solicitudes del servicio. Inténtalo más tarde.';
+      'Has llegado al límite de hoy. Escribe la tarea o inténtalo mañana.';
 
   @override
   String get captureSignIn =>
@@ -2610,11 +2556,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureSpeechStopped =>
-      'El reconocimiento se ha detenido. Las palabras guardadas se conservan; graba audio o escribe para continuar.';
+      'Se ha dejado de escuchar. Puedes volver a hablar o escribir.';
 
   @override
   String get captureNoSpeech =>
-      'No se ha detectado voz clara. Las palabras guardadas siguen disponibles.';
+      'No te he entendido. Vuelve a intentarlo o escríbelo.';
 
   @override
   String get captureSpeechLanguage =>
@@ -2659,9 +2605,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get captureSetupUnavailable =>
       'La configuración del reconocimiento no está disponible aquí. Usa audio guardado o escribe.';
-
-  @override
-  String get captureKept => 'Tu captura se conserva en este teléfono.';
 
   @override
   String get voiceRecording => 'Grabación de voz';
@@ -2756,6 +2699,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get captureUnderstanding => 'Entendiendo…';
 
   @override
+  String get captureFailed =>
+      'No ha funcionado. Tus palabras siguen aquí; inténtalo de nuevo.';
+
+  @override
+  String get captureSlow => 'Está tardando más de lo normal.';
+
+  @override
+  String get captureSaveAsWritten => 'Guardar tal cual';
+
+  @override
   String captureThingsToAdd(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2848,11 +2801,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String deleteSeriesHelp(String title) {
     return 'Se eliminarán «$title» y todas sus repeticiones.';
-  }
-
-  @override
-  String deleteItemHelp(String title) {
-    return 'Se eliminará «$title».';
   }
 
   @override
@@ -3335,6 +3283,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get voiceProRequired =>
       'La captura por voz está incluida en TaskFlow Pro.';
+
+  @override
+  String get captureSpeakingIsPro =>
+      'Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.';
 
   @override
   String get voiceProAction => 'Ver Pro';

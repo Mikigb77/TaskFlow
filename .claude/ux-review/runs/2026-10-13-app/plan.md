@@ -540,3 +540,69 @@ None.
 - From the C verify note: on Notas filtered to a view-only project, `Nueva nota` saves to Personal and says only `Nota guardada`. It belongs with P38's `Añadir nota` and UX-314, not this round.
 - From P59's implementer: when the row isn't built yet, the build-out loop's first `innerController.jumpTo(0)` collapses the header completely. It goes to the owner with U5.
 - From P60's implementer: at 320 dp, with text up to 1.28×, Spanish `Volver a decirlo` may wrap inside its row. The reviewer saw no overflow at 2×.
+
+## Round 2 (b4)
+
+Round 1 of batch 4 ran P65, P66, P38, P39, P40, P10 and P42. The reviewers found 17 of 18 findings fixed in code, several still needing phone checks (U5, UX-460, U8, UX-102, UX-106, UX-114, U7, UX-451, UX-208). UX-103 is partly fixed, first failure. The round check passed and no test failed. The reviewers found nine regressions, now UX-465 to UX-473.
+Round 2 has four packages: P67 (S3), P68 (S2), P69 (S2) and P70 (S2). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b4-r2.json`.
+
+### Packages, in run order
+
+#### P67 · Capture sheet: messages name what's on screen; slow is spoken · A · M
+- **UX-103** (S3; second attempt) Two error messages said `Toca Seguir` where `Seguir` isn't shown. Last attempt (P40) used the copy its brief gave: a 422 on recorded audio left only `Reintentar`, which resends the same silent audio, and a stop with no words shows `Empezar a hablar`. Now: `No te he entendido. Vuelve a intentarlo o escríbelo.` and `Se ha dejado de escuchar. Puedes volver a hablar o escribir.`, which name no button. After a 422 on audio the silent capture is dropped and `Empezar a hablar` shows. A 422 on typed text shows the general `No ha funcionado…` instead.
+- **UX-467** (S2; R1A-3, from P40) After 8 s, TalkBack now says `Está tardando más de lo normal.` when `Guardar tal cual` appears.
+- **UX-468** (S2; R1A-4, from P39) When typed words are understood on the phone, the hint is a one-task example, `Médico el viernes a las 17:00`. The three-part example stays for voice, where the assistant splits it.
+- **UX-469** (S1; R1A-5, from P40) After a failure, `Reintentar` and `Guardar tal cual` are always stacked full width, so the Spanish and Catalan labels don't wrap at 360 dp.
+- **UX-470** (S1; R1A-6, from P39) ES `Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.` / CA `Dictar una tasca forma part de TaskFlow Pro. La pots escriure aquí.` When the free tier's app side is built, this line becomes the "free dictations used up" line.
+
+#### P68 · The phone's time question gets its line · A · S
+- **UX-465** (S2; R1A-1, from P38/P40) A result made on the phone with `a las 5` showed `05:00 / 17:00 / Sin hora` with no question and a disabled save button. Now `¿A qué hora?` (`What time?` / `A quina hora?`) sits above the chips, like the assistant's question.
+
+#### P69 · From the timeline, the saved task lands where it can be seen · A · M
+- **UX-466** (S2; R1A-2, from P38) A task added from a day's timeline was highlighted on the Calendar hidden underneath. Now, if it's on the timeline's day, the timeline scrolls to it and highlights it. Otherwise the app goes back to Calendar, which selects its day (or `Sin fecha`) and highlights it, as after the pending list. No new strings.
+
+#### P70 · Task detail: every row answers, taps are spoken, Save offers Undo · B · S
+- **UX-471** (S2; R1B-1, from P10) Duración, Fecha límite, Repetir and Prioridad now open the edit form, like the date and time rows next to them.
+- **UX-472** (S1; R1B-2, from P10) The title and the tappable rows tell TalkBack what a tap does (`Cambiar fecha`, `Editar tarea`, `Editar nota`), using existing strings.
+- **UX-473** (S1; R1B-3, from P42) `Guardar` in the edit form now shows `Cambios guardados · Deshacer`, the same as Back.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- P42's implementer: deleting a task on the server (a tombstone) deletes its attachments for good, so Undo can't revive them if the deletion syncs within the undo window. The cause is server-side (`Backend/core/task_views.py` `update()` → `delete_task_attachments`), and it belongs to UX-208's phone check.
+- P38's implementer: the free tier (DECISIONS.md, 2026-10-13 late) replaces D4a. Today voice is Pro-only (`_voice`, `local: !_voice`). The free tier changes those two lines outside this loop. P67's hint follows the same flag.
+- P40's implementer: without a connectivity package, offline versus unreachable is guessed from the socket error. Check it on the phone with airplane mode (U7's phone check).
+- P10's implementer changed `integration_test/notes_flow_test.dart:241` (the ✏ tooltip is gone). It was analyzed but not run.
+- P66's implementer: Cancelar in the short native-stop window (up to about 4 s) still waits for the recognizer. That wait is local, not the server.
+- Reviewer B: Back with an emptied title stays in the form (D12, as designed); the attachment panel and project chip can appear a moment late; `deleteTaskError` says "tarea" for a note, which it already did before. None is planned this round.
+
+## Round 3 (b4)
+
+Round 2 of batch 4 ran P67, P68, P69 and P70. The reviewers found all ten findings fixed in code: UX-103, UX-465 to UX-473. UX-103, UX-466, UX-467, UX-469 and UX-472 still need phone checks. The round check passed and no test failed. Reviewer B found one regression from P70, now UX-474.
+Round 3 has one small package, P71 (S1). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b4-r3.json`.
+
+### Packages, in run order
+
+#### P71 · Edit form: Save on an untouched form just closes · B · S
+- **UX-474** (S1; R2B-1, regression from P70) With nothing changed, `Guardar cambios` wrote the same task and showed `Cambios guardados · Deshacer`, and Deshacer undid nothing. Back on the same form just closed. Now `_save` checks for an unchanged form right after validation, so both Back and `Guardar cambios` simply close it: nothing is written and no message shows. Last attempt: P70 removed `_save`'s `undo` flag as its brief asked, but the unchanged check stayed only in `_back`. No new copy.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- UX-103 and UX-465 to UX-473 were found fixed in code. Their lines move at close, with their phone checks: real silence gives `No te he entendido…` then `Empezar a hablar` and nothing new in Pendientes (UX-103); TalkBack says `Está tardando más de lo normal.` at about 8 s (UX-467); in Catalan at 360 dp, `Torna-ho a provar` and `Desa-ho tal com està` each fit on one line (UX-469); from a timeline, a task added for another day is lit on Calendar (UX-466); TalkBack reads the date row as a button with `Cambiar fecha` (UX-472).
+- P67's implementer: the Catalan typing hint uses `Metge divendres a les 17:00`, the brief's fallback, because the phone's parser leaves a stray `h` in the title for `17 h`. The reviewer accepted it. `examplePlan` keeps `17 h` for voice, which the server understands.
+- P67's implementer: when a widget reopens capture with `startListening: voice`, a silent capture is dropped and listening starts at once, which clears the `No te he entendido…` line. The person asked to speak, so it was left.
+- Reviewer A, for U5 (not a regression): at 390×844, Calendar's lit `Bandeja · 1` row sits almost entirely under `Tarea guardada en la bandeja de entrada`, because Calendar's content is too short to scroll it clear. It also happens from the pending list, so P69 didn't cause it, but it contradicts U5's "Calendar lands (verified)". Suggested fix: while a landing is active, give Calendar's scroll content a bottom inset of at least the message's height + 8 dp, the same idea UX-460 uses for Tareas. It goes with U5 and UX-460, not this round.
+- Reviewer B: the detail rows' ripple is a rectangle inside the rounded card (no `borderRadius`), the same as P10's date rows. Polish only.

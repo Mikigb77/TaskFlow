@@ -190,6 +190,12 @@ abstract class AppLocalizations {
   /// **'No time'**
   String get reviewNoTime;
 
+  /// The time question for a result made on the phone, above the morning and evening time chips. Neutral between morning and evening; in Spanish it avoids `mañana`, which also means tomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'What time?'**
+  String get captureWhatTime;
+
   /// No description provided for @reviewEditDetail.
   ///
   /// In en, this message translates to:
@@ -274,24 +280,6 @@ abstract class AppLocalizations {
   /// **'Note'**
   String get note;
 
-  /// No description provided for @noteEmptyBody.
-  ///
-  /// In en, this message translates to:
-  /// **'No text added.'**
-  String get noteEmptyBody;
-
-  /// No description provided for @fileNone.
-  ///
-  /// In en, this message translates to:
-  /// **'No attachments.'**
-  String get fileNone;
-
-  /// No description provided for @newNote.
-  ///
-  /// In en, this message translates to:
-  /// **'New note'**
-  String get newNote;
-
   /// No description provided for @editNote.
   ///
   /// In en, this message translates to:
@@ -346,11 +334,11 @@ abstract class AppLocalizations {
   /// **'Note saved'**
   String get noteSaved;
 
-  /// No description provided for @recordNote.
+  /// The one button on Notes that adds a note: it opens the capture sheet.
   ///
   /// In en, this message translates to:
-  /// **'Dictate a note'**
-  String get recordNote;
+  /// **'Add a note'**
+  String get addNote;
 
   /// No description provided for @noteHint.
   ///
@@ -387,18 +375,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All notes'**
   String get allNotes;
-
-  /// No description provided for @deleteNoteQuestion.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete this note?'**
-  String get deleteNoteQuestion;
-
-  /// No description provided for @keepNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep note'**
-  String get keepNote;
 
   /// No description provided for @viewOnlyNote.
   ///
@@ -838,12 +814,6 @@ abstract class AppLocalizations {
   /// **'Upcoming'**
   String get upcoming;
 
-  /// No description provided for @completed.
-  ///
-  /// In en, this message translates to:
-  /// **'Completed'**
-  String get completed;
-
   /// No description provided for @noDate.
   ///
   /// In en, this message translates to:
@@ -868,12 +838,6 @@ abstract class AppLocalizations {
   /// **'Remove date'**
   String get removeDate;
 
-  /// No description provided for @newTask.
-  ///
-  /// In en, this message translates to:
-  /// **'New task'**
-  String get newTask;
-
   /// No description provided for @editTask.
   ///
   /// In en, this message translates to:
@@ -886,11 +850,11 @@ abstract class AppLocalizations {
   /// **'Task details'**
   String get taskDetails;
 
-  /// No description provided for @sayTask.
+  /// The one button that adds a task: it opens the capture sheet.
   ///
   /// In en, this message translates to:
-  /// **'Say a task'**
-  String get sayTask;
+  /// **'Add a task'**
+  String get addTask;
 
   /// No description provided for @typeTasks.
   ///
@@ -1083,12 +1047,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep changes'**
   String get keepChanges;
-
-  /// No description provided for @createTask.
-  ///
-  /// In en, this message translates to:
-  /// **'Create Task'**
-  String get createTask;
 
   /// No description provided for @saveChanges.
   ///
@@ -1393,7 +1351,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Tap Say a task and speak naturally, or New task to type. Dates are optional; unscheduled tasks go to Inbox.'**
+  /// **'Nothing planned for this day.'**
   String get calendarEmpty;
 
   /// No description provided for @planTask.
@@ -1555,13 +1513,13 @@ abstract class AppLocalizations {
   /// No description provided for @tasksEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Use Say a task to speak, or New task to type.\nAdd a date now or leave it for later.'**
+  /// **'Tap Add a task to add one. A date is optional.'**
   String get tasksEmpty;
 
   /// No description provided for @inboxEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.'**
+  /// **'Keep ideas and to-dos here until you choose a date.\nStart with Add a task.'**
   String get inboxEmpty;
 
   /// No description provided for @savedOnDevice.
@@ -1576,35 +1534,11 @@ abstract class AppLocalizations {
   /// **'Check unfinished captures'**
   String get checkCaptures;
 
-  /// No description provided for @createTaskTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Create task'**
-  String get createTaskTooltip;
-
-  /// No description provided for @reviewTask.
-  ///
-  /// In en, this message translates to:
-  /// **'Review task'**
-  String get reviewTask;
-
   /// No description provided for @fineTunePlan.
   ///
   /// In en, this message translates to:
   /// **'Fine-tune your plan.'**
   String get fineTunePlan;
-
-  /// No description provided for @onYourMind.
-  ///
-  /// In en, this message translates to:
-  /// **'What’s on your mind?'**
-  String get onYourMind;
-
-  /// No description provided for @wordsPlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Your words, a clear plan.'**
-  String get wordsPlan;
 
   /// No description provided for @seriesEdits.
   ///
@@ -1732,12 +1666,6 @@ abstract class AppLocalizations {
   /// **'Delete task'**
   String get deleteTask;
 
-  /// No description provided for @deleteTaskQuestion.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete task?'**
-  String get deleteTaskQuestion;
-
   /// No description provided for @keepTask.
   ///
   /// In en, this message translates to:
@@ -1749,6 +1677,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not delete this task. Please try again.'**
   String get deleteTaskError;
+
+  /// No description provided for @taskDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Task deleted'**
+  String get taskDeleted;
+
+  /// No description provided for @noteDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Note deleted'**
+  String get noteDeleted;
 
   /// No description provided for @attachmentUnavailable.
   ///
@@ -1791,12 +1731,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit repeating task'**
   String get editRepeating;
-
-  /// No description provided for @nextStep.
-  ///
-  /// In en, this message translates to:
-  /// **'Your next step'**
-  String get nextStep;
 
   /// No description provided for @moveError.
   ///
@@ -1906,6 +1840,12 @@ abstract class AppLocalizations {
   /// **'Doctor Friday at 5 p.m. Bring my results. Also buy coffee.'**
   String get examplePlan;
 
+  /// Hint in the empty typing field of the capture sheet when typed words are understood on the phone, as one task: a short task with a day and a time the app reads.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor Friday at 5 p.m.'**
+  String get exampleTask;
+
   /// No description provided for @discard.
   ///
   /// In en, this message translates to:
@@ -2007,12 +1947,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick a date'**
   String get pickDate;
-
-  /// No description provided for @typeTask.
-  ///
-  /// In en, this message translates to:
-  /// **'Type a task'**
-  String get typeTask;
 
   /// No description provided for @addStepDialog.
   ///
@@ -2212,12 +2146,6 @@ abstract class AppLocalizations {
   /// **'Please try again in a moment.'**
   String get tryLater;
 
-  /// No description provided for @suggestionApplied.
-  ///
-  /// In en, this message translates to:
-  /// **'Schedule suggestion applied'**
-  String get suggestionApplied;
-
   /// No description provided for @changeSeriesQuestion.
   ///
   /// In en, this message translates to:
@@ -2290,29 +2218,23 @@ abstract class AppLocalizations {
   /// **'Could not attach that file. Please try again.'**
   String get attachError;
 
-  /// No description provided for @capturedWords.
-  ///
-  /// In en, this message translates to:
-  /// **'Captured from your words'**
-  String get capturedWords;
-
   /// No description provided for @titleRequiredField.
   ///
   /// In en, this message translates to:
   /// **'Please enter a task title'**
   String get titleRequiredField;
 
-  /// No description provided for @keepAsTitle.
+  /// Under a date read from typed words, before the Keep as typed button.
   ///
   /// In en, this message translates to:
-  /// **'Keep as title'**
-  String get keepAsTitle;
+  /// **'From your words'**
+  String get fromYourWords;
 
-  /// No description provided for @ambiguousTimeHelp.
+  /// Text button: the typed words become the title again, without the date read from them.
   ///
   /// In en, this message translates to:
-  /// **'Choose AM/PM or add the time yourself. No hour has been inferred.'**
-  String get ambiguousTimeHelp;
+  /// **'Keep as typed'**
+  String get keepAsTyped;
 
   /// No description provided for @clearDate.
   ///
@@ -2379,12 +2301,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save changes'**
   String get saveChangesSentence;
-
-  /// No description provided for @useSchedule.
-  ///
-  /// In en, this message translates to:
-  /// **'Use {schedule}'**
-  String useSchedule(String schedule);
 
   /// No description provided for @checklistCount.
   ///
@@ -3279,12 +3195,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Decline'**
   String get decline;
-
-  /// No description provided for @fileEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No attachments. Add a file when editing.'**
-  String get fileEmpty;
 
   /// No description provided for @fileLoadError.
   ///
@@ -4231,25 +4141,19 @@ abstract class AppLocalizations {
   /// No description provided for @captureOffline.
   ///
   /// In en, this message translates to:
-  /// **'Cannot reach the server. Check your connection and server address, then retry.'**
+  /// **'No internet. Your words are saved — try again when you’re online.'**
   String get captureOffline;
-
-  /// No description provided for @captureTimeout.
-  ///
-  /// In en, this message translates to:
-  /// **'The server took too long to respond. You can retry this capture.'**
-  String get captureTimeout;
 
   /// No description provided for @captureUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'The processing service is unavailable. Retry this capture later.'**
+  /// **'Couldn’t reach the assistant — your words are kept.'**
   String get captureUnavailable;
 
   /// No description provided for @captureAllowance.
   ///
   /// In en, this message translates to:
-  /// **'The service request limit was reached. Retry later.'**
+  /// **'You’ve reached today’s limit. Type the task, or try again tomorrow.'**
   String get captureAllowance;
 
   /// No description provided for @captureSignIn.
@@ -4369,13 +4273,13 @@ abstract class AppLocalizations {
   /// No description provided for @captureSpeechStopped.
   ///
   /// In en, this message translates to:
-  /// **'Speech stopped. Your retained words are safe; record audio or type to continue.'**
+  /// **'Listening stopped. You can talk again, or type.'**
   String get captureSpeechStopped;
 
   /// No description provided for @captureNoSpeech.
   ///
   /// In en, this message translates to:
-  /// **'No clear speech was detected. Retained words are still available.'**
+  /// **'I didn’t catch that. Try again, or type it.'**
   String get captureNoSpeech;
 
   /// No description provided for @captureSpeechLanguage.
@@ -4443,12 +4347,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Speech setup is unavailable here. Use saved audio or type.'**
   String get captureSetupUnavailable;
-
-  /// No description provided for @captureKept.
-  ///
-  /// In en, this message translates to:
-  /// **'Your capture is kept on this phone.'**
-  String get captureKept;
 
   /// No description provided for @voiceRecording.
   ///
@@ -4558,6 +4456,24 @@ abstract class AppLocalizations {
   /// **'Understanding…'**
   String get captureUnderstanding;
 
+  /// No description provided for @captureFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That didn’t work. Your words are saved here — try again.'**
+  String get captureFailed;
+
+  /// No description provided for @captureSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking longer than usual.'**
+  String get captureSlow;
+
+  /// No description provided for @captureSaveAsWritten.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as written'**
+  String get captureSaveAsWritten;
+
   /// No description provided for @captureThingsToAdd.
   ///
   /// In en, this message translates to:
@@ -4665,12 +4581,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'“{title}” and all its occurrences will be removed.'**
   String deleteSeriesHelp(String title);
-
-  /// No description provided for @deleteItemHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'“{title}” will be removed.'**
-  String deleteItemHelp(String title);
 
   /// No description provided for @viewOnlyTask.
   ///
@@ -5319,6 +5229,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice capture is included with TaskFlow Pro.'**
   String get voiceProRequired;
+
+  /// Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking a task is part of TaskFlow Pro. You can type it here.'**
+  String get captureSpeakingIsPro;
 
   /// No description provided for @voiceProAction.
   ///

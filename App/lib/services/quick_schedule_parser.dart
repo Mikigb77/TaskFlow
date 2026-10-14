@@ -1,13 +1,22 @@
-/// A deliberately bounded, local parser. Suggestions are never applied until
-/// the user accepts one. Unsupported phrases stay in the title unchanged.
+import 'package:agenda/models/task.dart';
+
+/// A deliberately bounded, local parser for typed English, Spanish and Catalan
+/// words. A date it finds applies at once; the capture result keeps the words
+/// as typed one tap away. Unsupported phrases stay in the title unchanged.
 class ScheduleSuggestion {
   final String title;
   final DateTime date;
   final bool hasTime;
   final bool ambiguousTime;
+
+  /// A bare hour from 1 to 12 (`a las 5`): morning or afternoon is asked, not
+  /// guessed. Its words are left out of [title].
+  final int? ambiguousHour;
   final bool isDeadline;
   const ScheduleSuggestion(this.title, this.date, this.hasTime,
-      {this.ambiguousTime = false, this.isDeadline = false});
+      {this.ambiguousTime = false,
+      this.ambiguousHour,
+      this.isDeadline = false});
 }
 
 class QuickScheduleParser {
@@ -28,19 +37,41 @@ class QuickScheduleParser {
     'sábado': 6,
     'sabado': 6,
     'domingo': 7,
+    'dilluns': 1,
+    'dimarts': 2,
+    'dimecres': 3,
+    'dijous': 4,
+    'divendres': 5,
+    'dissabte': 6,
+    'diumenge': 7,
   };
+  static const _today = {'today', 'hoy', 'avui'};
+  static const _tomorrow = {'tomorrow', 'mañana', 'demà'};
+  static const _next = r'next|próximo|proximo|proper';
+  // Catalan puts ‘next’ after the day: `dilluns vinent`.
+  static const _nextAfter = 'vinent';
+  // Words end at any letter, accented ones included (`demà`).
   static final _date = RegExp(
-      r'\b(?:on\s+|el\s+)?(?:(?:next|this|próximo|proximo)\s+)?(?:today|tomorrow|hoy|mañana|'
-      '${_weekdays.keys.join('|')}|[0-9]{4}-[0-9]{2}-[0-9]{2})'
-      r"\b(?!['’]\w)",
-      caseSensitive: false);
+      r'\b(?:on\s+|el\s+)?(?:(?:this|' '$_next' r')\s+)?(?:'
+      '${[..._today, ..._tomorrow, ..._weekdays.keys].join('|')}'
+      r'|[0-9]{4}-[0-9]{2}-[0-9]{2})(?:\s+' '$_nextAfter' r')?'
+      r"(?![\p{L}\p{N}_])(?!['’]\w)",
+      caseSensitive: false,
+      unicode: true);
   static final _time = RegExp(
-      r'\b(?:(?:at|a las)\s+)?(?:(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)?|(\d{1,2})\s*(a\.?m\.?|p\.?m\.?))\b',
+      r'\b(?:(?:at|a las|a les)\s+)?(?:(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?)?|(\d{1,2})\s*(a\.?m\.?|p\.?m\.?))\b',
       caseSensitive: false);
   static final _bareHour =
-      RegExp(r'\b(?:at|a las)\s+(\d{1,2})\b', caseSensitive: false);
+      RegExp(r'\b(?:at|a las|a les)\s+(\d{1,2})\b', caseSensitive: false);
 
-  static ScheduleSuggestion? parse(String input, DateTime reference) {
+  /// The one date (and time) [input] names, relative to [reference]. A time
+  /// with no date words goes on [day], or on [reference]'s day. The title can
+  /// be empty when the words are only a date.
+  static ScheduleSuggestion? parse(
+    String input,
+    DateTime reference, {
+    DateTime? day,
+  }) {
     if (input.length > 4000) return null;
     // Quoted titles, alternatives and explicit corrections require human/AI review.
     if (RegExp('["“”]').hasMatch(input) ||
@@ -49,24 +80,30 @@ class QuickScheduleParser {
       return null;
     }
     final dates = _date.allMatches(input).toList();
-    if (dates.length != 1) return null;
-    final match = dates.single;
-    final deadlineMarker = RegExp(
-            r'\b(?:by|due(?:\s+by)?|deadline(?:\s+is)?|antes\s+de(?:l)?|vence|fecha\s+l[ií]mite(?:\s+es)?)\s*$',
-            caseSensitive: false)
-        .firstMatch(input.substring(0, match.start));
-    final phrase = match.group(0)!.toLowerCase();
-    final word = phrase.split(RegExp(r'\s+')).last;
+    if (dates.length > 1) return null;
+    final match = dates.singleOrNull;
+    final deadlineMarker = match == null
+        ? null
+        : RegExp(
+                r'\b(?:by|due(?:\s+by)?|deadline(?:\s+is)?|antes\s+de(?:l)?|vence|fecha\s+l[ií]mite(?:\s+es)?)\s*$',
+                caseSensitive: false)
+            .firstMatch(input.substring(0, match.start));
+    final phrase = match?.group(0)!.toLowerCase() ?? '';
+    final words = phrase.split(RegExp(r'\s+'));
+    final word = words.lastWhere((w) => w != _nextAfter, orElse: () => '');
     final today = DateTime(reference.year, reference.month, reference.day);
     DateTime date;
-    if (word == 'today' || word == 'hoy') {
+    if (match == null) {
+      date = Task.day(day ?? today);
+    } else if (_today.contains(word)) {
       date = today;
-    } else if (word == 'tomorrow' || word == 'mañana') {
+    } else if (_tomorrow.contains(word)) {
       date = DateTime(today.year, today.month, today.day + 1);
     } else if (_weekdays.containsKey(word)) {
       var offset = (_weekdays[word]! - today.weekday + 7) % 7;
       if (offset == 0 &&
-          RegExp(r'\b(next|próximo|proximo)\b').hasMatch(phrase)) {
+          words.any(
+              (w) => w == _nextAfter || RegExp('^(?:$_next)\$').hasMatch(w))) {
         offset = 7;
       }
       date = DateTime(today.year, today.month, today.day + offset);
@@ -90,6 +127,7 @@ class QuickScheduleParser {
     }
     var hasTime = false;
     var ambiguous = false;
+    int? ambiguousHour;
     RegExpMatch? acceptedTime;
     if (times.isNotEmpty) {
       final time = times.single;
@@ -110,20 +148,27 @@ class QuickScheduleParser {
     } else {
       final bare = _bareHour.allMatches(input).toList();
       final hour = bare.length == 1 ? int.parse(bare.single.group(1)!) : null;
+      final beforeDeadline = deadlineMarker != null &&
+          bare.length == 1 &&
+          bare.single.end <= deadlineMarker.start;
       // 0 and 13–23 can only be a 24-hour time; 1–12 could be either.
       if (hour != null && (hour == 0 || (hour >= 13 && hour <= 23))) {
-        if (deadlineMarker != null && bare.single.end <= deadlineMarker.start) {
-          return null;
-        }
+        if (beforeDeadline) return null;
         date = DateTime(date.year, date.month, date.day, hour);
         hasTime = true;
         acceptedTime = bare.single;
       } else if (bare.isNotEmpty) {
         ambiguous = true;
+        if (hour != null && hour >= 1 && hour <= 12 && !beforeDeadline) {
+          ambiguousHour = hour;
+          acceptedTime = bare.single;
+        }
       }
     }
+    // Without date words, only a time says when.
+    if (match == null && !hasTime && ambiguousHour == null) return null;
     final ranges = [
-      match,
+      ?match,
       if (deadlineMarker != null) deadlineMarker,
       if (acceptedTime != null) acceptedTime
     ]..sort((a, b) => b.start.compareTo(a.start));
@@ -135,8 +180,9 @@ class QuickScheduleParser {
         .replaceAll(RegExp(r'\s+'), ' ')
         .replaceAll(RegExp(r'^[\s,.;:]+|[\s,.;:]+$'), '')
         .trim();
-    if (title.isEmpty) return null;
     return ScheduleSuggestion(title, date, hasTime,
-        ambiguousTime: ambiguous, isDeadline: deadlineMarker != null);
+        ambiguousTime: ambiguous,
+        ambiguousHour: ambiguousHour,
+        isDeadline: deadlineMarker != null);
   }
 }

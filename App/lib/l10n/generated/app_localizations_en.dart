@@ -56,6 +56,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewNoTime => 'No time';
 
   @override
+  String get captureWhatTime => 'What time?';
+
+  @override
   String get reviewEditDetail => 'Change this detail';
 
   @override
@@ -176,15 +179,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get note => 'Note';
 
   @override
-  String get noteEmptyBody => 'No text added.';
-
-  @override
-  String get fileNone => 'No attachments.';
-
-  @override
-  String get newNote => 'New note';
-
-  @override
   String get editNote => 'Edit note';
 
   @override
@@ -214,7 +208,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteSaved => 'Note saved';
 
   @override
-  String get recordNote => 'Dictate a note';
+  String get addNote => 'Add a note';
 
   @override
   String get noteHint => 'Ideas, meeting details, useful links…';
@@ -233,12 +227,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allNotes => 'All notes';
-
-  @override
-  String get deleteNoteQuestion => 'Delete this note?';
-
-  @override
-  String get keepNote => 'Keep note';
 
   @override
   String get viewOnlyNote =>
@@ -501,9 +489,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get upcoming => 'Upcoming';
 
   @override
-  String get completed => 'Completed';
-
-  @override
   String get noDate => 'No date';
 
   @override
@@ -516,16 +501,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeDate => 'Remove date';
 
   @override
-  String get newTask => 'New task';
-
-  @override
   String get editTask => 'Edit task';
 
   @override
   String get taskDetails => 'Task details';
 
   @override
-  String get sayTask => 'Say a task';
+  String get addTask => 'Add a task';
 
   @override
   String get typeTasks => 'Type tasks';
@@ -622,9 +604,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keepChanges => 'Keep changes';
-
-  @override
-  String get createTask => 'Create Task';
 
   @override
   String get saveChanges => 'Save Changes';
@@ -783,8 +762,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rememberPrompt => 'What would you like to remember?';
 
   @override
-  String get calendarEmpty =>
-      'Tap Say a task and speak naturally, or New task to type. Dates are optional; unscheduled tasks go to Inbox.';
+  String get calendarEmpty => 'Nothing planned for this day.';
 
   @override
   String get planTask => 'Plan a task';
@@ -870,12 +848,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add a task to this project. Its date and reminder are yours to choose.';
 
   @override
-  String get tasksEmpty =>
-      'Use Say a task to speak, or New task to type.\nAdd a date now or leave it for later.';
+  String get tasksEmpty => 'Tap Add a task to add one. A date is optional.';
 
   @override
   String get inboxEmpty =>
-      'Keep ideas and to-dos here until you choose a date.\nUse Say a task or New task to begin.';
+      'Keep ideas and to-dos here until you choose a date.\nStart with Add a task.';
 
   @override
   String get savedOnDevice => 'Your saved tasks are still on your device.';
@@ -884,19 +861,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkCaptures => 'Check unfinished captures';
 
   @override
-  String get createTaskTooltip => 'Create task';
-
-  @override
-  String get reviewTask => 'Review task';
-
-  @override
   String get fineTunePlan => 'Fine-tune your plan.';
-
-  @override
-  String get onYourMind => 'What’s on your mind?';
-
-  @override
-  String get wordsPlan => 'Your words, a clear plan.';
 
   @override
   String get seriesEdits => 'Edits apply to the whole repeating task.';
@@ -964,13 +929,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteTask => 'Delete task';
 
   @override
-  String get deleteTaskQuestion => 'Delete task?';
-
-  @override
   String get keepTask => 'Keep task';
 
   @override
   String get deleteTaskError => 'Could not delete this task. Please try again.';
+
+  @override
+  String get taskDeleted => 'Task deleted';
+
+  @override
+  String get noteDeleted => 'Note deleted';
 
   @override
   String get attachmentUnavailable =>
@@ -994,9 +962,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editRepeating => 'Edit repeating task';
-
-  @override
-  String get nextStep => 'Your next step';
 
   @override
   String get moveError => 'Could not move this task. Please retry.';
@@ -1054,6 +1019,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get examplePlan =>
       'Doctor Friday at 5 p.m. Bring my results. Also buy coffee.';
+
+  @override
+  String get exampleTask => 'Doctor Friday at 5 p.m.';
 
   @override
   String get discard => 'Discard';
@@ -1127,9 +1095,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pickDate => 'Pick a date';
-
-  @override
-  String get typeTask => 'Type a task';
 
   @override
   String get addStepDialog => 'Add a step';
@@ -1236,9 +1201,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tryLater => 'Please try again in a moment.';
 
   @override
-  String get suggestionApplied => 'Schedule suggestion applied';
-
-  @override
   String get changeSeriesQuestion => 'Change the repeating schedule?';
 
   @override
@@ -1279,17 +1241,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attachError => 'Could not attach that file. Please try again.';
 
   @override
-  String get capturedWords => 'Captured from your words';
-
-  @override
   String get titleRequiredField => 'Please enter a task title';
 
   @override
-  String get keepAsTitle => 'Keep as title';
+  String get fromYourWords => 'From your words';
 
   @override
-  String get ambiguousTimeHelp =>
-      'Choose AM/PM or add the time yourself. No hour has been inferred.';
+  String get keepAsTyped => 'Keep as typed';
 
   @override
   String get clearDate => 'Clear date';
@@ -1323,11 +1281,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saveChangesSentence => 'Save changes';
-
-  @override
-  String useSchedule(String schedule) {
-    return 'Use $schedule';
-  }
 
   @override
   String checklistCount(int done, int total) {
@@ -1842,9 +1795,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get decline => 'Decline';
-
-  @override
-  String get fileEmpty => 'No attachments. Add a file when editing.';
 
   @override
   String get fileLoadError => 'Could not load attachment status. Please retry.';
@@ -2477,19 +2427,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'Cannot reach the server. Check your connection and server address, then retry.';
-
-  @override
-  String get captureTimeout =>
-      'The server took too long to respond. You can retry this capture.';
+      'No internet. Your words are saved — try again when you’re online.';
 
   @override
   String get captureUnavailable =>
-      'The processing service is unavailable. Retry this capture later.';
+      'Couldn’t reach the assistant — your words are kept.';
 
   @override
   String get captureAllowance =>
-      'The service request limit was reached. Retry later.';
+      'You’ve reached today’s limit. Type the task, or try again tomorrow.';
 
   @override
   String get captureSignIn =>
@@ -2558,11 +2504,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureSpeechStopped =>
-      'Speech stopped. Your retained words are safe; record audio or type to continue.';
+      'Listening stopped. You can talk again, or type.';
 
   @override
-  String get captureNoSpeech =>
-      'No clear speech was detected. Retained words are still available.';
+  String get captureNoSpeech => 'I didn’t catch that. Try again, or type it.';
 
   @override
   String get captureSpeechLanguage =>
@@ -2607,9 +2552,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get captureSetupUnavailable =>
       'Speech setup is unavailable here. Use saved audio or type.';
-
-  @override
-  String get captureKept => 'Your capture is kept on this phone.';
 
   @override
   String get voiceRecording => 'Voice recording';
@@ -2695,6 +2637,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureUnderstanding => 'Understanding…';
+
+  @override
+  String get captureFailed =>
+      'That didn’t work. Your words are saved here — try again.';
+
+  @override
+  String get captureSlow => 'Taking longer than usual.';
+
+  @override
+  String get captureSaveAsWritten => 'Save as written';
 
   @override
   String captureThingsToAdd(int count) {
@@ -2789,11 +2741,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String deleteSeriesHelp(String title) {
     return '“$title” and all its occurrences will be removed.';
-  }
-
-  @override
-  String deleteItemHelp(String title) {
-    return '“$title” will be removed.';
   }
 
   @override
@@ -3270,6 +3217,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceProRequired => 'Voice capture is included with TaskFlow Pro.';
+
+  @override
+  String get captureSpeakingIsPro =>
+      'Speaking a task is part of TaskFlow Pro. You can type it here.';
 
   @override
   String get voiceProAction => 'Explore Pro';

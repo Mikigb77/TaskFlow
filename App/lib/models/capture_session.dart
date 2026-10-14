@@ -16,6 +16,10 @@ class CaptureDraft {
   final List<CaptureClarification> clarifications;
   final List<String> resolvedQuestions;
 
+  /// Built on the phone from typed words whose date was applied: the task as
+  /// it would be without that date, for `Keep as typed`.
+  final Task? asTyped;
+
   const CaptureDraft({
     required this.id,
     required this.task,
@@ -28,6 +32,7 @@ class CaptureDraft {
     this.removed = false,
     this.clarifications = const [],
     this.resolvedQuestions = const [],
+    this.asTyped,
   });
 
   factory CaptureDraft.fromAI(TaskDraft draft) => CaptureDraft(
@@ -85,6 +90,7 @@ class CaptureDraft {
     bool? assignmentReviewed,
     List<String>? resolvedQuestions,
     bool clearSavedTaskId = false,
+    bool clearAsTyped = false,
   }) => CaptureDraft(
     id: id,
     task: task ?? this.task,
@@ -97,6 +103,7 @@ class CaptureDraft {
     clarifications: clarifications,
     resolvedQuestions: resolvedQuestions ?? this.resolvedQuestions,
     removed: removed ?? this.removed,
+    asTyped: clearAsTyped ? null : asTyped,
   );
 
   Map<String, dynamic> toJson() => {
@@ -111,6 +118,7 @@ class CaptureDraft {
     'resolvedQuestions': resolvedQuestions,
     'savedTaskId': savedTaskId,
     'removed': removed,
+    if (asTyped != null) 'asTyped': asTyped!.toMap(),
   };
 
   factory CaptureDraft.fromJson(Map<String, dynamic> json) => CaptureDraft(
@@ -127,6 +135,9 @@ class CaptureDraft {
     resolvedQuestions: List<String>.from(json['resolvedQuestions'] ?? []),
     savedTaskId: json['savedTaskId'],
     removed: json['removed'] == true,
+    asTyped: json['asTyped'] == null
+        ? null
+        : Task.fromMap(Map<String, dynamic>.from(json['asTyped'])),
   );
 }
 
@@ -152,6 +163,10 @@ class CaptureSession {
   /// audio) or `typed` (the keyboard or a share). Null until words arrive.
   final String? source;
 
+  /// The later day capture was opened for (Calendar's selected day, the
+  /// timeline's day): a task understood with no date and no deadline gets it.
+  final DateTime? day;
+
   const CaptureSession({
     required this.id,
     required this.ownerKey,
@@ -167,6 +182,7 @@ class CaptureSession {
     this.error,
     this.drafts = const [],
     this.source,
+    this.day,
   });
 
   bool get terminal => status == 'saved' || status == 'discarded';
@@ -198,6 +214,7 @@ class CaptureSession {
     error: error,
     drafts: drafts ?? this.drafts,
     source: source ?? this.source,
+    day: day,
   );
 
   Map<String, dynamic> toJson() => {
@@ -215,6 +232,7 @@ class CaptureSession {
     'error': error,
     'drafts': drafts.map((d) => d.toJson()).toList(),
     'source': source,
+    'day': day == null ? null : Task.dateKey(day!),
   };
 
   factory CaptureSession.fromJson(Map<String, dynamic> json) => CaptureSession(
@@ -234,5 +252,6 @@ class CaptureSession {
         .map((d) => CaptureDraft.fromJson(Map<String, dynamic>.from(d)))
         .toList(),
     source: json['source'],
+    day: json['day'] == null ? null : DateTime.parse(json['day']),
   );
 }

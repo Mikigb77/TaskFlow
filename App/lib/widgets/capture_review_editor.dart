@@ -110,7 +110,10 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 : task.repeatUntil,
           );
     if (question == null) {
-      _change(changed);
+      // A date chosen here is no longer the one read from the words.
+      widget.onChanged(
+        widget.draft.copyWith(task: changed, clearAsTyped: true),
+      );
     } else {
       _resolve(question, value: changed);
     }
@@ -146,7 +149,9 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      question.question,
+                      question.question.isEmpty
+                          ? l.captureWhatTime
+                          : question.question,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     Wrap(
@@ -255,6 +260,43 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     onTap: widget.enabled ? onTap : null,
   );
 
+  /// `Dejar como está`: the typed words become the title again, with the
+  /// date the task would have had without them.
+  void _keepAsTyped() {
+    final typed = widget.draft.asTyped;
+    if (typed == null) return;
+    widget.onChanged(
+      widget.draft.copyWith(
+        task: typed,
+        clearAsTyped: true,
+        confirmed: true,
+        resolvedQuestions: [
+          for (final question in widget.draft.reviewQuestions) question.id,
+        ],
+      ),
+    );
+  }
+
+  /// Under a date read from typed words: where it came from, and the way
+  /// back to the words as typed.
+  Widget _fromWords() {
+    final l = context.l10n;
+    final text = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(l.fromYourWords, style: text),
+        ExcludeSemantics(child: Text(' · ', style: text)),
+        TextButton(
+          onPressed: widget.enabled ? _keepAsTyped : null,
+          child: Text(l.keepAsTyped),
+        ),
+      ],
+    );
+  }
+
   /// The date is the result's main line; a collapsed row shows it smaller.
   /// Tapping it opens the date sheet. TalkBack says what the line is:
   /// `Fecha y hora: Hoy`.
@@ -307,6 +349,8 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     // inbox is the default, so it stays behind `Más opciones`.
     final showAssignment =
         task.listId != null || !widget.draft.assignmentReviewed;
+    // The date was read from typed words: say so under it.
+    final fromWords = widget.draft.asTyped != null;
     TaskAssignmentPicker assignment({bool asRow = false}) =>
         TaskAssignmentPicker(
           task: task,
@@ -399,7 +443,11 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
           ),
           _questions('title'),
           // The date is the main line, with an open time question under it.
-          if (!task.isNote) ...[_dateLine(main: true), _questions('schedule')],
+          if (!task.isNote) ...[
+            _dateLine(main: true),
+            if (fromWords && task.dueDate != null) _fromWords(),
+            _questions('schedule'),
+          ],
           const SizedBox(height: 8),
           TextFormField(
             key: const ValueKey('draft-notes'),
@@ -430,6 +478,8 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 taskDeadlineLabel(context, task),
                 onTap: () => _schedule(deadline: true),
               ),
+            if (fromWords && task.dueDate == null && task.deadline != null)
+              _fromWords(),
             _questions('deadline'),
             if (task.durationMinutes != null)
               Text(

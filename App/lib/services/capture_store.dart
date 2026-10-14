@@ -49,11 +49,13 @@ class CaptureStore {
     String kind = 'task',
     String? projectId,
     String? source,
+    DateTime? day,
+    String? id,
   }) async {
     if (!['task', 'note'].contains(kind)) {
       throw ArgumentError('Invalid capture type.');
     }
-    final id = const Uuid().v4();
+    id ??= const Uuid().v4();
     final session = CaptureSession(
       id: id,
       ownerKey: ownerKey,
@@ -64,6 +66,7 @@ class CaptureStore {
       text: text,
       audioPath: audio ? p.join((await _directory()).path, '$id.wav') : null,
       source: source,
+      day: day,
     );
     await (await database.database).insert('captures', {
       'id': id,
@@ -75,11 +78,34 @@ class CaptureStore {
     return session;
   }
 
-  Future<String> audioPathFor(CaptureSession session) async =>
-      p.join((await _directory()).path, '${session.id}.wav');
+  Future<String> audioPathFor(CaptureSession session) =>
+      audioPathForId(session.id);
 
-  /// Android acknowledges a share only after this idempotent write. A lost
-  /// acknowledgement cannot duplicate a capture or move it to another account.
+  /// Where a capture's audio goes. The recorder writes there before the
+  /// capture exists: [create] with the same id once audio has arrived.
+  Future<String> audioPathForId(String id) async =>
+      p.join((await _directory()).path, '$id.wav');
+
+  /// Deletes audio that arrived for no capture.
+  Future<void> removeAudioFile(String id) async {
+    final file = File(await audioPathForId(id));
+    try {
+      if (await file.exists()) await file.delete();
+    } on FileSystemException {
+      /* Nothing refers to it. */
+    }
+  }
+
+  /// A capture with no words, no audio and no drafts holds nothing to keep.
+  static bool isEmpty(CaptureSession session) =>
+      session.text.trim().isEmpty &&
+      session.transcript.trim().isEmpty &&
+      session.audioPath == null &&
+      session.drafts.isEmpty;
+
+  /// Shared text only: it brings words. Android acknowledges a share only
+  /// after this idempotent write. A lost acknowledgement cannot duplicate a
+  /// capture or move it to another account.
   Future<CaptureSession?> acceptEntry(
     String id,
     String ownerKey,
@@ -87,7 +113,9 @@ class CaptureStore {
     required String text,
     required DateTime capturedAt,
   }) async {
-    if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id) || text.length > 4000) {
+    if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id) ||
+        text.trim().isEmpty ||
+        text.length > 4000) {
       throw ArgumentError('Invalid external capture');
     }
     final session = CaptureSession(
@@ -96,8 +124,7 @@ class CaptureStore {
       timezone: timezone,
       text: text,
       capturedAt: capturedAt.toUtc(),
-      // A share or typed shortcut brings words; a voice shortcut brings none.
-      source: text.trim().isEmpty ? null : 'typed',
+      source: 'typed',
     );
     return (await database.database).transaction((tx) async {
       await tx.insert('captures', {
@@ -135,7 +162,18 @@ class CaptureStore {
       whereArgs: [ownerKey],
       orderBy: 'captured_at DESC',
     );
-    return rows.map(_decode).toList();
+    final sessions = rows.map(_decode).toList();
+    // Opened and left without a word: nothing to come back to.
+    final empty = sessions.where(isEmpty).map((s) => s.id).toList();
+    if (empty.isNotEmpty) {
+      await (await database.database).delete(
+        'captures',
+        where:
+            "owner_key = ? AND status NOT IN ('saved','discarded') AND id IN (${List.filled(empty.length, '?').join(',')})",
+        whereArgs: [ownerKey, ...empty],
+      );
+    }
+    return sessions.where((s) => !isEmpty(s)).toList();
   }
 
   Future<void> update(CaptureSession session) async {
@@ -300,6 +338,7 @@ class CaptureStore {
       text: before.text,
       transcript: before.transcript,
       source: before.source,
+      day: before.day,
       status: 'ready',
       drafts: [
         for (final draft in current.drafts)

@@ -193,16 +193,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     );
   }
 
-  void _create() {
-    // Never pre-fill a day that has already gone.
-    final today = Task.day(_now());
-    Navigator.pushNamed(
-      context,
-      '/createTask',
-      arguments: Task.day(_selectedDay).isBefore(today) ? today : _selectedDay,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
@@ -594,10 +584,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 child: EmptyState(
                   title: context.l10n.rememberPrompt,
                   message: context.l10n.calendarEmpty,
-                  action: TextButton(
-                    onPressed: _create,
-                    child: Text(context.l10n.typeTask),
-                  ),
                 ),
               )
             else ...[
@@ -697,7 +683,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           ],
         ),
       ),
-      bottomNavigationBar: TaskActions(onCreate: _create),
+      // A task added for a later day without a date goes to that day.
+      bottomNavigationBar: TaskActions(day: _selectedDay),
     );
   }
 }

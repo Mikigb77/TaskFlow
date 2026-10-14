@@ -31,6 +31,9 @@ class TaskRepository {
     return await _database.deleteTask(id);
   }
 
+  /// Brings back a task deleted with [deleteTask], as it was.
+  Future<int> restoreTask(Task task) => _database.restoreTask(task);
+
   // Method to get tasks overdue by 4 months
   Future<List<Task>> getTasksOverdueByFourMonths() async {
     return await _database.getTasksOverdueByFourMonths();

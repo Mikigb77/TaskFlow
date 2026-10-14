@@ -56,6 +56,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get reviewNoTime => 'Sense hora';
 
   @override
+  String get captureWhatTime => 'A quina hora?';
+
+  @override
   String get reviewEditDetail => 'Canviar aquesta dada';
 
   @override
@@ -181,15 +184,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get note => 'Nota';
 
   @override
-  String get noteEmptyBody => 'No s’hi ha afegit text.';
-
-  @override
-  String get fileNone => 'No hi ha fitxers adjunts.';
-
-  @override
-  String get newNote => 'Nota nova';
-
-  @override
   String get editNote => 'Edita la nota';
 
   @override
@@ -219,7 +213,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get noteSaved => 'Nota desada';
 
   @override
-  String get recordNote => 'Dicta una nota';
+  String get addNote => 'Afegeix una nota';
 
   @override
   String get noteHint => 'Idees, detalls de reunions, enllaços útils…';
@@ -238,12 +232,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get allNotes => 'Totes les notes';
-
-  @override
-  String get deleteNoteQuestion => 'Vols suprimir aquesta nota?';
-
-  @override
-  String get keepNote => 'Conserva la nota';
 
   @override
   String get viewOnlyNote =>
@@ -508,9 +496,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get upcoming => 'Properes';
 
   @override
-  String get completed => 'Completades';
-
-  @override
   String get noDate => 'Sense data';
 
   @override
@@ -523,16 +508,13 @@ class AppLocalizationsCa extends AppLocalizations {
   String get removeDate => 'Treu la data';
 
   @override
-  String get newTask => 'Tasca nova';
-
-  @override
   String get editTask => 'Edita la tasca';
 
   @override
   String get taskDetails => 'Detalls de la tasca';
 
   @override
-  String get sayTask => 'Dicta una tasca';
+  String get addTask => 'Afegeix una tasca';
 
   @override
   String get typeTasks => 'Escriu tasques';
@@ -629,9 +611,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get keepChanges => 'Conserva els canvis';
-
-  @override
-  String get createTask => 'Crea la tasca';
 
   @override
   String get saveChanges => 'Desa els canvis';
@@ -792,8 +771,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get rememberPrompt => 'Què t’agradaria recordar?';
 
   @override
-  String get calendarEmpty =>
-      'Toca Dicta una tasca per parlar o Tasca nova per escriure. Les dates són opcionals; les tasques sense data van a la safata d’entrada.';
+  String get calendarEmpty => 'Res previst per a aquest dia.';
 
   @override
   String get planTask => 'Planifica una tasca';
@@ -883,11 +861,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get tasksEmpty =>
-      'Utilitza Dicta una tasca per parlar o Tasca nova per escriure.\nAfegeix-hi una data ara o deixa-la per a més endavant.';
+      'Toca Afegeix una tasca per afegir-ne una. La data és opcional.';
 
   @override
   String get inboxEmpty =>
-      'Desa-hi idees i coses per fer fins que en triïs la data.\nComença amb Dicta una tasca o Tasca nova.';
+      'Desa-hi idees i coses per fer fins que en triïs la data.\nComença amb Afegeix una tasca.';
 
   @override
   String get savedOnDevice => 'Les tasques desades continuen al dispositiu.';
@@ -896,19 +874,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get checkCaptures => 'Revisa les captures pendents';
 
   @override
-  String get createTaskTooltip => 'Crea una tasca';
-
-  @override
-  String get reviewTask => 'Revisa la tasca';
-
-  @override
   String get fineTunePlan => 'Ajusta el teu pla.';
-
-  @override
-  String get onYourMind => 'Què tens al cap?';
-
-  @override
-  String get wordsPlan => 'Les teves paraules, un pla clar.';
 
   @override
   String get seriesEdits => 'Els canvis s’apliquen a tota la tasca periòdica.';
@@ -978,14 +944,17 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deleteTask => 'Suprimeix la tasca';
 
   @override
-  String get deleteTaskQuestion => 'Vols suprimir la tasca?';
-
-  @override
   String get keepTask => 'Conserva la tasca';
 
   @override
   String get deleteTaskError =>
       'No s’ha pogut suprimir aquesta tasca. Torna-ho a provar.';
+
+  @override
+  String get taskDeleted => 'Tasca suprimida';
+
+  @override
+  String get noteDeleted => 'Nota suprimida';
 
   @override
   String get attachmentUnavailable =>
@@ -1009,9 +978,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get editRepeating => 'Edita la tasca periòdica';
-
-  @override
-  String get nextStep => 'El teu pas següent';
 
   @override
   String get moveError =>
@@ -1070,6 +1036,9 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get examplePlan =>
       'Metge divendres a les 17 h. Portar els resultats. També comprar cafè.';
+
+  @override
+  String get exampleTask => 'Metge divendres a les 17:00';
 
   @override
   String get discard => 'Descarta';
@@ -1145,9 +1114,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get pickDate => 'Tria una data';
-
-  @override
-  String get typeTask => 'Escriu una tasca';
 
   @override
   String get addStepDialog => 'Afegeix un pas';
@@ -1256,9 +1222,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get tryLater => 'Torna-ho a provar d’aquí a un moment.';
 
   @override
-  String get suggestionApplied => 'S’ha aplicat la proposta de planificació';
-
-  @override
   String get changeSeriesQuestion => 'Vols canviar la planificació periòdica?';
 
   @override
@@ -1301,17 +1264,13 @@ class AppLocalizationsCa extends AppLocalizations {
       'No s’ha pogut adjuntar aquest fitxer. Torna-ho a provar.';
 
   @override
-  String get capturedWords => 'Capturat de les teves paraules';
-
-  @override
   String get titleRequiredField => 'Introdueix un títol per a la tasca';
 
   @override
-  String get keepAsTitle => 'Conserva-ho com a títol';
+  String get fromYourWords => 'Segons el que has escrit';
 
   @override
-  String get ambiguousTimeHelp =>
-      'Tria AM/PM o afegeix l’hora manualment. No s’ha deduït cap hora.';
+  String get keepAsTyped => 'Deixa-ho com està';
 
   @override
   String get clearDate => 'Esborra la data';
@@ -1347,11 +1306,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get saveChangesSentence => 'Desa els canvis';
-
-  @override
-  String useSchedule(String schedule) {
-    return 'Utilitza $schedule';
-  }
 
   @override
   String checklistCount(int done, int total) {
@@ -1873,9 +1827,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get decline => 'Rebutja';
-
-  @override
-  String get fileEmpty => 'No hi ha fitxers adjunts. Afegeix-ne un en editar.';
 
   @override
   String get fileLoadError =>
@@ -2528,19 +2479,15 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'No es pot connectar amb el servidor. Revisa la connexió i l’adreça del servidor i torna-ho a provar.';
-
-  @override
-  String get captureTimeout =>
-      'El servidor ha trigat massa a respondre. Pots tornar a provar aquesta captura.';
+      'Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.';
 
   @override
   String get captureUnavailable =>
-      'El servei de processament no està disponible. Torna a provar aquesta captura més endavant.';
+      'No he pogut contactar amb l’assistent; les teves paraules es conserven.';
 
   @override
   String get captureAllowance =>
-      'S’ha arribat al límit de peticions del servei. Torna-ho a provar més endavant.';
+      'Has arribat al límit d’avui. Escriu la tasca o torna-ho a provar demà.';
 
   @override
   String get captureSignIn =>
@@ -2608,11 +2555,10 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureSpeechStopped =>
-      'El reconeixement de veu s’ha aturat. Les paraules conservades estan desades; grava àudio o escriu per continuar.';
+      'S’ha deixat d’escoltar. Pots tornar a parlar o escriure.';
 
   @override
-  String get captureNoSpeech =>
-      'No s’ha detectat veu clara. Les paraules conservades continuen disponibles.';
+  String get captureNoSpeech => 'No t’he entès. Torna-ho a provar o escriu-ho.';
 
   @override
   String get captureSpeechLanguage =>
@@ -2657,9 +2603,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get captureSetupUnavailable =>
       'La configuració de veu no està disponible aquí. Utilitza àudio desat o escriu.';
-
-  @override
-  String get captureKept => 'La captura es conserva en aquest telèfon.';
 
   @override
   String get voiceRecording => 'Gravació de veu';
@@ -2746,6 +2689,16 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureUnderstanding => 'Entenent…';
+
+  @override
+  String get captureFailed =>
+      'No ha funcionat. Les teves paraules continuen aquí; torna-ho a provar.';
+
+  @override
+  String get captureSlow => 'Està trigant més del normal.';
+
+  @override
+  String get captureSaveAsWritten => 'Desa-ho tal com està';
 
   @override
   String captureThingsToAdd(int count) {
@@ -2841,11 +2794,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String deleteSeriesHelp(String title) {
     return 'Se suprimiran «$title» i totes les seves repeticions.';
-  }
-
-  @override
-  String deleteItemHelp(String title) {
-    return 'Se suprimirà «$title».';
   }
 
   @override
@@ -3329,6 +3277,10 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get voiceProRequired =>
       'La captura per veu està inclosa a TaskFlow Pro.';
+
+  @override
+  String get captureSpeakingIsPro =>
+      'Dictar una tasca forma part de TaskFlow Pro. La pots escriure aquí.';
 
   @override
   String get voiceProAction => 'Descobreix Pro';

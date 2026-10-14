@@ -238,7 +238,14 @@ void main() {
 
       app.api.found = [found('Comprar bombillas')];
       await app.say(tester, 'Comprar bombillas');
-      expect(find.text(es.captureAddTask), findsOneWidget);
+      // The page under the sheet has its own Añadir tarea.
+      expect(
+        find.descendant(
+          of: find.byType(CaptureResult),
+          matching: find.text(es.captureAddTask),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
 
@@ -363,7 +370,22 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final app = await _App.open(tester, many(), size: const Size(360, 740));
-      await tareasHighPriority(tester);
+      // At 2× text the filter chips start below the fold: bring
+      // `Prioridad alta` into view before tapping it, so the list really is
+      // filtered.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(es.tasks),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final high = find.widgetWithText(ChoiceChip, es.highPriority);
+      await tester.ensureVisible(high);
+      await tester.pumpAndSettle();
+      await tester.tap(high);
+      await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(high).selected, isTrue);
       expect(row('Tarea número 9'), findsNothing);
       app.api.found = [found('Comprar bombillas')];
       await app.say(tester, 'Comprar bombillas');
@@ -451,9 +473,6 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     },
-    // U5 / UX-460 failed twice in UX loop batch b3. P65 makes a narrow third
-    // attempt and removes this skip.
-    skip: true,
   );
 
   testWidgets(
@@ -551,7 +570,7 @@ class _App {
     String words, {
     bool submit = true,
   }) async {
-    await tester.tap(find.text(es.sayTask).hitTestable());
+    await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip(es.captureTypeInstead));
     await tester.pumpAndSettle();
@@ -622,6 +641,8 @@ class _Captures extends CaptureStore {
     String kind = 'task',
     String? projectId,
     String? source,
+    DateTime? day,
+    String? id,
   }) async => current = CaptureSession(
     id: 'capture-${DateTime.now().microsecondsSinceEpoch}',
     ownerKey: ownerKey,
@@ -631,6 +652,7 @@ class _Captures extends CaptureStore {
     kind: kind,
     projectId: projectId,
     source: source,
+    day: day,
   );
   @override
   Future<void> update(CaptureSession value) async => current = value;

@@ -164,10 +164,15 @@ class DesignTaskNotifier extends TaskNotifier {
   }
 
   @override
-  Future<void> deleteTask(int id) async {
+  Future<void> deleteTask(int id, {bool sync = true}) async {
     state = AsyncData(
       state.requireValue.where((item) => item.id != id).toList(),
     );
+  }
+
+  @override
+  Future<void> restoreTask(Task task) async {
+    state = AsyncData([...state.requireValue, task]);
   }
 }
 
@@ -178,13 +183,16 @@ ProviderContainer designContainer({
   List<TaskListInfo>? projects,
   // Extra stand-ins a test needs, e.g. reminder storage or the phone's side.
   List<Override> overrides = const [],
+  // Without Pro, `Añadir tarea` opens typing, understood on the phone.
+  bool pro = true,
 }) => ProviderContainer(
   overrides: [
     ...overrides,
     invitationLinkProvider.overrideWith(
       (ref) => InvitationLinks(listen: false),
     ),
-    hasProProvider.overrideWithValue(true),
+    hasProProvider.overrideWithValue(pro),
+    billingLoadingProvider.overrideWithValue(false),
     authProvider.overrideWith(
       (ref) => SignedInFixtureAuth(ref.read(apiClientProvider)),
     ),

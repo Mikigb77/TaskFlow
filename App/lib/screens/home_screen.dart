@@ -18,7 +18,6 @@ import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
-import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/screens/notes_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -49,6 +48,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _highlight = false;
   Timer? _highlightTimer;
   final _landedRow = GlobalKey();
+  // Room under the last row, grown to the save message's height so a new
+  // task at the end can still scroll clear of it.
+  double _listEnd = 100;
 
   @override
   void dispose() {
@@ -135,6 +137,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _reveal() async {
     final instant = MediaQuery.disableAnimationsOf(context);
     for (var i = 0; i < 20 && mounted; i++) {
+      final clearance = _messageClearance();
+      if (clearance != null && clearance > _listEnd) {
+        setState(() => _listEnd = clearance);
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+      }
       final need = _shortfall();
       if (need != null) {
         if (need != 0) {
@@ -182,14 +190,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (rowRect.top < visible.top) return rowRect.top - visible.top;
     final need =
         rowRect.bottom -
-        math.min(visible.bottom - 88, _messageTop() ?? double.infinity);
+        visible.bottom +
+        math.max(88, _messageClearance() ?? 0);
     // Never past the row's top, so its top always shows.
     return need <= 0 ? 0 : math.min(need, rowRect.top - visible.top);
   }
 
-  /// Where the save message shown over this page starts, once laid out: it
-  /// can be taller than the usual clearance, as with long text or large type.
-  double? _messageTop() {
+  /// How much of the page's foot the save message shown over it takes, with
+  /// a gap: it can be taller than the usual clearance, as with long text or
+  /// large type. Read from its height, which is final while it fades in.
+  double? _messageClearance() {
     RenderBox? message;
     void visit(Element element) {
       // The list can't hold the message, so skip its rows.
@@ -205,7 +215,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _page.currentContext?.visitChildElements(visit);
     final box = message;
     if (box == null || box.size.height == 0) return null;
-    return box.localToGlobal(Offset.zero).dy;
+    return box.size.height + 8;
   }
 
   /// Scrolls the header first, then the list, by [need] pixels in all.
@@ -444,6 +454,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 landedIds: _landedIds,
                 lit: _highlight,
                 landedRow: _landedRow,
+                bottomPadding: _listEnd,
               ),
             );
           },
@@ -462,18 +473,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
       bottomNavigationBar: TaskActions(
-        projectId: scope.projectId,
+        projectId: ref.watch(listCanEditProvider(scope.projectId))
+            ? scope.projectId
+            : null,
         page: this,
-        onCreate: () =>
-            scope.projectId == null ||
-                !ref.read(listCanEditProvider(scope.projectId))
-            ? Navigator.pushNamed(context, '/createTask')
-            : Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => TaskEditor(initialListId: scope.projectId),
-                ),
-              ),
       ),
     );
   }

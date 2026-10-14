@@ -63,7 +63,12 @@ void main() {
         Brightness.dark,
       );
       expect(store.value, 'dark');
-      await tester.tap(find.byTooltip('Create task'));
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed(
+            '/editTask',
+            arguments: container.read(taskProvider).requireValue.first.id,
+          );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('task-title')),
@@ -229,8 +234,7 @@ void main() {
       lessThanOrEqualTo(tester.getRect(find.byType(TaskActions)).top),
     );
     expect(find.text('Undo').hitTestable(), findsOneWidget);
-    expect(find.byTooltip('Create task').hitTestable(), findsOneWidget);
-    expect(find.text('Say a task').hitTestable(), findsOneWidget);
+    expect(find.text('Add a task').hitTestable(), findsOneWidget);
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
     expect(

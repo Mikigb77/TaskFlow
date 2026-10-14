@@ -1,5 +1,5 @@
 <resources>
     <string name="capture_voice">Dicta una tarea</string>
-    <string name="capture_text">Captura texto</string>
+    <string name="capture_text">Escribir una tarea</string>
     <string name="capture_widget_description">Abre TaskFlow para grabar una tarea. Usa el mismo permiso de micrófono y conserva las capturas pendientes.</string>
 </resources>

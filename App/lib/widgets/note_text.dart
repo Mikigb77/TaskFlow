@@ -24,13 +24,16 @@ List<Uri> noteLinks(String text) {
 }
 
 class NoteText extends StatelessWidget {
-  const NoteText(this.text, {super.key});
+  const NoteText(this.text, {super.key, this.onTap});
   final String text;
+
+  /// Called for a tap on the text; long-press still selects it.
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
     final links = noteLinks(text);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SelectableText(text, style: const TextStyle(height: 1.6)),
+      SelectableText(text, style: const TextStyle(height: 1.6), onTap: onTap),
       if (links.isNotEmpty) ...[
         const SizedBox(height: 16),
         Text(context.l10n.noteLinks,

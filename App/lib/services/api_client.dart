@@ -32,6 +32,21 @@ class Account {
 }
 
 class ApiClient {
+  static const timeoutMessage =
+      'The server took too long to respond. Your local tasks are safe.';
+  static const offlineMessage =
+      'Cannot reach the server. Check your connection and server address.';
+  static const unreachableMessage =
+      'The server did not answer. Your local tasks are safe.';
+
+  /// No network at all, rather than a server that doesn't answer: the phone
+  /// can't look the server up, or has no route to any network.
+  static bool _noNetwork(SocketException error) {
+    final reason = error.osError?.message.toLowerCase() ?? '';
+    return error.message.contains('host lookup') ||
+        reason.contains('network is unreachable');
+  }
+
   final http.Client _http;
   final FlutterSecureStorage _storage;
   String baseUrl;
@@ -335,20 +350,14 @@ class ApiClient {
         Duration(seconds: path.startsWith('ai/') ? 100 : 12),
       );
     } on TimeoutException {
+      throw ApiException(0, timeoutMessage);
+    } on SocketException catch (error) {
       throw ApiException(
         0,
-        'The server took too long to respond. Your local tasks are safe.',
-      );
-    } on SocketException {
-      throw ApiException(
-        0,
-        'Cannot reach the server. Check your connection and server address.',
+        _noNetwork(error) ? offlineMessage : unreachableMessage,
       );
     } on http.ClientException {
-      throw ApiException(
-        0,
-        'Cannot reach the server. Check your connection and server address.',
-      );
+      throw ApiException(0, offlineMessage);
     }
   }
 

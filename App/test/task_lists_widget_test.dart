@@ -18,6 +18,8 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -29,7 +31,12 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final store = _Lists();
+    final captures = MemoryCaptures();
     final container = ProviderContainer(overrides: [
+      // Typed in the capture sheet without Pro, and saved in memory.
+      hasProProvider.overrideWithValue(false),
+      billingLoadingProvider.overrideWithValue(false),
+      captureStoreProvider.overrideWithValue(captures),
       authProvider.overrideWith(
           (ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
       pendingCapturesProvider.overrideWith((ref) async => []),
@@ -39,6 +46,7 @@ void main() {
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
       taskListStoreProvider.overrideWithValue(store),
     ]);
+    captures.tasks = container;
     addTearDown(container.dispose);
     await tester.pumpWidget(
         UncontrolledProviderScope(container: container, child: const MyApp()));
@@ -61,12 +69,19 @@ void main() {
     expect(store.lists.single.id, id);
     await tester.tap(find.text('Weekend'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New task'));
+    // Added from the project's page, it goes to the project.
+    await typeCapture(tester, 'Add a task', 'Buy coffee');
+    await saveCapture(tester);
+    final added = container
+        .read(taskProvider)
+        .requireValue
+        .singleWhere((task) => task.title == 'Buy coffee');
+    expect(added.listId, id);
+    // Labels are set in the form, which edits the saved task.
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(MaterialPageRoute<void>(builder: (_) => TaskEditor(task: added)));
     await tester.pumpAndSettle();
-    expect(
-        tester.widget<TaskEditor>(find.byType(TaskEditor)).initialListId, id);
-    await tester.enterText(
-        find.byKey(const ValueKey('task-title')), 'Buy coffee');
     await tester.tap(find.byKey(const ValueKey('task-more-details')));
     await tester.pumpAndSettle();
     final labels = find.byKey(const ValueKey('task-labels'));
@@ -78,7 +93,7 @@ void main() {
     await tester.enterText(labels, 'Errands, errands, home');
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create Task'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Save changes'));
     await tester.pumpAndSettle();
     final task = container
         .read(taskProvider)

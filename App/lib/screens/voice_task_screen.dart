@@ -14,6 +14,7 @@ import 'package:agenda/l10n/capture_messages.dart';
 import 'package:agenda/services/capture_problem.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:uuid/uuid.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -39,7 +40,14 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 ///
 /// Saved tasks land on Calendar. A task page that opens capture passes itself
 /// as [page] to show them there instead; [showCalendar] first goes back to
-/// the Calendar tab.
+/// the Calendar tab. [day] is the day shown where capture opened (Calendar's
+/// selected day, the timeline's day): when it is a later day, a task said or
+/// typed without a date goes there.
+///
+/// Voice and the assistant are Pro. Without Pro the sheet types, and the
+/// words are understood on the phone. [typing] opens with the keyboard up
+/// (the text shortcut, shared text); [askedToSpeak] marks the ways in that
+/// ask to speak (the widget, the voice shortcut), which say why without Pro.
 Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
@@ -48,6 +56,9 @@ Future<void> showCaptureSheet(
   bool startListening = true,
   Object? page,
   bool showCalendar = false,
+  DateTime? day,
+  bool typing = false,
+  bool askedToSpeak = false,
 }) {
   final navigator = Navigator.of(context);
   final localizations = MaterialLocalizations.of(context);
@@ -71,6 +82,9 @@ Future<void> showCaptureSheet(
             projectId: projectId,
             captureId: captureId,
             startListening: startListening,
+            day: day,
+            typing: typing,
+            askedToSpeak: askedToSpeak,
           ),
         ),
       ),
@@ -206,9 +220,8 @@ class _SheetFrameState extends State<_SheetFrame> {
   );
 }
 
-/// The capture sheet's content. Open it with [showCaptureSheet]. All recorder
-/// entry points, including shortcuts and recovered sessions, pass through the
-/// same paid-access gate before a recorder is created.
+/// The capture sheet's content. Open it with [showCaptureSheet]. Only Pro
+/// creates a recorder; without it every way in types.
 class VoiceTaskScreen extends ConsumerWidget {
   const VoiceTaskScreen({
     super.key,
@@ -216,53 +229,36 @@ class VoiceTaskScreen extends ConsumerWidget {
     this.startListening = true,
     this.kind = 'task',
     this.projectId,
+    this.day,
+    this.typing = false,
+    this.askedToSpeak = false,
   });
   final String? captureId;
   final bool startListening;
   final String kind;
   final String? projectId;
+  final DateTime? day;
+  final bool typing;
+  final bool askedToSpeak;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(hasProProvider)) {
-      return _VoiceCaptureScreen(
-        captureId: captureId,
-        startListening: startListening,
-        kind: kind,
-        projectId: projectId,
+    final pro = ref.watch(hasProProvider);
+    if (!pro && ref.watch(billingLoadingProvider)) {
+      // Until billing knows, don't guess between the mic and typing.
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
-    final billing = ref.watch(subscriptionProvider);
-    return Material(
-      type: MaterialType.transparency,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.mic_none_rounded, size: 48),
-            const SizedBox(height: 20),
-            Text(
-              context.l10n.voiceProRequired,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 20),
-            if (billing.busy)
-              const CircularProgressIndicator()
-            else ...[
-              FilledButton(
-                onPressed: () => Navigator.pushNamed(context, '/subscription'),
-                child: Text(context.l10n.voiceProAction),
-              ),
-              TextButton(
-                onPressed: () =>
-                    ref.read(subscriptionProvider.notifier).refresh(),
-                child: Text(context.l10n.billingRefresh),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return _VoiceCaptureScreen(
+      captureId: captureId,
+      startListening: startListening,
+      kind: kind,
+      projectId: projectId,
+      day: day,
+      voice: pro,
+      typing: typing,
+      askedToSpeak: askedToSpeak,
     );
   }
 }
@@ -278,18 +274,35 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
     this.startListening = true,
     this.kind = 'task',
     this.projectId,
+    this.day,
+    this.voice = true,
+    this.typing = false,
+    this.askedToSpeak = false,
   });
   final String kind;
   final String? projectId;
   final String? captureId;
   final bool startListening;
+  final DateTime? day;
+
+  /// Voice and the assistant (Pro). Without them the sheet only types, and
+  /// the words are understood on the phone.
+  final bool voice;
+
+  /// Opens typing, with the keyboard up, even with voice.
+  final bool typing;
+
+  /// Opened to speak: without voice, a line says why the sheet types.
+  final bool askedToSpeak;
   @override
   ConsumerState<_VoiceCaptureScreen> createState() => _VoiceTaskScreenState();
 }
 
 class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     with WidgetsBindingObserver {
-  late final AudioRecorder _recorder;
+  // Fixed when the sheet opens; typing alone never creates a recorder.
+  late final bool _voice = widget.voice;
+  AudioRecorder? _recorder;
   final _words = TextEditingController();
   final _wordsFocus = FocusNode();
   late final CaptureStore _store;
@@ -317,8 +330,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool _autoStarted = false;
   // Opening listens on the next frame: show `starting` until then.
   bool _startPending = false;
-  // Typing instead: the words become an editable field.
-  bool _typing = false;
+  // Typing instead: the words become an editable field. Without voice, and
+  // from a text entry, the sheet starts there.
+  late bool _typing = !_voice || widget.typing;
   // The keep-or-discard question is up.
   bool _asking = false;
   int _seconds = 0;
@@ -326,7 +340,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   int _wordsAt = 0;
   double _level = 0;
   String? _error;
-  bool _errorRetained = false;
+  // Understanding the words failed: `Reintentar`, and `Guardar tal cual`.
+  bool _failed = false;
+  // The assistant has taken more than a few seconds.
+  bool _slow = false;
+  Timer? _slowTimer;
+  // Counts understanding steps; saving as written ends the running one, so
+  // its late answer changes nothing.
+  int _attempts = 0;
+  // The result saved as soon as it shows: words saved as written.
+  String? _saveAtOnce;
   late final NativeSpeech _speech;
   SpeechCapability _capability = const SpeechCapability();
   StreamSubscription<SpeechEvent>? _speechEvents;
@@ -340,6 +363,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   Stopwatch? _listeningWatch;
   bool _firstWords = false;
   bool _typedStarted = false;
+  // The recorder's file before any audio arrived: no capture holds it yet.
+  String? _audioId;
   bool _movedToReview = false;
   bool _discarded = false;
   // The result, shown in this sheet once the words are understood.
@@ -353,18 +378,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   // already running knows its words were cancelled.
   int _returns = 0;
 
-  void _showProblem(Object problem, {bool retained = false}) {
+  void _showProblem(Object problem) {
     if (!mounted) return;
-    setState(() {
-      _error = CaptureProblem.from(problem);
-      _errorRetained = retained && _error != CaptureProblem.gone;
-    });
+    setState(() => _error = CaptureProblem.from(problem));
   }
 
   @override
   void initState() {
     super.initState();
-    _recorder = ref.read(captureRecorderFactoryProvider)();
+    if (_voice) _recorder = ref.read(captureRecorderFactoryProvider)();
     _store = ref.read(captureStoreProvider);
     unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.opened));
     _speech = ref.read(nativeSpeechProvider);
@@ -397,14 +419,19 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // With TalkBack, listening waits for `Start talking`, so the screen
     // reader's own speech doesn't end up in the words.
     _autoStart =
-        widget.startListening && !MediaQuery.accessibleNavigationOf(context);
+        _voice &&
+        widget.startListening &&
+        !widget.typing &&
+        !MediaQuery.accessibleNavigationOf(context);
     _tryAutoStart();
   }
 
   Future<void> _load() async {
     try {
-      _capability = await _speech.capability();
-      _nativeMode = _capability.usable;
+      if (_voice) {
+        _capability = await _speech.capability();
+        _nativeMode = _capability.usable;
+      }
       await ref.read(regionalProvider.notifier).ready;
       final zone = await CaptureTimezone.resolve(
         ref.read(regionalProvider),
@@ -428,8 +455,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           _review(_session!);
           return;
         }
-        _error = _session!.error;
-        _errorRetained = _error != null;
+        final error = _session!.error;
+        final heard = _session!.audioPath != null;
+        _error = error == null ? null : _problemFor(error, heard: heard);
+        _failed = _session!.status == 'failed';
+        // The server found no speech in its audio: nothing to keep.
+        if (heard &&
+            _error == CaptureProblem.noSpeech &&
+            !_hasWords &&
+            await _dropSilent(_session!)) {
+          _failed = false;
+        }
       }
     } catch (error) {
       _error = CaptureProblem.from(error);
@@ -439,6 +475,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _phase = _CapturePhase.idle;
       _initialized = true;
     });
+    // Typing: the field takes focus, with the keyboard up.
+    if (_typing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _typing) _wordsFocus.requestFocus();
+      });
+    }
     unawaited(
       CaptureDiagnostics(_store.database).record(
         CaptureEvent.ready,
@@ -472,22 +514,73 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     bool audio = false,
     String text = '',
     String? source,
+    String? id,
   }) async {
     if (_session != null) return;
+    final now = ref.read(calendarClockProvider)();
+    final day = widget.day == null ? null : Task.day(widget.day!);
+    final scoped = ref.read(projectScopeProvider).projectId;
     _session = await _store.create(
       _owner,
       _zone,
       text: text,
+      now: now,
       audio: audio,
       kind: _kind,
       projectId:
           _projectId ??
           widget.projectId ??
-          ref.read(projectScopeProvider).projectId,
+          (ref.read(listCanEditProvider(scoped)) ? scoped : null),
       source: source,
+      id: id,
+      // Kept with the capture, so resuming it keeps the day. Today, or a day
+      // gone by, adds nothing; notes never get a day.
+      day: _kind == 'task' && day != null && day.isAfter(Task.day(now))
+          ? day
+          : null,
     );
     await CaptureDiagnostics(_store.database).record(CaptureEvent.started);
     if (mounted) ref.invalidate(pendingCapturesProvider);
+  }
+
+  /// The recorder stopped before any audio arrived: its file holds nothing,
+  /// and no capture was kept.
+  Future<void> _dropUnheardAudio() async {
+    await _writes;
+    final id = _audioId;
+    if (_session != null || id == null) return;
+    _audioId = null;
+    try {
+      await _store.removeAudioFile(id);
+    } catch (_) {
+      /* An empty file holds nothing. */
+    }
+  }
+
+  static final _audioFormat = Platform.isAndroid
+      ? CaptureSession.androidPcmWav
+      : null;
+
+  /// The recorder measured its first audio: keep its capture, so it survives
+  /// the app being closed.
+  void _keepAudio() {
+    final id = _audioId;
+    if (_session != null || id == null) return;
+    _writes = _writes.catchError((Object _) {}).then((_) async {
+      if (_session != null || _audioId != id) return;
+      await _ensureSession(audio: true, source: 'speech', id: id);
+      _audioId = null;
+      _session = _session!.copyWith(
+        status: _recording ? 'recording' : 'editing',
+        audioFormat: _audioFormat,
+      );
+      await _store.update(_session!);
+    });
+    unawaited(
+      _writes.catchError((Object error) {
+        _showProblem(CaptureProblem.writeFailed);
+      }),
+    );
   }
 
   void _changedText(String text) {
@@ -505,6 +598,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         : 'typed';
     _writes = _writes.catchError((Object _) {}).then((_) async {
       if (text.trim().isEmpty && _session == null) return;
+      if (_session != null &&
+          CaptureStore.isEmpty(_session!.copyWith(text: text))) {
+        // Every word gone: nothing is kept.
+        await _store.discard(_session!.id, _owner);
+        _session = null;
+        _container?.invalidate(pendingCapturesProvider);
+        return;
+      }
       await _ensureSession(text: text, source: source);
       _session = _session!.copyWith(
         text: text,
@@ -615,7 +716,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     setState(() {
       _phase = _CapturePhase.starting;
       _error = null;
-      _errorRetained = false;
+      _failed = false;
     });
     try {
       await _writes;
@@ -627,7 +728,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       }
       final access = _usingNative
           ? await _speech.permission()
-          : await _recorder.hasPermission()
+          : await _recorder!.hasPermission()
           ? SpeechPermission.granted
           : SpeechPermission.denied;
       if (access != SpeechPermission.granted) {
@@ -648,10 +749,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         );
       }
       if (_usingNative) {
-        await _ensureSession(text: _words.text);
+        // The capture is kept from the first words, not from listening.
         _nativePrefix = _words.text.trim();
-        _session = _session!.copyWith(status: 'recording');
-        await _store.update(_session!);
+        if (_session != null) {
+          _session = _session!.copyWith(status: 'recording');
+          await _store.update(_session!);
+        }
         if (!mounted) return;
         _speechEnded = Completer<void>();
         _nativeRun++;
@@ -690,20 +793,24 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         }
         return;
       }
-      await _ensureSession(audio: true, source: 'speech');
-      if (_session!.audioPath == null) {
+      // The file is named before its capture exists: the capture is kept from
+      // the first audio bytes, not from listening.
+      final String path;
+      if (_session == null) {
+        path = await _store.audioPathForId(_audioId ??= const Uuid().v4());
+      } else {
+        path = _session!.audioPath ?? await _store.audioPathFor(_session!);
         _session = _session!.copyWith(
-          audioPath: await _store.audioPathFor(_session!),
+          audioPath: path,
+          status: 'recording',
+          audioFormat: _audioFormat,
+          source: _session!.source ?? 'speech',
         );
+        await _store.update(_session!);
       }
-      _session = _session!.copyWith(
-        status: 'recording',
-        audioFormat: Platform.isAndroid ? CaptureSession.androidPcmWav : null,
-        source: _session!.source ?? 'speech',
-      );
-      await _store.update(_session!);
       if (!mounted) return;
-      _recorderStates ??= _recorder.onStateChanged().listen(
+      final recorder = _recorder!;
+      _recorderStates ??= recorder.onStateChanged().listen(
         _receiveRecorderState,
         onError: (Object error) {
           if (mounted && _recording && !_usingNative) {
@@ -712,20 +819,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           }
         },
       );
-      await _recorder.start(
+      await recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
           sampleRate: 16000,
           numChannels: 1,
           audioInterruption: AudioInterruptionMode.pause,
         ),
-        path: _session!.audioPath!,
+        path: path,
       );
       _recording = true;
       _listeningWatch = Stopwatch()..start();
       // A call can take audio focus while start() is still awaiting the native
       // reply, before the state listener can see _recording=true.
-      if (await _recorder.isPaused() || !await _recorder.isRecording()) {
+      if (await recorder.isPaused() || !await recorder.isRecording()) {
         await _finishRecording(submit: false, interrupted: true);
         return;
       }
@@ -735,9 +842,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       _listening();
-      _amplitude = _recorder
+      _amplitude = recorder
           .onAmplitudeChanged(const Duration(milliseconds: 120))
           .listen((value) {
+            _keepAudio();
             if (mounted && _phase == _CapturePhase.listening) {
               setState(() => _level = ((value.current + 60) / 60).clamp(0, 1));
             }
@@ -807,6 +915,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final replacing = _previousResult;
     final started = _session;
     bool wentBack() => replacing != null && _returns != returns;
+    // Understanding runs on its own: going back from it never waits for the
+    // server, and it owns the processing phase.
+    var understanding = false;
     _recording = false;
     _listeningWatch?.stop();
     _timer?.cancel();
@@ -836,7 +947,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         await _speech.cancel(_nativeRun);
         await _writes;
       } else {
-        await _recorder.stop();
+        await _recorder!.stop();
+        await _dropUnheardAudio();
       }
       if (_session != null) {
         _session = _session!.copyWith(status: 'editing');
@@ -852,8 +964,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         await _dropSaidAgain(started, replacing!);
       } else if (mounted &&
           submit &&
+          _session != null &&
           (!_usingNative || _session!.text.trim().isNotEmpty)) {
-        await _process();
+        understanding = true;
+        unawaited(_process());
       }
     } catch (error) {
       if (wentBack()) {
@@ -865,7 +979,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _acceptSpeech = false;
       if (mounted) {
         ref.invalidate(pendingCapturesProvider);
-        setState(() => _phase = _restingPhase(interrupted));
+        if (!understanding) {
+          setState(() => _phase = _restingPhase(interrupted));
+        }
       }
     }
   }
@@ -901,17 +1017,27 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final returns = _returns;
     final replacing = _previousResult;
     bool wentBack() => replacing != null && _returns != returns;
+    // Saved as written meanwhile: whatever the assistant says is too late.
+    final attempts = ++_attempts;
+    bool superseded() => _attempts != attempts;
     var attempt = _session;
     var inputKept = false;
     setState(() {
       _phase = _CapturePhase.processing;
       _error = null;
-      _errorRetained = false;
+      _failed = false;
+      _slow = false;
+    });
+    _slowTimer?.cancel();
+    _slowTimer = Timer(const Duration(seconds: 8), () {
+      if (!mounted || superseded()) return;
+      setState(() => _slow = true);
+      _announce(context.l10n.captureSlow);
     });
     try {
       await _writes;
       if (wentBack()) {
-        await _dropSaidAgain(_session ?? attempt, replacing!);
+        await _dropSaidAgain(attempt ?? _session, replacing!);
         return;
       }
       if (_session == null && _words.text.trim().isEmpty) {
@@ -924,7 +1050,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       inputKept = true;
-      final session = await CaptureProcessor(_store, api).process(attempt!);
+      final session = await CaptureProcessor(_store, api).process(
+        attempt!,
+        local: !_voice,
+        now: ref.read(calendarClockProvider)(),
+      );
+      if (superseded()) return;
       if (wentBack()) {
         await _dropSaidAgain(session, replacing!);
         return;
@@ -935,18 +1066,105 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _review(session);
       }
     } catch (error) {
+      if (superseded()) return;
       if (wentBack()) {
         await _dropSaidAgain(attempt, replacing!);
         return;
       }
-      _showProblem(
-        !inputKept && _session != null ? CaptureProblem.writeFailed : error,
-        retained: inputKept,
-      );
+      final problem = !inputKept && _session != null
+          ? CaptureProblem.writeFailed
+          : _problemFor(error, heard: attempt?.audioPath != null);
+      // Saved audio with no speech in it: nothing to keep or retry. The
+      // sheet waits to listen again, with the message still up.
+      if (inputKept &&
+          problem == CaptureProblem.noSpeech &&
+          !_hasWords &&
+          await _dropSilent(attempt!)) {
+        if (mounted) {
+          setState(() {
+            _error = problem;
+            _failed = false;
+          });
+        }
+        return;
+      }
+      _showProblem(problem);
+      if (mounted) setState(() => _failed = inputKept);
     } finally {
-      if (mounted && _phase == _CapturePhase.processing) {
+      if (!superseded()) {
+        _slowTimer?.cancel();
+        if (mounted) setState(() => _slow = false);
+      }
+      // After going back, the sheet may be listening or understanding new
+      // words: a late answer leaves it as it is.
+      if (mounted &&
+          !superseded() &&
+          !wentBack() &&
+          _phase == _CapturePhase.processing) {
         setState(() => _phase = _CapturePhase.idle);
       }
+    }
+  }
+
+  /// The problem to show: every 422 means no speech, but words sent as text
+  /// weren't silent, so theirs is the plain failure.
+  static String _problemFor(Object error, {required bool heard}) {
+    final problem = CaptureProblem.from(error);
+    return problem == CaptureProblem.noSpeech && !heard
+        ? CaptureProblem.failed
+        : problem;
+  }
+
+  /// Drop a capture whose saved audio held no speech, as erasing every word
+  /// does. False when it couldn't be dropped: it stays to retry.
+  Future<bool> _dropSilent(CaptureSession session) async {
+    try {
+      await _store.discard(session.id, _owner);
+    } catch (_) {
+      return false;
+    }
+    if (_session?.id == session.id) _session = null;
+    _container?.invalidate(pendingCapturesProvider);
+    return true;
+  }
+
+  /// Words that can be saved as written: saved audio with no words can't.
+  bool get _hasWords => _words.text.trim().isNotEmpty;
+
+  /// `Guardar tal cual`: the words as written, with the date they name, saved
+  /// at once as any result is, while the assistant is slow or after it
+  /// failed.
+  Future<void> _saveAsWritten() async {
+    final session = _session;
+    if (session == null || !_hasWords) return;
+    // The running understanding step, if any, is over for this sheet.
+    _attempts++;
+    _slowTimer?.cancel();
+    setState(() {
+      _phase = _CapturePhase.processing;
+      _slow = false;
+      _failed = false;
+      _error = null;
+    });
+    try {
+      await _writes;
+      final written = await CaptureProcessor(
+        _store,
+        ref.read(apiClientProvider),
+      ).asWritten(session, now: ref.read(calendarClockProvider)());
+      if (!mounted) return;
+      _session = written;
+      _saveAtOnce = written.id;
+      ref.invalidate(pendingCapturesProvider);
+      _phase = _CapturePhase.idle;
+      _review(written);
+    } catch (error) {
+      if (!mounted) return;
+      _showProblem(error);
+      setState(() {
+        _failed = true;
+        _phase = _CapturePhase.idle;
+      });
     }
   }
 
@@ -989,16 +1207,18 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (_result == null || !mounted) return;
     _previousResult = previous;
     _projectId = previous.projectId;
+    _saveAtOnce = null;
     _words.clear();
     _nativePrefix = '';
     _typedStarted = false;
+    _audioId = null;
     setState(() {
       _result = null;
       _movedToReview = false;
       _session = null;
       _typing = false;
       _error = null;
-      _errorRetained = false;
+      _failed = false;
       _phase = _CapturePhase.idle;
       _initialized = true;
     });
@@ -1095,7 +1315,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _movedToReview = true;
         _typing = false;
         _error = null;
-        _errorRetained = false;
+        _failed = false;
         _phase = _CapturePhase.idle;
       });
       return;
@@ -1125,7 +1345,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _session = previous;
       _typing = false;
       _error = null;
-      _errorRetained = false;
+      _failed = false;
     });
   }
 
@@ -1154,6 +1374,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _slowTimer?.cancel();
     unawaited(_release());
     _words.dispose();
     _wordsFocus.dispose();
@@ -1174,7 +1395,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _acceptSpeech = false;
       await _speechEvents?.cancel();
       await _recorderStates?.cancel();
-      await _recorder.dispose();
+      await _recorder?.dispose();
       await _writes;
       final session = _session;
       if (!_movedToReview &&
@@ -1216,6 +1437,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         key: ValueKey(result.id),
         session: result,
         onSayAgain: _sayAgain,
+        saveAtOnce: _saveAtOnce == result.id,
       );
     }
     final l10n = context.l10n;
@@ -1239,7 +1461,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _CapturePhase.paused => l10n.capturePaused,
       _CapturePhase.idle => null,
     };
-    final hint = !listening
+    final processing = phase == _CapturePhase.processing;
+    final hint = processing && _slow
+        ? l10n.captureSlow
+        : !listening
         ? null
         : _seconds >= 50
         ? l10n.captureTimeLeft
@@ -1260,12 +1485,31 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         !recorded &&
         _nativeMode &&
         _words.text.trim().isNotEmpty;
+    final failed = _failed && resting;
+    // The assistant is slow, or failed: the words can be saved as written.
+    final saveAsWritten =
+        _hasWords && _session != null && ((processing && _slow) || failed);
     final primary = <Widget>[
       if (waiting)
         FilledButton(
           autofocus: true,
           onPressed: _busy ? null : _beginRecording,
           child: Text(l10n.captureStartTalking),
+        )
+      else if (saveAsWritten) ...[
+        if (failed)
+          FilledButton.tonal(
+            onPressed: _busy ? null : _done,
+            child: Text(l10n.tryAgain),
+          ),
+        FilledButton(
+          onPressed: () => unawaited(_saveAsWritten()),
+          child: Text(l10n.captureSaveAsWritten),
+        ),
+      ] else if (failed)
+        FilledButton(
+          onPressed: _busy || !_hasInput ? null : _done,
+          child: Text(l10n.tryAgain),
         )
       else ...[
         if (canContinue)
@@ -1293,7 +1537,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             keyboardType: TextInputType.multiline,
             style: wordsStyle,
             decoration: InputDecoration(
-              hintText: _kind == 'note' ? l10n.noteHint : l10n.examplePlan,
+              // Typed words understood on the phone become one task.
+              hintText: _kind == 'note'
+                  ? l10n.noteHint
+                  : _voice
+                  ? l10n.examplePlan
+                  : l10n.exampleTask,
               counterText: '',
             ),
           )
@@ -1305,6 +1554,22 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             style: wordsStyle,
           );
     final banners = <Widget>[
+      // Opened to speak, without voice: say why it types, and where Pro is.
+      if (widget.askedToSpeak && !_voice) ...[
+        Text(
+          l10n.captureSpeakingIsPro,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton(
+            onPressed: () => Navigator.pushNamed(context, '/subscription'),
+            child: Text(l10n.voiceProAction),
+          ),
+        ),
+      ],
       if (_timezoneFallback) MessageBanner(l10n.timezoneFallback(_zone)),
       if (_micBlocked) ...[
         MessageBanner(
@@ -1320,12 +1585,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ),
         ),
       ],
-      if (_error != null)
-        MessageBanner(
-          '${captureProblemText(l10n, _error!)}${_errorRetained ? '\n${l10n.captureKept}' : ''}',
-          isError: _error != CaptureProblem.setupRequested,
-        ),
     ];
+    // Directly under the status line, read out when it appears.
+    final error = _error == null
+        ? null
+        : MessageBanner(
+            captureProblemText(l10n, _error!),
+            isError: _error != CaptureProblem.setupRequested,
+          );
     final working = phase == _CapturePhase.processing || _stopping != null;
     return PopScope(
       canPop: false,
@@ -1342,6 +1609,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             children: [
               if (status != null)
                 Text(status, style: theme.textTheme.titleMedium),
+              if (error != null)
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(top: status == null ? 0 : 8),
+                    child: error,
+                  ),
+                ),
               if (banners.isNotEmpty || words != null)
                 Flexible(
                   // Reversed, so the newest words stay in view as they grow.
@@ -1382,6 +1656,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               _controls(
                 context,
                 primary,
+                // `Reintentar` and `Guardar tal cual` read in full only
+                // stacked.
+                stack: failed && saveAsWritten,
                 showType: !_typing && !recorded,
                 onType: working ? null : () => unawaited(_typeInstead()),
               ),
@@ -1424,10 +1701,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   );
 
   /// `Cancelar`, the filled action (with `Seguir` beside it when paused) and
-  /// the keyboard. They share a row when it fits, and stack at large text.
+  /// the keyboard. They share a row when it fits, and stack at large text or
+  /// when [stack] asks.
   Widget _controls(
     BuildContext context,
     List<Widget> primary, {
+    bool stack = false,
     required bool showType,
     VoidCallback? onType,
   }) {
@@ -1455,6 +1734,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         if (!large &&
+            !stack &&
             constraints.maxWidth >= (primary.length > 1 ? 440 : 280)) {
           return Row(
             children: [
@@ -1469,7 +1749,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (large)
+            if (large || stack)
               for (var i = 0; i < primary.length; i++) ...[
                 if (i > 0) const SizedBox(height: 8),
                 primary[i],
@@ -1495,8 +1775,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 /// date as the main line, and one button that adds them. Saving closes the
 /// sheet; an Undo after that reopens it on the restored result.
 class CaptureResult extends ConsumerStatefulWidget {
-  const CaptureResult({super.key, required this.session, this.onSayAgain});
+  const CaptureResult({
+    super.key,
+    required this.session,
+    this.onSayAgain,
+    this.saveAtOnce = false,
+  });
   final CaptureSession session;
+
+  /// Saved as written: saved as soon as it shows, unless a detail still
+  /// needs an answer (morning or afternoon).
+  final bool saveAtOnce;
 
   /// Spoken captures: listen again. It gets the result as it is now, with
   /// its edits written, so Cancel can bring it back.
@@ -1524,6 +1813,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     unawaited(
       CaptureDiagnostics(_store.database).record(CaptureEvent.reviewOpened),
     );
+    if (widget.saveAtOnce) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final pending = _items.where((d) => d.pending);
+        if (mounted && pending.isNotEmpty && pending.every((d) => d.ready)) {
+          unawaited(_save());
+        }
+      });
+    }
   }
 
   @override

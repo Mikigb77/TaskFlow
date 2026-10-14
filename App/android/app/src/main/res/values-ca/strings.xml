@@ -1,5 +1,5 @@
 <resources>
     <string name="capture_voice">Dicta una tasca</string>
-    <string name="capture_text">Captura text</string>
+    <string name="capture_text">Escriu una tasca</string>
     <string name="capture_widget_description">Obre TaskFlow per gravar una tasca. Utilitza el mateix permís de micròfon i conserva les captures pendents.</string>
 </resources>
