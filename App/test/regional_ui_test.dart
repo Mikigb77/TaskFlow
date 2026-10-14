@@ -13,6 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'support/design_fixtures.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/widgets/language_selector.dart';
 
 void main() {
   setUp(() {
@@ -227,7 +229,7 @@ void main() {
             .pushNamed('/region');
         await tester.pumpAndSettle();
         expect(find.byType(RegionalSettingsScreen), findsOneWidget);
-        expect(find.text('Idioma y región'), findsOneWidget);
+        expect(find.text('Hora y región'), findsOneWidget);
         final clock = find.byKey(const ValueKey('regional-clock'));
         await tester.scrollUntilVisible(
           clock,
@@ -249,4 +251,236 @@ void main() {
       },
     );
   }
+
+  // ---- P18 (UX-422, UX-431): Hora y región ----
+
+  final es = lookupAppLocalizations(const Locale('es'));
+
+  /// Hora y región in Spanish; [zone] is the stored time zone, if any.
+  Future<MemoryRegionalStore> openRegion(
+    WidgetTester tester, {
+    String? zone,
+  }) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final store = MemoryRegionalStore(
+      RegionalPreferences(language: 'es', captureTimezone: zone),
+    );
+    final container = designContainer(regionalStore: store);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await tester.pumpAndSettle();
+    tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/region');
+    await tester.pumpAndSettle();
+    return store;
+  }
+
+  Future<void> openZones(WidgetTester tester) async {
+    final row = find.widgetWithText(ListTile, es.timeZone);
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> search(WidgetTester tester, String query) async {
+    await tester.enterText(
+      find.widgetWithText(TextField, es.searchTimezone),
+      query,
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'UX-422: the screen is titled Hora y región, has no language picker, labels Zona horaria and shows a stored zone as its city',
+    (tester) async {
+      expect(es.timeZone, 'Zona horaria');
+      await openRegion(tester, zone: 'America/Argentina/Buenos_Aires');
+      final page = find.byType(RegionalSettingsScreen);
+      expect(
+        find.descendant(
+          of: find.descendant(of: page, matching: find.byType(AppBar)),
+          matching: find.text(es.regionalFormats),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Idioma y región'), findsNothing);
+      expect(
+        find.descendant(of: page, matching: find.byType(LanguageSelector)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: page, matching: find.text(es.language)),
+        findsNothing,
+      );
+      expect(find.textContaining('de captura'), findsNothing);
+      final row = find.widgetWithText(ListTile, es.timeZone);
+      expect(row, findsOneWidget);
+      expect(
+        find.descendant(of: row, matching: find.text('Buenos Aires')),
+        findsOneWidget,
+      );
+      expect(find.text('America/Argentina/Buenos_Aires'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-422: with no zone chosen it reads Como el teléfono; the list shows Buenos Aires for America/Argentina/Buenos_Aires and stores the id',
+    (tester) async {
+      final store = await openRegion(tester);
+      final row = find.widgetWithText(ListTile, es.timeZone);
+      expect(
+        find.descendant(of: row, matching: find.text(es.deviceDefault)),
+        findsOneWidget,
+      );
+      await openZones(tester);
+      await search(tester, 'Buenos');
+      final city = find.widgetWithText(ListTile, 'Buenos Aires');
+      expect(city, findsWidgets);
+      expect(find.textContaining('_'), findsNothing);
+      expect(find.textContaining('America/'), findsNothing);
+      await tester.tap(city.first);
+      await tester.pumpAndSettle();
+      expect(store.value.captureTimezone, endsWith('Buenos_Aires'));
+      expect(store.value.captureTimezone, startsWith('America/'));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-431: in the time-zone list, typing Bogotá lists Bogota and typing mexico city lists Mexico City',
+    (tester) async {
+      await openRegion(tester);
+      await openZones(tester);
+      await search(tester, 'Bogotá');
+      expect(find.widgetWithText(ListTile, 'Bogota'), findsOneWidget);
+      await search(tester, 'mexico city');
+      expect(find.widgetWithText(ListTile, 'Mexico City'), findsOneWidget);
+      await search(tester, 'México');
+      expect(find.widgetWithText(ListTile, 'Mexico City'), findsOneWidget);
+      // The continent in the id still finds its cities.
+      await search(tester, 'America');
+      expect(find.widgetWithText(ListTile, 'Adak'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P75 (UX-422): time-zone help without capture jargon ----
+
+  testWidgets(
+    'UX-422: Hora y región says Las tareas nuevas usan esta zona para entender las fechas. and no visible text contains captura',
+    (tester) async {
+      expect(
+        es.timezoneHelp,
+        'Las tareas nuevas usan esta zona para entender las fechas.',
+      );
+      await openRegion(tester);
+      final page = find.byType(RegionalSettingsScreen);
+      expect(
+        find.descendant(of: page, matching: find.text(es.timezoneHelp)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: page,
+          matching: find.textContaining(RegExp('captur', caseSensitive: false)),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-422: with the phone’s zone unreadable, the banner reads No se puede obtener la zona del dispositivo. Las tareas nuevas usarán …',
+    (tester) async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('flutter_timezone'),
+            (_) async => 'Not/AZone',
+          );
+      await openRegion(tester);
+      final page = find.byType(RegionalSettingsScreen);
+      const start =
+          'No se puede obtener la zona del dispositivo. Las tareas nuevas usarán ';
+      final banner = find.descendant(
+        of: page,
+        matching: find.textContaining(start),
+      );
+      expect(banner, findsOneWidget);
+      expect(
+        find.descendant(
+          of: page,
+          matching: find.textContaining(RegExp('captur', caseSensitive: false)),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-422: timezoneHelp and timezoneFallback say no captura / capture in any language',
+    () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(en.timezoneHelp, 'New tasks use this time zone to read dates.');
+      expect(
+        ca.timezoneHelp,
+        'Les tasques noves fan servir aquest fus horari per entendre les dates.',
+      );
+      expect(
+        en.timezoneFallback('Madrid'),
+        'The device timezone is unavailable. New tasks will use Madrid.',
+      );
+      expect(
+        es.timezoneFallback('Madrid'),
+        'No se puede obtener la zona del dispositivo. Las tareas nuevas usarán Madrid.',
+      );
+      expect(
+        ca.timezoneFallback('Madrid'),
+        'El fus horari del dispositiu no està disponible. Les tasques noves utilitzaran Madrid.',
+      );
+      for (final strings in [en, es, ca]) {
+        for (final text in [
+          strings.timezoneHelp,
+          strings.timezoneFallback('Madrid'),
+        ]) {
+          expect(text.toLowerCase().contains('captur'), isFalse, reason: text);
+        }
+      }
+    },
+  );
+  testWidgets('UX-422: the language sheet has no explanatory paragraph', (
+    tester,
+  ) async {
+    await openRegion(tester);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text(es.settings),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, es.language));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(sheet, findsOneWidget);
+    final words = tester
+        .widgetList<Text>(
+          find.descendant(of: sheet, matching: find.byType(Text)),
+        )
+        .map((text) => text.data ?? '')
+        .where((text) => text.split(' ').length > 12)
+        .toList();
+    expect(words, isEmpty, reason: 'long text in the sheet: $words');
+    expect(find.textContaining('preferencias del teléfono'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

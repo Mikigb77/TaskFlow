@@ -1454,6 +1454,136 @@
    ]
   },
   {
+   "id": "P77",
+   "title": "Sign-in: only a non-empty password; a used email offers sign-in",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-484"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/login_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/auth_gate_test.dart"
+   ],
+   "brief": [
+    "UX-484 (verify-b5-r1-D): sign-in mode still applies the 12-character rule meant for new accounts (`login_screen.dart:491-494`). A newcomer who types a short everyday password sees 'Usa al menos 12 caracteres' and never reaches the wrong-credentials error that offers to create an account with that email (UX-402, P17). In sign-in mode, require only a non-empty password. Keep the 12-character rule for creating an account and for setting a new password.",
+    "Reviewer's note on the same screen (b5 report): in create mode, the 'email already in use' error tells people to sign in but offers no button. Add the mirror of UX-402: a button that switches to sign-in and keeps the email. Reuse an existing string if one fits; otherwise add one in EN, ES and CA."
+   ],
+   "acceptance": [
+    "In sign-in mode, a 6-character password is sent to the server with no 12-character message; a wrong-credentials answer then shows the create-account button, with the email kept.",
+    "In create mode, a password under 12 characters is still refused with the existing message.",
+    "In create mode, an email-in-use error shows a button that switches to sign-in and keeps the email."
+   ],
+   "deviceChecks": [
+    "Against the real server, sign in with an unregistered email and a short password: the error offers to create the account, and creating it asks for 12 characters."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P80",
+   "title": "Invitations say who sent them",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-326"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/invitation_review_screen.dart",
+    "App/lib/widgets/invitation_cards.dart",
+    "App/lib/providers/invitations_provider.dart",
+    "App/lib/providers/groups_provider.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/invitation_review_test.dart"
+   ],
+   "brief": [
+    "UX-326 (partly fixed in b5 by P14): the invitation review screen and Calendar's invitation card don't say who sent the invitation. The help text, 'Sesión iniciada como' and 'Ahora no' are done; only the sender is missing.",
+    "The backend now returns `invited_by_name` (a string, or null) on each pending invitation, from `GET invitations/` (projects: the owner, the only one who can invite) and `GET group-invitations/` (groups: the owner or admin who sent it). Commit bc93848. Parse it wherever pending invitations are parsed (search for `list_name` / `group_name`).",
+    "Show it on the review screen's first line and on the Calendar card, for example ES 'Ana te invita a «Casa»', EN 'Ana invited you to \"Casa\"', CA 'Ana et convida a «Casa»' (follow App/docs/LOCALIZATION.md). When it's null (older group invitations) or not known yet (opened from an emailed link before the list loads), keep today's wording, with no layout jump when the name arrives."
+   ],
+   "acceptance": [
+    "With `invited_by_name: 'Ana'`, the review screen and the Calendar card name Ana, in EN, ES and CA.",
+    "With `invited_by_name: null`, both keep the current wording."
+   ],
+   "deviceChecks": [
+    "With a second account, open an invitation sent by the first: the Calendar card and the review screen name the sender."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P78",
+   "title": "Quiet endings: deleting a group says so; 'Ahora no' stays quiet",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-485",
+    "UX-487"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/groups_screen.dart",
+    "App/lib/main.dart",
+    "App/lib/services/invitation_links.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/groups_screen_test.dart",
+    "App/test/invitation_review_test.dart"
+   ],
+   "brief": [
+    "UX-485 (verify-b5-r1-C): deleting a group closes its page without a word. Do what UX-340 did for projects ('Proyecto eliminado', key `projectDeleted`): after the page closes, show 'Grupo eliminado' (EN 'Group deleted', CA 'Grup eliminat') on the screen it lands on.",
+    "UX-487 (b5 report, reviewer's note): after 'Ahora no' on the invitation review screen, the stored invitation link is kept on purpose, so Calendar's invitation card can offer it again. But the postponement lives only in memory (`_postponedInvitation`, `main.dart:233-239`), so every cold start reopens the review screen until the user answers. Persist the postponement with the stored link (`invitationLinkProvider`, `App/lib/services/invitation_links.dart:42`). A postponed invitation is then offered only by Calendar's card and never reopens by itself. A newly opened link, including the same invitation opened again from the email, still opens the review screen."
+   ],
+   "acceptance": [
+    "Deleting a group from its page lands on the previous screen with a 'Grupo eliminado' message, in EN, ES and CA.",
+    "After 'Ahora no', restoring the app from stored state (a fresh ProviderContainer over the same storage) doesn't open the review screen, and Calendar's invitation card still offers that invitation.",
+    "Opening an invitation link again after 'Ahora no' opens the review screen."
+   ],
+   "deviceChecks": [
+    "Open an invitation link and tap 'Ahora no', then force-stop and reopen the app: it opens on Calendar with the invitation card, not the review screen.",
+    "Delete an empty group: 'Grupo eliminado' shows where you land."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P79",
+   "title": "Time-zone search knows Spanish and Catalan city names",
+   "area": "D",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-486"
+   ],
+   "aliases": {},
+   "files": [
+    "App/lib/screens/regional_settings_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/regional_ui_test.dart"
+   ],
+   "brief": [
+    "UX-486 (verify-b5-r1-D): time-zone search matches only English tz city names (`regional_settings_screen.dart:164`), so 'Londres', 'Nueva York' or 'Nova York' find nothing. Add a small alias table for the commonly searched zones, about 40 to 60 cities (European capitals, the Americas, major Asian and Oceanian cities), with their Spanish and Catalan names. Match them with the same accent folding UX-431 added. Don't translate the whole tz database, and don't change what the rows display.",
+    "Reviewer's notes on the same screen (b5 report): the legacy `US/*` and `Canada/*` aliases make 'Pacific', 'Eastern' and others appear twice. Hide legacy alias zones from the list, but keep an account's stored legacy zone shown as the current one. The `regionalSettingsHelp` ARB key is unused and still says 'zona de captura': remove it from all three ARB files and regenerate."
+   ],
+   "acceptance": [
+    "Searching 'Londres', 'Nueva York' and 'Nova York', and their versions without accents, each lists the matching zone.",
+    "The list has no `US/*` or `Canada/*` duplicates, and an account whose stored zone is a legacy alias still sees it as the current zone.",
+    "`regionalSettingsHelp` is gone from the three ARB files and the analyzer is clean."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
    "id": "P20",
    "title": "Native labels, share messages and shortcut icons",
    "area": "A",

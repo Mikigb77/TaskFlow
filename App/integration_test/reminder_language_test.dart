@@ -7,6 +7,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/regional_settings_screen.dart';
+import 'package:agenda/widgets/language_selector.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
@@ -85,11 +86,12 @@ void main() {
     await tester.pumpWidget(UncontrolledProviderScope(
         container: container, child: const _Settings()));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('regional-language')));
+    // The language picker lives in Settings; its sheet works the same here.
+    showLanguageSelector(tester.element(find.byType(RegionalSettingsScreen)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Español').last);
     await tester.pumpAndSettle();
-    expect(find.text('Idioma y región'), findsOneWidget);
+    expect(find.text('Hora y región'), findsOneWidget);
     await _until(tester, () async {
       final rows = await sql
           .query('reminder_state', where: 'owner_key = ?', whereArgs: [owner]);

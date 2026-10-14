@@ -186,7 +186,7 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('invite-email')));
     await tester.enterText(
         find.byKey(const ValueKey('invite-email')), b.account!.email);
-    await tester.tap(find.text('Create invitation'));
+    await tester.tap(find.text('Send invitation'));
     await _until(
         tester,
         () async => find
@@ -214,14 +214,14 @@ void main() {
         UncontrolledProviderScope(container: cb, child: const MyApp()));
     await tester.pumpAndSettle();
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
-    navigator.pushNamed('/lists');
-    await _until(tester,
-        () async => find.text('Accept invitation').evaluate().isNotEmpty);
-    await tester.tap(find.text('Accept invitation'));
+    // The invitation waits on Calendar; pasting the code joins.
+    const invited = 'You’re invited to Household fixture · View';
+    await _until(tester, () async => find.text(invited).evaluate().isNotEmpty);
+    await tester.tap(find.text(invited));
     await tester.pumpAndSettle();
     await tester.enterText(
         find.byKey(const ValueKey('accept-invitation-code')), code);
-    await tester.tap(find.text('Join list'));
+    await tester.tap(find.text('Join'));
     await _until(tester, () async => (await rb.getAllTasks()).isNotEmpty);
     await cb.read(taskProvider.notifier).loadTasks();
     await tester.pumpAndSettle();

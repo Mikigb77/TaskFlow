@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -21,6 +22,7 @@ import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/widgets/device_calendar_events.dart';
+import 'package:agenda/widgets/invitation_cards.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -37,6 +39,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   Timer? _midnight;
   CalendarFormat _format = CalendarFormat.week;
   PageController? _calendarPage;
+  final _page = GlobalKey();
   final _scroll = ScrollController();
   // Tasks seen open on the selected day. Completing one keeps its place
   // until the day changes or Calendar is covered.
@@ -50,6 +53,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   bool _highlight = false;
   Timer? _highlightTimer;
   final _landedRow = GlobalKey();
+  // The gap after the last row. A task saved without a date lands on the
+  // last row, so it grows to the save message's height while that landing
+  // lasts, letting the row scroll clear of the message.
+  double _end = 20;
 
   DateTime _now() => ref.read(calendarClockProvider)();
 
@@ -79,6 +86,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       _landedIds = {};
       _landingInbox = false;
       _landedInbox = false;
+      _end = 20;
     }
     _selectedDay = day;
     _focusedDay = focused ?? day;
@@ -110,6 +118,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     _landingInbox = day == null;
     _landedIds = {};
     _landedInbox = false;
+    _end = 20;
     _highlight = false;
     _highlightTimer?.cancel();
   });
@@ -117,6 +126,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   /// Brings the new task's row (the first, for several) into view, clear of the save message, then
   /// lets its highlight fade.
   Future<void> _reveal() async {
+    // The no-date row is the last one: make room under it for the save
+    // message, which shows a moment after the landing.
+    if (_landedInbox) {
+      for (var i = 0; i < 60 && mounted; i++) {
+        final clearance = _messageClearance();
+        if (clearance != null) {
+          if (clearance > _end) setState(() => _end = clearance);
+          break;
+        }
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
     for (var i = 0; i < 20 && mounted && _scroll.hasClients; i++) {
       final row = _landedRow.currentContext?.findRenderObject();
       final position = _scroll.position;
@@ -134,7 +156,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       }
       final viewport = RenderAbstractViewport.of(row);
       final top = viewport.getOffsetToReveal(row, 0).offset;
-      final bottom = viewport.getOffsetToReveal(row, 1).offset + 88;
+      final bottom =
+          viewport.getOffsetToReveal(row, 1).offset + math.max(88, _end);
       final target = position.pixels > top
           ? top
           : position.pixels < bottom
@@ -164,6 +187,29 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     });
   }
 
+  /// How much of the page's foot the save message shown over it takes, with
+  /// a gap. Read inside its entrance, where its height is already final.
+  double? _messageClearance() {
+    RenderBox? message;
+    var inMessage = false;
+    void visit(Element element) {
+      // The list can't hold the message, so skip its rows.
+      if (message != null || element.widget is CustomScrollView) return;
+      if (element.widget is SnackBar) inMessage = true;
+      if (inMessage && element.widget is Dismissible) {
+        final box = element.findRenderObject();
+        if (box is RenderBox && box.hasSize) message = box;
+        return;
+      }
+      element.visitChildren(visit);
+    }
+
+    _page.currentContext?.visitChildElements(visit);
+    final box = message;
+    if (box == null || box.size.height == 0) return null;
+    return box.size.height + 8;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -179,6 +225,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   Future<void> _refresh() => Future.wait([
     ref.read(taskProvider.notifier).loadTasks(),
     ref.read(deviceCalendarProvider.notifier).refresh(),
+    // Offline, the invitation card just stays as it was.
+    ref
+        .refresh(pendingInvitationsProvider.future)
+        .then<void>((_) {}, onError: (Object _) {}),
   ]);
 
   void _showView(String view) {
@@ -202,7 +252,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     _followToday();
     // Calendar is covered by another screen: the user has left it.
     final shown = TickerMode.valuesOf(context).enabled;
-    if (!shown) _openOnDay.clear();
+    if (!shown) {
+      _openOnDay.clear();
+      // Leaving Calendar ends a landing's room for the save message.
+      _end = 20;
+    }
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
@@ -269,7 +323,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         .watch(deviceCalendarProvider)
         .preferences
         .enabled;
+    final invitations =
+        ref.watch(pendingInvitationsProvider).valueOrNull ?? const [];
     return Scaffold(
+      key: _page,
       appBar: CustomAppBar(title: context.l10n.calendar, isRoot: true),
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -528,6 +585,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 ),
               ),
             ),
+            // Someone shared a project or a group: the first invitation,
+            // with how many more wait.
+            if (invitations.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: InvitationCard(
+                    invitation: invitations.first,
+                    more: invitations.length - 1,
+                  ),
+                ),
+              ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
               sliver: SliverToBoxAdapter(
@@ -679,7 +748,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   ),
                 ),
               ),
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            SliverToBoxAdapter(child: SizedBox(height: _end)),
           ],
         ),
       ),

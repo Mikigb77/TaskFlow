@@ -1,19 +1,16 @@
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/screens/activity_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:agenda/widgets/app_components.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({
     super.key,
     required this.title,
     this.isRoot = false,
-    this.showAppearance = true,
     this.actions = const [],
   });
   final String title;
   final bool isRoot;
-  final bool showAppearance;
   final List<Widget> actions;
   @override
   Widget build(BuildContext context) => AppBar(
@@ -51,7 +48,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     actions: [
       ...actions,
       if (isRoot) const ActivityButton(),
-      if (showAppearance) const ThemeToggle(),
       if (isRoot)
         IconButton(
           tooltip: context.l10n.account,

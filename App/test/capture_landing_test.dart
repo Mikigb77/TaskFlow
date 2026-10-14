@@ -502,6 +502,101 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- P72 (UX-475): Calendar's no-date landing clears the save message ----
+
+  /// Saves `Comprar pilas` with no date from Calendar at 390×844 and checks
+  /// the lit `Bandeja` row sits fully above the save message, under the app
+  /// bar.
+  Future<void> noDateLanding(WidgetTester tester) async {
+    final app = await _App.open(tester, [
+      Task(
+        id: 1,
+        title: 'Regar las plantas',
+        priority: 1,
+        dueDate: inDays(0, 9),
+      ),
+      Task(id: 2, title: 'Llamar a mamá', priority: 1, dueDate: inDays(0, 18)),
+    ]);
+    expect(find.text(es.todayAgenda), findsOneWidget);
+    expect(find.byKey(const ValueKey('calendar-inbox')), findsNothing);
+    app.api.found = [found('Comprar pilas')];
+    await app.say(tester, 'Comprar pilas');
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    // Frame by frame for 1.2 s, as on a phone: past the message's entrance
+    // and the scroll, inside the 1.5 s highlight and the message's 10 s.
+    for (var frame = 0; frame < 48; frame++) {
+      await tester.pump(const Duration(milliseconds: 25));
+    }
+
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text(es.taskSavedInbox), findsOneWidget);
+    final inbox = find.byKey(const ValueKey('calendar-inbox'));
+    expect(inbox, findsOneWidget);
+    expect(find.text(es.inboxCount(1)), findsOneWidget);
+    final rowRect = tester.getRect(inbox);
+    final message = tester.getRect(find.byType(SnackBar));
+    final bar = tester.getRect(
+      find.descendant(
+        of: find.byType(CalendarScreen),
+        matching: find.byType(AppBar),
+      ),
+    );
+    expect(
+      rowRect.bottom,
+      lessThanOrEqualTo(message.top),
+      reason: 'row $rowRect, message $message',
+    );
+    expect(
+      rowRect.top,
+      greaterThanOrEqualTo(bar.bottom - 0.5),
+      reason: 'row $rowRect, app bar $bar',
+    );
+    // The whole row can be touched, not covered by the message.
+    for (final point in [rowRect.topCenter, rowRect.bottomCenter]) {
+      final at = point + Offset(0, point == rowRect.topCenter ? 2 : -2);
+      final hits = tester.hitTestOnBinding(at);
+      expect(
+        hits.path.any((entry) => entry.target == tester.renderObject(inbox)),
+        isTrue,
+        reason: 'the Bandeja row is hit-testable at $at',
+      );
+    }
+    // Lit as the landing.
+    final lit = tester.widget<DecoratedBox>(
+      find
+          .descendant(
+            of: find.ancestor(of: inbox, matching: find.byType(Align)).first,
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    expect(
+      (lit.decoration as BoxDecoration).color,
+      Theme.of(tester.element(inbox)).colorScheme.primaryContainer,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  }
+
+  testWidgets(
+    'UX-475: at 390×844, a task saved without a date from Calendar lights the Bandeja row fully above the save message',
+    (tester) async {
+      await noDateLanding(tester);
+    },
+  );
+
+  testWidgets(
+    'UX-475: with animations off, the no-date row on Calendar still lands fully above the save message',
+    (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await noDateLanding(tester);
+    },
+  );
 }
 
 /// The app in Spanish with a 24-hour clock, on Calendar, with capture

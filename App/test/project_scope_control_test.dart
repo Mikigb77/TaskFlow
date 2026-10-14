@@ -7,6 +7,10 @@ import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/widgets/task_assignment_picker.dart';
+import 'support/design_fixtures.dart';
 
 void main() {
   testWidgets(
@@ -96,4 +100,80 @@ void main() {
       }
     }
   });
+
+  // ---- P13 (UX-316): one word for "the other people" ----
+
+  final shared = TaskListInfo(
+      id: 'casa',
+      name: 'Casa',
+      version: 1,
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+      ]);
+
+  Widget localized(Widget child, String language) => MaterialApp(
+      locale: Locale(language),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: SafeArea(child: child)));
+
+  for (final (language, all) in [('es', 'Todas'), ('ca', 'Totes'), ('en', 'All')]) {
+    testWidgets('UX-316: the scope chips read For me and $all ($language)',
+        (tester) async {
+      final l10n = lookupAppLocalizations(Locale(language));
+      expect(l10n.forTeam, all);
+      await tester.pumpWidget(ProviderScope(
+          overrides: [taskListsProvider.overrideWith((ref) async => [shared])],
+          child: localized(const ProjectScopeControl(), language)));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ChoiceChip, l10n.forMe), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, l10n.forTeam), findsOneWidget);
+      expect(find.text('Equipo'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final (language, everyone) in [
+    ('es', 'Todos'),
+    ('ca', 'Tothom'),
+    ('en', 'Everyone'),
+  ]) {
+    testWidgets(
+        'UX-316: a task for the whole project reads $everyone ($language)',
+        (tester) async {
+      final l10n = lookupAppLocalizations(Locale(language));
+      expect(l10n.assignedToGroup, everyone);
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(api),
+            authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+            taskListsProvider.overrideWith((ref) async => [shared]),
+          ],
+          child: localized(
+              TaskAssignmentPicker(
+                  task: Task(
+                      title: 'Comprar pan',
+                      priority: 1,
+                      listId: 'casa',
+                      assignment: 'group'),
+                  onChanged: (_) {}),
+              language)));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ActionChip, everyone), findsOneWidget);
+      await tester.tap(find.widgetWithText(ActionChip, everyone));
+      await tester.pumpAndSettle();
+      expect(
+          find.descendant(
+              of: find.byType(BottomSheet), matching: find.text(everyone)),
+          findsOneWidget);
+      expect(find.text('Todo el grupo'), findsNothing);
+      expect(find.text('Tot el grup'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

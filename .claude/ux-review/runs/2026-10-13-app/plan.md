@@ -606,3 +606,78 @@ None.
 - P67's implementer: when a widget reopens capture with `startListening: voice`, a silent capture is dropped and listening starts at once, which clears the `No te he entendido…` line. The person asked to speak, so it was left.
 - Reviewer A, for U5 (not a regression): at 390×844, Calendar's lit `Bandeja · 1` row sits almost entirely under `Tarea guardada en la bandeja de entrada`, because Calendar's content is too short to scroll it clear. It also happens from the pending list, so P69 didn't cause it, but it contradicts U5's "Calendar lands (verified)". Suggested fix: while a landing is active, give Calendar's scroll content a bottom inset of at least the message's height + 8 dp, the same idea UX-460 uses for Tareas. It goes with U5 and UX-460, not this round.
 - Reviewer B: the detail rows' ripple is a rectangle inside the rounded card (no `borderRadius`), the same as P10's date rows. Polish only.
+
+## Round 2 (b5)
+
+Round 1 of batch 5 ran P72, P13, P14, P15, P17 and P18. The reviewers found 20 of 22 findings fixed in code. UX-475, UX-305, UX-306, UX-301, UX-402, U14, UX-120 and UX-406 still need phone checks. UX-326 and UX-422 are partly fixed, and each has failed once. The round check passed and no test failed. Reviewers C and D found seven regressions, now UX-476 to UX-482.
+
+Round 2 has three packages: P73 (S3), P74 (S2) and P75 (S2). There are no new decisions and nothing is escalated. UX-326's remaining part is server-side, so it isn't re-planned.
+
+The briefs are in `plan-b5-r2.json`.
+
+### Packages, in run order
+
+#### P73 · Removing a project closes its page; delete and Share say what's true · C · M
+- **UX-476** (S3; R1C-1, from P13 and P15) Deleting or leaving a project from its own page's Compartir / Miembros popped only the sharing screen. That left the user on an empty `Proyecto` page that asks them to add a task. Now the sharing screen pops with a result, and the project page closes too. `Proyecto eliminado` or `Has salido de {name}` shows on Projects, the group page or Calendar.
+- **UX-477** (S2; R1C-2, from P15) Unshared projects get their own confirmation: `¿Eliminar «{name}» con todas sus tareas, notas y archivos? No se puede deshacer.` On the sharing screen, the button reads `Eliminar proyecto` unless the project is shared.
+- **UX-479** (S2; R1C-4, from P13) Projects ⋮ says `Compartir` only to the owner or a group admin. Everyone else sees `Miembros`, the same word as the project page.
+
+#### P74 · Join dialog stays open while joining; a wrong code stays put · C · M
+- **UX-478** (S2; R1C-3, from P14) Unirme now shows a spinner inside the dialog until the project is loaded, and the other buttons are disabled. An error appears under the code field, and the code is kept. A wrong code reads `Pide a quien te invitó el código actual.` for projects and groups.
+- **UX-480** (S1; R1C-5, from P14) Rechazar's confirmation button is red. The member-limit message says `anula una invitación`, matching `Anular invitación`.
+
+#### P75 · Settings: blocked reminders say so; one sheet style; time help without "capturas" · D · M
+- **UX-481** (S2; R1D-1, from P18) When the phone blocks notifications, the Recordatorios row reads `Bloqueados por el teléfono` in red, with an icon. The row checks again when the app comes back and after the Recordatorios screen closes.
+- **UX-482** (S1; R1D-2, from P18) The Idioma sheet now uses the same radio rows as Apariencia, with no close X. "Follow the phone" is `Como el teléfono` in both sheets.
+- **UX-422** (S1; second attempt) P18's brief named only `regionalFormatsHelp`, so `timezoneHelp` kept its 31 Spanish words and `nuevas capturas`. Now it reads `Las tareas nuevas usan esta zona para entender las fechas.`, and the fallback banner says `Las tareas nuevas usarán {zone}`.
+
+### Escalated
+None.
+
+### Skipped
+- **UX-326**: the app-side copy and the `Ahora no` link are verified. Showing who sent the invitation needs `invited_by_name` in the invitation payload (Backend/core/list_views.py:33-35, group_views.py:52-54). The cause is server-side. It stays open.
+
+### Noted, not planned
+- Reviewer C: after `Ahora no`, the stored link reopens the review on every cold start until the user joins or declines. Watch for it on the phone walkthrough.
+- Reviewer C: deleting an empty group closes the group page with no message. This is outside UX-340's scope and pre-existing.
+- Reviewer C: in ES and CA, `sharingProblem` still uses feminine pronouns left over from "lista" (`si ya no la necesitas`, `Actualízala antes de eliminarla`). This is pre-existing.
+- Reviewer D: the sign-in password validator still applies the 12-character creation rule (login_screen.dart:491-494). A short everyday password never reaches the error that offers the create button. Candidate for the ledger; not a regression.
+- Reviewer D: in create mode, the email-in-use error offers no `Iniciar sesión con este correo` button.
+- Reviewer D and P18's implementer: legacy time-zone ids (`US/*`, `Canada/*`, a second `Buenos Aires`) appear twice, and city names are English, so `Londres` finds nothing.
+- P18's implementer: App/docs/LOCALIZATION.md still says the language picker is also under Hora y región.
+- P72's implementer: Tareas' `_messageClearance` (P65) measures the SnackBar box, which grows from height 0 under M3 floating. Calendar measures the inner Dismissible. Tareas was left as it is.
+- P13, P14 and P18 changed integration tests that can't be run here (sharing_flow_test, projects_flow_test, regional_flow_test, reminder_language_test). They were checked only by the analyzer.
+
+## Round 3 (b5)
+
+Round 2 of batch 5 ran P73, P74 and P75. The reviewers found all eight findings fixed in code: UX-476, UX-477, UX-478, UX-479, UX-480, UX-481, UX-482 and UX-422. UX-476, UX-478 and UX-481 still need phone checks. The round check passed and no test failed. Reviewer D found one regression from P75, now UX-483.
+
+Round 3 has one small package, P76 (S1). There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b5-r3.json`.
+
+### Packages, in run order
+
+#### P76 · Tapping the current choice closes the Idioma and Apariencia sheets · D · S
+- **UX-483** (S1; R2D-1, from P75) Idioma now uses radio rows and has no close X, so tapping the language already chosen did nothing: RadioListTile ignores taps on the checked row. Apariencia already behaved this way. In both sheets, the rows become `toggleable`. A tap on the current choice closes the sheet and saves nothing. No copy changes.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- Reviewer D: Idioma lists `Como el teléfono` first, while Apariencia lists it last. This was already so before P75. If the owner wants the two sheets fully alike, move `ThemeMode.system` to the top of Apariencia.
+- Reviewer D: `regionalSettingsHelp` still says `zona de captura` / `capture timezone`, but no Dart code uses it. Remove the unused key as housekeeping. Users don't see it.
+- Reviewer C: a deleted project's sharing button may briefly show the shared wording while the page closes, because `taskListsProvider` is invalidated. Reviewer C and P73's implementer both judged it invisible in practice.
+- Reviewer C: `expired` and `accepted` invitation errors now sit under the code field with Unirme still active, as P74's brief asked. Cancelar is visible.
+- P74's implementer: the code field's `errorMaxLines` is now 12, so the longest ES/CA errors (`networkKept`) fit at 2× text. The join dialog no longer closes on a tap outside it.
+
+## Queued by the main session after batch b5 (2026-10-14)
+
+From the b5 report's open items and reviewer notes. They go first in b6.
+- **P77** (UX-484, S2, D): in sign-in mode, require only a non-empty password; in create mode, an email-in-use error offers sign-in with the email kept.
+- **P80** (UX-326, S2, C): invitations name who sent them. The backend half is done (bc93848, `invited_by_name`).
+- **P78** (UX-485 and UX-487, S2, C): deleting a group says "Grupo eliminado"; "Ahora no" on an invitation survives a cold start.
+- **P79** (UX-486, S1, D): time-zone search knows Spanish and Catalan city names, hides the legacy `US/*` and `Canada/*` duplicates, and drops the unused `regionalSettingsHelp` key.

@@ -9,6 +9,7 @@ import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/regional_settings_screen.dart';
+import 'package:agenda/widgets/language_selector.dart';
 import 'package:agenda/screens/data_transfer_screen.dart';
 import 'package:agenda/services/archive_files.dart';
 import 'package:agenda/services/archive_store.dart';
@@ -99,11 +100,12 @@ void main() {
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     navigator.pushNamed('/region');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('regional-language')));
+    // The language picker lives in Settings; its sheet works the same here.
+    showLanguageSelector(tester.element(find.byType(RegionalSettingsScreen)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Español').last);
     await tester.pumpAndSettle();
-    expect(find.text('Idioma y región'), findsOneWidget);
+    expect(find.text('Hora y región'), findsOneWidget);
     await _choose(tester, 'regional-clock', 'Reloj de 12 horas');
     await _choose(tester, 'regional-week', 'Domingo');
     await binding.convertFlutterSurfaceToImage();

@@ -3,10 +3,12 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/text_search.dart';
 import 'package:agenda/models/task_group.dart';
 import 'package:agenda/providers/groups_provider.dart';
+import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/widgets/project_preferences.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -14,6 +16,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/invitation_cards.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskListsScreen extends ConsumerStatefulWidget {
@@ -54,16 +57,31 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
     TaskListInfo list,
   ) async {
     final store = ref.read(taskListStoreProvider);
+    final tasks = ref.read(taskProvider.notifier);
     try {
       await store.update(list.copyWith(archived: !list.archived));
       if (context.mounted) {
         ref.invalidate(taskListsProvider);
-        ref.read(taskProvider.notifier).loadTasks();
+        tasks.loadTasks();
+        final messenger = ScaffoldMessenger.of(context);
+        final strings = context.l10n;
         showFeedback(
-          ScaffoldMessenger.of(context),
+          messenger,
           list.archived
-              ? context.l10n.listRestored
-              : context.l10n.listArchivedHelp,
+              ? strings.listRestored
+              : strings.projectArchivedNoReminders(list.name),
+          actionLabel: list.archived ? null : strings.undo,
+          onAction: () async {
+            try {
+              await store.update(list);
+            } catch (_) {
+              showFeedback(messenger, strings.listUpdateError);
+              return;
+            }
+            if (mounted) ref.invalidate(taskListsProvider);
+            // Loading the tasks again reschedules the project's reminders.
+            await tasks.loadTasks();
+          },
         );
       }
     } catch (_) {
@@ -73,6 +91,41 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
           context.l10n.listUpdateError,
         );
       }
+    }
+  }
+
+  Future<void> _delete(TaskListInfo list) async {
+    final account = ref.read(authProvider).account;
+    if (account == null ||
+        !await groupConfirm(
+          context,
+          context.l10n.deleteList,
+          list.shared
+              ? context.l10n.deleteListHelp
+              : context.l10n.deleteListPrivateHelp(list.name),
+          destructive: true,
+        ) ||
+        !mounted) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
+    try {
+      await ref
+          .read(apiClientProvider)
+          .request(
+            'DELETE',
+            'lists/${list.id}/',
+            data: {'version': list.version},
+            accountId: account.id,
+          );
+      if (!mounted) return;
+      await ref.read(taskProvider.notifier).loadTasks();
+      if (!mounted) return;
+      ref.invalidate(taskListsProvider);
+      showFeedback(messenger, strings.projectDeleted);
+    } catch (error) {
+      showFeedback(messenger, requestProblemText(strings, error));
     }
   }
 
@@ -191,11 +244,10 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                   onChanged: (value) => setState(() => _query = value.trim()),
                 ),
                 const SizedBox(height: 12),
-                const GroupInvitations(),
-                const ListInvitations(),
+                const PendingInvitations(),
                 TextButton.icon(
                   onPressed: () async {
-                    ref.invalidate(invitationsProvider);
+                    ref.invalidate(pendingInvitationsProvider);
                     await ref.read(taskProvider.notifier).loadTasks();
                     ref.invalidate(taskListsProvider);
                   },
@@ -277,16 +329,37 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                                   : context.l10n.archiveList,
                             ),
                           ),
-                        if (ref.read(authProvider).account != null &&
-                            list.version > 0)
+                        if (ref.read(authProvider).account != null)
+                          // Everyone can see the members and leave here;
+                          // only those who can invite are told “Share”.
                           PopupMenuItem(
                             value: 'sharing',
-                            child: Text(context.l10n.sharingAndPeople),
+                            child: Text(
+                              list.canManage
+                                  ? context.l10n.shareProject
+                                  : context.l10n.people,
+                            ),
                           ),
                         if (list.conflict != null && list.canManage)
                           PopupMenuItem(
                             value: 'resolve',
                             child: Text(context.l10n.chooseDetails),
+                          ),
+                        // The server deletes it, so only a project it knows.
+                        if (list.groupId == null &&
+                            list.role == 'owner' &&
+                            list.version > 0 &&
+                            ref.read(authProvider).account != null)
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              list.shared
+                                  ? context.l10n.deleteListForEveryone
+                                  : context.l10n.deleteList,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
                           ),
                       ],
                       onSelected: (action) => switch (action) {
@@ -298,6 +371,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                         ),
                         'edit' => _edit(context, ref, list),
                         'resolve' => _resolve(context, ref, list),
+                        'delete' => _delete(list),
                         'sharing' => Navigator.push(
                           context,
                           MaterialPageRoute<void>(

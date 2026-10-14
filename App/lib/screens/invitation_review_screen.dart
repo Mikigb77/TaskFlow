@@ -3,12 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/auth_provider.dart';
-import 'package:agenda/providers/groups_provider.dart';
-import 'package:agenda/providers/task_lists_provider.dart';
-import 'package:agenda/providers/task_provider.dart';
-import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/widgets/invitation_cards.dart';
 
 class InvitationReviewScreen extends ConsumerStatefulWidget {
   const InvitationReviewScreen({super.key, required this.invitation});
@@ -70,8 +67,13 @@ class _InvitationReviewScreenState
       _accepting = true;
       _error = null;
     });
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
+    final details = _details!;
+    final group = widget.invitation.kind == 'group';
     try {
-      await ref
+      final result = await ref
           .read(apiClientProvider)
           .request(
             'POST',
@@ -80,13 +82,23 @@ class _InvitationReviewScreenState
             accountId: _accountId,
           );
       if (!mounted || _accountId != ref.read(authProvider).account?.id) return;
-      ref.invalidate(groupsProvider);
-      ref.invalidate(groupInvitationsProvider);
-      ref.invalidate(invitationsProvider);
-      ref.invalidate(taskListsProvider);
-      await ref.read(taskProvider.notifier).loadTasks();
+      await refreshAfterInvitation(
+        ProviderScope.containerOf(context, listen: false),
+        widget.invitation.id,
+      );
       if (mounted && _accountId == ref.read(authProvider).account?.id) {
-        Navigator.pop(context, true);
+        // Land on what was joined, in place of this screen.
+        showJoined(
+          navigator: navigator,
+          messenger: messenger,
+          strings: strings,
+          group: group,
+          targetId:
+              joinedId(result) ??
+              (group ? details['group_id'] : details['list_id']) as String?,
+          name: (details['group_name'] ?? details['list_name']) as String,
+          replace: true,
+        );
       }
     } catch (error) {
       if (mounted) setState(() => _error = error);
@@ -94,6 +106,11 @@ class _InvitationReviewScreenState
       if (mounted) setState(() => _accepting = false);
     }
   }
+
+  bool get _unavailable =>
+      _details == null &&
+      _error is ApiException &&
+      (_error as ApiException).status == 404;
 
   @override
   Widget build(BuildContext context) {
@@ -136,10 +153,11 @@ class _InvitationReviewScreenState
                         ),
                       ),
                     ],
-                    Text(
-                      account?.email ?? '',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    if (account != null)
+                      Text(
+                        strings.signedInAs(account.email),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     if (_error != null)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -173,11 +191,14 @@ class _InvitationReviewScreenState
                         onPressed: _load,
                         child: Text(strings.tryAgain),
                       ),
+                    // Keeps the link: Calendar's card offers the
+                    // invitation again. One this account can't see is
+                    // dropped.
                     TextButton(
                       onPressed: _accepting
                           ? null
-                          : () => Navigator.pop(context, true),
-                      child: Text(strings.cancel),
+                          : () => Navigator.pop(context, _unavailable),
+                      child: Text(strings.invitationNotNow),
                     ),
                   ],
                 ],

@@ -3,6 +3,7 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
@@ -21,20 +22,6 @@ final listSharingProvider = FutureProvider.autoDispose
       );
     });
 
-final invitationsProvider =
-    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final account = ref.watch(authProvider).account;
-      if (account == null) return [];
-      final response =
-          await ref
-                  .watch(apiClientProvider)
-                  .request('GET', 'invitations/', accountId: account.id)
-              as Map;
-      return (response['invitations'] as List)
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
-    });
-
 class ListSharingScreen extends ConsumerStatefulWidget {
   const ListSharingScreen({super.key, required this.listId});
   final String listId;
@@ -50,6 +37,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     Map<String, dynamic> data, {
     bool deleting = false,
     bool leave = false,
+    String? done,
   }) async {
     if (_busy) return;
     final account = ref.read(authProvider).account;
@@ -74,6 +62,8 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
       ref.invalidate(listSharingProvider(widget.listId));
       if (action == 'invite/' && result is Map && result['code'] is String) {
         final code = result['code'] as String;
+        // The work is done: no progress bar under “Invitation sent”.
+        setState(() => _busy = false);
         await showDialog<void>(
           context: context,
           builder: (context) => Consumer(
@@ -82,21 +72,13 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   dialogRef.watch(authProvider).account?.id == account.id;
               return AlertDialog(
                 scrollable: true,
-                title: Text(context.l10n.invitationCode),
+                title: Text(context.l10n.invitationSent),
                 content: sameAccount
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (result['email_status'] != null) ...[
-                            Text(
-                              result['email_status'] == 'sent'
-                                  ? context.l10n.invitationEmailSent
-                                  : context.l10n.invitationEmailPending,
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          Text(context.l10n.invitationCodeHelp),
+                          Text(context.l10n.invitationCodeFallback),
                           const SizedBox(height: 16),
                           SelectableText(
                             code,
@@ -122,7 +104,12 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
           ),
         );
       }
-      if (mounted && (deleting || leave)) Navigator.pop(context);
+      if (mounted && (deleting || leave)) {
+        final messenger = ScaffoldMessenger.of(context);
+        // True tells the project page under this one to close as well.
+        Navigator.pop(context, true);
+        if (done != null) showFeedback(messenger, done);
+      }
     } catch (error) {
       if (mounted) {
         setState(() => _error = error);
@@ -132,54 +119,44 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     }
   }
 
-  Future<void> _invite() async {
+  /// Everyone joins as an editor; the owner can make them a viewer on
+  /// their row.
+  Future<void> _invite(String project) async {
     var email = '';
-    var role = 'editor';
     final form = GlobalKey<FormState>();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
+      builder: (context) {
+        void send() {
+          if (form.currentState!.validate()) Navigator.pop(context, true);
+        }
+
+        return AlertDialog(
           scrollable: true,
-          title: Text(context.l10n.inviteToList),
+          title: Text(context.l10n.shareProjectTitle(project)),
           content: Form(
             key: form,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(context.l10n.inviteHelp),
-                const SizedBox(height: 16),
                 TextFormField(
                   key: const ValueKey('invite-email'),
+                  autofocus: true,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.send,
                   decoration: InputDecoration(
-                    labelText: context.l10n.inviteeEmail,
+                    labelText: context.l10n.theirEmail,
                     errorMaxLines: 3,
                   ),
                   onChanged: (value) => email = value.trim(),
+                  onFieldSubmitted: (_) => send(),
                   validator: (value) => value?.contains('@') == true
                       ? null
                       : context.l10n.enterEmailAddress,
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: role,
-                  isExpanded: true,
-                  decoration: InputDecoration(labelText: context.l10n.access),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'editor',
-                      child: Text(context.l10n.roleEditor),
-                    ),
-                    DropdownMenuItem(
-                      value: 'viewer',
-                      child: Text(context.l10n.roleViewer),
-                    ),
-                  ],
-                  onChanged: (value) => update(() => role = value!),
-                ),
-                const SizedBox(height: 12),
-                Text(context.l10n.sharingRolesHelp),
+                Text(context.l10n.shareProjectHelp(project)),
               ],
             ),
           ),
@@ -189,45 +166,43 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
               child: Text(context.l10n.cancel),
             ),
             FilledButton(
-              onPressed: () {
-                if (form.currentState!.validate()) {
-                  Navigator.pop(context, true);
-                }
-              },
-              child: Text(context.l10n.createInvitation),
+              onPressed: send,
+              child: Text(context.l10n.sendInvitation),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
     if (confirmed == true && mounted) {
-      await _run('invite/', {'email': email, 'role': role});
+      await _run('invite/', {'email': email, 'role': 'editor'});
     }
   }
 
-  Future<bool> _confirm(String title, String message) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          scrollable: true,
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(title),
-            ),
+  @override
+  Widget build(BuildContext context) {
+    // A project this phone hasn't synced yet doesn't exist on the server.
+    final local = (ref.watch(taskListsProvider).valueOrNull ?? [])
+        .where((project) => project.id == widget.listId)
+        .firstOrNull;
+    if (local != null && local.version == 0) {
+      return Scaffold(
+        appBar: CustomAppBar(title: context.l10n.listSharing),
+        body: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(local.name, style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 16),
+            Text(context.l10n.connectToShare),
           ],
         ),
-      ) ==
-      true;
+      );
+    }
+    // Same flag as Projects ⋮, so both doors use the same words. A project
+    // missing from the provider gets the cautious, shared wording.
+    return _sharing(context, shared: local?.shared ?? true);
+  }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget _sharing(BuildContext context, {required bool shared}) => Scaffold(
     appBar: CustomAppBar(title: context.l10n.listSharing),
     body: ref
         .watch(listSharingProvider(widget.listId))
@@ -252,6 +227,11 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
           data: (data) {
             final list = data['list'] as Map;
             final owner = list['role'] == 'owner';
+            final danger = Theme.of(context).colorScheme.error;
+            final dangerButton = OutlinedButton.styleFrom(
+              foregroundColor: danger,
+              side: BorderSide(color: danger),
+            );
             return ListView(
               padding: const EdgeInsets.all(24),
               children: [
@@ -259,14 +239,16 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   list['name'] as String,
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  context.l10n.yourRole(
-                    context.listRole(list['role'] as String),
+                if (!owner) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    context.l10n.yourRole(
+                      context.listRole(list['role'] as String),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(context.l10n.sharingHelp),
+                  const SizedBox(height: 16),
+                  Text(context.l10n.sharingHelp),
+                ],
                 if (_error != null)
                   MessageBanner(
                     requestProblemText(context.l10n, _error!),
@@ -277,7 +259,9 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                 if (owner) ...[
                   FilledButton.icon(
                     key: const ValueKey('invite-person'),
-                    onPressed: _busy ? null : _invite,
+                    onPressed: _busy
+                        ? null
+                        : () => _invite(list['name'] as String),
                     icon: const Icon(Icons.person_add_outlined),
                     label: Text(context.l10n.invitePerson),
                   ),
@@ -308,14 +292,19 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                           ),
                           PopupMenuItem(
                             value: 'remove',
-                            child: Text(context.l10n.removeAccess),
+                            child: Text(
+                              context.l10n.removeAccess,
+                              style: TextStyle(color: danger),
+                            ),
                           ),
                         ],
                         onSelected: (role) async {
                           if (role == 'remove' &&
-                              !await _confirm(
+                              !await groupConfirm(
+                                context,
                                 context.l10n.removeAccess,
                                 context.l10n.removeAccessHelp,
+                                destructive: true,
                               )) {
                             return;
                           }
@@ -328,7 +317,8 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                         },
                       ),
                     ),
-                  SectionLabel(context.l10n.pendingInvitations),
+                  if ((data['invitations'] as List).isNotEmpty)
+                    SectionLabel(context.l10n.pendingInvitations),
                   for (final invitation in data['invitations'] as List)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -338,28 +328,40 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                           context.listRole(invitation['role'] as String),
                         ),
                       ),
-                      onTap: _busy
-                          ? null
-                          : () => _run('invite/', {
-                              'email': invitation['email'],
-                              'role': invitation['role'],
-                            }),
-                      trailing: IconButton(
-                        tooltip: context.l10n.revokeInvitation,
-                        onPressed: _busy
-                            ? null
-                            : () => _run('revoke_invite/', {
+                      trailing: PopupMenuButton<String>(
+                        enabled: !_busy,
+                        tooltip: context.l10n.manageItem(
+                          invitation['email'] as String,
+                        ),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'again',
+                            child: Text(context.l10n.sendInvitationAgain),
+                          ),
+                          PopupMenuItem(
+                            value: 'cancel',
+                            child: Text(
+                              context.l10n.cancelInvitation,
+                              style: TextStyle(color: danger),
+                            ),
+                          ),
+                        ],
+                        onSelected: (action) => action == 'again'
+                            ? _run('invite/', {
+                                'email': invitation['email'],
+                                'role': invitation['role'],
+                              })
+                            : _run('revoke_invite/', {
                                 'invitation_id': invitation['id'],
                               }),
-                        icon: const Icon(Icons.close),
                       ),
                     ),
-                  if ((data['invitations'] as List).isNotEmpty)
-                    Text(context.l10n.replaceInvitationHelp),
                   ExpansionTile(
                     title: Text(context.l10n.howSharingWorks),
                     tilePadding: EdgeInsets.zero,
                     children: [
+                      Text(context.l10n.sharingRolesHelp),
+                      const SizedBox(height: 12),
                       Text(context.l10n.sharedDataHelp),
                       const SizedBox(height: 12),
                       Text(context.l10n.sharingRemovalHelp),
@@ -367,33 +369,59 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   ),
                   const SizedBox(height: 24),
                   OutlinedButton(
+                    style: dangerButton,
                     onPressed: _busy
                         ? null
                         : () async {
-                            if (await _confirm(
+                            final deleted = context.l10n.projectDeleted;
+                            if (await groupConfirm(
+                              context,
                               context.l10n.deleteList,
-                              context.l10n.deleteListHelp,
+                              shared
+                                  ? context.l10n.deleteListHelp
+                                  : context.l10n.deleteListPrivateHelp(
+                                      list['name'] as String,
+                                    ),
+                              destructive: true,
                             )) {
                               if (mounted) {
-                                await _run('', {
-                                  'version': list['version'],
-                                }, deleting: true);
+                                await _run(
+                                  '',
+                                  {'version': list['version']},
+                                  deleting: true,
+                                  done: deleted,
+                                );
                               }
                             }
                           },
-                    child: Text(context.l10n.deleteListForEveryone),
+                    child: Text(
+                      shared
+                          ? context.l10n.deleteListForEveryone
+                          : context.l10n.deleteList,
+                    ),
                   ),
                 ] else
                   OutlinedButton(
+                    style: dangerButton,
                     onPressed: _busy
                         ? null
                         : () async {
-                            if (await _confirm(
+                            final left = context.l10n.youLeft(
+                              list['name'] as String,
+                            );
+                            if (await groupConfirm(
+                              context,
                               context.l10n.leaveList,
                               context.l10n.leaveListHelp,
+                              destructive: true,
                             )) {
                               if (mounted) {
-                                await _run('leave/', {}, leave: true);
+                                await _run(
+                                  'leave/',
+                                  {},
+                                  leave: true,
+                                  done: left,
+                                );
                               }
                             }
                           },
@@ -404,159 +432,4 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
           },
         ),
   );
-}
-
-class ListInvitations extends ConsumerStatefulWidget {
-  const ListInvitations({super.key});
-  @override
-  ConsumerState<ListInvitations> createState() => _ListInvitationsState();
-}
-
-class _ListInvitationsState extends ConsumerState<ListInvitations> {
-  bool _busy = false;
-  Object? _error;
-  Future<void> _respond(String id, String decision) async {
-    final account = ref.read(authProvider).account;
-    if (account == null || _busy) return;
-    String? code;
-    if (decision == 'accept') {
-      var entered = '';
-      final form = GlobalKey<FormState>();
-      code = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          scrollable: true,
-          title: Text(context.l10n.enterInvitationCode),
-          content: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(context.l10n.requestInvitationCodeHelp),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('accept-invitation-code'),
-                  maxLength: 128,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: context.l10n.invitationCode,
-                    errorMaxLines: 3,
-                  ),
-                  onChanged: (value) => entered = value.trim(),
-                  validator: (_) => entered.length >= 16
-                      ? null
-                      : context.l10n.invitationCodeRequired,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (form.currentState!.validate()) {
-                  Navigator.pop(context, entered);
-                }
-              },
-              child: Text(context.l10n.joinList),
-            ),
-          ],
-        ),
-      );
-      if (code == null ||
-          !mounted ||
-          ref.read(authProvider).account?.id != account.id) {
-        return;
-      }
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await ref
-          .read(apiClientProvider)
-          .request(
-            'POST',
-            'invitations/$id/respond/',
-            data: {'decision': decision, if (code != null) 'code': code},
-            accountId: account.id,
-          );
-      if (!mounted || ref.read(authProvider).account?.id != account.id) return;
-      ref.invalidate(invitationsProvider);
-      await ref.read(taskProvider.notifier).loadTasks();
-      if (mounted) ref.invalidate(taskListsProvider);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = error);
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ref
-      .watch(invitationsProvider)
-      .when(
-        skipLoadingOnRefresh: false,
-        skipLoadingOnReload: false,
-        loading: () => const LinearProgressIndicator(),
-        error: (_, __) => TextButton(
-          onPressed: () => ref.invalidate(invitationsProvider),
-          child: Text(context.l10n.retryInvitations),
-        ),
-        data: (invitations) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_error != null)
-              MessageBanner(
-                requestProblemText(context.l10n, _error!),
-                isError: true,
-              ),
-            if (invitations.isNotEmpty) SectionLabel(context.l10n.invitations),
-            for (final invitation in invitations)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        invitation['list_name'] as String,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        context.l10n.joinListHelp(
-                          context.listRole(invitation['role'] as String),
-                        ),
-                      ),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          FilledButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _respond(invitation['id'], 'accept'),
-                            child: Text(context.l10n.acceptInvitation),
-                          ),
-                          TextButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _respond(invitation['id'], 'decline'),
-                            child: Text(context.l10n.decline),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
 }

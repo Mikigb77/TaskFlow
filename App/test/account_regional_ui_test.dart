@@ -53,8 +53,8 @@ void main() {
       final email = find.byKey(const ValueKey('account-email'));
       await reveal(email);
       await tester.enterText(email, 'recovery@example.invalid');
-      await reveal(find.text('Continuar recuperación'));
-      await tester.tap(find.text('Continuar recuperación'));
+      await reveal(find.text('Enviar código'));
+      await tester.tap(find.text('Enviar código'));
       await tester.pumpAndSettle();
       // Requesting a recovery email must not require a password or a code.
       expect(api.requests.single.$1, 'auth/password-reset/');
@@ -69,16 +69,16 @@ void main() {
       final password = find.byKey(const ValueKey('account-password'));
       await reveal(password);
       await tester.enterText(password, 'short');
-      await reveal(find.text('Continuar recuperación'));
-      await tester.tap(find.text('Continuar recuperación'));
+      await reveal(find.text('Guardar contraseña nueva'));
+      await tester.tap(find.text('Guardar contraseña nueva'));
       await tester.pumpAndSettle();
       expect(api.requests, hasLength(1));
       await reveal(find.text('Usa al menos 12 caracteres'));
       expect(tester.takeException(), isNull);
       await reveal(password);
       await tester.enterText(password, 'Synthetic-only-password!');
-      await reveal(find.text('Continuar recuperación'));
-      await tester.tap(find.text('Continuar recuperación'));
+      await reveal(find.text('Guardar contraseña nueva'));
+      await tester.tap(find.text('Guardar contraseña nueva'));
       await tester.pumpAndSettle();
       expect(api.requests.last.$1, 'auth/password-reset/confirm/');
       expect(api.requests.last.$2, {

@@ -52,11 +52,11 @@ void main() {
   });
 
   testWidgets(
-    'theme toggle preserves navigation, selected day and editor values',
+    'changing appearance preserves navigation, selected day and editor values',
     (tester) async {
       final store = MemoryThemeStore();
       final container = await _pump(tester, store: store);
-      await tester.tap(find.byTooltip('Switch to dark mode'));
+      await setAppearance(container, ThemeMode.dark);
       await tester.pumpAndSettle();
       expect(
         Theme.of(tester.element(find.byType(CalendarScreen))).brightness,
@@ -74,7 +74,6 @@ void main() {
         find.byKey(const ValueKey('task-title')),
         'Keep my draft',
       );
-      expect(find.byTooltip('Switch to light mode'), findsNothing);
       await container.read(themeModeProvider.notifier).setMode(ThemeMode.light);
       await tester.pumpAndSettle();
       expect(find.text('Keep my draft'), findsOneWidget);

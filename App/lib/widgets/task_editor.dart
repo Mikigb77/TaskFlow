@@ -427,7 +427,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       },
       child: Scaffold(
         appBar: CustomAppBar(
-          showAppearance: false,
           title: _isNote ? context.l10n.editNote : context.l10n.editTask,
         ),
         body: SafeArea(

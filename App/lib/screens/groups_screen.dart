@@ -6,12 +6,14 @@ import 'package:agenda/models/task_group.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/groups_provider.dart';
+import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/task_lists_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/invitation_cards.dart';
 
 String groupRoleLabel(BuildContext context, String role) =>
     role == 'admin' ? context.l10n.groupAdmin : context.listRole(role);
@@ -84,8 +86,9 @@ Future<String?> groupTextDialog(
 Future<bool> groupConfirm(
   BuildContext context,
   String title,
-  String message,
-) async =>
+  String message, {
+  bool destructive = false,
+}) async =>
     await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -98,6 +101,12 @@ Future<bool> groupConfirm(
             child: Text(context.l10n.cancel),
           ),
           FilledButton(
+            style: destructive
+                ? FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  )
+                : null,
             onPressed: () => Navigator.pop(context, true),
             child: Text(title),
           ),
@@ -161,7 +170,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     body: RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(groupsProvider);
-        ref.invalidate(groupInvitationsProvider);
+        ref.invalidate(pendingInvitationsProvider);
         await ref.read(groupsProvider.future);
       },
       child: ListView(
@@ -172,7 +181,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 20),
-          const GroupInvitations(),
+          const PendingInvitations(kind: 'group'),
           ref
               .watch(groupsProvider)
               .when(
@@ -240,6 +249,8 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
     Map<String, dynamic> data, {
     String method = 'POST',
     bool leave = false,
+    String? done,
+    void Function(Object? result)? undo,
   }) async {
     final accountId = ref.read(authProvider).account?.id;
     if (_busy || accountId == null) return;
@@ -262,9 +273,19 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
       await ref.read(taskProvider.notifier).loadTasks();
       if (!mounted || ref.read(authProvider).account?.id != accountId) return;
       ref.invalidate(taskListsProvider);
+      final messenger = ScaffoldMessenger.of(context);
       if (leave) {
         Navigator.pop(context);
+        if (done != null) showFeedback(messenger, done);
         return;
+      }
+      if (done != null) {
+        showFeedback(
+          messenger,
+          done,
+          actionLabel: undo == null ? null : context.l10n.undo,
+          onAction: undo == null ? null : () => undo(result),
+        );
       }
       if (result is Map && result['code'] is String) {
         final code = result['code'] as String;
@@ -357,6 +378,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                 ),
               if (canRemove)
                 ListTile(
+                  textColor: Theme.of(context).colorScheme.error,
                   title: Text(context.l10n.removeAccess),
                   onTap: () => Navigator.pop(context, 'remove'),
                 ),
@@ -373,6 +395,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
           context,
           context.l10n.removeAccess,
           context.l10n.groupRemoveHelp,
+          destructive: true,
         )) {
       return;
     }
@@ -523,6 +546,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.close),
+                        color: Theme.of(context).colorScheme.error,
                         tooltip: context.l10n.revokeInvitation,
                         onPressed: _busy
                             ? null
@@ -596,11 +620,28 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                       leading: const Icon(Icons.inventory_2_outlined),
                       onTap: _busy
                           ? null
-                          : () => _run('', {
-                              'name': group.name,
-                              'archived': !group.archived,
-                              'version': group.version,
-                            }, method: 'PUT'),
+                          : () => _run(
+                              '',
+                              {
+                                'name': group.name,
+                                'archived': !group.archived,
+                                'version': group.version,
+                              },
+                              method: 'PUT',
+                              done: group.archived
+                                  ? null
+                                  : context.l10n.groupArchivedForEveryone(
+                                      group.name,
+                                    ),
+                              undo: (result) {
+                                if (!mounted || result is! Map) return;
+                                _run('', {
+                                  'name': group.name,
+                                  'archived': false,
+                                  'version': result['version'],
+                                }, method: 'PUT');
+                              },
+                            ),
                     ),
                   ],
                   if (group.role == 'owner') ...[
@@ -612,9 +653,21 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                     ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(context.l10n.delete),
+                      title: Text(
+                        context.l10n.delete,
+                        style: group.projectCount == 0
+                            ? TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              )
+                            : null,
+                      ),
                       subtitle: Text(context.l10n.groupDeleteHelp),
-                      leading: const Icon(Icons.delete_outline),
+                      leading: Icon(
+                        Icons.delete_outline,
+                        color: group.projectCount == 0
+                            ? Theme.of(context).colorScheme.error
+                            : null,
+                      ),
                       onTap: _busy || group.projectCount != 0
                           ? null
                           : () async {
@@ -622,6 +675,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                                     context,
                                     context.l10n.delete,
                                     context.l10n.groupDeleteHelp,
+                                    destructive: true,
                                   ) &&
                                   mounted) {
                                 await _run(
@@ -636,18 +690,27 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                   ] else
                     ListTile(
                       contentPadding: EdgeInsets.zero,
+                      textColor: Theme.of(context).colorScheme.error,
+                      iconColor: Theme.of(context).colorScheme.error,
                       title: Text(context.l10n.groupLeave),
                       leading: const Icon(Icons.logout),
                       onTap: _busy
                           ? null
                           : () async {
+                              final left = context.l10n.youLeft(group.name);
                               if (await groupConfirm(
                                     context,
                                     context.l10n.groupLeave,
                                     context.l10n.groupLeaveHelp,
+                                    destructive: true,
                                   ) &&
                                   mounted) {
-                                await _run('leave/', {}, leave: true);
+                                await _run(
+                                  'leave/',
+                                  {},
+                                  leave: true,
+                                  done: left,
+                                );
                               }
                             },
                     ),
@@ -657,106 +720,4 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
           },
         ),
   );
-}
-
-class GroupInvitations extends ConsumerStatefulWidget {
-  const GroupInvitations({super.key});
-  @override
-  ConsumerState<GroupInvitations> createState() => _GroupInvitationsState();
-}
-
-class _GroupInvitationsState extends ConsumerState<GroupInvitations> {
-  bool _busy = false;
-  Future<void> _respond(
-    Map<String, dynamic> invitation,
-    String decision,
-  ) async {
-    final account = ref.read(authProvider).account;
-    if (account == null || _busy) return;
-    final code = decision == 'accept'
-        ? await groupTextDialog(
-            context,
-            context.l10n.invitationCode,
-            help: context.l10n.groupInviteHelp,
-            maxLength: 128,
-          )
-        : '';
-    if (code == null ||
-        !mounted ||
-        ref.read(authProvider).account?.id != account.id) {
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await ref
-          .read(apiClientProvider)
-          .request(
-            'POST',
-            'group-invitations/${invitation['id']}/respond/',
-            data: {'decision': decision, 'code': code},
-            accountId: account.id,
-          );
-      if (!mounted || ref.read(authProvider).account?.id != account.id) return;
-      ref.invalidate(groupInvitationsProvider);
-      ref.invalidate(groupsProvider);
-      await ref.read(taskProvider.notifier).loadTasks();
-    } catch (_) {
-      if (mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.groupActionError,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ref
-      .watch(groupInvitationsProvider)
-      .when(
-        loading: () => const SizedBox.shrink(),
-        error: (_, __) => TextButton(
-          onPressed: () => ref.invalidate(groupInvitationsProvider),
-          child: Text(context.l10n.retryInvitations),
-        ),
-        data: (invitations) => Column(
-          children: [
-            for (final invitation in invitations)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        invitation['group_name'],
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(groupRoleLabel(context, invitation['role'])),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          FilledButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _respond(invitation, 'accept'),
-                            child: Text(context.l10n.groupJoin),
-                          ),
-                          TextButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _respond(invitation, 'decline'),
-                            child: Text(context.l10n.decline),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
 }

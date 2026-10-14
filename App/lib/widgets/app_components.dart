@@ -1,7 +1,4 @@
-import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/services/feedback_timeout.dart';
 
 /// Every brief message goes through here: it replaces the one on screen,
@@ -22,36 +19,68 @@ Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>
     duration: duration,
     behavior: SnackBarBehavior.floating,
     margin: margin,
-    content: Text(text),
-    action: actionLabel == null
+    padding: actionLabel == null
         ? null
-        : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
+        : const EdgeInsetsDirectional.only(start: 16),
+    content: actionLabel == null
+        ? Text(text)
+        : _FeedbackWithAction(
+            text,
+            SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
+          ),
   ));
 }
 
-class ThemeToggle extends ConsumerWidget {
-  const ThemeToggle({super.key});
+/// Lays the action out as the SDK does (beside a short label, under a long
+/// one) but, when it goes under, lets the message use the whole width: the
+/// SDK keeps 40% of it empty, which at large text pushes a long message off
+/// a small screen.
+class _FeedbackWithAction extends StatelessWidget {
+  const _FeedbackWithAction(this.text, this.action);
+  final String text;
+  final SnackBarAction action;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return IconButton(
-        key: const ValueKey('theme-toggle'),
-        tooltip: dark ? context.l10n.switchLight : context.l10n.switchDark,
-        onPressed: () async {
-          try {
-            await ref
-                .read(themeModeProvider.notifier)
-                .setMode(dark ? ThemeMode.light : ThemeMode.dark);
-          } catch (_) {
-            if (context.mounted) {
-              showFeedback(ScaffoldMessenger.of(context),
-                  context.l10n.appearanceChangedError);
-            }
-          }
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final label = TextPainter(
+            text: TextSpan(
+              text: action.label,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            textScaler: MediaQuery.textScalerOf(context),
+            textDirection: Directionality.of(context),
+            maxLines: 1,
+          )..layout();
+          final beside =
+              label.width + 16 <= (constraints.maxWidth + 16) * 0.25;
+          label.dispose();
+          final button = Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: action,
+          );
+          const vertical = EdgeInsets.symmetric(vertical: 14);
+          return beside
+              ? Row(children: [
+                  Expanded(
+                      child: Padding(padding: vertical, child: Text(text))),
+                  button,
+                ])
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                        top: 14, bottom: 14, end: 16),
+                    child: SizedBox(width: double.infinity, child: Text(text)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: button),
+                  ),
+                ]);
         },
-        icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-            size: 22));
-  }
+      );
 }
 
 class AppSurface extends StatelessWidget {

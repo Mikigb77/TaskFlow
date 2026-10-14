@@ -22,7 +22,7 @@
   "reviewResolved": "Reviewed",
   "reviewResolve": "Check this detail",
   "languageNativeName": "English",
-  "sharingProblem": "{reason, select, alreadyMember{This person already has access. Manage their role in People.} memberLimit{This project supports up to 20 members and 20 pending invitations. Remove someone or revoke an invitation first.} accepted{This invitation was already accepted. Manage the person’s access in People.} owner{The owner cannot leave. You can delete the project if it is no longer needed.} expired{This invitation is no longer available. Ask the owner for a new one.} code{Ask the project owner for the current invitation code.} refresh{This project changed. Refresh before deleting it.} ownerOnly{Only the project owner can manage sharing and project details.} other{This project is read-only for your account. Ask the owner for editing access.}}",
+  "sharingProblem": "{reason, select, alreadyMember{This person already has access. Manage their role in Members.} memberLimit{This project supports up to 20 members and 20 pending invitations. Remove someone or cancel an invitation first.} accepted{This invitation was already accepted. Manage the person’s access in Members.} owner{The owner cannot leave. You can delete the project if it is no longer needed.} expired{This invitation is no longer available. Ask the owner for a new one.} code{Ask the project owner for the current invitation code.} refresh{This project changed. Refresh before deleting it.} ownerOnly{Only the project owner can manage sharing and project details.} other{This project is read-only for your account. Ask the owner for editing access.}}",
   "@sharingProblem": {
     "description": "Actionable sharing API errors. Reasons stay internal and never get translated.",
     "placeholders": {
@@ -40,7 +40,7 @@
       }
     }
   },
-  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{The email or password is incorrect. Please try again.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
+  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
   "@requestError": {
     "description": "Localized account, sync and file error categories. Never display raw server exception text.",
     "placeholders": {
@@ -52,9 +52,8 @@
   "@languageNativeName": {
     "description": "This language's name in its own language, used in the language selector."
   },
-  "languageAutomatic": "Follow phone",
-  "languageHelp": "Use your phone’s preferred available language, or choose one below. If none is available, TaskFlow uses English. Your choice stays on this device.",
-  "languageFollowing": "Follow phone · {language}",
+  "languageAutomatic": "Same as phone",
+  "languageFollowing": "Same as phone · {language}",
   "@languageFollowing": {
     "description": "Summary of automatic language selection; language is the resolved language's native name.",
     "placeholders": {
@@ -64,7 +63,6 @@
     }
   },
   "regionalFormats": "Time & region",
-  "regionalFormatsHelp": "Clock, first day of the week and capture timezone",
   "sharedCaptureRetained": "Your shared capture is retained. Reopen TaskFlow to try again.",
   "note": "Note",
   "editNote": "Edit note",
@@ -250,24 +248,38 @@
   "moreDetails": "More details",
   "fewerDetails": "Fewer details",
   "appearance": "Appearance",
-  "chooseAppearance": "Choose your appearance",
-  "appearanceHelp": "Choose your look, or follow your device.",
   "light": "Light",
   "dark": "Dark",
-  "system": "System",
-  "yourSpace": "Your space",
-  "welcomeSettings": "Make yourself at home",
-  "notifications": "Notifications",
-  "notificationsHelp": "Reminder choices and upcoming alerts",
-  "accountBackup": "Account & backup",
+  "reminders": "Reminders",
+  "remindersOnLead": "On · {lead}",
+  "@remindersOnLead": {
+    "description": "Subtitle of the Reminders row in Settings when reminders are on; lead is the default reminder time, e.g. ‘10 minutes before’.",
+    "placeholders": {
+      "lead": {
+        "type": "String"
+      }
+    }
+  },
+  "remindersOff": "Off",
+  "remindersBlocked": "Blocked by your phone",
+  "@remindersBlocked": {
+    "description": "Subtitle of the Reminders row in Settings when reminders are on but the phone does not allow TaskFlow's notifications."
+  },
+  "otherSettings": "Other settings",
+  "appVersion": "TaskFlow {version}",
+  "@appVersion": {
+    "description": "Version line at the bottom of Other settings; version is the version and build, e.g. ‘1.0.5 (4007)’.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "completedTasks": "Completed tasks",
-  "progressHelp": "A little record of your progress",
   "exportImport": "Export & import",
-  "exportImportHelp": "TaskFlow backups and Todoist CSV migration",
-  "regionalSettings": "Language & region",
   "regionalSettingsHelp": "Language, clock, week start and capture timezone",
   "language": "Language",
-  "deviceDefault": "Follow device",
+  "deviceDefault": "Same as phone",
   "clockFormat": "Time format",
   "clock12": "12-hour clock",
   "clock24": "24-hour clock",
@@ -275,12 +287,12 @@
   "monday": "Monday",
   "sunday": "Sunday",
   "saturday": "Saturday",
-  "captureTimezone": "Capture timezone",
-  "timezoneHelp": "Used to interpret dates in new captures. Existing tasks and unfinished captures keep their schedules. Task times are displayed in your device timezone.",
+  "timeZone": "Time zone",
+  "timezoneHelp": "New tasks use this time zone to read dates.",
   "searchTimezone": "Find a timezone",
   "regionHelp": "These preferences stay on this device. Changing them does not change stored task dates or times.",
   "preferenceError": "Could not save this preference. Please try again.",
-  "timezoneFallback": "The device timezone is unavailable. New captures will use {zone}.",
+  "timezoneFallback": "The device timezone is unavailable. New tasks will use {zone}.",
   "@timezoneFallback": {
     "placeholders": {
       "zone": {
@@ -293,7 +305,6 @@
   "day": "Day",
   "previousPeriod": "Previous month or week",
   "nextPeriod": "Next month or week",
-  "moreClarity": "More clarity. More room for life.",
   "licenses": "Open-source licences",
   "todayAgenda": "Today’s agenda",
   "breathingRoom": "A little breathing room.",
@@ -303,16 +314,10 @@
   "rememberPrompt": "What would you like to remember?",
   "calendarEmpty": "Nothing planned for this day.",
   "planTask": "Plan a task",
-  "homeCapture": "Capture from your home screen",
-  "homeCaptureHelp": "Android mic widget, app shortcuts and text sharing",
+  "homeCapture": "Mic button on your home screen",
   "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for capture shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.",
   "widgetPickerHelp": "Add the TaskFlow widget from your launcher’s widget picker.",
-  "signInHelp": "Sign in to keep your tasks with you",
-  "diagnosticsHelp": "Local timing and counters, without your words",
   "appearanceError": "Could not save your appearance preference.",
-  "appearanceChangedError": "Appearance changed. Could not save the preference on this device.",
-  "switchLight": "Switch to light mode",
-  "switchDark": "Switch to dark mode",
   "list": "Project",
   "archivedList": "Archived project",
   "yourList": "Your project",
@@ -617,27 +622,29 @@
   },
   "connectionDetails": "Connection details",
   "signOut": "Sign out",
-  "recoveryHeading": "Let’s get you back in.",
-  "registerHeading": "A space for your plans.",
-  "signInHeading": "Welcome back.",
+  "recoveryHeading": "Reset your password",
+  "registerHeading": "Create your account",
+  "signInHeading": "Sign in",
+  "authPitch": "Note down what you need to do, and TaskFlow puts it on your calendar.",
   "recoveryHelp": "Request a recovery email, then use the code to set a new password.",
-  "accountSignInHelp": "Sign in to keep your plans together.",
   "email": "Email",
   "enterEmail": "Enter your email",
   "recoveryCode": "Recovery code",
   "recoveryCodeHelp": "Leave empty to request an email.",
   "newPassword": "New password",
   "password": "Password",
-  "passwordHelp": "At least 12 characters",
+  "passwordHelp": "At least 12 characters, not only numbers",
   "passwordTooShort": "Use at least 12 characters",
   "showPassword": "Show password",
   "hidePassword": "Hide password",
-  "continueRecovery": "Continue recovery",
   "createAccount": "Create account",
   "signIn": "Sign in",
   "alreadyHaveAccount": "Already have an account? Sign in",
   "createAnAccount": "Create an account",
+  "createAccountWithEmail": "Create an account with this email",
   "backToSignIn": "Back to sign in",
+  "sendRecoveryCode": "Send code",
+  "saveNewPassword": "Save new password",
   "forgotPassword": "Forgot password?",
   "accountGuestHelp": "Sign in to access your tasks and notes.",
   "connectionSettings": "Connection settings",
@@ -658,7 +665,14 @@
   "saveList": "Save project",
   "listSaveError": "Could not save this project. Please retry.",
   "listRestored": "Project restored",
-  "listArchivedHelp": "Project archived. Contents kept.",
+  "projectArchivedNoReminders": "{name} archived — hidden from your calendar, no reminders.",
+  "@projectArchivedNoReminders": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "listUpdateError": "Could not update this project. Please retry.",
   "chooseListDetails": "Choose project details",
   "listConflictHelp": "This phone: {local}\n\nOther device: {remote}\n\nTask and note contents will stay the same.",
@@ -712,7 +726,6 @@
   },
   "restoreList": "Restore project",
   "archiveList": "Archive project",
-  "sharingAndPeople": "Sharing and people",
   "chooseDetails": "Choose details",
   "invitationCode": "Invitation code",
   "invitationCodeHelp": "This code and the invited TaskFlow account are both needed to join. Share it only with the intended person. Replacing an invitation invalidates its previous code.",
@@ -720,13 +733,46 @@
   "copyCode": "Copy code",
   "done": "Done",
   "sharingUpdateError": "Could not update sharing. Check the connection and retry.",
-  "inviteToList": "Invite to this project",
-  "inviteHelp": "All tasks, notes and uploaded files in this project will be visible after they accept. We will email the invitation; it also appears in their TaskFlow account. It expires in 7 days.",
+  "shareProject": "Share",
+  "@shareProject": {
+    "description": "Opens sharing for a project nobody else can see yet, on the project page and in its menu."
+  },
+  "projectMembersCount": "Members · {count}",
+  "@projectMembersCount": {
+    "description": "Project page button once others have access. {count} is everyone with access, the owner included.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shareProjectTitle": "Share {project}",
+  "@shareProjectTitle": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "theirEmail": "Their email",
+  "shareProjectHelp": "They’ll see everything in {project}.",
+  "@shareProjectHelp": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "sendInvitation": "Send invitation",
+  "invitationSent": "Invitation sent",
+  "invitationCodeFallback": "If the email doesn’t arrive, send them this code:",
+  "connectToShare": "Connect to the internet to share.",
+  "sendInvitationAgain": "Send again",
+  "cancelInvitation": "Cancel invitation",
   "inviteeEmail": "Their account email",
   "enterEmailAddress": "Enter an email address.",
   "access": "Access",
   "sharingRolesHelp": "Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.",
-  "createInvitation": "Create invitation",
   "listSharing": "Project sharing",
   "sharingLoadError": "Could not load sharing.",
   "retry": "Retry",
@@ -740,7 +786,7 @@
   },
   "sharingHelp": "Share shopping and chores. Changes sync when the app connects or you refresh.",
   "invitePerson": "Invite a person",
-  "people": "People",
+  "people": "Members",
   "noOtherMembers": "Only you have accepted access so far.",
   "makeEditor": "Make editor",
   "makeViewer": "Make viewer",
@@ -756,32 +802,90 @@
     }
   },
   "revokeInvitation": "Revoke invitation",
-  "replaceInvitationHelp": "Tap a pending invitation to replace its code.",
   "howSharingWorks": "How sharing works",
   "sharedDataHelp": "Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.",
   "sharingRemovalHelp": "Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.",
   "deleteList": "Delete project",
   "deleteListHelp": "Delete this project and all its tasks, notes and uploaded files for everyone? This cannot be undone.",
-  "deleteListForEveryone": "Delete project for everyone",
-  "leaveList": "Leave project",
-  "leaveListHelp": "Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the project.",
-  "enterInvitationCode": "Enter invitation code",
-  "requestInvitationCodeHelp": "Ask the project owner for the code they received when inviting you.",
-  "invitationCodeRequired": "Paste the full invitation code.",
-  "joinList": "Join project",
-  "invitationResponseError": "Could not respond. Retry when connected.",
-  "retryInvitations": "Retry invitations",
-  "invitations": "Invitations",
-  "joinListHelp": "Join as {role}. Shared tasks, notes and uploaded files will sync to your account.",
-  "@joinListHelp": {
+  "deleteListPrivateHelp": "Delete {name} with all its tasks, notes and files? This can’t be undone.",
+  "@deleteListPrivateHelp": {
     "placeholders": {
-      "role": {
+      "name": {
         "type": "String"
       }
     }
   },
+  "deleteListForEveryone": "Delete project for everyone",
+  "leaveList": "Leave project",
+  "leaveListHelp": "Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the project.",
+  "youLeft": "You left {name}",
+  "@youLeft": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectDeleted": "Project deleted",
+  "invitationCodeRequired": "Paste the full invitation code.",
+  "invitationCodeWrong": "Ask the person who invited you for the current code.",
+  "invitationResponseError": "Could not respond. Retry when connected.",
+  "retryInvitations": "Retry invitations",
   "acceptInvitation": "Accept invitation",
   "decline": "Decline",
+  "invitedTo": "You’re invited to {name} · View",
+  "@invitedTo": {
+    "description": "A card for a pending invitation, on Calendar, Projects and Groups; tapping it opens the join dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitationsMore": "+{count}",
+  "@invitationsMore": {
+    "description": "How many more invitations wait behind the one shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "joinInvitationTitle": "Join {name}",
+  "@joinInvitationTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinInvitationHelp": "Open your invitation email and tap its link. Or paste the code from it here.",
+  "joinInvitation": "Join",
+  "declineInvitationConfirm": "Decline the invitation to {name}? You’d need a new one to join later.",
+  "@declineInvitationConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinedInvitation": "You joined {name}",
+  "@joinedInvitation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitationNotNow": "Not now",
+  "signedInAs": "Signed in as {email}",
+  "@signedInAs": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "fileLoadError": "Could not load attachment status. Please retry.",
   "fileActionError": "Could not complete this action. Your task is saved; please retry.",
   "fileSignInHelp": "Sign in to upload your files and restore them on another device.",
@@ -1443,8 +1547,6 @@
       }
     }
   },
-  "authWelcome": "Your day, in focus.",
-  "authRegisterHelp": "Keep your tasks and notes together, wherever you go.",
   "authOr": "or",
   "authRestoring": "Opening your space…",
   "authHaveRecoveryCode": "I already have a code",
@@ -1457,7 +1559,7 @@
   "projectsFind": "Find a project",
   "projectsManage": "Manage projects",
   "forMe": "For me",
-  "forTeam": "Team",
+  "forTeam": "All",
   "responsibility": "Responsible",
   "assignedToMe": "Me",
   "assignedToGroup": "Everyone",
@@ -1490,13 +1592,20 @@
   "groupAdmin": "Administrator",
   "groupProjects": "Group projects",
   "groupInviteHelp": "They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.",
-  "groupJoin": "Join group",
   "groupLeave": "Leave group",
   "groupLeaveHelp": "You will lose access to this group’s projects and files. Your tasks stay in the group for reassignment.",
   "groupTransfer": "Transfer ownership",
   "groupTransferHelp": "The new owner controls this group and its projects. You will remain an administrator.",
   "groupArchive": "Archive group",
   "groupRestore": "Restore group",
+  "groupArchivedForEveryone": "{name} archived for everyone — hidden from calendars, no reminders.",
+  "@groupArchivedForEveryone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "groupDeleteHelp": "Only an empty group can be deleted. Archive a group to keep its projects and content.",
   "groupActionError": "This change could not be saved. Check your connection and refresh; permissions may have changed.",
   "groupVoiceName": "Your spoken name",
@@ -1506,7 +1615,7 @@
   "projectNotifications": "Project updates",
   "updatesAll": "All changes",
   "updatesAssigned": "My assignments",
-  "updatesMuted": "Muted",
+  "updatesMuted": "Muted — no updates or reminders",
   "activity": "Activity",
   "activityEmpty": "You’re up to date.",
   "activityHelp": "Assignments and updates from your shared projects appear here.",
@@ -1532,7 +1641,7 @@
   "invitationEmailSent": "Invitation sent by email. You can also share the code below.",
   "invitationEmailPending": "Your invitation is ready. Email delivery is pending and will retry automatically. You can share this code now.",
   "invitationReview": "Review invitation",
-  "invitationReviewHelp": "Joining gives you access to the shared projects, tasks, notes and files described below.",
+  "invitationReviewHelp": "You’ll see its tasks, notes and files.",
   "invitationUnavailable": "This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.",
   "stagingInviteOnly": "This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address."
 }

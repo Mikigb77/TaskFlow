@@ -1,9 +1,8 @@
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/settings_screen.dart';
-import 'package:agenda/screens/regional_settings_screen.dart';
-import 'package:agenda/widgets/language_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,18 +59,18 @@ void main() {
       expect(find.text('L’agenda d’avui'), findsOneWidget);
       expect(container.read(regionalProvider).language, 'ca');
 
-      navigator.pushNamed('/region');
+      navigator.pushNamed('/settings');
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(LanguageSelector));
+      await tester.tap(selector);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('language-system')));
       await tester.pumpAndSettle();
       expect(store.value.language, 'system');
-      expect(find.text('Idioma y región'), findsOneWidget);
+      expect(find.text('Recordatorios'), findsOneWidget);
       tester.platformDispatcher.localesTestValue = [const Locale('ja', 'JP')];
       await tester.pumpAndSettle();
-      expect(find.text('Language & region'), findsOneWidget);
-      expect(find.text('Follow phone · English'), findsOneWidget);
+      expect(find.text('Reminders'), findsOneWidget);
+      expect(find.text('Same as phone · English'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -98,13 +97,13 @@ void main() {
         await tester.pumpAndSettle();
         tester
             .state<NavigatorState>(find.byType(Navigator))
-            .pushNamed('/region');
+            .pushNamed('/settings');
         await tester.pumpAndSettle();
-        final selector = find.byType(LanguageSelector);
+        final selector = find.byKey(const ValueKey('settings-language'));
         await tester.scrollUntilVisible(selector, 160,
             scrollable: find
                 .descendant(
-                    of: find.byType(RegionalSettingsScreen),
+                    of: find.byType(SettingsScreen),
                     matching: find.byType(Scrollable))
                 .first);
         await tester.pumpAndSettle();
@@ -140,9 +139,11 @@ void main() {
         UncontrolledProviderScope(container: container, child: const MyApp()),
       );
       await tester.pumpAndSettle();
-      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/region');
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/settings');
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(LanguageSelector));
+      await tester.tap(find.byKey(const ValueKey('settings-language')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('language-ca')));
       await tester.pumpAndSettle();
@@ -153,6 +154,80 @@ void main() {
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'UX-482: in Catalan at 2x text on 320×568 the Idioma sheet opens with no overflow, and every row (Com el telèfon, Español, Català, English) scrolls into view and can be chosen',
+    (tester) async {
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(ca.languageAutomatic, 'Com el telèfon');
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final store = MemoryRegionalStore(
+        const RegionalPreferences(language: 'ca'),
+      );
+      final container = designContainer(regionalStore: store);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/settings');
+      await tester.pumpAndSettle();
+      final selector = find.byKey(const ValueKey('settings-language'));
+      // The first sheet opens in Catalan, before any choice.
+      var catalan = true;
+      for (final code in ['system', 'es', 'en', 'ca']) {
+        await tester.scrollUntilVisible(
+          selector,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byType(SettingsScreen),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(selector);
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        expect(tester.takeException(), isNull, reason: 'opening for $code');
+        if (catalan) {
+          expect(
+            find.descendant(
+              of: sheet,
+              matching: find.text(ca.languageAutomatic),
+            ),
+            findsOneWidget,
+          );
+          catalan = false;
+        }
+        final row = find.descendant(
+          of: sheet,
+          matching: find.byKey(ValueKey('language-$code')),
+        );
+        await tester.scrollUntilVisible(
+          row,
+          100,
+          scrollable: find
+              .descendant(of: sheet, matching: find.byType(Scrollable))
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(row.hitTestable(), findsOneWidget, reason: code);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        expect(store.value.language, code);
+        expect(find.byType(BottomSheet), findsNothing, reason: code);
+        expect(tester.takeException(), isNull, reason: code);
+      }
     },
   );
 }

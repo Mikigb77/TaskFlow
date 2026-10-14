@@ -74,11 +74,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String sharingProblem(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'alreadyMember':
-          'Aquesta persona ja hi té accés. Gestiona’n el rol a Persones.',
+          'Aquesta persona ja hi té accés. Gestiona’n el rol a Membres.',
       'memberLimit':
-          'Aquest projecte admet fins a 20 membres i 20 invitacions pendents. Primer elimina algú o revoca una invitació.',
+          'Aquest projecte admet fins a 20 membres i 20 invitacions pendents. Primer elimina algú o anul·la una invitació.',
       'accepted':
-          'Aquesta invitació ja s’ha acceptat. Gestiona l’accés de la persona a Persones.',
+          'Aquesta invitació ja s’ha acceptat. Gestiona l’accés de la persona a Membres.',
       'owner':
           'El propietari no pot sortir. Pots suprimir el projecte si ja no la necessites.',
       'expired':
@@ -125,8 +125,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'emailUsed':
           'Ja existeix un compte amb aquest correu. Inicia la sessió o recupera la contrasenya.',
       'email': 'Introdueix una adreça de correu vàlida.',
-      'credentials':
-          'El correu o la contrasenya són incorrectes. Torna-ho a provar.',
+      'credentials': 'No trobem aquest compte o la contrasenya no és correcta.',
       'session':
           'Torna a iniciar la sessió per continuar. Les tasques locals es conserven.',
       'accountChanged':
@@ -158,23 +157,15 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get languageAutomatic => 'Utilitza l’idioma del telèfon';
-
-  @override
-  String get languageHelp =>
-      'Utilitza el primer idioma disponible de les preferències del telèfon o tria’n un aquí. Si no n’hi ha cap de disponible, TaskFlow utilitza l’anglès. La tria es desa en aquest dispositiu.';
+  String get languageAutomatic => 'Com el telèfon';
 
   @override
   String languageFollowing(String language) {
-    return 'Idioma del telèfon · $language';
+    return 'Com el telèfon · $language';
   }
 
   @override
   String get regionalFormats => 'Hora i regió';
-
-  @override
-  String get regionalFormatsHelp =>
-      'Rellotge, primer dia de la setmana i fus horari de captura';
 
   @override
   String get sharedCaptureRetained =>
@@ -631,51 +622,38 @@ class AppLocalizationsCa extends AppLocalizations {
   String get appearance => 'Aparença';
 
   @override
-  String get chooseAppearance => 'Tria l’aparença';
-
-  @override
-  String get appearanceHelp => 'Tria el teu estil o segueix el del dispositiu.';
-
-  @override
   String get light => 'Clar';
 
   @override
   String get dark => 'Fosc';
 
   @override
-  String get system => 'Sistema';
+  String get reminders => 'Recordatoris';
 
   @override
-  String get yourSpace => 'El teu espai';
+  String remindersOnLead(String lead) {
+    return 'Activats · $lead';
+  }
 
   @override
-  String get welcomeSettings => 'Com a casa';
+  String get remindersOff => 'Desactivats';
 
   @override
-  String get notifications => 'Notificacions';
+  String get remindersBlocked => 'Bloquejats pel telèfon';
 
   @override
-  String get notificationsHelp =>
-      'Preferències dels recordatoris i avisos propers';
+  String get otherSettings => 'Altres opcions';
 
   @override
-  String get accountBackup => 'Compte i còpia de seguretat';
+  String appVersion(String version) {
+    return 'TaskFlow $version';
+  }
 
   @override
   String get completedTasks => 'Tasques completades';
 
   @override
-  String get progressHelp => 'Un petit registre del teu progrés';
-
-  @override
   String get exportImport => 'Exporta i importa';
-
-  @override
-  String get exportImportHelp =>
-      'Còpies de TaskFlow i migració de CSV de Todoist';
-
-  @override
-  String get regionalSettings => 'Idioma i regió';
 
   @override
   String get regionalSettingsHelp =>
@@ -685,7 +663,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get language => 'Idioma';
 
   @override
-  String get deviceDefault => 'Segueix el dispositiu';
+  String get deviceDefault => 'Com el telèfon';
 
   @override
   String get clockFormat => 'Format de l’hora';
@@ -709,11 +687,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get saturday => 'Dissabte';
 
   @override
-  String get captureTimezone => 'Fus horari de captura';
+  String get timeZone => 'Fus horari';
 
   @override
   String get timezoneHelp =>
-      'S’utilitza per interpretar les dates de les captures noves. Les tasques i captures pendents conserven la planificació. Les hores es mostren segons el fus horari del dispositiu.';
+      'Les tasques noves fan servir aquest fus horari per entendre les dates.';
 
   @override
   String get searchTimezone => 'Cerca un fus horari';
@@ -728,7 +706,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String timezoneFallback(String zone) {
-    return 'El fus horari del dispositiu no està disponible. Les captures noves utilitzaran $zone.';
+    return 'El fus horari del dispositiu no està disponible. Les tasques noves utilitzaran $zone.';
   }
 
   @override
@@ -745,9 +723,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get nextPeriod => 'Mes o setmana següent';
-
-  @override
-  String get moreClarity => 'Més claredat. Més espai per viure.';
 
   @override
   String get licenses => 'Llicències de codi obert';
@@ -777,11 +752,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get planTask => 'Planifica una tasca';
 
   @override
-  String get homeCapture => 'Captura des de la pantalla d’inici';
-
-  @override
-  String get homeCaptureHelp =>
-      'Giny de micròfon, dreceres i text compartit a Android';
+  String get homeCapture => 'Botó de dictar a la pantalla d’inici';
 
   @override
   String get homeCaptureInstructions =>
@@ -792,26 +763,8 @@ class AppLocalizationsCa extends AppLocalizations {
       'Afegeix el giny de TaskFlow des del selector de ginys de la pantalla d’inici.';
 
   @override
-  String get signInHelp =>
-      'Inicia la sessió per tenir les tasques sempre amb tu';
-
-  @override
-  String get diagnosticsHelp =>
-      'Temps i comptadors locals, sense les teves paraules';
-
-  @override
   String get appearanceError =>
       'No s’ha pogut desar la preferència d’aparença.';
-
-  @override
-  String get appearanceChangedError =>
-      'S’ha canviat l’aparença, però no s’ha pogut desar la preferència en aquest dispositiu.';
-
-  @override
-  String get switchLight => 'Canvia al mode clar';
-
-  @override
-  String get switchDark => 'Canvia al mode fosc';
 
   @override
   String get list => 'Projecte';
@@ -1443,21 +1396,21 @@ class AppLocalizationsCa extends AppLocalizations {
   String get signOut => 'Tanca la sessió';
 
   @override
-  String get recoveryHeading => 'Recupera l’accés al teu compte.';
+  String get recoveryHeading => 'Recupera la contrasenya';
 
   @override
-  String get registerHeading => 'Un espai per als teus plans.';
+  String get registerHeading => 'Crea el teu compte';
 
   @override
-  String get signInHeading => 'Et donem la benvinguda de nou.';
+  String get signInHeading => 'Inicia la sessió';
+
+  @override
+  String get authPitch =>
+      'Apunta el que has de fer i TaskFlow ho posa al teu calendari.';
 
   @override
   String get recoveryHelp =>
       'Demana un correu de recuperació i utilitza el codi per establir una contrasenya nova.';
-
-  @override
-  String get accountSignInHelp =>
-      'Inicia sessió i tingues els teus plans a mà.';
 
   @override
   String get email => 'Correu electrònic';
@@ -1478,7 +1431,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get password => 'Contrasenya';
 
   @override
-  String get passwordHelp => 'Com a mínim 12 caràcters';
+  String get passwordHelp => 'Com a mínim 12 caràcters, no només números';
 
   @override
   String get passwordTooShort => 'Utilitza com a mínim 12 caràcters';
@@ -1488,9 +1441,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get hidePassword => 'Amaga la contrasenya';
-
-  @override
-  String get continueRecovery => 'Continua la recuperació';
 
   @override
   String get createAccount => 'Crea el compte';
@@ -1505,7 +1455,16 @@ class AppLocalizationsCa extends AppLocalizations {
   String get createAnAccount => 'Crea un compte';
 
   @override
+  String get createAccountWithEmail => 'Crea un compte amb aquest correu';
+
+  @override
   String get backToSignIn => 'Torna a l’inici de sessió';
+
+  @override
+  String get sendRecoveryCode => 'Envia el codi';
+
+  @override
+  String get saveNewPassword => 'Desa la contrasenya nova';
 
   @override
   String get forgotPassword => 'Has oblidat la contrasenya?';
@@ -1573,7 +1532,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get listRestored => 'Projecte restaurat';
 
   @override
-  String get listArchivedHelp => 'Projecte arxivat. El contingut es conserva.';
+  String projectArchivedNoReminders(String name) {
+    return '«$name» arxivat: ja no surt al calendari ni t’avisarà.';
+  }
 
   @override
   String get listUpdateError =>
@@ -1663,9 +1624,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get archiveList => 'Arxiva el projecte';
 
   @override
-  String get sharingAndPeople => 'Ús compartit i persones';
-
-  @override
   String get chooseDetails => 'Tria els detalls';
 
   @override
@@ -1689,11 +1647,44 @@ class AppLocalizationsCa extends AppLocalizations {
       'No s’ha pogut actualitzar l’ús compartit. Comprova la connexió i torna-ho a provar.';
 
   @override
-  String get inviteToList => 'Convida a aquest projecte';
+  String get shareProject => 'Comparteix';
 
   @override
-  String get inviteHelp =>
-      'Totes les tasques, notes i fitxers d’aquest projecte seran visibles quan acceptin. Enviarem la invitació per correu i també apareixerà al seu compte de TaskFlow. Caduca en 7 dies.';
+  String projectMembersCount(int count) {
+    return 'Membres · $count';
+  }
+
+  @override
+  String shareProjectTitle(String project) {
+    return 'Comparteix $project';
+  }
+
+  @override
+  String get theirEmail => 'El seu correu';
+
+  @override
+  String shareProjectHelp(String project) {
+    return 'Veurà tot el que hi ha a $project.';
+  }
+
+  @override
+  String get sendInvitation => 'Envia la invitació';
+
+  @override
+  String get invitationSent => 'Invitació enviada';
+
+  @override
+  String get invitationCodeFallback =>
+      'Si no li arriba el correu, envia-li aquest codi:';
+
+  @override
+  String get connectToShare => 'Connecta’t a internet per compartir.';
+
+  @override
+  String get sendInvitationAgain => 'Torna a enviar';
+
+  @override
+  String get cancelInvitation => 'Anul·la la invitació';
 
   @override
   String get inviteeEmail => 'Correu del seu compte';
@@ -1707,9 +1698,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get sharingRolesHelp =>
       'Els editors poden afegir, modificar, completar i suprimir tasques i fitxers. Només el propietari gestiona el projecte i les persones. Les tasques compartides es queden en aquest projecte; exportar-les crea una còpia personal.';
-
-  @override
-  String get createInvitation => 'Crea la invitació';
 
   @override
   String get listSharing => 'Ús compartit del projecte';
@@ -1733,7 +1721,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get invitePerson => 'Convida una persona';
 
   @override
-  String get people => 'Persones';
+  String get people => 'Membres';
 
   @override
   String get noOtherMembers => 'De moment, només tu has acceptat l’accés.';
@@ -1763,10 +1751,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get revokeInvitation => 'Revoca la invitació';
 
   @override
-  String get replaceInvitationHelp =>
-      'Toca una invitació pendent per substituir-ne el codi.';
-
-  @override
   String get howSharingWorks => 'Com funciona l’ús compartit';
 
   @override
@@ -1785,6 +1769,11 @@ class AppLocalizationsCa extends AppLocalizations {
       'Vols suprimir aquest projecte i totes les seves tasques, notes i fitxers pujats per a tothom? No es pot desfer.';
 
   @override
+  String deleteListPrivateHelp(String name) {
+    return 'Vols suprimir «$name» amb totes les tasques, notes i fitxers? No es pot desfer.';
+  }
+
+  @override
   String get deleteListForEveryone => 'Suprimeix el projecte per a tothom';
 
   @override
@@ -1795,17 +1784,19 @@ class AppLocalizationsCa extends AppLocalizations {
       'Les tasques, notes i fitxers compartits, i els canvis pendents d’enviar, se suprimiran d’aquest telèfon. Els altres membres conservaran el projecte.';
 
   @override
-  String get enterInvitationCode => 'Introdueix el codi d’invitació';
+  String youLeft(String name) {
+    return 'Has sortit de $name';
+  }
 
   @override
-  String get requestInvitationCodeHelp =>
-      'Demana al propietari del projecte el codi que ha rebut en convidar-te.';
+  String get projectDeleted => 'Projecte suprimit';
 
   @override
   String get invitationCodeRequired => 'Enganxa el codi d’invitació complet.';
 
   @override
-  String get joinList => 'Uneix-te al projecte';
+  String get invitationCodeWrong =>
+      'Demana el codi actual a qui t’ha convidat.';
 
   @override
   String get invitationResponseError =>
@@ -1815,18 +1806,50 @@ class AppLocalizationsCa extends AppLocalizations {
   String get retryInvitations => 'Torna a carregar les invitacions';
 
   @override
-  String get invitations => 'Invitacions';
-
-  @override
-  String joinListHelp(String role) {
-    return 'Uneix-t’hi com a $role. Les tasques, notes i fitxers pujats compartits se sincronitzaran amb el teu compte.';
-  }
-
-  @override
   String get acceptInvitation => 'Accepta la invitació';
 
   @override
   String get decline => 'Rebutja';
+
+  @override
+  String invitedTo(String name) {
+    return 'T’han convidat a $name · Mostra';
+  }
+
+  @override
+  String invitationsMore(int count) {
+    return '+$count';
+  }
+
+  @override
+  String joinInvitationTitle(String name) {
+    return 'Uneix-te a $name';
+  }
+
+  @override
+  String get joinInvitationHelp =>
+      'Obre el correu d’invitació i toca’n l’enllaç. O enganxa-hi el codi que hi apareix.';
+
+  @override
+  String get joinInvitation => 'Uneix-me';
+
+  @override
+  String declineInvitationConfirm(String name) {
+    return 'Vols rebutjar la invitació a $name? Per unir-t’hi més endavant en necessitaries una altra.';
+  }
+
+  @override
+  String joinedInvitation(String name) {
+    return 'T’has unit a $name';
+  }
+
+  @override
+  String get invitationNotNow => 'Ara no';
+
+  @override
+  String signedInAs(String email) {
+    return 'Sessió iniciada com a $email';
+  }
 
   @override
   String get fileLoadError =>
@@ -3056,13 +3079,6 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get authWelcome => 'El teu dia, més clar.';
-
-  @override
-  String get authRegisterHelp =>
-      'Totes les teves tasques i notes, amb tu allà on vagis.';
-
-  @override
   String get authOr => 'o';
 
   @override
@@ -3100,7 +3116,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get forMe => 'Per a mi';
 
   @override
-  String get forTeam => 'Equip';
+  String get forTeam => 'Totes';
 
   @override
   String get responsibility => 'Responsable';
@@ -3109,7 +3125,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get assignedToMe => 'Jo';
 
   @override
-  String get assignedToGroup => 'Tot el grup';
+  String get assignedToGroup => 'Tothom';
 
   @override
   String get assignmentNeeded => 'Cal un responsable';
@@ -3185,9 +3201,6 @@ class AppLocalizationsCa extends AppLocalizations {
       'Veuran tots els projectes d’aquest grup, incloses les tasques, notes i fitxers. Els enviarem un correu per revisar la invitació i unir-s’hi.';
 
   @override
-  String get groupJoin => 'Uneix-me al grup';
-
-  @override
   String get groupLeave => 'Surt del grup';
 
   @override
@@ -3206,6 +3219,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get groupRestore => 'Restaura el grup';
+
+  @override
+  String groupArchivedForEveryone(String name) {
+    return '«$name» arxivat per a tothom: ja no surt al calendari ni avisarà.';
+  }
 
   @override
   String get groupDeleteHelp =>
@@ -3238,7 +3256,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get updatesAssigned => 'Les meves assignacions';
 
   @override
-  String get updatesMuted => 'Silenciades';
+  String get updatesMuted => 'Silenciat: sense novetats ni recordatoris';
 
   @override
   String get activity => 'Activitat';
@@ -3315,7 +3333,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get invitationReviewHelp =>
-      'En unir-te tindràs accés als projectes compartits, tasques, notes i fitxers que s’indiquen a continuació.';
+      'En veuràs les tasques, les notes i els fitxers.';
 
   @override
   String get invitationUnavailable =>

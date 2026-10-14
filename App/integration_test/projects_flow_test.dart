@@ -214,7 +214,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Finish exercise three'), findsNothing);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Team'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'All'));
     await tester.pumpAndSettle();
     expect(find.text('Finish exercise three'), findsOneWidget);
     await binding.takeScreenshot('projects-team-light');

@@ -67,22 +67,6 @@ final groupDetailsProvider = FutureProvider.autoDispose
       );
     });
 
-final groupInvitationsProvider =
-    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final accountId = ref.watch(
-        authProvider.select((state) => state.account?.id),
-      );
-      if (accountId == null) return [];
-      final result =
-          await ref
-                  .watch(apiClientProvider)
-                  .request('GET', 'group-invitations/', accountId: accountId)
-              as Map;
-      return (result['invitations'] as List)
-          .map((p) => Map<String, dynamic>.from(p))
-          .toList();
-    });
-
 final collaborationActivityProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
       final accountId = ref.watch(

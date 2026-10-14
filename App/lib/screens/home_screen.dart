@@ -323,28 +323,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (list?.shared == true)
+                  // The owner can share a project of their own from here.
+                  if (list != null &&
+                      (list.shared ||
+                          (list.groupId == null && list.role == 'owner')))
                     Wrap(
                       spacing: 8,
                       children: [
                         TextButton.icon(
-                          icon: const Icon(Icons.group_outlined),
-                          label: Text(context.l10n.groupMembers),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => list!.groupId == null
-                                  ? ListSharingScreen(listId: list.id)
-                                  : GroupScreen(groupId: list.groupId!),
-                            ),
+                          icon: Icon(
+                            list.shared
+                                ? Icons.group_outlined
+                                : Icons.person_add_outlined,
                           ),
+                          label: Text(
+                            list.shared
+                                ? context.l10n.projectMembersCount(
+                                    list.people.length,
+                                  )
+                                : context.l10n.shareProject,
+                          ),
+                          onPressed: () async {
+                            final gone = await Navigator.push(
+                              context,
+                              MaterialPageRoute<bool>(
+                                builder: (_) => list.groupId == null
+                                    ? ListSharingScreen(listId: list.id)
+                                    : GroupScreen(groupId: list.groupId!),
+                              ),
+                            );
+                            // Deleted or left: this page has nothing to show.
+                            if (gone == true && context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          },
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.notifications_outlined),
-                          tooltip: context.l10n.projectNotifications,
-                          onPressed: () =>
-                              showProjectPreferences(context, ref, list!),
-                        ),
+                        if (list.shared)
+                          IconButton(
+                            icon: const Icon(Icons.notifications_outlined),
+                            tooltip: context.l10n.projectNotifications,
+                            onPressed: () =>
+                                showProjectPreferences(context, ref, list),
+                          ),
                       ],
                     ),
                   if (widget.listId != null)

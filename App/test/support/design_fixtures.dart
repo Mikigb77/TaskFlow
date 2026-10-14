@@ -185,6 +185,8 @@ ProviderContainer designContainer({
   List<Override> overrides = const [],
   // Without Pro, `Añadir tarea` opens typing, understood on the phone.
   bool pro = true,
+  // A stand-in server; by default every request goes nowhere.
+  ApiClient? api,
 }) => ProviderContainer(
   overrides: [
     ...overrides,
@@ -203,9 +205,9 @@ ProviderContainer designContainer({
     pendingCapturesProvider.overrideWith((ref) async => []),
     taskListsProvider.overrideWith((ref) async => projects ?? []),
     apiClientProvider.overrideWith((ref) {
-      final api = OfflineApiClient();
-      ref.onDispose(api.close);
-      return api;
+      final client = api ?? OfflineApiClient();
+      ref.onDispose(client.close);
+      return client;
     }),
     taskRepositoryProvider.overrideWithValue(MemoryTasks()),
     taskProvider.overrideWith((ref) => tasks?.call() ?? DesignTaskNotifier()),

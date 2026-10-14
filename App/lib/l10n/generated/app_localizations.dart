@@ -223,7 +223,7 @@ abstract class AppLocalizations {
   /// Actionable sharing API errors. Reasons stay internal and never get translated.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, alreadyMember{This person already has access. Manage their role in People.} memberLimit{This project supports up to 20 members and 20 pending invitations. Remove someone or revoke an invitation first.} accepted{This invitation was already accepted. Manage the person’s access in People.} owner{The owner cannot leave. You can delete the project if it is no longer needed.} expired{This invitation is no longer available. Ask the owner for a new one.} code{Ask the project owner for the current invitation code.} refresh{This project changed. Refresh before deleting it.} ownerOnly{Only the project owner can manage sharing and project details.} other{This project is read-only for your account. Ask the owner for editing access.}}'**
+  /// **'{reason, select, alreadyMember{This person already has access. Manage their role in Members.} memberLimit{This project supports up to 20 members and 20 pending invitations. Remove someone or cancel an invitation first.} accepted{This invitation was already accepted. Manage the person’s access in Members.} owner{The owner cannot leave. You can delete the project if it is no longer needed.} expired{This invitation is no longer available. Ask the owner for a new one.} code{Ask the project owner for the current invitation code.} refresh{This project changed. Refresh before deleting it.} ownerOnly{Only the project owner can manage sharing and project details.} other{This project is read-only for your account. Ask the owner for editing access.}}'**
   String sharingProblem(String reason);
 
   /// Sync notices with recovery instructions, including messages persisted by older app versions.
@@ -235,25 +235,19 @@ abstract class AppLocalizations {
   /// Localized account, sync and file error categories. Never display raw server exception text.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{The email or password is incorrect. Please try again.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
+  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MiB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
   String requestError(String reason);
 
   /// No description provided for @languageAutomatic.
   ///
   /// In en, this message translates to:
-  /// **'Follow phone'**
+  /// **'Same as phone'**
   String get languageAutomatic;
-
-  /// No description provided for @languageHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Use your phone’s preferred available language, or choose one below. If none is available, TaskFlow uses English. Your choice stays on this device.'**
-  String get languageHelp;
 
   /// Summary of automatic language selection; language is the resolved language's native name.
   ///
   /// In en, this message translates to:
-  /// **'Follow phone · {language}'**
+  /// **'Same as phone · {language}'**
   String languageFollowing(String language);
 
   /// No description provided for @regionalFormats.
@@ -261,12 +255,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Time & region'**
   String get regionalFormats;
-
-  /// No description provided for @regionalFormatsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Clock, first day of the week and capture timezone'**
-  String get regionalFormatsHelp;
 
   /// No description provided for @sharedCaptureRetained.
   ///
@@ -1084,18 +1072,6 @@ abstract class AppLocalizations {
   /// **'Appearance'**
   String get appearance;
 
-  /// No description provided for @chooseAppearance.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose your appearance'**
-  String get chooseAppearance;
-
-  /// No description provided for @appearanceHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose your look, or follow your device.'**
-  String get appearanceHelp;
-
   /// No description provided for @light.
   ///
   /// In en, this message translates to:
@@ -1108,41 +1084,41 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get dark;
 
-  /// No description provided for @system.
+  /// No description provided for @reminders.
   ///
   /// In en, this message translates to:
-  /// **'System'**
-  String get system;
+  /// **'Reminders'**
+  String get reminders;
 
-  /// No description provided for @yourSpace.
+  /// Subtitle of the Reminders row in Settings when reminders are on; lead is the default reminder time, e.g. ‘10 minutes before’.
   ///
   /// In en, this message translates to:
-  /// **'Your space'**
-  String get yourSpace;
+  /// **'On · {lead}'**
+  String remindersOnLead(String lead);
 
-  /// No description provided for @welcomeSettings.
+  /// No description provided for @remindersOff.
   ///
   /// In en, this message translates to:
-  /// **'Make yourself at home'**
-  String get welcomeSettings;
+  /// **'Off'**
+  String get remindersOff;
 
-  /// No description provided for @notifications.
+  /// Subtitle of the Reminders row in Settings when reminders are on but the phone does not allow TaskFlow's notifications.
   ///
   /// In en, this message translates to:
-  /// **'Notifications'**
-  String get notifications;
+  /// **'Blocked by your phone'**
+  String get remindersBlocked;
 
-  /// No description provided for @notificationsHelp.
+  /// No description provided for @otherSettings.
   ///
   /// In en, this message translates to:
-  /// **'Reminder choices and upcoming alerts'**
-  String get notificationsHelp;
+  /// **'Other settings'**
+  String get otherSettings;
 
-  /// No description provided for @accountBackup.
+  /// Version line at the bottom of Other settings; version is the version and build, e.g. ‘1.0.5 (4007)’.
   ///
   /// In en, this message translates to:
-  /// **'Account & backup'**
-  String get accountBackup;
+  /// **'TaskFlow {version}'**
+  String appVersion(String version);
 
   /// No description provided for @completedTasks.
   ///
@@ -1150,29 +1126,11 @@ abstract class AppLocalizations {
   /// **'Completed tasks'**
   String get completedTasks;
 
-  /// No description provided for @progressHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'A little record of your progress'**
-  String get progressHelp;
-
   /// No description provided for @exportImport.
   ///
   /// In en, this message translates to:
   /// **'Export & import'**
   String get exportImport;
-
-  /// No description provided for @exportImportHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'TaskFlow backups and Todoist CSV migration'**
-  String get exportImportHelp;
-
-  /// No description provided for @regionalSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Language & region'**
-  String get regionalSettings;
 
   /// No description provided for @regionalSettingsHelp.
   ///
@@ -1189,7 +1147,7 @@ abstract class AppLocalizations {
   /// No description provided for @deviceDefault.
   ///
   /// In en, this message translates to:
-  /// **'Follow device'**
+  /// **'Same as phone'**
   String get deviceDefault;
 
   /// No description provided for @clockFormat.
@@ -1234,16 +1192,16 @@ abstract class AppLocalizations {
   /// **'Saturday'**
   String get saturday;
 
-  /// No description provided for @captureTimezone.
+  /// No description provided for @timeZone.
   ///
   /// In en, this message translates to:
-  /// **'Capture timezone'**
-  String get captureTimezone;
+  /// **'Time zone'**
+  String get timeZone;
 
   /// No description provided for @timezoneHelp.
   ///
   /// In en, this message translates to:
-  /// **'Used to interpret dates in new captures. Existing tasks and unfinished captures keep their schedules. Task times are displayed in your device timezone.'**
+  /// **'New tasks use this time zone to read dates.'**
   String get timezoneHelp;
 
   /// No description provided for @searchTimezone.
@@ -1267,7 +1225,7 @@ abstract class AppLocalizations {
   /// No description provided for @timezoneFallback.
   ///
   /// In en, this message translates to:
-  /// **'The device timezone is unavailable. New captures will use {zone}.'**
+  /// **'The device timezone is unavailable. New tasks will use {zone}.'**
   String timezoneFallback(String zone);
 
   /// No description provided for @week.
@@ -1299,12 +1257,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next month or week'**
   String get nextPeriod;
-
-  /// No description provided for @moreClarity.
-  ///
-  /// In en, this message translates to:
-  /// **'More clarity. More room for life.'**
-  String get moreClarity;
 
   /// No description provided for @licenses.
   ///
@@ -1363,14 +1315,8 @@ abstract class AppLocalizations {
   /// No description provided for @homeCapture.
   ///
   /// In en, this message translates to:
-  /// **'Capture from your home screen'**
+  /// **'Mic button on your home screen'**
   String get homeCapture;
-
-  /// No description provided for @homeCaptureHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Android mic widget, app shortcuts and text sharing'**
-  String get homeCaptureHelp;
 
   /// No description provided for @homeCaptureInstructions.
   ///
@@ -1384,41 +1330,11 @@ abstract class AppLocalizations {
   /// **'Add the TaskFlow widget from your launcher’s widget picker.'**
   String get widgetPickerHelp;
 
-  /// No description provided for @signInHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in to keep your tasks with you'**
-  String get signInHelp;
-
-  /// No description provided for @diagnosticsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Local timing and counters, without your words'**
-  String get diagnosticsHelp;
-
   /// No description provided for @appearanceError.
   ///
   /// In en, this message translates to:
   /// **'Could not save your appearance preference.'**
   String get appearanceError;
-
-  /// No description provided for @appearanceChangedError.
-  ///
-  /// In en, this message translates to:
-  /// **'Appearance changed. Could not save the preference on this device.'**
-  String get appearanceChangedError;
-
-  /// No description provided for @switchLight.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to light mode'**
-  String get switchLight;
-
-  /// No description provided for @switchDark.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to dark mode'**
-  String get switchDark;
 
   /// No description provided for @list.
   ///
@@ -2521,32 +2437,32 @@ abstract class AppLocalizations {
   /// No description provided for @recoveryHeading.
   ///
   /// In en, this message translates to:
-  /// **'Let’s get you back in.'**
+  /// **'Reset your password'**
   String get recoveryHeading;
 
   /// No description provided for @registerHeading.
   ///
   /// In en, this message translates to:
-  /// **'A space for your plans.'**
+  /// **'Create your account'**
   String get registerHeading;
 
   /// No description provided for @signInHeading.
   ///
   /// In en, this message translates to:
-  /// **'Welcome back.'**
+  /// **'Sign in'**
   String get signInHeading;
+
+  /// No description provided for @authPitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Note down what you need to do, and TaskFlow puts it on your calendar.'**
+  String get authPitch;
 
   /// No description provided for @recoveryHelp.
   ///
   /// In en, this message translates to:
   /// **'Request a recovery email, then use the code to set a new password.'**
   String get recoveryHelp;
-
-  /// No description provided for @accountSignInHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in to keep your plans together.'**
-  String get accountSignInHelp;
 
   /// No description provided for @email.
   ///
@@ -2587,7 +2503,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordHelp.
   ///
   /// In en, this message translates to:
-  /// **'At least 12 characters'**
+  /// **'At least 12 characters, not only numbers'**
   String get passwordHelp;
 
   /// No description provided for @passwordTooShort.
@@ -2607,12 +2523,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide password'**
   String get hidePassword;
-
-  /// No description provided for @continueRecovery.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue recovery'**
-  String get continueRecovery;
 
   /// No description provided for @createAccount.
   ///
@@ -2638,11 +2548,29 @@ abstract class AppLocalizations {
   /// **'Create an account'**
   String get createAnAccount;
 
+  /// No description provided for @createAccountWithEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an account with this email'**
+  String get createAccountWithEmail;
+
   /// No description provided for @backToSignIn.
   ///
   /// In en, this message translates to:
   /// **'Back to sign in'**
   String get backToSignIn;
+
+  /// No description provided for @sendRecoveryCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get sendRecoveryCode;
+
+  /// No description provided for @saveNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Save new password'**
+  String get saveNewPassword;
 
   /// No description provided for @forgotPassword.
   ///
@@ -2764,11 +2692,11 @@ abstract class AppLocalizations {
   /// **'Project restored'**
   String get listRestored;
 
-  /// No description provided for @listArchivedHelp.
+  /// No description provided for @projectArchivedNoReminders.
   ///
   /// In en, this message translates to:
-  /// **'Project archived. Contents kept.'**
-  String get listArchivedHelp;
+  /// **'{name} archived — hidden from your calendar, no reminders.'**
+  String projectArchivedNoReminders(String name);
 
   /// No description provided for @listUpdateError.
   ///
@@ -2902,12 +2830,6 @@ abstract class AppLocalizations {
   /// **'Archive project'**
   String get archiveList;
 
-  /// No description provided for @sharingAndPeople.
-  ///
-  /// In en, this message translates to:
-  /// **'Sharing and people'**
-  String get sharingAndPeople;
-
   /// No description provided for @chooseDetails.
   ///
   /// In en, this message translates to:
@@ -2950,17 +2872,71 @@ abstract class AppLocalizations {
   /// **'Could not update sharing. Check the connection and retry.'**
   String get sharingUpdateError;
 
-  /// No description provided for @inviteToList.
+  /// Opens sharing for a project nobody else can see yet, on the project page and in its menu.
   ///
   /// In en, this message translates to:
-  /// **'Invite to this project'**
-  String get inviteToList;
+  /// **'Share'**
+  String get shareProject;
 
-  /// No description provided for @inviteHelp.
+  /// Project page button once others have access. {count} is everyone with access, the owner included.
   ///
   /// In en, this message translates to:
-  /// **'All tasks, notes and uploaded files in this project will be visible after they accept. We will email the invitation; it also appears in their TaskFlow account. It expires in 7 days.'**
-  String get inviteHelp;
+  /// **'Members · {count}'**
+  String projectMembersCount(int count);
+
+  /// No description provided for @shareProjectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share {project}'**
+  String shareProjectTitle(String project);
+
+  /// No description provided for @theirEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Their email'**
+  String get theirEmail;
+
+  /// No description provided for @shareProjectHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'They’ll see everything in {project}.'**
+  String shareProjectHelp(String project);
+
+  /// No description provided for @sendInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Send invitation'**
+  String get sendInvitation;
+
+  /// No description provided for @invitationSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation sent'**
+  String get invitationSent;
+
+  /// No description provided for @invitationCodeFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'If the email doesn’t arrive, send them this code:'**
+  String get invitationCodeFallback;
+
+  /// No description provided for @connectToShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to the internet to share.'**
+  String get connectToShare;
+
+  /// No description provided for @sendInvitationAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Send again'**
+  String get sendInvitationAgain;
+
+  /// No description provided for @cancelInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel invitation'**
+  String get cancelInvitation;
 
   /// No description provided for @inviteeEmail.
   ///
@@ -2985,12 +2961,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.'**
   String get sharingRolesHelp;
-
-  /// No description provided for @createInvitation.
-  ///
-  /// In en, this message translates to:
-  /// **'Create invitation'**
-  String get createInvitation;
 
   /// No description provided for @listSharing.
   ///
@@ -3031,7 +3001,7 @@ abstract class AppLocalizations {
   /// No description provided for @people.
   ///
   /// In en, this message translates to:
-  /// **'People'**
+  /// **'Members'**
   String get people;
 
   /// No description provided for @noOtherMembers.
@@ -3082,12 +3052,6 @@ abstract class AppLocalizations {
   /// **'Revoke invitation'**
   String get revokeInvitation;
 
-  /// No description provided for @replaceInvitationHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap a pending invitation to replace its code.'**
-  String get replaceInvitationHelp;
-
   /// No description provided for @howSharingWorks.
   ///
   /// In en, this message translates to:
@@ -3118,6 +3082,12 @@ abstract class AppLocalizations {
   /// **'Delete this project and all its tasks, notes and uploaded files for everyone? This cannot be undone.'**
   String get deleteListHelp;
 
+  /// No description provided for @deleteListPrivateHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name} with all its tasks, notes and files? This can’t be undone.'**
+  String deleteListPrivateHelp(String name);
+
   /// No description provided for @deleteListForEveryone.
   ///
   /// In en, this message translates to:
@@ -3136,17 +3106,17 @@ abstract class AppLocalizations {
   /// **'Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the project.'**
   String get leaveListHelp;
 
-  /// No description provided for @enterInvitationCode.
+  /// No description provided for @youLeft.
   ///
   /// In en, this message translates to:
-  /// **'Enter invitation code'**
-  String get enterInvitationCode;
+  /// **'You left {name}'**
+  String youLeft(String name);
 
-  /// No description provided for @requestInvitationCodeHelp.
+  /// No description provided for @projectDeleted.
   ///
   /// In en, this message translates to:
-  /// **'Ask the project owner for the code they received when inviting you.'**
-  String get requestInvitationCodeHelp;
+  /// **'Project deleted'**
+  String get projectDeleted;
 
   /// No description provided for @invitationCodeRequired.
   ///
@@ -3154,11 +3124,11 @@ abstract class AppLocalizations {
   /// **'Paste the full invitation code.'**
   String get invitationCodeRequired;
 
-  /// No description provided for @joinList.
+  /// No description provided for @invitationCodeWrong.
   ///
   /// In en, this message translates to:
-  /// **'Join project'**
-  String get joinList;
+  /// **'Ask the person who invited you for the current code.'**
+  String get invitationCodeWrong;
 
   /// No description provided for @invitationResponseError.
   ///
@@ -3172,18 +3142,6 @@ abstract class AppLocalizations {
   /// **'Retry invitations'**
   String get retryInvitations;
 
-  /// No description provided for @invitations.
-  ///
-  /// In en, this message translates to:
-  /// **'Invitations'**
-  String get invitations;
-
-  /// No description provided for @joinListHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Join as {role}. Shared tasks, notes and uploaded files will sync to your account.'**
-  String joinListHelp(String role);
-
   /// No description provided for @acceptInvitation.
   ///
   /// In en, this message translates to:
@@ -3195,6 +3153,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Decline'**
   String get decline;
+
+  /// A card for a pending invitation, on Calendar, Projects and Groups; tapping it opens the join dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re invited to {name} · View'**
+  String invitedTo(String name);
+
+  /// How many more invitations wait behind the one shown.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count}'**
+  String invitationsMore(int count);
+
+  /// No description provided for @joinInvitationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join {name}'**
+  String joinInvitationTitle(String name);
+
+  /// No description provided for @joinInvitationHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your invitation email and tap its link. Or paste the code from it here.'**
+  String get joinInvitationHelp;
+
+  /// No description provided for @joinInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get joinInvitation;
+
+  /// No description provided for @declineInvitationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline the invitation to {name}? You’d need a new one to join later.'**
+  String declineInvitationConfirm(String name);
+
+  /// No description provided for @joinedInvitation.
+  ///
+  /// In en, this message translates to:
+  /// **'You joined {name}'**
+  String joinedInvitation(String name);
+
+  /// No description provided for @invitationNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get invitationNotNow;
+
+  /// No description provided for @signedInAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in as {email}'**
+  String signedInAs(String email);
 
   /// No description provided for @fileLoadError.
   ///
@@ -4822,18 +4834,6 @@ abstract class AppLocalizations {
   /// **'{code, select, google_not_configured{Google sign-in is not available yet. Use email and password for now.} google_link_required{This email already has a TaskFlow account. Sign in with your password, then choose Link Google account.} google_password_required{Enter your current TaskFlow password to link Google.} google_email_mismatch{Choose the Google account with the same email as your TaskFlow account.} google_already_linked{This Google account is already linked. Sign in to the original TaskFlow account.} google_account_changed{Your account changed during sign-in. Please try again.} google_invalid_token{Google could not verify your sign-in. Please try again.} other{Google sign-in could not finish. Check your connection and try again.}}'**
   String googleSignInError(String code);
 
-  /// No description provided for @authWelcome.
-  ///
-  /// In en, this message translates to:
-  /// **'Your day, in focus.'**
-  String get authWelcome;
-
-  /// No description provided for @authRegisterHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep your tasks and notes together, wherever you go.'**
-  String get authRegisterHelp;
-
   /// No description provided for @authOr.
   ///
   /// In en, this message translates to:
@@ -4909,7 +4909,7 @@ abstract class AppLocalizations {
   /// No description provided for @forTeam.
   ///
   /// In en, this message translates to:
-  /// **'Team'**
+  /// **'All'**
   String get forTeam;
 
   /// No description provided for @responsibility.
@@ -5056,12 +5056,6 @@ abstract class AppLocalizations {
   /// **'They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.'**
   String get groupInviteHelp;
 
-  /// No description provided for @groupJoin.
-  ///
-  /// In en, this message translates to:
-  /// **'Join group'**
-  String get groupJoin;
-
   /// No description provided for @groupLeave.
   ///
   /// In en, this message translates to:
@@ -5097,6 +5091,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restore group'**
   String get groupRestore;
+
+  /// No description provided for @groupArchivedForEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} archived for everyone — hidden from calendars, no reminders.'**
+  String groupArchivedForEveryone(String name);
 
   /// No description provided for @groupDeleteHelp.
   ///
@@ -5155,7 +5155,7 @@ abstract class AppLocalizations {
   /// No description provided for @updatesMuted.
   ///
   /// In en, this message translates to:
-  /// **'Muted'**
+  /// **'Muted — no updates or reminders'**
   String get updatesMuted;
 
   /// No description provided for @activity.
@@ -5293,7 +5293,7 @@ abstract class AppLocalizations {
   /// No description provided for @invitationReviewHelp.
   ///
   /// In en, this message translates to:
-  /// **'Joining gives you access to the shared projects, tasks, notes and files described below.'**
+  /// **'You’ll see its tasks, notes and files.'**
   String get invitationReviewHelp;
 
   /// No description provided for @invitationUnavailable.

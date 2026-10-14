@@ -76,7 +76,6 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
   Widget build(BuildContext context) {
     final preferences = ref.watch(regionalProvider);
     final strings = context.l10n;
-    final colors = Theme.of(context).colorScheme;
     final automatic = AppLanguages.nativeName(
       AppLanguages.resolve(
         AppLanguages.system,
@@ -85,55 +84,42 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
     );
     return SafeArea(
       top: false,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .85,
-        ),
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    strings.language,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                IconButton(
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  onPressed: _saving ? null : () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                strings.language,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              strings.languageHelp,
-              style: TextStyle(color: colors.onSurfaceVariant),
-            ),
-            const SizedBox(height: 20),
-            for (final code in [
-              AppLanguages.system,
-              ...AppLanguages.displayCodes,
-            ])
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Semantics(
-                  selected: preferences.language == code,
-                  child: Material(
-                    color: preferences.language == code
-                        ? colors.primaryContainer
-                        : colors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(18),
-                    clipBehavior: Clip.antiAlias,
-                    child: ListTile(
+            RadioGroup<String>(
+              groupValue: preferences.language,
+              onChanged: (value) {
+                if (value != null) {
+                  _choose(value);
+                } else if (!_saving) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Column(
+                children: [
+                  for (final code in [
+                    AppLanguages.system,
+                    ...AppLanguages.displayCodes,
+                  ])
+                    RadioListTile<String>(
                       key: ValueKey('language-$code'),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 6,
+                        horizontal: 24,
                       ),
+                      value: code,
+                      toggleable: true,
+                      enabled: !_saving,
                       title: Text(
                         code == AppLanguages.system
                             ? strings.languageAutomatic
@@ -142,18 +128,10 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
                       subtitle: code == AppLanguages.system
                           ? Text(automatic)
                           : null,
-                      trailing: preferences.language == code
-                          ? Icon(
-                              Icons.check_circle_rounded,
-                              color: colors.primary,
-                            )
-                          : null,
-                      enabled: !_saving,
-                      onTap: () => _choose(code),
                     ),
-                  ),
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),

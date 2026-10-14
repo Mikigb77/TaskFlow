@@ -21,21 +21,7 @@ String requestProblemText(
   if (message.contains('staging version is for invited testers')) {
     return strings.stagingInviteOnly;
   }
-  final sharing = switch (message) {
-    _ when message.contains('already has access') => 'alreadyMember',
-    _
-        when message.contains('20 members') ||
-            message.contains('membership limit') =>
-      'memberLimit',
-    _ when message.contains('invitation was already accepted') => 'accepted',
-    _ when message.contains('owner cannot leave') => 'owner',
-    _ when message.contains('invitation is no longer available') => 'expired',
-    _ when message.contains('current invitation code') => 'code',
-    _ when message.contains('refresh before deleting') => 'refresh',
-    _ when message.contains('only the list owner') => 'ownerOnly',
-    _ when message.contains('read-only for your account') => 'readOnly',
-    _ => null,
-  };
+  final sharing = sharingProblemReason(error);
   if (sharing != null) return strings.sharingProblem(sharing);
   // These older sync notices are persisted as text. Preserve their recovery
   // instructions while translating at render time, including after a switch.
@@ -57,6 +43,27 @@ String requestProblemText(
   final reason = requestProblem(error);
   final kept = !onSignIn && (reason == 'network' || reason == 'other');
   return strings.requestError(kept ? '${reason}Kept' : reason);
+}
+
+/// The sharing problem [error] names, as `sharingProblem`'s reason: `code`
+/// is a wrong or outdated invitation code. Null when it names none.
+String? sharingProblemReason(Object error) {
+  final message = error.toString().toLowerCase();
+  return switch (message) {
+    _ when message.contains('already has access') => 'alreadyMember',
+    _
+        when message.contains('20 members') ||
+            message.contains('membership limit') =>
+      'memberLimit',
+    _ when message.contains('invitation was already accepted') => 'accepted',
+    _ when message.contains('owner cannot leave') => 'owner',
+    _ when message.contains('invitation is no longer available') => 'expired',
+    _ when message.contains('current invitation code') => 'code',
+    _ when message.contains('refresh before deleting') => 'refresh',
+    _ when message.contains('only the list owner') => 'ownerOnly',
+    _ when message.contains('read-only for your account') => 'readOnly',
+    _ => null,
+  };
 }
 
 String requestProblem(Object error) {

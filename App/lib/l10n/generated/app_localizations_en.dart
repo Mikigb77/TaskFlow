@@ -74,11 +74,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String sharingProblem(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'alreadyMember':
-          'This person already has access. Manage their role in People.',
+          'This person already has access. Manage their role in Members.',
       'memberLimit':
-          'This project supports up to 20 members and 20 pending invitations. Remove someone or revoke an invitation first.',
+          'This project supports up to 20 members and 20 pending invitations. Remove someone or cancel an invitation first.',
       'accepted':
-          'This invitation was already accepted. Manage the person’s access in People.',
+          'This invitation was already accepted. Manage the person’s access in Members.',
       'owner':
           'The owner cannot leave. You can delete the project if it is no longer needed.',
       'expired':
@@ -124,7 +124,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'emailUsed':
           'An account with this email already exists. Sign in or recover your password.',
       'email': 'Enter a valid email address.',
-      'credentials': 'The email or password is incorrect. Please try again.',
+      'credentials': 'We couldn’t find that account, or the password is wrong.',
       'session': 'Please sign in again to continue. Your local tasks are kept.',
       'accountChanged':
           'The account changed. Reopen this screen and try again.',
@@ -153,23 +153,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get languageAutomatic => 'Follow phone';
-
-  @override
-  String get languageHelp =>
-      'Use your phone’s preferred available language, or choose one below. If none is available, TaskFlow uses English. Your choice stays on this device.';
+  String get languageAutomatic => 'Same as phone';
 
   @override
   String languageFollowing(String language) {
-    return 'Follow phone · $language';
+    return 'Same as phone · $language';
   }
 
   @override
   String get regionalFormats => 'Time & region';
-
-  @override
-  String get regionalFormatsHelp =>
-      'Clock, first day of the week and capture timezone';
 
   @override
   String get sharedCaptureRetained =>
@@ -624,49 +616,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appearance => 'Appearance';
 
   @override
-  String get chooseAppearance => 'Choose your appearance';
-
-  @override
-  String get appearanceHelp => 'Choose your look, or follow your device.';
-
-  @override
   String get light => 'Light';
 
   @override
   String get dark => 'Dark';
 
   @override
-  String get system => 'System';
+  String get reminders => 'Reminders';
 
   @override
-  String get yourSpace => 'Your space';
+  String remindersOnLead(String lead) {
+    return 'On · $lead';
+  }
 
   @override
-  String get welcomeSettings => 'Make yourself at home';
+  String get remindersOff => 'Off';
 
   @override
-  String get notifications => 'Notifications';
+  String get remindersBlocked => 'Blocked by your phone';
 
   @override
-  String get notificationsHelp => 'Reminder choices and upcoming alerts';
+  String get otherSettings => 'Other settings';
 
   @override
-  String get accountBackup => 'Account & backup';
+  String appVersion(String version) {
+    return 'TaskFlow $version';
+  }
 
   @override
   String get completedTasks => 'Completed tasks';
 
   @override
-  String get progressHelp => 'A little record of your progress';
-
-  @override
   String get exportImport => 'Export & import';
-
-  @override
-  String get exportImportHelp => 'TaskFlow backups and Todoist CSV migration';
-
-  @override
-  String get regionalSettings => 'Language & region';
 
   @override
   String get regionalSettingsHelp =>
@@ -676,7 +657,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
-  String get deviceDefault => 'Follow device';
+  String get deviceDefault => 'Same as phone';
 
   @override
   String get clockFormat => 'Time format';
@@ -700,11 +681,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saturday => 'Saturday';
 
   @override
-  String get captureTimezone => 'Capture timezone';
+  String get timeZone => 'Time zone';
 
   @override
-  String get timezoneHelp =>
-      'Used to interpret dates in new captures. Existing tasks and unfinished captures keep their schedules. Task times are displayed in your device timezone.';
+  String get timezoneHelp => 'New tasks use this time zone to read dates.';
 
   @override
   String get searchTimezone => 'Find a timezone';
@@ -719,7 +699,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String timezoneFallback(String zone) {
-    return 'The device timezone is unavailable. New captures will use $zone.';
+    return 'The device timezone is unavailable. New tasks will use $zone.';
   }
 
   @override
@@ -736,9 +716,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nextPeriod => 'Next month or week';
-
-  @override
-  String get moreClarity => 'More clarity. More room for life.';
 
   @override
   String get licenses => 'Open-source licences';
@@ -768,11 +745,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get planTask => 'Plan a task';
 
   @override
-  String get homeCapture => 'Capture from your home screen';
-
-  @override
-  String get homeCaptureHelp =>
-      'Android mic widget, app shortcuts and text sharing';
+  String get homeCapture => 'Mic button on your home screen';
 
   @override
   String get homeCaptureInstructions =>
@@ -783,23 +756,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add the TaskFlow widget from your launcher’s widget picker.';
 
   @override
-  String get signInHelp => 'Sign in to keep your tasks with you';
-
-  @override
-  String get diagnosticsHelp => 'Local timing and counters, without your words';
-
-  @override
   String get appearanceError => 'Could not save your appearance preference.';
-
-  @override
-  String get appearanceChangedError =>
-      'Appearance changed. Could not save the preference on this device.';
-
-  @override
-  String get switchLight => 'Switch to light mode';
-
-  @override
-  String get switchDark => 'Switch to dark mode';
 
   @override
   String get list => 'Project';
@@ -1417,20 +1374,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signOut => 'Sign out';
 
   @override
-  String get recoveryHeading => 'Let’s get you back in.';
+  String get recoveryHeading => 'Reset your password';
 
   @override
-  String get registerHeading => 'A space for your plans.';
+  String get registerHeading => 'Create your account';
 
   @override
-  String get signInHeading => 'Welcome back.';
+  String get signInHeading => 'Sign in';
+
+  @override
+  String get authPitch =>
+      'Note down what you need to do, and TaskFlow puts it on your calendar.';
 
   @override
   String get recoveryHelp =>
       'Request a recovery email, then use the code to set a new password.';
-
-  @override
-  String get accountSignInHelp => 'Sign in to keep your plans together.';
 
   @override
   String get email => 'Email';
@@ -1451,7 +1409,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get password => 'Password';
 
   @override
-  String get passwordHelp => 'At least 12 characters';
+  String get passwordHelp => 'At least 12 characters, not only numbers';
 
   @override
   String get passwordTooShort => 'Use at least 12 characters';
@@ -1461,9 +1419,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hidePassword => 'Hide password';
-
-  @override
-  String get continueRecovery => 'Continue recovery';
 
   @override
   String get createAccount => 'Create account';
@@ -1478,7 +1433,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createAnAccount => 'Create an account';
 
   @override
+  String get createAccountWithEmail => 'Create an account with this email';
+
+  @override
   String get backToSignIn => 'Back to sign in';
+
+  @override
+  String get sendRecoveryCode => 'Send code';
+
+  @override
+  String get saveNewPassword => 'Save new password';
 
   @override
   String get forgotPassword => 'Forgot password?';
@@ -1544,7 +1508,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listRestored => 'Project restored';
 
   @override
-  String get listArchivedHelp => 'Project archived. Contents kept.';
+  String projectArchivedNoReminders(String name) {
+    return '$name archived — hidden from your calendar, no reminders.';
+  }
 
   @override
   String get listUpdateError => 'Could not update this project. Please retry.';
@@ -1631,9 +1597,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get archiveList => 'Archive project';
 
   @override
-  String get sharingAndPeople => 'Sharing and people';
-
-  @override
   String get chooseDetails => 'Choose details';
 
   @override
@@ -1657,11 +1620,44 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not update sharing. Check the connection and retry.';
 
   @override
-  String get inviteToList => 'Invite to this project';
+  String get shareProject => 'Share';
 
   @override
-  String get inviteHelp =>
-      'All tasks, notes and uploaded files in this project will be visible after they accept. We will email the invitation; it also appears in their TaskFlow account. It expires in 7 days.';
+  String projectMembersCount(int count) {
+    return 'Members · $count';
+  }
+
+  @override
+  String shareProjectTitle(String project) {
+    return 'Share $project';
+  }
+
+  @override
+  String get theirEmail => 'Their email';
+
+  @override
+  String shareProjectHelp(String project) {
+    return 'They’ll see everything in $project.';
+  }
+
+  @override
+  String get sendInvitation => 'Send invitation';
+
+  @override
+  String get invitationSent => 'Invitation sent';
+
+  @override
+  String get invitationCodeFallback =>
+      'If the email doesn’t arrive, send them this code:';
+
+  @override
+  String get connectToShare => 'Connect to the internet to share.';
+
+  @override
+  String get sendInvitationAgain => 'Send again';
+
+  @override
+  String get cancelInvitation => 'Cancel invitation';
 
   @override
   String get inviteeEmail => 'Their account email';
@@ -1675,9 +1671,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sharingRolesHelp =>
       'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.';
-
-  @override
-  String get createInvitation => 'Create invitation';
 
   @override
   String get listSharing => 'Project sharing';
@@ -1701,7 +1694,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invitePerson => 'Invite a person';
 
   @override
-  String get people => 'People';
+  String get people => 'Members';
 
   @override
   String get noOtherMembers => 'Only you have accepted access so far.';
@@ -1731,10 +1724,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get revokeInvitation => 'Revoke invitation';
 
   @override
-  String get replaceInvitationHelp =>
-      'Tap a pending invitation to replace its code.';
-
-  @override
   String get howSharingWorks => 'How sharing works';
 
   @override
@@ -1753,6 +1742,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete this project and all its tasks, notes and uploaded files for everyone? This cannot be undone.';
 
   @override
+  String deleteListPrivateHelp(String name) {
+    return 'Delete $name with all its tasks, notes and files? This can’t be undone.';
+  }
+
+  @override
   String get deleteListForEveryone => 'Delete project for everyone';
 
   @override
@@ -1763,17 +1757,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the project.';
 
   @override
-  String get enterInvitationCode => 'Enter invitation code';
+  String youLeft(String name) {
+    return 'You left $name';
+  }
 
   @override
-  String get requestInvitationCodeHelp =>
-      'Ask the project owner for the code they received when inviting you.';
+  String get projectDeleted => 'Project deleted';
 
   @override
   String get invitationCodeRequired => 'Paste the full invitation code.';
 
   @override
-  String get joinList => 'Join project';
+  String get invitationCodeWrong =>
+      'Ask the person who invited you for the current code.';
 
   @override
   String get invitationResponseError =>
@@ -1783,18 +1779,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get retryInvitations => 'Retry invitations';
 
   @override
-  String get invitations => 'Invitations';
-
-  @override
-  String joinListHelp(String role) {
-    return 'Join as $role. Shared tasks, notes and uploaded files will sync to your account.';
-  }
-
-  @override
   String get acceptInvitation => 'Accept invitation';
 
   @override
   String get decline => 'Decline';
+
+  @override
+  String invitedTo(String name) {
+    return 'You’re invited to $name · View';
+  }
+
+  @override
+  String invitationsMore(int count) {
+    return '+$count';
+  }
+
+  @override
+  String joinInvitationTitle(String name) {
+    return 'Join $name';
+  }
+
+  @override
+  String get joinInvitationHelp =>
+      'Open your invitation email and tap its link. Or paste the code from it here.';
+
+  @override
+  String get joinInvitation => 'Join';
+
+  @override
+  String declineInvitationConfirm(String name) {
+    return 'Decline the invitation to $name? You’d need a new one to join later.';
+  }
+
+  @override
+  String joinedInvitation(String name) {
+    return 'You joined $name';
+  }
+
+  @override
+  String get invitationNotNow => 'Not now';
+
+  @override
+  String signedInAs(String email) {
+    return 'Signed in as $email';
+  }
 
   @override
   String get fileLoadError => 'Could not load attachment status. Please retry.';
@@ -2999,13 +3027,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get authWelcome => 'Your day, in focus.';
-
-  @override
-  String get authRegisterHelp =>
-      'Keep your tasks and notes together, wherever you go.';
-
-  @override
   String get authOr => 'or';
 
   @override
@@ -3043,7 +3064,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forMe => 'For me';
 
   @override
-  String get forTeam => 'Team';
+  String get forTeam => 'All';
 
   @override
   String get responsibility => 'Responsible';
@@ -3126,9 +3147,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.';
 
   @override
-  String get groupJoin => 'Join group';
-
-  @override
   String get groupLeave => 'Leave group';
 
   @override
@@ -3147,6 +3165,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get groupRestore => 'Restore group';
+
+  @override
+  String groupArchivedForEveryone(String name) {
+    return '$name archived for everyone — hidden from calendars, no reminders.';
+  }
 
   @override
   String get groupDeleteHelp =>
@@ -3179,7 +3202,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updatesAssigned => 'My assignments';
 
   @override
-  String get updatesMuted => 'Muted';
+  String get updatesMuted => 'Muted — no updates or reminders';
 
   @override
   String get activity => 'Activity';
@@ -3254,8 +3277,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invitationReview => 'Review invitation';
 
   @override
-  String get invitationReviewHelp =>
-      'Joining gives you access to the shared projects, tasks, notes and files described below.';
+  String get invitationReviewHelp => 'You’ll see its tasks, notes and files.';
 
   @override
   String get invitationUnavailable =>

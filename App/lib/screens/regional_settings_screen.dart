@@ -6,7 +6,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/services/notification_service.dart';
-import 'package:agenda/widgets/language_selector.dart';
+import 'package:agenda/services/text_search.dart';
 
 final _timezoneProvider = FutureProvider.autoDispose<CaptureTimezone>((ref) {
   final zone = ref.watch(regionalProvider.select((p) => p.captureTimezone));
@@ -18,6 +18,10 @@ final _timezoneProvider = FutureProvider.autoDispose<CaptureTimezone>((ref) {
     accountTimezone: accountZone,
   );
 });
+
+/// A time zone as people know it: its city, e.g. `Buenos Aires` for
+/// `America/Argentina/Buenos_Aires`. The IANA id is still what's stored.
+String timeZoneName(String id) => id.split('/').last.replaceAll('_', ' ');
 
 class RegionalSettingsScreen extends ConsumerWidget {
   const RegionalSettingsScreen({super.key});
@@ -43,13 +47,11 @@ class RegionalSettingsScreen extends ConsumerWidget {
     final s = context.l10n;
     final zone = ref.watch(_timezoneProvider).valueOrNull;
     return Scaffold(
-      appBar: CustomAppBar(title: s.regionalSettings),
+      appBar: CustomAppBar(title: s.regionalFormats),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           Text(s.regionHelp),
-          const SizedBox(height: 24),
-          const LanguageSelector(key: ValueKey('regional-language')),
           const SizedBox(height: 24),
           _choice<ClockFormat>(
             key: const ValueKey('regional-clock'),
@@ -77,8 +79,12 @@ class RegionalSettingsScreen extends ConsumerWidget {
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            title: Text(s.captureTimezone),
-            subtitle: Text(p.captureTimezone ?? s.deviceDefault),
+            title: Text(s.timeZone),
+            subtitle: Text(
+              p.captureTimezone == null
+                  ? s.deviceDefault
+                  : timeZoneName(p.captureTimezone!),
+            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () async {
               final zone = await Navigator.push<String>(
@@ -102,8 +108,10 @@ class RegionalSettingsScreen extends ConsumerWidget {
             child: zone == null
                 ? const SizedBox.shrink()
                 : zone.fallback
-                    ? MessageBanner(s.timezoneFallback(zone.identifier))
-                    : Text(zone.identifier),
+                    ? MessageBanner(
+                        s.timezoneFallback(timeZoneName(zone.identifier)),
+                      )
+                    : Text(timeZoneName(zone.identifier)),
           ),
         ],
       ),
@@ -151,10 +159,13 @@ class _TimezonePickerState extends State<_TimezonePicker> {
   final _zones = CaptureTimezone.identifiers;
   @override
   Widget build(BuildContext context) {
-    final matches =
-        _zones.where((z) => z.toLowerCase().contains(_query)).toList();
+    // The city and the id together, so `Bogotá` finds Bogota and `America`
+    // still lists the continent.
+    final matches = _zones
+        .where((z) => matchesSearch('${timeZoneName(z)} $z', _query))
+        .toList();
     return Scaffold(
-      appBar: CustomAppBar(title: context.l10n.captureTimezone),
+      appBar: CustomAppBar(title: context.l10n.timeZone),
       body: Column(
         children: [
           Padding(
@@ -165,7 +176,7 @@ class _TimezonePickerState extends State<_TimezonePicker> {
                 labelText: context.l10n.searchTimezone,
                 prefixIcon: const Icon(Icons.search),
               ),
-              onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+              onChanged: (v) => setState(() => _query = v.trim()),
             ),
           ),
           ListTile(
@@ -176,7 +187,7 @@ class _TimezonePickerState extends State<_TimezonePicker> {
             child: ListView.builder(
               itemCount: matches.length,
               itemBuilder: (context, i) => ListTile(
-                title: Text(matches[i]),
+                title: Text(timeZoneName(matches[i])),
                 onTap: () => Navigator.pop(context, matches[i]),
               ),
             ),

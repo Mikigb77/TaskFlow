@@ -176,7 +176,7 @@ class _NotificationSettingsScreenState
               },
         child: Text(context.l10n.retryScheduling));
     return Scaffold(
-        appBar: CustomAppBar(title: context.l10n.notifications),
+        appBar: CustomAppBar(title: context.l10n.reminders),
         body: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.all(24), children: [
