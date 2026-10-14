@@ -6,9 +6,9 @@
   "reviewOptions": "Más opciones",
   "reviewOriginal": "Ver lo que dije",
   "reviewOriginalText": "Texto original",
-  "reviewRemove": "Quitar de esta captura",
-  "reviewRemoved": "Borrador retirado",
-  "reviewUndoSaved": "Las tareas han vuelto a tus borradores.",
+  "reviewRemove": "Quitar",
+  "reviewRemoved": "Quitada",
+  "reviewUndoSaved": "Han vuelto aquí, sin guardar.",
   "reviewUndoChanged": "Esta tarea ha cambiado. Las tareas guardadas se han conservado.",
   "reviewRepair": "Corregir texto",
   "reviewRepairHelp": "Este texto puede tener acentos dañados. Revisa la corrección antes de guardar.",
@@ -890,8 +890,7 @@
   "captureTypeInstead": "Escribir",
   "captureStillListening": "Sigo escuchando. Toca Listo cuando termines.",
   "captureTimeLeft": "Quedan 10 segundos",
-  "captureKeepQuestion": "¿Conservar lo que has dicho?",
-  "captureKeepHelp": "Podrás terminarlo más tarde.",
+  "captureKeepQuestion": "¿Quieres conservarlo para más tarde?",
   "captureRecordingFirst": "Reintenta esta grabación o descártala antes de grabar otra.",
   "captureEmptyInput": "Primero di o escribe lo que necesitas hacer.",
   "captureSpeechStopped": "Se ha dejado de escuchar. Puedes volver a hablar o escribir.",
@@ -900,7 +899,7 @@
   "captureSpeechUnavailable": "El reconocimiento local no está disponible. Graba audio o escribe.",
   "captureSpeechBusy": "Ya hay una solicitud del micrófono abierta. Termínala antes de volver a intentarlo.",
   "captureIncompleteAudio": "El audio guardado está incompleto y no se puede procesar. Sigue conservado en este teléfono.",
-  "captureWriteFailed": "No se ha podido guardar este borrador en el teléfono. Inténtalo de nuevo antes de salir.",
+  "captureWriteFailed": "No se ha podido guardar en el teléfono. Inténtalo de nuevo antes de salir.",
   "captureStopFailed": "No se ha podido finalizar la grabación. El contenido guardado anteriormente se conserva.",
   "captureDiscardFailed": "No se ha podido descartar esta captura. Sigue conservada.",
   "captureReviewWriteFailed": "No se han podido guardar estos cambios. Inténtalo de nuevo antes de salir.",
@@ -912,15 +911,12 @@
   "voiceRecording": "Grabación de voz",
   "retryCaptures": "Volver a cargar las capturas",
   "capturesCaughtUp": "Todo al día",
-  "capturesEmptyHelp": "Aquí se guardarán las grabaciones y los borradores que dejes pendientes.",
+  "capturesEmptyHelp": "Aquí se guardan las grabaciones y las tareas que dejes a medias.",
   "captureResumeHelp": "Guardado en este teléfono · Toca para continuar",
-  "captureDraftSummary": "{count, plural, one {1 borrador} other {{count} borradores}} · {ready, plural, one {1 listo} other {{ready} listos}}",
+  "captureDraftSummary": "{count, plural, one{1 sin añadir} other{{count} sin añadir}}",
   "@captureDraftSummary": {
     "placeholders": {
       "count": {
-        "type": "int"
-      },
-      "ready": {
         "type": "int"
       }
     }
@@ -957,12 +953,13 @@
       }
     }
   },
+  "captureAlsoOn": "también el {date}",
+  "captureAlsoOnDays": "{count, plural, one{también en otro día} other{también en otros {count} días}}",
   "captureConfirmDetails": "Usar los datos mostrados",
   "captureNothingToReview": "No queda nada por revisar",
-  "captureRemovedDraftsHelp": "Los borradores eliminados no se convertirán en tareas.",
+  "captureRemovedDraftsHelp": "No se añadirá nada.",
   "captureFinish": "Terminar",
   "captureYourWords": "Tus palabras",
-  "captureReviewRetainedHelp": "Los borradores pendientes se conservan en este teléfono. Puedes retomarlos desde Capturas pendientes.",
   "captureCheckDetails": "Revisa los datos de arriba",
   "captureUnderstanding": "Entendiendo…",
   "captureFailed": "No ha funcionado. Tus palabras siguen aquí; inténtalo de nuevo.",
@@ -1018,7 +1015,7 @@
   "diagnosticsTiming": "Mediana {median} s · P95 {p95} s · {count, plural, one {1 observación cronometrada} other {{count} observaciones cronometradas}}",
   "diagnosticsClearError": "No se han podido borrar los diagnósticos. Inténtalo de nuevo.",
   "clearDiagnostics": "Borrar diagnósticos locales",
-  "diagnosticsEvent": "{event, select, opened{Captura abierta} ready{Captura lista para usar} started{Nuevas capturas guardadas} typedStarted{Entrada de texto iniciada} permissionDenied{Permiso del micrófono denegado} nativeStarted{Escucha en el dispositivo iniciada} firstPartial{Primeras palabras en el dispositivo} nativeListening{Duración de la escucha en el dispositivo} recordingStopped{Duración del audio guardado} transcription{Transcripción de audio en línea} extraction{Extracción de tareas en línea} processing{Solicitud y borradores guardados} notePrepared{Nota local preparada} noteTranscribed{Nota de voz preparada} failed{Solicitudes fallidas} retried{Solicitudes reintentadas} edited{Cambios en borradores} reviewOpened{Revisión abierta} reviewTime{Tiempo de revisión} correction{Tiempo en el diálogo de corrección} saved{De confirmar a guardar en el dispositivo} discarded{Capturas descartadas explícitamente} resumed{Capturas reanudadas} leftCapturePending{Captura guardada para más tarde} leftReviewPending{Revisión guardada para más tarde} other{Otro evento de captura}}",
+  "diagnosticsEvent": "{event, select, opened{Captura abierta} ready{Captura lista para usar} started{Nuevas capturas guardadas} typedStarted{Entrada de texto iniciada} permissionDenied{Permiso del micrófono denegado} nativeStarted{Escucha en el dispositivo iniciada} firstPartial{Primeras palabras en el dispositivo} nativeListening{Duración de la escucha en el dispositivo} recordingStopped{Duración del audio guardado} transcription{Transcripción de audio en línea} extraction{Extracción de tareas en línea} processing{Solicitud y borradores guardados} notePrepared{Nota local preparada} noteTranscribed{Nota de voz preparada} failed{Solicitudes fallidas} retried{Solicitudes reintentadas} edited{Cambios en borradores} reviewOpened{Revisión abierta} reviewTime{Tiempo de revisión} correction{Tiempo en el diálogo de corrección} saved{De confirmar a guardar en el dispositivo} discarded{Capturas descartadas explícitamente} resumed{Capturas reanudadas} leftCapturePending{Captura guardada para más tarde} leftReviewPending{Revisión guardada para más tarde} recognizerFinish{Últimas palabras tras Listo} other{Otro evento de captura}}",
   "@reopenNamedTask": {
     "placeholders": {
       "title": {
@@ -1178,7 +1175,7 @@
   "invitationUnavailable": "Esta invitación no está disponible para esta cuenta. Comprueba que hayas iniciado sesión con el correo que la recibió o pide una nueva invitación.",
   "stagingInviteOnly": "Esta versión de prueba privada es para personas invitadas. Pide al responsable de TaskFlow una invitación a este correo.",
   "freeVoiceLeft": "{count, plural, =0{Ya no te quedan dictados gratis este mes} =1{Te queda 1 dictado gratis este mes} other{Te quedan {count} dictados gratis este mes}}",
-  "freeVoiceUsedUp": "Ya has usado los dictados gratis de este mes. Puedes escribirla aquí; tendrás más el {date}.",
+  "freeVoiceUsedUp": "Sin dictados gratis hasta el {date}.",
   "freeVoiceUsedUpRecording": "Tu grabación se conserva. Se podrá entender a partir del {date}, o ahora con Pro.",
   "captureClose": "Cerrar",
   "freeVoiceStatus": "Dictados gratis: {left, plural, =1{te queda 1} other{te quedan {left}}} de {limit} este mes. Más el {date}.",

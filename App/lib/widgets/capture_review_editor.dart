@@ -41,22 +41,36 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
   late final _notes = TextEditingController(
     text: widget.draft.task.notes ?? '',
   );
+  final _notesFocus = FocusNode();
   bool _options = false;
+  // The notes field shows once the task has notes, or once `Añadir notas`
+  // opened it; then it stays for this card even if emptied again.
+  late bool _notesOpen = _hasNotes;
   Task get task => widget.draft.task;
   bool get expanded => !widget.compact || widget.expanded;
+  bool get _hasNotes => task.notes?.trim().isNotEmpty ?? false;
 
   @override
   void didUpdateWidget(CaptureReviewEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_title.text != task.title) _title.text = task.title;
     if (_notes.text != (task.notes ?? '')) _notes.text = task.notes ?? '';
+    if (_hasNotes) _notesOpen = true;
   }
 
   @override
   void dispose() {
     _title.dispose();
     _notes.dispose();
+    _notesFocus.dispose();
     super.dispose();
+  }
+
+  void _openNotes() {
+    setState(() => _notesOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notesFocus.requestFocus();
+    });
   }
 
   void _change(Task value) =>
@@ -83,6 +97,9 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
       date: deadline ? task.deadline : task.dueDate,
       hasTime: deadline ? task.deadlineHasTime : task.hasTime,
       title: deadline ? context.l10n.deadline : null,
+      // Fixing a day on the result is one tap: Hoy, Mañana and Sin fecha
+      // apply at once.
+      applyDays: true,
     );
     if (result == null || !mounted) return;
     final changed = deadline
@@ -119,16 +136,19 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     }
   }
 
+  List<CaptureClarification> _openQuestions(String field) =>
+      widget.draft.confirmed
+      ? <CaptureClarification>[]
+      : widget.draft.reviewQuestions
+            .where(
+              (q) =>
+                  q.field == field &&
+                  !widget.draft.resolvedQuestions.contains(q.id),
+            )
+            .toList();
+
   Widget _questions(String field) {
-    final questions = widget.draft.confirmed
-        ? <CaptureClarification>[]
-        : widget.draft.reviewQuestions
-              .where(
-                (q) =>
-                    q.field == field &&
-                    !widget.draft.resolvedQuestions.contains(q.id),
-              )
-              .toList();
+    final questions = _openQuestions(field);
     final l = context.l10n;
     final timed = field == 'schedule' || field == 'deadline';
     final day = field == 'deadline' ? task.deadline : task.dueDate;
@@ -365,6 +385,21 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                   widget.draft.copyWith(assignmentReviewed: true),
                 ),
         );
+    // A note's body is its notes, so it always shows.
+    final showNotes = task.isNote || _notesOpen;
+    // An underline says the field can be tapped and corrected, and keeps
+    // the title's heading look.
+    final fieldBorders = (
+      border: UnderlineInputBorder(
+        borderSide: BorderSide(color: colors.outlineVariant),
+      ),
+      enabled: UnderlineInputBorder(
+        borderSide: BorderSide(color: colors.outline),
+      ),
+      focused: UnderlineInputBorder(
+        borderSide: BorderSide(color: colors.primary, width: 2),
+      ),
+    );
     final optionsSummary = [
       if (task.priority > 1)
         l.priorityValue(context.priorityName(task.priority)),
@@ -387,10 +422,35 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         ),
       ],
     ];
+    bool openQuestion(String field) => _openQuestions(field).isNotEmpty;
+    final belowNotes =
+        repair.isNotEmpty ||
+        showAssignment ||
+        (!task.isNote &&
+            (task.deadline != null ||
+                task.durationMinutes != null ||
+                openQuestion('deadline') ||
+                openQuestion('duration'))) ||
+        task.checklist.isNotEmpty ||
+        task.priority > 1 ||
+        task.isRecurring ||
+        openQuestion('recurrence') ||
+        openQuestion('details');
+    final notesLast = showNotes && !belowNotes;
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.compact)
+        // An opened card keeps only ✕ here; its title is in the field.
+        if (widget.compact && expanded)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: IconButton(
+              tooltip: l.removeCaptureItem(task.title),
+              onPressed: widget.enabled ? widget.onRemove : null,
+              icon: const Icon(Icons.close_rounded, size: 18),
+            ),
+          )
+        else if (widget.compact)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -432,8 +492,10 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               labelText: task.isNote ? l.noteTitle : l.taskTitle,
               filled: false,
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
+              border: fieldBorders.border,
+              disabledBorder: fieldBorders.border,
+              enabledBorder: fieldBorders.enabled,
+              focusedBorder: fieldBorders.focused,
               counterText: '',
               errorText: task.title.trim().isEmpty
                   ? l.titleRequiredField
@@ -448,26 +510,31 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             if (fromWords && task.dueDate != null) _fromWords(),
             _questions('schedule'),
           ],
-          const SizedBox(height: 8),
-          TextFormField(
-            key: const ValueKey('draft-notes'),
-            controller: _notes,
-            enabled: widget.enabled,
-            minLines: 2,
-            maxLines: null,
-            maxLength: 8000,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: l.notes,
-              hintText: l.addNotes,
-              filled: false,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          if (showNotes) ...[
+            const SizedBox(height: 8),
+            TextFormField(
+              key: const ValueKey('draft-notes'),
+              controller: _notes,
+              focusNode: _notesFocus,
+              enabled: widget.enabled,
+              minLines: 2,
+              maxLines: null,
+              maxLength: 8000,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: l.notes,
+                hintText: l.addNotes,
+                filled: false,
+                border: fieldBorders.border,
+                disabledBorder: fieldBorders.border,
+                enabledBorder: fieldBorders.enabled,
+                focusedBorder: fieldBorders.focused,
+                counterText: '',
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              onChanged: (value) => _change(task.copyWith(notes: value)),
             ),
-            onChanged: (value) => _change(task.copyWith(notes: value)),
-          ),
+          ],
           const SizedBox(height: 8),
           ...repair,
           if (showAssignment) assignment(),
@@ -521,7 +588,9 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             ),
           _questions('recurrence'),
           _questions('details'),
-          const Divider(height: 1),
+          // The notes field's underline already separates it from the row,
+          // when nothing else sits between them.
+          if (!notesLast) const Divider(height: 1),
           ListTile(
             contentPadding: EdgeInsets.zero,
             key: ValueKey('draft-options-${widget.draft.id}'),
@@ -537,6 +606,13 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             onTap: () => setState(() => _options = !_options),
           ),
           if (_options) ...[
+            if (!showNotes)
+              _row(
+                Icons.notes_rounded,
+                l.addNotes,
+                key: ValueKey('draft-add-notes-${widget.draft.id}'),
+                onTap: _openNotes,
+              ),
             if (!showAssignment) assignment(asRow: true),
             if (!task.isNote) ...[
               DropdownButtonFormField<int>(

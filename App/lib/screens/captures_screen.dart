@@ -25,8 +25,7 @@ class CapturesScreen extends ConsumerWidget {
   String _help(BuildContext context, WidgetRef ref, CaptureSession session) {
     final l = context.l10n;
     if (session.remaining.isNotEmpty) {
-      return l.captureDraftSummary(
-          session.remaining.length, session.ready.length);
+      return l.captureDraftSummary(session.remaining.length);
     }
     if (session.audioPath != null &&
         session.text.trim().isEmpty &&

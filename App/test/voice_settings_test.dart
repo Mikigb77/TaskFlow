@@ -866,14 +866,18 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.descendant(of: page, matching: find.text(es.onDeviceUnavailable)),
+          find.descendant(
+            of: page,
+            matching: find.text(es.onDeviceUnavailable),
+          ),
           findsNothing,
         );
         expectSetUpRow(page, es, findsNothing);
         // Said once: no other line on Voz ends the same way.
-        final online = textsUnder(tester, page)
-            .where((text) => text.endsWith('lo hace en línea.'))
-            .toList();
+        final online = textsUnder(
+          tester,
+          page,
+        ).where((text) => text.endsWith('lo hace en línea.')).toList();
         expect(online, [es.voiceSetupUnavailable]);
         expect(tester.takeException(), isNull);
       },
@@ -1099,6 +1103,60 @@ void main() {
       },
     );
   });
+
+  // ---- 2026-10-14-speed · P103 (UX-603): the remembered answer ----
+
+  testWidgets(
+    'UX-603: capture reuses the answer Voz just checked, and after Voz’s set-up (prepareLanguage) the next capture asks capability() again',
+    (tester) async {
+      final speech = _Speech()..installed = false;
+      await openApp(
+        tester,
+        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        speech,
+        size: const Size(390, 1600),
+      );
+      Future<void> backToCalendar() async {
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .popUntil((route) => route.isFirst);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> captureAndClose() async {
+        await openCapture(tester);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+      }
+
+      // Voz checks afresh, and capture then uses that answer.
+      await openVoice(tester, es);
+      await backToCalendar();
+      var asked = speech.checked.length;
+      await captureAndClose();
+      expect(speech.checked.length, asked, reason: 'Voz’s answer is kept');
+
+      // Set up on Voz: the language may be installed now.
+      await openVoice(tester, es);
+      final page = find.byType(VoiceSettingsScreen);
+      final setUp = find.descendant(
+        of: page,
+        matching: find.text(es.setUpSpeech),
+      );
+      await tester.ensureVisible(setUp);
+      await tester.pumpAndSettle();
+      await tester.tap(setUp);
+      await tester.pumpAndSettle();
+      speech.installed = true;
+      await backToCalendar();
+      asked = speech.checked.length;
+      await captureAndClose();
+      expect(speech.checked.length, asked + 1, reason: 'asked again');
+      expect(speech.started, isNotEmpty, reason: 'listening on the new answer');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// Preferences written as JSON and read back, as the phone's store does

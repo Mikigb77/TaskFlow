@@ -446,6 +446,9 @@ void main() {
           inSheet(find.widgetWithText(TextButton, es.cancel)).first,
         );
         await tester.pumpAndSettle();
+        // Kept for later, as before the question.
+        await tester.tap(find.widgetWithText(FilledButton, es.keep));
+        await tester.pumpAndSettle();
         expect(find.byType(BottomSheet), findsNothing);
 
         await tapDay(tester, start);
@@ -611,10 +614,7 @@ void main() {
         );
         expect(find.text(es.captureSpeakingIsPro), findsNothing);
         expect(find.text(es.voiceProAction), findsNothing);
-        expect(
-          find.byKey(const ValueKey('free-voice-used-up')),
-          findsNothing,
-        );
+        expect(find.byKey(const ValueKey('free-voice-used-up')), findsNothing);
         expect(words(), findsNothing);
         expect(app.speech.starts, 0);
         expect(tester.takeException(), isNull);
@@ -1515,6 +1515,244 @@ void main() {
       );
       expect(row.hitTestable(), findsOneWidget);
       expect(tester.widget<TaskTile>(row).color, litColor(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed · P104 (UX-604): parts of the day on the phone ----
+
+  testWidgets(
+    'UX-604: without Pro, typed “Llamar a mamá mañana por la mañana” shows the date line Mañana and the title Llamar a mamá por la mañana',
+    (tester) async {
+      final app = await _App.open(tester, pro: false);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.enterText(words(), 'Llamar a mamá mañana por la mañana');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(titleText(tester), 'Llamar a mamá por la mañana');
+      expect(dateLine(tester), es.tomorrow);
+      expect(es.tomorrow, 'Mañana');
+      expect(app.api.requests, 0, reason: 'understood on the phone');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-604: with the assistant offline, a spoken “Médico el viernes a las 5 de la tarde” saved with Guardar tal cual is saved at once on Friday at 17:00, titled Médico',
+    (tester) async {
+      final start = monday();
+      final friday = plus(start, 4);
+      final app = await _App.open(tester, pro: true, clock: start);
+      app.api.failure = ApiException(0, 'Offline. Retry when connected.');
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(app.speech.starts, 1);
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Médico el viernes a las 5 de la tarde');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, es.captureSaveAsWritten);
+      expect(save, findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      // Saved at once: no result to check, no time question.
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(app.tasks.titles(), ['Médico']);
+      final saved = app.tasks.state.requireValue.single;
+      expect(
+        saved.dueDate,
+        DateTime(friday.year, friday.month, friday.day, 17),
+      );
+      expect(saved.hasTime, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed round 2 · P107 (UX-618): a passed time goes on the
+  // next day ----
+
+  testWidgets(
+    'UX-618: at 10:00 with the assistant offline, a spoken “Llamar a Juan a las 9 de la mañana” saved with Guardar tal cual is saved on the next day at 09:00, titled Llamar a Juan',
+    (tester) async {
+      final wednesday = plus(monday(), 2);
+      final start = DateTime(
+        wednesday.year,
+        wednesday.month,
+        wednesday.day,
+        10,
+      );
+      final thursday = plus(start, 1);
+      final app = await _App.open(tester, pro: true, clock: start);
+      app.api.failure = ApiException(0, 'Offline. Retry when connected.');
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(app.speech.starts, 1);
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Llamar a Juan a las 9 de la mañana');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
+      await tester.pumpAndSettle();
+      final save = find.widgetWithText(FilledButton, es.captureSaveAsWritten);
+      expect(save, findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      // Saved at once, with no question, and not in the past.
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(app.tasks.titles(), ['Llamar a Juan']);
+      final saved = app.tasks.state.requireValue.single;
+      expect(
+        saved.dueDate,
+        DateTime(thursday.year, thursday.month, thursday.day, 9),
+      );
+      expect(saved.hasTime, isTrue);
+      expect(saved.dueDate!.isAfter(start), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed · P102 (UX-602): a landing doesn't date the next ----
+
+  /// `Añadir tarea`, the words (typed, or to the assistant with Pro through
+  /// Escribir), `Listo`: the result shows.
+  Future<void> captureWords(
+    WidgetTester tester,
+    String said, {
+    required bool pro,
+  }) async {
+    await tester.tap(find.text(es.addTask).hitTestable());
+    await tester.pumpAndSettle();
+    if (pro) {
+      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.pumpAndSettle();
+    }
+    await tester.enterText(words(), said);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, es.done));
+    await tester.pumpAndSettle();
+    expect(find.byType(CaptureResult), findsOneWidget);
+  }
+
+  Future<void> saveResult(WidgetTester tester) async {
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+  }
+
+  /// Leaves the result pending (Cancelar, Conservar).
+  Future<void> keepResult(WidgetTester tester) async {
+    await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, es.keep));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+  }
+
+  Map<String, dynamic> dated(String title, DateTime at) => {
+    ..._found(title),
+    'due_date': at.toIso8601String(),
+  };
+
+  String selectedHeader(DateTime day) => DateFormat.MMMMEEEEd('es').format(day);
+
+  for (final pro in [true, false]) {
+    testWidgets(
+      'UX-602: ${pro ? 'with the assistant' : 'typed without Pro'}, from Calendar on today, a result for Friday lands on Friday; the next result with no date reads Sin fecha; after tapping Friday, it reads Friday’s date (D9)',
+      (tester) async {
+        final start = monday();
+        final friday = plus(start, 4);
+        final app = await _App.open(tester, pro: pro, clock: start);
+        expect(find.text(es.todayAgenda), findsOneWidget);
+
+        app.api.found = [
+          dated('Médico', DateTime(friday.year, friday.month, friday.day, 17)),
+        ];
+        await captureWords(tester, 'Médico el viernes a las 17', pro: pro);
+        await saveResult(tester);
+        expect(find.text(selectedHeader(friday)), findsOneWidget);
+        expect(
+          tester
+              .widget<TaskTile>(find.widgetWithText(TaskTile, 'Médico'))
+              .color,
+          Theme.of(
+            tester.element(find.byType(NavigationBar)),
+          ).colorScheme.primaryContainer,
+        );
+
+        // The next thing said has no date: no day is guessed for it.
+        app.api.found = [_found('Comprar pan')];
+        await captureWords(tester, 'comprar pan', pro: pro);
+        expect(titleText(tester), 'Comprar pan');
+        expect(dateLine(tester), es.noDate);
+        expect(app.store.sessions.values.last.day, isNull);
+        await keepResult(tester);
+
+        // D9: a Friday the person taps is the day for undated words.
+        await tapDay(tester, friday);
+        expect(find.text(selectedHeader(friday)), findsOneWidget);
+        app.api.found = [_found('Llamar a Juan')];
+        await captureWords(tester, 'llamar a Juan', pro: pro);
+        final calendar = tester.element(find.byType(CalendarScreen));
+        expect(dateLine(tester), calendar.weekdayDate(friday));
+        expect(app.store.sessions.values.last.day, friday);
+        // A landing on the day already chosen keeps it chosen.
+        await saveResult(tester);
+        expect(find.text(selectedHeader(friday)), findsOneWidget);
+        app.api.found = [_found('Regar las plantas')];
+        await captureWords(tester, 'regar las plantas', pro: pro);
+        expect(dateLine(tester), calendar.weekdayDate(friday));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-602: after picking Wednesday in the week strip, a result dated Friday lands on Friday; the next result with no date reads Sin fecha',
+    (tester) async {
+      final start = monday();
+      final wednesday = plus(start, 2);
+      final friday = plus(start, 4);
+      final app = await _App.open(tester, pro: true, clock: start);
+      await tapDay(tester, wednesday);
+      expect(find.text(selectedHeader(wednesday)), findsOneWidget);
+      app.api.found = [
+        dated('Médico', DateTime(friday.year, friday.month, friday.day, 17)),
+      ];
+      await captureWords(tester, 'Médico el viernes a las 17', pro: true);
+      await saveResult(tester);
+      expect(find.text(selectedHeader(friday)), findsOneWidget);
+      app.api.found = [_found('Comprar pan')];
+      await captureWords(tester, 'comprar pan', pro: true);
+      expect(dateLine(tester), es.noDate);
+      expect(app.store.sessions.values.last.day, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-602: in the month view, a later day tapped there is the day a result with no date takes',
+    (tester) async {
+      final start = monday();
+      // A later day in the same month as the Monday Calendar opens on.
+      var later = plus(start, 9);
+      if (later.month != start.month) later = plus(start, 2);
+      final app = await _App.open(tester, pro: true, clock: start);
+      await tester.tap(find.byKey(const ValueKey('calendar-format')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.month).last);
+      await tester.pumpAndSettle();
+      await tapDay(tester, later);
+      expect(find.text(selectedHeader(later)), findsOneWidget);
+      app.api.found = [_found('Comprar pan')];
+      await captureWords(tester, 'comprar pan', pro: true);
+      final calendar = tester.element(find.byType(CalendarScreen));
+      expect(dateLine(tester), calendar.weekdayDate(later));
+      expect(app.store.sessions.values.last.day, later);
       expect(tester.takeException(), isNull);
     },
   );

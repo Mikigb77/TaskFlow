@@ -6,9 +6,9 @@
   "reviewOptions": "More options",
   "reviewOriginal": "See what I said",
   "reviewOriginalText": "Original text",
-  "reviewRemove": "Remove from this capture",
-  "reviewRemoved": "Draft removed",
-  "reviewUndoSaved": "Tasks returned to your drafts.",
+  "reviewRemove": "Remove",
+  "reviewRemoved": "Removed",
+  "reviewUndoSaved": "They’re back here, not saved yet.",
   "reviewUndoChanged": "This task has changed. Your saved tasks were kept.",
   "reviewRepair": "Repair text",
   "reviewRepairHelp": "This text may have been saved with damaged accents. Review the correction before saving.",
@@ -1300,13 +1300,9 @@
   "@captureTimeLeft": {
     "description": "Shown 10 seconds before the 60-second listening limit."
   },
-  "captureKeepQuestion": "Keep what you said?",
+  "captureKeepQuestion": "Keep it for later?",
   "@captureKeepQuestion": {
-    "description": "Asked when closing the capture sheet with words or a recording."
-  },
-  "captureKeepHelp": "You can finish it later.",
-  "@captureKeepHelp": {
-    "description": "Body of the question asked when closing the capture sheet."
+    "description": "The one question asked when leaving the capture sheet with something said or written: by Cancel, Back, a tap above the sheet or a swipe down, while listening, while typing and on a result. No body text; its buttons are discard and keep."
   },
   "captureRecordingFirst": "Retry this recording or discard it before recording another.",
   "captureEmptyInput": "Say or type what you need to do first.",
@@ -1316,7 +1312,7 @@
   "captureSpeechUnavailable": "On-device speech is unavailable. Record audio or type instead.",
   "captureSpeechBusy": "A microphone request is already open. Finish it before trying again.",
   "captureIncompleteAudio": "The retained audio is incomplete and cannot be processed. It is still kept on this phone.",
-  "captureWriteFailed": "Could not keep this draft on your phone. Try again before leaving.",
+  "captureWriteFailed": "Couldn’t keep this on your phone. Try again before leaving.",
   "captureStopFailed": "Could not finish recording. Previously retained input is kept.",
   "captureDiscardFailed": "Could not discard this capture. It is still kept.",
   "captureReviewWriteFailed": "Could not keep these changes. Please try again before leaving.",
@@ -1334,15 +1330,13 @@
   "voiceRecording": "Voice recording",
   "retryCaptures": "Retry loading captures",
   "capturesCaughtUp": "All caught up",
-  "capturesEmptyHelp": "Recordings and drafts you leave unfinished will be kept here.",
+  "capturesEmptyHelp": "Recordings and tasks you leave unfinished are kept here.",
   "captureResumeHelp": "Kept on this phone · Tap to resume",
-  "captureDraftSummary": "{count, plural, one {1 draft} other {{count} drafts}} · {ready, plural, one {1 ready} other {{ready} ready}}",
+  "captureDraftSummary": "{count, plural, one{1 not added yet} other{{count} not added yet}}",
   "@captureDraftSummary": {
+    "description": "In Unfinished captures, under a capture's first task: how many of its tasks are not added yet.",
     "placeholders": {
       "count": {
-        "type": "int"
-      },
-      "ready": {
         "type": "int"
       }
     }
@@ -1379,12 +1373,29 @@
       }
     }
   },
+  "captureAlsoOn": "also on {date}",
+  "@captureAlsoOn": {
+    "description": "After a save, follows the count of tasks added (\"2 tasks added · also on Sat, Oct 17\") when one other task is on a day other than the one Calendar shows. The date is a weekday and date such as Sat, Oct 17.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "captureAlsoOnDays": "{count, plural, one{also on 1 other day} other{also on {count} other days}}",
+  "@captureAlsoOnDays": {
+    "description": "After a save, follows the count of tasks added (\"3 tasks added · also on 2 other days\") when the tasks fall on several days other than the one Calendar shows.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "captureConfirmDetails": "Use the details shown",
   "captureNothingToReview": "Nothing left to review",
-  "captureRemovedDraftsHelp": "Removed drafts will not become tasks.",
+  "captureRemovedDraftsHelp": "Nothing will be added.",
   "captureFinish": "Done",
   "captureYourWords": "Your words",
-  "captureReviewRetainedHelp": "Unfinished drafts are kept on this phone. You can return from Unfinished captures.",
   "captureCheckDetails": "Check the details above",
   "captureUnderstanding": "Understanding…",
   "captureFailed": "That didn’t work. Your words are saved here — try again.",
@@ -1454,7 +1465,7 @@
   "diagnosticsTiming": "Median {median} s · P95 {p95} s · {count, plural, one {1 timed observation} other {{count} timed observations}}",
   "diagnosticsClearError": "Could not clear diagnostics. Try again.",
   "clearDiagnostics": "Clear local diagnostics",
-  "diagnosticsEvent": "{event, select, opened{Capture opened} ready{Capture ready to use} started{New durable captures} typedStarted{Typed input started} permissionDenied{Microphone permission denied} nativeStarted{On-device listening started} firstPartial{First on-device words} nativeListening{On-device listening duration} recordingStopped{Saved audio duration} transcription{Online audio transcription} extraction{Online task extraction} processing{Request and retained drafts} notePrepared{Local note prepared} noteTranscribed{Recorded note ready} failed{Failed requests} retried{Retried requests} edited{Draft changes} reviewOpened{Review opened} reviewTime{Time in review} correction{Correction dialog time} saved{Confirmed to local save} discarded{Explicitly discarded captures} resumed{Resumed captures} leftCapturePending{Capture kept for later} leftReviewPending{Review kept for later} other{Other capture event}}",
+  "diagnosticsEvent": "{event, select, opened{Capture opened} ready{Capture ready to use} started{New durable captures} typedStarted{Typed input started} permissionDenied{Microphone permission denied} nativeStarted{On-device listening started} firstPartial{First on-device words} nativeListening{On-device listening duration} recordingStopped{Saved audio duration} transcription{Online audio transcription} extraction{Online task extraction} processing{Request and retained drafts} notePrepared{Local note prepared} noteTranscribed{Recorded note ready} failed{Failed requests} retried{Retried requests} edited{Draft changes} reviewOpened{Review opened} reviewTime{Time in review} correction{Correction dialog time} saved{Confirmed to local save} discarded{Explicitly discarded captures} resumed{Resumed captures} leftCapturePending{Capture kept for later} leftReviewPending{Review kept for later} recognizerFinish{Last words after Done} other{Other capture event}}",
   "@reopenNamedTask": {
     "placeholders": {
       "title": {
@@ -1696,9 +1707,9 @@
       }
     }
   },
-  "freeVoiceUsedUp": "You’ve used this month’s free dictations. You can type it here — more on {date}.",
+  "freeVoiceUsedUp": "No free dictations until {date}.",
   "@freeVoiceUsedUp": {
-    "description": "Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead. {date} is the local short date they come back.",
+    "description": "Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead, with the field already focused, and also in Unfinished captures. {date} is the local short date they come back.",
     "placeholders": {
       "date": {
         "type": "String"

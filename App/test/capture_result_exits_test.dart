@@ -118,7 +118,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-457: the result shows Cancelar; it closes the sheet with no dialog and the capture stays pending',
+    'UX-457 / UX-605: the result shows Cancelar; it asks to keep, and Conservar closes the sheet with the capture pending',
     (tester) async {
       final app = await _App.open(tester);
       app.api.found = [_found('Comprar pan')];
@@ -128,6 +128,9 @@ void main() {
       expect(cancel.hitTestable(), findsOneWidget);
       final id = app.store.pendingIds.single;
       await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(find.text(es.captureKeepQuestion), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(CaptureResult), findsNothing);
@@ -506,6 +509,270 @@ void main() {
       semantics.dispose();
     },
   );
+
+  // ---- 2026-10-14-speed · P106 (UX-605, UX-612): leaving a result asks ----
+
+  Finder dialog() => find.byType(AlertDialog);
+
+  /// The one question, with its two buttons and no second line.
+  void expectKeepQuestion(WidgetTester tester) {
+    expect(dialog(), findsOneWidget);
+    expect(
+      find.descendant(
+        of: dialog(),
+        matching: find.text(es.captureKeepQuestion),
+      ),
+      findsOneWidget,
+    );
+    expect(es.captureKeepQuestion, '¿Quieres conservarlo para más tarde?');
+    expect(tester.widget<AlertDialog>(dialog()).content, isNull);
+    expect(
+      find.descendant(
+        of: dialog(),
+        matching: find.widgetWithText(TextButton, es.discard),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: dialog(),
+        matching: find.widgetWithText(FilledButton, es.keep),
+      ),
+      findsOneWidget,
+    );
+  }
+
+  /// Calendar's pending-captures link, `Capturas pendientes · n`.
+  Finder pendingLink(int count) => find.text(es.pendingCaptureCount(count));
+
+  testWidgets(
+    'UX-605: on a spoken result, Cancelar asks ¿Quieres conservarlo para más tarde? with Descartar and Conservar and no second line; Descartar closes the sheet and nothing is pending',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.api.found = [_found('Comprar pan')];
+      await app.speak(tester, 'Comprar pan');
+      expect(app.store.pendingIds, hasLength(1));
+      await tester.tap(resultButton(es.cancel));
+      await tester.pumpAndSettle();
+      expectKeepQuestion(tester);
+      await tester.tap(find.widgetWithText(TextButton, es.discard));
+      await tester.pumpAndSettle();
+      expect(dialog(), findsNothing);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(app.store.pendingIds, isEmpty);
+      expect(pendingLink(1), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-605: on a spoken result, Conservar closes the sheet and one capture is pending under Capturas pendientes · 1',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.api.found = [_found('Comprar pan')];
+      await app.speak(tester, 'Comprar pan');
+      await tester.tap(resultButton(es.cancel));
+      await tester.pumpAndSettle();
+      expectKeepQuestion(tester);
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(app.store.pendingIds, hasLength(1));
+      expect(pendingLink(1), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-605: on a result, the system Back and a tap on the dimmed area above the sheet show the same question; dismissing it leaves the result open',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.api.found = [_found('Comprar pan')];
+      await app.speak(tester, 'Comprar pan');
+      final id = app.store.pendingIds.single;
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expectKeepQuestion(tester);
+      // Dismissed: a tap outside the dialog.
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+      expect(dialog(), findsNothing);
+      expect(find.byType(CaptureResult), findsOneWidget);
+
+      final sheetTop = tester.getRect(find.byType(BottomSheet)).top;
+      expect(sheetTop, greaterThan(40), reason: 'room above the sheet');
+      await tester.tapAt(Offset(195, sheetTop / 2));
+      await tester.pumpAndSettle();
+      expectKeepQuestion(tester);
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+      expect(dialog(), findsNothing);
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(titleText(tester), 'Comprar pan');
+      expect(app.store.pendingIds, [id]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-605: while typing, Cancelar with words asks ¿Quieres conservarlo para más tarde?',
+    (tester) async {
+      await _App.open(tester);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('capture-words')),
+        'Comprar pan',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await tester.pumpAndSettle();
+      expectKeepQuestion(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-605: while listening with words, Cancelar asks ¿Quieres conservarlo para más tarde?',
+    (tester) async {
+      final app = await _App.open(tester);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Comprar pan');
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await tester.pumpAndSettle();
+      expectKeepQuestion(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-605: with every batch card removed, Back closes the sheet with no question and nothing is pending',
+    (tester) async {
+      final app = await _App.open(tester);
+      final session = _spoken(app, 'Comprar pan', null);
+      await app.openResult(
+        tester,
+        session.copyWith(
+          drafts: [
+            ...session.drafts,
+            CaptureDraft(
+              id: 'b',
+              task: Task(title: 'Llamar a mamá', priority: 1),
+            ),
+          ],
+        ),
+      );
+      expect(app.store.pendingIds, hasLength(1));
+      // ✕ on the first card; the one left shows as a single result, removed
+      // with Quitar under Más opciones.
+      await tester.tap(find.byTooltip(es.removeCaptureItem('Comprar pan')));
+      await tester.pumpAndSettle();
+      // Past the `Quitada` message, which sits over the card.
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      final options = find.byKey(const ValueKey('draft-options-b'));
+      await tester.ensureVisible(options);
+      await tester.pumpAndSettle();
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      final remove = find.widgetWithText(TextButton, es.reviewRemove);
+      await tester.ensureVisible(remove);
+      await tester.pumpAndSettle();
+      await tester.tap(remove);
+      await tester.pumpAndSettle();
+      expect(find.text(es.captureNothingToReview), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(dialog(), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(app.store.pendingIds, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-605: Añadir tarea on a result still closes the sheet and lands, with no question',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.api.found = [_found('Comprar pan')];
+      await app.speak(tester, 'Comprar pan');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(dialog(), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text(es.taskSavedInbox), findsOneWidget);
+      expect(find.text(es.undo), findsOneWidget);
+      expect(app.store.pendingIds, isEmpty);
+      expect(
+        app.container.read(taskProvider).requireValue.map((t) => t.title),
+        contains('Comprar pan'),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-612: removing a batch card says Quitada with Deshacer; Capturas pendientes lists a capture with three cards left as Tareas · 3 sin añadir',
+    (tester) async {
+      final app = await _App.open(tester);
+      final session = _spoken(app, 'Comprar pan', null);
+      await app.openResult(
+        tester,
+        session.copyWith(
+          drafts: [
+            ...session.drafts,
+            for (final (i, title) in [
+              'Llamar a mamá',
+              'Pagar la luz',
+              'Regar',
+            ].indexed)
+              CaptureDraft(
+                id: 'more$i',
+                task: Task(title: title, priority: 1),
+              ),
+          ],
+        ),
+      );
+      await tester.tap(find.byTooltip(es.removeCaptureItem('Regar')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      final message = find.byType(SnackBar);
+      expect(message, findsOneWidget);
+      expect(es.reviewRemoved, 'Quitada');
+      expect(
+        find.descendant(of: message, matching: find.text(es.reviewRemoved)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: message, matching: find.text(es.undo)),
+        findsOneWidget,
+      );
+      await tester.pumpAndSettle();
+      // Kept for later with three cards left.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
+      await tester.pumpAndSettle();
+      expect(app.store.pendingIds, hasLength(1));
+      unawaited(
+        Navigator.of(
+          tester.element(find.byType(Scaffold).first),
+        ).pushNamed('/captures'),
+      );
+      await tester.pumpAndSettle();
+      final summary = '${es.tasks} · ${es.captureDraftSummary(3)}';
+      expect(summary, 'Tareas · 3 sin añadir');
+      expect(find.text(summary), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Map<String, dynamic> _found(String title) => {
@@ -581,6 +848,7 @@ class _App {
         captureRecorderFactoryProvider.overrideWithValue(SilentRecorder.new),
       ],
     );
+    store.tasks = container;
     addTearDown(() {
       container.dispose();
       api.close();
@@ -663,6 +931,9 @@ class _Captures extends CaptureStore {
   /// While set, `Añadir…` stays saving until the test completes it.
   Completer<void>? holdSave;
 
+  /// The app's task list: a save adds to it, as the real store's table does.
+  ProviderContainer? tasks;
+
   @override
   Future<CaptureSession> saveReady(
     String id,
@@ -670,7 +941,26 @@ class _Captures extends CaptureStore {
     Set<String> draftIds,
   ) async {
     final gate = holdSave;
-    if (gate == null) return super.saveReady(id, ownerKey, draftIds);
+    if (gate == null) {
+      final current = sessions[id]!;
+      final list = tasks!.read(taskProvider).requireValue;
+      // The ids the in-memory list gives them, in the order they are added.
+      var next = list.fold<int>(0, (max, t) => t.id! > max ? t.id! : max);
+      final drafts = [
+        for (final draft in current.drafts)
+          draftIds.contains(draft.id)
+              ? draft.copyWith(savedTaskId: ++next)
+              : draft,
+      ];
+      await tasks!.read(taskProvider.notifier).addTasks([
+        for (final draft in current.drafts)
+          if (draftIds.contains(draft.id)) draft.task,
+      ]);
+      return sessions[id] = current.copyWith(
+        status: drafts.any((d) => d.pending) ? 'ready' : 'saved',
+        drafts: drafts,
+      );
+    }
     await gate.future;
     throw StateError('Not saved in this test.');
   }

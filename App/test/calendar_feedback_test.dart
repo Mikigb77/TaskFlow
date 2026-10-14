@@ -1633,6 +1633,9 @@ void main() {
         );
         await tester.tap(find.widgetWithText(TextButton, l.cancel));
         await tester.pumpAndSettle();
+        // Cancelar asks first; kept for later, as before the question.
+        await tester.tap(find.widgetWithText(FilledButton, l.keep));
+        await tester.pumpAndSettle();
         expect(find.byType(CaptureResult), findsNothing);
       }
 

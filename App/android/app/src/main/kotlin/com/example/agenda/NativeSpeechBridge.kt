@@ -223,6 +223,9 @@ class NativeSpeechBridge(private val activity: Activity, messenger: BinaryMessen
                 }
             }
             try { recognizer.startListening(request) } catch (error: Exception) { release(); throw error }
+            // Our own microphone keeps every word from here on, before the
+            // recognizer is ready: listening can show now.
+            if (feed != null) emit(run, "listening")
         }
 
         /** With our own audio, ending it is the stop; otherwise ask the recognizer. */

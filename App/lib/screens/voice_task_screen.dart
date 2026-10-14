@@ -221,6 +221,32 @@ class _SheetFrameState extends State<_SheetFrame> {
   );
 }
 
+/// Leaving the sheet with something said, written or understood: the one
+/// question, while listening, typing and on a result. True keeps it pending,
+/// false discards it, null (dismissed) stays.
+Future<bool?> _askToKeep(BuildContext context) => showDialog<bool>(
+  context: context,
+  builder: (context) => AlertDialog(
+    // At large text on a small screen, the question scrolls instead of
+    // overflowing.
+    scrollable: true,
+    title: Text(context.l10n.captureKeepQuestion),
+    actions: [
+      TextButton(
+        style: TextButton.styleFrom(
+          foregroundColor: Theme.of(context).colorScheme.error,
+        ),
+        onPressed: () => Navigator.pop(context, false),
+        child: Text(context.l10n.discard),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, true),
+        child: Text(context.l10n.keep),
+      ),
+    ],
+  ),
+);
+
 /// The capture sheet's content. Open it with [showCaptureSheet]. A recorder
 /// is created only with the mic; without it every way in types.
 class VoiceTaskScreen extends ConsumerWidget {
@@ -244,8 +270,12 @@ class VoiceTaskScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final voice = ref.watch(voiceAvailableProvider);
-    if (!voice && ref.watch(billingLoadingProvider)) {
-      // Until billing knows, don't guess between the mic and typing.
+    if (!voice &&
+        ref.watch(billingLoadingProvider) &&
+        ref.watch(freeVoiceLeftProvider) == null) {
+      // Until billing knows, don't guess between the mic and typing. With
+      // none left on the saved account, the sheet types at once; it keeps
+      // typing even if billing then finds Pro.
       return const Padding(
         padding: EdgeInsets.all(32),
         child: Center(child: CircularProgressIndicator()),
@@ -313,6 +343,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   late String _kind = widget.kind;
   String _zone = 'UTC';
   bool _timezoneFallback = false;
+  Future<void>? _zoneLookup;
+  // Per store (one for the app): owners whose finished captures were swept
+  // this app session.
+  static final _swept = Expando<Set<String>>();
   Timer? _timer;
   StreamSubscription<Amplitude>? _amplitude;
   StreamSubscription<RecordState>? _recorderStates;
@@ -362,6 +396,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   Completer<void>? _speechEnded;
   bool _nativeMode = false;
   bool _usingNative = false;
+  // This run's recognizer reported `ready`.
+  bool _recognizerReady = false;
   bool _acceptSpeech = false;
   String _nativePrefix = '';
   int _nativeRun = DateTime.now().millisecondsSinceEpoch % 2000000000;
@@ -404,6 +440,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     CaptureInterruption.active = _interruptCapture;
     // The sheet shows the words and the controls that fit them.
     _words.addListener(_wordsChanged);
+    _wordsFocus.addListener(() {
+      if (_wordsFocus.hasFocus) _sweepOnce();
+    });
     // An earlier save's Undo must not follow the user into a new capture.
     // It lives on the app's messenger, not the sheet's own.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -433,26 +472,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   }
 
   Future<void> _load() async {
+    // Listening doesn't wait for the time zone; a new capture does.
+    _zoneLookup = _lookUpZone();
     try {
       await ref.read(regionalProvider.notifier).ready;
       if (_voice && mounted) {
         // The language chosen in Voz, else the app's; never the phone's.
         final preferences = ref.read(regionalProvider);
-        _speechLanguage = speechLanguageTag(
-          preferences.speechLanguage,
-          app: Localizations.localeOf(context),
-          devices: WidgetsBinding.instance.platformDispatcher.locales,
-        );
-        _capability = await _speech.capability(language: _speechLanguage);
+        _speechLanguage = captureSpeechLanguage(context, preferences);
+        _capability = await _speech.knownCapability(_speechLanguage);
         _nativeMode = _capability.usable && !preferences.speechOnline;
       }
-      final zone = await CaptureTimezone.resolve(
-        ref.read(regionalProvider),
-        accountTimezone: _zone,
-      );
-      _zone = zone.identifier;
-      _timezoneFallback = zone.fallback;
-      await _store.cleanFinished(_owner);
       if (widget.captureId != null) {
         _session = await _store.read(widget.captureId!, _owner);
         if (_session == null || _session!.terminal) {
@@ -463,7 +493,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _kind = _session!.kind;
         _timezoneFallback = false;
         _words.text = _session!.text;
-        await CaptureDiagnostics(_store.database).record(CaptureEvent.resumed);
+        unawaited(
+          CaptureDiagnostics(_store.database).record(CaptureEvent.resumed),
+        );
         if (_session!.drafts.isNotEmpty && mounted) {
           _review(_session!);
           return;
@@ -513,6 +545,40 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _tryAutoStart();
   }
 
+  /// The zone a new capture is stored in. A resumed capture keeps its own.
+  Future<void> _lookUpZone() async {
+    try {
+      await ref.read(regionalProvider.notifier).ready;
+      if (!mounted) return;
+      final zone = await CaptureTimezone.resolve(
+        ref.read(regionalProvider),
+        accountTimezone: _zone,
+      );
+      if (!mounted || widget.captureId != null) return;
+      setState(() {
+        _zone = zone.identifier;
+        _timezoneFallback = zone.fallback;
+      });
+    } catch (_) {
+      /* The account's zone stays. */
+    }
+  }
+
+  /// Leftover audio of saved and discarded captures goes once per app
+  /// session, after listening or typing has begun. It never holds them up.
+  void _sweepOnce() {
+    if (!(_swept[_store] ??= <String>{}).add(_owner)) return;
+    Future<void> sweep() async {
+      try {
+        await _store.cleanFinished(_owner);
+      } catch (_) {
+        /* Swept again next app session. */
+      }
+    }
+
+    unawaited(sweep());
+  }
+
   void _tryAutoStart() {
     if (!_initialized ||
         !_autoStart ||
@@ -543,6 +609,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final now = ref.read(calendarClockProvider)();
     final day = widget.day == null ? null : Task.day(widget.day!);
     final scoped = ref.read(projectScopeProvider).projectId;
+    final projectId =
+        _projectId ??
+        widget.projectId ??
+        (ref.read(listCanEditProvider(scoped)) ? scoped : null);
+    // Stored in the phone's zone, once it is known.
+    await _zoneLookup;
+    if (_session != null) return;
     _session = await _store.create(
       _owner,
       _zone,
@@ -550,10 +623,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       now: now,
       audio: audio,
       kind: _kind,
-      projectId:
-          _projectId ??
-          widget.projectId ??
-          (ref.read(listCanEditProvider(scoped)) ? scoped : null),
+      projectId: projectId,
       source: source,
       id: id,
       // Spoken captures keep the Voz language, so online transcription
@@ -565,7 +635,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ? day
           : null,
     );
-    await CaptureDiagnostics(_store.database).record(CaptureEvent.started);
+    unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.started));
     if (mounted) ref.invalidate(pendingCapturesProvider);
   }
 
@@ -671,8 +741,18 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   void _receiveSpeech(SpeechEvent event) {
     if (!_acceptSpeech || event.run != _nativeRun) return;
     final text = event.text?.trim() ?? '';
-    if (event.kind == 'ready' || text.isNotEmpty) _listening();
+    // `listening`: the app's own microphone already keeps the words.
+    if (event.kind == 'ready' ||
+        event.kind == 'listening' ||
+        text.isNotEmpty) {
+      _listening();
+    }
+    if (event.kind == 'error' && !_recognizerReady) {
+      // The recognizer never came up: the next capture asks again.
+      _speech.forget(_speechLanguage);
+    }
     if (event.kind == 'ready') {
+      _recognizerReady = true;
       // A new recognizer attempt is starting: keep what the field shows, even
       // words the last attempt heard but never finalized.
       final shown = _words.text.trim();
@@ -736,6 +816,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     setState(() => _phase = _CapturePhase.listening);
     _armTimer();
     _announce(context.l10n.captureListening);
+    _sweepOnce();
   }
 
   void _armTimer() {
@@ -777,9 +858,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ? SpeechPermission.granted
           : SpeechPermission.denied;
       if (access != SpeechPermission.granted) {
-        await CaptureDiagnostics(
-          _store.database,
-        ).record(CaptureEvent.permissionDenied);
+        unawaited(
+          CaptureDiagnostics(
+            _store.database,
+          ).record(CaptureEvent.permissionDenied),
+        );
         if (access == SpeechPermission.blocked) {
           if (mounted) setState(() => _micBlocked = true);
           return;
@@ -819,13 +902,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         );
         _recording = true;
         _firstWords = false;
+        _recognizerReady = false;
         _listeningWatch = Stopwatch()..start();
         unawaited(
           CaptureDiagnostics(
             _store.database,
           ).record(CaptureEvent.nativeStarted),
         );
-        // Listening shows, and its clock runs, from the recognizer's `ready`.
+        // Listening shows, and its clock runs, from the recognizer's `ready`,
+        // or earlier from `listening` when the app's own microphone keeps
+        // the words (Android 13+).
         await _speech.start(
           _nativeRun,
           _speechLanguage,
@@ -902,6 +988,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _acceptSpeech = false;
       _timer?.cancel();
       if (_usingNative) {
+        _speech.forget(_speechLanguage);
         try {
           await _speech.cancel(_nativeRun);
         } catch (_) {
@@ -985,10 +1072,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     try {
       if (_usingNative) {
         // The recognizer still has the last words: give it time to send them.
+        final finishWatch = Stopwatch()..start();
         await _speech.stop(_nativeRun);
         await _speechEnded?.future.timeout(
           const Duration(seconds: 4),
           onTimeout: () {},
+        );
+        unawaited(
+          CaptureDiagnostics(_store.database).record(
+            CaptureEvent.recognizerFinish,
+            elapsedMs: finishWatch.elapsedMilliseconds,
+          ),
         );
         _acceptSpeech = false;
         await _speech.cancel(_nativeRun);
@@ -1000,11 +1094,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       if (_session != null) {
         _session = _session!.copyWith(status: 'editing');
         await _store.update(_session!);
-        await CaptureDiagnostics(_store.database).record(
-          _usingNative
-              ? CaptureEvent.nativeListening
-              : CaptureEvent.recordingStopped,
-          elapsedMs: _listeningWatch?.elapsedMilliseconds,
+        unawaited(
+          CaptureDiagnostics(_store.database).record(
+            _usingNative
+                ? CaptureEvent.nativeListening
+                : CaptureEvent.recordingStopped,
+            elapsedMs: _listeningWatch?.elapsedMilliseconds,
+          ),
         );
       }
       if (wentBack()) {
@@ -1366,26 +1462,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _finishRecording(submit: false, interrupted: true, quiet: true),
       );
     }
-    final keep = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.l10n.captureKeepQuestion),
-        content: Text(context.l10n.captureKeepHelp),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.discard),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.keep),
-          ),
-        ],
-      ),
-    );
+    final keep = await _askToKeep(context);
     _asking = false;
     if (!mounted || keep == null) return;
     if (keep) {
@@ -1511,9 +1588,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           await _store.discard(session.id, _owner);
           _container?.invalidate(pendingCapturesProvider);
         } else {
-          await CaptureDiagnostics(
-            _store.database,
-          ).record(CaptureEvent.leftCapturePending);
+          unawaited(
+            CaptureDiagnostics(
+              _store.database,
+            ).record(CaptureEvent.leftCapturePending),
+          );
         }
       }
     } catch (_) {
@@ -1966,6 +2045,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   String? _error;
   final _reviewWatch = Stopwatch()..start();
   bool _finished = false;
+  bool _asking = false;
   final _actions = GlobalKey();
 
   @override
@@ -2027,7 +2107,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         .then((_) => _store.update(snapshot));
     try {
       await _writes;
-      await CaptureDiagnostics(_store.database).record(CaptureEvent.edited);
+      unawaited(
+        CaptureDiagnostics(_store.database).record(CaptureEvent.edited),
+      );
       if (mounted) ref.invalidate(pendingCapturesProvider);
     } catch (_) {
       if (mounted) {
@@ -2075,14 +2157,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           undoIds[draft.id] = draft.savedTaskId!;
         }
       }
-      await CaptureDiagnostics(_store.database).record(
-        CaptureEvent.saved,
-        elapsedMs: saveWatch.elapsedMilliseconds,
-        count: ready.length,
+      unawaited(
+        CaptureDiagnostics(_store.database).record(
+          CaptureEvent.saved,
+          elapsedMs: saveWatch.elapsedMilliseconds,
+          count: ready.length,
+        ),
       );
       _reviewWatch.reset();
       _finished = !_items.any((d) => d.pending);
-      await notifier.loadTasks();
+      await notifier.showLocal();
       if (!mounted) return;
       ref.invalidate(pendingCapturesProvider);
       final remaining = _items.where((d) => d.pending).length;
@@ -2091,16 +2175,32 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       EdgeInsets? margin() =>
           messenger == sheetMessages ? _aboveActions() : null;
       final tasks = ready.where((item) => !item.task.isNote).toList();
+      // The tasks' days, earliest first: Calendar lands on the first.
+      final days =
+          tasks
+              .map((item) => item.task.dueDate)
+              .whereType<DateTime>()
+              .map(Task.day)
+              .toSet()
+              .toList()
+            ..sort();
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
       final added = ready.length > 1
           ? strings.captureTasksAdded(ready.length)
           : day == null
           ? strings.taskSavedInbox
           : strings.taskAddedOn(context.weekdayDate(day));
+      // Tasks on days other than the one Calendar lands on are out of sight:
+      // name them.
+      final otherDays = days.skip(1).toList();
       final message = tasks.isEmpty
           ? strings.noteSaved
           : remaining > 0
           ? '$added · ${strings.captureKeptForReview(remaining)}'
+          : otherDays.length == 1
+          ? '$added · ${strings.captureAlsoOn(context.weekdayDate(otherDays.single))}'
+          : otherDays.length > 1
+          ? '$added · ${strings.captureAlsoOnDays(otherDays.length)}'
           : added;
       if (remaining == 0) {
         // From the pending list, back to Calendar, where the tasks land.
@@ -2109,25 +2209,20 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         } else {
           Navigator.pop(context);
         }
-        // Calendar shows the earliest saved day (the no-date row when none
-        // has a date); a task page that opened capture shows them itself.
+        // Calendar shows the earliest saved day, and the no-date row too
+        // when a task has no date; a task page that opened capture shows
+        // them itself.
         final ids = {
           for (final item in tasks)
             if (undoIds[item.id] != null) undoIds[item.id]!,
         };
-        final days =
-            tasks
-                .map((item) => item.task.dueDate)
-                .whereType<DateTime>()
-                .map(Task.day)
-                .toList()
-              ..sort();
         if (ids.isNotEmpty) {
           container.read(calendarFocusProvider.notifier).state = CalendarFocus(
             days.firstOrNull,
             ids,
             page: origin?.page,
             showCalendar: origin?.showCalendar ?? false,
+            undated: tasks.any((item) => item.task.dueDate == null),
           );
         }
       }
@@ -2158,7 +2253,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               }
               return;
             }
-            await container.read(taskProvider.notifier).loadTasks();
+            await container.read(taskProvider.notifier).showLocal();
             container.invalidate(pendingCapturesProvider);
             if (mounted) {
               setState(() {
@@ -2246,16 +2341,55 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     if (mounted) widget.onSayAgain?.call(_session);
   }
 
-  /// `Cancelar` closes the sheet as Back does: the result stays pending.
-  /// `Volver a decirlo` (spoken words only) sits at the other end. They
-  /// share a row, and stack at large text.
-  Widget _exits(BuildContext context, {required bool spoken}) {
+  /// Cancel, Back, a tap above the sheet and a swipe down: ask once whether
+  /// to keep it, as while listening. With every card removed, it finishes as
+  /// `Terminar` does. While saving, nothing happens.
+  Future<void> _leave() async {
+    if (_saving || _asking || !mounted) return;
+    if (!_items.any((d) => d.pending)) {
+      await _finishEmpty();
+      return;
+    }
+    _asking = true;
+    final keep = await _askToKeep(context);
+    _asking = false;
+    if (!mounted || keep == null || _saving) return;
+    if (keep) {
+      // The capture stays in the pending list.
+      Navigator.pop(context);
+    } else {
+      await _discard();
+    }
+  }
+
+  Future<void> _discard() async {
+    try {
+      // A failed edit doesn't keep it from being discarded.
+      await _writes.catchError((Object _) {});
+      await _store.discard(_session.id, _session.ownerKey);
+      _finished = true;
+      unawaited(
+        CaptureDiagnostics(_store.database).record(CaptureEvent.discarded),
+      );
+      if (mounted) {
+        ref.invalidate(pendingCapturesProvider);
+        Navigator.pop(context);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = CaptureProblem.discardFailed);
+    }
+  }
+
+  /// `Cancelar` asks as Back does. `Volver a decirlo` (spoken words, while
+  /// dictations are available) sits at the other end. They share a row, and
+  /// stack at large text.
+  Widget _exits(BuildContext context, {required bool canSayAgain}) {
     final l = context.l10n;
     final cancel = TextButton(
       onPressed: _saving ? null : () => unawaited(Navigator.maybePop(context)),
       child: Text(l.cancel),
     );
-    if (!spoken || widget.onSayAgain == null) {
+    if (!canSayAgain) {
       return Align(alignment: AlignmentDirectional.centerStart, child: cancel);
     }
     final sayAgain = TextButton(
@@ -2301,6 +2435,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         (_items.isNotEmpty && _items.every((d) => d.task.isNote));
     // "See what I said" and "Say it again" only fit words that were spoken.
     final spoken = _session.source == 'speech' || _session.audioPath != null;
+    // Saying it again needs a dictation: with none left, Cancel stands alone.
+    final sayAgain =
+        spoken &&
+        widget.onSayAgain != null &&
+        ref.watch(voiceAvailableProvider);
     // With the keyboard up, only the button stays under the result.
     final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
     // Without Pro, a spoken result says how many free dictations are left,
@@ -2319,8 +2458,12 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         : pending.single.task.dueDate != null
         ? l.captureAddToCalendar
         : l.captureAddTask;
+    // A save closes the sheet itself; every other way out asks first.
     return PopScope(
-      canPop: !_saving,
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_leave());
+      },
       child: Material(
         type: MaterialType.transparency,
         child: Column(
@@ -2415,7 +2558,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                       ),
                     ],
                     const SizedBox(height: 12),
-                    _exits(context, spoken: spoken),
+                    _exits(context, canSayAgain: sayAgain),
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       leading: Icon(

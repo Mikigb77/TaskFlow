@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:flutter/services.dart';
@@ -11,8 +14,15 @@ class SpeechCapability {
   final bool onDevice;
   final String language;
   final bool? languageInstalled;
+  // No answer came: the probe failed or timed out. Never remembered.
+  final bool _unanswered;
   const SpeechCapability(
-      {this.onDevice = false, this.language = '', this.languageInstalled});
+      {this.onDevice = false, this.language = '', this.languageInstalled})
+      : _unanswered = false;
+  const SpeechCapability._unanswered(this.language)
+      : onDevice = false,
+        languageInstalled = null,
+        _unanswered = true;
   bool get usable => onDevice && languageInstalled != false;
 }
 
@@ -20,9 +30,11 @@ class SpeechCapability {
 /// only the phone's Settings can turn the microphone on.
 enum SpeechPermission { granted, denied, blocked }
 
-/// One event of a listening run: `ready`, `partial` (the words of the segment
-/// in progress), `segment` (committed words), `level`, `ended` (only after
-/// stop, cancel or leaving the app) and `error` (only what can't recover).
+/// One event of a listening run: `listening` (Android 13+, the app's own
+/// microphone keeps words before the recognizer is ready), `ready`, `partial`
+/// (the words of the segment in progress), `segment` (committed words),
+/// `level`, `ended` (only after stop, cancel or leaving the app) and `error`
+/// (only what can't recover).
 class SpeechEvent {
   final int run;
   final String kind;
@@ -41,16 +53,21 @@ class SpeechEvent {
 /// Only the explicit Android on-device recognizer is used. Audio fallback goes
 /// through the existing retained recording flow, never a hidden cloud recognizer.
 class NativeSpeech {
+  static const _bridge = 'taskflow/speech';
   final MethodChannel channel;
   final EventChannel eventChannel;
   NativeSpeech(
-      {this.channel = const MethodChannel('taskflow/speech'),
-      this.eventChannel = const EventChannel('taskflow/speech/events')});
+      {this.channel = const MethodChannel(_bridge),
+      this.eventChannel = const EventChannel('$_bridge/events')});
 
   Stream<SpeechEvent> get events => eventChannel.receiveBroadcastStream().map(
       (event) => SpeechEvent.fromMap(Map<Object?, Object?>.from(event as Map)));
 
   Future<SpeechCapability> capability({String? language}) async {
+    // Only Android has the bridge: elsewhere there is nobody to ask.
+    if (channel.name == _bridge && !Platform.isAndroid) {
+      return SpeechCapability._unanswered(language ?? '');
+    }
     try {
       final result = await channel.invokeMapMethod<String, dynamic>(
           'capability',
@@ -59,11 +76,60 @@ class NativeSpeech {
           onDevice: result?['onDevice'] == true,
           language: result?['language'] as String? ?? language ?? '',
           languageInstalled: result?['languageInstalled'] as bool?);
-    } on MissingPluginException {
-      return SpeechCapability(language: language ?? '');
     } catch (_) {
-      return SpeechCapability(language: language ?? '');
+      return SpeechCapability._unanswered(language ?? '');
     }
+  }
+
+  // The answer per speech language, kept for the app session.
+  final _known = <String, Future<SpeechCapability>>{};
+  final _warmed = <String>{};
+
+  /// [capability] for [language], asked once per app session: later captures
+  /// listen without waiting for it. A failed or timed-out probe isn't kept,
+  /// so the next capture asks again.
+  Future<SpeechCapability> knownCapability(String language) {
+    final known = _known[language];
+    if (known != null) return known;
+    final probe = Completer<SpeechCapability>();
+    _known[language] = probe.future;
+    unawaited(_probe(language, probe));
+    return probe.future;
+  }
+
+  Future<void> _probe(
+    String language,
+    Completer<SpeechCapability> probe,
+  ) async {
+    SpeechCapability? answer;
+    try {
+      answer = await capability(language: language);
+    } catch (_) {
+      /* No answer: asked again next time. */
+    }
+    if ((answer == null || answer._unanswered) &&
+        identical(_known[language], probe.future)) {
+      _known.remove(language);
+    }
+    probe.complete(answer ?? SpeechCapability._unanswered(language));
+  }
+
+  /// A fresh answer for [language] (Voz checks it), kept for later captures.
+  void remember(String language, SpeechCapability value) {
+    if (value._unanswered) {
+      forget(language);
+    } else {
+      _known[language] = Future.value(value);
+    }
+  }
+
+  /// The next capture in [language] asks again: its start failed, or the
+  /// language is being set up.
+  void forget(String language) => _known.remove(language);
+
+  /// Asks for [language]'s answer ahead of the first capture, once.
+  void warm(String language) {
+    if (_warmed.add(language)) unawaited(knownCapability(language));
   }
 
   Future<SpeechPermission> permission() async =>
@@ -119,6 +185,17 @@ String speechLanguageTag(
       };
   return '$code-$region';
 }
+
+/// The language capture listens in, for Voz's choice in [preferences]: see
+/// [speechLanguageTag]. Capture, Voz and the warm-up all ask here.
+String captureSpeechLanguage(
+  BuildContext context,
+  RegionalPreferences preferences,
+) => speechLanguageTag(
+  preferences.speechLanguage,
+  app: Localizations.localeOf(context),
+  devices: WidgetsBinding.instance.platformDispatcher.locales,
+);
 
 /// Day and time-of-day words per speech language. Recognizer vocabulary, never
 /// shown; the speech language can differ from the app language.

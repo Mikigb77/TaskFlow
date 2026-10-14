@@ -446,6 +446,33 @@ void main() {
   );
 
   testWidgets(
+    'UX-608: in TaskEditor’s date sheet, Mañana still only selects; the sheet stays open until Listo',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await openEditorEs(
+        tester,
+        Task(
+          id: 1,
+          title: 'Llamar al médico',
+          priority: 1,
+          dueDate: today(),
+          hasTime: false,
+        ),
+      );
+      await openEditorDate(tester);
+      final tomorrow = find.widgetWithText(ChoiceChip, es.tomorrow);
+      await tester.tap(tomorrow);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+      expect(tester.widget<ChoiceChip>(tomorrow).selected, isTrue);
+      expect(find.byType(TaskEditor), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'UX-455: TaskEditor → Repetir opens the repeat sheet with Listo, not Guardar repetición',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);

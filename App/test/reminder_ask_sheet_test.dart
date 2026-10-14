@@ -480,6 +480,8 @@ void main() {
         expect(find.byType(CaptureResult), findsOneWidget);
         await tester.tap(find.widgetWithText(TextButton, l.cancel));
         await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, l.keep));
+        await tester.pumpAndSettle();
         expect(find.byType(VoiceTaskScreen), findsNothing);
         await tester.pump(FeedbackTimeout.defaultDuration * 2);
         await tester.pumpAndSettle();

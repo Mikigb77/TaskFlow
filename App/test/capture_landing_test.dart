@@ -16,6 +16,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
@@ -200,7 +201,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
       expect(es.captureTasksAdded(2), '2 tareas añadidas');
-      expect(find.text(es.captureTasksAdded(2)), findsOneWidget);
+      // The later day is out of sight: the message names it (P102).
+      final calendar = tester.element(find.byType(CalendarScreen));
+      expect(
+        find.text(
+          '${es.captureTasksAdded(2)} · '
+          '${es.captureAlsoOn(calendar.weekdayDate(late))}',
+        ),
+        findsOneWidget,
+      );
       expect(find.text(es.undo), findsOneWidget);
       expect(
         find.text(DateFormat.MMMMEEEEd('es').format(early)),
@@ -597,28 +606,353 @@ void main() {
       await noDateLanding(tester);
     },
   );
+
+  // ---- 2026-10-14-speed · P101 (UX-601): saving never waits on the cloud ----
+
+  /// Friday at 17:00, said and saved with `Añadir al calendario` from
+  /// Calendar on a signed-in account whose cloud is [cloud].
+  Future<_App> saveFridayResult(WidgetTester tester, _SlowCloud cloud) async {
+    final day = friday();
+    final app = await _App.open(tester, [], cloud: cloud);
+    app.api.found = [
+      found(
+        'Llevar el coche al taller',
+        at: DateTime(day.year, day.month, day.day, 17),
+      ),
+    ];
+    await app.speak(tester, 'Llevar el coche al taller el viernes a las 5');
+    expect(find.byType(CaptureResult), findsOneWidget);
+    expect(find.text(es.captureAddToCalendar), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('save-drafts')));
+    await tester.pumpAndSettle();
+    return app;
+  }
+
+  List<String> listed(_App app) => [
+    for (final task in app.container.read(taskProvider).valueOrNull ?? [])
+      task.title,
+  ];
+
+  testWidgets(
+    'UX-601: with a cloud sync that never completes, Añadir al calendario closes the sheet at once, selects Friday, lights its row and says Añadida al vie, … with Deshacer',
+    (tester) async {
+      final cloud = _SlowCloud();
+      final app = await saveFridayResult(tester, cloud);
+      expect(cloud.syncs, greaterThan(0), reason: 'a sync is under way');
+      expect(cloud.finished, 0, reason: 'and it never finished');
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(find.text(es.saving), findsNothing);
+      final day = friday();
+      expect(find.text(DateFormat.MMMMEEEEd('es').format(day)), findsOneWidget);
+      final saved = row('Llevar el coche al taller');
+      expect(saved.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(saved).color, lit(tester));
+      final calendar = tester.element(find.byType(CalendarScreen));
+      final message = es.taskAddedOn(calendar.weekdayDate(day));
+      expect(
+        message,
+        startsWith('Añadida al ${DateFormat.E('es').format(day)}'),
+      );
+      expect(find.text(message), findsOneWidget);
+      expect(find.text(es.undo), findsOneWidget);
+      expect(listed(app), contains('Llevar el coche al taller'));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-601: with the same never-ending sync, Deshacer brings the result back in the sheet and the task leaves Calendar',
+    (tester) async {
+      final cloud = _SlowCloud();
+      final app = await saveFridayResult(tester, cloud);
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(cloud.finished, 0);
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('task-title')))
+            .controller!
+            .text,
+        'Llevar el coche al taller',
+      );
+      expect(find.text(es.saving), findsNothing);
+      expect(listed(app), isNot(contains('Llevar el coche al taller')));
+      expect(cloud.titles, isNot(contains('Llevar el coche al taller')));
+      expect(row('Llevar el coche al taller'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-601: with a sync already running when the save happens, the saved task is in the task list from the save on and never leaves it, before and after that sync completes',
+    (tester) async {
+      final cloud = _SlowCloud();
+      final day = friday();
+      final app = await _App.open(tester, [], cloud: cloud);
+      final gate = cloud.gate;
+      expect(cloud.syncs, 1, reason: 'the first load is syncing');
+      final seen = <List<String>>[];
+      app.container.listen(
+        taskProvider,
+        (_, next) =>
+            seen.add([for (final t in next.valueOrNull ?? []) t.title]),
+      );
+      app.api.found = [
+        found(
+          'Llevar el coche al taller',
+          at: DateTime(day.year, day.month, day.day, 17),
+        ),
+      ];
+      await app.speak(tester, 'Llevar el coche al taller el viernes a las 5');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      final from = seen.indexWhere(
+        (titles) => titles.contains('Llevar el coche al taller'),
+      );
+      expect(from, isNot(-1), reason: 'shown before the sync completed');
+      expect(cloud.finished, 0);
+
+      // The running sync completes; the loop reads the list again.
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(cloud.finished, greaterThan(0));
+      expect(seen.length, greaterThan(from + 1), reason: 'read again');
+      for (final titles in seen.skip(from)) {
+        expect(titles, contains('Llevar el coche al taller'), reason: '$seen');
+      }
+      expect(listed(app), contains('Llevar el coche al taller'));
+      expect(row('Llevar el coche al taller').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-601: a task-list read that began before the save and answers after it never puts back a list without the saved task',
+    (tester) async {
+      final cloud = _SlowCloud()..gate.complete();
+      final day = friday();
+      final app = await _App.open(tester, [], cloud: cloud);
+      app.api.found = [
+        found(
+          'Llevar el coche al taller',
+          at: DateTime(day.year, day.month, day.day, 17),
+        ),
+      ];
+      await app.speak(tester, 'Llevar el coche al taller el viernes a las 5');
+      // A reload starts now: its read is taken before the save and held.
+      final held = cloud.holdNextRead();
+      unawaited(app.container.read(taskProvider.notifier).loadTasks());
+      await tester.pump();
+      final seen = <List<String>>[];
+      app.container.listen(
+        taskProvider,
+        (_, next) =>
+            seen.add([for (final t in next.valueOrNull ?? []) t.title]),
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(listed(app), contains('Llevar el coche al taller'));
+
+      // The old read answers late, without the task.
+      held.complete();
+      await tester.pumpAndSettle();
+      final from = seen.indexWhere(
+        (titles) => titles.contains('Llevar el coche al taller'),
+      );
+      expect(from, isNot(-1));
+      for (final titles in seen.skip(from)) {
+        expect(titles, contains('Llevar el coche al taller'), reason: '$seen');
+      }
+      expect(listed(app), contains('Llevar el coche al taller'));
+      expect(row('Llevar el coche al taller').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed · P102 (U5): a batch shows every place ----
+
+  /// The Bandeja (no-date) row's fill, lit or not.
+  Color? inboxFill(WidgetTester tester) {
+    final inbox = find.byKey(const ValueKey('calendar-inbox'));
+    if (inbox.evaluate().isEmpty) return null;
+    final box = tester.widget<DecoratedBox>(
+      find
+          .descendant(
+            of: find.ancestor(of: inbox, matching: find.byType(Align)).first,
+            matching: find.byType(DecoratedBox),
+          )
+          .first,
+    );
+    return (box.decoration as BoxDecoration).color;
+  }
+
+  /// The colour the Bandeja row is lighting up to (or fading to).
+  Color? inboxTarget(WidgetTester tester) {
+    final inbox = find.byKey(const ValueKey('calendar-inbox'));
+    if (inbox.evaluate().isEmpty) return null;
+    return (tester
+                .widget<TweenAnimationBuilder<Color?>>(
+                  find
+                      .ancestor(
+                        of: inbox,
+                        matching: find.byType(TweenAnimationBuilder<Color?>),
+                      )
+                      .first,
+                )
+                .tween
+            as ColorTween)
+        .end;
+  }
+
+  /// The colour [title]'s row is lighting up to (or fading to).
+  Color? rowTarget(WidgetTester tester, String title) {
+    final tile = row(title);
+    if (tile.evaluate().isEmpty) return null;
+    final builder = find.ancestor(
+      of: tile,
+      matching: find.byType(TweenAnimationBuilder<Color?>),
+    );
+    if (builder.evaluate().isEmpty) return tester.widget<TaskTile>(tile).color;
+    return (tester.widget<TweenAnimationBuilder<Color?>>(builder.first).tween
+            as ColorTween)
+        .end;
+  }
+
+  testWidgets(
+    'U5: one save with a Saturday task and an undated one lands on Saturday with the Saturday row and the no-date row lit in the same frame; both fade, with no exception',
+    (tester) async {
+      final saturday = DateTime(
+        friday().year,
+        friday().month,
+        friday().day + 1,
+      );
+      final app = await _App.open(tester, [
+        // An older task with no date: the no-date row already shows.
+        Task(id: 1, title: 'Ordenar el trastero', priority: 1),
+      ]);
+      app.api.found = [
+        found(
+          'Recoger el coche',
+          at: DateTime(saturday.year, saturday.month, saturday.day, 10),
+        ),
+        found('Pagar la luz'),
+      ];
+      await app.say(
+        tester,
+        'Recoger el coche el sábado por la mañana y pagar la luz',
+      );
+      expect(find.text(es.captureAddTasks(2)), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      final frames = <(bool, bool)>[];
+      for (var frame = 0; frame < 60; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        // Lit: each row is lighting up to the highlight colour.
+        final carLit = rowTarget(tester, 'Recoger el coche') == lit(tester);
+        final inboxLit = inboxTarget(tester) == lit(tester);
+        frames.add((carLit, inboxLit));
+      }
+      final first = frames.indexWhere((f) => f.$1 || f.$2);
+      expect(first, isNot(-1), reason: 'something lit: $frames');
+      expect(frames[first], (true, true), reason: 'same frame: $frames');
+      expect(tester.takeException(), isNull);
+      expect(
+        find.text(DateFormat.MMMMEEEEd('es').format(saturday)),
+        findsOneWidget,
+      );
+      // The undated task names no other day.
+      expect(find.text(es.captureTasksAdded(2)), findsOneWidget);
+      expect(find.byKey(const ValueKey('calendar-inbox')), findsOneWidget);
+      // Both light fully, then both fade.
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(
+        tester.widget<TaskTile>(row('Recoger el coche')).color,
+        lit(tester),
+      );
+      expect(inboxFill(tester), lit(tester));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(rowTarget(tester, 'Recoger el coche'), isNot(lit(tester)));
+      expect(inboxTarget(tester), isNot(lit(tester)));
+      expect(
+        tester.widget<TaskTile>(row('Recoger el coche')).color,
+        isNot(lit(tester)),
+      );
+      expect(inboxFill(tester), isNot(lit(tester)));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'U5: a Friday and a Saturday task in one save say 2 tareas añadidas · también el sáb, …; Friday, Saturday and the next Monday say 3 tareas añadidas · también en otros 2 días',
+    (tester) async {
+      final fri = friday();
+      final sat = DateTime(fri.year, fri.month, fri.day + 1);
+      final mon = DateTime(fri.year, fri.month, fri.day + 3);
+      final app = await _App.open(tester, []);
+      app.api.found = [
+        found('Médico', at: DateTime(fri.year, fri.month, fri.day, 17)),
+        found('Recoger el coche', on: sat),
+      ];
+      await app.say(tester, 'Médico el viernes y recoger el coche el sábado');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      final calendar = tester.element(find.byType(CalendarScreen));
+      final two =
+          '${es.captureTasksAdded(2)} · ${es.captureAlsoOn(calendar.weekdayDate(sat))}';
+      expect(two, startsWith('2 tareas añadidas · también el '));
+      expect(two, endsWith(calendar.weekdayDate(sat)));
+      expect(calendar.weekdayDate(sat), startsWith('sáb'));
+      expect(find.text(two), findsOneWidget);
+      // Lands on the earliest day.
+      expect(find.text(DateFormat.MMMMEEEEd('es').format(fri)), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      app.api.found = [
+        found('Médico', at: DateTime(fri.year, fri.month, fri.day, 17)),
+        found('Recoger el coche', on: sat),
+        found('Llamar al banco', on: mon),
+      ];
+      await app.say(tester, 'Tres cosas en tres días');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      final three = '${es.captureTasksAdded(3)} · ${es.captureAlsoOnDays(2)}';
+      expect(three, '3 tareas añadidas · también en otros 2 días');
+      expect(find.text(three), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// The app in Spanish with a 24-hour clock, on Calendar, with capture
 /// answered by [api] and kept in [store].
 class _App {
-  _App(this.container, this.store, this.api, this.tasks);
+  _App(this.container, this.store, this.api, this.tasks, this.speech);
   final ProviderContainer container;
   final _Captures store;
   final _Api api;
   final _Tasks tasks;
+  final _Speech speech;
 
+  /// With [cloud], the app's own task list reads a signed-in account's
+  /// repository, as on a phone, and a save writes to it.
   static Future<_App> open(
     WidgetTester tester,
     List<Task> initial, {
     Size size = const Size(390, 844),
+    _SlowCloud? cloud,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final store = _Captures();
+    final store = _Captures()..cloud = cloud;
     final api = _Api();
     final tasks = _Tasks(initial);
+    final speech = _Speech();
     final container = ProviderContainer(
       overrides: [
         invitationLinkProvider.overrideWith(
@@ -638,11 +972,13 @@ class _App {
         ),
         taskListsProvider.overrideWith((ref) async => []),
         apiClientProvider.overrideWithValue(api),
-        taskRepositoryProvider.overrideWithValue(MemoryTasks()),
-        taskProvider.overrideWith((ref) => tasks),
+        taskRepositoryProvider.overrideWithValue(cloud ?? MemoryTasks()),
+        taskProvider.overrideWith(
+          (ref) => cloud == null ? tasks : TaskNotifier(cloud),
+        ),
         themeStoreProvider.overrideWithValue(MemoryThemeStore()),
         captureStoreProvider.overrideWithValue(store),
-        nativeSpeechProvider.overrideWithValue(_Speech()),
+        nativeSpeechProvider.overrideWithValue(speech),
         captureRecorderFactoryProvider.overrideWithValue(SilentRecorder.new),
       ],
     );
@@ -655,7 +991,18 @@ class _App {
       UncontrolledProviderScope(container: container, child: const MyApp()),
     );
     await tester.pumpAndSettle();
-    return _App(container, store, api, tasks);
+    return _App(container, store, api, tasks, speech);
+  }
+
+  /// `Añadir tarea` listening, the recognizer hears [words], then `Listo`.
+  Future<void> speak(WidgetTester tester, String words) async {
+    await tester.tap(find.text(es.addTask).hitTestable());
+    await tester.pumpAndSettle();
+    speech.send('ready');
+    speech.send('segment', text: words);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, es.done));
+    await tester.pumpAndSettle();
   }
 
   /// `Dictar una tarea` on the screen in front, `Escribir`, the words, and
@@ -724,6 +1071,8 @@ class _Captures extends CaptureStore {
   _Captures() : super(TaskDatabase());
   CaptureSession? current;
   _Tasks? tasks;
+  // Set: saving writes to this repository, as the real store's table does.
+  _SlowCloud? cloud;
   int undos = 0;
 
   @override
@@ -777,7 +1126,10 @@ class _Captures extends CaptureStore {
     final drafts = [
       for (final draft in current!.drafts)
         draftIds.contains(draft.id)
-            ? draft.copyWith(savedTaskId: tasks!.add(draft.task))
+            ? draft.copyWith(
+                savedTaskId:
+                    cloud?.insert(draft.task) ?? tasks!.add(draft.task),
+              )
             : draft,
     ];
     return current = current!.copyWith(
@@ -793,7 +1145,11 @@ class _Captures extends CaptureStore {
   ) async {
     undos++;
     for (final id in savedIds.values) {
-      await tasks!.deleteTask(id);
+      if (cloud != null) {
+        cloud!.remove(id);
+      } else {
+        await tasks!.deleteTask(id);
+      }
     }
     return current = before;
   }
@@ -820,6 +1176,9 @@ class _Speech extends NativeSpeech {
     String language, {
     List<String> hints = const [],
   }) async => _run = id;
+  void send(String kind, {String? text}) =>
+      _events.add(SpeechEvent(_run!, kind, text: text));
+
   @override
   Future<void> stop(int id) async {
     if (_run != null) _events.add(SpeechEvent(_run!, 'ended'));
@@ -827,4 +1186,71 @@ class _Speech extends NativeSpeech {
 
   @override
   Future<void> cancel(int id) async {}
+}
+
+/// A signed-in account's tasks on the phone, with a cloud sync that runs
+/// until [gate] completes (never, unless the test says so).
+class _SlowCloud extends TaskRepository {
+  _SlowCloud() : super(TaskDatabase());
+  final _rows = <Task>[];
+  var _next = 200;
+  Completer<void> gate = Completer<void>();
+  int syncs = 0;
+  int finished = 0;
+  Completer<void>? _heldRead;
+
+  List<String> get titles => [for (final task in _rows) task.title];
+
+  /// The next read takes the list as it is now and answers when the returned
+  /// completer completes.
+  Completer<void> holdNextRead() => _heldRead = Completer<void>();
+
+  /// The capture store's write: the task is on the phone at once.
+  int insert(Task task) {
+    final id = _next++;
+    _rows.add(task.copyWith(id: id));
+    return id;
+  }
+
+  void remove(int id) => _rows.removeWhere((task) => task.id == id);
+
+  @override
+  String get ownerKey => 'account:1';
+
+  @override
+  Future<void> sync() async {
+    syncs++;
+    await gate.future;
+    finished++;
+  }
+
+  @override
+  Future<List<Task>> getAllTasks() async {
+    final snapshot = [..._rows];
+    final held = _heldRead;
+    if (held != null) {
+      _heldRead = null;
+      await held.future;
+    }
+    return snapshot;
+  }
+
+  @override
+  Future<int> addTask(Task task) async => insert(task);
+
+  @override
+  Future<void> addTasks(List<Task> tasks) async => tasks.forEach(insert);
+
+  @override
+  Future<int> updateTask(Task task) async {
+    final index = _rows.indexWhere((row) => row.id == task.id);
+    if (index >= 0) _rows[index] = task;
+    return index >= 0 ? 1 : 0;
+  }
+
+  @override
+  Future<int> deleteTask(int id) async {
+    remove(id);
+    return 1;
+  }
 }

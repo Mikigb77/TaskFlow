@@ -30,13 +30,13 @@ class AppLocalizationsCa extends AppLocalizations {
   String get reviewOriginalText => 'Text original';
 
   @override
-  String get reviewRemove => 'Treure d’aquesta captura';
+  String get reviewRemove => 'Treu';
 
   @override
-  String get reviewRemoved => 'Esborrany retirat';
+  String get reviewRemoved => 'Treta';
 
   @override
-  String get reviewUndoSaved => 'Les tasques han tornat als esborranys.';
+  String get reviewUndoSaved => 'Tornen a ser aquí, sense desar.';
 
   @override
   String get reviewUndoChanged =>
@@ -2581,10 +2581,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get captureTimeLeft => 'Queden 10 segons';
 
   @override
-  String get captureKeepQuestion => 'Vols conservar el que has dit?';
-
-  @override
-  String get captureKeepHelp => 'Ho podràs acabar més tard.';
+  String get captureKeepQuestion => 'Ho vols conservar per a més tard?';
 
   @override
   String get captureRecordingFirst =>
@@ -2618,7 +2615,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureWriteFailed =>
-      'No s’ha pogut conservar aquest esborrany al telèfon. Torna-ho a provar abans de sortir.';
+      'No s’ha pogut conservar al telèfon. Torna-ho a provar abans de sortir.';
 
   @override
   String get captureStopFailed =>
@@ -2663,27 +2660,21 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get capturesEmptyHelp =>
-      'Les gravacions i els esborranys que deixis pendents es conservaran aquí.';
+      'Aquí es guarden les gravacions i les tasques que deixis a mig fer.';
 
   @override
   String get captureResumeHelp =>
       'Conservat en aquest telèfon · Toca per continuar';
 
   @override
-  String captureDraftSummary(int count, int ready) {
+  String captureDraftSummary(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count esborranys',
-      one: '1 esborrany',
+      other: '$count sense afegir',
+      one: '1 sense afegir',
     );
-    String _temp1 = intl.Intl.pluralLogic(
-      ready,
-      locale: localeName,
-      other: '$ready a punt',
-      one: '1 a punt',
-    );
-    return '$_temp0 · $_temp1';
+    return '$_temp0';
   }
 
   @override
@@ -2713,24 +2704,35 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String captureAlsoOn(String date) {
+    return 'també el $date';
+  }
+
+  @override
+  String captureAlsoOnDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'també en $count dies més',
+      one: 'també en un altre dia',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get captureConfirmDetails => 'Utilitza els detalls mostrats';
 
   @override
   String get captureNothingToReview => 'No queda res per revisar';
 
   @override
-  String get captureRemovedDraftsHelp =>
-      'Els esborranys eliminats no es convertiran en tasques.';
+  String get captureRemovedDraftsHelp => 'No s’afegirà res.';
 
   @override
   String get captureFinish => 'Fet';
 
   @override
   String get captureYourWords => 'Les teves paraules';
-
-  @override
-  String get captureReviewRetainedHelp =>
-      'Els esborranys pendents es conserven en aquest telèfon. Hi pots tornar des de Captures pendents.';
 
   @override
   String get captureCheckDetails => 'Revisa els detalls de sobre';
@@ -2936,6 +2938,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'resumed': 'Captures represes',
       'leftCapturePending': 'Captura conservada per a més endavant',
       'leftReviewPending': 'Revisió conservada per a més endavant',
+      'recognizerFinish': 'Últimes paraules després de Fet',
       'other': 'Altre esdeveniment de captura',
     });
     return '$_temp0';
@@ -3369,7 +3372,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String freeVoiceUsedUp(String date) {
-    return 'Ja has fet servir els dictats gratuïts d’aquest mes. La pots escriure aquí; el dia $date en tindràs més.';
+    return 'Fins al dia $date no tens dictats gratuïts.';
   }
 
   @override

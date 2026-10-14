@@ -26,7 +26,8 @@ enum CaptureEvent {
   discarded,
   resumed,
   leftCapturePending,
-  leftReviewPending
+  leftReviewPending,
+  recognizerFinish
 }
 
 extension CaptureEventLabel on CaptureEvent {
@@ -56,6 +57,7 @@ extension CaptureEventLabel on CaptureEvent {
         CaptureEvent.resumed => 'Resumed captures',
         CaptureEvent.leftCapturePending => 'Capture kept for later',
         CaptureEvent.leftReviewPending => 'Review kept for later',
+        CaptureEvent.recognizerFinish => 'Last words after Done',
       };
 }
 

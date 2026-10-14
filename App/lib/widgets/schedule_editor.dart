@@ -13,14 +13,17 @@ class ScheduleChoice {
   final String scope;
 }
 
-/// [moving] is the task "Cambiar fecha" moves: Hoy and Mañana then apply at
-/// once, and a repeating task chooses this occurrence or the whole series.
+/// [moving] is the task "Cambiar fecha" moves: Hoy, Mañana and Sin fecha
+/// then apply at once, and a repeating task chooses this occurrence or the
+/// whole series. [applyDays] makes those chips apply at once without a move,
+/// as on the capture result. Otherwise (the edit form) they only select.
 Future<ScheduleChoice?> editSchedule(
   BuildContext context, {
   DateTime? date,
   required bool hasTime,
   String? title,
   Task? moving,
+  bool applyDays = false,
 }) => showModalBottomSheet<ScheduleChoice>(
   context: context,
   isScrollControlled: true,
@@ -30,6 +33,7 @@ Future<ScheduleChoice?> editSchedule(
     hasTime: hasTime,
     title: title,
     moving: moving,
+    applyDays: applyDays,
   ),
 );
 
@@ -39,11 +43,13 @@ class _ScheduleEditor extends StatefulWidget {
     required this.hasTime,
     this.title,
     this.moving,
+    this.applyDays = false,
   });
   final DateTime? date;
   final bool hasTime;
   final String? title;
   final Task? moving;
+  final bool applyDays;
   @override
   State<_ScheduleEditor> createState() => _ScheduleEditorState();
 }
@@ -236,10 +242,11 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                                 selected: _day == entry.$2,
                                 onSelected: (_) {
                                   _select(entry.$2);
-                                  // Moving: every day chip applies at once
-                                  // (Hoy and Mañana keep the time); elsewhere
-                                  // a time often follows, so they only select.
-                                  if (moving != null) {
+                                  // Moving, or fixing a capture result: every
+                                  // day chip applies at once (Hoy and Mañana
+                                  // keep the time). In the edit form a time
+                                  // often follows, so they only select.
+                                  if (moving != null || widget.applyDays) {
                                     _done();
                                   }
                                 },

@@ -231,6 +231,80 @@ void main() {
       }
     },
   );
+  // UX-606 and UX-613: a direct result without notes, and an opened batch
+  // card. Written as previews with WRITE_REVIEW_PREVIEWS.
+  testWidgets(
+    'a direct result without notes and an opened batch card render in Spanish',
+    (tester) async {
+      Future<void> write(GlobalKey preview, String name) async {
+        if (!const bool.fromEnvironment('WRITE_REVIEW_PREVIEWS')) return;
+        final boundary =
+            preview.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 2);
+          final bytes = (await image.toByteData(
+            format: ui.ImageByteFormat.png,
+          ))!;
+          await File(
+            'build/$name.png',
+          ).writeAsBytes(bytes.buffer.asUint8List());
+          image.dispose();
+        });
+      }
+
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      final day = DateFormat('yyyy-MM-dd').format(tomorrow);
+      for (final batch in [false, true]) {
+        final preview = GlobalKey();
+        final container = await openReview(tester, [
+          TaskDraft.fromJson({
+            'title': 'Comprar pan',
+            'scheduled_date': day,
+            'notes': '',
+            'priority': 1,
+            'questions': [],
+            'transcript': 'Comprar pan mañana.',
+          }),
+          if (batch)
+            TaskDraft.fromJson({
+              'title': 'Llamar al médico',
+              'scheduled_date': day,
+              'notes': '',
+              'priority': 1,
+              'questions': [],
+              'transcript': 'Llamar al médico mañana.',
+            }),
+        ], preview: preview);
+        await container
+            .read(regionalProvider.notifier)
+            .set(const RegionalPreferences(language: 'es'));
+        await tester.pumpAndSettle();
+        if (batch) {
+          await tester.tap(find.text('Comprar pan'));
+          await tester.pumpAndSettle();
+        } else {
+          expect(find.byKey(const ValueKey('draft-notes')), findsNothing);
+        }
+        for (final mode in [ThemeMode.light, if (!batch) ThemeMode.dark]) {
+          await setAppearance(container, mode);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('save-drafts')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await write(
+            preview,
+            batch
+                ? 'review-batch-open-${mode.name}'
+                : 'review-direct-no-notes-${mode.name}',
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
   testWidgets(
     'one task has editable title and notes with optional controls folded away',
     (tester) async {
@@ -238,9 +312,16 @@ void main() {
         draft('Revisar la aplicación'),
       ]);
       expect(find.byKey(const ValueKey('task-title')), findsOneWidget);
-      expect(find.byKey(const ValueKey('draft-notes')), findsOneWidget);
+      // No notes yet: the field waits behind `Más opciones`.
+      expect(find.byKey(const ValueKey('draft-notes')), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+      await tester.tap(find.byIcon(Icons.tune_rounded));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byIcon(Icons.notes_rounded));
+      await tester.tap(find.byIcon(Icons.notes_rounded));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('draft-notes')), findsOneWidget);
       await tester.enterText(
         find.byKey(const ValueKey('task-title')),
         'Comprobar la aplicación',
@@ -427,7 +508,8 @@ void main() {
         for (final theme in [ThemeMode.light, ThemeMode.dark]) {
           await setAppearance(container, theme);
           await tester.pumpAndSettle();
-          await tester.ensureVisible(find.byKey(const ValueKey('draft-notes')));
+          // The end of the opened card (no notes: the field stays hidden).
+          await tester.ensureVisible(find.byIcon(Icons.tune_rounded));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
           expect(
@@ -736,7 +818,7 @@ void main() {
       expect(inQuestion(question, find.byType(TextButton)), findsNothing);
       expect(find.text(es.reviewEditDetail), findsNothing);
       expect(find.text(es.reviewConfirmDetail), findsNothing);
-      // Right under the date line, above the notes.
+      // Right under the date line, above Más opciones (no notes to show).
       final dateLine = tester.getRect(
         find.byKey(const ValueKey('draft-schedule-doctor')),
       );
@@ -745,7 +827,9 @@ void main() {
       expect(
         chip.bottom,
         lessThanOrEqualTo(
-          tester.getRect(find.byKey(const ValueKey('draft-notes'))).top,
+          tester
+              .getRect(find.byKey(const ValueKey('draft-options-doctor')))
+              .top,
         ),
       );
       // Until a time is picked, nothing can be saved without it.
@@ -1285,6 +1369,497 @@ void main() {
         'Comprar pan',
       );
       expect(saveButton(tester).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed · P105: the result card ----
+
+  Finder notesField() => find.byKey(const ValueKey('draft-notes'));
+  Finder inResult(Finder finder) =>
+      find.descendant(of: find.byType(CaptureResult), matching: finder);
+  bool focused(WidgetTester tester, Finder field) => tester
+      .widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      )
+      .focusNode
+      .hasFocus;
+  Future<void> openOptions(WidgetTester tester, String id) async {
+    final options = find.byKey(ValueKey('draft-options-$id'));
+    await tester.ensureVisible(options);
+    await tester.pumpAndSettle();
+    await tester.tap(options);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'UX-606: a spoken result without notes shows no notes field; Más opciones starts with Añadir notas, which shows the field with focus',
+    (tester) async {
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'bread',
+          task: Task(title: 'Comprar pan', priority: 1),
+        ),
+      ]);
+      expect(notesField(), findsNothing);
+      expect(inResult(find.text(es.notes)), findsNothing);
+      expect(inResult(find.text(es.addNotes)), findsNothing);
+      await openOptions(tester, 'bread');
+      final add = find.byKey(const ValueKey('draft-add-notes-bread'));
+      expect(add, findsOneWidget);
+      expect(
+        find.descendant(of: add, matching: find.text(es.addNotes)),
+        findsOneWidget,
+      );
+      expect(es.addNotes, 'Añadir notas');
+      // The first row inside Más opciones: right under it, above every other
+      // control there.
+      final top = tester.getRect(add).top;
+      final options = tester.getRect(
+        find.byKey(const ValueKey('draft-options-bread')),
+      );
+      expect(top, greaterThanOrEqualTo(options.bottom - 0.5));
+      final others = inResult(find.byType(DropdownButtonFormField<int>));
+      expect(others, findsWidgets);
+      for (final element in others.evaluate()) {
+        final box = element.renderObject! as RenderBox;
+        expect(top, lessThan(box.localToGlobal(Offset.zero).dy));
+      }
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(notesField(), findsOneWidget);
+      expect(focused(tester, notesField()), isTrue);
+      // In its usual place, under the date line.
+      expect(
+        tester.getRect(notesField()).top,
+        greaterThanOrEqualTo(
+          tester
+              .getRect(find.byKey(const ValueKey('draft-schedule-bread')))
+              .bottom,
+        ),
+      );
+      expect(find.byKey(const ValueKey('draft-add-notes-bread')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-606: a result with notes shows its notes field, and Más opciones has no Añadir notas',
+    (tester) async {
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'bread',
+          task: Task(title: 'Comprar pan', priority: 1, notes: 'Integral, si hay'),
+        ),
+      ]);
+      expect(notesField(), findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(notesField()).controller!.text,
+        'Integral, si hay',
+      );
+      await openOptions(tester, 'bread');
+      expect(find.byKey(const ValueKey('draft-add-notes-bread')), findsNothing);
+      // `Añadir notas` is only the notes field's own hint.
+      expect(
+        inResult(find.text(es.addNotes)).evaluate().length,
+        find
+            .descendant(of: notesField(), matching: find.text(es.addNotes))
+            .evaluate()
+            .length,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('UX-606: a note capture always shows its body field', (
+    tester,
+  ) async {
+    await openResultIn(tester, [
+      CaptureDraft(
+        id: 'idea',
+        task: Task(title: 'Ideas para el viaje', priority: 1, kind: 'note'),
+      ),
+    ]);
+    expect(notesField(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'UX-606: after Añadir notas, typing and clearing the field again leaves it shown',
+    (tester) async {
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'bread',
+          task: Task(title: 'Comprar pan', priority: 1),
+        ),
+      ]);
+      await openOptions(tester, 'bread');
+      final add = find.byKey(const ValueKey('draft-add-notes-bread'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      await tester.enterText(notesField(), 'Integral');
+      await tester.pumpAndSettle();
+      await tester.enterText(notesField(), '');
+      await tester.pumpAndSettle();
+      expect(notesField(), findsOneWidget);
+      // Folding Más opciones and opening it again keeps it too.
+      await openOptions(tester, 'bread');
+      await openOptions(tester, 'bread');
+      expect(notesField(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-607: the title and notes fields are underlined in colorScheme.outline, in light and dark, and in primary at 2 dp on focus',
+    (tester) async {
+      final (container, _) = await openResultIn(tester, [
+        CaptureDraft(
+          id: 'bread',
+          task: Task(title: 'Comprar pan', priority: 1, notes: 'Integral'),
+        ),
+      ]);
+      for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+        await setAppearance(container, mode);
+        await tester.pumpAndSettle();
+        final colors = Theme.of(
+          tester.element(find.byType(CaptureResult)),
+        ).colorScheme;
+        for (final field in [
+          find.byKey(const ValueKey('task-title')),
+          notesField(),
+        ]) {
+          final decoration = tester
+              .widget<InputDecorator>(
+                find.descendant(
+                  of: field,
+                  matching: find.byType(InputDecorator),
+                ),
+              )
+              .decoration;
+          final enabled = decoration.enabledBorder;
+          expect(enabled, isA<UnderlineInputBorder>(), reason: '$mode $field');
+          expect(
+            (enabled! as UnderlineInputBorder).borderSide.color,
+            colors.outline,
+            reason: '$mode $field',
+          );
+          final focusedBorder = decoration.focusedBorder;
+          expect(focusedBorder, isA<UnderlineInputBorder>());
+          expect(
+            (focusedBorder! as UnderlineInputBorder).borderSide.color,
+            colors.primary,
+          );
+          expect(focusedBorder.borderSide.width, 2);
+          expect(decoration.filled, isFalse);
+        }
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  Future<void> openDateLine(WidgetTester tester, String id) async {
+    final line = find.byKey(ValueKey('draft-schedule-$id'));
+    await tester.ensureVisible(line);
+    await tester.pumpAndSettle();
+    await tester.tap(line);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+  }
+
+  testWidgets(
+    'UX-608: on a result dated Friday at 17:00, Mañana in the date sheet closes it at once and the line reads Mañana · 17:00; Sin fecha closes it and reads Sin fecha',
+    (tester) async {
+      final friday = nextWeekday(DateTime.friday);
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(
+            title: 'Médico',
+            priority: 1,
+            dueDate: DateTime(friday.year, friday.month, friday.day, 17),
+            hasTime: true,
+          ),
+        ),
+      ]);
+      final line = find.byKey(const ValueKey('draft-schedule-doctor'));
+      await openDateLine(tester, 'doctor');
+      await tester.tap(find.widgetWithText(ChoiceChip, es.tomorrow));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
+      expect(
+        find.descendant(
+          of: line,
+          matching: find.text('${es.tomorrow} · 17:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(es.tomorrow, 'Mañana');
+
+      await openDateLine(tester, 'doctor');
+      await tester.tap(find.widgetWithText(ChoiceChip, es.noDate));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
+      expect(
+        find.descendant(of: line, matching: find.text(es.noDate)),
+        findsOneWidget,
+      );
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-608: picking a day in the date sheet’s calendar keeps the sheet open; Listo closes it with that day',
+    (tester) async {
+      final friday = nextWeekday(DateTime.friday);
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(
+            title: 'Médico',
+            priority: 1,
+            dueDate: DateTime(friday.year, friday.month, friday.day, 17),
+            hasTime: true,
+          ),
+        ),
+      ]);
+      await openDateLine(tester, 'doctor');
+      // Saturday, or Thursday at a month's end: never today or tomorrow.
+      var picked = DateTime(friday.year, friday.month, friday.day + 1);
+      if (picked.month != friday.month) {
+        picked = DateTime(friday.year, friday.month, friday.day - 1);
+      }
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CalendarDatePicker),
+          matching: find.text('${picked.day}'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const ValueKey('schedule-done')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-done')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      final context = tester.element(find.byType(CaptureResult));
+      final label = picked == tomorrow
+          ? es.tomorrow
+          : context.weekdayDate(picked);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('draft-schedule-doctor')),
+          matching: find.text('$label · 17:00'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-613: an opened card of a two-task batch shows its title once, in the field, and keeps ✕ with its tooltip',
+    (tester) async {
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'bread',
+          task: Task(title: 'Comprar pan', priority: 1),
+        ),
+        CaptureDraft(
+          id: 'mum',
+          task: Task(title: 'Llamar a mamá', priority: 1),
+        ),
+      ]);
+      await tester.tap(find.text('Comprar pan'));
+      await tester.pumpAndSettle();
+      final title = find.byKey(const ValueKey('task-title'));
+      expect(title, findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(title).controller!.text,
+        'Comprar pan',
+      );
+      // Once: the field's own text, with no header repeating it.
+      expect(inResult(find.text('Comprar pan')), findsOneWidget);
+      expect(
+        find.descendant(of: title, matching: find.text('Comprar pan')),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip(es.removeCaptureItem('Comprar pan')),
+        findsOneWidget,
+      );
+      // The other card stays folded, with its title and ✕.
+      expect(inResult(find.text('Llamar a mamá')), findsOneWidget);
+      expect(
+        find.byTooltip(es.removeCaptureItem('Llamar a mamá')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed round 2 · P108 (UX-619): one line above Más opciones ----
+
+  /// The dividers in the result whose box lies between [top] and [bottom].
+  List<Rect> dividersBetween(WidgetTester tester, double top, double bottom) =>
+      inResult(find.byType(Divider))
+          .evaluate()
+          .map((element) {
+            final box = element.renderObject! as RenderBox;
+            return box.localToGlobal(Offset.zero) & box.size;
+          })
+          .where((rect) => rect.top >= top - 0.5 && rect.bottom <= bottom + 0.5)
+          .toList();
+
+  testWidgets(
+    'UX-619: a spoken result with notes (es, 360×740) has no Divider between the notes field and Más opciones',
+    (tester) async {
+      await openResultIn(
+        tester,
+        [
+          CaptureDraft(
+            id: 'bread',
+            task: Task(
+              title: 'Comprar pan',
+              priority: 1,
+              notes: 'Integral, si hay',
+            ),
+          ),
+        ],
+        size: const Size(360, 740),
+      );
+      final options = find.byKey(const ValueKey('draft-options-bread'));
+      await tester.ensureVisible(options);
+      await tester.pumpAndSettle();
+      expect(notesField(), findsOneWidget);
+      final notes = tester.getRect(notesField());
+      final row = tester.getRect(options);
+      expect(notes.bottom, lessThanOrEqualTo(row.top + 0.5));
+      expect(dividersBetween(tester, notes.bottom, row.top), isEmpty);
+      // Nor one drawn across the notes field itself, or right above the row.
+      expect(dividersBetween(tester, notes.top, row.top), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-619: a spoken result without notes (es, 360×740) has exactly one Divider, directly above Más opciones',
+    (tester) async {
+      await openResultIn(
+        tester,
+        [
+          CaptureDraft(
+            id: 'bread',
+            task: Task(title: 'Comprar pan', priority: 1),
+          ),
+        ],
+        size: const Size(360, 740),
+      );
+      final options = find.byKey(const ValueKey('draft-options-bread'));
+      await tester.ensureVisible(options);
+      await tester.pumpAndSettle();
+      expect(notesField(), findsNothing);
+      final date = tester.getRect(
+        find.byKey(const ValueKey('draft-schedule-bread')),
+      );
+      final row = tester.getRect(options);
+      final between = dividersBetween(tester, date.bottom, row.top);
+      expect(between, hasLength(1));
+      // Directly above: nothing sits between the line and the row.
+      expect(between.single.bottom, closeTo(row.top, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed round 3 · P109 (UX-620): the line returns when rows sit below the notes ----
+
+  testWidgets(
+    'UX-620: with notes and a deadline (es, 360×740), exactly one Divider separates the deadline row from Más opciones',
+    (tester) async {
+      final now = DateTime.now();
+      final later = DateTime(now.year, now.month, now.day + 3);
+      await openResultIn(
+        tester,
+        [
+          CaptureDraft(
+            id: 'bread',
+            assignmentReviewed: true,
+            task: Task(
+              title: 'Comprar pan',
+              priority: 1,
+              notes: 'Integral, si hay',
+              deadline: later,
+            ),
+          ),
+        ],
+        size: const Size(360, 740),
+      );
+      final options = find.byKey(const ValueKey('draft-options-bread'));
+      await tester.ensureVisible(options);
+      await tester.pumpAndSettle();
+      expect(notesField(), findsOneWidget);
+      final deadlineRow = inResult(
+        find.ancestor(
+          of: find.byIcon(Icons.flag_outlined),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect(deadlineRow, findsOneWidget);
+      final notes = tester.getRect(notesField());
+      final deadline = tester.getRect(deadlineRow);
+      final row = tester.getRect(options);
+      // The deadline row sits between the notes and Más opciones.
+      expect(notes.bottom, lessThanOrEqualTo(deadline.top + 0.5));
+      expect(deadline.bottom, lessThanOrEqualTo(row.top + 0.5));
+      final between = dividersBetween(tester, deadline.bottom, row.top);
+      expect(between, hasLength(1));
+      expect(between.single.bottom, closeTo(row.top, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-620: with notes and the priority chip (es, 360×740), one Divider sits directly above Más opciones and none crosses the notes',
+    (tester) async {
+      await openResultIn(
+        tester,
+        [
+          CaptureDraft(
+            id: 'bread',
+            assignmentReviewed: true,
+            task: Task(
+              title: 'Comprar pan',
+              priority: 3,
+              notes: 'Integral, si hay',
+            ),
+          ),
+        ],
+        size: const Size(360, 740),
+      );
+      final options = find.byKey(const ValueKey('draft-options-bread'));
+      await tester.ensureVisible(options);
+      await tester.pumpAndSettle();
+      expect(notesField(), findsOneWidget);
+      // The priority chip is drawn between the notes and the row.
+      final chip = inResult(find.byType(Chip));
+      expect(chip, findsOneWidget);
+      final notes = tester.getRect(notesField());
+      final chipRect = tester.getRect(chip);
+      final row = tester.getRect(options);
+      expect(notes.bottom, lessThanOrEqualTo(chipRect.top + 0.5));
+      expect(chipRect.bottom, lessThanOrEqualTo(row.top + 0.5));
+      final between = dividersBetween(tester, notes.bottom, row.top);
+      expect(between, hasLength(1));
+      expect(between.single.bottom, closeTo(row.top, 0.5));
+      // No line drawn across the notes field itself.
+      expect(dividersBetween(tester, notes.top, notes.bottom), isEmpty);
       expect(tester.takeException(), isNull);
     },
   );

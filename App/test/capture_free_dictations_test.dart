@@ -35,6 +35,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -847,7 +848,11 @@ void main() {
     expect(rect.bottom, lessThanOrEqualTo(740.5), reason: 'in view');
   }
 
-  for (final (language, width) in [('es', 360.0), ('ca', 320.0), ('en', 320.0)]) {
+  for (final (language, width) in [
+    ('es', 360.0),
+    ('ca', 320.0),
+    ('en', 320.0),
+  ]) {
     testWidgets(
       'UX-502: a recording-only capture refused with 402 shows the kept-recording line, Ver Pro and exactly one Cerrar — no typing field, no Cancelar ($language, 2× text at ${width.toInt()} dp)',
       (tester) async {
@@ -886,7 +891,9 @@ void main() {
       final resets = nextReset();
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(1));
       await refuseRecording(tester, app, resets, es);
-      await tester.tap(inSheet(find.widgetWithText(FilledButton, es.captureClose)));
+      await tester.tap(
+        inSheet(find.widgetWithText(FilledButton, es.captureClose)),
+      );
       await tester.pump();
       expect(find.byType(AlertDialog), findsNothing, reason: 'no question');
       await tester.pumpAndSettle();
@@ -943,7 +950,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsOneWidget);
       expect(
-        tester.widget<Text>(find.byKey(const ValueKey('free-voice-used-up'))).data,
+        tester
+            .widget<Text>(find.byKey(const ValueKey('free-voice-used-up')))
+            .data,
         es.freeVoiceUsedUpRecording(resetDay(tester, resets)),
       );
       expectOnlyClose(tester, es, 360);
@@ -994,17 +1003,17 @@ void main() {
   );
 
   test(
-    'UX-503: in Catalan the reset date sits mid-sentence: “el dia 1 de nov. en tindràs més”, “a partir del dia 1 de nov.” and “El dia 1 de nov. en tindràs més.”',
+    'UX-503 / UX-609: in Catalan the reset date sits mid-sentence: “Fins al dia 1 de nov. no tens”, “a partir del dia 1 de nov.” and “El dia 1 de nov. en tindràs més.”',
     () async {
       await initializeDateFormatting('ca');
       final november = DateTime(2026, 11, 1, 12);
-      String day(String language) =>
-          DateFormat.MMMd(language).format(november);
+      String day(String language) => DateFormat.MMMd(language).format(november);
       expect(day('ca'), '1 de nov.');
 
+      // UX-609: the used-up line is shorter; the date stays mid-sentence.
       expect(
         freeVoiceUsedUpText(ca, november),
-        contains('el dia 1 de nov. en tindràs més'),
+        'Fins al dia 1 de nov. no tens dictats gratuïts.',
       );
       expect(
         freeVoiceUsedUpText(ca, november, recording: true),
@@ -1029,17 +1038,16 @@ void main() {
   );
 
   test(
-    'UX-503: the ES and EN used-up and Pro-screen lines are unchanged',
+    'UX-503 / UX-609: the ES and EN used-up lines are the short ones; the recording and Pro-screen lines are unchanged',
     () async {
       await initializeDateFormatting('es');
       await initializeDateFormatting('en');
       final november = DateTime(2026, 11, 1, 12);
-      String day(String language) =>
-          DateFormat.MMMd(language).format(november);
+      String day(String language) => DateFormat.MMMd(language).format(november);
 
       expect(
         freeVoiceUsedUpText(es, november),
-        'Ya has usado los dictados gratis de este mes. Puedes escribirla aquí; tendrás más el ${day('es')}.',
+        'Sin dictados gratis hasta el ${day('es')}.',
       );
       expect(
         freeVoiceUsedUpText(es, november, recording: true),
@@ -1051,7 +1059,7 @@ void main() {
       );
       expect(
         freeVoiceUsedUpText(en, november),
-        'You’ve used this month’s free dictations. You can type it here — more on ${day('en')}.',
+        'No free dictations until ${day('en')}.',
       );
       expect(
         freeVoiceUsedUpText(en, november, recording: true),
@@ -1067,7 +1075,7 @@ void main() {
   // ---- Round 3 · P98 (UX-503): the Catalan date sits mid-sentence ----
 
   test(
-    'UX-503: in Catalan, for 1 November, the used-up line ends “el dia 1 de nov. en tindràs més.” and the Pro-screen line reads in full, with no doubled full stop',
+    'UX-503 / UX-609: in Catalan, for 1 November, the used-up line reads “Fins al dia 1 de nov. no tens dictats gratuïts.” and the Pro-screen line reads in full, with no doubled full stop',
     () async {
       await initializeDateFormatting('ca');
       final november = DateTime(2026, 11, 1, 12);
@@ -1077,7 +1085,7 @@ void main() {
       final usedUp = freeVoiceUsedUpText(ca, november);
       final recording = freeVoiceUsedUpText(ca, november, recording: true);
       final status = ca.freeVoiceStatus(4, 10, day);
-      expect(usedUp, endsWith('el dia 1 de nov. en tindràs més.'));
+      expect(usedUp, 'Fins al dia 1 de nov. no tens dictats gratuïts.');
       expect(recording, contains('a partir del dia 1 de nov.'));
       expect(
         status,
@@ -1090,7 +1098,7 @@ void main() {
   );
 
   test(
-    'UX-503: in Catalan, for 1 May (a month with no abbreviation dot), the used-up and Pro-screen lines still end “en tindràs més.”',
+    'UX-503 / UX-609: in Catalan, for 1 May (a month with no abbreviation dot), the used-up line reads “Fins al dia 1 de maig no tens dictats gratuïts.” and the Pro-screen line still ends “en tindràs més.”',
     () async {
       await initializeDateFormatting('ca');
       final may = DateTime(2027, 5, 1, 12);
@@ -1099,9 +1107,10 @@ void main() {
 
       final usedUp = freeVoiceUsedUpText(ca, may);
       final status = ca.freeVoiceStatus(4, 10, day);
+      expect(usedUp, 'Fins al dia 1 de maig no tens dictats gratuïts.');
+      expect(status, endsWith('en tindràs més.'));
+      expect(status.toLowerCase(), contains('el dia 1 de maig'));
       for (final text in [usedUp, status]) {
-        expect(text, endsWith('en tindràs més.'), reason: text);
-        expect(text.toLowerCase(), contains('el dia 1 de maig'), reason: text);
         expect(text, isNot(contains('..')), reason: text);
       }
       expect(ca.freeVoiceStatus(1, 10, day), contains('et queda 1'));
@@ -1109,7 +1118,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-503: the capture sheet in Catalan at 2× text on 320 dp, with free dictations used up and the words kept, shows the used-up line ending “el dia 1 de nov. en tindràs més.” with no overflow',
+    'UX-503 / UX-609: the capture sheet in Catalan at 2× text on 320 dp, with free dictations used up and the words kept, shows “Fins al dia 1 de nov. no tens dictats gratuïts.” with no overflow',
     (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -1134,12 +1143,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(app.api.drafts, hasLength(1));
-      expect(tester.widget<TextField>(words()).controller!.text, 'Comprar pa',
-          reason: 'the words are kept');
+      expect(
+        tester.widget<TextField>(words()).controller!.text,
+        'Comprar pa',
+        reason: 'the words are kept',
+      );
       final line = find.byKey(const ValueKey('free-voice-used-up'));
       expect(line, findsOneWidget);
       final text = tester.widget<Text>(line).data!;
-      expect(text, endsWith('el dia 1 de nov. en tindràs més.'));
+      expect(text, 'Fins al dia 1 de nov. no tens dictats gratuïts.');
       expect(text, isNot(contains('..')));
       await tester.ensureVisible(line);
       await tester.pumpAndSettle();
@@ -1155,7 +1167,10 @@ void main() {
     () {
       expect(en.freeVoiceLeft(0), 'No free dictations left this month');
       expect(es.freeVoiceLeft(0), 'Ya no te quedan dictados gratis este mes');
-      expect(ca.freeVoiceLeft(0), 'Ja no et queden dictats gratuïts aquest mes');
+      expect(
+        ca.freeVoiceLeft(0),
+        'Ja no et queden dictats gratuïts aquest mes',
+      );
       for (final l in [en, es, ca]) {
         expect(l.freeVoiceLeft(0), isNot(contains('0')), reason: l.localeName);
       }
@@ -1172,6 +1187,226 @@ void main() {
     expect(en.captureClose, 'Close');
     expect(es.captureClose, 'Cerrar');
     expect(ca.captureClose, 'Tanca');
+  });
+
+  // ---- 2026-10-14-speed · P103 (UX-611): typing opens at once at 0 left ----
+
+  Finder spinner() => inSheet(find.byType(CircularProgressIndicator));
+  bool wordsFocused(WidgetTester tester) => tester
+      .widget<EditableText>(
+        find.descendant(of: words(), matching: find.byType(EditableText)),
+      )
+      .focusNode
+      .hasFocus;
+
+  testWidgets(
+    'UX-611: a free account with 0 dictations left while billing is still loading opens Añadir tarea on the typing field, focused, with no spinner',
+    (tester) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0),
+        billingLoading: true,
+      );
+      expect(app.container.read(billingLoadingProvider), isTrue);
+      expect(app.container.read(freeVoiceLeftProvider), 0);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await frames(tester);
+      expect(spinner(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(wordsFocused(tester), isTrue);
+      expect(app.speech.starts, 0);
+      expect(app.recorders, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-611: with the free count unknown while billing loads, the sheet shows the spinner until billing answers, then types',
+    (tester) async {
+      final app = await _FreeApp.open(tester, billingLoading: true);
+      expect(app.container.read(freeVoiceLeftProvider), isNull);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await frames(tester);
+      expect(spinner(), findsOneWidget);
+      expect(words(), findsNothing);
+      app.container.read(_billing.notifier).state = (
+        pro: false,
+        loading: false,
+      );
+      await tester.pumpAndSettle();
+      expect(spinner(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-611: typing opened at 0 left stays typing when billing then reports Pro; the next capture opens listening',
+    (tester) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0),
+        billingLoading: true,
+      );
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await frames(tester);
+      expect(words(), findsOneWidget);
+      app.container.read(_billing.notifier).state = (pro: true, loading: false);
+      await tester.pumpAndSettle();
+      expect(app.container.read(voiceAvailableProvider), isTrue);
+      expect(words(), findsOneWidget);
+      expect(spinner(), findsNothing);
+      expect(app.speech.starts, 0, reason: 'the open sheet keeps typing');
+      // Closed with nothing typed: the next capture listens.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(app.speech.starts, 1);
+      expect(find.text(es.listeningSeconds('00:00')), findsNothing);
+      app.speech.send('ready');
+      await tester.pump();
+      expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-14-speed · P106 (UX-614): Volver a decirlo needs a dictation ----
+
+  testWidgets(
+    'UX-614: a free account’s result at 0 left says Ya no te quedan dictados gratis este mes and has no Volver a decirlo; Cancelar stands alone',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(1));
+      app.api.answerFreeVoice = freeVoice(0);
+      await dictate(tester, app, 'Comprar pan');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(find.text(es.freeVoiceLeft(0)), findsOneWidget);
+      expect(es.freeVoiceLeft(0), 'Ya no te quedan dictados gratis este mes');
+      expect(find.text(es.captureSayAgain), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(CaptureResult),
+          matching: find.widgetWithText(TextButton, es.cancel),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final pro in [false, true]) {
+    testWidgets(
+      'UX-614: ${pro ? 'with Pro' : 'with free dictations left'}, a spoken result has Volver a decirlo',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          pro: pro,
+          freeVoice: pro ? null : freeVoice(5),
+        );
+        if (!pro) app.api.answerFreeVoice = freeVoice(4);
+        await dictate(tester, app, 'Comprar pan');
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.captureSayAgain),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // ---- 2026-10-14-speed · P106 (UX-609): fewer words at 0 left ----
+
+  group('UX-609 with the app’s fonts', () {
+    setUpAll(() async {
+      final font = FontLoader('Manrope')
+        ..addFont(rootBundle.load('assets/fonts/Manrope.ttf'));
+      await font.load();
+    });
+
+    for (final (language, expected) in [
+      ('es', 'Sin dictados gratis hasta el 1 nov.'),
+      ('ca', 'Fins al dia 1 de nov. no tens dictats gratuïts.'),
+      ('en', 'No free dictations until Nov 1.'),
+    ]) {
+      testWidgets(
+        'UX-609: at 0 left with free dictations back on 1 November, the typing sheet at 2× text on 320 dp ($language) reads “$expected” in at most two lines (three in Catalan), and the typing field stays above a 300 dp keyboard',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final now = DateTime.now().toUtc();
+          var year = now.year;
+          if (!DateTime.utc(year, 11, 1, 12).isAfter(now)) year++;
+          final resets = DateTime.utc(year, 11, 1, 12);
+          const size = Size(320, 740);
+          final app = await _FreeApp.open(
+            tester,
+            language: language,
+            freeVoice: freeVoice(0, resets: resets),
+            size: size,
+          );
+          final l = strings(language);
+          await tester.tap(find.text(l.addTask).hitTestable());
+          await tester.pumpAndSettle();
+          // The keyboard comes up for the focused field.
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          addTearDown(tester.view.resetViewInsets);
+          await tester.pumpAndSettle();
+          expect(app.speech.starts, 0);
+
+          final line = find.byKey(const ValueKey('free-voice-used-up'));
+          expect(line, findsOneWidget);
+          final text = tester.widget<Text>(line).data!;
+          expect(text, expected);
+          expect(text, isNot(contains('..')));
+          final field = words();
+          expect(field, findsOneWidget);
+          final rect = tester.getRect(field);
+          expect(rect.top, greaterThanOrEqualTo(0));
+          expect(
+            rect.bottom,
+            lessThanOrEqualTo(size.height - 300 + 0.5),
+            reason: 'field $rect above the keyboard',
+          );
+          expect(field.hitTestable(), findsOneWidget);
+          // Last: the Catalan copy may take a third line (DECISIONS.md,
+          // 2026-10-14: UX-609), as long as the field stays visible above.
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: line, matching: find.byType(RichText)),
+          );
+          // Laid out as the paragraph is: same text, scale and width.
+          final painter = TextPainter(
+            text: paragraph.text,
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+            locale: paragraph.locale,
+            strutStyle: paragraph.strutStyle,
+            textWidthBasis: paragraph.textWidthBasis,
+            textHeightBehavior: paragraph.textHeightBehavior,
+          )..layout(maxWidth: paragraph.constraints.maxWidth);
+          addTearDown(painter.dispose);
+          expect(
+            painter.computeLineMetrics().length,
+            lessThanOrEqualTo(language == 'ca' ? 3 : 2),
+            reason: '“$text” at 2× on 320 dp',
+          );
+
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   });
 }
 
@@ -1194,6 +1429,12 @@ Map<String, dynamic> _found(String title) => {
   'notes': '',
   'questions': [],
 };
+
+/// What billing says: Pro, and whether it is still loading. A test can
+/// change it while the app runs.
+final _billing = StateProvider<({bool pro, bool loading})>(
+  (ref) => (pro: false, loading: false),
+);
 
 /// An account restored from the session saved on the phone, as at launch.
 class _SavedAuth extends AuthNotifier {
@@ -1232,6 +1473,7 @@ class _FreeApp {
     Map<String, dynamic>? freeVoice,
     String language = 'es',
     Size size = const Size(390, 844),
+    bool billingLoading = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -1252,8 +1494,11 @@ class _FreeApp {
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),
         ),
-        hasProProvider.overrideWithValue(pro),
-        billingLoadingProvider.overrideWithValue(false),
+        _billing.overrideWith((ref) => (pro: pro, loading: billingLoading)),
+        hasProProvider.overrideWith((ref) => ref.watch(_billing).pro),
+        billingLoadingProvider.overrideWith(
+          (ref) => ref.watch(_billing).loading,
+        ),
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) => _SavedAuth(api)),
         attachmentEntriesProvider.overrideWith((ref, taskId) async => []),

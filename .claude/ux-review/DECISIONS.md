@@ -2,6 +2,9 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-14 — Decided by the main session while the owner was away (reversible; tell the owner)
+- **UX-609, the Catalan used-up line.** At 2× text on 320 dp, «Fins al dia {date} no tens dictats gratuïts.» takes 3 lines, where Spanish and English take 2. Accepted as it is: Catalan runs longer, and the typing field stays above a 300 dp keyboard in all three languages. The test allows 3 lines in Catalan and 2 in the others. Rejected: a shorter Catalan line that no native speaker has read.
+
 ## 2026-10-13 (late) — The product bar, the login wall, and the free tier
 
 - **The selling point is speed, and it's the bar for every capture review.**
@@ -118,5 +121,9 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - archived groups drop out of the daily view, capture and reminders.
 
 ## Open — not decided; anything that depends on these is a decision, not a fix
+- **From the capture-speed review (run 2026-10-14-speed; details in its `plan.md`):**
+  - **UX-615: should a spoken result with nothing to ask save itself, with Deshacer?** It would cut a capture to 2 taps (Añadir tarea, Listo) and save about 1–2 s, but it removes D3/U4's confirming tap, so a misheard date would be saved without a look. Recommendation: keep the tap until the §7 test with the owner's father, then decide.
+  - **UX-616: should the assistant's wait be cut on the server,** with a faster model, or by understanding while the person is still speaking? Staging took 1.3, 4.8, 4.8, 4.8 and once 20.5 s. Recommendation: measure first (P101 adds the phone's share to Diagnóstico de captura). Then, if the server is most of the wait, try a faster extraction model on staging and compare cost and accuracy.
+  - **UX-617: should the app teach that one dictation can hold several tasks?** Three tasks take 3 taps in one dictation and 9 taps as three. Recommendation: not in the first-run line yet (P41 keeps one task); decide after §7 task 3.
 - **Finding the tasks that hold files** (from UX-506, b7). When a free account's file space is full, the message asks people to remove files from other tasks, but nothing lists which tasks have files. Whether to add a way to find them is the owner's call: it adds a feature, so the loop doesn't.
 - **The two-tab layout** (U13, D7a): after the UX loop and the owner's tests with his father, family and friends.

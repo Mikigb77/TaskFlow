@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:record/record.dart';
+import 'package:sqflite/sqflite.dart' show ConflictAlgorithm, Database;
 import 'support/design_fixtures.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -1086,7 +1087,7 @@ void main() {
     }
 
     testWidgets(
-      'U2: with words, Cancelar asks ¿Conservar lo que has dicho?; Conservar is the filled button and keeps the capture',
+      'U2: with words, Cancelar asks ¿Quieres conservarlo para más tarde?; Conservar is the filled button and keeps the capture',
       (tester) async {
         final store = await withWords(tester);
         await tester.tap(find.widgetWithText(TextButton, es.cancel));
@@ -1100,10 +1101,8 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(
-          find.descendant(of: dialog, matching: find.text(es.captureKeepHelp)),
-          findsOneWidget,
-        );
+        // One question, with no second line.
+        expect(tester.widget<AlertDialog>(dialog).content, isNull);
         final keep = find.widgetWithText(FilledButton, es.keep);
         final discard = find.widgetWithText(TextButton, es.discard);
         expect(keep, findsOneWidget);
@@ -1634,6 +1633,450 @@ void main() {
       },
     );
   });
+
+  // ---- 2026-10-14-speed · P103 (UX-603): capture opens ready ----
+
+  group('P103: capture opens ready', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    Finder sheet() => find.byType(BottomSheet);
+
+    /// A few frames, without waiting for anything to settle.
+    Future<void> frames(WidgetTester tester, [int count = 4]) async {
+      for (var i = 0; i < count; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+    }
+
+    /// Calendar's `Añadir tarea`.
+    Future<void> addTask(WidgetTester tester) async {
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await frames(tester);
+    }
+
+    /// Closes the sheet with nothing said: Back, which asks nothing.
+    Future<void> close(WidgetTester tester) async {
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(sheet(), findsNothing);
+    }
+
+    testWidgets(
+      'UX-603: with a capability answer that takes 2 s, the first open listens once it answers; the next open listens at once, and capability() was asked only once',
+      (tester) async {
+        final speech = _OpeningSpeech()..gate = Completer<void>();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        await addTask(tester);
+        await tester.pump(const Duration(milliseconds: 1900));
+        expect(speech.starts, 0, reason: 'listening waits for the answer');
+        // The answer arrives, 2 s after it was asked.
+        speech.gate!.complete();
+        await frames(tester);
+        expect(speech.starts, 1);
+        expect(speech.capabilities, 1);
+        await close(tester);
+
+        // The next open: the gate would hold a second probe forever.
+        speech.gate = Completer<void>();
+        await addTask(tester);
+        expect(speech.starts, 2, reason: 'listening without waiting');
+        expect(speech.capabilities, 1);
+        await close(tester);
+        speech.gate!.complete();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-603: after a failed native start, the next open asks capability() again',
+      (tester) async {
+        final speech = _OpeningSpeech()
+          ..startError = PlatformException(code: 'recognizer-busy');
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: _Recorder(),
+          language: 'es',
+          open: false,
+        );
+        expect(speech.capabilities, 1, reason: 'the warm-up asked once');
+        await addTask(tester);
+        await tester.pumpAndSettle();
+        expect(speech.starts, 1);
+        expect(speech.capabilities, 1, reason: 'the open used the answer');
+        await close(tester);
+
+        speech.startError = null;
+        await addTask(tester);
+        await tester.pumpAndSettle();
+        expect(speech.capabilities, 2, reason: 'asked again after the failure');
+        expect(speech.starts, 2);
+        await close(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-603: an error event before the recognizer is ready makes the next open ask capability() again',
+      (tester) async {
+        final speech = _OpeningSpeech();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: _Recorder(),
+          language: 'es',
+          open: false,
+        );
+        await addTask(tester);
+        await tester.pumpAndSettle();
+        expect(speech.capabilities, 1);
+        speech.emit('error');
+        await tester.pumpAndSettle();
+        await close(tester);
+        await addTask(tester);
+        await tester.pumpAndSettle();
+        expect(speech.capabilities, 2);
+        await close(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-603: an answer from capability()’s error path (it throws) isn’t remembered: every open asks again',
+      (tester) async {
+        final speech = _OpeningSpeech()
+          ..capabilityError = PlatformException(code: 'binder');
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: _Recorder(),
+          language: 'es',
+          open: false,
+        );
+        expect(speech.capabilities, 1, reason: 'the warm-up asked once');
+        await addTask(tester);
+        await tester.pumpAndSettle();
+        expect(speech.capabilities, 2);
+        await close(tester);
+        await addTask(tester);
+        await tester.pumpAndSettle();
+        expect(speech.capabilities, 3);
+        await close(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final timesOut in [false, true]) {
+      testWidgets(
+        'UX-603: over the real bridge, a capability call that ${timesOut ? 'times out (4 s)' : 'fails on the platform side'} isn’t remembered: the next open asks again',
+        (tester) async {
+          final bridge = _Bridge(tester)
+            ..capability = timesOut
+                ? () => Completer<Object?>().future
+                : () async => throw PlatformException(code: 'binder');
+          await _open(
+            tester,
+            bridge.speech,
+            _Captures(),
+            _OfflineExtraction(),
+            recorder: _Recorder(),
+            language: 'es',
+            open: false,
+          );
+          await tester.pump(const Duration(seconds: 5));
+          await tester.pumpAndSettle();
+          final warmed = bridge.capabilities;
+          expect(warmed, 1, reason: 'the warm-up asked once');
+          await addTask(tester);
+          await tester.pump(const Duration(seconds: 5));
+          await tester.pumpAndSettle();
+          expect(bridge.capabilities, warmed + 1);
+          await close(tester);
+          await addTask(tester);
+          await tester.pump(const Duration(seconds: 5));
+          await tester.pumpAndSettle();
+          expect(bridge.capabilities, warmed + 2);
+          await close(tester);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-603: Calendar with Añadir tarea and the mic asks capability() once by itself after its first frame; opening capture then listens with no second call',
+      (tester) async {
+        final speech = _OpeningSpeech();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        expect(find.text(es.addTask), findsOneWidget);
+        expect(speech.capabilities, 1);
+        await tester.pump(const Duration(seconds: 2));
+        expect(speech.capabilities, 1, reason: 'once, not on every frame');
+        expect(speech.starts, 0);
+        await addTask(tester);
+        expect(speech.starts, 1);
+        expect(speech.capabilities, 1);
+        await close(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-603: with a time-zone lookup that takes 3 s, listening starts before it answers, and the capture made from the first words stores the zone it returned',
+      (tester) async {
+        final messenger = tester.binding.defaultBinaryMessenger;
+        const zone = MethodChannel('flutter_timezone');
+        var answered = false;
+        messenger.setMockMethodCallHandler(zone, (_) async {
+          await Future<void>.delayed(const Duration(seconds: 3));
+          answered = true;
+          return 'America/New_York';
+        });
+        final speech = _OpeningSpeech();
+        final store = _Captures();
+        await _open(
+          tester,
+          speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        await addTask(tester);
+        expect(speech.starts, 1);
+        expect(answered, isFalse, reason: 'started before the zone answered');
+        speech.emit('ready');
+        speech.emit('segment', text: 'Mañana llamar a Juan');
+        await frames(tester);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pump();
+        expect(answered, isTrue);
+        expect(store.session, isNotNull);
+        expect(store.session!.timezone, 'America/New_York');
+        expect(store.session!.text, 'Mañana llamar a Juan');
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, es.keep));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final throws in [false, true]) {
+      testWidgets(
+        'UX-603: with a cleanFinished that ${throws ? 'throws' : 'takes 2 s'}, listening starts first and no error shows',
+        (tester) async {
+          final log = <String>[];
+          final speech = _OpeningSpeech()..log = log;
+          final store = _Captures()
+            ..log = log
+            ..cleanDelay = throws ? null : const Duration(seconds: 2)
+            ..cleanError = throws
+                ? StateError('Synthetic sweep failure')
+                : null;
+          await _open(
+            tester,
+            speech,
+            store,
+            _OfflineExtraction(),
+            language: 'es',
+            open: false,
+          );
+          await addTask(tester);
+          expect(speech.starts, 1);
+          speech.emit('ready');
+          await tester.pump(const Duration(seconds: 3));
+          expect(log.first, 'start', reason: '$log');
+          expect(log, contains('clean'), reason: 'the sweep still runs');
+          expect(find.text(es.listeningSeconds('00:03')), findsOneWidget);
+          expect(find.byType(MessageBanner), findsNothing);
+          await close(tester);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-603: a recognizer that sends listening and no ready shows Escuchando · 00:00 and announces Escuchando once; a later ready keeps the words and the clock',
+      (tester) async {
+        final speech = _OpeningSpeech();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        await addTask(tester);
+        expect(speech.starts, 1);
+        expect(find.text(es.captureStarting), findsOneWidget);
+        tester.takeAnnouncements();
+        speech.emit('listening');
+        await frames(tester, 2);
+        expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);
+        expect(find.text(es.captureStarting), findsNothing);
+        expect(
+          tester.takeAnnouncements().where(
+            (a) => a.message == es.captureListening,
+          ),
+          hasLength(1),
+        );
+        // Words kept by the app's own microphone, before the recognizer is
+        // ready.
+        speech.emit('partial', text: 'Mañana');
+        await tester.pump(const Duration(seconds: 2));
+        expect(find.text(es.listeningSeconds('00:02')), findsOneWidget);
+        speech.emit('ready');
+        await frames(tester, 2);
+        expect(
+          find.text('Mañana'),
+          findsOneWidget,
+          reason: 'ready keeps the words shown',
+        );
+        expect(find.text(es.listeningSeconds('00:02')), findsOneWidget);
+        expect(find.text(es.listeningSeconds('00:00')), findsNothing);
+        expect(
+          tester.takeAnnouncements().where(
+            (a) => a.message == es.captureListening,
+          ),
+          isEmpty,
+          reason: 'announced once',
+        );
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text(es.listeningSeconds('00:03')), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, es.cancel));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, es.keep));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- P101 (UX-610): the recognizer's last words are measured ----
+
+    testWidgets(
+      'UX-610: after Listo on a native capture, one recognizerFinish diagnostics row is recorded with an elapsed time',
+      (tester) async {
+        final database = _DiagnosticsDatabase();
+        final store = _Captures(database: TaskDatabase.forTesting(database));
+        final speech = _OpeningSpeech();
+        await _open(
+          tester,
+          speech,
+          store,
+          _OfflineExtraction(),
+          language: 'es',
+          open: false,
+        );
+        await addTask(tester);
+        speech.emit('ready');
+        speech.emit('segment', text: 'Comprar pan');
+        await tester.pumpAndSettle();
+        expect(
+          database.rows.where((row) => row['event'] == 'recognizerFinish'),
+          isEmpty,
+        );
+        await tester.tap(find.widgetWithText(FilledButton, es.done));
+        await tester.pumpAndSettle();
+        final rows = database.rows
+            .where((row) => row['event'] == 'recognizerFinish')
+            .toList();
+        expect(rows, hasLength(1));
+        expect(rows.single['elapsed_ms'], isA<int>());
+        expect(rows.single['elapsed_ms'] as int, greaterThanOrEqualTo(0));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+}
+
+/// A recognizer for opening capture: [capabilities] counts the questions,
+/// [gate] holds the answer back, [capabilityError] and [startError] fail.
+class _OpeningSpeech extends NativeSpeech {
+  final controller = StreamController<SpeechEvent>.broadcast(sync: true);
+  int capabilities = 0;
+  int starts = 0;
+  int? run;
+  Completer<void>? gate;
+  Object? capabilityError;
+  Object? startError;
+
+  /// What happened, in order, shared with the store.
+  List<String>? log;
+  @override
+  Future<SpeechCapability> capability({String? language}) async {
+    capabilities++;
+    await gate?.future;
+    final error = capabilityError;
+    if (error != null) throw error;
+    return const SpeechCapability(
+      onDevice: true,
+      language: 'es-ES',
+      languageInstalled: true,
+    );
+  }
+
+  @override
+  Stream<SpeechEvent> get events => controller.stream;
+  @override
+  Future<SpeechPermission> permission() async => SpeechPermission.granted;
+  @override
+  Future<void> start(
+    int id,
+    String language, {
+    List<String> hints = const [],
+  }) async {
+    starts++;
+    run = id;
+    log?.add('start');
+    final error = startError;
+    if (error != null) throw error;
+  }
+
+  void emit(String kind, {String? text}) =>
+      controller.add(SpeechEvent(run!, kind, text: text));
+  @override
+  Future<void> stop(int id) async => emit('ended');
+  @override
+  Future<void> cancel(int id) async {}
+}
+
+/// The diagnostics table, in memory: every row recorded.
+class _DiagnosticsDatabase extends Fake implements Database {
+  final rows = <Map<String, Object?>>[];
+  @override
+  Future<int> insert(
+    String table,
+    Map<String, Object?> values, {
+    String? nullColumnHack,
+    ConflictAlgorithm? conflictAlgorithm,
+  }) async {
+    if (table == 'diagnostics') rows.add(values);
+    return rows.length;
+  }
+
+  @override
+  Future<int> rawDelete(String sql, [List<Object?>? arguments]) async => 0;
 }
 
 Future<ProviderContainer> _open(
@@ -1772,9 +2215,16 @@ class _Speech extends NativeSpeech {
 }
 
 class _Captures extends CaptureStore {
-  _Captures() : super(TaskDatabase());
+  _Captures({TaskDatabase? database}) : super(database ?? TaskDatabase());
   CaptureSession? session;
   bool failWrites = false;
+
+  /// The leftover sweep: how long it takes, or what it throws.
+  Duration? cleanDelay;
+  Object? cleanError;
+
+  /// What happened, in order, shared with the recognizer.
+  List<String>? log;
   @override
   Future<CaptureSession> create(
     String ownerKey,
@@ -1811,7 +2261,14 @@ class _Captures extends CaptureStore {
   Future<CaptureSession?> read(String id, String ownerKey) async =>
       session?.id == id && session?.ownerKey == ownerKey ? session : null;
   @override
-  Future<void> cleanFinished(String ownerKey) async {}
+  Future<void> cleanFinished(String ownerKey) async {
+    log?.add('clean');
+    final delay = cleanDelay;
+    if (delay != null) await Future<void>.delayed(delay);
+    final error = cleanError;
+    if (error != null) throw error;
+  }
+
   @override
   Future<String> audioPathForId(String id) async => '/synthetic/capture.wav';
 
@@ -1900,6 +2357,9 @@ class _Bridge {
       final arguments = call.arguments;
       switch (call.method) {
         case 'capability':
+          capabilities++;
+          final answer = capability;
+          if (answer != null) return answer();
           return {
             'onDevice': true,
             'language': 'es-ES',
@@ -1945,6 +2405,10 @@ class _Bridge {
   final speech = NativeSpeech(channel: _methods, eventChannel: _events);
   MockStreamHandlerEventSink? _sink;
   Object permission = 'granted';
+
+  /// Answers `capability` instead of the bridge's usual on-device answer.
+  Future<Object?> Function()? capability;
+  int capabilities = 0;
   int? run;
 
   /// The speech hints the last `start` call carried.

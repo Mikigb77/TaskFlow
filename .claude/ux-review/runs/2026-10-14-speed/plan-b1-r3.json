@@ -1,0 +1,47 @@
+{
+ "runId": "2026-10-14-speed",
+ "mode": "changes",
+ "round": "b1-r3",
+ "packages": [
+  {
+   "id": "P109",
+   "title": "The line above Más opciones returns when other rows sit below the notes",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-620"
+   ],
+   "files": [
+    "App/lib/widgets/capture_review_editor.dart",
+    "App/test/review_tasks_test.dart"
+   ],
+   "brief": [
+    "Regression from round 2 (P108, UX-619; the reviewer's R2A-1, now UX-620, severity 1). P108 changed the Divider just above the Más opciones ListTile (key `draft-options-<id>`, about App/lib/widgets/capture_review_editor.dart:574) to `if (!showNotes) const Divider(height: 1),`. That fixed the double line when the notes field is the last thing above the row, but it also removes the line whenever notes show and something else is drawn between the notes and Más opciones: the text-repair help (`...repair`), the assignment picker (`showAssignment`), the deadline `_row` (flag icon + text + chevron), the duration text, a deadline or duration question, the `ChecklistEditor`, the priority/repeat chips, or an open recurrence/details question. Then, for example, the deadline row sits directly on the Más opciones row and they read as two fields of one list. The reviewer verified this in code; no preview covers the state.",
+    "Change: draw the Divider unless the notes field is directly above it. In `build`, after `repair` is defined (about :405-420), compute what is drawn between the notes and the row, matching the conditions the build already uses (:520-572):\n  `final openQuestion = (String field) => !widget.draft.confirmed && widget.draft.reviewQuestions.any((q) => q.field == field && !widget.draft.resolvedQuestions.contains(q.id));`\n  `final belowNotes = repair.isNotEmpty || showAssignment || (!task.isNote && (task.deadline != null || task.durationMinutes != null || openQuestion('deadline') || openQuestion('duration'))) || task.checklist.isNotEmpty || task.priority > 1 || task.isRecurring || openQuestion('recurrence') || openQuestion('details');`\n  `final notesLast = showNotes && !belowNotes;`\nThen replace `if (!showNotes) const Divider(height: 1),` with `if (!notesLast) const Divider(height: 1),` and update its comment to: `// The notes field's underline already separates it from the row, when nothing else sits between them.`",
+    "Use the open-question test (not resolved, draft not confirmed), not `showPlanning`: `showPlanning` counts resolved deadline/duration questions too, which would bring back the double line in the case where such a question was answered and left nothing to draw. If you prefer, factor the same filter out of `_questions` (about :139-148) into a small `_openQuestions(String field)` and use it in both places; the behaviour of `_questions` must not change.",
+    "Don't touch the notes or title underline styles, the `const SizedBox(height: 8)` after the notes, the 'Añadir notas' row inside Más opciones (`if (!showNotes)` at about :590 stays as it is), the order of the rows, or any copy. No ARB changes. Don't run `dart format` over the whole file if it reformats code you didn't change; keep the diff to this block.",
+    "Keep the two UX-619 tests in App/test/review_tasks_test.dart (about :1721-1775) passing unchanged. Re-render with `flutter test --no-pub --dart-define=WRITE_REVIEW_PREVIEWS=true test/review_tasks_test.dart`; review-direct-light/-dark and review-direct-no-notes-light/-dark must look the same as after round 2."
+   ],
+   "acceptance": [
+    "Widget test, Spanish, 360×740, a spoken result with notes and a deadline (draft id 'bread', notes 'Integral, si hay', a deadline on a later day, assignment reviewed): exactly one Divider lies between the deadline row and the Más opciones row (key 'draft-options-bread'), and its bottom is within 0.5 dp of the row's top.",
+    "Widget test, Spanish, 360×740, a spoken result with notes and priority 3 (the priority chip shows), no deadline: exactly one Divider sits directly above the Más opciones row, and no Divider lies across the notes field (key 'draft-notes').",
+    "Widget test: the two existing UX-619 tests still pass (notes only: no Divider between the notes field and Más opciones; no notes: exactly one Divider directly above Más opciones).",
+    "Code: the Divider's condition is `!notesLast`, and `notesLast` is false whenever repair, the assignment picker, the deadline row, the duration text, an open deadline/duration/recurrence/details question, a checklist, or the priority/repeat chips are drawn; `_questions` renders the same as before.",
+    "Render review-direct-light.png and -dark.png: still one line (the notes underline) between the notes and 'Más opciones'; review-direct-no-notes-light/-dark: one line above 'Más opciones', unchanged from round 2."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [
+  {
+   "question": "UX-609 (Catalan only, unchanged from round 2): at 0 free dictations, the line above typing reads «Fins al dia 1 de nov. no tens dictats gratuïts.» and takes 3 lines at 2× text on a 320 dp phone; Spanish and English take 2. Accept 3 lines in Catalan, or shorten the Catalan line?",
+   "findings": [
+    "UX-609"
+   ],
+   "recommendation": "Keep the Catalan wording and accept 3 lines in Catalan (the reviewer's options a and c together); the typing field stays above the keyboard in all three languages, and Spanish fits in 2. If you agree, ux-tester changes the Catalan check to 'at most 3 lines and the field above a 300 dp keyboard'. Until you answer, that Catalan test (capture_free_dictations_test.dart, UX-609 ca) keeps failing; rounds 2 and 3 don't touch that sheet, so it is not re-planned."
+  }
+ ],
+ "skipped": []
+}

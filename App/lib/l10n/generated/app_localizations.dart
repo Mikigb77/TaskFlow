@@ -145,19 +145,19 @@ abstract class AppLocalizations {
   /// No description provided for @reviewRemove.
   ///
   /// In en, this message translates to:
-  /// **'Remove from this capture'**
+  /// **'Remove'**
   String get reviewRemove;
 
   /// No description provided for @reviewRemoved.
   ///
   /// In en, this message translates to:
-  /// **'Draft removed'**
+  /// **'Removed'**
   String get reviewRemoved;
 
   /// No description provided for @reviewUndoSaved.
   ///
   /// In en, this message translates to:
-  /// **'Tasks returned to your drafts.'**
+  /// **'They’re back here, not saved yet.'**
   String get reviewUndoSaved;
 
   /// No description provided for @reviewUndoChanged.
@@ -4288,17 +4288,11 @@ abstract class AppLocalizations {
   /// **'10 seconds left'**
   String get captureTimeLeft;
 
-  /// Asked when closing the capture sheet with words or a recording.
+  /// The one question asked when leaving the capture sheet with something said or written: by Cancel, Back, a tap above the sheet or a swipe down, while listening, while typing and on a result. No body text; its buttons are discard and keep.
   ///
   /// In en, this message translates to:
-  /// **'Keep what you said?'**
+  /// **'Keep it for later?'**
   String get captureKeepQuestion;
-
-  /// Body of the question asked when closing the capture sheet.
-  ///
-  /// In en, this message translates to:
-  /// **'You can finish it later.'**
-  String get captureKeepHelp;
 
   /// No description provided for @captureRecordingFirst.
   ///
@@ -4351,7 +4345,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureWriteFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not keep this draft on your phone. Try again before leaving.'**
+  /// **'Couldn’t keep this on your phone. Try again before leaving.'**
   String get captureWriteFailed;
 
   /// No description provided for @captureStopFailed.
@@ -4423,7 +4417,7 @@ abstract class AppLocalizations {
   /// No description provided for @capturesEmptyHelp.
   ///
   /// In en, this message translates to:
-  /// **'Recordings and drafts you leave unfinished will be kept here.'**
+  /// **'Recordings and tasks you leave unfinished are kept here.'**
   String get capturesEmptyHelp;
 
   /// No description provided for @captureResumeHelp.
@@ -4432,11 +4426,11 @@ abstract class AppLocalizations {
   /// **'Kept on this phone · Tap to resume'**
   String get captureResumeHelp;
 
-  /// No description provided for @captureDraftSummary.
+  /// In Unfinished captures, under a capture's first task: how many of its tasks are not added yet.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one {1 draft} other {{count} drafts}} · {ready, plural, one {1 ready} other {{ready} ready}}'**
-  String captureDraftSummary(int count, int ready);
+  /// **'{count, plural, one{1 not added yet} other{{count} not added yet}}'**
+  String captureDraftSummary(int count);
 
   /// No description provided for @editCaptureItem.
   ///
@@ -4462,6 +4456,18 @@ abstract class AppLocalizations {
   /// **'{count} kept for review'**
   String captureKeptForReview(int count);
 
+  /// After a save, follows the count of tasks added ("2 tasks added · also on Sat, Oct 17") when one other task is on a day other than the one Calendar shows. The date is a weekday and date such as Sat, Oct 17.
+  ///
+  /// In en, this message translates to:
+  /// **'also on {date}'**
+  String captureAlsoOn(String date);
+
+  /// After a save, follows the count of tasks added ("3 tasks added · also on 2 other days") when the tasks fall on several days other than the one Calendar shows.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{also on 1 other day} other{also on {count} other days}}'**
+  String captureAlsoOnDays(int count);
+
   /// No description provided for @captureConfirmDetails.
   ///
   /// In en, this message translates to:
@@ -4477,7 +4483,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureRemovedDraftsHelp.
   ///
   /// In en, this message translates to:
-  /// **'Removed drafts will not become tasks.'**
+  /// **'Nothing will be added.'**
   String get captureRemovedDraftsHelp;
 
   /// No description provided for @captureFinish.
@@ -4491,12 +4497,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your words'**
   String get captureYourWords;
-
-  /// No description provided for @captureReviewRetainedHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Unfinished drafts are kept on this phone. You can return from Unfinished captures.'**
-  String get captureReviewRetainedHelp;
 
   /// No description provided for @captureCheckDetails.
   ///
@@ -4705,7 +4705,7 @@ abstract class AppLocalizations {
   /// No description provided for @diagnosticsEvent.
   ///
   /// In en, this message translates to:
-  /// **'{event, select, opened{Capture opened} ready{Capture ready to use} started{New durable captures} typedStarted{Typed input started} permissionDenied{Microphone permission denied} nativeStarted{On-device listening started} firstPartial{First on-device words} nativeListening{On-device listening duration} recordingStopped{Saved audio duration} transcription{Online audio transcription} extraction{Online task extraction} processing{Request and retained drafts} notePrepared{Local note prepared} noteTranscribed{Recorded note ready} failed{Failed requests} retried{Retried requests} edited{Draft changes} reviewOpened{Review opened} reviewTime{Time in review} correction{Correction dialog time} saved{Confirmed to local save} discarded{Explicitly discarded captures} resumed{Resumed captures} leftCapturePending{Capture kept for later} leftReviewPending{Review kept for later} other{Other capture event}}'**
+  /// **'{event, select, opened{Capture opened} ready{Capture ready to use} started{New durable captures} typedStarted{Typed input started} permissionDenied{Microphone permission denied} nativeStarted{On-device listening started} firstPartial{First on-device words} nativeListening{On-device listening duration} recordingStopped{Saved audio duration} transcription{Online audio transcription} extraction{Online task extraction} processing{Request and retained drafts} notePrepared{Local note prepared} noteTranscribed{Recorded note ready} failed{Failed requests} retried{Retried requests} edited{Draft changes} reviewOpened{Review opened} reviewTime{Time in review} correction{Correction dialog time} saved{Confirmed to local save} discarded{Explicitly discarded captures} resumed{Resumed captures} leftCapturePending{Capture kept for later} leftReviewPending{Review kept for later} recognizerFinish{Last words after Done} other{Other capture event}}'**
   String diagnosticsEvent(String event);
 
   /// No description provided for @taskflowPro.
@@ -5332,10 +5332,10 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{No free dictations left this month} =1{1 free dictation left this month} other{{count} free dictations left this month}}'**
   String freeVoiceLeft(int count);
 
-  /// Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead. {date} is the local short date they come back.
+  /// Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead, with the field already focused, and also in Unfinished captures. {date} is the local short date they come back.
   ///
   /// In en, this message translates to:
-  /// **'You’ve used this month’s free dictations. You can type it here — more on {date}.'**
+  /// **'No free dictations until {date}.'**
   String freeVoiceUsedUp(String date);
 
   /// For a capture that is only a recording, refused because this month's free dictations are used up: in the capture sheet and in Unfinished captures. {date} is the local short date they come back.

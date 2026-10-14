@@ -9,9 +9,14 @@ class CalendarFocus {
     this.taskIds, {
     this.page,
     this.showCalendar = false,
+    this.undated = false,
   });
   final DateTime? day;
   final Set<int> taskIds;
+
+  /// A task saved with dated ones has no date: Calendar lights its no-date
+  /// row too.
+  final bool undated;
 
   /// The task page (Tareas, a project) that opened capture. It shows the tasks
   /// itself, and Calendar stays as it is.

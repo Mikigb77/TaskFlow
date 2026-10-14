@@ -1,0 +1,73 @@
+{
+  "runId": "2026-10-14-speed",
+  "mode": "changes",
+  "round": "b1-r2",
+  "packages": [
+    {
+      "id": "P107",
+      "title": "A time with no date word that has already passed goes on the next day",
+      "area": "A",
+      "size": "S",
+      "severity": 2,
+      "findings": ["UX-618"],
+      "files": [
+        "App/lib/services/quick_schedule_parser.dart",
+        "App/test/quick_schedule_parser_test.dart",
+        "App/test/capture_sheet_test.dart"
+      ],
+      "brief": [
+        "Regression from round 1 (P104, UX-604; the reviewer's R1A-1, now UX-618, severity 2). P104 made a part of the day settle a bare hour: 'a las 9 de la mañana' is now 09:00 with no question. Before P104 the same phrase read 'mañana' as tomorrow, or the bare 9 asked the hour question. Now, with no date word, `parse` dates the time on `today` (App/lib/services/quick_schedule_parser.dart, the `if (match == null) { date = Task.day(day ?? today); }` branch, about :123-124), and `settle()` (about :163-174) plus the two places that use it (about :185-191 and :203-212) put the hour on that day. At 10:00, 'Llamar a Juan a las 9 de la mañana' becomes today 09:00, already past. Nothing is asked, so 'Guardar tal cual' (offline or slow assistant) saves it at once, and its reminder can never fire. Typed tasks of free accounts at 0 left take the same path. 'a las 17' said at 18:00 already had this problem before P104.",
+        "Change, in `QuickScheduleParser.parse` only: after the time is set (both the `times.isNotEmpty` branch and the bare-hour branch, i.e. wherever `hasTime` becomes true), if `match == null` (no date word) and `day == null` (no day the person picked) and the resulting `date` is earlier than `reference` truncated to the minute, move `date` to the same hour and minute on the next calendar day (build it with `DateTime(date.year, date.month, date.day + 1, hour, minute)` so DST and month ends stay right). Apply this to every no-date time: a time settled by a part of the day, a 24-hour hour (13–23, 0), an H:MM time and an a.m./p.m. time. A time in the same minute as `reference`, or later, stays today.",
+        "Leave unchanged: a date word always wins, so 'hoy a las 9' at 10:00 stays today 09:00 (the person said today). A passed-in `day` always wins (capture_processor.dart `_laterDay` only passes a later day the person picked). The ambiguous-hour path (`ambiguousHour`, 'a las 9' with no part of the day) keeps today and its question; don't change how the question's answer is dated. 'tonight' / 'esta noche' / 'aquesta nit' with no date word follow the same rule as any no-date time (implementer note (P104): they are not date words); a past 'tonight' time therefore also moves to tomorrow, which is better than a silent past save.",
+        "Update the doc comment on `parse` (about :94-96): 'A time with no date words goes on [day], or on [reference]'s day; on the next day when that time has already passed.'",
+        "Don't touch the titles, the part-of-day rules P104 added (_partOfDay, _partAfter, _partBefore, _settle and the three decisions in P104's notes), local_capture.dart, capture_processor.dart, any ARB file or any UI file. No copy changes.",
+        "Existing tests in App/test/quick_schedule_parser_test.dart use `reference = DateTime(2026, 9, 22, 23, 58)`. Any case there with a time and no date word will now move to 23 Sep; that is the intended change. Update only those expectations, and say which ones in your notes. Every case with a date word or a `day:` must pass unchanged. Run the whole suite."
+      ],
+      "acceptance": [
+        "Unit test (reference Wed 14 Oct 2026, 10:00, no day): 'Llamar a Juan a las 9 de la mañana' → Thu 15 Oct 2026 09:00, hasTime true, no question, title 'Llamar a Juan'.",
+        "Unit test (reference Wed 14 Oct 2026, 10:00, no day): 'Llamar a Juan a las 5 de la tarde' → Wed 14 Oct 2026 17:00, title 'Llamar a Juan'.",
+        "Unit test (reference Wed 14 Oct 2026, 18:00, no day): 'Llamar al médico a las 17' → Thu 15 Oct 2026 17:00; 'Call Ana at 9:30 am' → Thu 15 Oct 2026 09:30; 'Trucar a la Marta a les 9 del matí' → Thu 15 Oct 2026 09:00.",
+        "Unit test (reference Wed 14 Oct 2026, 10:00): 'Llamar a Juan a las 10' (no part of the day, so ambiguous) still asks 10:00 / 22:00 and keeps Wed 14 Oct; 'Llamar a Juan a las 10:00' → Wed 14 Oct 10:00 (same minute stays today).",
+        "Unit test (reference Wed 14 Oct 2026, 10:00): 'Llamar a Juan hoy a las 9 de la mañana' → Wed 14 Oct 09:00 (a date word wins); 'Llamar a Juan a las 9 de la mañana' with day: Fri 16 Oct → Fri 16 Oct 09:00.",
+        "Unit test (reference Sat 31 Oct 2026, 23:30): 'Cena a las 9 de la noche' → Sun 1 Nov 2026 21:00.",
+        "Every other case in App/test/quick_schedule_parser_test.dart passes; only no-date timed cases at the 23:58 reference change, to 23 Sep 2026.",
+        "Widget test, Spanish, if capture_sheet_test can fix the capture's clock at Wed 14 Oct 2026 10:00: with the assistant failing (offline), a spoken 'Llamar a Juan a las 9 de la mañana' saved with 'Guardar tal cual' is saved on Thu 15 Oct at 09:00, titled 'Llamar a Juan'. If the clock can't be fixed, the unit tests above are enough; say so."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    },
+    {
+      "id": "P108",
+      "title": "One line, not two, between the notes and Más opciones",
+      "area": "A",
+      "size": "S",
+      "severity": 1,
+      "findings": ["UX-619"],
+      "files": [
+        "App/lib/widgets/capture_review_editor.dart",
+        "App/test/review_tasks_test.dart"
+      ],
+      "brief": [
+        "Regression from round 1 (P105, UX-607; the reviewer's R1A-2, now UX-619, severity 1). P105 gave the notes field an underline (`fieldBorders`, the `TextFormField` with key `draft-notes`, inside `if (showNotes) ...[` at about App/lib/widgets/capture_review_editor.dart:495). The existing `const Divider(height: 1)` just above the Más opciones `ListTile` (about :573, before `key: ValueKey('draft-options-…')`) now draws a second line about 9 dp under it. Seen in App/build/review-direct-light.png and review-direct-dark.png (y≈1177 and y≈1195).",
+        "Change: draw that Divider only when the notes field is hidden: `if (!showNotes) const Divider(height: 1),`. `showNotes` is already defined at about :386 (`task.isNote || _notesOpen`). Nothing else moves.",
+        "Don't touch the title or notes underline styles, the 'Añadir notas' row inside Más opciones, the spacing above Más opciones, or any copy. No ARB changes.",
+        "Re-render with `flutter test --no-pub --dart-define=WRITE_REVIEW_PREVIEWS=true test/review_tasks_test.dart` and look at review-direct-light/-dark (notes shown) and review-direct-no-notes-light/-dark (notes hidden)."
+      ],
+      "acceptance": [
+        "Widget test, Spanish, 360×740, a spoken result with notes: between the notes field (key 'draft-notes') and the Más opciones row (key 'draft-options-<id>') there is no Divider widget.",
+        "Widget test, Spanish, 360×740, a spoken result with no notes (notes field hidden): exactly one Divider sits directly above the Más opciones row.",
+        "Render review-direct-light.png and -dark.png: one line (the notes underline) between the notes and 'Más opciones'. review-direct-no-notes-light/-dark: one line above 'Más opciones', unchanged from round 1."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [
+    {
+      "question": "UX-609 (Catalan only): at 0 free dictations, the line above typing reads «Fins al dia 1 de nov. no tens dictats gratuïts.» and takes 3 lines at 2× text on a 320 dp phone; Spanish and English take 2. Accept 3 lines in Catalan, or shorten the Catalan line?",
+      "findings": ["UX-609"],
+      "recommendation": "Keep the Catalan wording and accept 3 lines in Catalan (the reviewer's options a and c together). The point of the check is that the typing field stays above the keyboard, and it does in all three languages; Spanish, your father's language, fits in 2. Option b («Més dictats el dia {date}.») drops 'free' and needs a native read. If you agree, ux-tester changes the Catalan check to 'at most 3 lines and the field above a 300 dp keyboard'; until you answer, that one Catalan test fails and is the only failing test in the suite."
+    }
+  ],
+  "skipped": []
+}

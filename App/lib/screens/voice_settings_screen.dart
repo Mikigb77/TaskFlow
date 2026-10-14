@@ -34,18 +34,13 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
   // null before any attempt.
   bool? _setupOpened;
 
-  String _language(RegionalPreferences preferences) => speechLanguageTag(
-    preferences.speechLanguage,
-    app: Localizations.localeOf(context),
-    devices: WidgetsBinding.instance.platformDispatcher.locales,
-  );
-
+  // Always asked fresh here; capture keeps the answer for the session.
   Future<void> _check(String language) async {
     final check = ++_checks;
     setState(() => _capability = null);
-    final capability = await ref
-        .read(nativeSpeechProvider)
-        .capability(language: language);
+    final speech = ref.read(nativeSpeechProvider);
+    final capability = await speech.capability(language: language);
+    speech.remember(language, capability);
     if (mounted && check == _checks) {
       setState(() => _capability = capability);
     }
@@ -65,12 +60,15 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
   }
 
   Future<void> _setUp(String language) async {
+    final speech = ref.read(nativeSpeechProvider);
     bool opened;
     try {
-      opened = await ref.read(nativeSpeechProvider).prepareLanguage(language);
+      opened = await speech.prepareLanguage(language);
     } catch (_) {
       opened = false;
     }
+    // The language may be installed now: the next capture asks again.
+    speech.forget(language);
     if (mounted) setState(() => _setupOpened = opened);
   }
 
@@ -79,7 +77,7 @@ class _VoiceSettingsScreenState extends ConsumerState<VoiceSettingsScreen> {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final preferences = ref.watch(regionalProvider);
-    final language = _language(preferences);
+    final language = captureSpeechLanguage(context, preferences);
     // A new language: check it once this frame is built.
     if (language != _checked) {
       _checked = language;

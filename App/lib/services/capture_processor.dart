@@ -168,7 +168,7 @@ class CaptureProcessor {
     final diagnostics = CaptureDiagnostics(store.database);
     final watch = Stopwatch()..start();
     if (existing.status == 'failed') {
-      await diagnostics.record(CaptureEvent.retried);
+      unawaited(diagnostics.record(CaptureEvent.retried));
     }
     await store.update(existing.copyWith(status: 'processing'));
     final day = _laterDay(existing, now);
@@ -182,10 +182,12 @@ class CaptureProcessor {
         final next = _local(existing, now);
         await store.update(next);
         if (note) {
-          await diagnostics.record(
-            CaptureEvent.notePrepared,
-            elapsedMs: watch.elapsedMilliseconds,
-            count: 1,
+          unawaited(
+            diagnostics.record(
+              CaptureEvent.notePrepared,
+              elapsedMs: watch.elapsedMilliseconds,
+              count: 1,
+            ),
           );
         }
         return next;
@@ -263,12 +265,14 @@ class CaptureProcessor {
       // Saved as written meanwhile: the answer is too late.
       if (_written.contains(key)) return _latest(existing);
       await store.update(next);
-      await diagnostics.record(
-        existing.kind == 'note'
-            ? CaptureEvent.noteTranscribed
-            : CaptureEvent.processing,
-        elapsedMs: watch.elapsedMilliseconds,
-        count: drafts.length,
+      unawaited(
+        diagnostics.record(
+          existing.kind == 'note'
+              ? CaptureEvent.noteTranscribed
+              : CaptureEvent.processing,
+          elapsedMs: watch.elapsedMilliseconds,
+          count: drafts.length,
+        ),
       );
       final timings = response['timings'];
       if (timings is Map) {
@@ -285,7 +289,7 @@ class CaptureProcessor {
           }
           final elapsed = timings[entry.value];
           if (elapsed is int) {
-            await diagnostics.record(entry.key, elapsedMs: elapsed);
+            unawaited(diagnostics.record(entry.key, elapsedMs: elapsed));
           }
         }
       }
@@ -302,9 +306,11 @@ class CaptureProcessor {
           latest.copyWith(status: 'failed', error: CaptureProblem.from(error)),
         );
       }
-      await diagnostics.record(
-        CaptureEvent.failed,
-        elapsedMs: watch.elapsedMilliseconds,
+      unawaited(
+        diagnostics.record(
+          CaptureEvent.failed,
+          elapsedMs: watch.elapsedMilliseconds,
+        ),
       );
       rethrow;
     }

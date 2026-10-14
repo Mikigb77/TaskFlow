@@ -34,6 +34,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     with WidgetsBindingObserver {
   late DateTime _selectedDay;
   late DateTime _focusedDay;
+  // The person chose the selected day, rather than a landing moving to it.
+  // Only a chosen day is passed on to capture.
+  bool _picked = false;
   // The day that was today when Calendar last checked the date.
   late DateTime _today;
   Timer? _midnight;
@@ -45,7 +48,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   // until the day changes or Calendar is covered.
   final _openOnDay = <String>{};
   // Just-saved tasks: waiting to appear, then shown and highlighted. Saved
-  // without a date, the no-date row is highlighted instead.
+  // without a date, the no-date row is highlighted instead, or as well.
   Set<int> _landingIds = {};
   Set<int> _landedIds = {};
   bool _landingInbox = false;
@@ -113,9 +116,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
 
   void _land(CalendarFocus focus) => setState(() {
     final day = focus.day;
-    if (day != null) _select(day);
+    if (day != null) {
+      // A landing on another day shows the tasks; it doesn't choose that day
+      // for the next capture.
+      if (!isSameDay(day, _selectedDay)) _picked = false;
+      _select(day);
+    }
     _landingIds = day == null ? {} : focus.taskIds;
-    _landingInbox = day == null;
+    _landingInbox = day == null || focus.undated;
     _landedIds = {};
     _landedInbox = false;
     _end = 20;
@@ -128,7 +136,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   Future<void> _reveal() async {
     // The no-date row is the last one: make room under it for the save
     // message, which shows a moment after the landing.
-    if (_landedInbox) {
+    if (_inboxOnly) {
       for (var i = 0; i < 60 && mounted; i++) {
         final clearance = _messageClearance();
         if (clearance != null) {
@@ -186,6 +194,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       if (mounted) setState(() => _highlight = false);
     });
   }
+
+  /// Only the no-date row landed: no saved task has a date.
+  bool get _inboxOnly => _landedInbox && _landedIds.isEmpty;
 
   /// How much of the page's foot the save message shown over it takes, with
   /// a gap. Read inside its entrance, where its height is already final.
@@ -278,11 +289,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       if (settled(a) != settled(b)) return settled(a) ? 1 : -1;
       return Task.compareBySchedule(a, b);
     });
+    final inbox = tasks
+        .where(
+          (task) => !task.isNote && task.dueDate == null && !task.isCompleted,
+        )
+        .length;
     if (_landingIds.isNotEmpty &&
         shown &&
         events.any((task) => _landingIds.contains(task.id))) {
       _landedIds = _landingIds;
       _landingIds = {};
+      // Saved with a task without a date: the no-date row lights up with
+      // these rows, and the reveal goes to these.
+      _landedInbox = _landingInbox && inbox > 0;
+      _landingInbox = false;
       _highlight = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
     }
@@ -308,12 +328,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final completed = events.where((task) => task.isCompleted).length;
     final total = events.length + overdue.length;
     final syncError = ref.read(taskRepositoryProvider).syncError;
-    final inbox = tasks
-        .where(
-          (task) => !task.isNote && task.dueDate == null && !task.isCompleted,
-        )
-        .length;
-    if (_landingInbox && shown && inbox > 0) {
+    if (_landingInbox && _landingIds.isEmpty && shown && inbox > 0) {
       _landingInbox = false;
       _landedInbox = true;
       _highlight = true;
@@ -451,9 +466,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                                   ),
                                   if (!today)
                                     TextButton(
-                                      onPressed: () => setState(
-                                        () => _select(Task.day(_now())),
-                                      ),
+                                      onPressed: () => setState(() {
+                                        _picked = true;
+                                        _select(Task.day(_now()));
+                                      }),
                                       child: Text(context.l10n.today),
                                     ),
                                 ],
@@ -498,8 +514,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             _calendarPage = controller,
                         selectedDayPredicate: (day) =>
                             isSameDay(_selectedDay, day),
-                        onDaySelected: (selected, focused) =>
-                            setState(() => _select(selected, focused)),
+                        onDaySelected: (selected, focused) => setState(() {
+                          _picked = true;
+                          _select(selected, focused);
+                        }),
                         onPageChanged: (focused) =>
                             setState(() => _focusedDay = focused),
                         eventLoader: (day) => tasks
@@ -719,7 +737,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverToBoxAdapter(
                   child: Align(
-                    key: _landedInbox ? _landedRow : null,
+                    key: _inboxOnly ? _landedRow : null,
                     alignment: AlignmentDirectional.centerStart,
                     // A task saved without a date lights this row up.
                     child: TweenAnimationBuilder<Color?>(
@@ -752,8 +770,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           ],
         ),
       ),
-      // A task added for a later day without a date goes to that day.
-      bottomNavigationBar: TaskActions(day: _selectedDay),
+      // A task added without a date goes to a later day the person chose,
+      // not to one a landing moved to.
+      bottomNavigationBar: TaskActions(day: _picked ? _selectedDay : null),
     );
   }
 }

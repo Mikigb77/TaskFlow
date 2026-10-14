@@ -30,13 +30,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reviewOriginalText => 'Texto original';
 
   @override
-  String get reviewRemove => 'Quitar de esta captura';
+  String get reviewRemove => 'Quitar';
 
   @override
-  String get reviewRemoved => 'Borrador retirado';
+  String get reviewRemoved => 'Quitada';
 
   @override
-  String get reviewUndoSaved => 'Las tareas han vuelto a tus borradores.';
+  String get reviewUndoSaved => 'Han vuelto aquí, sin guardar.';
 
   @override
   String get reviewUndoChanged =>
@@ -2583,10 +2583,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get captureTimeLeft => 'Quedan 10 segundos';
 
   @override
-  String get captureKeepQuestion => '¿Conservar lo que has dicho?';
-
-  @override
-  String get captureKeepHelp => 'Podrás terminarlo más tarde.';
+  String get captureKeepQuestion => '¿Quieres conservarlo para más tarde?';
 
   @override
   String get captureRecordingFirst =>
@@ -2622,7 +2619,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureWriteFailed =>
-      'No se ha podido guardar este borrador en el teléfono. Inténtalo de nuevo antes de salir.';
+      'No se ha podido guardar en el teléfono. Inténtalo de nuevo antes de salir.';
 
   @override
   String get captureStopFailed =>
@@ -2667,27 +2664,21 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturesEmptyHelp =>
-      'Aquí se guardarán las grabaciones y los borradores que dejes pendientes.';
+      'Aquí se guardan las grabaciones y las tareas que dejes a medias.';
 
   @override
   String get captureResumeHelp =>
       'Guardado en este teléfono · Toca para continuar';
 
   @override
-  String captureDraftSummary(int count, int ready) {
+  String captureDraftSummary(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count borradores',
-      one: '1 borrador',
+      other: '$count sin añadir',
+      one: '1 sin añadir',
     );
-    String _temp1 = intl.Intl.pluralLogic(
-      ready,
-      locale: localeName,
-      other: '$ready listos',
-      one: '1 listo',
-    );
-    return '$_temp0 · $_temp1';
+    return '$_temp0';
   }
 
   @override
@@ -2723,24 +2714,35 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String captureAlsoOn(String date) {
+    return 'también el $date';
+  }
+
+  @override
+  String captureAlsoOnDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'también en otros $count días',
+      one: 'también en otro día',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get captureConfirmDetails => 'Usar los datos mostrados';
 
   @override
   String get captureNothingToReview => 'No queda nada por revisar';
 
   @override
-  String get captureRemovedDraftsHelp =>
-      'Los borradores eliminados no se convertirán en tareas.';
+  String get captureRemovedDraftsHelp => 'No se añadirá nada.';
 
   @override
   String get captureFinish => 'Terminar';
 
   @override
   String get captureYourWords => 'Tus palabras';
-
-  @override
-  String get captureReviewRetainedHelp =>
-      'Los borradores pendientes se conservan en este teléfono. Puedes retomarlos desde Capturas pendientes.';
 
   @override
   String get captureCheckDetails => 'Revisa los datos de arriba';
@@ -2945,6 +2947,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'resumed': 'Capturas reanudadas',
       'leftCapturePending': 'Captura guardada para más tarde',
       'leftReviewPending': 'Revisión guardada para más tarde',
+      'recognizerFinish': 'Últimas palabras tras Listo',
       'other': 'Otro evento de captura',
     });
     return '$_temp0';
@@ -3376,7 +3379,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String freeVoiceUsedUp(String date) {
-    return 'Ya has usado los dictados gratis de este mes. Puedes escribirla aquí; tendrás más el $date.';
+    return 'Sin dictados gratis hasta el $date.';
   }
 
   @override

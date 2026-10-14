@@ -30,13 +30,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewOriginalText => 'Original text';
 
   @override
-  String get reviewRemove => 'Remove from this capture';
+  String get reviewRemove => 'Remove';
 
   @override
-  String get reviewRemoved => 'Draft removed';
+  String get reviewRemoved => 'Removed';
 
   @override
-  String get reviewUndoSaved => 'Tasks returned to your drafts.';
+  String get reviewUndoSaved => 'They’re back here, not saved yet.';
 
   @override
   String get reviewUndoChanged =>
@@ -2534,10 +2534,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureTimeLeft => '10 seconds left';
 
   @override
-  String get captureKeepQuestion => 'Keep what you said?';
-
-  @override
-  String get captureKeepHelp => 'You can finish it later.';
+  String get captureKeepQuestion => 'Keep it for later?';
 
   @override
   String get captureRecordingFirst =>
@@ -2571,7 +2568,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureWriteFailed =>
-      'Could not keep this draft on your phone. Try again before leaving.';
+      'Couldn’t keep this on your phone. Try again before leaving.';
 
   @override
   String get captureStopFailed =>
@@ -2616,26 +2613,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get capturesEmptyHelp =>
-      'Recordings and drafts you leave unfinished will be kept here.';
+      'Recordings and tasks you leave unfinished are kept here.';
 
   @override
   String get captureResumeHelp => 'Kept on this phone · Tap to resume';
 
   @override
-  String captureDraftSummary(int count, int ready) {
+  String captureDraftSummary(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count drafts',
-      one: '1 draft',
+      other: '$count not added yet',
+      one: '1 not added yet',
     );
-    String _temp1 = intl.Intl.pluralLogic(
-      ready,
-      locale: localeName,
-      other: '$ready ready',
-      one: '1 ready',
-    );
-    return '$_temp0 · $_temp1';
+    return '$_temp0';
   }
 
   @override
@@ -2665,24 +2656,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String captureAlsoOn(String date) {
+    return 'also on $date';
+  }
+
+  @override
+  String captureAlsoOnDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'also on $count other days',
+      one: 'also on 1 other day',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get captureConfirmDetails => 'Use the details shown';
 
   @override
   String get captureNothingToReview => 'Nothing left to review';
 
   @override
-  String get captureRemovedDraftsHelp =>
-      'Removed drafts will not become tasks.';
+  String get captureRemovedDraftsHelp => 'Nothing will be added.';
 
   @override
   String get captureFinish => 'Done';
 
   @override
   String get captureYourWords => 'Your words';
-
-  @override
-  String get captureReviewRetainedHelp =>
-      'Unfinished drafts are kept on this phone. You can return from Unfinished captures.';
 
   @override
   String get captureCheckDetails => 'Check the details above';
@@ -2885,6 +2887,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'resumed': 'Resumed captures',
       'leftCapturePending': 'Capture kept for later',
       'leftReviewPending': 'Review kept for later',
+      'recognizerFinish': 'Last words after Done',
       'other': 'Other capture event',
     });
     return '$_temp0';
@@ -3314,7 +3317,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String freeVoiceUsedUp(String date) {
-    return 'You’ve used this month’s free dictations. You can type it here — more on $date.';
+    return 'No free dictations until $date.';
   }
 
   @override

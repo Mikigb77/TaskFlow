@@ -36,20 +36,31 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     return _loading ??= _loadLoop().whenComplete(() => _loading = null);
   }
 
+  /// Counts [showLocal]s: a read that began before one is older than the list
+  /// it showed. That [showLocal] also runs the loop again, which reads anew.
+  int _shown = 0;
+
   Future<void> _loadLoop() async {
     do {
       _loadAgain = false;
       try {
+        var shown = _shown;
         final local = await _repository.getAllTasks();
         if (!mounted) return;
-        state = AsyncValue.data(local);
-        unawaited(TaskReminders.sync(local, ownerKey: _repository.ownerKey));
+        if (shown == _shown) {
+          state = AsyncValue.data(local);
+          unawaited(TaskReminders.sync(local, ownerKey: _repository.ownerKey));
+        }
         await _repository.sync();
         if (!mounted) return;
+        shown = _shown;
         final synced = await _repository.getAllTasks();
         if (!mounted) return;
-        state = AsyncValue.data(synced);
-        unawaited(TaskReminders.sync(synced, ownerKey: _repository.ownerKey));
+        if (shown == _shown) {
+          state = AsyncValue.data(synced);
+          unawaited(
+              TaskReminders.sync(synced, ownerKey: _repository.ownerKey));
+        }
       } catch (error, stack) {
         if (!mounted) return;
         if (!state.hasValue) state = AsyncValue.error(error, stack);
@@ -57,6 +68,21 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
             'Sync could not complete. Your local tasks are safe.';
       }
     } while (_loadAgain && mounted);
+  }
+
+  /// Shows what is on this phone now, after a write made elsewhere, without
+  /// waiting for the network: the cloud sync runs behind.
+  Future<void> showLocal() async {
+    _shown++;
+    try {
+      final local = await _repository.getAllTasks();
+      if (!mounted) return;
+      state = AsyncValue.data(local);
+      unawaited(TaskReminders.sync(local, ownerKey: _repository.ownerKey));
+    } catch (_) {
+      /* The load below reads again. */
+    }
+    if (mounted) unawaited(loadTasks());
   }
 
   /// Returns the new task's id, so a save can show it and undo it.
