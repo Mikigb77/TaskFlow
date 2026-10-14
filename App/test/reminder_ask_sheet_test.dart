@@ -223,6 +223,32 @@ void main() {
     },
   );
 
+  testWidgets(
+    'U12: after the first dated task is saved, the try-it instruction is gone and the reminder question shows',
+    (tester) async {
+      final store = MemoryReminderStore();
+      final access = FakeReminderAccess();
+      await openApp(tester, store, access);
+      final l = strings(tester);
+      // A brand-new account without Pro is told to type.
+      expect(find.text(l.calendarTryTyping), findsOneWidget);
+      await typeDatedTask(tester, 'Comprar pan');
+      expect(find.text(l.calendarTryTyping), findsNothing);
+      await letSaveMessageClose(tester);
+      expect(
+        find.descendant(of: sheet(), matching: question(l)),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(TextButton, l.reminderAskNotNow));
+      await tester.pumpAndSettle();
+      // Only one question: the instruction never comes back either.
+      expect(question(l), findsNothing);
+      expect(find.text(l.calendarTryTyping), findsNothing);
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('UX-401: saving a task without a date never shows the sheet', (
     tester,
   ) async {

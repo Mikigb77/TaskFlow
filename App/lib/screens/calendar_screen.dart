@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/providers/first_task_provider.dart';
 import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/l10n/request_locale.dart';
@@ -290,6 +292,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
+    final hadTask = ref.watch(hadTaskProvider);
     final scope = ref.watch(projectScopeProvider);
     final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
     final accountId = ref.watch(authProvider).account?.id;
@@ -346,6 +349,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         : <Task>[];
     final completed = events.where((task) => task.isCompleted).length;
     final total = events.length + overdue.length;
+    final hasAny = (tasksState.valueOrNull ?? const []).isNotEmpty;
+    const loading = SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
     final syncError = ref.read(taskRepositoryProvider).syncError;
     if (_landingInbox && _landingIds.isEmpty && shown && inbox > 0) {
       _landingInbox = false;
@@ -663,12 +673,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
               ),
             ),
             if (tasksState.isLoading)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              )
+              loading
             else if (tasksState.hasError)
               SliverToBoxAdapter(
                 child: EmptyState(
@@ -680,11 +685,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   ),
                 ),
               )
+            else if (total == 0 && !hasAny && hadTask.isLoading)
+              loading
             else if (total == 0)
               SliverToBoxAdapter(
                 child: EmptyState(
                   title: context.l10n.rememberPrompt,
-                  message: context.l10n.calendarEmpty,
+                  // An account that has never had a task or note is told what
+                  // to try, as Añadir tarea will open it. Once it has had one,
+                  // the instruction never comes back.
+                  message: hasAny || hadTask.valueOrNull == true
+                      ? context.l10n.calendarEmpty
+                      : ref.watch(voiceAvailableProvider)
+                      ? context.l10n.calendarTrySaying
+                      : context.l10n.calendarTryTyping,
                 ),
               )
             else ...[

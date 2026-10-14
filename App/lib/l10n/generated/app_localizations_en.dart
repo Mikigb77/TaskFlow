@@ -728,6 +728,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get calendarEmpty => 'Nothing planned for this day.';
 
   @override
+  String get calendarTrySaying =>
+      'Try it: tap Add a task and say “Call the dentist on Friday at 10.”';
+
+  @override
+  String get calendarTryTyping =>
+      'Try it: tap Add a task and type “Call the dentist on Friday at 10.”';
+
+  @override
   String get planTask => 'Plan a task';
 
   @override
@@ -2415,20 +2423,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationSnooze => 'Snooze 10 min';
 
   @override
-  String get notificationDeadline => 'Your task deadline is approaching.';
-
-  @override
-  String get notificationDue => 'It’s time for your task.';
-
-  @override
-  String notificationInMinutes(int minutes) {
-    String _temp0 = intl.Intl.pluralLogic(
-      minutes,
+  String notificationAt(String day, String date, String time, int hour) {
+    String _temp0 = intl.Intl.selectLogic(day, {
+      'today': 'Today at $time',
+      'tomorrow': 'Tomorrow at $time',
+      'other': '$date at $time',
+    });
+    String _temp1 = intl.Intl.pluralLogic(
+      hour,
       locale: localeName,
-      other: 'Scheduled in $minutes minutes.',
-      one: 'Scheduled in 1 minute.',
+      other: '$_temp0',
     );
-    return '$_temp0';
+    return '$_temp1';
+  }
+
+  @override
+  String notificationDeadlineAt(
+    String day,
+    String date,
+    String time,
+    int hour,
+  ) {
+    String _temp0 = intl.Intl.selectLogic(day, {
+      'today': 'Deadline: today at $time',
+      'tomorrow': 'Deadline: tomorrow at $time',
+      'other': 'Deadline: $date at $time',
+    });
+    String _temp1 = intl.Intl.pluralLogic(
+      hour,
+      locale: localeName,
+      other: '$_temp0',
+    );
+    return '$_temp1';
+  }
+
+  @override
+  String get notificationDeadlineToday => 'Deadline: today';
+
+  @override
+  String notificationInMinutes(String when, int minutes) {
+    return '$when · in $minutes min';
+  }
+
+  @override
+  String notificationInHours(String when, int hours) {
+    return '$when · in $hours h';
+  }
+
+  @override
+  String notificationCompleted(String title) {
+    return 'Completed: $title';
   }
 
   @override
@@ -2443,9 +2487,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationCheckIn =>
       'Open TaskFlow to see your current tasks and plan your next step.';
-
-  @override
-  String get notificationSnoozed => 'Your snoozed task.';
 
   @override
   String get captureGone => 'Your words are no longer available.';

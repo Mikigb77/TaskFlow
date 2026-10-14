@@ -952,3 +952,29 @@ None.
 ### Noted, not planned
 - Reviewer C's other option for UX-630 was to close a gone project's page, as the sharing screen does. It isn't planned: going back to the read-only state needs no new behaviour.
 - With P116, the projects list reloads whenever tasks reload. On a gone project's page, the bottom bar can show `Añadir tarea` for the moment of each reload. The page is rare, and the reload is local, so this is accepted.
+
+## Round 2 (b10)
+
+Round 1 of batch 10 ran P29 (reminder text and Undo) and P41 (the first-run line). Reviewer D found UX-411 fixed in code (it still needs a phone), and UX-409 and U12 partly fixed (verify-b10-r1-D.md). The round check failed on one new test: deleting the only task brings the first-run line back. Two regressions came from P29: UX-631 (R1D-1, S2) and UX-632 (R1D-2, S1).
+
+Round 2 has two packages in area D. Each finding has failed once, so nothing is escalated, and there are no new owner questions. The briefs are in `plan-b10-r2.json`.
+
+### Packages, in run order
+
+#### P117 · Reminder text: snoozes say only when, dates start capitalised, Undo waits · D · M
+- **UX-409** (S2; failed once) A snoozed alert repeated the original line with its tail, so 10 minutes later it read `Hoy a las 17:00 · en 10 min`, which was false by then. A snoozed alert now drops the tail: `Hoy a las 17:00` / `Today at 5:00 PM` / `Avui a les 17:00`, with "today" counted from when it fires again.
+- **UX-631** (S2; R1D-1, from P29) `Completada: …` and Deshacer disappeared after a fixed 10 s, ignoring the phone's accessibility "time to take action". Notification buttons run in the background, where the app can't ask Android for that setting. So the open app saves the setting at start and on return, and Undo stays for the longer of 10 s and that setting. This is inferred from the notification plugin's source and needs a phone.
+- **UX-632** (S1; R1D-2, from P29) Reminders for a day further ahead started in lowercase in Spanish and Catalan (`vie, 25 sept a las 17:00`). They now start with a capital (`Vie, 25 sept a las 17:00`). The deadline form keeps the date in lowercase after `Fecha límite:`.
+
+#### P118 · The first-run line never comes back once a task existed · D · S
+- **U12** (failed once) The try-it line (`Prueba: toca Añadir tarea y di «…»`) depended on the task list being empty right now, so deleting the only task brought it back. The phone now remembers, for each account, that the account has had a task or note. After that, an empty Calendar always says `Nada previsto para este día.` The planner confirms the brief's "never comes back"; this is a local flag, not synced, like the reminder question's "asked" flag. Accepted: undoing the very first task doesn't bring the line back either.
+
+### Escalated
+None.
+
+### Skipped
+None.
+
+### Noted, not planned
+- With P117, Undo uses the timeout saved the last time the app was open. If the person changes the accessibility setting and taps Completar without opening TaskFlow in between, the old value applies once.
+- UX-411 (Undo after Completar) was found fixed in code in round 1. It stays for the phone checks in P29 and P117.

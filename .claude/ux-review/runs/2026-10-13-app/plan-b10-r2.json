@@ -1,0 +1,91 @@
+{
+  "runId": "2026-10-13-app",
+  "mode": "app",
+  "round": "b10-r2",
+  "packages": [
+    {
+      "id": "P117",
+      "title": "Reminder text: snoozes say only when, dates start capitalised, Undo waits",
+      "area": "D",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-409", "UX-631", "UX-632"],
+      "aliases": {"UX-631": ["R1D-1"], "UX-632": ["R1D-2"]},
+      "files": [
+        "App/lib/services/reminder_engine.dart",
+        "App/lib/services/reminder_copy.dart",
+        "App/lib/services/notification_service.dart",
+        "App/lib/services/feedback_timeout.dart",
+        "App/lib/main.dart",
+        "App/test/reminder_engine_test.dart"
+      ],
+      "brief": [
+        "Context: P29 (b10 round 1) rewrote reminder bodies to lead with the absolute time (`ReminderCopy.body`, App/lib/services/reminder_copy.dart:85-114) and added `Completada: {title}` with Deshacer after Completar. Reviewer D verified the timed, tomorrow, deadline and one-o'clock lines and the Undo flow (UX-411). Keep all of that. Three things are left, all in the reminder text and the undo notification. No ARB change is needed.",
+        "UX-409 (S2, partly fixed, failed once). Last attempt: the snooze branch of `reconcile` (App/lib/services/reminder_engine.dart:323-339) rebuilds the body with the alert's ORIGINAL fire time and lead: `copy.body(task, firing?.when ?? task.reminderDate!, firing?.lead ?? 0)`. A 17:00 task with a 10-minute lead, snoozed at 16:51, fires again at about 17:01 and reads `Hoy a las 17:00 · en 10 min`, which is false at that moment: the same staleness UX-409 is about. The test pins the wrong text (App/test/reminder_engine_test.dart:716-736 expects the snoozed body to equal the original). Fix: in the snooze branch, call `copy.body(task, when.toLocal(), 0)`, where `when` is the snooze fire time parsed from `reminder_snoozes.fire_at` (it is stored as UTC ISO, so `.toLocal()` is required: `body` decides today/tomorrow from that date's calendar day). With lead 0 the body has no tail, so it reads EN `Today at 5:00 PM` / ES `Hoy a las 17:00` / CA `Avui a les 17:00`, and a snooze that crosses midnight says `Hoy`/`Today`/`Avui` for the task's own day. Remove the `firing` local if nothing else uses it there. Change the comment above it to: `// A snoozed alert says when the task is, without “in N min”: the snooze has used that time up.` In reminder_copy.dart, change the doc comment on `body` that says `A snooze repeats this same line.` to `A snoozed alert passes lead 0, so it has no “in N min” tail.` Update the existing snooze test to expect `Hoy a las 17:00` (not `original`), still with `isNot(contains('pospuesta'))`.",
+        "UX-632 (S1, regression R1D-2 from P29). A reminder for a day two or more days ahead starts with the weekday date in lowercase in Spanish and Catalan: `vie, 25 sept a las 17:00`, because `notificationAt`'s `other` branch starts with `{date}` (`formatMediumDate`, reminder_copy.dart:107). Fix: in `body`, after `strings.notificationAt(...)` and before the `· en … min` tail is added, upper-case the first character of `at` when `day == 'other'`, so it reads ES `Vie, 25 sept a las 17:00` / CA `Dv., 25 de set. a les 17:00` (the rest of the date exactly as `formatMediumDate` gives it). English is already capitalised and is unchanged. Do NOT change the deadline form: `Fecha límite: vie, 25 sept a las 17:00` / `Termini: dv., 25 de set. a les 17:00` keep the date lowercase mid-sentence. Do not change the ARB strings or the date formatter. Update the existing test at reminder_engine_test.dart:703 so its expected text is the capitalised date (build it from `DateFormat.MMMEd('es').format(...)` with the first letter upper-cased).",
+        "UX-631 (S2, regression R1D-1 from P29). `showUndo` (App/lib/services/notification_service.dart:99-120) sets `timeoutAfter: TaskReminders.undoWindow` (fixed 10 s, :153). Everywhere else in the app, Undo stays up for `FeedbackTimeout.forAction()` (App/lib/services/feedback_timeout.dart), which asks Android for the user's accessibility `Time to take action`. A TalkBack or tremor user who set a longer time loses Deshacer after 10 s. Important: notification action taps (Completar, Posponer, Deshacer) are handled in a background isolate. flutter_local_notifications 17.2.2's `ActionBroadcastReceiver.onReceive` always calls `startEngine`, and the app's handler is `notificationActionBackground` (notification_service.dart:18-24). The `taskflow/accessibility` channel is only registered on MainActivity's engine (android/app/src/main/kotlin/com/example/agenda/MainActivity.kt:20), so calling the channel from `showUndo` would almost always hit MissingPluginException and fall back to 10 s. So do it this way, with no Kotlin change:",
+        "1. In feedback_timeout.dart, give `forAction` an optional named parameter `{Duration original = defaultDuration}`. Send `original.inMilliseconds` as `originalTimeoutMillis`, accept a result only when it is `>= original`, and return `original` (not `defaultDuration`) in every fallback. With no argument it behaves exactly as today, so the 9 existing callers don't change. (AccessibilityBridge.kt already returns `recommended.coerceAtLeast(original)`, so passing 10 000 gives the longer of 10 s and the user's setting.)",
+        "2. In notification_service.dart, add `static Future<void> rememberUndoTimeout()` to `TaskReminders`. It calls `FeedbackTimeout.forAction(original: undoWindow)` and stores the milliseconds in the existing `reminder_meta` table under the key `undo_timeout_ms` (insert with replace). It swallows any error. Call it (unawaited) at the end of `_initialize` only when `background` is false, and in App/lib/main.dart's `didChangeAppLifecycleState` on `resumed`, next to `TaskReminders.refreshLanguage()`, so a changed accessibility setting applies after the person comes back from Ajustes.",
+        "3. Add `static Future<Duration> undoTimeout()` to `TaskReminders`. It reads `undo_timeout_ms` from `reminder_meta` and returns the longer of that value and `undoWindow`. If the row is missing, unreadable or not a positive int, it returns `undoWindow` (10 s). `showUndo` uses `timeoutAfter: (await undoTimeout()).inMilliseconds` (make it `async`). Keep `undoWindow` at 10 s and keep the existing test that checks it (reminder_engine_test.dart:778). Update the comment on `undoWindow` to: `/// The shortest time Completed: … and its Undo stay; longer when the phone's accessibility timeout asks for it.`",
+        "Don't touch: the ARB files; the wording and order of the timed, tomorrow, deadline and date-only lines; Posponer's 10 minutes; the Undo action itself (reopen the task, repost the alert with its token); iOS (no timeout there)."
+      ],
+      "acceptance": [
+        "Unit test (reminder_engine_test.dart): with `RegionalPreferences(language: 'es', clock: ClockFormat.twentyFour)`, a task at 17:00 on 22 Sep 2026 with a 10-minute lead first reads `Hoy a las 17:00 · en 10 min`; after Posponer at 16:51, the re-scheduled alert's body is exactly `Hoy a las 17:00`, it stays `Hoy a las 17:00` after `engine.reconcile('local')`, and it contains neither `en 10 min` nor `pospuesta`.",
+        "Unit test: the same snooze in English with a 12-hour clock gives exactly `Today at 5:00 PM`; in Catalan with a 24-hour clock, exactly `Avui a les 17:00`.",
+        "Unit test: in Spanish with a 24-hour clock, a task at 00:05 on 23 Sep 2026 with a 10-minute lead, snoozed at 23:56 on 22 Sep (so it fires again on 23 Sep), has a snoozed body that starts with `Hoy a las`, not `Mañana`, and has no `· en` tail.",
+        "Unit test: in Spanish with a 24-hour clock, planned on Tue 22 Sep 2026 for a task on Fri 25 Sep 2026 at 17:00 (lead 2880), the body is the `DateFormat.MMMEd('es')` date for 25 Sep with its first letter upper-cased, followed by ` a las 17:00`, and its first character is upper-case (e.g. `Vie, 25 sept a las 17:00`). In Catalan the same alert starts with an upper-case letter and ends with ` a les 17:00`.",
+        "Unit test: in Spanish, a deadline alert for Fri 25 Sep 2026 at 17:00 planned on Tue 22 Sep reads `Fecha límite: ` followed by the lowercase `DateFormat.MMMEd('es')` date and ` a las 17:00` (the date is not capitalised mid-sentence).",
+        "Unit test (feedback_timeout): with the `taskflow/accessibility` channel mocked, `FeedbackTimeout.forAction(original: Duration(seconds: 10))` sends `originalTimeoutMillis: 10000`; it returns 30 s when the channel answers 30000, 10 s when it answers 10000 or 4000, and 10 s when no handler is set (MissingPluginException). `FeedbackTimeout.forAction()` with no argument still sends 4000 and returns 4 s with no handler.",
+        "Unit test: `TaskReminders.undoTimeout()` returns 10 s when `reminder_meta` has no `undo_timeout_ms`, 10 s when it holds 4000, and 30 s when it holds 30000.",
+        "Code: `showUndo` in notification_service.dart sets `timeoutAfter` from `undoTimeout()`, not from `undoWindow` directly; `rememberUndoTimeout()` is called in `_initialize` only when not in the background, and on `AppLifecycleState.resumed` in main.dart; no Kotlin, manifest or ARB file changed."
+      ],
+      "deviceChecks": [
+        "On an Android phone in Spanish, 24-hour: a task at 17:00 with a 10-minute reminder; tap Posponer 10 min on the alert. When it comes back about 10 minutes later it reads `Hoy a las 17:00`, with no `en 10 min`.",
+        "With the phone idle, a reminder delivered 20 minutes late still starts with `Hoy a las 17:00` (the original alert's `· en 10 min` tail can still be stale when delivery is late; accepted in P29's brief).",
+        "Set Ajustes > Accesibilidad > Tiempo para actuar (Time to take action) to 1 minute, open TaskFlow once, close it, then tap Completar on a reminder. `Completada: …` with Deshacer stays about 1 minute, not 10 seconds. With the default setting it goes after about 10 seconds. (The background-isolate path is inferred from the plugin's source; it needs a phone.)"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P118",
+      "title": "The first-run instruction never comes back once a task existed",
+      "area": "D",
+      "size": "S",
+      "severity": 2,
+      "findings": ["U12"],
+      "files": [
+        "App/lib/providers/first_task_provider.dart",
+        "App/lib/screens/calendar_screen.dart",
+        "App/test/support/design_fixtures.dart",
+        "App/test/calendar_feedback_test.dart"
+      ],
+      "brief": [
+        "Context: P41 (b10 round 1) made Calendar's empty state (App/lib/screens/calendar_screen.dart:684-696) show `calendarTrySaying` (ES `Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».`) or `calendarTryTyping` when the task list is empty, and `calendarEmpty` (`Nada previsto para este día.`) otherwise. Reviewer D verified the copy, the say/type choice by `voiceAvailableProvider`, the loading spinner and the 2× fit. Keep all of that, and keep the two ARB keys as they are.",
+        "U12 (partly fixed, failed once). Last attempt: the choice reads the live list, `(tasksState.valueOrNull ?? const []).isNotEmpty ? calendarEmpty : …`. Deleting the account's only task brings the instruction back (ux-tester's failing test `U12: once a task has existed, deleting it does not bring the instruction back`, calendar_feedback_test.dart:2503). The brief says the instruction never comes back once any task or note has existed; the planner confirms that is the intent. It is shown only to an account that has never had anything.",
+        "Fix: remember, per account on this phone, that the account has had a task or note.",
+        "1. New file App/lib/providers/first_task_provider.dart. Add a `FirstTaskStore` with `Future<bool> hadTask(String owner)` and `Future<void> markHadTask(String owner)`, stored in the existing `app_preferences` table under the scope `firstTask:<owner>` (data `{\"hadTask\":true}`), the same way ReminderPreferenceStore stores `reminders:<owner>` (App/lib/services/reminder_preferences.dart:53-66). Add `firstTaskStoreProvider = Provider((ref) => FirstTaskStore(TaskDatabase()))`. Add `hadTaskProvider`, a provider of `AsyncValue<bool>` for the current owner (`ref.watch(taskRepositoryProvider).ownerKey`, as reminder_ask_sheet.dart:38 reads it). It loads the stored flag. It also listens to `taskProvider` with `fireImmediately: true`. The first time that list has data and is not empty (any task or note, completed or not), it sets its state to `true` at once and calls `markHadTask` (unawaited). A read error counts as `false`. A write error is swallowed: the flag stays `true` in memory for this run. Because it watches the owner, another account on the same phone has its own flag.",
+        "2. In calendar_screen.dart's `total == 0` branch, the message is `calendarEmpty` when the list is not empty OR `hadTaskProvider` is `true`. It is `calendarTrySaying` / `calendarTryTyping` (unchanged rule) only when the list is empty and the flag is `false`. While the flag is still loading and the list is empty, show the same spinner as the `tasksState.isLoading` branch, so neither text flashes. Update the comment above it to: `// An account that has never had a task or note is told what to try, as Añadir tarea will open it. Once it has had one, the instruction never comes back.`",
+        "3. In App/test/support/design_fixtures.dart, add an in-memory `MemoryFirstTaskStore` and override `firstTaskStoreProvider` with it in `designContainer` by default (a new optional parameter `bool hadTask = false` sets its starting value), so widget tests never touch sqflite. Existing U12 tests keep passing unchanged.",
+        "Accepted on purpose: if the person's very first task is undone (Deshacer after the first save), the instruction does not come back; the empty day shows `Nada previsto para este día.` and `Añadir tarea` is still there.",
+        "Don't touch: the ARB files; `voiceAvailableProvider`; the reminder question (P32's sheet and its `asked` flag); UX-617 (whether the line teaches several tasks is the owner's open question, so keep one task); any other screen."
+      ],
+      "acceptance": [
+        "Widget test (calendar_feedback_test.dart, Spanish, 390×844, 1× text): Calendar opens with one task 30 days ahead, so the empty day shows `Nada previsto para este día.`; after `taskProvider.notifier.deleteTask(1, sync: false)` the list is empty and the screen still shows `Nada previsto para este día.` and not `Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».` (the existing failing test passes).",
+        "Widget test: a new container that shares the same `MemoryFirstTaskStore` already marked for this account, opened with no tasks and no notes, shows `Nada previsto para este día.` and neither try-it instruction (the flag survives a restart).",
+        "Widget test: with no tasks, no notes and the flag unset, Spanish with Pro shows `Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».`; without Pro and no free dictations, `Prueba: toca Añadir tarea y escribe «Llamar al dentista el viernes a las 10».` (P41's checks still pass).",
+        "Widget test: with no tasks and a `FirstTaskStore` whose read never completes, Calendar shows the loading spinner and neither `Nada previsto para este día.` nor either try-it instruction.",
+        "Widget test: the flag is per account: a store marked for another owner key, with no tasks for this account, still shows the try-it instruction.",
+        "Widget test: at 2× text on 320×568, in Catalan, after the only task is deleted the empty state shows `calendarEmpty` with no overflow error.",
+        "Code: `firstTask:<owner>` is the only new `app_preferences` scope; no ARB key added or removed."
+      ],
+      "deviceChecks": [
+        "UX_REVIEW §7 on a fresh install: the owner's father creates the first task from the instruction alone (U12's done-when).",
+        "On a phone: create one task, delete it, close and reopen the app. Calendar shows `Nada previsto para este día.`, not the try-it instruction."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": [],
+  "escalated": []
+}

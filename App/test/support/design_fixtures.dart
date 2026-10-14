@@ -5,6 +5,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/models/task_schedule_change.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/first_task_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -43,6 +44,20 @@ class MemoryThemeStore extends ThemePreferenceStore {
   @override
   Future<void> write(String mode) async {
     value = mode;
+  }
+}
+
+/// Remembers which accounts have had a task, without sqflite.
+class MemoryFirstTaskStore extends FirstTaskStore {
+  MemoryFirstTaskStore([Iterable<String> owners = const []])
+    : owners = {...owners},
+      super(TaskDatabase());
+  final Set<String> owners;
+  @override
+  Future<bool> hadTask(String owner) async => owners.contains(owner);
+  @override
+  Future<void> markHadTask(String owner) async {
+    owners.add(owner);
   }
 }
 
@@ -192,8 +207,14 @@ ProviderContainer designContainer({
   ApiClient? api,
   // What was said or typed but not saved yet; none by default.
   List<CaptureSession> pendingCaptures = const [],
+  // Whether this account has had a task before; a test's own
+  // firstTaskStoreProvider in [overrides] wins over this.
+  bool hadTask = false,
 }) => ProviderContainer(
   overrides: [
+    firstTaskStoreProvider.overrideWithValue(
+      MemoryFirstTaskStore([if (hadTask) MemoryTasks().ownerKey]),
+    ),
     ...overrides,
     invitationLinkProvider.overrideWith(
       (ref) => InvitationLinks(listen: false),

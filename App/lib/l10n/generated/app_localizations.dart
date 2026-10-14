@@ -1288,6 +1288,18 @@ abstract class AppLocalizations {
   /// **'Nothing planned for this day.'**
   String get calendarEmpty;
 
+  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it: tap Add a task and say “Call the dentist on Friday at 10.”'**
+  String get calendarTrySaying;
+
+  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it: tap Add a task and type “Call the dentist on Friday at 10.”'**
+  String get calendarTryTyping;
+
   /// No description provided for @planTask.
   ///
   /// In en, this message translates to:
@@ -4036,23 +4048,41 @@ abstract class AppLocalizations {
   /// **'Snooze 10 min'**
   String get notificationSnooze;
 
-  /// No description provided for @notificationDeadline.
+  /// Reminder body: when the task is due. day is today, tomorrow or other; date is the weekday date; hour is the hour as shown, for the article (Spanish and Catalan say a la 1:00).
   ///
   /// In en, this message translates to:
-  /// **'Your task deadline is approaching.'**
-  String get notificationDeadline;
+  /// **'{hour, plural, other{{day, select, today{Today at {time}} tomorrow{Tomorrow at {time}} other{{date} at {time}}}}}'**
+  String notificationAt(String day, String date, String time, int hour);
 
-  /// No description provided for @notificationDue.
+  /// Reminder body for a deadline. Placeholders as in notificationAt.
   ///
   /// In en, this message translates to:
-  /// **'It’s time for your task.'**
-  String get notificationDue;
+  /// **'{hour, plural, other{{day, select, today{Deadline: today at {time}} tomorrow{Deadline: tomorrow at {time}} other{Deadline: {date} at {time}}}}}'**
+  String notificationDeadlineAt(String day, String date, String time, int hour);
 
-  /// No description provided for @notificationInMinutes.
+  /// No description provided for @notificationDeadlineToday.
   ///
   /// In en, this message translates to:
-  /// **'{minutes, plural, one{Scheduled in 1 minute.} other{Scheduled in {minutes} minutes.}}'**
-  String notificationInMinutes(int minutes);
+  /// **'Deadline: today'**
+  String get notificationDeadlineToday;
+
+  /// Reminder body: when, from notificationAt, then how far away.
+  ///
+  /// In en, this message translates to:
+  /// **'{when} · in {minutes} min'**
+  String notificationInMinutes(String when, int minutes);
+
+  /// Reminder body: when, from notificationAt, then how far away.
+  ///
+  /// In en, this message translates to:
+  /// **'{when} · in {hours} h'**
+  String notificationInHours(String when, int hours);
+
+  /// Replaces a reminder for a few seconds after Complete, beside an Undo action.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed: {title}'**
+  String notificationCompleted(String title);
 
   /// No description provided for @notificationToday.
   ///
@@ -4077,12 +4107,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open TaskFlow to see your current tasks and plan your next step.'**
   String get notificationCheckIn;
-
-  /// No description provided for @notificationSnoozed.
-  ///
-  /// In en, this message translates to:
-  /// **'Your snoozed task.'**
-  String get notificationSnoozed;
 
   /// No description provided for @captureGone.
   ///

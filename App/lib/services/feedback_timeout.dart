@@ -7,30 +7,33 @@ class FeedbackTimeout {
   static const defaultDuration = Duration(seconds: 4);
   static const _channel = MethodChannel('taskflow/accessibility');
 
-  static Future<Duration> forAction() async {
+  /// The phone's accessibility timeout when it is longer than [original],
+  /// otherwise [original].
+  static Future<Duration> forAction({
+    Duration original = defaultDuration,
+  }) async {
     // iOS has no public equivalent of Android's recommended UI timeout.
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      return defaultDuration;
+      return original;
     }
     try {
       // Read each time so changes in the phone's accessibility settings apply
       // to the next notice. An unavailable platform must not hold up feedback.
       final milliseconds = await _channel
           .invokeMethod<Object?>('recommendedActionTimeout', {
-            'originalTimeoutMillis': defaultDuration.inMilliseconds,
+            'originalTimeoutMillis': original.inMilliseconds,
           })
           .timeout(const Duration(milliseconds: 500));
-      if (milliseconds is int &&
-          milliseconds >= defaultDuration.inMilliseconds) {
+      if (milliseconds is int && milliseconds >= original.inMilliseconds) {
         return Duration(milliseconds: milliseconds);
       }
     } on MissingPluginException {
-      return defaultDuration;
+      return original;
     } on PlatformException {
-      return defaultDuration;
+      return original;
     } on TimeoutException {
-      return defaultDuration;
+      return original;
     }
-    return defaultDuration;
+    return original;
   }
 }

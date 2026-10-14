@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:agenda/l10n/generated/app_localizations.dart';
-import 'package:agenda/l10n/generated/app_localizations_en.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/reminder_copy.dart';
 import 'package:agenda/services/reminder_preferences.dart';
@@ -69,6 +67,18 @@ abstract class ReminderDriver {
     required bool exact,
     required String token,
   });
+
+  /// Shows [reminder] again at once, quietly: Undo brings back what the user
+  /// had on screen.
+  Future<void> show(int id, PlannedReminder reminder, {required String token});
+
+  /// Replaces alert [id] for a few seconds with [text] and an Undo action.
+  Future<void> showUndo(
+    int id,
+    String text, {
+    required String languageCode,
+    required String token,
+  });
 }
 
 /// Planning and persistence are separate from the OS, so denied permissions,
@@ -79,16 +89,16 @@ class ReminderEngine {
   final DateTime Function() clock;
   final int capacity;
   final Duration leaseWait;
-  final Future<AppLocalizations> Function() readStrings;
+  final Future<ReminderCopy> Function() readCopy;
   ReminderEngine(
     this.database,
     this.driver, {
     DateTime Function()? clock,
     this.capacity = 400,
     this.leaseWait = const Duration(seconds: 10),
-    Future<AppLocalizations> Function()? readStrings,
+    Future<ReminderCopy> Function()? readCopy,
   }) : clock = clock ?? DateTime.now,
-       readStrings = readStrings ?? (() => readReminderStrings(database));
+       readCopy = readCopy ?? (() => readReminderCopy(database));
 
   Future<String?> activeOwner() async {
     final rows = await (await database.database).query(
@@ -153,23 +163,17 @@ class ReminderEngine {
     return result..sort(Task.compareBySchedule);
   }
 
-  static List<PlannedReminder> plan(
-    String owner,
-    List<Task> tasks,
+  /// When [task]'s alert fires, and how many minutes ahead of the task.
+  static ({DateTime when, int lead})? _firing(
+    Task task,
     ReminderPreferences preferences,
-    DateTime now, {
-    AppLocalizations? strings,
-  }) {
-    if (!preferences.enabled) return [];
-    final l = strings ?? AppLocalizationsEn();
-    final result = <PlannedReminder>[];
-    for (final task in upcoming(tasks, now)) {
-      if (task.id == null || task.reminderMinutes == -1) continue;
-      final date = task.reminderDate!;
-      final lead = task.reminderMinutes ?? preferences.leadMinutes;
-      final minute = task.reminderTime ?? preferences.dateOnlyTime;
-      if (task.reminderHasTime ? lead < 0 : minute == null) continue;
-      final when = task.reminderHasTime
+  ) {
+    final date = task.reminderDate!;
+    final lead = task.reminderMinutes ?? preferences.leadMinutes;
+    final minute = task.reminderTime ?? preferences.dateOnlyTime;
+    if (task.reminderHasTime ? lead < 0 : minute == null) return null;
+    return (
+      when: task.reminderHasTime
           ? date.subtract(Duration(minutes: lead))
           : DateTime(
               date.year,
@@ -177,22 +181,36 @@ class ReminderEngine {
               date.day,
               minute! ~/ 60,
               minute % 60,
-            );
-      if (!when.isAfter(now)) continue;
+            ),
+      lead: lead,
+    );
+  }
+
+  static List<PlannedReminder> plan(
+    String owner,
+    List<Task> tasks,
+    ReminderPreferences preferences,
+    DateTime now, {
+    ReminderCopy? copy,
+  }) {
+    if (!preferences.enabled) return [];
+    final c = copy ?? ReminderCopy.fallback();
+    final l = c.strings;
+    final result = <PlannedReminder>[];
+    for (final task in upcoming(tasks, now)) {
+      if (task.id == null || task.reminderMinutes == -1) continue;
+      final firing = _firing(task, preferences);
+      if (firing == null || !firing.when.isAfter(now)) continue;
       result.add(
         PlannedReminder(
           identity: identity(owner, task),
           taskId: task.id,
           occurrence: task.occurrenceId,
-          due: date,
-          when: when,
+          due: task.reminderDate,
+          when: firing.when,
           title: task.title,
-          languageCode: l.localeName,
-          body: task.reminderAnchor == 'deadline'
-              ? l.notificationDeadline
-              : task.reminderHasTime
-              ? (lead == 0 ? l.notificationDue : l.notificationInMinutes(lead))
-              : l.notificationToday,
+          languageCode: c.languageCode,
+          body: c.body(task, firing.when, firing.lead),
         ),
       );
     }
@@ -280,10 +298,10 @@ class ReminderEngine {
         await database.getTasks(ownerKey: owner),
       );
       final preferences = await ReminderPreferenceStore(database).read(owner);
-      final strings = await readStrings();
+      final copy = await readCopy();
       final capabilities = await driver.capability();
       final pending = await driver.pendingIds();
-      final planned = plan(owner, tasks, preferences, now, strings: strings);
+      final planned = plan(owner, tasks, preferences, now, copy: copy);
       final db = await database.database;
       // A snooze is a separate durable choice. Unrelated edits must not reset it.
       final snoozes = await db.rawQuery(
@@ -302,6 +320,7 @@ class ReminderEngine {
           continue;
         }
         planned.removeWhere((p) => p.identity == row['identity']);
+        // A snoozed alert says when the task is, without “in N min”: the snooze has used that time up.
         planned.add(
           PlannedReminder(
             identity: row['identity'] as String,
@@ -310,8 +329,8 @@ class ReminderEngine {
             due: task.reminderDate,
             when: when,
             title: task.title,
-            languageCode: strings.localeName,
-            body: strings.notificationSnoozed,
+            languageCode: copy.languageCode,
+            body: copy.body(task, when.toLocal(), 0),
           ),
         );
       }
@@ -451,7 +470,13 @@ class ReminderEngine {
     }
   }
 
-  Task? _currentTask(List<Task> tasks, Map<String, Object?> row) {
+  /// The task, or occurrence, that alert [row] is about while the alert still
+  /// matches it. Undo looks for the [completed] one.
+  Task? _currentTask(
+    List<Task> tasks,
+    Map<String, Object?> row, {
+    bool completed = false,
+  }) {
     var task = tasks.where((t) => t.id == row['task_id']).firstOrNull;
     if (task == null) return null;
     if (task.isRecurring) {
@@ -460,7 +485,7 @@ class ReminderEngine {
       task = task.occurrenceByKey(Task.dateKey(date));
     }
     if (task == null ||
-        task.isCompleted ||
+        task.isCompleted != completed ||
         task.reminderDate == null ||
         task.reminderDate!.toIso8601String() != row['due_at']) {
       return null;
@@ -489,8 +514,10 @@ class ReminderEngine {
     );
   }
 
+  /// `complete`, `snooze`, or `undo`, which reopens what `complete` closed
+  /// and shows the alert again.
   Future<bool> action(int id, String action, {String? token}) async {
-    if (action != 'complete' && action != 'snooze') return false;
+    if (!const {'complete', 'snooze', 'undo'}.contains(action)) return false;
     final db = await database.database;
     final result = await db.transaction((tx) async {
       final active = await tx.query(
@@ -519,17 +546,19 @@ class ReminderEngine {
       final task = _currentTask(
         await TaskDatabase.reminderTasks(tx, owner, rows.map(Task.fromMap)),
         alert,
+        completed: action == 'undo',
       );
       if (task == null) return null;
-      if (action == 'complete') {
+      if (action == 'complete' || action == 'undo') {
+        final done = action == 'complete';
+        final occurrence = task.occurrenceId;
+        final dates = {...task.completedDates};
+        if (occurrence != null) {
+          done ? dates.add(occurrence) : dates.remove(occurrence);
+        }
         final values = task.isRecurring
-            ? {
-                'completedDates': jsonEncode(
-                  ({...task.completedDates, task.occurrenceId!}.toList()
-                    ..sort()),
-                ),
-              }
-            : {'isCompleted': 1};
+            ? {'completedDates': jsonEncode(dates.toList()..sort())}
+            : {'isCompleted': done ? 1 : 0};
         await tx.update(
           'tasks',
           {
@@ -555,10 +584,37 @@ class ReminderEngine {
               .toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
-      return owner;
+      return (owner: owner, title: task.title, alert: alert);
     });
     if (result == null) return false;
-    await reconcile(result);
+    await reconcile(result.owner);
+    final alert = result.alert;
+    // The alert keeps its token, so Undo and the restored alert stay valid.
+    final alertToken = alert['token'] as String;
+    if (action == 'complete') {
+      final copy = await readCopy();
+      await driver.showUndo(
+        id,
+        copy.strings.notificationCompleted(result.title),
+        languageCode: copy.languageCode,
+        token: alertToken,
+      );
+    } else if (action == 'undo') {
+      await driver.show(
+        id,
+        PlannedReminder(
+          identity: alert['identity'] as String,
+          taskId: alert['task_id'] as int?,
+          occurrence: alert['occurrence'] as String?,
+          due: DateTime.tryParse(alert['due_at'] as String? ?? ''),
+          when: DateTime.parse(alert['fire_at'] as String).toLocal(),
+          title: alert['title'] as String,
+          body: alert['body'] as String,
+          languageCode: (await readCopy()).languageCode,
+        ),
+        token: alertToken,
+      );
+    }
     return true;
   }
 }

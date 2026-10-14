@@ -216,7 +216,16 @@ void main() {
   testWidgets(
     'U8: the empty Calendar reads Nada previsto para este día. and its empty state has no button',
     (tester) async {
-      await _App.open(tester, pro: false);
+      final app = await _App.open(tester, pro: false);
+      // The account has something, so an empty day isn't the first run.
+      app.tasks.add(
+        Task(
+          title: 'Comprar pan',
+          priority: 1,
+          dueDate: DateTime.now().add(const Duration(days: 30)),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(es.calendarEmpty, 'Nada previsto para este día.');
       final empty = find.descendant(
         of: find.byType(CalendarScreen),

@@ -735,6 +735,14 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarEmpty => 'Res previst per a aquest dia.';
 
   @override
+  String get calendarTrySaying =>
+      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10».';
+
+  @override
+  String get calendarTryTyping =>
+      'Prova-ho: toca Afegeix una tasca i escriu «Trucar al dentista divendres a les 10».';
+
+  @override
   String get planTask => 'Planifica una tasca';
 
   @override
@@ -2467,20 +2475,68 @@ class AppLocalizationsCa extends AppLocalizations {
   String get notificationSnooze => 'Ajorna 10 min';
 
   @override
-  String get notificationDeadline => 'S’acosta el termini de la tasca.';
-
-  @override
-  String get notificationDue => 'És l’hora de la teva tasca.';
-
-  @override
-  String notificationInMinutes(int minutes) {
-    String _temp0 = intl.Intl.pluralLogic(
-      minutes,
+  String notificationAt(String day, String date, String time, int hour) {
+    String _temp0 = intl.Intl.selectLogic(day, {
+      'today': 'Avui a les $time',
+      'tomorrow': 'Demà a les $time',
+      'other': '$date a les $time',
+    });
+    String _temp1 = intl.Intl.selectLogic(day, {
+      'today': 'Avui a la $time',
+      'tomorrow': 'Demà a la $time',
+      'other': '$date a la $time',
+    });
+    String _temp2 = intl.Intl.pluralLogic(
+      hour,
       locale: localeName,
-      other: 'Planificada d’aquí a $minutes minuts.',
-      one: 'Planificada d’aquí a 1 minut.',
+      other: '$_temp0',
+      one: '$_temp1',
     );
-    return '$_temp0';
+    return '$_temp2';
+  }
+
+  @override
+  String notificationDeadlineAt(
+    String day,
+    String date,
+    String time,
+    int hour,
+  ) {
+    String _temp0 = intl.Intl.selectLogic(day, {
+      'today': 'Termini: avui a les $time',
+      'tomorrow': 'Termini: demà a les $time',
+      'other': 'Termini: $date a les $time',
+    });
+    String _temp1 = intl.Intl.selectLogic(day, {
+      'today': 'Termini: avui a la $time',
+      'tomorrow': 'Termini: demà a la $time',
+      'other': 'Termini: $date a la $time',
+    });
+    String _temp2 = intl.Intl.pluralLogic(
+      hour,
+      locale: localeName,
+      other: '$_temp0',
+      one: '$_temp1',
+    );
+    return '$_temp2';
+  }
+
+  @override
+  String get notificationDeadlineToday => 'Termini: avui';
+
+  @override
+  String notificationInMinutes(String when, int minutes) {
+    return '$when · d’aquí a $minutes min';
+  }
+
+  @override
+  String notificationInHours(String when, int hours) {
+    return '$when · d’aquí a $hours h';
+  }
+
+  @override
+  String notificationCompleted(String title) {
+    return 'Completada: $title';
   }
 
   @override
@@ -2495,9 +2551,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get notificationCheckIn =>
       'Obre TaskFlow per veure les tasques actuals i planificar el pas següent.';
-
-  @override
-  String get notificationSnoozed => 'La teva tasca ajornada.';
 
   @override
   String get captureGone => 'Les teves paraules ja no estan disponibles.';

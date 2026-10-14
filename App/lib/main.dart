@@ -126,6 +126,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() {});
       unawaited(TaskReminders.refreshLanguage());
+      // A changed accessibility timeout applies to the next Undo.
+      unawaited(TaskReminders.rememberUndoTimeout());
       unawaited(ref.read(subscriptionProvider.notifier).refresh());
       ref.invalidate(collaborationUnreadProvider);
     }

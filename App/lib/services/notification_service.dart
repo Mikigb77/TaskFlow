@@ -13,6 +13,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_copy.dart';
+import 'package:agenda/services/feedback_timeout.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 
 @pragma('vm:entry-point')
@@ -64,33 +65,70 @@ class _NotificationDriver implements ReminderDriver {
       (await plugin.pendingNotificationRequests()).map((n) => n.id).toSet();
   @override
   Future<void> cancel(int id) => plugin.cancel(id);
-  @override
-  Future<void> schedule(int id, PlannedReminder reminder,
-      {required bool exact, required String token}) async {
+  NotificationDetails _details(PlannedReminder reminder,
+      {bool silent = false}) {
     final l = lookupAppLocalizations(Locale(reminder.languageCode));
-    await plugin.zonedSchedule(
+    return NotificationDetails(
+        android: AndroidNotificationDetails(
+            'taskflow_reminders', l.notificationChannel,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: 'app_notifications_icon',
+            silent: silent,
+            actions: reminder.taskId == null
+                ? null
+                : [
+                    AndroidNotificationAction(
+                        'complete', l.notificationComplete),
+                    AndroidNotificationAction('snooze', l.notificationSnooze),
+                  ]),
+        iOS: DarwinNotificationDetails(
+            presentSound: silent ? false : null,
+            categoryIdentifier: reminder.taskId == null
+                ? null
+                : 'task_${reminder.languageCode}'));
+  }
+
+  @override
+  Future<void> show(int id, PlannedReminder reminder,
+          {required String token}) =>
+      plugin.show(id, reminder.title, reminder.body,
+          _details(reminder, silent: true),
+          payload: jsonEncode({'id': id, 'token': token}));
+
+  @override
+  Future<void> showUndo(int id, String text,
+      {required String languageCode, required String token}) async {
+    final l = lookupAppLocalizations(Locale(languageCode));
+    final timeout = await TaskReminders.undoTimeout();
+    return plugin.show(
         id,
-        reminder.title,
-        reminder.body,
-        tz.TZDateTime.from(reminder.when, tz.local),
+        text,
+        null,
         NotificationDetails(
             android: AndroidNotificationDetails(
                 'taskflow_reminders', l.notificationChannel,
                 importance: Importance.high,
                 priority: Priority.high,
                 icon: 'app_notifications_icon',
-                actions: reminder.taskId == null
-                    ? null
-                    : [
-                        AndroidNotificationAction(
-                            'complete', l.notificationComplete),
-                        AndroidNotificationAction(
-                            'snooze', l.notificationSnooze),
-                      ]),
+                silent: true,
+                // Gone by itself once Undo is no longer likely.
+                timeoutAfter: timeout.inMilliseconds,
+                actions: [AndroidNotificationAction('undo', l.undo)]),
             iOS: DarwinNotificationDetails(
-                categoryIdentifier: reminder.taskId == null
-                    ? null
-                    : 'task_${reminder.languageCode}')),
+                presentSound: false, categoryIdentifier: 'undo_$languageCode')),
+        payload: jsonEncode({'id': id, 'token': token}));
+  }
+
+  @override
+  Future<void> schedule(int id, PlannedReminder reminder,
+      {required bool exact, required String token}) async {
+    await plugin.zonedSchedule(
+        id,
+        reminder.title,
+        reminder.body,
+        tz.TZDateTime.from(reminder.when, tz.local),
+        _details(reminder),
         payload: jsonEncode({'id': id, 'token': token}),
         androidScheduleMode: exact
             ? AndroidScheduleMode.exactAllowWhileIdle
@@ -113,6 +151,9 @@ class TaskReminders {
   static final openRequest = ValueNotifier<ReminderReference?>(null);
   static final changes = StreamController<void>.broadcast();
   static final actionChanges = StreamController<void>.broadcast();
+  /// The shortest time Completed: … and its Undo stay; longer when the phone's accessibility timeout asks for it.
+  static const undoWindow = Duration(seconds: 10);
+  static const _undoTimeoutKey = 'undo_timeout_ms';
   static Future<void>? _initializing;
   static Future<void> _queue = Future.value();
   static bool get supported => Platform.isAndroid || Platform.isIOS;
@@ -156,9 +197,15 @@ class TaskReminders {
                 notificationCategories: [
                   // Retain the legacy category for already delivered alerts.
                   _category('task', strings),
-                  for (final locale in AppLocalizations.supportedLocales)
+                  for (final locale in AppLocalizations.supportedLocales) ...[
                     _category('task_${locale.languageCode}',
                         lookupAppLocalizations(locale)),
+                    DarwinNotificationCategory('undo_${locale.languageCode}',
+                        actions: [
+                          DarwinNotificationAction.plain(
+                              'undo', lookupAppLocalizations(locale).undo),
+                        ]),
+                  ],
                 ])),
         onDidReceiveNotificationResponse: respond,
         onDidReceiveBackgroundNotificationResponse:
@@ -181,7 +228,36 @@ class TaskReminders {
       } catch (_) {
         await recordError('background_unavailable');
       }
+      unawaited(rememberUndoTimeout());
     }
+  }
+
+  /// Notification actions run in a background isolate that cannot ask the
+  /// phone for its accessibility timeout, so the app saves it while open.
+  static Future<void> rememberUndoTimeout() async {
+    if (!supported) return;
+    try {
+      final timeout = await FeedbackTimeout.forAction(original: undoWindow);
+      await (await TaskDatabase().database).insert('reminder_meta',
+          {'key': _undoTimeoutKey, 'value': '${timeout.inMilliseconds}'},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (_) {/* Undo then stays for undoWindow. */}
+  }
+
+  /// How long `Completed: …` and its Undo stay: the saved accessibility
+  /// timeout when it is longer than [undoWindow].
+  static Future<Duration> undoTimeout() async {
+    try {
+      final rows = await (await TaskDatabase().database).query('reminder_meta',
+          columns: ['value'], where: 'key = ?', whereArgs: [_undoTimeoutKey]);
+      final saved = rows.isEmpty
+          ? null
+          : int.tryParse('${rows.single['value']}');
+      if (saved != null && saved > undoWindow.inMilliseconds) {
+        return Duration(milliseconds: saved);
+      }
+    } catch (_) {/* Fall back to the shortest window. */}
+    return undoWindow;
   }
 
   static DarwinNotificationCategory _category(String id, AppLocalizations l) =>
@@ -237,7 +313,7 @@ class TaskReminders {
     final id = data['id'];
     final token = data['token'];
     if (id is! int || token is! String) return;
-    if (response.actionId == 'complete' || response.actionId == 'snooze') {
+    if (const {'complete', 'snooze', 'undo'}.contains(response.actionId)) {
       try {
         await engine.action(id, response.actionId!, token: token);
         changes.add(null);

@@ -219,6 +219,8 @@
   "tryAgain": "Reintentar",
   "rememberPrompt": "¿Qué quieres recordar?",
   "calendarEmpty": "Nada previsto para este día.",
+  "calendarTrySaying": "Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».",
+  "calendarTryTyping": "Prueba: toca Añadir tarea y escribe «Llamar al dentista el viernes a las 10».",
   "planTask": "Planificar una tarea",
   "homeCapture": "Botón de dictar en la pantalla de inicio",
   "homeCaptureInstructions": "En Android, mantén pulsado el icono de TaskFlow para ver los accesos directos, o añade el widget de micrófono desde el lanzador. Comparte texto con TaskFlow desde otra aplicación.",
@@ -834,21 +836,16 @@
   "notificationChannel": "Recordatorios de tareas",
   "notificationComplete": "Completar",
   "notificationSnooze": "Posponer 10 min",
-  "notificationDeadline": "Se acerca la fecha límite de tu tarea.",
-  "notificationDue": "Es hora de tu tarea.",
-  "notificationInMinutes": "{minutes, plural, one{Programada dentro de 1 minuto.} other{Programada dentro de {minutes} minutos.}}",
+  "notificationAt": "{hour, plural, one{{day, select, today{Hoy a la {time}} tomorrow{Mañana a la {time}} other{{date} a la {time}}}} other{{day, select, today{Hoy a las {time}} tomorrow{Mañana a las {time}} other{{date} a las {time}}}}}",
+  "notificationDeadlineAt": "{hour, plural, one{{day, select, today{Fecha límite: hoy a la {time}} tomorrow{Fecha límite: mañana a la {time}} other{Fecha límite: {date} a la {time}}}} other{{day, select, today{Fecha límite: hoy a las {time}} tomorrow{Fecha límite: mañana a las {time}} other{Fecha límite: {date} a las {time}}}}}",
+  "notificationDeadlineToday": "Fecha límite: hoy",
+  "notificationInMinutes": "{when} · en {minutes} min",
+  "notificationInHours": "{when} · en {hours} h",
+  "notificationCompleted": "Completada: {title}",
   "notificationToday": "En tu lista para hoy.",
   "notificationMorning": "Organiza tu día",
   "notificationEvening": "Un momento para revisar",
   "notificationCheckIn": "Abre TaskFlow para ver tus tareas actuales y decidir tu próximo paso.",
-  "notificationSnoozed": "Tu tarea pospuesta.",
-  "@notificationInMinutes": {
-    "placeholders": {
-      "minutes": {
-        "type": "int"
-      }
-    }
-  },
   "@archiveField": {
     "placeholders": {
       "field": {

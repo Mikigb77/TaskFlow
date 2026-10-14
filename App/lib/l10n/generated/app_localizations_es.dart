@@ -735,6 +735,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarEmpty => 'Nada previsto para este día.';
 
   @override
+  String get calendarTrySaying =>
+      'Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».';
+
+  @override
+  String get calendarTryTyping =>
+      'Prueba: toca Añadir tarea y escribe «Llamar al dentista el viernes a las 10».';
+
+  @override
   String get planTask => 'Planificar una tarea';
 
   @override
@@ -2474,20 +2482,68 @@ class AppLocalizationsEs extends AppLocalizations {
   String get notificationSnooze => 'Posponer 10 min';
 
   @override
-  String get notificationDeadline => 'Se acerca la fecha límite de tu tarea.';
-
-  @override
-  String get notificationDue => 'Es hora de tu tarea.';
-
-  @override
-  String notificationInMinutes(int minutes) {
-    String _temp0 = intl.Intl.pluralLogic(
-      minutes,
+  String notificationAt(String day, String date, String time, int hour) {
+    String _temp0 = intl.Intl.selectLogic(day, {
+      'today': 'Hoy a las $time',
+      'tomorrow': 'Mañana a las $time',
+      'other': '$date a las $time',
+    });
+    String _temp1 = intl.Intl.selectLogic(day, {
+      'today': 'Hoy a la $time',
+      'tomorrow': 'Mañana a la $time',
+      'other': '$date a la $time',
+    });
+    String _temp2 = intl.Intl.pluralLogic(
+      hour,
       locale: localeName,
-      other: 'Programada dentro de $minutes minutos.',
-      one: 'Programada dentro de 1 minuto.',
+      other: '$_temp0',
+      one: '$_temp1',
     );
-    return '$_temp0';
+    return '$_temp2';
+  }
+
+  @override
+  String notificationDeadlineAt(
+    String day,
+    String date,
+    String time,
+    int hour,
+  ) {
+    String _temp0 = intl.Intl.selectLogic(day, {
+      'today': 'Fecha límite: hoy a las $time',
+      'tomorrow': 'Fecha límite: mañana a las $time',
+      'other': 'Fecha límite: $date a las $time',
+    });
+    String _temp1 = intl.Intl.selectLogic(day, {
+      'today': 'Fecha límite: hoy a la $time',
+      'tomorrow': 'Fecha límite: mañana a la $time',
+      'other': 'Fecha límite: $date a la $time',
+    });
+    String _temp2 = intl.Intl.pluralLogic(
+      hour,
+      locale: localeName,
+      other: '$_temp0',
+      one: '$_temp1',
+    );
+    return '$_temp2';
+  }
+
+  @override
+  String get notificationDeadlineToday => 'Fecha límite: hoy';
+
+  @override
+  String notificationInMinutes(String when, int minutes) {
+    return '$when · en $minutes min';
+  }
+
+  @override
+  String notificationInHours(String when, int hours) {
+    return '$when · en $hours h';
+  }
+
+  @override
+  String notificationCompleted(String title) {
+    return 'Completada: $title';
   }
 
   @override
@@ -2502,9 +2558,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get notificationCheckIn =>
       'Abre TaskFlow para ver tus tareas actuales y decidir tu próximo paso.';
-
-  @override
-  String get notificationSnoozed => 'Tu tarea pospuesta.';
 
   @override
   String get captureGone => 'Tus palabras ya no están disponibles.';

@@ -8,6 +8,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/repositories/task_repository.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/providers/first_task_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
@@ -2366,6 +2367,357 @@ void main() {
       },
     );
   }
+
+  // ---- Round 1 · P41 (U12): a brand-new account is told what to try ----
+
+  Finder emptyState() => find.descendant(
+    of: find.byType(CalendarScreen),
+    matching: find.byType(EmptyState),
+  );
+
+  testWidgets(
+    'U12: a new account with Pro and no tasks shows Prueba: toca Añadir tarea y di «…»',
+    (tester) async {
+      await openCalendar(tester, const []);
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        l.calendarTrySaying,
+        'Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».',
+      );
+      expect(
+        find.descendant(of: emptyState(), matching: find.text(l.rememberPrompt)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: emptyState(),
+          matching: find.text(l.calendarTrySaying),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l.calendarEmpty), findsNothing);
+      expect(find.text(l.calendarTryTyping), findsNothing);
+      // The instruction names the button that is on screen, and adds no
+      // card or dismiss button of its own.
+      expect(find.text(l.addTask), findsWidgets);
+      expect(
+        find.descendant(of: emptyState(), matching: find.byType(ButtonStyleButton)),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'U12: a new account without Pro shows Prueba: toca Añadir tarea y escribe «…»',
+    (tester) async {
+      await openCalendar(tester, const [], captures: MemoryCaptures());
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        l.calendarTryTyping,
+        'Prueba: toca Añadir tarea y escribe «Llamar al dentista el viernes a las 10».',
+      );
+      expect(
+        find.descendant(
+          of: emptyState(),
+          matching: find.text(l.calendarTryTyping),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(find.text(l.calendarEmpty), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('U12: the instruction in English and Catalan names the real button', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      en.calendarTrySaying,
+      'Try it: tap Add a task and say “Call the dentist on Friday at 10.”',
+    );
+    expect(
+      en.calendarTryTyping,
+      'Try it: tap Add a task and type “Call the dentist on Friday at 10.”',
+    );
+    expect(
+      ca.calendarTrySaying,
+      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10».',
+    );
+    expect(
+      ca.calendarTryTyping,
+      'Prova-ho: toca Afegeix una tasca i escriu «Trucar al dentista divendres a les 10».',
+    );
+    for (final l in [en, ca, lookupAppLocalizations(const Locale('es'))]) {
+      expect(l.calendarTrySaying, contains(l.addTask));
+      expect(l.calendarTryTyping, contains(l.addTask));
+    }
+  });
+
+  for (final (name, task) in [
+    (
+      'a task on another day',
+      Task(
+        id: 1,
+        title: 'Comprar pan',
+        priority: 1,
+        dueDate: DateTime.now().add(const Duration(days: 30)),
+      ),
+    ),
+    (
+      'a task with no date',
+      Task(id: 1, title: 'Algún día', priority: 1),
+    ),
+    (
+      'only a note',
+      Task(id: 1, title: 'Ideas para el viaje', priority: 1, kind: 'note'),
+    ),
+    (
+      'only a completed task from yesterday',
+      Task(
+        id: 1,
+        title: 'Hecho ayer',
+        priority: 1,
+        isCompleted: true,
+        dueDate: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+    ),
+  ]) {
+    testWidgets(
+      'U12: once the account has $name, an empty day shows Nada previsto para este día.',
+      (tester) async {
+        await openCalendar(tester, [task]);
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(l.calendarEmpty, 'Nada previsto para este día.');
+        expect(
+          find.descendant(of: emptyState(), matching: find.text(l.calendarEmpty)),
+          findsOneWidget,
+        );
+        expect(find.text(l.calendarTrySaying), findsNothing);
+        expect(find.text(l.calendarTryTyping), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'U12: once a task has existed, deleting it does not bring the instruction back',
+    (tester) async {
+      final container = await openCalendar(tester, [
+        Task(
+          id: 1,
+          title: 'Comprar pan',
+          priority: 1,
+          dueDate: DateTime.now().add(const Duration(days: 30)),
+        ),
+      ]);
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(find.text(l.calendarEmpty), findsOneWidget);
+      await container.read(taskProvider.notifier).deleteTask(1, sync: false);
+      await tester.pumpAndSettle();
+      expect(container.read(taskProvider).requireValue, isEmpty);
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(find.text(l.calendarEmpty), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'ca']) {
+    for (final pro in [true, false]) {
+      testWidgets(
+        'U12: at 2x text on 320x568 ($language, ${pro ? 'Pro' : 'no Pro'}) the instruction fits without overflow',
+        (tester) async {
+          await openCalendar(
+            tester,
+            const [],
+            language: language,
+            size: const Size(320, 568),
+            textScale: 2,
+            captures: pro ? null : MemoryCaptures(),
+          );
+          final l = tester.element(find.byType(CalendarScreen)).l10n;
+          final message = find.text(
+            pro ? l.calendarTrySaying : l.calendarTryTyping,
+          );
+          // Scroll the page, not the week strip: a drag on the strip changes
+          // the calendar's format.
+          await scrollAgendaToEnd(tester);
+          expect(message, findsOneWidget);
+          final box = tester.getRect(message);
+          expect(box.left, greaterThanOrEqualTo(0));
+          expect(box.right, lessThanOrEqualTo(320));
+          // Fully on screen, above the bottom of the 568-high view.
+          expect(box.top, greaterThanOrEqualTo(0));
+          expect(box.bottom, lessThanOrEqualTo(568));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  // ---- Round 2 (b10) · P118 (U12): the instruction never comes back once
+  // the account has had a task or note ----
+
+  Task later() => Task(
+    id: 1,
+    title: 'Comprar pan',
+    priority: 1,
+    dueDate: DateTime.now().add(const Duration(days: 30)),
+  );
+
+  testWidgets(
+    'U12: the flag survives a restart: a marked account with no tasks shows Nada previsto para este día.',
+    (tester) async {
+      final store = MemoryFirstTaskStore();
+      // First run: the account has one task, then deletes it.
+      final first = await openCalendar(tester, [
+        later(),
+      ], overrides: [firstTaskStoreProvider.overrideWithValue(store)]);
+      await first.read(taskProvider.notifier).deleteTask(1, sync: false);
+      await tester.pumpAndSettle();
+      expect(store.owners, contains(first.read(taskRepositoryProvider).ownerKey));
+      // The app closes and opens again, with no tasks and no notes.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await openCalendar(
+        tester,
+        const [],
+        overrides: [firstTaskStoreProvider.overrideWithValue(store)],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        find.descendant(of: emptyState(), matching: find.text(l.calendarEmpty)),
+        findsOneWidget,
+      );
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(find.text(l.calendarTryTyping), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'U12: a new container whose store is already marked for this account shows Nada previsto para este día.',
+    (tester) async {
+      for (final pro in [true, false]) {
+        await tester.pumpWidget(const SizedBox());
+        await openCalendar(
+          tester,
+          const [],
+          captures: pro ? null : MemoryCaptures(),
+          overrides: [
+            firstTaskStoreProvider.overrideWithValue(
+              MemoryFirstTaskStore([MemoryTasks().ownerKey]),
+            ),
+          ],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(
+          find.descendant(
+            of: emptyState(),
+            matching: find.text(l.calendarEmpty),
+          ),
+          findsOneWidget,
+          reason: pro ? 'Pro' : 'no Pro',
+        );
+        expect(find.text(l.calendarTrySaying), findsNothing);
+        expect(find.text(l.calendarTryTyping), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
+  testWidgets(
+    'U12: while the remembered flag is still loading, Calendar shows the spinner and neither text',
+    (tester) async {
+      final never = Completer<bool>();
+      await openCalendar(
+        tester,
+        const [],
+        settle: false,
+        overrides: [
+          firstTaskStoreProvider.overrideWithValue(_PendingFirstTaskStore(never)),
+        ],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsWidgets,
+      );
+      expect(find.text(l.calendarEmpty), findsNothing);
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(find.text(l.calendarTryTyping), findsNothing);
+      expect(tester.takeException(), isNull);
+      // Leave nothing pending: tear the screen down before the test ends.
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'U12: the flag is per account: another account marked on this phone still gets the instruction',
+    (tester) async {
+      final ownerKey = MemoryTasks().ownerKey;
+      final store = MemoryFirstTaskStore(['$ownerKey-another-account']);
+      await openCalendar(
+        tester,
+        const [],
+        overrides: [firstTaskStoreProvider.overrideWithValue(store)],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        find.descendant(
+          of: emptyState(),
+          matching: find.text(l.calendarTrySaying),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l.calendarEmpty), findsNothing);
+      expect(store.owners, isNot(contains(ownerKey)));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'U12: at 2x text on 320x568 in Catalan, deleting the only task shows calendarEmpty without overflow',
+    (tester) async {
+      final container = await openCalendar(
+        tester,
+        [later()],
+        language: 'ca',
+        size: const Size(320, 568),
+        textScale: 2,
+      );
+      await container.read(taskProvider.notifier).deleteTask(1, sync: false);
+      await tester.pumpAndSettle();
+      expect(container.read(taskProvider).requireValue, isEmpty);
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      await scrollAgendaToEnd(tester);
+      final message = find.descendant(
+        of: emptyState(),
+        matching: find.text(l.calendarEmpty),
+      );
+      expect(message, findsOneWidget);
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(find.text(l.calendarTryTyping), findsNothing);
+      final box = tester.getRect(message);
+      expect(box.left, greaterThanOrEqualTo(0));
+      expect(box.right, lessThanOrEqualTo(320));
+      expect(box.top, greaterThanOrEqualTo(0));
+      expect(box.bottom, lessThanOrEqualTo(568));
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+/// A first-task store whose read never finishes, as a slow disk.
+class _PendingFirstTaskStore extends MemoryFirstTaskStore {
+  _PendingFirstTaskStore(this.read);
+  final Completer<bool> read;
+  @override
+  Future<bool> hadTask(String owner) => read.future;
 }
 
 /// Phone calendars whose reads can fail with an ordinary (not permission)

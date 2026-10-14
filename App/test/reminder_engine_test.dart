@@ -8,7 +8,10 @@ import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/reminder_copy.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/notification_service.dart' show TaskReminders;
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -136,7 +139,7 @@ void main() {
         driver.pending.values
             .singleWhere((p) => p.title == 'Original single minute')
             .body,
-        'Scheduled in 1 minute.');
+        'Today at 9:00 AM · in 1 min');
     final times = {
       for (final entry in driver.pending.entries) entry.key: entry.value.when
     };
@@ -148,10 +151,10 @@ void main() {
     }, times);
     expect(driver.pending.values.every((p) => p.languageCode == 'es'), isTrue);
     expect(driver.pending.values.map((p) => p.body).toSet(), {
-      'Es hora de tu tarea.',
-      'Se acerca la fecha límite de tu tarea.',
+      'Hoy a las 10:00 a. m.',
+      'Fecha límite: hoy a las 12:00 p. m.',
       'En tu lista para hoy.',
-      'Programada dentro de 1 minuto.',
+      'Hoy a las 9:00 a. m. · en 1 min',
       'Abre TaskFlow para ver tus tareas actuales y decidir tu próximo paso.',
     });
     expect(
@@ -189,13 +192,13 @@ void main() {
     expect(await engine.action(id, 'snooze', token: alert['token'] as String),
         isTrue);
     final snoozedAt = driver.pending[id]!.when;
-    expect(driver.pending[id]!.body, 'Your snoozed task.');
+    expect(driver.pending[id]!.body, 'Today at 9:00 AM');
     alert = (await alerts()).single;
     await regional.write(const RegionalPreferences(language: 'es'));
     engine = ReminderEngine(database, driver, clock: () => now);
     await engine.reconcile('local');
     expect(driver.pending[id]!.when, snoozedAt);
-    expect(driver.pending[id]!.body, 'Tu tarea pospuesta.');
+    expect(driver.pending[id]!.body, 'Hoy a las 9:00 a. m.');
     expect(driver.pending[id]!.title, 'My own title');
     expect(await engine.action(id, 'complete', token: alert['token'] as String),
         isFalse);
@@ -589,6 +592,392 @@ void main() {
     expect(driver.pending, isEmpty);
     expect(await alerts(), isEmpty);
   });
+
+  // UX-409 / P29: the body leads with the clock time, in the alert's
+  // language and the stored 12/24-hour choice, so it stays true however late
+  // the phone delivers it.
+  group('UX-409: reminder bodies say when', () {
+    Future<String> bodyOf(Task task, RegionalPreferences regional) async {
+      await RegionalPreferenceStore(database).write(regional);
+      await enable();
+      await database.insertTask(task);
+      await engine.reconcile('local');
+      return driver.pending.values
+          .singleWhere((p) => p.title == task.title)
+          .body;
+    }
+
+    const es24 =
+        RegionalPreferences(language: 'es', clock: ClockFormat.twentyFour);
+    const ca24 =
+        RegionalPreferences(language: 'ca', clock: ClockFormat.twentyFour);
+    const en12 = RegionalPreferences(language: 'en', clock: ClockFormat.twelve);
+    Task timed(DateTime due, int lead) =>
+        Task(title: 'Cita', priority: 1, dueDate: due, reminderMinutes: lead);
+    Task deadline(DateTime due) => Task(
+        title: 'Informe',
+        priority: 2,
+        deadline: due,
+        deadlineHasTime: true,
+        reminderAnchor: 'deadline',
+        reminderMinutes: 60);
+
+    test('UX-409: a timed alert in Spanish reads Hoy a las 17:00 · en 10 min',
+        () async {
+      expect(await bodyOf(timed(DateTime(2026, 9, 22, 17), 10), es24),
+          'Hoy a las 17:00 · en 10 min');
+    });
+
+    test(
+        'UX-409: a timed alert in English with a 12-hour clock reads Today at 5:00 PM · in 10 min',
+        () async {
+      expect(await bodyOf(timed(DateTime(2026, 9, 22, 17), 10), en12),
+          'Today at 5:00 PM · in 10 min');
+    });
+
+    test('UX-409: a timed alert in Catalan reads Avui a les 17:00 · d’aquí a 10 min',
+        () async {
+      expect(await bodyOf(timed(DateTime(2026, 9, 22, 17), 10), ca24),
+          'Avui a les 17:00 · d’aquí a 10 min');
+    });
+
+    test('UX-409: the stored clock choice wins over the language default',
+        () async {
+      expect(
+          await bodyOf(
+              timed(DateTime(2026, 9, 22, 17), 10),
+              const RegionalPreferences(
+                  language: 'en', clock: ClockFormat.twentyFour)),
+          'Today at 17:00 · in 10 min');
+    });
+
+    test('UX-409: the phone’s 24-hour setting is followed when the clock is System',
+        () async {
+      await RegionalPreferenceStore(database)
+          .write(const RegionalPreferences(language: 'es'));
+      final copy = await readReminderCopy(database, system24Hour: true);
+      final task = timed(DateTime(2026, 9, 22, 17), 10);
+      expect(copy.body(task, DateTime(2026, 9, 22, 16, 50), 10),
+          'Hoy a las 17:00 · en 10 min');
+    });
+
+    test('UX-409: one o’clock uses a la in Spanish and Catalan', () async {
+      // Fires at 0:50 on the 23rd, for a task at 1:00 that same day. The
+      // 24-hour time is written as the app writes it (HH:mm in Spanish and
+      // Catalan); what matters here is the singular article.
+      final one = timed(DateTime(2026, 9, 23, 1), 10);
+      expect(await bodyOf(one, es24), 'Hoy a la 01:00 · en 10 min');
+      await database.deleteTask((await database.getTasks()).single.id!);
+      expect(await bodyOf(one, ca24), 'Avui a la 01:00 · d’aquí a 10 min');
+      // Other hours keep the plural article.
+      await database.deleteTask((await database.getTasks()).single.id!);
+      expect(await bodyOf(timed(DateTime(2026, 9, 22, 13), 10), es24),
+          'Hoy a las 13:00 · en 10 min');
+    });
+
+    test('UX-409: 1:00 p. m. on a 12-hour clock also uses a la', () async {
+      final body = await bodyOf(
+          timed(DateTime(2026, 9, 22, 13), 10),
+          const RegionalPreferences(
+              language: 'es', clock: ClockFormat.twelve));
+      expect(body, startsWith('Hoy a la 1:00'));
+      expect(body, endsWith(' · en 10 min'));
+    });
+
+    test('UX-409: an alert the day before says Mañana / Tomorrow / Demà',
+        () async {
+      // A day ahead: fires on the 22nd for a task on the 23rd.
+      final task = timed(DateTime(2026, 9, 23, 17), 1440);
+      expect(await bodyOf(task, es24), 'Mañana a las 17:00');
+      await database.deleteTask((await database.getTasks()).single.id!);
+      expect(await bodyOf(task, en12), 'Tomorrow at 5:00 PM');
+      await database.deleteTask((await database.getTasks()).single.id!);
+      expect(await bodyOf(task, ca24), 'Demà a les 17:00');
+    });
+
+    test('UX-409: an alert further ahead names the weekday date', () async {
+      // Fires on the 23rd for Friday the 25th.
+      final body =
+          await bodyOf(timed(DateTime(2026, 9, 25, 17), 2880), es24);
+      // The line starts with the date, so its first letter is upper-case.
+      final date = DateFormat.MMMEd('es').format(DateTime(2026, 9, 25));
+      expect(body,
+          '${date[0].toUpperCase()}${date.substring(1)} a las 17:00');
+    });
+
+    test('UX-409: a deadline alert says when the deadline is, in each language',
+        () async {
+      final task = deadline(DateTime(2026, 9, 22, 17));
+      expect(await bodyOf(task, es24), 'Fecha límite: hoy a las 17:00');
+      await database.deleteTask((await database.getTasks()).single.id!);
+      expect(await bodyOf(task, en12), 'Deadline: today at 5:00 PM');
+      await database.deleteTask((await database.getTasks()).single.id!);
+      expect(await bodyOf(task, ca24), 'Termini: avui a les 17:00');
+    });
+
+    test(
+        'UX-409: a snoozed alert says when the task is, without the stale tail.',
+        () async {
+      final task = timed(DateTime(2026, 9, 22, 17), 10);
+      final original = await bodyOf(task, es24);
+      expect(original, 'Hoy a las 17:00 · en 10 min');
+      final alert = (await alerts()).single;
+      final id = alert['id'] as int;
+      // Delivered at 16:50; the person taps Posponer 10 min.
+      now = DateTime(2026, 9, 22, 16, 51);
+      driver.pending.remove(id);
+      expect(
+          await engine.action(id, 'snooze', token: alert['token'] as String),
+          isTrue);
+      expect(driver.pending[id]!.when, isNot(DateTime(2026, 9, 22, 16, 50)));
+      expect(driver.pending[id]!.body, 'Hoy a las 17:00');
+      // A later refresh keeps it.
+      await engine.reconcile('local');
+      expect(driver.pending[id]!.body, 'Hoy a las 17:00');
+      expect(driver.pending[id]!.body, isNot(contains('pospuesta')));
+    });
+
+    // ---- Round 2 (b10) · P117: snoozes say only when, dates start capitalised ----
+
+    /// Plans [task], lets the phone deliver its alert, then taps Posponer at
+    /// [at]. Returns the alert id.
+    Future<int> snoozeAt(
+        Task task, RegionalPreferences regional, DateTime at) async {
+      await bodyOf(task, regional);
+      final alert = (await alerts()).single;
+      final id = alert['id'] as int;
+      now = at;
+      driver.pending.remove(id);
+      expect(
+          await engine.action(id, 'snooze', token: alert['token'] as String),
+          isTrue);
+      return id;
+    }
+
+    test(
+        'UX-409: after Posponer at 16:51 the alert reads exactly Hoy a las 17:00, also after a refresh',
+        () async {
+      final task = timed(DateTime(2026, 9, 22, 17), 10);
+      expect(await bodyOf(task, es24), 'Hoy a las 17:00 · en 10 min');
+      await database.deleteTask((await database.getTasks()).single.id!);
+      final id =
+          await snoozeAt(task, es24, DateTime(2026, 9, 22, 16, 51));
+      final snoozed = driver.pending[id]!;
+      expect(snoozed.body, 'Hoy a las 17:00');
+      expect(snoozed.body, isNot(contains('en 10 min')));
+      expect(snoozed.body, isNot(contains('pospuesta')));
+      await engine.reconcile('local');
+      expect(driver.pending[id]!.body, 'Hoy a las 17:00');
+      expect(driver.pending[id]!.body, isNot(contains('en 10 min')));
+      expect(driver.pending[id]!.body, isNot(contains('pospuesta')));
+    });
+
+    test(
+        'UX-409: a snoozed alert in English with a 12-hour clock reads exactly Today at 5:00 PM',
+        () async {
+      final task = timed(DateTime(2026, 9, 22, 17), 10);
+      final id = await snoozeAt(task, en12, DateTime(2026, 9, 22, 16, 51));
+      expect(driver.pending[id]!.body, 'Today at 5:00 PM');
+      await engine.reconcile('local');
+      expect(driver.pending[id]!.body, 'Today at 5:00 PM');
+    });
+
+    test(
+        'UX-409: a snoozed alert in Catalan with a 24-hour clock reads exactly Avui a les 17:00',
+        () async {
+      final task = timed(DateTime(2026, 9, 22, 17), 10);
+      final id = await snoozeAt(task, ca24, DateTime(2026, 9, 22, 16, 51));
+      expect(driver.pending[id]!.body, 'Avui a les 17:00');
+      await engine.reconcile('local');
+      expect(driver.pending[id]!.body, 'Avui a les 17:00');
+    });
+
+    test(
+        'UX-409: a snooze that crosses midnight says Hoy for the task’s own day, with no tail',
+        () async {
+      // 00:05 on the 23rd, 10 minutes ahead: delivered at 23:55 on the 22nd.
+      final task = timed(DateTime(2026, 9, 23, 0, 5), 10);
+      final id = await snoozeAt(task, es24, DateTime(2026, 9, 22, 23, 56));
+      final snoozed = driver.pending[id]!;
+      // It comes back after midnight, on the task's own day.
+      expect(Task.day(snoozed.when.toLocal()), DateTime(2026, 9, 23));
+      expect(snoozed.body, startsWith('Hoy a las'));
+      expect(snoozed.body, isNot(startsWith('Mañana')));
+      expect(snoozed.body, isNot(contains('· en')));
+      expect(snoozed.body, isNot(contains('·')));
+    });
+
+    test(
+        'UX-632: two days ahead the line starts with the capitalised weekday date (Spanish and Catalan)',
+        () async {
+      // Planned on Tuesday the 22nd; fires on the 23rd for Friday the 25th.
+      final task = timed(DateTime(2026, 9, 25, 17), 2880);
+      final es = await bodyOf(task, es24);
+      final date = DateFormat.MMMEd('es').format(DateTime(2026, 9, 25));
+      expect(es, '${date[0].toUpperCase()}${date.substring(1)} a las 17:00');
+      expect(es[0], es[0].toUpperCase());
+      expect(es[0], isNot(es[0].toLowerCase()));
+
+      await database.deleteTask((await database.getTasks()).single.id!);
+      final ca = await bodyOf(task, ca24);
+      expect(ca[0], ca[0].toUpperCase());
+      expect(ca[0], isNot(ca[0].toLowerCase()));
+      expect(ca, endsWith(' a les 17:00'));
+    });
+
+    test(
+        'UX-632: a deadline alert keeps the date lowercase after Fecha límite:',
+        () async {
+      // Planned on Tuesday the 22nd for a deadline on Friday the 25th.
+      final body = await bodyOf(
+          Task(
+              title: 'Informe',
+              priority: 2,
+              deadline: DateTime(2026, 9, 25, 17),
+              deadlineHasTime: true,
+              reminderAnchor: 'deadline',
+              reminderMinutes: 2880),
+          es24);
+      final date = DateFormat.MMMEd('es').format(DateTime(2026, 9, 25));
+      expect(date[0], date[0].toLowerCase());
+      expect(body, 'Fecha límite: $date a las 17:00');
+    });
+  });
+
+  // UX-411 / P29: Completar from the notification can be undone.
+  group('UX-411: Completar from a reminder can be undone', () {
+    Future<({int id, String token})> delivered(Task task,
+        {String language = 'es'}) async {
+      await RegionalPreferenceStore(database).write(RegionalPreferences(
+          language: language, clock: ClockFormat.twentyFour));
+      await enable();
+      await database.insertTask(task);
+      await engine.reconcile('local');
+      final alert = (await alerts())
+          .firstWhere((row) => row['title'] == task.title);
+      final id = alert['id'] as int;
+      // The phone delivers it.
+      now = DateTime.parse(alert['fire_at'] as String)
+          .toLocal()
+          .add(const Duration(minutes: 1));
+      driver.pending.remove(id);
+      await engine.reconcile('local');
+      final current = (await alerts()).singleWhere((row) => row['id'] == id);
+      return (id: id, token: current['token'] as String);
+    }
+
+    test('UX-411: the undo copy reads Completed / Completada and Undo / Deshacer / Desfés',
+        () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(en.notificationCompleted('Call the doctor'),
+          'Completed: Call the doctor');
+      expect(es.notificationCompleted('Llamar al médico'),
+          'Completada: Llamar al médico');
+      expect(ca.notificationCompleted('Trucar al metge'),
+          'Completada: Trucar al metge');
+      expect(en.undo, 'Undo');
+      expect(es.undo, 'Deshacer');
+      expect(ca.undo, 'Desfés');
+    });
+
+    test('UX-411: the undo line is replaced for about 10 seconds', () {
+      expect(TaskReminders.undoWindow, const Duration(seconds: 10));
+    });
+
+    test(
+        'UX-411: Completar posts Completada: {title} with Undo in the alert’s language',
+        () async {
+      final alert = await delivered(Task(
+          title: 'Llamar al médico',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 22, 9)));
+      expect(await engine.action(alert.id, 'complete', token: alert.token),
+          isTrue);
+      expect((await database.getTasks()).single.isCompleted, isTrue);
+      expect(driver.shown[alert.id], 'Completada: Llamar al médico');
+      expect(driver.undoLanguage[alert.id], 'es');
+      // The same notification is replaced, and its Undo can act.
+      expect(driver.undoToken[alert.id], alert.token);
+    });
+
+    test(
+        'UX-411: Undo reopens the task and brings back the reminder as it was',
+        () async {
+      final alert = await delivered(Task(
+          title: 'Llamar al médico',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 22, 9)));
+      await engine.action(alert.id, 'complete', token: alert.token);
+      expect(
+          await engine.action(alert.id, 'undo',
+              token: driver.undoToken[alert.id]),
+          isTrue);
+      expect((await database.getTasks()).single.isCompleted, isFalse);
+      final restored = driver.shown[alert.id];
+      expect(restored, isA<PlannedReminder>());
+      restored as PlannedReminder;
+      expect(restored.title, 'Llamar al médico');
+      expect(restored.body, 'Hoy a las 09:00 · en 10 min');
+      expect(restored.taskId, isNotNull);
+      // The restored reminder's own Completar still works.
+      expect(await engine.action(alert.id, 'complete', token: alert.token),
+          isTrue);
+      expect((await database.getTasks()).single.isCompleted, isTrue);
+    });
+
+    test('UX-411: Undo on a task that is open again does nothing', () async {
+      final alert = await delivered(Task(
+          title: 'Llamar al médico',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 22, 9)));
+      await engine.action(alert.id, 'complete', token: alert.token);
+      expect(await engine.action(alert.id, 'undo', token: alert.token), isTrue);
+      expect(await engine.action(alert.id, 'undo', token: alert.token), isFalse);
+      expect((await database.getTasks()).single.isCompleted, isFalse);
+    });
+
+    test('UX-411: Undo on a repeating task reopens only that day', () async {
+      final alert = await delivered(Task(
+          title: 'Pastilla',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 22, 9),
+          recurrence: 'daily',
+          repeatUntil: DateTime(2026, 9, 24)));
+      await engine.action(alert.id, 'complete', token: alert.token);
+      expect((await database.getTasks()).single.completedDates, ['2026-09-22']);
+      expect(driver.shown[alert.id], 'Completada: Pastilla');
+      expect(await engine.action(alert.id, 'undo', token: alert.token), isTrue);
+      final task = (await database.getTasks()).single;
+      expect(task.completedDates, isEmpty);
+      expect(task.occurrenceByKey('2026-09-22')!.isCompleted, isFalse);
+      expect(task.occurrenceByKey('2026-09-23')!.isCompleted, isFalse);
+    });
+
+    test('UX-411: in English the undo line reads Completed: {title}', () async {
+      final alert = await delivered(
+          Task(
+              title: 'Call the doctor',
+              priority: 1,
+              dueDate: DateTime(2026, 9, 22, 9)),
+          language: 'en');
+      await engine.action(alert.id, 'complete', token: alert.token);
+      expect(driver.shown[alert.id], 'Completed: Call the doctor');
+      expect(driver.undoLanguage[alert.id], 'en');
+    });
+
+    test('UX-411: Posponer stays as it is: no undo line', () async {
+      final alert = await delivered(Task(
+          title: 'Llamar al médico',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 22, 9)));
+      expect(
+          await engine.action(alert.id, 'snooze', token: alert.token), isTrue);
+      expect(driver.shown, isEmpty);
+      expect(driver.pending[alert.id], isNotNull);
+    });
+  });
 }
 
 class _Driver implements ReminderDriver {
@@ -618,4 +1007,24 @@ class _Driver implements ReminderDriver {
     if (fail) throw StateError('Scheduling rejected');
     pending[id] = reminder;
   }
+
+  /// What the phone shows now, by alert ID: a reminder or an undo line.
+  final Map<int, Object> shown = {};
+  @override
+  Future<void> show(int id, PlannedReminder reminder,
+      {required String token}) async {
+    shown[id] = reminder;
+  }
+
+  @override
+  Future<void> showUndo(int id, String text,
+      {required String languageCode, required String token}) async {
+    shown[id] = text;
+    undoLanguage[id] = languageCode;
+    undoToken[id] = token;
+  }
+
+  /// The language and token each undo line was posted with.
+  final Map<int, String> undoLanguage = {};
+  final Map<int, String> undoToken = {};
 }

@@ -310,6 +310,14 @@
   "tryAgain": "Try again",
   "rememberPrompt": "What would you like to remember?",
   "calendarEmpty": "Nothing planned for this day.",
+  "calendarTrySaying": "Try it: tap Add a task and say “Call the dentist on Friday at 10.”",
+  "@calendarTrySaying": {
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic."
+  },
+  "calendarTryTyping": "Try it: tap Add a task and type “Call the dentist on Friday at 10.”",
+  "@calendarTryTyping": {
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing."
+  },
   "planTask": "Plan a task",
   "homeCapture": "Mic button on your home screen",
   "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for its shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.",
@@ -1232,18 +1240,77 @@
   "notificationChannel": "Task reminders",
   "notificationComplete": "Complete",
   "notificationSnooze": "Snooze 10 min",
-  "notificationDeadline": "Your task deadline is approaching.",
-  "notificationDue": "It’s time for your task.",
-  "notificationInMinutes": "{minutes, plural, one{Scheduled in 1 minute.} other{Scheduled in {minutes} minutes.}}",
+  "notificationAt": "{hour, plural, other{{day, select, today{Today at {time}} tomorrow{Tomorrow at {time}} other{{date} at {time}}}}}",
+  "notificationDeadlineAt": "{hour, plural, other{{day, select, today{Deadline: today at {time}} tomorrow{Deadline: tomorrow at {time}} other{Deadline: {date} at {time}}}}}",
+  "notificationDeadlineToday": "Deadline: today",
+  "notificationInMinutes": "{when} · in {minutes} min",
+  "notificationInHours": "{when} · in {hours} h",
+  "notificationCompleted": "Completed: {title}",
   "notificationToday": "On your list for today.",
   "notificationMorning": "Make room for today",
   "notificationEvening": "A moment to check in",
   "notificationCheckIn": "Open TaskFlow to see your current tasks and plan your next step.",
-  "notificationSnoozed": "Your snoozed task.",
-  "@notificationInMinutes": {
+  "@notificationAt": {
+    "description": "Reminder body: when the task is due. day is today, tomorrow or other; date is the weekday date; hour is the hour as shown, for the article (Spanish and Catalan say a la 1:00).",
     "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationDeadlineAt": {
+    "description": "Reminder body for a deadline. Placeholders as in notificationAt.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationInMinutes": {
+    "description": "Reminder body: when, from notificationAt, then how far away.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
       "minutes": {
         "type": "int"
+      }
+    }
+  },
+  "@notificationInHours": {
+    "description": "Reminder body: when, from notificationAt, then how far away.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationCompleted": {
+    "description": "Replaces a reminder for a few seconds after Complete, beside an Undo action.",
+    "placeholders": {
+      "title": {
+        "type": "String"
       }
     }
   },
