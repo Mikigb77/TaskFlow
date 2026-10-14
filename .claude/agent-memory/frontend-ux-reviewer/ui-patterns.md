@@ -19,7 +19,9 @@ What the app does today, so a consistency finding can name the standard and the 
 - Snackbars use the root messenger: they follow the user onto new screens and queue behind each other.
 - They float above the capture bar (asserted in `App/test/calendar_feedback_test.dart`). The exceptions use `SnackBarBehavior.fixed`: `screens/task_lists_screen.dart` and `screens/data_transfer_screen.dart`.
 - **Undo exists for:** complete, voice save, removing a draft in review, move, and applying a date suggestion.
-- **No undo for:** typed save, delete, archive, moving a task into a shared project, leaving, and Completar on a notification.
+- **No undo for:** typed save, delete, archive, moving a task into a shared project, leaving.
+- **Undo outside the app (b10, 2026-10-14):** Completar on a notification posts a silent `Completada: {title}` + Deshacer that reopens the task (or that day of a repeat). Its `timeoutAfter` is `TaskReminders.undoTimeout()`: the stored accessibility timeout (`undo_timeout_ms`, saved on foreground/resume) when longer than 10 s, else 10 s. Any new out-of-app undo should follow this, not a fixed 10 s.
+- `FeedbackTimeout.forAction({original})` takes a base duration and returns it on every fallback.
 - **Destructive actions** use confirmation dialogs where the destructive button is the filled or default-teal one. Nothing uses `colorScheme.error`.
 
 ## Date, time and repeat
@@ -37,9 +39,9 @@ What the app does today, so a consistency finding can name the standard and the 
 
 ## Calendar state
 - The selected day is private state (`_selectedDay` in `screens/calendar_screen.dart`), set when the screen is created.
-  - Nothing outside can tell the calendar which day or task to show.
+  - Since the landing work, `providers/calendar_focus_provider.dart` (CalendarFocus, incl. `undated`) lets a save move the view and light the landed rows (2026-10-14).
   - It doesn't follow midnight.
-- "Nueva tarea" pre-fills the selected day, past days included. "Dictar una tarea" ignores it.
+- Capture buttons get the selected day only when the person picked it (`_picked`, 2026-10-14); a landing does not count as picking.
 - The agenda shows only tasks dated on the selected day. The app has no concept of "overdue".
 
 ## Error text and copy
@@ -73,12 +75,23 @@ What the app does today, so a consistency finding can name the standard and the 
 - `_busy` in `screens/voice_task_screen.dart` means both "loading" and "processing", so both show "Preparando tu plan…".
 - **Listening stops** on any lifecycle state other than `resumed`, including `inactive` (pulling down the shade, system dialogs).
 - **The pattern to keep:** the microphone permission is asked at the first capture, and typing stays available if it's refused.
+- **Standards since the 2026-10-14 speed run:**
+  - A save shows the phone's copy at once and syncs behind (`taskProvider.showLocal()`); nothing awaited sits between a tap and its visible result (no network, no diagnostics write). A new save/undo path that awaits `loadTasks()` is a departure.
+  - Leaving any capture state with content (listening, typing, result) asks the same `_askToKeep` question: Descartar / Conservar. Save is the only exit that doesn't ask.
+  - Calendar passes a day to capture only when the person picked it (`_picked`), never because a landing moved the view.
+  - On the result card, day chips (Hoy, Mañana, Sin fecha) apply and close in one tap, as when moving a task; empty optional fields (notes) stay inside Más opciones until asked for.
+  - Editable text on the result has a visible underline; don't ship borderless editable titles.
+  - Capture copy never says "borrador/draft"; leftovers are "sin añadir" / «Quitada».
 
 ## Reminders and notifications
 - The reminders master switch defaults to off, per account and per device (`ReminderPreferences.enabled = false`).
 - The OS notification permission and exact alarms are requested only from Ajustes › Notificaciones.
 - The reminder chip (`widgets/reminder_control.dart`) leads with the timing and ends with the real state ("… · desactivado en el dispositivo"). It checks only the in-app switch, not the OS permission.
-- **Notification actions:** Completar and Posponer 10 min. Tapping opens the task, or pushes a second MainShell if the task is gone.
+- **Notification actions:** Completar (with undo, above) and Posponer 10 min. Tapping opens the task, or pushes a second MainShell if the task is gone.
+- **Notification body (b10):** absolute time, built in `services/reminder_copy.dart` in the alert's language and the stored 12/24-hour clock: `Hoy a las 17:00 · en 10 min`, `Mañana a las…`, `Vie, 25 sept a las 17:00` (capitalised when it starts with the date), `Fecha límite: vie, 25 sept…` (stays lowercase after the label). ES/CA `a la`/`a las` via `hour` plural. A snoozed alert passes lead 0 — no `· en N min` tail. Never reintroduce relative-only text ("dentro de 10 minutos") in an alert body.
+
+## First-run teaching
+- Calendar's empty day (`calendar_screen.dart`, b10): the try-it line `Prueba: toca Añadir tarea y di «…»` (or `escribe «…»` without voice) shows only while the account has never had a task or note; after that it's `calendarEmpty` "Nada previsto para este día.". The flag is per account and persisted (`providers/first_task_provider.dart`, `hadTaskProvider`); a loading flag shows the list's spinner. One-time teaching must hang off a persisted flag like this, never off the live list.
 
 ## Search
 - **The standard (P11/P46, 2026-10-13):** every search over tasks, notes and projects calls `matchesSearch` in `services/text_search.dart`. Callers: Tareas/project pages (`home_screen.dart`), Notas, Proyectos (`task_lists_screen.dart`), the "Todos los proyectos" sheet (`project_scope_control.dart`). Fields pass the trimmed query.

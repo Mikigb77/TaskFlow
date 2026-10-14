@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Seventeen problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text...), as a checklist to run first on any screen
+description: Twenty-three problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -89,5 +89,23 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
 17. **Work hidden behind tabs runs on every change.**
     - IndexedStack keeps Tareas and Notas built; their filters re-run on every task change anywhere (UX-426).
     - Any new per-item cost in a root tab's build is paid on every save in the app.
+
+18. **Background work is awaited in the tap path.**
+    - Save waited for a full server sync; Listo waited for diagnostics writes; every capture open re-checked speech capability and swept old captures before the mic (UX-601/603/610, 2026-10-14).
+    - On any tap → visible result, look for `await` on sync, logging, diagnostics, time-zone lookups or housekeeping; they should be `unawaited` or done once per session.
+19. **A fix that removes a question creates silent wrong results.**
+    - Making «de la mañana» settle 09:00 removed the hour question, so a past time saved today silently with no reminder (R1A-1 → UX-618).
+    - When a fix removes a question, check the cases the question used to catch (past times, ambiguity), especially on "Guardar tal cual", where nothing is shown before saving.
+20. **One-flag visual conditions miss in-between states.**
+    - A divider hidden "when notes show" also vanished when other rows sat between the notes and Más opciones (R2A-1 → UX-620); it took three rounds.
+    - For separators conditioned on a neighbour, enumerate every row the build can draw between the two, and have the flag derived from the same conditions the build uses.
+21. **Copy written for the scheduled moment is read at a different moment.**
+    - Relative alert text ("dentro de 10 minutos") was false on late delivery; then the snooze reused the original `· en 10 min` tail and was false again (UX-409, R1D-1 round).
+    - For any text built ahead of display (notifications, widget, scheduled copy), ask what it says when shown late, snoozed, or after midnight. Prefer absolute times.
+22. **"Show once" conditions derived from live data come back.**
+    - The first-run instruction keyed on an empty task list returned after deleting the only task (U12 round 1).
+    - One-time teaching needs a persisted, per-account flag; check delete-to-empty, restart, account switch and the loading state.
+23. **Fixed timeouts outside the in-app snackbar path ignore accessibility settings.**
+    - The notification Undo started at a fixed 10 s (R1D-1 → UX-631). Background isolates can't read the platform timeout, so it must be stored from the foreground.
 
 Related: [[ui-patterns]], [[review-techniques]].

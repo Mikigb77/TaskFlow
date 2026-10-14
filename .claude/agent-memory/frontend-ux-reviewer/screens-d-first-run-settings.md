@@ -22,7 +22,7 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
   - it has a language picker, which works before sign-in, and the sun–moon toggle;
   - Back from create or recovery exits the app.
 - **Install → Calendar:** 5 actions by email, 3 with Google.
-- **First run:** nothing teaches the app. The notification permission is only ever asked from Settings.
+- **First run:** Calendar's empty day carries a one-time try-it line until the account's first task (b10, U12). The notification permission is only ever asked from Settings.
 
 ## Settings tab (`lib/screens/settings_screen.dart`, tab 4)
 - **14 entries in the body, in order:**
@@ -54,8 +54,8 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 
 ## Reminders and notifications
 - **Turning reminders on from Calendar:** Ajustes → scroll → Notificaciones → the switch → the system dialog, plus exact alarms on Android 14+. That's 7–8 steps.
-- **Notification body:** relative time ("Programada dentro de 10 minutos").
-- **Notification actions:** Completar (no undo) and Posponer 10 min.
+- **Notification body:** absolute time ("Hoy a las 17:00 · en 10 min"); snoozed alerts drop the tail (b10, UX-409/632).
+- **Notification actions:** Completar, then a silent Deshacer notification that follows the accessibility timeout (UX-411/631); Posponer 10 min. Phone checks for these are in `.claude/ux-review/PHONE_CHECKS.md`.
 - **Tapping a notification** opens the task detail, or a second MainShell if the task is gone.
 - The task-detail reminder chip and the off-by-default switch are described in [[ui-patterns]].
 

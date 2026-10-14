@@ -1,6 +1,6 @@
 ---
 name: screens-a-voice-capture
-description: Screen and flow map for UX-loop area A (voice capture) as of 2026-10-13 — every way into capture, the Pro gate, the capture screen, review and save, the recovery list, and baseline counts
+description: Screen and flow map for UX-loop area A (voice capture) — 2026-10-13 base map plus the 2026-10-14 speed-run changes (save without network wait, landing day rules, result card, leave-asks, parser)
 metadata:
   type: project
 ---
@@ -73,5 +73,19 @@ Current as of 2026-10-13 (whole-app run, slice A). The capture direction in UX_R
   - 5 decisions along the way.
 - **Capture screen, idle:** 8 tap targets, ~115 words in Spanish, ~12 concepts.
 - **Review screen, one task:** 8 tap targets.
+
+## Changes from the 2026-10-14 speed run (verified in code; several need a phone)
+The base map above predates the free tier (b7) and this run; trust this section where they differ.
+- **Save path:** "Añadir al calendario" and Deshacer call `taskProvider.showLocal()` (reads the phone, shows, syncs behind with `unawaited`). A `_shown` counter stops an older read overwriting the list. Diagnostics `record` calls are never awaited in the tap path.
+- **Speech readiness:** `NativeSpeech.knownCapability` is memoized per language per session and warmed from `TaskActions` after first frame; forgotten on failed start, error before ready, or `prepareLanguage`. On Android 13+ "Escuchando" shows once the app's own mic feed is live. The last-words wait after Listo is still a 4 s cap (debug timing "Last words after Done").
+- **Free tier at 0 left:** typing opens at once, no spinner (spinner only while `freeVoiceLeftProvider` is null). Line above typing: «Sin dictados gratis hasta el {date}.» + Ver Pro. "Volver a decirlo" hidden when voice isn't available.
+- **Calendar → capture day:** `TaskActions(day: _picked ? _selectedDay : null)`; `_picked` is set only by the week strip/month or Hoy, and cleared when a landing moves to another day. A landing never re-dates the next dictation.
+- **Landing a mixed save:** `CalendarFocus.undated` lights the no-date row in the same build as dated rows; the message adds «también el {date}» / «también en otros {n} días». Residual: with many dated rows the lit no-date row can sit below the fold, unnamed.
+- **Result card** (`capture_review_editor.dart`): notes field only when there are notes or "Añadir notas" (first row of Más opciones) was tapped; title and notes have underlines; Hoy/Mañana/Sin fecha chips apply and close at once (`applyDays: true`), also on the deadline row; an opened batch card shows its title once (header keeps only ✕). Divider above Más opciones is drawn unless the notes field is directly above it (`notesLast`).
+- **Leaving a result:** Cancelar, Back and scrim go through `_askToKeep` (Descartar / Conservar), the same question as while listening or typing. A batch with no cards left finishes on its own.
+- **Copy:** no "borrador/esborrany/draft" in capture copy («Quitada», «Tareas · 3 sin añadir», «Quitar»).
+- **Typed/offline date parser** (`services/quick_schedule_parser.dart`; typed free-tier captures and "Guardar tal cual"): «por la mañana» alone is not tomorrow; «mañana por la mañana» = tomorrow; «pasado mañana / demà passat / passat demà / the day after tomorrow» = +2; «a las 5 de la tarde» = 17:00 with no question; a part of day with no hour stays in the title; a time with no date word that is already past goes to the next day (a date word or picked day wins; ambiguous «a las 10» still asks).
+- **Counts after the run (reviewer estimates):** taps for one dated spoken task 3; avoidable waits per capture 2 → 0; day fix to Hoy/Mañana/Sin fecha 3 → 2 taps; tap targets on one spoken result 8 → 7.
+- **Still open here:** cold-start waits (UX-424 / P30), U11 names («bandeja de entrada» on undated save), U12 first-run line (P41), server AI wait (UX-616), Catalan 0-left line length (UX-609).
 
 Related: [[ui-patterns]], [[screens-b-calendar-tasks]].

@@ -23,7 +23,7 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
   9. phone-calendar events — up to 3 cards and "Ver todos los eventos", or an access prompt;
   10. the tasks;
   11. the bottom bar: "Capturas pendientes · N" when there are any, then Dictar una tarea / Nueva tarea. The two buttons stack from 1.3× text.
-- **Empty day:** "Un momento de calma", plus "Escribir una tarea".
+- **Empty day (b10):** a never-used account sees the try-it line ("Prueba: toca Añadir tarea y di «…»"); afterwards "Nada previsto para este día." — see [[ui-patterns]] › First-run teaching.
 - **The agenda** shows only tasks dated on the selected day. The selected day is fixed when the screen is created.
 - **Offline:** a red banner that mentions "la dirección del servidor".
 - **A phone event** opens a sheet with "Abrir en la aplicación de calendario".
