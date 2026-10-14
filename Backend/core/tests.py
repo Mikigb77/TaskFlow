@@ -483,6 +483,41 @@ class DraftTests(TestCase):
                 audio_transcription=types.Transcription(text="Doctor appointment on Friday at 5 p.m."))]))])
         self.assertEqual(transcribe(audio), "Doctor appointment on Friday at 5 p.m.")
 
+    def _recording(self):
+        audio = io.BytesIO()
+        with wave.open(audio, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(16000)
+            wav.writeframes(b"\0" * 32000)
+        audio.size = len(audio.getvalue())
+        audio.seek(0)
+        return audio
+
+    @patch("core.ai.client")
+    def test_transcription_hears_the_language_chosen_in_the_app(self, client):
+        api = client.return_value.__enter__.return_value
+        api.models.generate_content.return_value = types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(
+                audio_transcription=types.Transcription(text="Trucar al metge divendres"))]))])
+        self.assertEqual(transcribe(self._recording(), "ca-ES"), "Trucar al metge divendres")
+        config = api.models.generate_content.call_args.kwargs["config"]
+        self.assertEqual(config.audio_transcription_config.language_codes, ["ca-ES"])
+        transcribe(self._recording())
+        self.assertIsNone(api.models.generate_content.call_args.kwargs["config"].audio_transcription_config)
+
+    @patch("core.ai.client")
+    def test_a_refused_language_hint_never_costs_the_dictation(self, client):
+        api = client.return_value.__enter__.return_value
+        api.models.generate_content.side_effect = [
+            errors.ClientError(400, {"error": {"message": "Synthetic refusal"}}),
+            types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(parts=[types.Part(
+                audio_transcription=types.Transcription(text="Trucar al metge divendres"))]))]),
+        ]
+        self.assertEqual(transcribe(self._recording(), "ca-ES"), "Trucar al metge divendres")
+        self.assertEqual(api.models.generate_content.call_count, 2)
+        self.assertIsNone(api.models.generate_content.call_args.kwargs["config"].audio_transcription_config)
+
     def test_oversized_duration_is_rejected(self):
         audio = io.BytesIO()
         with wave.open(audio, "wb") as wav:

@@ -278,7 +278,7 @@ class FreeVoiceTests(TestCase):
     def test_a_recorded_note_counts_once_and_its_audio_reaches_the_ai_whole(self, transcribe, extract):
         recording = wav()
 
-        def heard(audio):
+        def heard(audio, language=None):
             self.assertEqual(audio.read(), recording)  # Hashing rewound the upload.
             return "Gate code 4512"
         transcribe.side_effect = heard

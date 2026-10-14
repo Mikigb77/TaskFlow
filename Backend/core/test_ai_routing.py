@@ -225,3 +225,8 @@ class VertexAdapterTests(SimpleTestCase):
         self.assertEqual(args["model"], "vertex-audio")
         self.assertEqual(args["contents"][1].inline_data.data, audio.getvalue())
         self.assertIn("verbatim", args["contents"][0].text)
+        audio.seek(0)
+        transcribe(audio, "ca-ES")
+        args = api.models.generate_content.call_args.kwargs
+        self.assertIn("ca-ES", args["contents"][0].text)
+        self.assertIsNone(args["config"].audio_transcription_config)

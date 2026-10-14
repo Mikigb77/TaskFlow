@@ -299,6 +299,9 @@ class DraftRequestSerializer(serializers.Serializer):
     audio = serializers.FileField(required=False)
     # The app's capture UUID: a retry with the same words is free, and it can be cancelled.
     capture_id = serializers.UUIDField(required=False, allow_null=True)
+    # The speech language chosen in the app (BCP-47, e.g. "ca-ES"), a hint for transcription.
+    language = serializers.RegexField(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$", max_length=35,
+                                      required=False, allow_null=True)
 
     def validate(self, attrs):
         if bool(attrs.get("text")) == bool(attrs.get("audio")):
