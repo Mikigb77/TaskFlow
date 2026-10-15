@@ -122,11 +122,17 @@ class InvitationLinks extends StateNotifier<InvitationLink?> {
 
   void clear(InvitationLink expected) {
     if (!identical(state, expected)) return;
+    unawaited(forget());
+  }
+
+  /// Drops the kept invitation, whichever it is, here and in storage: the
+  /// account it waited for was deleted.
+  Future<void> forget() {
     _revision++;
     _postponed = false;
     _saved = null;
-    state = null;
-    _writes = _writes
+    if (mounted) state = null;
+    return _writes = _writes
         .then((_) => _storage.delete(key: _key))
         .catchError((Object _) {});
   }

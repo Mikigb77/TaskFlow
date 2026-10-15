@@ -3514,4 +3514,160 @@ class AppLocalizationsCa extends AppLocalizations {
   String projectGroupSees(String group) {
     return 'Tothom a $group el veurà.';
   }
+
+  @override
+  String get deleteAccount => 'Suprimeix el compte';
+
+  @override
+  String get deleteAccountQuestion => 'Vols suprimir el compte?';
+
+  @override
+  String get deleteAccountIntro =>
+      'Es suprimiran el compte i les teves tasques, notes i fitxers a tots els dispositius. No es pot desfer.';
+
+  @override
+  String get deleteAccountWhatGoes => 'El que es suprimirà:';
+
+  @override
+  String deleteAccountTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques',
+      one: '1 tasca',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountNotes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notes',
+      one: '1 nota',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fitxers',
+      one: '1 fitxer',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountProjects(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count projectes',
+      one: '1 projecte',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountGroups(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count grups',
+      one: '1 grup',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountKeptShared(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count tasques que vas afegir a projectes compartits es queden per als altres, sense el teu nom.',
+      one:
+          '1 tasca que vas afegir a projectes compartits es queda per als altres, sense el teu nom.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountHandover(String kind, String name, String person) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'group': 'El grup «$name» passarà a $person.',
+      'other': 'El projecte «$name» passarà a $person.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteAccountSubscription =>
+      'Suprimir el compte no cancel·la la subscripció de Google Play.';
+
+  @override
+  String get deleteAccountSubscriptionHelp => 'Com cancel·lar-la a Google Play';
+
+  @override
+  String get deleteAccountSaveCopy => 'Desa abans una còpia de les tasques';
+
+  @override
+  String get deleteAccountPasswordHelp =>
+      'Per confirmar-ho, escriu la contrasenya.';
+
+  @override
+  String get deleteAccountGoogleHelp =>
+      'Per confirmar-ho, tria el compte de Google.';
+
+  @override
+  String get deleteAccountConfirmGoogle => 'Confirma amb Google';
+
+  @override
+  String get deleteAccountGoogleConfirmed => 'Confirmat amb Google';
+
+  @override
+  String get deleteAccountButton => 'Suprimeix el meu compte';
+
+  @override
+  String get deleteAccountDeleting => 'S’està suprimint el compte';
+
+  @override
+  String get deleteAccountWrongPassword => 'La contrasenya no és correcta.';
+
+  @override
+  String get deleteAccountOtherGoogle =>
+      'Tria el mateix compte de Google amb què entres a TaskFlow.';
+
+  @override
+  String get deleteAccountOffline =>
+      'Necessites connexió per suprimir el compte. No s’ha suprimit res.';
+
+  @override
+  String get deleteAccountNoAnswer =>
+      'No ha arribat cap resposta. Revisa la connexió i torna-ho a provar.';
+
+  @override
+  String get deleteAccountThrottled =>
+      'Massa intents. Torna-ho a provar més tard.';
+
+  @override
+  String get deleteAccountPlanChanged =>
+      'Alguna cosa ha canviat des que has obert aquesta pantalla. Revisa què passarà i torna a confirmar-ho.';
+
+  @override
+  String get deleteAccountConfirmAgain => 'Torna a confirmar que ets tu.';
+
+  @override
+  String get deleteAccountFailed =>
+      'No s’ha pogut suprimir el compte. Torna-ho a provar més tard.';
+
+  @override
+  String get deleteAccountLinkError => 'No s’ha pogut obrir la pàgina.';
+
+  @override
+  String get accountDeleted => 'S’ha suprimit el compte.';
 }

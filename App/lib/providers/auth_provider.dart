@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/services/account_deletion.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
@@ -19,12 +20,16 @@ class AuthState {
   /// screens, which keep what was typed until the same account signs back in.
   final bool expired;
   final Object? error;
+
+  /// The account was just deleted: sign-in says so until the next attempt.
+  final bool deleted;
   const AuthState({
     this.account,
     this.loading = false,
     this.restoring = false,
     this.expired = false,
     this.error,
+    this.deleted = false,
   });
 }
 
@@ -32,6 +37,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
   (ref) => AuthNotifier(
     ref.read(apiClientProvider),
     google: ref.read(googleSignInServiceProvider),
+    prepareErase: (accountId) => prepareAccountErase(ref.read, accountId),
   ),
 );
 
@@ -41,13 +47,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Points reminders at an account, or at no one ('signed-out').
   final Future<void> Function(String owner) activateReminders;
+
+  /// Readies erasing what a deleted account left on this phone. Called while
+  /// it is still signed in: its own providers go as soon as it does. Null
+  /// leaves the phone as it is.
+  final Future<void> Function() Function(int accountId)? prepareErase;
   late final StreamSubscription<void> _sessionInvalidated;
   late final StreamSubscription<void> _accountUpdated;
+  late final StreamSubscription<int> _accountDeleted;
   Future<void> _reminders = Future.value();
+  int? _deletedAccount;
+  Future<void> _forgettingDeleted = Future.value();
   AuthNotifier(
     this.api, {
     this.google,
     this.activateReminders = TaskReminders.activate,
+    this.prepareErase,
   }) : super(const AuthState(loading: true, restoring: true)) {
     _sessionInvalidated = api.sessionInvalidated.listen((_) {
       if (!mounted || api.account != null) return;
@@ -70,6 +85,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       state = AuthState(account: account);
     });
+    // The server says the account no longer exists: deleted on another
+    // phone, or on this one with the answer lost. Another account's
+    // session is never touched.
+    _accountDeleted = api.accountDeleted.listen((accountId) {
+      if (mounted && state.account?.id == accountId) {
+        unawaited(forgetDeletedAccount().catchError((Object _) {}));
+      }
+    });
     restore();
   }
 
@@ -77,6 +100,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void dispose() {
     _sessionInvalidated.cancel();
     _accountUpdated.cancel();
+    _accountDeleted.cancel();
     super.dispose();
   }
 
@@ -164,6 +188,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await google?.signOut();
     if (mounted) state = const AuthState();
     _remind('signed-out');
+  }
+
+  /// After the server deleted the signed-in account: the delete page's
+  /// answer, or any request learning that the account no longer exists.
+  /// Like [signOut], but nothing more is sent and sign-in says the account
+  /// was deleted; once every reminder is cancelled, what the account left
+  /// on this phone is erased, which signing out keeps. Runs once per
+  /// account, however many requests learn it.
+  Future<void> forgetDeletedAccount() {
+    final accountId = state.account?.id;
+    if (accountId != null && accountId != _deletedAccount) {
+      _deletedAccount = accountId;
+      _forgettingDeleted = _forgetDeleted(accountId);
+    }
+    return _forgettingDeleted;
+  }
+
+  Future<void> _forgetDeleted(int accountId) async {
+    Future<void> Function()? erase;
+    try {
+      // Readied first, while the account's providers are still its own.
+      erase = prepareErase?.call(accountId);
+    } catch (_) {
+      // Leaving the deleted account matters more than the erase.
+    }
+    try {
+      await api.forgetSession();
+    } catch (_) {
+      // Already forgotten in memory; a saved copy is refused when next used.
+    }
+    await google?.signOut();
+    if (mounted) state = const AuthState(deleted: true);
+    _remind('signed-out');
+    await _reminders;
+    await erase?.call();
   }
 
   Future<void> signInWithGoogle(String token, {String timezone = 'UTC'}) async {

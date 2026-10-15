@@ -5391,6 +5391,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Everyone in {group} will see it.'**
   String projectGroupSees(String group);
+
+  /// The last row of the Account screen, in the destructive colour, and the title of the page it opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccount;
+
+  /// Heading of the delete-account page.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account?'**
+  String get deleteAccountQuestion;
+
+  /// First line of the delete-account page, under its heading.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes your account and your tasks, notes and files on all your devices. It can’t be undone.'**
+  String get deleteAccountIntro;
+
+  /// Introduces the list of counts (tasks, notes, files, projects, groups) that deleting the account removes.
+  ///
+  /// In en, this message translates to:
+  /// **'What will be deleted:'**
+  String get deleteAccountWhatGoes;
+
+  /// A line in the list under 'What will be deleted:'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 task} other{{count} tasks}}'**
+  String deleteAccountTasks(int count);
+
+  /// A line in the list under 'What will be deleted:'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 note} other{{count} notes}}'**
+  String deleteAccountNotes(int count);
+
+  /// A line in the list under 'What will be deleted:'. Attached files.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
+  String deleteAccountFiles(int count);
+
+  /// A line in the list under 'What will be deleted:'. The person's own unshared projects.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 project} other{{count} projects}}'**
+  String deleteAccountProjects(int count);
+
+  /// A line in the list under 'What will be deleted:'. Groups with no one else in them.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 group} other{{count} groups}}'**
+  String deleteAccountGroups(int count);
+
+  /// On the delete-account page, when tasks the person added to other people's projects stay after the account is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 task you added to shared projects stays for the others, without your name.} other{{count} tasks you added to shared projects stay for the others, without your name.}}'**
+  String deleteAccountKeptShared(int count);
+
+  /// One line per project or group the person owns that passes to someone else when the account is deleted. {kind} is 'group' or 'project' and is never translated. {name} is the project or group; {person} is who receives it (a name or an email).
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, group{The group “{name}” will go to {person}.} other{The project “{name}” will go to {person}.}}'**
+  String deleteAccountHandover(String kind, String name, String person);
+
+  /// On the delete-account page, only for an account with Pro.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting your account doesn’t cancel your Google Play subscription.'**
+  String get deleteAccountSubscription;
+
+  /// Link under the subscription line; opens Google Play's help page on cancelling a subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'How to cancel it on Google Play'**
+  String get deleteAccountSubscriptionHelp;
+
+  /// Link on the delete-account page to the Export & import screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a copy of your tasks first'**
+  String get deleteAccountSaveCopy;
+
+  /// Above the password field that confirms deleting the account.
+  ///
+  /// In en, this message translates to:
+  /// **'To confirm, enter your password.'**
+  String get deleteAccountPasswordHelp;
+
+  /// Above the Confirm with Google button, for an account that signs in only with Google.
+  ///
+  /// In en, this message translates to:
+  /// **'To confirm, choose your Google account.'**
+  String get deleteAccountGoogleHelp;
+
+  /// Button that opens Google sign-in to confirm deleting the account.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with Google'**
+  String get deleteAccountConfirmGoogle;
+
+  /// Shown in place of the Confirm with Google button once Google sign-in succeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed with Google'**
+  String get deleteAccountGoogleConfirmed;
+
+  /// The destructive button at the bottom of the delete-account page.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my account'**
+  String get deleteAccountButton;
+
+  /// Spoken label of the progress indicator inside Delete my account while the request runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting your account'**
+  String get deleteAccountDeleting;
+
+  /// Under the password field on the delete-account page.
+  ///
+  /// In en, this message translates to:
+  /// **'That password isn’t right.'**
+  String get deleteAccountWrongPassword;
+
+  /// On the delete-account page, when the Google account chosen to confirm isn't the one linked to this TaskFlow account.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the same Google account you use for TaskFlow.'**
+  String get deleteAccountOtherGoogle;
+
+  /// Under Delete my account when the phone is offline.
+  ///
+  /// In en, this message translates to:
+  /// **'You need a connection to delete your account. Nothing was deleted.'**
+  String get deleteAccountOffline;
+
+  /// Under Delete my account when the request timed out; it may or may not have arrived, so it doesn't say nothing was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'There was no answer. Check your connection and try again.'**
+  String get deleteAccountNoAnswer;
+
+  /// Under Delete my account when the server refuses more attempts for now.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many tries. Try again later.'**
+  String get deleteAccountThrottled;
+
+  /// Above Delete my account when the server refused because what the page showed changed meanwhile (for example, the person who would receive a project left it). The page has just reloaded; nothing was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Something has changed since you opened this screen. Check what will happen and confirm again.'**
+  String get deleteAccountPlanChanged;
+
+  /// On the delete-account page when the server needs the password or Google confirmation again.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm it’s you again.'**
+  String get deleteAccountConfirmAgain;
+
+  /// Under Delete my account for any other failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account couldn’t be deleted. Try again later.'**
+  String get deleteAccountFailed;
+
+  /// Brief message when Google Play's help page couldn't be opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t open the page.'**
+  String get deleteAccountLinkError;
+
+  /// On the sign-in screen, right after the account was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has been deleted.'**
+  String get accountDeleted;
 }
 
 class _AppLocalizationsDelegate

@@ -11,6 +11,9 @@ class TaskRepository {
   String get ownerKey => 'local';
   AttachmentStore get attachments => AttachmentStore(_database, ownerKey);
   Future<void> sync() async {}
+
+  /// Done once a sync already under way has finished; never starts one.
+  Future<void> get settled async {}
   Future<int> importLocalTasks() async => 0;
 
   /// Tasks and notes saved on this phone before signing in.

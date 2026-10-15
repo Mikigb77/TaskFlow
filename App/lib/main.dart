@@ -16,6 +16,7 @@ import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/screens/edit_task_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/account_screen.dart';
+import 'package:agenda/screens/delete_account_screen.dart';
 import 'package:agenda/screens/login_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
@@ -445,6 +446,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               '/settings': (_) => const MainShell(initialIndex: 3),
               '/completedTasks': (_) => const CompletedTasksScreen(),
               '/account': (_) => const AccountScreen(),
+              '/deleteAccount': (_) => const DeleteAccountScreen(),
               '/subscription': (_) => const SubscriptionScreen(),
               '/captures': (_) => const CapturesScreen(),
               '/captureDiagnostics': (_) => const CaptureDiagnosticsScreen(),

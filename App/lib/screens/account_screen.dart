@@ -300,6 +300,20 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  key: const ValueKey('account-delete'),
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.pushNamed(context, '/deleteAccount'),
+                  child: Text(
+                    context.l10n.deleteAccount,
+                    style: TextStyle(color: colors.error),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

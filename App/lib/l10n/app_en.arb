@@ -1898,5 +1898,166 @@
         "type": "String"
       }
     }
+  },
+  "deleteAccount": "Delete account",
+  "@deleteAccount": {
+    "description": "The last row of the Account screen, in the destructive colour, and the title of the page it opens."
+  },
+  "deleteAccountQuestion": "Delete your account?",
+  "@deleteAccountQuestion": {
+    "description": "Heading of the delete-account page."
+  },
+  "deleteAccountIntro": "This deletes your account and your tasks, notes and files on all your devices. It can’t be undone.",
+  "@deleteAccountIntro": {
+    "description": "First line of the delete-account page, under its heading."
+  },
+  "deleteAccountWhatGoes": "What will be deleted:",
+  "@deleteAccountWhatGoes": {
+    "description": "Introduces the list of counts (tasks, notes, files, projects, groups) that deleting the account removes."
+  },
+  "deleteAccountTasks": "{count, plural, =1{1 task} other{{count} tasks}}",
+  "@deleteAccountTasks": {
+    "description": "A line in the list under 'What will be deleted:'.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountNotes": "{count, plural, =1{1 note} other{{count} notes}}",
+  "@deleteAccountNotes": {
+    "description": "A line in the list under 'What will be deleted:'.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountFiles": "{count, plural, =1{1 file} other{{count} files}}",
+  "@deleteAccountFiles": {
+    "description": "A line in the list under 'What will be deleted:'. Attached files.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountProjects": "{count, plural, =1{1 project} other{{count} projects}}",
+  "@deleteAccountProjects": {
+    "description": "A line in the list under 'What will be deleted:'. The person's own unshared projects.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountGroups": "{count, plural, =1{1 group} other{{count} groups}}",
+  "@deleteAccountGroups": {
+    "description": "A line in the list under 'What will be deleted:'. Groups with no one else in them.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountKeptShared": "{count, plural, =1{1 task you added to shared projects stays for the others, without your name.} other{{count} tasks you added to shared projects stay for the others, without your name.}}",
+  "@deleteAccountKeptShared": {
+    "description": "On the delete-account page, when tasks the person added to other people's projects stay after the account is deleted.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountHandover": "{kind, select, group{The group “{name}” will go to {person}.} other{The project “{name}” will go to {person}.}}",
+  "@deleteAccountHandover": {
+    "description": "One line per project or group the person owns that passes to someone else when the account is deleted. {kind} is 'group' or 'project' and is never translated. {name} is the project or group; {person} is who receives it (a name or an email).",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      },
+      "person": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountSubscription": "Deleting your account doesn’t cancel your Google Play subscription.",
+  "@deleteAccountSubscription": {
+    "description": "On the delete-account page, only for an account with Pro."
+  },
+  "deleteAccountSubscriptionHelp": "How to cancel it on Google Play",
+  "@deleteAccountSubscriptionHelp": {
+    "description": "Link under the subscription line; opens Google Play's help page on cancelling a subscription."
+  },
+  "deleteAccountSaveCopy": "Save a copy of your tasks first",
+  "@deleteAccountSaveCopy": {
+    "description": "Link on the delete-account page to the Export & import screen."
+  },
+  "deleteAccountPasswordHelp": "To confirm, enter your password.",
+  "@deleteAccountPasswordHelp": {
+    "description": "Above the password field that confirms deleting the account."
+  },
+  "deleteAccountGoogleHelp": "To confirm, choose your Google account.",
+  "@deleteAccountGoogleHelp": {
+    "description": "Above the Confirm with Google button, for an account that signs in only with Google."
+  },
+  "deleteAccountConfirmGoogle": "Confirm with Google",
+  "@deleteAccountConfirmGoogle": {
+    "description": "Button that opens Google sign-in to confirm deleting the account."
+  },
+  "deleteAccountGoogleConfirmed": "Confirmed with Google",
+  "@deleteAccountGoogleConfirmed": {
+    "description": "Shown in place of the Confirm with Google button once Google sign-in succeeded."
+  },
+  "deleteAccountButton": "Delete my account",
+  "@deleteAccountButton": {
+    "description": "The destructive button at the bottom of the delete-account page."
+  },
+  "deleteAccountDeleting": "Deleting your account",
+  "@deleteAccountDeleting": {
+    "description": "Spoken label of the progress indicator inside Delete my account while the request runs."
+  },
+  "deleteAccountWrongPassword": "That password isn’t right.",
+  "@deleteAccountWrongPassword": {
+    "description": "Under the password field on the delete-account page."
+  },
+  "deleteAccountOtherGoogle": "Choose the same Google account you use for TaskFlow.",
+  "@deleteAccountOtherGoogle": {
+    "description": "On the delete-account page, when the Google account chosen to confirm isn't the one linked to this TaskFlow account."
+  },
+  "deleteAccountOffline": "You need a connection to delete your account. Nothing was deleted.",
+  "@deleteAccountOffline": {
+    "description": "Under Delete my account when the phone is offline."
+  },
+  "deleteAccountNoAnswer": "There was no answer. Check your connection and try again.",
+  "@deleteAccountNoAnswer": {
+    "description": "Under Delete my account when the request timed out; it may or may not have arrived, so it doesn't say nothing was deleted."
+  },
+  "deleteAccountThrottled": "Too many tries. Try again later.",
+  "@deleteAccountThrottled": {
+    "description": "Under Delete my account when the server refuses more attempts for now."
+  },
+  "deleteAccountPlanChanged": "Something has changed since you opened this screen. Check what will happen and confirm again.",
+  "@deleteAccountPlanChanged": {
+    "description": "Above Delete my account when the server refused because what the page showed changed meanwhile (for example, the person who would receive a project left it). The page has just reloaded; nothing was deleted."
+  },
+  "deleteAccountConfirmAgain": "Confirm it’s you again.",
+  "@deleteAccountConfirmAgain": {
+    "description": "On the delete-account page when the server needs the password or Google confirmation again."
+  },
+  "deleteAccountFailed": "Your account couldn’t be deleted. Try again later.",
+  "@deleteAccountFailed": {
+    "description": "Under Delete my account for any other failure."
+  },
+  "deleteAccountLinkError": "Couldn’t open the page.",
+  "@deleteAccountLinkError": {
+    "description": "Brief message when Google Play's help page couldn't be opened."
+  },
+  "accountDeleted": "Your account has been deleted.",
+  "@accountDeleted": {
+    "description": "On the sign-in screen, right after the account was deleted."
   }
 }

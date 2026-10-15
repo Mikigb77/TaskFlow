@@ -317,6 +317,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 32),
+                    // Right after deleting the account; gone on the next try.
+                    if (auth.deleted) ...[
+                      Semantics(
+                        liveRegion: true,
+                        child: MessageBanner(
+                          strings.accountDeleted,
+                          key: const ValueKey('account-deleted'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     DecoratedBox(
                       decoration: BoxDecoration(
                         color: colors.surface,

@@ -3521,4 +3521,160 @@ class AppLocalizationsEs extends AppLocalizations {
   String projectGroupSees(String group) {
     return 'Todos en $group lo verán.';
   }
+
+  @override
+  String get deleteAccount => 'Eliminar cuenta';
+
+  @override
+  String get deleteAccountQuestion => '¿Eliminar tu cuenta?';
+
+  @override
+  String get deleteAccountIntro =>
+      'Se eliminarán tu cuenta y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.';
+
+  @override
+  String get deleteAccountWhatGoes => 'Lo que se eliminará:';
+
+  @override
+  String deleteAccountTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas',
+      one: '1 tarea',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountNotes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notas',
+      one: '1 nota',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count archivos',
+      one: '1 archivo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountProjects(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count proyectos',
+      one: '1 proyecto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountGroups(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count grupos',
+      one: '1 grupo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountKeptShared(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count tareas que añadiste a proyectos compartidos se quedan para los demás, sin tu nombre.',
+      one:
+          '1 tarea que añadiste a proyectos compartidos se queda para los demás, sin tu nombre.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountHandover(String kind, String name, String person) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'group': 'El grupo «$name» pasará a $person.',
+      'other': 'El proyecto «$name» pasará a $person.',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteAccountSubscription =>
+      'Eliminar tu cuenta no cancela tu suscripción de Google Play.';
+
+  @override
+  String get deleteAccountSubscriptionHelp => 'Cómo cancelarla en Google Play';
+
+  @override
+  String get deleteAccountSaveCopy => 'Guardar antes una copia de tus tareas';
+
+  @override
+  String get deleteAccountPasswordHelp =>
+      'Para confirmar, escribe tu contraseña.';
+
+  @override
+  String get deleteAccountGoogleHelp =>
+      'Para confirmar, elige tu cuenta de Google.';
+
+  @override
+  String get deleteAccountConfirmGoogle => 'Confirmar con Google';
+
+  @override
+  String get deleteAccountGoogleConfirmed => 'Confirmado con Google';
+
+  @override
+  String get deleteAccountButton => 'Eliminar mi cuenta';
+
+  @override
+  String get deleteAccountDeleting => 'Eliminando tu cuenta';
+
+  @override
+  String get deleteAccountWrongPassword => 'La contraseña no es correcta.';
+
+  @override
+  String get deleteAccountOtherGoogle =>
+      'Elige la misma cuenta de Google con la que entras en TaskFlow.';
+
+  @override
+  String get deleteAccountOffline =>
+      'Necesitas conexión para eliminar tu cuenta. No se ha eliminado nada.';
+
+  @override
+  String get deleteAccountNoAnswer =>
+      'No ha llegado respuesta. Revisa la conexión e inténtalo de nuevo.';
+
+  @override
+  String get deleteAccountThrottled =>
+      'Demasiados intentos. Inténtalo más tarde.';
+
+  @override
+  String get deleteAccountPlanChanged =>
+      'Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.';
+
+  @override
+  String get deleteAccountConfirmAgain => 'Vuelve a confirmar que eres tú.';
+
+  @override
+  String get deleteAccountFailed =>
+      'No se ha podido eliminar tu cuenta. Inténtalo más tarde.';
+
+  @override
+  String get deleteAccountLinkError => 'No se ha podido abrir la página.';
+
+  @override
+  String get accountDeleted => 'Tu cuenta se ha eliminado.';
 }

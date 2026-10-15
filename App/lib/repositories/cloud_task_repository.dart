@@ -102,6 +102,15 @@ class CloudTaskRepository extends TaskRepository {
   Future<void> sync() =>
       _syncing ??= _synchronize().whenComplete(() => _syncing = null);
 
+  @override
+  Future<void> get settled async {
+    try {
+      await _syncing;
+    } catch (_) {
+      // Whoever started the sync reports how it ended.
+    }
+  }
+
   Future<void> _synchronize() async {
     syncError = null;
     try {

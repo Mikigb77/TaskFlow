@@ -122,6 +122,12 @@ class ApiClient {
   /// answer carried the free dictations left, or a refused upload the file
   /// space used.
   Stream<void> get accountUpdated => _accountUpdated.stream;
+  final _accountDeleted = StreamController<int>.broadcast();
+
+  /// The server said the signed-in account no longer exists: it was deleted,
+  /// on another phone or on this one with the answer lost. Its session is
+  /// already forgotten here; carries that account's id, once.
+  Stream<int> get accountDeleted => _accountDeleted.stream;
 
   ApiClient({
     http.Client? transport,
@@ -290,9 +296,16 @@ class ApiClient {
     } on ApiException {
       /* Local sign-out still succeeds. */
     }
+    await forgetSession();
+  }
+
+  /// Forgets the session on this phone without telling the server: after the
+  /// account was deleted there, nothing is left to sign out of. Requests
+  /// still under way are refused when they answer.
+  Future<void> forgetSession() {
     _generation++;
     _session = null;
-    await _persist(null, _generation);
+    return _persist(null, _generation);
   }
 
   Future<void> _persist(Map<String, dynamic>? session, int generation) {
@@ -325,7 +338,13 @@ class ApiClient {
     } on ApiException catch (error) {
       // An offline/server failure retains the saved session. Only an explicit
       // authentication rejection locks the app and removes the credentials.
-      if (error.status == 401) await _invalidateSession(generation);
+      if (error.status == 401) {
+        if (error.body?['code'] == _userNotFound) {
+          await _accountGone(generation);
+        } else {
+          await _invalidateSession(generation);
+        }
+      }
       rethrow;
     }
     if (generation != _generation) {
@@ -344,6 +363,37 @@ class ApiClient {
     } finally {
       if (!_sessionInvalidated.isClosed && _generation == invalidated) {
         _sessionInvalidated.add(null);
+      }
+    }
+  }
+
+  /// simplejwt's answer when a signed token's account no longer exists.
+  static const _userNotFound = 'user_not_found';
+
+  /// Whether a 401's [body] says the account is gone, rather than only the
+  /// session: no refresh can help then.
+  static bool _accountGoneIn(List<int> body) {
+    try {
+      final data = jsonDecode(utf8.decode(body));
+      return data is Map && data['code'] == _userNotFound;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// The account of the session that sent the request at [generation] no
+  /// longer exists. Forgets that session and says so once: other answers
+  /// for it, or for a session that came later, change nothing.
+  Future<void> _accountGone(int generation) async {
+    final accountId = account?.id;
+    if (generation != _generation || accountId == null) return;
+    _session = null;
+    final gone = ++_generation;
+    try {
+      await _persist(null, gone);
+    } finally {
+      if (!_accountDeleted.isClosed && _generation == gone) {
+        _accountDeleted.add(accountId);
       }
     }
   }
@@ -375,15 +425,18 @@ class ApiClient {
       if (generation != _generation) {
         throw ApiException(401, 'The account changed. Please try again.');
       }
-      if (response.statusCode == 401 && authenticated && attempt == 0) {
-        _refreshing ??= _refresh(
-          generation,
-        ).whenComplete(() => _refreshing = null);
-        await _refreshing;
-        continue;
-      }
       if (response.statusCode == 401 && authenticated) {
-        await _invalidateSession(generation);
+        if (_accountGoneIn(response.bodyBytes)) {
+          await _accountGone(generation);
+        } else if (attempt == 0) {
+          _refreshing ??= _refresh(
+            generation,
+          ).whenComplete(() => _refreshing = null);
+          await _refreshing;
+          continue;
+        } else {
+          await _invalidateSession(generation);
+        }
       }
       dynamic body;
       try {
@@ -456,7 +509,15 @@ class ApiClient {
 
     try {
       return await perform().timeout(
-        Duration(seconds: path.startsWith('ai/') ? 100 : 12),
+        Duration(
+          seconds: path.startsWith('ai/')
+              ? 100
+              // Deleting an account removes all of it at once; giving up
+              // early would leave the phone unsure whether it happened.
+              : method == 'POST' && path == 'auth/delete-account/'
+              ? 60
+              : 12,
+        ),
       );
     } on TimeoutException {
       throw ApiException(0, timeoutMessage);
@@ -571,14 +632,19 @@ class ApiClient {
         );
       }
       checkAccount();
-      if (response.statusCode == 401 && attempt == 0) {
-        _refreshing ??= _refresh(
-          generation,
-        ).whenComplete(() => _refreshing = null);
-        await _refreshing;
-        continue;
+      if (response.statusCode == 401) {
+        if (_accountGoneIn(response.bodyBytes)) {
+          await _accountGone(generation);
+        } else if (attempt == 0) {
+          _refreshing ??= _refresh(
+            generation,
+          ).whenComplete(() => _refreshing = null);
+          await _refreshing;
+          continue;
+        } else {
+          await _invalidateSession(generation);
+        }
       }
-      if (response.statusCode == 401) await _invalidateSession(generation);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         Map<String, dynamic>? body;
         try {
@@ -613,5 +679,6 @@ class ApiClient {
     _http.close();
     unawaited(_sessionInvalidated.close());
     unawaited(_accountUpdated.close());
+    unawaited(_accountDeleted.close());
   }
 }
