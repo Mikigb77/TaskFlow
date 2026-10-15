@@ -350,6 +350,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final completed = events.where((task) => task.isCompleted).length;
     final total = events.length + overdue.length;
     final hasAny = (tasksState.valueOrNull ?? const []).isNotEmpty;
+    // The state in which the empty state shows the instruction, or is still
+    // deciding whether to. Its header and empty state drop their decorations
+    // so the instruction sits above Añadir tarea at the largest text.
+    final firstRun = total == 0 && !hasAny && hadTask.valueOrNull != true;
     const loading = SliverToBoxAdapter(
       child: Padding(
         padding: EdgeInsets.all(24),
@@ -653,21 +657,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             ).format(_selectedDay),
                       style: text.titleLarge,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      total == 0
-                          ? phoneCalendars
-                                ? context.l10n.noScheduledTasks
-                                : context.l10n.breathingRoom
-                          : context.l10n.agendaCounts(
-                              total - completed,
-                              completed,
-                            ),
-                      style: TextStyle(
-                        color: colors.onSurfaceVariant,
-                        fontSize: 12,
+                    if (!firstRun) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        total == 0
+                            ? phoneCalendars
+                                  ? context.l10n.noScheduledTasks
+                                  : context.l10n.breathingRoom
+                            : context.l10n.agendaCounts(
+                                total - completed,
+                                completed,
+                              ),
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -691,6 +697,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
               SliverToBoxAdapter(
                 child: EmptyState(
                   title: context.l10n.rememberPrompt,
+                  icon: firstRun ? null : Icons.event_available_outlined,
                   // An account that has never had a task or note is told what
                   // to try, as Añadir tarea will open it. Once it has had one,
                   // the instruction never comes back.

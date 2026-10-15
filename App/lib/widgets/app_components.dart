@@ -126,22 +126,25 @@ class EmptyState extends StatelessWidget {
       this.action});
   final String title;
   final String message;
-  final IconData icon;
+  final IconData? icon;
   final Widget? action;
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final icon = this.icon;
     return Padding(
         padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(22)),
-              child: Icon(icon, size: 28, color: colors.onPrimaryContainer)),
-          const SizedBox(height: 16),
+          if (icon != null) ...[
+            Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(22)),
+                child: Icon(icon, size: 28, color: colors.onPrimaryContainer)),
+            const SizedBox(height: 16),
+          ],
           Text(title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium),

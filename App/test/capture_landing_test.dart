@@ -926,6 +926,57 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- 2026-10-15-changes · P119 (UX-701): the first-run example lands
+  // both tasks on one day ----
+
+  testWidgets(
+    'UX-701: a new account says the first-run example; two tasks for tomorrow land on tomorrow, both lit, with 2 tareas añadidas and no también',
+    (tester) async {
+      final tomorrow = inDays(1);
+      final app = await _App.open(tester, []);
+      // A new account on Calendar, today shown, told what to say.
+      expect(find.text(es.todayAgenda), findsOneWidget);
+      expect(find.text(es.calendarTrySaying), findsOneWidget);
+      app.api.found = [
+        found('Llamar al dentista', on: tomorrow),
+        found('Comprar pan', on: tomorrow),
+      ];
+      await app.speak(tester, 'Mañana, llamar al dentista y comprar pan');
+      expect(find.text(es.captureAddTasks(2)), findsOneWidget);
+      expect(es.captureAddTasks(2), 'Añadir 2 tareas');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsNothing);
+      // Tomorrow is selected.
+      expect(
+        find.text(DateFormat.MMMMEEEEd('es').format(tomorrow)),
+        findsOneWidget,
+      );
+      expect(find.text(es.todayAgenda), findsNothing);
+      for (final title in ['Llamar al dentista', 'Comprar pan']) {
+        final saved = row(title);
+        expect(saved.hitTestable(), findsOneWidget, reason: title);
+        expect(
+          tester.widget<TaskTile>(saved).color,
+          lit(tester),
+          reason: title,
+        );
+      }
+      expect(es.captureTasksAdded(2), '2 tareas añadidas');
+      expect(find.text(es.captureTasksAdded(2)), findsOneWidget);
+      expect(find.textContaining('también'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(es.undo),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// The app in Spanish with a 24-hour clock, on Calendar, with capture

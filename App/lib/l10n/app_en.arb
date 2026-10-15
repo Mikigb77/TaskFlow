@@ -310,13 +310,13 @@
   "tryAgain": "Try again",
   "rememberPrompt": "What would you like to remember?",
   "calendarEmpty": "Nothing planned for this day.",
-  "calendarTrySaying": "Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”",
+  "calendarTrySaying": "Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”",
   "@calendarTrySaying": {
-    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic."
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as written (the phone's parser) still dates it without a question."
   },
-  "calendarTryTyping": "Try it: tap Add a task and type “Call the dentist on Friday at 10.”",
+  "calendarTryTyping": "Try it: tap Add a task and type “Tomorrow, call the dentist.”",
   "@calendarTryTyping": {
-    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing."
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing. One task, because typed words are parsed on the phone, which can't split them; one date word and no hour from 1 to 12, so it's added with no question."
   },
   "planTask": "Plan a task",
   "homeCapture": "Mic button on your home screen",

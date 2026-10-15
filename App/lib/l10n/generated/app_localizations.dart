@@ -1288,16 +1288,16 @@ abstract class AppLocalizations {
   /// **'Nothing planned for this day.'**
   String get calendarEmpty;
 
-  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic.
+  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as written (the phone's parser) still dates it without a question.
   ///
   /// In en, this message translates to:
-  /// **'Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”'**
+  /// **'Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”'**
   String get calendarTrySaying;
 
-  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing.
+  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing. One task, because typed words are parsed on the phone, which can't split them; one date word and no hour from 1 to 12, so it's added with no question.
   ///
   /// In en, this message translates to:
-  /// **'Try it: tap Add a task and type “Call the dentist on Friday at 10.”'**
+  /// **'Try it: tap Add a task and type “Tomorrow, call the dentist.”'**
   String get calendarTryTyping;
 
   /// No description provided for @planTask.

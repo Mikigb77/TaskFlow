@@ -30,6 +30,7 @@ import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/screens/day_timeline_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/local_capture.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/device_calendars.dart';
@@ -2382,7 +2383,7 @@ void main() {
       final l = tester.element(find.byType(CalendarScreen)).l10n;
       expect(
         l.calendarTrySaying,
-        'Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10 y comprar pan mañana».',
+        'Prueba: toca Añadir tarea y di «Mañana, llamar al dentista y comprar pan».',
       );
       expect(
         find.descendant(of: emptyState(), matching: find.text(l.rememberPrompt)),
@@ -2415,7 +2416,7 @@ void main() {
       final l = tester.element(find.byType(CalendarScreen)).l10n;
       expect(
         l.calendarTryTyping,
-        'Prueba: toca Añadir tarea y escribe «Llamar al dentista el viernes a las 10».',
+        'Prueba: toca Añadir tarea y escribe «Mañana, llamar al dentista».',
       );
       expect(
         find.descendant(
@@ -2435,19 +2436,19 @@ void main() {
     final ca = lookupAppLocalizations(const Locale('ca'));
     expect(
       en.calendarTrySaying,
-      'Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”',
+      'Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”',
     );
     expect(
       en.calendarTryTyping,
-      'Try it: tap Add a task and type “Call the dentist on Friday at 10.”',
+      'Try it: tap Add a task and type “Tomorrow, call the dentist.”',
     );
     expect(
       ca.calendarTrySaying,
-      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10 i comprar pa demà».',
+      'Prova-ho: toca Afegeix una tasca i digues «Demà, trucar al dentista i comprar pa».',
     );
     expect(
       ca.calendarTryTyping,
-      'Prova-ho: toca Afegeix una tasca i escriu «Trucar al dentista divendres a les 10».',
+      'Prova-ho: toca Afegeix una tasca i escriu «Demà, trucar al dentista».',
     );
     for (final l in [en, ca, lookupAppLocalizations(const Locale('es'))]) {
       expect(l.calendarTrySaying, contains(l.addTask));
@@ -2710,6 +2711,328 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- 2026-10-15-changes · P119 (UX-701, UX-702, UX-703): the first-run
+  // line names both tasks on one day, asks no hour, and sits above the
+  // button ----
+
+  /// The words a person is told to say or type: between « » in Spanish and
+  /// Catalan, between “ ” in English.
+  String quoted(String line) {
+    final (open, close) = line.contains('«') ? ('«', '»') : ('“', '”');
+    return line.substring(line.indexOf(open) + 1, line.lastIndexOf(close));
+  }
+
+  test(
+    'UX-701, UX-703: the first-run lines read exactly as planned in each language, and each names its Añadir tarea',
+    () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        en.calendarTrySaying,
+        'Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”',
+      );
+      expect(
+        es.calendarTrySaying,
+        'Prueba: toca Añadir tarea y di «Mañana, llamar al dentista y comprar pan».',
+      );
+      expect(
+        ca.calendarTrySaying,
+        'Prova-ho: toca Afegeix una tasca i digues «Demà, trucar al dentista i comprar pa».',
+      );
+      expect(
+        en.calendarTryTyping,
+        'Try it: tap Add a task and type “Tomorrow, call the dentist.”',
+      );
+      expect(
+        es.calendarTryTyping,
+        'Prueba: toca Añadir tarea y escribe «Mañana, llamar al dentista».',
+      );
+      expect(
+        ca.calendarTryTyping,
+        'Prova-ho: toca Afegeix una tasca i escriu «Demà, trucar al dentista».',
+      );
+      for (final l in [en, es, ca]) {
+        expect(l.calendarTrySaying, contains(l.addTask), reason: l.localeName);
+        expect(l.calendarTryTyping, contains(l.addTask), reason: l.localeName);
+      }
+    },
+  );
+
+  for (final (language, title) in [
+    ('es', 'Llamar al dentista y comprar pan'),
+    ('en', 'Call the dentist and buy bread'),
+    ('ca', 'Trucar al dentista i comprar pa'),
+  ]) {
+    test(
+      'UX-701: Guardar tal cual on the spoken example ($language) is one task dated tomorrow, no time, no question',
+      () {
+        final words = quoted(
+          lookupAppLocalizations(Locale(language)).calendarTrySaying,
+        );
+        for (final (reference, tomorrow) in [
+          // Monday 19 Oct 2026 10:00 → Tuesday 20 Oct.
+          (DateTime(2026, 10, 19, 10), DateTime(2026, 10, 20)),
+          // Friday 16 Oct 2026 10:00 → Saturday 17 Oct.
+          (DateTime(2026, 10, 16, 10), DateTime(2026, 10, 17)),
+        ]) {
+          final drafts = localDrafts(words, reference);
+          expect(drafts, hasLength(1), reason: '$words at $reference');
+          final draft = drafts.single;
+          expect(draft.confirmed, isTrue, reason: words);
+          expect(draft.clarifications, isEmpty, reason: words);
+          expect(draft.task.dueDate, tomorrow, reason: '$words at $reference');
+          expect(draft.task.hasTime, isFalse, reason: words);
+          expect(draft.task.title, title, reason: words);
+        }
+      },
+    );
+  }
+
+  for (final (language, title) in [
+    ('es', 'Llamar al dentista'),
+    ('en', 'Call the dentist'),
+    ('ca', 'Trucar al dentista'),
+  ]) {
+    test(
+      'UX-703: the typed example ($language) is one task dated tomorrow with no time choices',
+      () {
+        final words = quoted(
+          lookupAppLocalizations(Locale(language)).calendarTryTyping,
+        );
+        final drafts = localDrafts(words, DateTime(2026, 10, 19, 10));
+        expect(drafts, hasLength(1), reason: words);
+        final draft = drafts.single;
+        expect(draft.confirmed, isTrue, reason: words);
+        expect(draft.clarifications, isEmpty, reason: words);
+        expect(draft.task.dueDate, DateTime(2026, 10, 20), reason: words);
+        expect(draft.task.hasTime, isFalse, reason: words);
+        expect(draft.task.title, title, reason: words);
+      },
+    );
+  }
+
+  for (final (language, scale) in [
+    ('es', 1.8),
+    ('en', 1.8),
+    ('ca', 1.8),
+    ('es', 2.0),
+    ('en', 2.0),
+  ]) {
+    testWidgets(
+      'UX-702: on first launch at ${scale}x text, 390x844 ($language), the whole try-saying line is above Añadir tarea without scrolling',
+      (tester) async {
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+        await openCalendar(
+          tester,
+          const [],
+          language: language,
+          textScale: scale,
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(find.text(l.todayAgenda), findsOneWidget);
+        // Not scrolled.
+        expect(tester.state<ScrollableState>(agenda()).position.pixels, 0);
+        final message = find.descendant(
+          of: emptyState(),
+          matching: find.text(l.calendarTrySaying),
+        );
+        expect(message, findsOneWidget);
+        final actions = find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.byType(TaskActions),
+        );
+        expect(actions, findsOneWidget);
+        final line = tester.getRect(message);
+        final button = tester.getRect(actions);
+        expect(
+          line.bottom,
+          lessThanOrEqualTo(button.top),
+          reason:
+              'the line ends ${(line.bottom - button.top).toStringAsFixed(1)} dp below the top of Añadir tarea',
+        );
+        expect(line.top, greaterThanOrEqualTo(0));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final pro in [true, false]) {
+    testWidgets(
+      'UX-702: first run (${pro ? 'Pro' : 'no Pro'}) shows Agenda de hoy and ¿Qué quieres recordar?, no line under the title and no icon tile',
+      (tester) async {
+        await openCalendar(
+          tester,
+          const [],
+          captures: pro ? null : MemoryCaptures(),
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(l.breathingRoom, 'Un momento de calma.');
+        expect(l.noScheduledTasks, 'No hay tareas de TaskFlow programadas');
+        expect(find.text(l.todayAgenda), findsOneWidget);
+        expect(
+          find.descendant(
+            of: emptyState(),
+            matching: find.text(l.rememberPrompt),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: emptyState(),
+            matching: find.text(
+              pro ? l.calendarTrySaying : l.calendarTryTyping,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(l.breathingRoom), findsNothing);
+        expect(find.text(l.noScheduledTasks), findsNothing);
+        expect(
+          find.descendant(of: emptyState(), matching: find.byType(Icon)),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-702: with phone calendars on, first run has no No hay tareas de TaskFlow programadas line; once the account has had a task it does',
+    (tester) async {
+      for (final hadTask in [false, true]) {
+        await tester.pumpWidget(const SizedBox());
+        final bridge = _FlakyCalendars()..data = [];
+        addTearDown(bridge.close);
+        await openCalendar(
+          tester,
+          const [],
+          overrides: [
+            ...phoneCalendar(bridge),
+            firstTaskStoreProvider.overrideWithValue(
+              MemoryFirstTaskStore([if (hadTask) MemoryTasks().ownerKey]),
+            ),
+          ],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(
+          find.text(l.noScheduledTasks),
+          hadTask ? findsOneWidget : findsNothing,
+          reason: hadTask ? 'had a task' : 'first run',
+        );
+        expect(find.text(l.breathingRoom), findsNothing);
+        expect(
+          find.descendant(
+            of: emptyState(),
+            matching: find.byIcon(Icons.event_available_outlined),
+          ),
+          hadTask ? findsOneWidget : findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
+  testWidgets(
+    'UX-702: an account that has had a task, on an empty day, still shows Un momento de calma. under the title and the icon tile',
+    (tester) async {
+      await openCalendar(
+        tester,
+        const [],
+        overrides: [
+          firstTaskStoreProvider.overrideWithValue(
+            MemoryFirstTaskStore([MemoryTasks().ownerKey]),
+          ),
+        ],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final title = find.text(l.todayAgenda);
+      final calm = find.text(l.breathingRoom);
+      expect(title, findsOneWidget);
+      expect(calm, findsOneWidget);
+      expect(
+        tester.getRect(calm).top,
+        greaterThanOrEqualTo(tester.getRect(title).bottom),
+      );
+      expect(
+        find.descendant(of: emptyState(), matching: find.text(l.calendarEmpty)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: emptyState(),
+          matching: find.byIcon(Icons.event_available_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l.calendarTrySaying), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-702: when the tasks fail to load, the error keeps its icon tile',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(language: 'es'),
+        ),
+        tasks: _FailingTasks.new,
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final error = find.descendant(
+        of: find.byType(CalendarScreen),
+        matching: find.widgetWithText(EmptyState, l.loadTasksError),
+      );
+      expect(error, findsOneWidget);
+      expect(
+        find.descendant(
+          of: error,
+          matching: find.byIcon(Icons.event_available_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-702: EmptyState without an icon argument shows the calendar icon; with icon: null it shows no Icon but keeps its title and message',
+    (tester) async {
+      Future<void> pump(Widget state) => tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: Center(child: state))),
+      );
+      await pump(const EmptyState(title: 'Título', message: 'Mensaje'));
+      expect(find.byIcon(Icons.event_available_outlined), findsOneWidget);
+      expect(find.text('Título'), findsOneWidget);
+      expect(find.text('Mensaje'), findsOneWidget);
+
+      await pump(
+        const EmptyState(title: 'Título', message: 'Mensaje', icon: null),
+      );
+      expect(find.byType(Icon), findsNothing);
+      expect(find.text('Título'), findsOneWidget);
+      expect(find.text('Mensaje'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+/// Tasks whose first read fails, as when the phone's database can't be read.
+class _FailingTasks extends DesignTaskNotifier {
+  @override
+  Future<void> loadTasks() async {
+    state = AsyncError(StateError('Synthetic read failure'), StackTrace.empty);
+  }
 }
 
 /// A first-task store whose read never finishes, as a slow disk.

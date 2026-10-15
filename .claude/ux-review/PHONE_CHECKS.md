@@ -91,9 +91,9 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
 - [ ] **UX-494** (S1) Empty share says 'Share a shorter text'.
   - share an empty text to TaskFlow, and the toast says there's no text
 - [ ] **UX-617** (S1) Nothing teaches that one dictation can hold several tasks.
-  - on a new account, say the example; two tasks are saved and both are lit.
+  - after P119, on a new account and on any day, say the example; two tasks are saved for tomorrow and both rows are lit.
 
-## B · Calendar, Tareas and the task form (17)
+## B · Calendar, Tareas and the task form (19)
 
 - [ ] **UX-201** (S4) Unfinished tasks from earlier days vanish from Today.
   - UX_REVIEW §7 step 4 on the day after step 2: open the app the next morning and find yesterday's ‘comprar pan’ under Atrasadas.
@@ -109,6 +109,8 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - a free account near the cap; attach a photo that crosses it; remove a file; tap Reintentar
 - [ ] **UX-621** (S3) Capture result card drops a step typed without Enter.
   - type a step, tap "Añadir al calendario" without Enter, open the task, and the step is there
+- [ ] **UX-701** (S3) Example lands on two days; fallback saves one undated task.
+  - on a new account, say the example in Spanish, English and Catalan. The model should return two tasks dated tomorrow, and both rows should be lit after saving.
 - [ ] **UX-218** (S2) Offline shows a red error about a "server address".
   - in airplane mode, open Calendar and try to sign in, with no red banner and no "server address"
 - [ ] **UX-223** (S2) Back on a secondary tab closes the app.
@@ -123,6 +125,8 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - on a free account, open a long task, scroll to the bottom and attach a photo; the card never disappears and the view stays put.
 - [ ] **UX-622** (S2) Toggling Más detalles erases a half-typed step.
   - on a task with no steps, type a step in Más detalles, tap Menos detalles, save, reopen, and the step is there
+- [ ] **UX-702** (S2) At the largest text, the example sits below the button.
+  - Android 14's largest font (non-linear) on a 393 dp phone, the example shows above the button without scrolling
 - [ ] **UX-436** (S1) Turn-on confirmation over-promises.
   - Android 14 phone: turn reminders on, then go back from the exact-alarm screen without allowing. The last message asks for «Alarmas y recordatorios»; it doesn't say `Listo`.
 - [ ] **UX-446** (S1) View switcher is read as "Mostrar menú" by TalkBack. _(needs: TalkBack)_
