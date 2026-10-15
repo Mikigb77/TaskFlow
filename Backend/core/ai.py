@@ -17,7 +17,7 @@ import google.auth
 from google import genai
 from google.genai import types, errors
 from langchain_core.runnables import RunnableLambda
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from .capture_context import prompt_context, resolve_targets
 from .ai_routing import route
 
@@ -61,6 +61,27 @@ class ExtractedTask(BaseModel):
     @classmethod
     def empty_notes(cls, value):
         return "" if value is None else value
+
+    @model_validator(mode="before")
+    @classmethod
+    def clarifications_written_as_questions(cls, data):
+        # Gemma sometimes writes a whole clarification ({field, question, times}) into questions. Move it to
+        # clarifications, so one misplaced question doesn't cost the person every task they said.
+        if not isinstance(data, dict) or not isinstance(data.get("questions"), list):
+            return data
+        if not any(isinstance(item, dict) for item in data["questions"]):
+            return data
+        questions, clarifications = [], list(data.get("clarifications") or [])
+        for item in data["questions"]:
+            if not isinstance(item, dict):
+                questions.append(item)
+                continue
+            try:
+                clarifications.append(Clarification.model_validate(item).model_dump())
+            except ValidationError:
+                if isinstance(item.get("question"), str) and item["question"].strip():
+                    questions.append(item["question"])
+        return {**data, "questions": questions, "clarifications": clarifications}
 
 
 class ExtractedTasks(BaseModel):
@@ -164,17 +185,23 @@ def build_prompt(data):
         "has title 'Ir a la cita médica', time 17:00, and notes 'Llevar los análisis del mes pasado.' "
         "Example: 'Demà he de revisar que l’aplicació funcioni sense afegir funcionalitats noves' "
         "has title 'Comprovar el funcionament de l’aplicació' and notes 'Ha de funcionar amb les funcionalitats actuals, sense afegir-ne de noves.' "
+        "Example: 'Go to the doctor on Friday at 5 and bring my blood test' has title 'Go to the doctor', time 17:00, "
+        "and notes 'Bring the blood test.': English words get English titles, notes and questions. "
         "The time zone does NOT indicate the user's language. Keep preparation details in notes in the same language. "
         "Medical appointments and treatment, safety, and explicit urgency have priority 3; "
         "important deadlines have priority 2; routine tasks default to 1. Honor an explicitly requested priority. "
         "Resolve relative dates against the reference in its time zone. An unqualified weekday means its next occurrence, "
         "including today if no time was specified or the explicit time has not passed. Never invent missing dates or times. "
-        "If AM/PM is ambiguous (e.g. 'at 5' with no other context), set time to null and ask which. "
+        "Resolve a bare clock hour from context when one reading is clearly more plausible: appointments, work, errands "
+        "and other daytime activities at 1 to 7 are in the afternoon ('doctor on Friday at 5' is 17:00), 'dinner at 9' "
+        "is 21:00 and 'a meeting at 9' is 09:00. Set time to null and ask only when both readings are plausible, such as "
+        "waking up, a flight or a train 'at 5'. "
         "An omitted date means an unscheduled Inbox task; an omitted time means a date-only task. Do NOT ask for omitted dates or times. "
         "Ask only when the user supplied ambiguous or contradictory scheduling details. Honor corrections such as 'Friday, actually Saturday'. "
         "For each question also return a clarifications item: field (schedule/deadline/recurrence/duration/details), question, "
         "and times (HH:MM choices only for an ambiguous clock time; otherwise an empty list). "
-        "For 'at 5' on a known day, offer ['05:00','17:00'] with field schedule, keeping time null. "
+        "When you ask about a bare hour on a known day, offer both clock times, e.g. ['05:00','17:00'], with field "
+        "schedule, keeping time null. "
         "Never offer invented clock alternatives for other ambiguities. Write questions in the user's language. "
         "Separate independent tasks, but keep preparation details with their appointment. Honor shared dates/times only when clearly stated. "
         "Return a checklist array of short strings for explicit steps or grouped items within ONE goal, such as packing or shopping. "
@@ -301,8 +328,13 @@ def validate_draft(raw):
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
     parsed = json.loads(raw)
-    # Providers can omit the outer object despite JSON mode. Normalize only
-    # the envelope; every task and the batch size still pass the same schema.
+    # Providers can omit the outer object despite JSON mode, or wrap it in an
+    # array (Gemma answered a three-task dictation as [{"tasks": [...]}]).
+    # Normalize only the envelope; every task and the batch size still pass
+    # the same schema.
+    if (isinstance(parsed, list) and len(parsed) == 1 and isinstance(parsed[0], dict)
+            and isinstance(parsed[0].get("tasks"), list)):
+        parsed = parsed[0]
     if isinstance(parsed, list):
         parsed = {"tasks": parsed}
     elif isinstance(parsed, dict) and "tasks" not in parsed:

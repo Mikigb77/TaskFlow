@@ -60,6 +60,40 @@ class RoutingTests(SimpleTestCase):
         cache.delete(_cooldown_key("text"))
         self.assertEqual(route("text", self.free, self.paid), "free draft")
 
+    def test_a_retry_never_gets_less_than_the_providers_10_s_minimum(self):
+        # A slow first failure used to leave 1-4 s, and Google refuses that with a 400 that has no fallback.
+        calls = []
+
+        def provider(milliseconds):
+            calls.append(milliseconds)
+            self.advance(38)
+            raise provider_error(500)
+
+        with override_settings(AI_ROUTE="ai_studio"):
+            with self.assertRaises(errors.ServerError):
+                route("text", provider, self.paid)
+        self.assertEqual(calls, [45000])
+        self.paid.assert_not_called()
+        # In auto mode, the paid fallback isn't called with a doomed deadline either.
+        cache.clear()
+        calls.clear()
+
+        def overloaded_then_slow(milliseconds):
+            calls.append(milliseconds)
+            if len(calls) == 2:
+                self.advance(38)
+            raise provider_error(503)
+
+        with self.assertRaises(errors.ServerError):
+            route("text", overloaded_then_slow, self.paid)
+        self.assertEqual(len(calls), 2)
+        self.paid.assert_not_called()
+
+    @override_settings(AI_FREE_ATTEMPT_SECONDS=4)
+    def test_a_free_attempt_is_never_shorter_than_10_s(self):
+        self.assertEqual(route("text", self.free, self.paid), "free draft")
+        self.free.assert_called_once_with(10000)
+
     def test_overload_has_two_free_attempts_then_one_paid(self):
         self.free.side_effect = provider_error(503)
         self.assertEqual(route("text", self.free, self.paid), "paid draft")
@@ -125,21 +159,18 @@ class RoutingTests(SimpleTestCase):
 
     @override_settings(AI_ROUTE="ai_studio")
     def test_free_only_retry_uses_remaining_budget(self):
-        def slow_failure(milliseconds):
-            self.advance(40)
-            raise provider_error(503)
-        self.free.side_effect = [None]
-        first = True
+        calls = []
 
         def provider(milliseconds):
-            nonlocal first
-            if first:
-                first = False
-                return slow_failure(milliseconds)
-            self.assertEqual(milliseconds, 4500)
+            calls.append(milliseconds)
+            if len(calls) == 1:
+                self.advance(20)
+                raise provider_error(503)
             return "recovered"
 
-        self.assertEqual(route("text", provider, self.paid), "recovered")
+        with override_settings(AI_ROUTE="ai_studio"):
+            self.assertEqual(route("text", provider, self.paid), "recovered")
+        self.assertEqual(calls, [45000, 24500])
         self.paid.assert_not_called()
 
     def test_retry_after_is_honored_but_bounded(self):

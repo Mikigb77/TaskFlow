@@ -345,6 +345,53 @@ class DraftTests(TestCase):
         self.assertEqual(result["tasks"][1]["title"], "Prepare presentation")
 
     @patch("core.ai.generate")
+    def test_an_envelope_wrapped_in_an_array_keeps_every_task(self, provider):
+        # The free model's real answer to the owner's three-task dictation, which used to be rejected whole.
+        provider.return_value = json.dumps([{"tasks": [
+            {"title": "Ir al médico", "date": "2026-09-25", "time": "17:00", "priority": 3,
+             "notes": "Llevar los análisis de sangre.", "questions": [], "recurrence": "none"},
+            {"title": "Terminar el diseño del front con los mockups", "date": None, "time": None, "priority": 2,
+             "notes": "", "questions": [], "deadline_date": "2026-09-24", "deadline_time": "17:00"},
+            {"title": "Comprar verduras", "date": "2026-09-21", "time": None, "priority": 1, "notes": "",
+             "questions": [], "checklist": ["tomates", "patatas", "zanahorias"]},
+        ], "clarifications": []}], ensure_ascii=False)
+        words = ("Tengo que ir al médico el viernes a las cinco y llevarme los análisis de sangre, terminar el diseño "
+                 "del front con los mockups para el jueves a las cinco y comprar tomates, patatas y zanahorias para mañana")
+        tasks = extract_tasks(words, "Europe/Madrid", self.reference)["tasks"]
+        self.assertEqual([task["title"] for task in tasks],
+                         ["Ir al médico", "Terminar el diseño del front con los mockups", "Comprar verduras"])
+        self.assertEqual((tasks[0]["time"], tasks[0]["notes"]), ("17:00:00", "Llevar los análisis de sangre."))
+        self.assertTrue(tasks[1]["deadline_at"].startswith("2026-09-24T17:00"))
+        self.assertEqual([step["title"] for step in tasks[2]["checklist"]], ["tomates", "patatas", "zanahorias"])
+        # Two envelopes, or one without a tasks list, stay malformed.
+        from pydantic import ValidationError
+        for wrapped in ([{"tasks": []}, {"tasks": []}], [{"tasks": "Comprar pan"}]):
+            provider.return_value = json.dumps(wrapped)
+            with self.assertRaises((ValidationError, AIUnavailable)):
+                extract_tasks("Comprar pan", "Europe/Madrid", self.reference)
+
+    @patch("core.ai.generate")
+    def test_a_clarification_written_into_questions_keeps_every_task(self, provider):
+        # The free model's real answer to the Catalan three-task dictation: its AM/PM question sat in questions.
+        provider.return_value = json.dumps({"tasks": [
+            {"title": "Anar al metge", "date": "2026-09-25", "time": None, "priority": 3,
+             "notes": "Portar les anàlisis de sang.", "questions": [
+                 {"field": "schedule", "question": "A les 5 de la tarda o de la matinada?", "times": ["05:00", "17:00"]},
+                 {"field": "nonsense", "question": "Kept as text"}, {"times": ["05:00"]}, "Plain question?"]},
+            {"title": "Comprar verdura", "date": "2026-09-21", "time": None, "priority": 1, "questions": [],
+             "checklist": ["tomàquets", "patates", "pastanagues"]},
+        ]}, ensure_ascii=False)
+        tasks = extract_tasks("Anar al metge divendres a les 5 i comprar verdura per demà", "Europe/Madrid",
+                              self.reference)["tasks"]
+        self.assertEqual(len(tasks), 2)
+        doctor = tasks[0]
+        self.assertEqual(doctor["clarifications"], [{"field": "schedule", "question": "A les 5 de la tarda o de la matinada?",
+                                                     "times": ["05:00", "17:00"]}])
+        self.assertEqual(doctor["questions"], ["Kept as text", "Plain question?", "A les 5 de la tarda o de la matinada?"])
+        self.assertIsNone(doctor["time"])
+        self.assertEqual(len(tasks[1]["checklist"]), 3)
+
+    @patch("core.ai.generate")
     def test_bare_array_keeps_schema_and_batch_size_validation(self, provider):
         from pydantic import ValidationError
         for tasks in [[], [self.output] * 13, [{**self.output, "priority": 99}], ["not a task"]]:

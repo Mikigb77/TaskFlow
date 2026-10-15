@@ -15,6 +15,8 @@ from google.genai import errors
 
 logger = logging.getLogger(__name__)
 TRANSIENT = {429, 500, 502, 503, 504}
+# Google refuses a request deadline under 10 s with a 400, and a 400 has no fallback.
+MIN_ATTEMPT_MS = 10_000
 try:
     # Newer Google SDKs prefer httpx2 when available; its errors have different
     # classes from httpx even though the API is compatible.
@@ -69,7 +71,7 @@ def route(stage, free, vertex):
 
     def remaining():
         milliseconds = int((deadline - time.monotonic()) * 1000)
-        if milliseconds <= 0:
+        if milliseconds < MIN_ATTEMPT_MS:
             raise errors.ServerError(504, {"error": {"message": "AI stage timed out"}})
         return milliseconds
 
@@ -88,7 +90,7 @@ def route(stage, free, vertex):
     for attempt in range(2):
         timeout = remaining()
         if mode == "auto":
-            timeout = min(timeout, settings.AI_FREE_ATTEMPT_SECONDS * 1000)
+            timeout = min(timeout, max(MIN_ATTEMPT_MS, settings.AI_FREE_ATTEMPT_SECONDS * 1000))
         started = time.monotonic()
         try:
             result = free(timeout)
@@ -103,6 +105,6 @@ def route(stage, free, vertex):
             if mode == "auto" and (code == 429 or attempt == 1):
                 _cool_down(key, error)
                 return call_vertex(True)
-            if attempt or code == 429 or deadline - time.monotonic() <= 1:
+            if attempt or code == 429 or (deadline - time.monotonic()) * 1000 < MIN_ATTEMPT_MS + 500:
                 raise
             time.sleep(.5)
