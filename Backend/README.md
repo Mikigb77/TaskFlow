@@ -212,6 +212,7 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | POST | `auth/refresh/` | Rotate refresh token |
 | POST | `auth/logout/` | Revoke current session |
 | GET | `auth/me/` | Current account, with its `free_voice` and `storage` limits |
+| GET, POST | `auth/delete-account/` | Preview of what deletion removes, keeps in shared projects and hands over, with its `plan`; POST `password` or `google_id_token` plus that `plan` deletes the account (204), or 409 `plan_changed` if the handovers changed |
 | POST | `auth/password-reset/` | Request recovery email |
 | POST | `auth/password-reset/confirm/` | Code + new password |
 | GET, POST | `tasks/` | Paginated list or create task |

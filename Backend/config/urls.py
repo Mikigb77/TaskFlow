@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from core import auth_views, views
+from core.account_deletion import DeleteAccountView
 from core.google_auth import GoogleLoginView, GoogleLinkView
 from core.task_views import TaskViewSet
 from core.list_views import TaskListViewSet, InvitationViewSet
@@ -30,6 +31,7 @@ urlpatterns = [
     path("api/auth/refresh/", auth_views.RefreshView.as_view()),
     path("api/auth/logout/", auth_views.LogoutView.as_view()),
     path("api/auth/me/", auth_views.MeView.as_view()),
+    path("api/auth/delete-account/", DeleteAccountView.as_view()),
     path("api/auth/password-reset/", auth_views.ResetRequestView.as_view()),
     path("api/auth/password-reset/confirm/", auth_views.ResetConfirmView.as_view()),
     path("api/ai/draft/", views.DraftView.as_view()),
