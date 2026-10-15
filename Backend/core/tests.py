@@ -277,7 +277,10 @@ class APITests(TestCase):
     def test_logout_revokes_access_and_refresh_immediately(self):
         self.assertEqual(self.client.post("/api/auth/logout/", {}, format="json").status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
-        self.assertEqual(APIClient().post("/api/auth/refresh/", {"refresh": self.tokens["refresh"]}, format="json").status_code, 401)
+        refresh = APIClient().post("/api/auth/refresh/", {"refresh": self.tokens["refresh"]}, format="json")
+        self.assertEqual(refresh.status_code, 401)
+        # An ended session is not a deleted account: the app keeps its local copy.
+        self.assertNotEqual(refresh.data.get("code"), "user_not_found")
 
     def test_recovery_email_does_not_enumerate_accounts(self):
         other = APIClient()

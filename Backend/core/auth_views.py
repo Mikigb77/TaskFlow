@@ -17,7 +17,7 @@ from rest_framework.exceptions import AuthenticationFailed, Throttled, Validatio
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.exceptions import AuthenticationFailed as TokenAuthenticationFailed, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import get_md5_hash_password
@@ -82,6 +82,13 @@ class RefreshView(PublicAuthView):
         raw = serializers.CharField(max_length=4096).run_validation(request.data.get("refresh"))
         try:
             initial = RefreshToken(raw)
+        except TokenError:
+            raise AuthenticationFailed("Your session has ended. Please sign in again.")
+        if not User.objects.filter(pk=initial.get("user_id")).exists():
+            # A token we signed, for an account that's been deleted: the same answer as the
+            # API's other endpoints give, so the person's other phones erase their copy.
+            raise TokenAuthenticationFailed("This account no longer exists.", code="user_not_found")
+        try:
             with transaction.atomic():
                 session = LoginSession.objects.select_for_update().select_related("user").get(
                     id=initial.get("sid"), user_id=initial.get("user_id"), revoked=False,

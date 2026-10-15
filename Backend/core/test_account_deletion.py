@@ -124,6 +124,9 @@ class AccountDeletionTests(TestCase):
         self.assertEqual(tablet.get("/api/auth/me/").status_code, 401)
         refresh = APIClient().post("/api/auth/refresh/", {"refresh": sessions[1]["refresh"]}, format="json")
         self.assertEqual(refresh.status_code, 401)
+        # The same code as the other endpoints, so a phone that was idle also erases its copy.
+        self.assertEqual(refresh.data["code"], "user_not_found")
+        self.assertEqual(tablet.get("/api/auth/me/").data["code"], "user_not_found")
         again = APIClient().post("/api/auth/register/", {"email": "leaver@example.invalid", "password": PASSWORD}, format="json")
         self.assertEqual(again.status_code, 201, again.data)
         self.assertNotEqual(again.data["user"]["id"], leaver_id)
