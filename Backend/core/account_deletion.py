@@ -104,6 +104,10 @@ class _Plan:
                 "groups": sum(not group.is_deleted for group in self.deleted_groups.values()),
             },
             "kept_in_shared": self.kept_tasks.filter(is_deleted=False, task_list__is_deleted=False).count(),
+            # Files the person added that stay, on their own tasks or on other people's.
+            "kept_files_in_shared": Attachment.objects.filter(
+                owner=self.user, is_deleted=False, task__is_deleted=False, task__task_list__isnull=False,
+                task__task_list__is_deleted=False).exclude(task__in=self.deleted_tasks).count(),
             "handovers": self.handovers(),
             # The app sends this back to confirm, so nothing is handed over unseen.
             "plan": self.fingerprint(),

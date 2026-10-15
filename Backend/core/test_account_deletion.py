@@ -142,6 +142,7 @@ class AccountDeletionTests(TestCase):
         summary = self.upload(self.me, revision, b"summary sheet")
         preview = self.me.get(PATH).data
         self.assertEqual(preview["kept_in_shared"], 1)
+        self.assertEqual(preview["kept_files_in_shared"], 2)  # the solution and the summary sheet
 
         self.assertEqual(self.delete(password=PASSWORD, plan=preview["plan"]).status_code, 204)
 
@@ -484,7 +485,7 @@ class AccountDeletionTests(TestCase):
         with patch("core.account_deletion.has_pro", side_effect=ValueError("synthetic billing failure")):
             preview = self.me.get(PATH)
         self.assertEqual((preview.status_code, preview.data["pro"]), (200, True))
-        self.assertEqual(set(preview.data), {"personal", "kept_in_shared", "handovers", "plan", "pro", "reauth"})
+        self.assertEqual(set(preview.data), {"personal", "kept_in_shared", "kept_files_in_shared", "handovers", "plan", "pro", "reauth"})
 
     def test_a_storage_error_still_deletes_the_account(self):
         scan = self.upload(self.me, self.task(self.me, title="Scan"))

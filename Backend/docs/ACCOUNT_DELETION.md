@@ -33,7 +33,7 @@ Everything runs in one transaction on the server. Stored files are removed only 
 
 **Showing what will happen before deleting.** `GET /api/auth/delete-account/` returns a preview, and the app shows it before the person confirms. It lists:
 - what will be deleted, as counts;
-- what stays in shared projects, as a count;
+- what stays in shared projects: tasks (`kept_in_shared`) and files (`kept_files_in_shared`), as counts;
 - each handover, as the project or group name plus the name of the person receiving it;
 - whether the account has Pro, so the app can say that deleting the account doesn't cancel the Google Play subscription. When billing can't be checked, it says Pro: the note is harmless to someone without a subscription;
 - a `plan`: a fingerprint of the handovers, as who receives which project or group, by id. Renaming something doesn't change it.
