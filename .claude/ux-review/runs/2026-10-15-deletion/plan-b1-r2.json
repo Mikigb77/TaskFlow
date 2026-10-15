@@ -1,0 +1,55 @@
+{
+ "runId": "2026-10-15-deletion",
+ "mode": "changes",
+ "round": "b1-r2",
+ "packages": [
+  {
+   "id": "P125",
+   "title": "Delete page: the title holds still while deleting, and the changed-plan banner is spoken once, without the bullet",
+   "area": "D",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-816",
+    "UX-817"
+   ],
+   "files": [
+    "App/lib/widgets/custom_app_bar.dart",
+    "App/lib/screens/delete_account_screen.dart",
+    "App/test/delete_account_test.dart"
+   ],
+   "brief": [
+    "Context: round 1 (P120 to P124) passed review. Two small regressions came out of it on the delete page (App/lib/screens/delete_account_screen.dart). UX-816 comes from P121, which hides the back arrow while deleting. UX-817 comes from P122's detailed changed-plan banner. Both are severity 1, and both are inferred from code: no render covers this page. Line numbers are from the working tree after round 1. Search for the code if they have moved. There is no copy change and no ARB change in this package.",
+    "UX-816 (S1, regression R1D-1 from P121): the title jumps sideways while deleting. CustomAppBar (App/lib/widgets/custom_app_bar.dart:20-21) uses `automaticallyImplyLeading: !isRoot && canGoBack`. When the delete page passes `canGoBack: false` (delete_account_screen.dart:386-390, while `_deleting`), AppBar drops the whole 56 dp leading slot. «Eliminar cuenta» then slides about 56 dp toward the start at the moment of the tap, and slides back if an error ends the deletion. Fix it in CustomAppBar only: add `leading: !isRoot && !canGoBack ? const SizedBox.shrink() : null`. AppBar puts any non-null leading in its `leadingWidth` slot (56 dp), so the title keeps its start. Keep `automaticallyImplyLeading: !isRoot && canGoBack` as it is. With the default `canGoBack: true`, leading stays null, so every other screen is unchanged. Update the doc comment on `canGoBack` to: 'False hides the back arrow but keeps its space, so the title doesn’t move. For a moment when leaving isn’t possible.' Don't hide the arrow with Opacity or Visibility(maintainState): those leave a BackButton that TalkBack can still focus or tap. An empty SizedBox has no semantics. The delete page needs no change for this. PopScope (:383-385) stays as it is.",
+    "UX-817 (S1, regression R1D-2 from P122): the changed-plan banner has two problems. (1) It speaks the bullet aloud. Its handover lines start with a literal '• ' (delete_account_screen.dart:436-441), which TalkBack reads («viñeta»). In the two lists, `_bullet` (:566-575) hides '•' with ExcludeSemantics. (2) It may announce twice. The banner's Semantics is `liveRegion: true` (:430-431) during the reload too. It first shows `deleteAccountPlanChanged`, then the detailed lines, so TalkBack can say two near-identical messages in a row.",
+    "Fix, in the `if (_problem == _Problem.planChanged)` block (:429-447): build the lines once. When `_reloading || _changedHandovers.isEmpty`, that is `[strings.deleteAccountPlanChanged]`. Otherwise it is `[strings.deleteAccountChangedIntro, for each handover in _changedHandovers: _handoverText(strings, handover), strings.deleteAccountChangedCheck]`. The visible text is unchanged: the handover lines get the '• ' prefix, joined with '\\n', as now. The spoken text is the same lines without '• ', joined with '\\n'. Replace the wrapper with `Semantics(container: true, liveRegion: !_reloading, label: spoken, child: ExcludeSemantics(child: MessageBanner(visible, key: _changed, icon: Icons.info_outline)))`. The key `_changed` stays on the MessageBanner, because `_reveal(_changed)` scrolls to it.",
+    "Why `liveRegion: !_reloading` gives one announcement, with the final text. `_delete` sets `_problem = planChanged`, then calls `_load()`. `_load()` sets `_reloading = true` synchronously, before its first await (:100-105). So the banner's first frame is already not live, and nothing is announced then. When the reload ends, `_load`'s setState (`_reloading = false`, :118-123) and the `.then` setState that fills `_changedHandovers` (:248-256) both run before the next frame. So the banner turns live once, with its final text: the detailed lines, or the general line when nothing is new. Flutter's Android bridge announces a node when it gains the live-region flag, so the general-line case is spoken too. This is inferred, and the device check covers it. If the reload fails, LoadFailed replaces the whole section, as now.",
+    "Don't touch: MessageBanner (App/lib/widgets/app_components.dart:160, shared by many screens), the banner's visible text, the bold lines in the second list, `_bullet`, the `_reveal` scroll, the kept password, PopScope, every ARB file. No other screen passes `canGoBack`.",
+    "Tests: the visible banner text doesn't change, so `find.text` checks keep passing. If a test reads the banner's semantics, or expects it in a live region during the reload, update it to this behaviour. The '•' semantics check at App/test/delete_account_test.dart:2362 must keep passing. ux-tester writes the acceptance tests. The suite's `backArrow` finder (:1556-1559) and `inLiveRegion` helper (:1561-1570) already fit them."
+   ],
+   "acceptance": [
+    "Widget test (UX-816): Spanish, 1×, the default password account, password typed, the deletion held (`holdDelete`). The app bar shows no BackButton, and the left edge of the title «Eliminar cuenta» is at the same x as before the tap (within 0.5 dp). Released with an error (offline): the BackButton is back, and the title is still at that x.",
+    "Widget test (UX-816): the same at 2× on 320×640 in Spanish. The title's left edge doesn't move between before the tap, while held, and after the error, and the app bar fits the width with no exception.",
+    "Widget test (UX-816): while held, no semantics node in the app bar has the back tooltip (MaterialLocalizations.backButtonTooltip, «Atrás» in Spanish) or a tap action.",
+    "Code (UX-816): CustomAppBar passes `leading: null` when `canGoBack` is true (the default), and `const SizedBox.shrink()` only when `!isRoot && !canGoBack`. Only delete_account_screen.dart passes `canGoBack`.",
+    "Widget test (UX-817): Spanish, password typed, a 409 `plan_changed`, then a preview where Casa goes to Luis. After the reload, the banner's semantics label is exactly «Algo ha cambiado desde que abriste esta pantalla:\\nEl proyecto «Casa» pasará a Luis\\nRevísalo y vuelve a confirmar.», and it is in a live region. No semantics node in the banner contains '•'. The visible text still reads «• El proyecto «Casa» pasará a Luis» on its own line.",
+    "Widget test (UX-817): the same in EN. The label is exactly `Something has changed since you opened this screen:\\nThe project “Casa” will go to Luis\\nCheck it and confirm again.` In CA it is «Alguna cosa ha canviat des que has obert aquesta pantalla:\\nEl projecte «Casa» passarà a Luis\\nRevisa-ho i torna a confirmar-ho.»",
+    "Widget test (UX-817): Spanish, a 409 `plan_changed` with the reload held. The banner shows «Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.» and is not in a live region (no ancestor Semantics with liveRegion true). Released with the same handovers: the banner is in a live region, with that same label.",
+    "Widget test (UX-817): a 409 whose new preview only drops Matemáticas (Casa still goes to Ana). After the reload, the banner is in a live region, and its label is «Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.»"
+   ],
+   "deviceChecks": [
+    "Phone, Spanish, any account, in airplane mode (nothing is deleted: the request fails as offline). Type the password and tap «Eliminar mi cuenta». The title «Eliminar cuenta» doesn't move while the button reads «Eliminando tu cuenta…». When the offline message shows, the back arrow is back and the title still hasn't moved.",
+    "Phone with TalkBack, Spanish, a throwaway account on staging that shares a project with a second throwaway account. Open the delete page. With the second account, change what would be handed over (for example, remove the second account from the project). Then type the password and tap «Eliminar mi cuenta» (a 409 deletes nothing). TalkBack reads the banner once, with the detailed lines and without «viñeta». For a change where nothing new is handed over, it reads the general line once."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": [
+  {
+   "id": "UX-804",
+   "reason": "Not re-planned: cause server-side. Review D's original plan already set this part aside. The app part is in place (verify-b1-r1-D: two lists, count first, files named, a group's projects named). The only gap left: someone who added files, but no tasks, to shared projects sees no kept line. That's because `kept_in_shared` (Backend/core/account_deletion.py:106) counts only kept tasks, and this run doesn't change Backend/. Main session: counting those files in the preview is a backend change, outside the UX loop; the app line may then need a files-only variant, planned in a later /ux run."
+  }
+ ],
+ "escalated": []
+}

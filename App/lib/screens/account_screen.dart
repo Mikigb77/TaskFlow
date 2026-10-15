@@ -300,6 +300,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ),
                 ),
               ),
+              // Deleting the account is its own group, kept apart from
+              // signing out.
+              const SizedBox(height: 24),
+              const Divider(height: 1),
               const SizedBox(height: 8),
               Align(
                 alignment: AlignmentDirectional.centerStart,

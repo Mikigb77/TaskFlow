@@ -7,14 +7,20 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.title,
     this.isRoot = false,
+    this.canGoBack = true,
     this.actions = const [],
   });
   final String title;
   final bool isRoot;
+
+  /// False hides the back arrow but keeps its space, so the title doesn’t
+  /// move. For a moment when leaving isn’t possible.
+  final bool canGoBack;
   final List<Widget> actions;
   @override
   Widget build(BuildContext context) => AppBar(
-    automaticallyImplyLeading: !isRoot,
+    automaticallyImplyLeading: !isRoot && canGoBack,
+    leading: !isRoot && !canGoBack ? const SizedBox.shrink() : null,
     titleSpacing: isRoot ? 24 : null,
     toolbarHeight: 64,
     title: isRoot

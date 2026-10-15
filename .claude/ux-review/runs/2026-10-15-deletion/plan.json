@@ -1,0 +1,260 @@
+{
+  "runId": "2026-10-15-deletion",
+  "mode": "changes",
+  "created": "2026-10-15",
+  "conventions": [
+    "Paths are relative to the repo root. Line numbers come from review D (.claude/ux-review/runs/2026-10-15-deletion/review-D.md) at commit e1df0a7. Packages run one at a time, in order, mostly on the same files (App/lib/screens/delete_account_screen.dart, the three catalogs, App/test/delete_account_test.dart): after an earlier package, search for the code a line number points at, and build on what that package left.",
+    "Copy is exact, shown as EN / ES / CA. Keep the catalogs' marks: “…” in English, with a closing full stop inside; «…» in Spanish and Catalan, with the full stop after; ’ for apostrophes; … as one character (U+2026). Lines in the delete page's bulleted lists have no final full stop.",
+    "Every changed string goes in app_en.arb, app_es.arb and app_ca.arb (App/docs/LOCALIZATION.md). Each new or changed key keeps an accurate `@key` description in app_en.arb, with typed placeholders. A key a package removes goes from all three catalogs. Run `flutter gen-l10n`; never edit lib/l10n/generated/. The Catalan here is the reviewer's, checked by the organizer: use it as written.",
+    "The owner's rules for deleting an account (main session, 2026-10-15; design in Backend/docs/ACCOUNT_DELETION.md): the person's own data goes; what they created in a shared project or group stays for the group; ownership is never transferred silently, so every handover is named before confirming; deleting doesn't cancel a store subscription; people can export first. Clarity before the destructive tap matters more than speed here. No new settings, screens or concepts.",
+    "Out of this run, don't build any of them: the confirmation email, a cleanup of completed tasks, deleting the RevenueCat customer, free dictations after signing up again, and the open questions UX-812 to UX-815 (plan.md).",
+    "The server is committed and out of scope: no package changes Backend/. Keep what review D praised: deletion only as previewed (the plan sent back), the typed password surviving every error and reload, answers shown where they belong and scrolled into view respecting reduced motion, PopScope blocking Back while deleting, the 409 reload in place, one ending for every path («Tu cuenta se ha eliminado.», `accountDeleted`, from ACCOUNT_DELETION.md), and the phone cleaned in order (reminders stop, then this account's copy is erased).",
+    "Package numbering continues after P119 (run 2026-10-15-changes).",
+    "Tests live in App/test/delete_account_test.dart. `open()` (:196-268) shows Account with the delete page on top, for account 1, ana@example.invalid (`_Auth.restore`, :136-144). `previewJson()` (:42-67) defaults to 12 tasks, 3 notes, 2 files, 1 project, 0 groups, 4 kept, handovers Casa → Ana (project) then Matemáticas → Luis (group), no Pro, password. `_DeletionApi` (:70-101) throws `deleteError` and can hold the preview or the deletion. The implementer keeps the suite passing, updates the tests its change rightly breaks (each brief names them), and adds overrides to `open()` when the page reads a new provider. ux-tester writes the acceptance tests. 'Widget test' and 'Unit test' name the proof expected; 'Code' lines are for the reviewer; deviceChecks need a phone or, where marked, the main session.",
+    "2× means `TextScaler.linear(2.0)` (`open(textScale: 2)`); 320 dp means a 320×640 view at devicePixelRatio 1 (`open(size: const Size(320, 640))`). 'Fits' means no exception and the widget's rect within 0–320 dp, as `fits()` checks (:921-936). Where a check counts lines or truncation, load Manrope (assets/fonts/Manrope.ttf) as App/test/calendar_feedback_test.dart:55-57 does.",
+    "No agent touches a phone or an emulator, runs the backend, or calls the AI. Device checks that confirm a deletion use a throwaway account: deleting is real and can't be undone."
+  ],
+  "packages": [
+    {
+      "id": "P120",
+      "title": "Save a copy from the delete page itself, and say it leaves the files out",
+      "area": "D",
+      "size": "M",
+      "severity": 3,
+      "findings": [
+        "UX-802",
+        "UX-807"
+      ],
+      "files": [
+        "App/lib/screens/delete_account_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/delete_account_test.dart"
+      ],
+      "brief": [
+        "Context: the delete page (App/lib/screens/delete_account_screen.dart) offers «Guardar antes una copia de tus tareas» (`deleteAccountSaveCopy`, :303-313), right under the list that counts «2 archivos» among what will be deleted. Today the link opens Exportar e importar (`/dataTransfer`): a slogan, an intro, «Exportar archivo TaskFlow», «Elegir archivo para importar» and a 26-word line about JSON, CSV, Todoist and 32 MB. After saving, Back returns to a page that looks exactly as before. And the copy holds tasks, notes and projects with only the names of their files (App/lib/services/archive_store.dart:35-58, App/lib/models/task_archive.dart:339-343); after deleting, the files are gone from the server and the phone. The owner promised that people can export first; this package makes that one tap, confirmed, and honest. No new screen.",
+        "UX-807 (S2), the link runs the export itself. Use the same two calls as Export & import's «Exportar archivo TaskFlow» (App/lib/screens/data_transfer_screen.dart:76-84): `ref.read(archiveStoreProvider).export()`, then `ref.read(archiveFilesProvider).save(contents)`. Import both providers from data_transfer_screen.dart (:17-19); don't copy them. Android's save screen then opens straight away. Keep the link's key `delete-account-export`, its download icon and its label.",
+        "(a) While the export runs, the link is disabled, so it can't run twice. No spinner and no new string. It stays disabled while deleting, as now (:307).",
+        "(b) `save` returns true: replace the link, in place, with a check row built like «Confirmado con Google» (:521-529: `Icons.check_circle_outline` in `colorScheme.primary`, 10 dp, then the text in an Expanded), its icon where the link's icon was, with key `delete-account-copy-saved`, wrapped in `Semantics(liveRegion: true)` so TalkBack says it when it appears. Text, new key `deleteAccountCopySaved`, exact: EN `Copy saved` / ES `Copia guardada` / CA `Còpia desada`. It stays for the life of the page, including a reload after a 409. No snackbar: don't show `exportSaved`.",
+        "(c) `save` returns false (the person backed out of Android's save screen): nothing changes; the link stays.",
+        "(d) `export` or `save` throws: the link stays, and under it one line in `colorScheme.error`, inside `Semantics(liveRegion: true)`, as the Google error at :530-537. For an `ArchiveDiagnostic` (for example `exportTooLarge`, task_archive.dart:348-351) the line is `context.archiveDiagnostic(error)`, as on Export & import (data_transfer_screen.dart:54-63; import App/lib/l10n/archive_locale.dart and App/lib/models/archive_diagnostic.dart); anything else shows the existing `transferError` (ES «No se pudo completar la operación. Tus tareas y notas no han cambiado. Inténtalo de nuevo.»). The line goes away on the next tap of the link.",
+        "(e) Show the link, or the check row, only when the preview has tasks or notes (`preview.tasks > 0 || preview.notes > 0`). With neither, there is nothing of the person's own to copy.",
+        "(f) The page no longer opens `/dataTransfer`. Leave that route, data_transfer_screen.dart, archive_store.dart and the export format as they are; Ajustes still opens Export & import.",
+        "UX-802 (S3), say what the copy leaves out. When `preview.files > 0`, one line directly under the link, or under the «Copia guardada» row once saved, starting where the link's icon starts. New key `deleteAccountCopyNoFiles`, exact: EN `The copy doesn’t include files.` / ES `La copia no incluye los archivos.` / CA `La còpia no inclou els fitxers.` Body text in `colorScheme.onSurfaceVariant`. No line when files = 0. Don't change what the copy contains: whether it should carry the files themselves is the owner's question UX-814.",
+        "In app_en.arb, rewrite `@deleteAccountSaveCopy` as 'Link on the delete-account page that saves a TaskFlow export file at once, through Android's save screen. Shown only when the person has tasks or notes.' Add `@deleteAccountCopySaved` ('Replaces the save-a-copy link on the delete-account page once the file was saved.') and `@deleteAccountCopyNoFiles` ('Under the save-a-copy link, or under Copy saved, when the person has attached files: the export keeps only the names of the files.'). Run `flutter gen-l10n`.",
+        "Tests. `open()` in App/test/delete_account_test.dart (:196-268) must override `archiveStoreProvider` and `archiveFilesProvider` with fakes (an ArchiveStore whose `export()` returns a fixed string; an ArchiveFiles whose `save()` returns a set answer and counts its calls), so no test reaches SQLite or Android's save screen. Replace the test at :466-479 (the link opened Exportar e importar) with the new behaviour. Keep :354-406 (the link before the password help) and the 2× test (:915-1013) passing, and add `deleteAccountCopyNoFiles` to its list at :946-958. ux-tester writes the acceptance tests.",
+        "Don't touch: the counts list, the password and Google areas, the button, the 409 reload, the phone clean-up."
+      ],
+      "acceptance": [
+        "Widget test (UX-807): Spanish, 1×, the default preview (12 tasks, 3 notes, 2 files), with fakes whose `save` returns true. One tap on «Guardar antes una copia de tus tareas» calls `export` once and `save` once, with the string `export` returned; no other screen opens (no DataTransferScreen); «Copia guardada» shows where the link was, after a check icon, inside a live region; the link is gone.",
+        "Widget test (UX-807): `save` returns false: the link is still there and enabled; there is no «Copia guardada» and no error line.",
+        "Widget test (UX-807): `save` throws an Exception: the link stays and «No se pudo completar la operación. Tus tareas y notas no han cambiado. Inténtalo de nuevo.» shows under it in the error colour, in a live region. `export` throws `ArchiveDiagnostic(ArchiveCode.exportTooLarge)`: that diagnostic's Spanish text shows instead. The next tap on the link clears the line.",
+        "Widget test (UX-807): a preview with 0 tasks, 0 notes and 0 files shows neither the link nor «Copia guardada»; with 0 tasks and 1 note, the link shows.",
+        "Widget test (UX-807): while a deletion is held (`holdDelete`), the link is disabled.",
+        "Widget test (UX-802): with 2 files, «La copia no incluye los archivos.» sits directly under the link, and after saving directly under «Copia guardada»; with 0 files and 12 tasks it's absent. EN reads `The copy doesn’t include files.` and CA `La còpia no inclou els fitxers.`",
+        "Widget test (UX-802, UX-807): at 2× on 320×640, in ES, EN and CA, light and dark, the link, «Copia guardada» / `Copy saved` / «Còpia desada» and the files line fit the width, with no exception.",
+        "Code: delete_account_screen.dart no longer pushes `/dataTransfer`; data_transfer_screen.dart, archive_store.dart and task_archive.dart are unchanged."
+      ],
+      "deviceChecks": [
+        "Phone, Spanish, an account with tasks and a photo attached (don't confirm the deletion unless the account is a throwaway): on Eliminar cuenta, tap «Guardar antes una copia de tus tareas». Android's save screen opens straight away; after Guardar, «Copia guardada» replaces the link and «La copia no incluye los archivos.» sits under it; the saved file is a TaskFlow export that Exportar e importar can read. Backing out of Android's save screen instead leaves the link as it was.",
+        "Phone with TalkBack: after saving, TalkBack says «Copia guardada»."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P121",
+      "title": "Confirming and deleting: a way out of a forgotten password, the real wait, Google heard, progress shown",
+      "area": "D",
+      "size": "M",
+      "severity": 3,
+      "findings": [
+        "UX-801",
+        "UX-808",
+        "UX-809",
+        "UX-810"
+      ],
+      "files": [
+        "App/lib/screens/delete_account_screen.dart",
+        "App/lib/widgets/custom_app_bar.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/delete_account_test.dart"
+      ],
+      "brief": [
+        "Context: the lower half of the delete page (App/lib/screens/delete_account_screen.dart): the password field or Confirmar con Google, the red «Eliminar mi cuenta», then the answers. Four gaps: a forgotten password has no way out; a deletion that can take up to 60 s looks frozen; a 15-minute lock reads «Inténtalo más tarde»; TalkBack hears nothing when Google confirms. Keep everything the review praised (see conventions).",
+        "UX-801 (S3), a forgotten password. A wrong password gets only «La contraseña no es correcta.» under the field (`deleteAccountWrongPassword`, errorText at :473-476). Sign-in has «¿Has olvidado tu contraseña?», but from here the only way to it is signing out, and the page never says so. This package does the reviewer's minimum: the message says how to recover. Don't add a link, a recovery flow or a sign-out button: a password reset ends every session (Backend/core/auth_views.py:159) and doesn't lift the 15-minute lock, so the page couldn't reliably sign back in. Keeping the person on the page is the owner's question UX-815.",
+        "New `deleteAccountWrongPassword`, exact: EN `That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”` / ES `La contraseña no es correcta. Si no la recuerdas, cierra sesión y toca «¿Has olvidado tu contraseña?».` / CA `La contrasenya no és correcta. Si no te’n recordes, tanca la sessió i toca «Has oblidat la contrasenya?».` The quoted words are sign-in's `forgotPassword` in each language, and «cierra sesión» / sign out / «tanca la sessió» name Account's `signOut` button. `errorMaxLines` is 4 (:476); raise it so the whole message shows at 2× on 320 dp in all three languages with Manrope (10 is enough). Rewrite `@deleteAccountWrongPassword`: 'Under the password field on the delete-account page after a wrong password. Says how to recover a forgotten one: sign out, then Forgot password? on sign-in. The quoted words must match forgotPassword, and the verb the signOut button.'",
+        "UX-808 (S2), deleting looks frozen. While the request runs (up to 60 s, App/lib/services/api_client.dart:511-520), the button turns grey with an 18 dp spinner and still reads «Eliminar mi cuenta»; «Eliminando tu cuenta» exists only as the spinner's TalkBack label (:354); Back and the app-bar arrow do nothing.",
+        "(a) While `_deleting`, the button's text is `deleteAccountDeleting`, now with an ellipsis, exact: EN `Deleting your account…` / ES `Eliminando tu cuenta…` / CA `S’està suprimint el compte…`. Otherwise `deleteAccountButton`, as now. The spinner stays before the text, and the button stays disabled. (b) Drop the spinner's `semanticsLabel`, so TalkBack reads the text once. (c) Hide the app-bar back arrow while deleting. CustomAppBar (App/lib/widgets/custom_app_bar.dart) can't do that today: add an optional `bool canGoBack = true` and use `automaticallyImplyLeading: !isRoot && canGoBack`. Nothing else in it changes, and no other screen passes it. The delete page passes `canGoBack: !_deleting`. PopScope (:278-280) stays. After any error, the arrow and «Eliminar mi cuenta» come back, since both follow `_deleting`. Rewrite `@deleteAccountDeleting`: 'Inside Delete my account, after a spinner, while the request runs (up to a minute). Ends with an ellipsis.'",
+        "UX-809 (S2), the real wait. The burst limit (`auth`, 10 a minute, Backend/config/settings.py:55) and the lock after five wrong passwords (15 minutes, shared with sign-in, Backend/core/account_deletion.py:307-310) both show «Demasiados intentos. Inténtalo más tarde.» (:142, :273). Both answers carry the wait in their text: DRF 3.16 appends 'Expected available in N seconds.' ('N second.' for 1) to `detail`, which ApiClient puts in `ApiException.message` (api_client.dart:458-470). The lock reads 'Too many failed attempts. Try again in 15 minutes. Expected available in 900 seconds.' and the burst limit, for example, 'Request was throttled. Expected available in 37 seconds.'; the server answers in English only. On a 429, read N from `ApiException.message` with `RegExp(r'Expected available in (\\d+) seconds?')` and round up to whole minutes, at least 1 (900 → 15, 40 → 1, 61 → 2). Keep it next to `_problemFor` (for example an `int? _waitMinutes` set with the problem and cleared with it). Don't change ApiClient or ApiException.",
+        "New key `deleteAccountThrottledWait`, with an int placeholder `minutes`, exact: EN `{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}` / ES `{minutes, plural, =1{Demasiados intentos. Espera un minuto y vuelve a intentarlo.} other{Demasiados intentos. Espera {minutes} minutos y vuelve a intentarlo.}}` / CA `{minutes, plural, =1{Massa intents. Espera un minut i torna-ho a provar.} other{Massa intents. Espera {minutes} minuts i torna-ho a provar.}}`. It shows where `deleteAccountThrottled` shows today, in the banner under the button. When the text carries no wait, `deleteAccountThrottled` shows, unchanged. `@deleteAccountThrottledWait`: 'Under Delete my account when the server refuses more attempts for {minutes} minutes, rounded up, at least 1. After five wrong passwords it is 15 minutes, and signing in waits too.' That the lock also stops sign-in is the server's rule; sign-in's messages are out of scope.",
+        "UX-810 (S2), Google heard. After a token, «Confirmado con Google» replaces the Google button (:521-529), but it isn't a live region, so TalkBack, whose focus was on the button, says nothing; at large text the newly enabled «Eliminar mi cuenta» can sit below the screen. (a) Wrap the confirmed row in `Semantics(liveRegion: true)`, keeping its key `delete-account-google-confirmed`. (b) When a token arrives (`_confirmWithGoogle`, :118-119), bring the confirm button into view with `_reveal` (:231-249), which respects reduced motion: give it a GlobalKey on a KeyedSubtree around the FilledButton, so its `delete-account-confirm` key stays. No copy change.",
+        "Tests to update in App/test/delete_account_test.dart: :552-613 (the spinner no longer carries `deleteAccountDeleting`; the button's text does); :719 (the wrong-password literal); the throttled row at :741-745 has no wait in its text, so it still expects «Demasiados intentos. Inténtalo más tarde.»; keep the 2× test (:915-1013) passing. ux-tester writes the acceptance tests.",
+        "Don't touch: the plan sent with the confirmation, PopScope, the 60 s limit, the order of the phone clean-up (reminders, then erase), App/lib/providers/auth_provider.dart, App/lib/services/api_client.dart, the sign-in screen."
+      ],
+      "acceptance": [
+        "Widget test (UX-801): Spanish, a password account, a 400 `wrong_password`: the field's error reads «La contraseña no es correcta. Si no la recuerdas, cierra sesión y toca «¿Has olvidado tu contraseña?».»; EN `That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”`; CA «La contrasenya no és correcta. Si no te’n recordes, tanca la sessió i toca «Has oblidat la contrasenya?».» The typed password stays, and typing again clears the error, as now.",
+        "Unit test (UX-801): in EN, ES and CA, `deleteAccountWrongPassword` contains that language's `forgotPassword` (“Forgot password?”, «¿Has olvidado tu contraseña?», «Has oblidat la contrasenya?»).",
+        "Widget test (UX-801), with Manrope loaded: at 2× on 320×640 in ES, EN and CA, after `wrong_password`, the whole error shows: its text doesn't exceed its max lines (no ellipsis) and fits the width.",
+        "Widget test (UX-808): Spanish, password typed, the deletion held (`holdDelete`): the confirm button's visible text is «Eliminando tu cuenta…», after a spinner; the button's semantics label contains «Eliminando tu cuenta…» exactly once; the app bar has no back arrow (no BackButton); system Back still leaves the page in place. Released with an error (offline): «Eliminar mi cuenta» and the back arrow are back. EN `Deleting your account…`, CA «S’està suprimint el compte…».",
+        "Widget test (UX-809): Spanish, a 429 whose message is 'Too many failed attempts. Try again in 15 minutes. Expected available in 900 seconds.' shows «Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.» under the button; 'Request was throttled. Expected available in 40 seconds.' shows «Demasiados intentos. Espera un minuto y vuelve a intentarlo.»; 'Expected available in 61 seconds.' gives «Espera 2 minutos»; 'Request was throttled.' (no wait) shows «Demasiados intentos. Inténtalo más tarde.». The typed password stays in every case.",
+        "Widget test (UX-809): at 2× on 320×640 in CA, «Massa intents. Espera 15 minuts i torna-ho a provar.» fits the width under the button, with no exception. EN reads `Too many tries. Wait 15 minutes and try again.`",
+        "Widget test (UX-810): a Google-only preview; after Confirmar con Google returns a token, the «Confirmado con Google» row (key `delete-account-google-confirmed`) is in a live region.",
+        "Widget test (UX-810): the same at 2× on 320×640 in Spanish: once the token arrives and the page settles, «Eliminar mi cuenta» lies fully inside the viewport, and it's enabled.",
+        "Code (UX-808): CustomAppBar's new `canGoBack` defaults to true, and no screen but the delete page passes it."
+      ],
+      "deviceChecks": [
+        "Phone with TalkBack, a throwaway Google-only account on staging, Spanish: tap Confirmar con Google and pick the account. TalkBack says «Confirmado con Google». At the largest font, «Eliminar mi cuenta» comes into view by itself.",
+        "Phone, a throwaway account on staging (this deletes it), on a slow connection: tap «Eliminar mi cuenta». Until the answer, the button reads «Eliminando tu cuenta…» after a spinner and there is no back arrow; TalkBack reads «Eliminando tu cuenta…» once.",
+        "Main session, local backend, a throwaway password account (not a phone): after five wrong passwords on POST /api/auth/delete-account/, the next answer is 429 and its detail ends with 'Expected available in 900 seconds.', the text P121 reads. Backend/core/test_account_deletion.py:348 pins Retry-After 900 but not this text."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P122",
+      "title": "Say whose account goes, what goes, what stays for the others, and what changed",
+      "area": "D",
+      "size": "L",
+      "severity": 2,
+      "findings": [
+        "UX-803",
+        "UX-804",
+        "UX-805"
+      ],
+      "files": [
+        "App/lib/screens/delete_account_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/delete_account_test.dart"
+      ],
+      "brief": [
+        "Context: the top of the delete page (App/lib/screens/delete_account_screen.dart): heading and intro (:290-295), the list of what goes, the kept and handover lines (`_consequences`, :385-448), and the banner after a 409 (:321-331). Three gaps before a tap that can't be undone: the page never names the account, and with Google «tu cuenta» reads as the Google account; what stays reads like more of what goes; after a 409 the banner doesn't say what changed. Ownership is never transferred silently: every handover is named before confirming. This package makes those names unmissable. It adds no control.",
+        "UX-803 (S2), name the account, and say Google stays. (a) The heading stays `deleteAccountQuestion` («¿Eliminar tu cuenta?»): «TaskFlow?» at 2× would be 280 px of 272 and break mid-word, so 'TaskFlow' goes in the intro. (b) 8 dp under the heading, the signed-in account's email in `colorScheme.onSurfaceVariant`, as on Account (App/lib/screens/account_screen.dart:187-190); read it once, like `_accountId` (:54). The intro follows 12 dp below. (c) `deleteAccountIntro`, exact: EN `This deletes your TaskFlow account and your tasks, notes and files on all your devices. It can’t be undone.` / ES `Se eliminarán tu cuenta de TaskFlow y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.` / CA `Es suprimiran el compte de TaskFlow i les teves tasques, notes i fitxers a tots els dispositius. No es pot desfer.`",
+        "(d) `deleteAccountGoogleHelp` (:511) takes a String placeholder `email`, exact: EN `To confirm, choose {email} when Google asks. Your Google account isn’t deleted.` / ES `Para confirmar, elige {email} cuando Google te lo pida. Tu cuenta de Google no se elimina.` / CA `Per confirmar-ho, tria {email} quan Google t’ho demani. El compte de Google no se suprimeix.` (e) `deleteAccountOtherGoogle` (:501-502) takes `email` too, exact: EN `Choose {email}, the Google account you use for TaskFlow.` / ES `Elige {email}, la cuenta de Google con la que entras en TaskFlow.` / CA `Tria {email}, el compte de Google amb què entres a TaskFlow.` Both get the account's email: a Google-only account was created with its Google address (Backend/core/google_auth.py:76). The website promises «La baja no elimina tu cuenta de Google o Apple»; this is where the app says it. Update both `@` entries with the placeholder, saying {email} is the TaskFlow account's email, which for these accounts is the Google address.",
+        "UX-804 (S2), two parallel lists. Today the kept line and the handover lines follow the bulleted list with no heading of their own (:425-429), and the kept line reaches «se quedan para los demás» only at words 8–9. (a) The first list stays: `deleteAccountWhatGoes` and its bullets, only when there are counts. (b) Then, only when it has at least one bullet, a second heading in the same style (`titleMedium`, 8 dp under it), new key `deleteAccountWhatStays`, exact: EN `What stays for the others:` / ES `Lo que se queda para los demás:` / CA `El que es queda per als altres:`. (c) Its bullets use the first list's row (:411-422: an ExcludeSemantics '•', 10 dp, the text in an Expanded, 4 dp under each), and 16 dp follow the list, as after the first. First the kept line, when `keptInShared > 0`, then one line per handover in the order the server sent them.",
+        "(d) `deleteAccountKeptShared`, exact: EN `{count, plural, =1{1 task and the files you added to shared projects, without your name} other{{count} tasks and the files you added to shared projects, without your name}}` / ES `{count, plural, =1{1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre} other{{count} tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre}}` / CA `{count, plural, =1{1 tasca i els fitxers que vas afegir a projectes compartits, sense el teu nom} other{{count} tasques i els fitxers que vas afegir a projectes compartits, sense el teu nom}}`. Files added there stay too (Backend/docs/ACCOUNT_DELETION.md). (e) `deleteAccountHandover`, exact: EN `{kind, select, group{The group “{name}” and its projects will go to {person}} other{The project “{name}” will go to {person}}}` / ES `{kind, select, group{El grupo «{name}» y sus proyectos pasarán a {person}} other{El proyecto «{name}» pasará a {person}}}` / CA `{kind, select, group{El grup «{name}» i els seus projectes passaran a {person}} other{El projecte «{name}» passarà a {person}}}`. A group's projects go with it (Backend/core/account_deletion.py:62-63, :83), as `groupTransferHelp` already says. Bullets have no final full stop, like the first list's. Update `@deleteAccountKeptShared` and `@deleteAccountHandover` to say they are bullets under What stays for the others, and add `@deleteAccountWhatStays` ('Heading of the second list on the delete-account page: what stays for other people. Shown only when that list has a line.').",
+        "Not in this package, cause server-side: someone who added files, but no tasks, to shared projects still sees no line for them, because the preview doesn't count those files.",
+        "UX-805 (S2), say what changed. After a 409 `plan_changed`, the page reloads in place (:203-214) and the banner above the button says only `deleteAccountPlanChanged`; the changed handover line is somewhere above, unmarked, and the old one is gone. (a) Compare the handovers before and after that reload: a handover is new or changed when no handover in the previous preview has the same kind, name and person (Casa going to Luis instead of Ana counts). (b) While the reload runs, the banner shows `deleteAccountPlanChanged`, as now. (c) When the new preview has new or changed handovers, the banner's text becomes, one per line: new key `deleteAccountChangedIntro` (EN `Something has changed since you opened this screen:` / ES `Algo ha cambiado desde que abriste esta pantalla:` / CA `Alguna cosa ha canviat des que has obert aquesta pantalla:`); then each new or changed handover as '• ' plus its `deleteAccountHandover` text; then new key `deleteAccountChangedCheck` (EN `Check it and confirm again.` / ES `Revísalo y vuelve a confirmar.` / CA `Revisa-ho i torna a confirmar-ho.`). Join the lines with line breaks inside the existing MessageBanner, still in `Semantics(liveRegion: true)` with key `_changed`; each line is a whole sentence or item, so this isn't concatenating fragments. Spanish example: «Algo ha cambiado desde que abriste esta pantalla:» / «• El proyecto «Casa» pasará a Luis» / «Revísalo y vuelve a confirmar.»",
+        "(d) The same handover lines are bold (`FontWeight.w700`) in the second list until the next tap on «Eliminar mi cuenta» (clear them when `_delete` starts). (e) When nothing is new or changed (a handover only disappeared, or only counts changed), keep `deleteAccountPlanChanged` and bold nothing. (f) The scroll to the banner (`_reveal(_changed)`) and the kept password stay. Add `@deleteAccountChangedIntro` ('First line of the banner above Delete my account after the page reloaded because a handover is new or changed; the changed handover lines follow, then deleteAccountChangedCheck.') and `@deleteAccountChangedCheck` ('Last line of that banner.'), and add to `@deleteAccountPlanChanged`: 'Used when no handover is new or changed.'",
+        "Tests to update in App/test/delete_account_test.dart: :354-406 (intro, kept and handover lines; the second heading), :408-432 (the singular kept line), :615-656 (`deleteAccountGoogleHelp` takes the email), :687 (the other-Google literal), :817-881 (the banner and the list lines after the reload), the 2× test :915-1013 (its strings take new arguments), and :1359-1387. In that last test keep `deleteAccount`, `deleteAccountButton`, `deleteAccountConfirmGoogle` and `accountDeleted` exactly as they are, update the kept, handover and plan-changed expectations, and rename it so it no longer claims to be the owner's brief: DECISIONS.md records no deletion copy, and only «Tu cuenta se ha eliminado.» comes from ACCOUNT_DELETION.md. ux-tester writes the acceptance tests.",
+        "Don't touch: the counts and their strings, the plan sent with the confirmation, the order of the page apart from the email line and the second heading, the sign-in screen."
+      ],
+      "acceptance": [
+        "Widget test (UX-803): Spanish, 1×, the default password account (ana@example.invalid): top to bottom, «¿Eliminar tu cuenta?», «ana@example.invalid» in onSurfaceVariant, then «Se eliminarán tu cuenta de TaskFlow y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.». EN and CA show their exact intros.",
+        "Widget test (UX-803): a Google-only preview (`reauth: google`), Spanish: «Para confirmar, elige ana@example.invalid cuando Google te lo pida. Tu cuenta de Google no se elimina.» sits above «Confirmar con Google»; after a 400 `google_reauth_failed`, «Elige ana@example.invalid, la cuenta de Google con la que entras en TaskFlow.» sits under the Google button. EN: `To confirm, choose ana@example.invalid when Google asks. Your Google account isn’t deleted.` and `Choose ana@example.invalid, the Google account you use for TaskFlow.`; CA likewise, with its exact copy.",
+        "Widget test (UX-803): at 2× on 320×640, in ES, EN and CA, for an account whose email is the 34-character `maria.dolores.garcia1957@gmail.com`: the heading, the email, the intro, the Google help line and the other-Google error each fit the width, with no exception.",
+        "Widget test (UX-804): Spanish, 1×, the default preview: top to bottom «Lo que se eliminará:», «12 tareas», «3 notas», «2 archivos», «1 proyecto», «Lo que se queda para los demás:», «4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre», «El proyecto «Casa» pasará a Ana», «El grupo «Matemáticas» y sus proyectos pasarán a Luis», then the copy link and «Para confirmar, escribe tu contraseña.». Every line of both lists has a '•' before it that isn't in the semantics tree, and none ends with a full stop.",
+        "Widget test (UX-804): 1 kept → «1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre»; 0 kept and no handovers → no «Lo que se queda para los demás:»; no counts, 1 kept and no handovers → the second heading and its one bullet, with no «Lo que se eliminará:».",
+        "Widget test (UX-804): EN and CA, the default preview: `What stays for the others:`, `4 tasks and the files you added to shared projects, without your name`, `The project “Casa” will go to Ana`, `The group “Matemáticas” and its projects will go to Luis`; «El que es queda per als altres:», «4 tasques i els fitxers que vas afegir a projectes compartits, sense el teu nom», «El projecte «Casa» passarà a Ana», «El grup «Matemáticas» i els seus projectes passaran a Luis». At 2× on 320×640, in ES, EN and CA, light and dark, both headings and every bullet fit the width.",
+        "Widget test (UX-805): Spanish, password typed, a 409 `plan_changed`, then a preview where Casa goes to Luis (as at :817): after the reload, the banner's text is exactly «Algo ha cambiado desde que abriste esta pantalla:», «• El proyecto «Casa» pasará a Luis» and «Revísalo y vuelve a confirmar.», on three lines; «El proyecto «Casa» pasará a Luis» in the list is bold (w700) and no other list line is; the password is kept; the banner is above the button.",
+        "Widget test (UX-805): the same at 2× on 320×640 in Spanish: after the reload, the banner is inside the viewport, above «Eliminar mi cuenta».",
+        "Widget test (UX-805): after the next tap on «Eliminar mi cuenta» (answered with an error), no list line is bold.",
+        "Widget test (UX-805): a 409 whose new preview only drops Matemáticas (Casa still to Ana) shows «Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.» and nothing bold.",
+        "Unit test: `deleteAccountWhatStays`, `deleteAccountChangedIntro` and `deleteAccountChangedCheck` read exactly as given, in EN, ES and CA."
+      ],
+      "deviceChecks": [
+        "Phone, a throwaway Google-only account on staging, Spanish (don't confirm unless it may be deleted): under «¿Eliminar tu cuenta?» the Gmail address shows, «Para confirmar, elige … cuando Google te lo pida.» names it, and Google's account chooser lists that address."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P123",
+      "title": "The Google Play line: true for whoever reads it, with Gestionar suscripción instead of a help page",
+      "area": "D",
+      "size": "M",
+      "severity": 2,
+      "findings": [
+        "UX-806"
+      ],
+      "files": [
+        "App/lib/screens/delete_account_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/delete_account_test.dart"
+      ],
+      "brief": [
+        "Context: with Pro, the delete page shows a bold «Eliminar tu cuenta no cancela tu suscripción de Google Play.» (`deleteAccountSubscription`) and «Cómo cancelarla en Google Play» (`deleteAccountSubscriptionHelp`), which opens a Google help article in the browser (`playCancelHelp` :16-19, `_openPlayHelp` :251-263, the block :430-445). The preview's `pro` is true for complimentary Pro and when billing can't be checked (Backend/core/account_deletion.py:115-121, Backend/core/billing.py:82-92, :119-127), so a complimentary tester reads about a subscription they don't have. Meanwhile the Pro screen manages the subscription in one tap: «Gestionar suscripción» (App/lib/screens/subscription_screen.dart:200-210, kept by D4d). The owner's promise stays: deleting doesn't cancel a store subscription, and the page says so to anyone who may have one.",
+        "(a) A complimentary account sees no block: when the signed-in account's `complimentaryPro` is true (read it once, like `_accountId`, :54), show neither the line nor the link, whatever `preview.pro` says. The Pro screen hides its store buttons for them too (subscription_screen.dart:191, :213).",
+        "(b) Anyone else with `preview.pro`: `deleteAccountSubscription`, exact, in normal weight (drop the w700): EN `If you pay for TaskFlow Pro on Google Play, deleting your account doesn’t cancel the subscription.` / ES `Si pagas TaskFlow Pro en Google Play, eliminar tu cuenta no cancela la suscripción.` / CA `Si pagues TaskFlow Pro a Google Play, suprimir el compte no cancel·la la subscripció.`",
+        "(c) The link under it reads the Pro screen's `billingManage` (ES «Gestionar suscripción», EN `Manage subscription`, CA «Gestiona la subscripció»), with `Icons.manage_accounts_outlined` as on the Pro screen and the key `delete-account-manage-subscription` (it replaces `delete-account-play-help`). Watch `subscriptionProvider`. When its state is ready and `customerInfo?.allPurchasedProductIdentifiers` isn't empty (the Pro screen's condition, :200-201), the link calls `ref.read(subscriptionProvider.notifier).presentCustomerCenter(locale)` with `Localizations.localeOf(context).toLanguageTag()`, and is disabled while the state is busy; as on the Pro screen (:26-33), a result other than `cancelled` shows `billingResult(result.name)` through `showFeedback`. Otherwise (billing not ready, or no purchase known) it opens `https://play.google.com/store/account/subscriptions` through `openWebPageProvider`, and when nothing opens it, `deleteAccountLinkError` shows, as today. That URI replaces `playCancelHelp`.",
+        "(d) Remove `deleteAccountSubscriptionHelp` from all three catalogs. Rewrite `@deleteAccountSubscription` ('On the delete-account page when the server says the account has Pro or billing could not be checked, except for complimentary Pro. True for anyone who reads it.') and `@deleteAccountLinkError` ('Brief message when the Google Play subscriptions page could not be opened.').",
+        "(e) The block stays where it is, last in `_consequences`, after whatever list comes before it. Don't touch the Pro screen: D4d removed its open-the-store button there, and that stays.",
+        "Tests: `open()` in App/test/delete_account_test.dart (:196-268) must override `subscriptionProvider` with a `SubscriptionController` over `FakeRevenueCat` (App/test/support/billing_fixtures.dart; set up as App/test/subscription_screen_test.dart:36-54 does), so no test reaches the real billing SDK; the account JSON in `_Auth.restore` (:136-144) can take `complimentary_pro`. Update :354-406 (no Pro: no line and no `delete-account-manage-subscription`), rewrite :434-464 for the new line and link, and in the 2× test replace `deleteAccountSubscriptionHelp` (:954) with `billingManage`. ux-tester writes the acceptance tests.",
+        "Don't touch: subscription_screen.dart, subscription_provider.dart, the server's `pro`, the rest of the page."
+      ],
+      "acceptance": [
+        "Widget test: Spanish, preview `pro: true`, an account with `complimentary_pro: true`: neither «Si pagas TaskFlow Pro en Google Play, eliminar tu cuenta no cancela la suscripción.» nor «Gestionar suscripción» is on the page.",
+        "Widget test: Spanish, preview `pro: true`, not complimentary, billing ready with a purchase (`billingInfo(active: true)`): the line shows in normal weight (not w700), with «Gestionar suscripción» under it; one tap opens the Customer Center once (FakeRevenueCat `centers` is 1) and opens no web page.",
+        "Widget test: preview `pro: true`, with billing not ready, and again ready with no purchase: one tap on «Gestionar suscripción» opens exactly `https://play.google.com/store/account/subscriptions`; when nothing can open it, «No se ha podido abrir la página.» shows.",
+        "Widget test: preview `pro: false`: neither the line nor the link.",
+        "Widget test: at 2× on 320×640, in ES, EN and CA, light and dark: the line (EN `If you pay for TaskFlow Pro on Google Play, deleting your account doesn’t cancel the subscription.`, CA «Si pagues TaskFlow Pro a Google Play, suprimir el compte no cancel·la la subscripció.») and the link fit the width.",
+        "Code: `deleteAccountSubscriptionHelp` and the help-article URL (support.google.com/googleplay/answer/7018481) appear nowhere in App/lib or the catalogs; subscription_screen.dart is unchanged."
+      ],
+      "deviceChecks": [
+        "Phone, staging, a sandbox Google Play subscriber on a throwaway account (don't confirm the deletion otherwise): on Eliminar cuenta, «Gestionar suscripción» opens the subscription manager, and its cancel option is reached in 2 taps from the page.",
+        "Phone, an account the server reports as Pro with no purchase on this phone's Google account: «Gestionar suscripción» opens Google Play's subscriptions page."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P124",
+      "title": "Account: Eliminar cuenta in a group of its own, apart from Cerrar sesión",
+      "area": "D",
+      "size": "S",
+      "severity": 1,
+      "findings": [
+        "UX-811"
+      ],
+      "files": [
+        "App/lib/screens/account_screen.dart",
+        "App/test/delete_account_test.dart"
+      ],
+      "brief": [
+        "Context: the bottom of Account (App/lib/screens/account_screen.dart:284-316) holds two red text buttons of the same size and weight, 8 dp apart (:303): «Cerrar sesión» and «Eliminar cuenta». They read as one group. A mis-tap only opens a dialog or the delete page, so this is about telling them apart.",
+        "Fix: replace the 8 dp gap (:303) with 24 dp, a `Divider` (height 1), then 8 dp, before «Eliminar cuenta». It stays last and red, with its key `account-delete` and its label. No copy change. Cerrar sesión, its progress icon and everything above stay as they are.",
+        "Tests: :310-350 and :1015-1046 in App/test/delete_account_test.dart must keep passing. ux-tester writes the acceptance tests."
+      ],
+      "acceptance": [
+        "Widget test: Spanish, 1×, Account: the top of «Eliminar cuenta» is at least 24 dp below the bottom of «Cerrar sesión», and a Divider lies between them (its top below the sign-out button, its bottom above the delete button); «Eliminar cuenta» is still the last button, in the error colour.",
+        "Widget test: at 2× on 320×640, in ES, EN and CA, «Eliminar cuenta» fits the width, below the divider, last."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [
+    {
+      "question": "UX-815 · A password account that forgot its password: should deletion get through without leaving the page? P121 makes the wrong-password message say how (sign out, then «¿Has olvidado tu contraseña?»), but the route is long: sign out, get the code by email, set a new password, sign in, then Ajustes › Cuenta › Eliminar cuenta again. Both ways to shorten it need the server: (a) let accounts with Google linked confirm with Google instead of the password (review D's question 4); (b) recovery inside the delete page (review D's full fix for UX-801), which first needs a reset to lift the 15-minute lock, because a reset ends every session and the page must sign back in.",
+      "findings": [
+        "UX-815"
+      ],
+      "recommendation": "(a) now, (b) not yet. Google sign-in already opens a linked account (Backend/core/google_auth.py:66-69), so confirming with it is no weaker, and the page gains no control: a linked account sees «Confirmar con Google» instead of the field. Password-only accounts keep P121's way out. Revisit (b) if testers get stuck there."
+    },
+    {
+      "question": "UX-813 · Telling the heir: nothing tells the person who receives a project or group. Should they be told, and how?",
+      "findings": [
+        "UX-813"
+      ],
+      "recommendation": "Yes, later, on the server. The website says ownership is never transferred silently, and the heir is the other side of that promise. Decide how (an in-app notice, an email, or both) together with the confirmation-email step already set for later; nothing in the app changes now."
+    },
+    {
+      "question": "UX-814 · Files in the copy: «Guardar antes una copia» keeps only the names of the files, and after deleting the files are gone. P120 now says so («La copia no incluye los archivos.»). Should the copy carry the files themselves?",
+      "findings": [
+        "UX-814"
+      ],
+      "recommendation": "Not for now. It needs a new export format (a zip with the files), can be large (up to the 100 MB free total, more with Pro), and needs an import that reads it back: a feature, not a fix. P120's line keeps the promise honest; revisit if testers say they lost photos."
+    },
+    {
+      "question": "UX-812 · Choosing the heir: heirs are picked automatically (the earliest admin or editor) and named before the tap. Should a handover line let the person pick someone else first? Groups already have Transferir propiedad; projects have no such action. It adds a control to the delete page.",
+      "findings": [
+        "UX-812"
+      ],
+      "recommendation": "Not now. Every heir is named before confirming, which keeps the website's promise, and a group can be handed to someone else first with Transferir propiedad. A choice per line adds a decision to a page that should stay plain; revisit if a tester asks for it."
+    }
+  ],
+  "skipped": []
+}

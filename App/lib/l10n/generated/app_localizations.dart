@@ -5407,7 +5407,7 @@ abstract class AppLocalizations {
   /// First line of the delete-account page, under its heading.
   ///
   /// In en, this message translates to:
-  /// **'This deletes your account and your tasks, notes and files on all your devices. It can’t be undone.'**
+  /// **'This deletes your TaskFlow account and your tasks, notes and files on all your devices. It can’t be undone.'**
   String get deleteAccountIntro;
 
   /// Introduces the list of counts (tasks, notes, files, projects, groups) that deleting the account removes.
@@ -5446,35 +5446,47 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 group} other{{count} groups}}'**
   String deleteAccountGroups(int count);
 
-  /// On the delete-account page, when tasks the person added to other people's projects stay after the account is deleted.
+  /// A bullet under 'What stays for the others:' on the delete-account page, when tasks the person added to other people's shared projects stay after the account is deleted; the files they added there stay too. No final full stop.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 task you added to shared projects stays for the others, without your name.} other{{count} tasks you added to shared projects stay for the others, without your name.}}'**
+  /// **'{count, plural, =1{1 task and the files you added to shared projects, without your name} other{{count} tasks and the files you added to shared projects, without your name}}'**
   String deleteAccountKeptShared(int count);
 
-  /// One line per project or group the person owns that passes to someone else when the account is deleted. {kind} is 'group' or 'project' and is never translated. {name} is the project or group; {person} is who receives it (a name or an email).
+  /// A bullet under 'What stays for the others:' on the delete-account page, one per project or group the person owns that passes to someone else when the account is deleted; a group's projects go with it. Also a line of the banner after the page reloaded, when this handover is new or changed. {kind} is 'group' or 'project' and is never translated. {name} is the project or group; {person} is who receives it (a name or an email). No final full stop.
   ///
   /// In en, this message translates to:
-  /// **'{kind, select, group{The group “{name}” will go to {person}.} other{The project “{name}” will go to {person}.}}'**
+  /// **'{kind, select, group{The group “{name}” and its projects will go to {person}} other{The project “{name}” will go to {person}}}'**
   String deleteAccountHandover(String kind, String name, String person);
 
-  /// On the delete-account page, only for an account with Pro.
+  /// Heading of the second list on the delete-account page: what stays for other people. Shown only when that list has a line.
   ///
   /// In en, this message translates to:
-  /// **'Deleting your account doesn’t cancel your Google Play subscription.'**
+  /// **'What stays for the others:'**
+  String get deleteAccountWhatStays;
+
+  /// On the delete-account page when the server says the account has Pro or billing could not be checked, except for complimentary Pro. True for anyone who reads it.
+  ///
+  /// In en, this message translates to:
+  /// **'If you pay for TaskFlow Pro on Google Play, deleting your account doesn’t cancel the subscription.'**
   String get deleteAccountSubscription;
 
-  /// Link under the subscription line; opens Google Play's help page on cancelling a subscription.
-  ///
-  /// In en, this message translates to:
-  /// **'How to cancel it on Google Play'**
-  String get deleteAccountSubscriptionHelp;
-
-  /// Link on the delete-account page to the Export & import screen.
+  /// Link on the delete-account page that saves a TaskFlow export file at once, through Android's save screen. Shown only when the person has tasks or notes.
   ///
   /// In en, this message translates to:
   /// **'Save a copy of your tasks first'**
   String get deleteAccountSaveCopy;
+
+  /// Replaces the save-a-copy link on the delete-account page once the file was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy saved'**
+  String get deleteAccountCopySaved;
+
+  /// Under the save-a-copy link, or under Copy saved, when the person has attached files: the export keeps only the names of the files.
+  ///
+  /// In en, this message translates to:
+  /// **'The copy doesn’t include files.'**
+  String get deleteAccountCopyNoFiles;
 
   /// Above the password field that confirms deleting the account.
   ///
@@ -5482,11 +5494,11 @@ abstract class AppLocalizations {
   /// **'To confirm, enter your password.'**
   String get deleteAccountPasswordHelp;
 
-  /// Above the Confirm with Google button, for an account that signs in only with Google.
+  /// Above the Confirm with Google button, for an account that signs in only with Google. {email} is the TaskFlow account's email, which for these accounts is the Google address. Says the Google account itself isn't deleted.
   ///
   /// In en, this message translates to:
-  /// **'To confirm, choose your Google account.'**
-  String get deleteAccountGoogleHelp;
+  /// **'To confirm, choose {email} when Google asks. Your Google account isn’t deleted.'**
+  String deleteAccountGoogleHelp(String email);
 
   /// Button that opens Google sign-in to confirm deleting the account.
   ///
@@ -5506,23 +5518,23 @@ abstract class AppLocalizations {
   /// **'Delete my account'**
   String get deleteAccountButton;
 
-  /// Spoken label of the progress indicator inside Delete my account while the request runs.
+  /// Inside Delete my account, after a spinner, while the request runs (up to a minute). Ends with an ellipsis.
   ///
   /// In en, this message translates to:
-  /// **'Deleting your account'**
+  /// **'Deleting your account…'**
   String get deleteAccountDeleting;
 
-  /// Under the password field on the delete-account page.
+  /// Under the password field on the delete-account page after a wrong password. Says how to recover a forgotten one: sign out, then Forgot password? on sign-in. The quoted words must match forgotPassword, and the verb the signOut button.
   ///
   /// In en, this message translates to:
-  /// **'That password isn’t right.'**
+  /// **'That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”'**
   String get deleteAccountWrongPassword;
 
-  /// On the delete-account page, when the Google account chosen to confirm isn't the one linked to this TaskFlow account.
+  /// On the delete-account page, when the Google account chosen to confirm isn't the one linked to this TaskFlow account. {email} is the TaskFlow account's email, which for these accounts is the Google address.
   ///
   /// In en, this message translates to:
-  /// **'Choose the same Google account you use for TaskFlow.'**
-  String get deleteAccountOtherGoogle;
+  /// **'Choose {email}, the Google account you use for TaskFlow.'**
+  String deleteAccountOtherGoogle(String email);
 
   /// Under Delete my account when the phone is offline.
   ///
@@ -5542,11 +5554,29 @@ abstract class AppLocalizations {
   /// **'Too many tries. Try again later.'**
   String get deleteAccountThrottled;
 
-  /// Above Delete my account when the server refused because what the page showed changed meanwhile (for example, the person who would receive a project left it). The page has just reloaded; nothing was deleted.
+  /// Under Delete my account when the server refuses more attempts for {minutes} minutes, rounded up, at least 1. After five wrong passwords it is 15 minutes, and signing in waits too.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}'**
+  String deleteAccountThrottledWait(int minutes);
+
+  /// Above Delete my account when the server refused because what the page showed changed meanwhile (for example, the person who would receive a project left it). The page has just reloaded; nothing was deleted. Used when no handover is new or changed.
   ///
   /// In en, this message translates to:
   /// **'Something has changed since you opened this screen. Check what will happen and confirm again.'**
   String get deleteAccountPlanChanged;
+
+  /// First line of the banner above Delete my account after the page reloaded because a handover is new or changed; the changed handover lines follow, then deleteAccountChangedCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Something has changed since you opened this screen:'**
+  String get deleteAccountChangedIntro;
+
+  /// Last line of that banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Check it and confirm again.'**
+  String get deleteAccountChangedCheck;
 
   /// On the delete-account page when the server needs the password or Google confirmation again.
   ///
@@ -5560,7 +5590,7 @@ abstract class AppLocalizations {
   /// **'Your account couldn’t be deleted. Try again later.'**
   String get deleteAccountFailed;
 
-  /// Brief message when Google Play's help page couldn't be opened.
+  /// Brief message when the Google Play subscriptions page could not be opened.
   ///
   /// In en, this message translates to:
   /// **'Couldn’t open the page.'**

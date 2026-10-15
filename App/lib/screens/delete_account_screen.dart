@@ -1,10 +1,16 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:agenda/l10n/archive_locale.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
+import 'package:agenda/models/archive_diagnostic.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/screens/data_transfer_screen.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/services/account_deletion.dart';
 import 'package:agenda/services/api_client.dart';
@@ -13,9 +19,9 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/google_login_button.dart';
 
-/// Google Play's help page on cancelling a subscription.
-final playCancelHelp = Uri.parse(
-  'https://support.google.com/googleplay/answer/7018481',
+/// Google Play's subscriptions page, for when billing knows of no purchase.
+final playSubscriptions = Uri.parse(
+  'https://play.google.com/store/account/subscriptions',
 );
 
 /// Opens a web page outside the app; false when nothing could open it.
@@ -51,16 +57,31 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
   final _googleArea = GlobalKey();
   final _changed = GlobalKey();
   final _outcome = GlobalKey();
+  final _confirmButton = GlobalKey();
   late final int? _accountId = ref.read(authProvider).account?.id;
+  late final String _email = ref.read(authProvider).account?.email ?? '';
+  late final bool _complimentary =
+      ref.read(authProvider).account?.complimentaryPro == true;
   DeletionPreview? _preview;
   bool _loading = true;
   bool _reloading = false;
   bool _showPassword = false;
   bool _confirmingGoogle = false;
   bool _deleting = false;
+  bool _savingCopy = false;
+  bool _copySaved = false;
+  Object? _copyError;
   String? _googleToken;
   Object? _googleError;
   _Problem? _problem;
+
+  /// Handovers that are new or changed since the page last showed them,
+  /// after the server refused because the plan changed. Bold until the next
+  /// tap on Delete my account.
+  List<Handover> _changedHandovers = const [];
+
+  /// How long the server said to wait, when it said.
+  int? _waitMinutes;
 
   @override
   void initState() {
@@ -113,10 +134,15 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       _confirmingGoogle = true;
       _googleError = null;
       _problem = null;
+      _waitMinutes = null;
     });
     try {
       final token = await ref.read(googleSignInServiceProvider).authenticate();
-      if (mounted && token != null) setState(() => _googleToken = token);
+      if (mounted && token != null) {
+        setState(() => _googleToken = token);
+        // At large text the button it enables can be below the screen.
+        _reveal(_confirmButton);
+      }
     } catch (error) {
       if (mounted) setState(() => _googleError = error);
     } finally {
@@ -150,6 +176,18 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     return _Problem.failed;
   }
 
+  /// The wait a refusal names, in whole minutes rounded up: the server
+  /// (English only) ends it with "Expected available in N seconds."
+  static int? _waitMinutesFor(Object error) {
+    if (error is! ApiException || error.status != 429) return null;
+    final match = RegExp(
+      r'Expected available in (\d+) seconds?',
+    ).firstMatch(error.message);
+    final seconds = int.tryParse(match?.group(1) ?? '');
+    if (seconds == null) return null;
+    return max(1, (seconds + 59) ~/ 60);
+  }
+
   Future<void> _delete() async {
     final preview = _preview;
     final account = ref.read(authProvider).account;
@@ -165,7 +203,9 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     setState(() {
       _deleting = true;
       _problem = null;
+      _waitMinutes = null;
       _googleError = null;
+      _changedHandovers = const [];
     });
     try {
       await api.request(
@@ -194,6 +234,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       setState(() {
         _deleting = false;
         _problem = problem;
+        _waitMinutes = _waitMinutesFor(error);
         // That Google confirmation can't be used again.
         if (problem == _Problem.otherGoogleAccount ||
             problem == _Problem.confirmAgain) {
@@ -202,13 +243,19 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       });
       // What will happen, or the way to confirm, changed since the page
       // opened: show it as it is now. Only the person sends it again.
-      if (problem == _Problem.planChanged ||
-          problem == _Problem.confirmAgain) {
+      if (problem == _Problem.planChanged || problem == _Problem.confirmAgain) {
         unawaited(
           _load().then((_) {
-            if (mounted) {
-              _reveal(problem == _Problem.planChanged ? _changed : _outcome);
+            if (!mounted) return;
+            if (problem == _Problem.planChanged) {
+              setState(
+                () => _changedHandovers = _newOrChanged(
+                  preview.handovers,
+                  _preview?.handovers ?? const [],
+                ),
+              );
             }
+            _reveal(problem == _Problem.planChanged ? _changed : _outcome);
           }),
         );
         return;
@@ -226,6 +273,29 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       // Sign-in shows by now; nothing left behind belongs to any account.
     }
   }
+
+  /// The handovers in [after] that nothing in [before] matched in kind, name
+  /// and recipient: a project now going to someone else counts.
+  static List<Handover> _newOrChanged(
+    List<Handover> before,
+    List<Handover> after,
+  ) => [
+    for (final handover in after)
+      if (!before.any(
+        (old) =>
+            old.group == handover.group &&
+            old.name == handover.name &&
+            old.to == handover.to,
+      ))
+        handover,
+  ];
+
+  static String _handoverText(AppLocalizations strings, Handover handover) =>
+      strings.deleteAccountHandover(
+        handover.group ? 'group' : 'project',
+        handover.name,
+        handover.to,
+      );
 
   /// Brings an answer into view: at large text it can be below the screen.
   void _reveal(GlobalKey key) {
@@ -248,17 +318,49 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     });
   }
 
-  Future<void> _openPlayHelp() async {
+  /// Saves a TaskFlow file here, as Export & import does, through Android's
+  /// save screen. Backing out of it changes nothing.
+  Future<void> _saveCopy() async {
+    setState(() {
+      _savingCopy = true;
+      _copyError = null;
+    });
+    try {
+      final contents = await ref.read(archiveStoreProvider).export();
+      if (!mounted) return;
+      final saved = await ref.read(archiveFilesProvider).save(contents);
+      if (mounted && saved) setState(() => _copySaved = true);
+    } catch (error) {
+      if (mounted) setState(() => _copyError = error);
+    } finally {
+      if (mounted) setState(() => _savingCopy = false);
+    }
+  }
+
+  /// The Pro screen's Customer Center when billing knows of a purchase;
+  /// otherwise Google Play's subscriptions page.
+  Future<void> _manageSubscription(bool purchased) async {
     final messenger = ScaffoldMessenger.of(context);
-    final failed = context.l10n.deleteAccountLinkError;
+    final strings = context.l10n;
+    if (purchased) {
+      final result = await ref
+          .read(subscriptionProvider.notifier)
+          .presentCustomerCenter(
+            Localizations.localeOf(context).toLanguageTag(),
+          );
+      if (result != BillingResult.cancelled && messenger.mounted) {
+        unawaited(showFeedback(messenger, strings.billingResult(result.name)));
+      }
+      return;
+    }
     var opened = false;
     try {
-      opened = await ref.read(openWebPageProvider)(playCancelHelp);
+      opened = await ref.read(openWebPageProvider)(playSubscriptions);
     } catch (_) {
       opened = false;
     }
     if (!opened && messenger.mounted) {
-      unawaited(showFeedback(messenger, failed));
+      unawaited(showFeedback(messenger, strings.deleteAccountLinkError));
     }
   }
 
@@ -270,7 +372,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     final outcome = switch (_problem) {
       _Problem.offline => strings.deleteAccountOffline,
       _Problem.noAnswer => strings.deleteAccountNoAnswer,
-      _Problem.throttled => strings.deleteAccountThrottled,
+      _Problem.throttled =>
+        _waitMinutes == null
+            ? strings.deleteAccountThrottled
+            : strings.deleteAccountThrottledWait(_waitMinutes!),
       _Problem.confirmAgain => strings.deleteAccountConfirmAgain,
       _Problem.failed => strings.deleteAccountFailed,
       _ => null,
@@ -279,7 +384,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       // Leaving wouldn't stop a deletion already sent.
       canPop: !_deleting,
       child: Scaffold(
-        appBar: CustomAppBar(title: strings.deleteAccount),
+        appBar: CustomAppBar(
+          title: strings.deleteAccount,
+          canGoBack: !_deleting,
+        ),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
@@ -291,7 +399,15 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   strings.deleteAccountQuestion,
                   style: theme.textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 8),
+                if (_email.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  // Which account goes, as Account names it.
+                  Text(
+                    _email,
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+                const SizedBox(height: 12),
                 Text(strings.deleteAccountIntro),
                 const SizedBox(height: 24),
                 if (_loading)
@@ -300,17 +416,9 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   LoadFailed(onRetry: _load)
                 else ...[
                   ..._consequences(context, preview),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton.icon(
-                      key: const ValueKey('delete-account-export'),
-                      onPressed: _deleting
-                          ? null
-                          : () => Navigator.pushNamed(context, '/dataTransfer'),
-                      icon: const Icon(Icons.download_outlined, size: 20),
-                      label: Text(strings.deleteAccountSaveCopy),
-                    ),
-                  ),
+                  // Only what is the person's own can be copied.
+                  if (preview.tasks > 0 || preview.notes > 0)
+                    _copy(context, preview),
                   const SizedBox(height: 24),
                   if (preview.google)
                     _googleConfirmation(context)
@@ -319,50 +427,47 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   const SizedBox(height: 24),
                   // Above the button: read before confirming again.
                   if (_problem == _Problem.planChanged) ...[
-                    Semantics(
-                      liveRegion: true,
-                      child: MessageBanner(
-                        strings.deleteAccountPlanChanged,
-                        key: _changed,
-                        icon: Icons.info_outline,
-                      ),
-                    ),
+                    _changedBanner(strings),
                     const SizedBox(height: 16),
                   ],
                   if (_reloading) ...[
                     const LinearProgressIndicator(),
                     const SizedBox(height: 16),
                   ],
-                  FilledButton(
-                    key: const ValueKey('delete-account-confirm'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.error,
-                      foregroundColor: theme.colorScheme.onError,
-                    ),
-                    onPressed: _ready ? _delete : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_deleting) ...[
-                            SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                semanticsLabel: strings.deleteAccountDeleting,
+                  KeyedSubtree(
+                    key: _confirmButton,
+                    child: FilledButton(
+                      key: const ValueKey('delete-account-confirm'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.error,
+                        foregroundColor: theme.colorScheme.onError,
+                      ),
+                      onPressed: _ready ? _delete : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_deleting) ...[
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Flexible(
+                              child: Text(
+                                _deleting
+                                    ? strings.deleteAccountDeleting
+                                    : strings.deleteAccountButton,
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                            const SizedBox(width: 10),
                           ],
-                          Flexible(
-                            child: Text(
-                              strings.deleteAccountButton,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -393,58 +498,176 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     ];
     final stays = [
       if (preview.keptInShared > 0)
-        strings.deleteAccountKeptShared(preview.keptInShared),
+        _bullet(strings.deleteAccountKeptShared(preview.keptInShared)),
       for (final handover in preview.handovers)
-        strings.deleteAccountHandover(
-          handover.group ? 'group' : 'project',
-          handover.name,
-          handover.to,
+        _bullet(
+          _handoverText(strings, handover),
+          bold: _changedHandovers.contains(handover),
         ),
     ];
+    final heading = Theme.of(context).textTheme.titleMedium;
     return [
       if (counts.isNotEmpty) ...[
-        Text(
-          strings.deleteAccountWhatGoes,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text(strings.deleteAccountWhatGoes, style: heading),
         const SizedBox(height: 8),
-        for (final line in counts)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const ExcludeSemantics(child: Text('•')),
-                const SizedBox(width: 10),
-                Expanded(child: Text(line)),
-              ],
-            ),
-          ),
+        for (final line in counts) _bullet(line),
         const SizedBox(height: 16),
       ],
-      for (final line in stays)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(line),
-        ),
-      if (preview.pro) ...[
-        if (stays.isNotEmpty) const SizedBox(height: 4),
-        Text(
-          strings.deleteAccountSubscription,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
+      if (stays.isNotEmpty) ...[
+        Text(strings.deleteAccountWhatStays, style: heading),
+        const SizedBox(height: 8),
+        ...stays,
+        const SizedBox(height: 16),
+      ],
+      if (preview.pro && !_complimentary) ...[
+        Text(strings.deleteAccountSubscription),
         Align(
           alignment: AlignmentDirectional.centerStart,
-          child: TextButton.icon(
-            key: const ValueKey('delete-account-play-help'),
-            onPressed: _openPlayHelp,
-            icon: const Icon(Icons.open_in_new_rounded, size: 18),
-            label: Text(strings.deleteAccountSubscriptionHelp),
-          ),
+          child: _manageLink(strings),
         ),
       ],
       const SizedBox(height: 8),
     ];
+  }
+
+  /// Gestionar suscripción, as on the Pro screen: its Customer Center when
+  /// billing is ready and knows of a purchase, else Google Play's page.
+  Widget _manageLink(AppLocalizations strings) {
+    final billing = ref.watch(subscriptionProvider);
+    final purchased =
+        billing.ready &&
+        billing.customerInfo?.allPurchasedProductIdentifiers.isNotEmpty == true;
+    return TextButton.icon(
+      key: const ValueKey('delete-account-manage-subscription'),
+      onPressed: purchased && billing.busy
+          ? null
+          : () => _manageSubscription(purchased),
+      icon: const Icon(Icons.manage_accounts_outlined),
+      label: Text(strings.billingManage),
+    );
+  }
+
+  /// What changed, one line each once the reload knows. Silent while it
+  /// reloads, then read once with its final text, without the bullets.
+  Widget _changedBanner(AppLocalizations strings) {
+    final lines = _reloading || _changedHandovers.isEmpty
+        ? [strings.deleteAccountPlanChanged]
+        : [
+            strings.deleteAccountChangedIntro,
+            for (final handover in _changedHandovers)
+              _handoverText(strings, handover),
+            strings.deleteAccountChangedCheck,
+          ];
+    // Between the intro and the check, every line is a handover.
+    final visible = [
+      for (var i = 0; i < lines.length; i++)
+        i > 0 && i < lines.length - 1 ? '• ${lines[i]}' : lines[i],
+    ];
+    return Semantics(
+      container: true,
+      liveRegion: !_reloading,
+      label: lines.join('\n'),
+      child: ExcludeSemantics(
+        child: MessageBanner(
+          visible.join('\n'),
+          key: _changed,
+          icon: Icons.info_outline,
+        ),
+      ),
+    );
+  }
+
+  /// One line of a list on this page, after a bullet TalkBack doesn't read.
+  Widget _bullet(String line, {bool bold = false}) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const ExcludeSemantics(child: Text('•')),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            line,
+            style: bold ? const TextStyle(fontWeight: FontWeight.w700) : null,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// The link that saves a copy, then the check that it was saved, and what
+  /// the copy leaves out.
+  Widget _copy(BuildContext context, DeletionPreview preview) {
+    final strings = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    // Where TextButton.icon puts its icon: 12 dp in, less at large text.
+    final inset = ButtonStyleButton.scaledPadding(
+      const EdgeInsetsDirectional.only(start: 12),
+      const EdgeInsetsDirectional.only(start: 4),
+      const EdgeInsetsDirectional.only(start: 4),
+      MediaQuery.textScalerOf(context).scale(14) / 14,
+    );
+    final error = _copyError;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_copySaved)
+          Semantics(
+            key: const ValueKey('delete-account-copy-saved'),
+            liveRegion: true,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: inset,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: colors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(strings.deleteAccountCopySaved)),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const ValueKey('delete-account-export'),
+              onPressed: _deleting || _savingCopy ? null : _saveCopy,
+              icon: const Icon(Icons.download_outlined, size: 20),
+              label: Text(strings.deleteAccountSaveCopy),
+            ),
+          ),
+        if (error != null)
+          Padding(
+            padding: inset.add(const EdgeInsets.only(bottom: 4)),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                error is ArchiveDiagnostic
+                    ? context.archiveDiagnostic(error)
+                    : strings.transferError,
+                style: TextStyle(color: colors.error),
+              ),
+            ),
+          ),
+        if (preview.files > 0)
+          Padding(
+            padding: inset,
+            child: Text(
+              strings.deleteAccountCopyNoFiles,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _passwordConfirmation(BuildContext context) {
@@ -473,7 +696,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
               errorText: _problem == _Problem.wrongPassword
                   ? strings.deleteAccountWrongPassword
                   : null,
-              errorMaxLines: 4,
+              errorMaxLines: 10,
               suffixIcon: IconButton(
                 tooltip: _showPassword
                     ? strings.hidePassword
@@ -499,7 +722,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     final strings = context.l10n;
     final colors = Theme.of(context).colorScheme;
     final error = _problem == _Problem.otherGoogleAccount
-        ? strings.deleteAccountOtherGoogle
+        ? strings.deleteAccountOtherGoogle(_email)
         : _googleError == null
         ? null
         : requestProblemText(strings, _googleError!, onSignIn: true);
@@ -508,7 +731,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(strings.deleteAccountGoogleHelp),
+          Text(strings.deleteAccountGoogleHelp(_email)),
           const SizedBox(height: 12),
           if (_googleToken == null)
             GoogleLoginButton(
@@ -519,13 +742,17 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   : _confirmWithGoogle,
             )
           else
-            Row(
-              key: const ValueKey('delete-account-google-confirmed'),
-              children: [
-                Icon(Icons.check_circle_outline, color: colors.primary),
-                const SizedBox(width: 10),
-                Expanded(child: Text(strings.deleteAccountGoogleConfirmed)),
-              ],
+            // TalkBack's focus was on the button this replaces.
+            Semantics(
+              liveRegion: true,
+              child: Row(
+                key: const ValueKey('delete-account-google-confirmed'),
+                children: [
+                  Icon(Icons.check_circle_outline, color: colors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(strings.deleteAccountGoogleConfirmed)),
+                ],
+              ),
             ),
           if (error != null)
             Padding(

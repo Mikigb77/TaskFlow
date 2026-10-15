@@ -3523,7 +3523,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get deleteAccountIntro =>
-      'Es suprimiran el compte i les teves tasques, notes i fitxers a tots els dispositius. No es pot desfer.';
+      'Es suprimiran el compte de TaskFlow i les teves tasques, notes i fitxers a tots els dispositius. No es pot desfer.';
 
   @override
   String get deleteAccountWhatGoes => 'El que es suprimirà:';
@@ -3589,9 +3589,9 @@ class AppLocalizationsCa extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count tasques que vas afegir a projectes compartits es queden per als altres, sense el teu nom.',
+          '$count tasques i els fitxers que vas afegir a projectes compartits, sense el teu nom',
       one:
-          '1 tasca que vas afegir a projectes compartits es queda per als altres, sense el teu nom.',
+          '1 tasca i els fitxers que vas afegir a projectes compartits, sense el teu nom',
     );
     return '$_temp0';
   }
@@ -3599,29 +3599,36 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String deleteAccountHandover(String kind, String name, String person) {
     String _temp0 = intl.Intl.selectLogic(kind, {
-      'group': 'El grup «$name» passarà a $person.',
-      'other': 'El projecte «$name» passarà a $person.',
+      'group': 'El grup «$name» i els seus projectes passaran a $person',
+      'other': 'El projecte «$name» passarà a $person',
     });
     return '$_temp0';
   }
 
   @override
-  String get deleteAccountSubscription =>
-      'Suprimir el compte no cancel·la la subscripció de Google Play.';
+  String get deleteAccountWhatStays => 'El que es queda per als altres:';
 
   @override
-  String get deleteAccountSubscriptionHelp => 'Com cancel·lar-la a Google Play';
+  String get deleteAccountSubscription =>
+      'Si pagues TaskFlow Pro a Google Play, suprimir el compte no cancel·la la subscripció.';
 
   @override
   String get deleteAccountSaveCopy => 'Desa abans una còpia de les tasques';
+
+  @override
+  String get deleteAccountCopySaved => 'Còpia desada';
+
+  @override
+  String get deleteAccountCopyNoFiles => 'La còpia no inclou els fitxers.';
 
   @override
   String get deleteAccountPasswordHelp =>
       'Per confirmar-ho, escriu la contrasenya.';
 
   @override
-  String get deleteAccountGoogleHelp =>
-      'Per confirmar-ho, tria el compte de Google.';
+  String deleteAccountGoogleHelp(String email) {
+    return 'Per confirmar-ho, tria $email quan Google t’ho demani. El compte de Google no se suprimeix.';
+  }
 
   @override
   String get deleteAccountConfirmGoogle => 'Confirma amb Google';
@@ -3633,14 +3640,16 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deleteAccountButton => 'Suprimeix el meu compte';
 
   @override
-  String get deleteAccountDeleting => 'S’està suprimint el compte';
+  String get deleteAccountDeleting => 'S’està suprimint el compte…';
 
   @override
-  String get deleteAccountWrongPassword => 'La contrasenya no és correcta.';
+  String get deleteAccountWrongPassword =>
+      'La contrasenya no és correcta. Si no te’n recordes, tanca la sessió i toca «Has oblidat la contrasenya?».';
 
   @override
-  String get deleteAccountOtherGoogle =>
-      'Tria el mateix compte de Google amb què entres a TaskFlow.';
+  String deleteAccountOtherGoogle(String email) {
+    return 'Tria $email, el compte de Google amb què entres a TaskFlow.';
+  }
 
   @override
   String get deleteAccountOffline =>
@@ -3655,8 +3664,26 @@ class AppLocalizationsCa extends AppLocalizations {
       'Massa intents. Torna-ho a provar més tard.';
 
   @override
+  String deleteAccountThrottledWait(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Massa intents. Espera $minutes minuts i torna-ho a provar.',
+      one: 'Massa intents. Espera un minut i torna-ho a provar.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get deleteAccountPlanChanged =>
       'Alguna cosa ha canviat des que has obert aquesta pantalla. Revisa què passarà i torna a confirmar-ho.';
+
+  @override
+  String get deleteAccountChangedIntro =>
+      'Alguna cosa ha canviat des que has obert aquesta pantalla:';
+
+  @override
+  String get deleteAccountChangedCheck => 'Revisa-ho i torna a confirmar-ho.';
 
   @override
   String get deleteAccountConfirmAgain => 'Torna a confirmar que ets tu.';

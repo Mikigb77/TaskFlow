@@ -137,6 +137,19 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - archived groups drop out of the daily view, capture and reminders.
 
 ## Open — not decided; anything that depends on these is a decision, not a fix
+- **Account deletion (2026-10-15).** The design is `Backend/docs/ACCOUNT_DELETION.md`; the review is run `2026-10-15-deletion`. Each item below gives the organizer's recommendation:
+  - **Cleaning up completed tasks.** The owner described completed tasks being removed after 1 month (free) or 3 months (Pro). That job doesn't exist, and the privacy page says completed tasks are not deleted after 30 or 90 days. Choose one, and the website must match:
+    - for everyone;
+    - only for what a deleted account left in shared projects;
+    - none.
+  - **UX-815: a password account that forgot its password.** Let accounts with Google linked confirm with Google instead. The server already accepts that; the app only needs to offer it. Recovery inside the delete page can come later.
+  - **UX-813: telling the person who receives a project or group.** Yes, later, together with the confirmation email.
+  - **UX-814: files in "save a copy".** Not for now. It needs a new export format.
+  - **UX-812: choosing the heir.** Not now. Heirs are named before confirming, and a group can be transferred first.
+  - **Also for later:**
+    - deleting the RevenueCat customer;
+    - stopping someone who signs up again from getting new free dictations (which needs a hashed email);
+    - the website's delete-account page, which still says the app has no deletion option.
 - **From the capture-speed review (run 2026-10-14-speed; details in its `plan.md`):**
   - **UX-615: should a spoken result with nothing to ask save itself, with Deshacer?** It would cut a capture to 2 taps (Añadir tarea, Listo) and save about 1–2 s, but it removes D3/U4's confirming tap, so a misheard date would be saved without a look. Recommendation: keep the tap until the §7 test with the owner's father, then decide.
   - **UX-616: should the assistant's wait be cut on the server,** with a faster model, or by understanding while the person is still speaking? Staging took 1.3, 4.8, 4.8, 4.8 and once 20.5 s. Recommendation: measure first (P101 adds the phone's share to Diagnóstico de captura). Then, if the server is most of the wait, try a faster extraction model on staging and compare cost and accuracy.

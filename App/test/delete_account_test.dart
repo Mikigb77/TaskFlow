@@ -6,8 +6,10 @@ import 'dart:convert';
 
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
+import 'package:agenda/models/archive_diagnostic.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
@@ -18,20 +20,27 @@ import 'package:agenda/screens/delete_account_screen.dart';
 import 'package:agenda/screens/login_screen.dart';
 import 'package:agenda/services/account_deletion.dart';
 import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/archive_files.dart';
+import 'package:agenda/services/archive_store.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/services/revenuecat_service.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/google_login_button.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:purchases_flutter/purchases_flutter.dart' show CustomerInfo;
 
+import 'support/billing_fixtures.dart';
 import 'support/design_fixtures.dart';
 
 final es = lookupAppLocalizations(const Locale('es'));
@@ -132,14 +141,19 @@ class _Auth extends AuthNotifier {
     super.google,
     required super.activateReminders,
     super.prepareErase,
+    this.complimentary = false,
+    this.email = 'ana@example.invalid',
   });
+  final bool complimentary;
+  final String email;
   @override
   Future<void> restore() async {
     state = AuthState(
       account: Account.fromJson({
         'id': 1,
-        'email': 'ana@example.invalid',
+        'email': email,
         'timezone': 'Europe/Madrid',
+        'complimentary_pro': complimentary,
       }),
     );
   }
@@ -176,10 +190,44 @@ class _SyncingTasks extends _Tasks {
   }
 }
 
+/// The phone's tasks as an export file, without SQLite.
+class _Archive extends ArchiveStore {
+  _Archive() : super(TaskDatabase(), 'local');
+  static const contents = '{"format":"taskflow"}';
+  int exports = 0;
+  Object? error;
+  @override
+  Future<String> export() async {
+    exports++;
+    if (error != null) throw error!;
+    return contents;
+  }
+}
+
+/// Android's save screen: saved (true), backed out of (false), or an error.
+class _SaveScreen extends ArchiveFiles {
+  final saved = <String>[];
+  bool answer = true;
+  Object? error;
+  @override
+  Future<bool> save(String contents) async {
+    saved.add(contents);
+    if (error != null) throw error!;
+    return answer;
+  }
+}
+
 class _Phone {
   _Phone(Map<String, dynamic> preview) : api = _DeletionApi(preview);
   final _DeletionApi api;
   final google = _Google();
+  final archive = _Archive();
+  final saveScreen = _SaveScreen();
+  final billing = FakeRevenueCat();
+  late final subscription = SubscriptionController(
+    billing,
+    const BillingConfiguration(apiKey: 'test_fixture', supported: true),
+  );
   final log = <String>[];
   final opened = <Uri>[];
   bool opens = true;
@@ -201,11 +249,19 @@ void main() {
     bool dark = false,
     Size size = const Size(390, 1600),
     bool onAccount = false,
+    bool complimentary = false,
+    CustomerInfo? purchases,
+    String email = 'ana@example.invalid',
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final phone = _Phone(preview ?? previewJson());
+    // Billing stays not ready unless the test gives it the store's purchases.
+    if (purchases != null) {
+      phone.billing.info = purchases;
+      await phone.subscription.setIdentity('owner', () async => 'owner-id');
+    }
     phone.container = ProviderContainer(
       overrides: [
         apiClientProvider.overrideWithValue(phone.api),
@@ -218,7 +274,13 @@ void main() {
                 phone.log.add('reminders $owner'),
             // As the app wires it.
             prepareErase: (id) => prepareAccountErase(ref.read, id),
+            complimentary: complimentary,
+            email: email,
           ),
+        ),
+        subscriptionProvider.overrideWith((_) => phone.subscription),
+        billingConfigurationProvider.overrideWithValue(
+          phone.subscription.configuration,
         ),
         taskRepositoryProvider.overrideWithValue(_Tasks(phone.log)),
         taskProvider.overrideWith((ref) => DesignTaskNotifier()),
@@ -231,6 +293,8 @@ void main() {
           phone.opened.add(uri);
           return phone.opens;
         }),
+        archiveStoreProvider.overrideWithValue(phone.archive),
+        archiveFilesProvider.overrideWithValue(phone.saveScreen),
       ],
     );
     addTearDown(phone.container.dispose);
@@ -259,9 +323,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     if (!onAccount) {
-      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(
-        '/deleteAccount',
-      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/deleteAccount');
       await tester.pumpAndSettle();
     }
     return phone;
@@ -313,7 +377,10 @@ void main() {
       final phone = await open(tester, onAccount: true);
       final row = find.byKey(const ValueKey('account-delete'));
       expect(row, findsOneWidget);
-      final label = find.descendant(of: row, matching: find.text(es.deleteAccount));
+      final label = find.descendant(
+        of: row,
+        matching: find.text(es.deleteAccount),
+      );
       expect(label, findsOneWidget);
       final signOut = find.ancestor(
         of: find.text(es.signOut),
@@ -352,24 +419,26 @@ void main() {
   // ---- What the page says ----
 
   testWidgets(
-    'the page says, in order: the title and what deleting does, the counts, what stays in shared projects, each handover, the copy link, the password and the red button',
+    'the page says, in order: the title, the account, what deleting does, the counts, what stays for the others with each handover, the copy link, the password and the red button',
     (tester) async {
       await open(tester);
       final order = [
         find.text(es.deleteAccountQuestion),
+        find.text('ana@example.invalid'),
         find.text(
-          'Se eliminarán tu cuenta y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.',
+          'Se eliminarán tu cuenta de TaskFlow y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.',
         ),
         find.text(es.deleteAccountWhatGoes),
         find.text('12 tareas'),
         find.text('3 notas'),
         find.text('2 archivos'),
         find.text('1 proyecto'),
+        find.text('Lo que se queda para los demás:'),
         find.text(
-          '4 tareas que añadiste a proyectos compartidos se quedan para los demás, sin tu nombre.',
+          '4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
         ),
-        find.text('El proyecto «Casa» pasará a Ana.'),
-        find.text('El grupo «Matemáticas» pasará a Luis.'),
+        find.text('El proyecto «Casa» pasará a Ana'),
+        find.text('El grupo «Matemáticas» y sus proyectos pasarán a Luis'),
         find.text(es.deleteAccountSaveCopy),
         find.text(es.deleteAccountPasswordHelp),
         passwordField,
@@ -385,7 +454,10 @@ void main() {
       // No groups to delete: no line for them. No Pro: no subscription line.
       expect(find.textContaining('grupos'), findsNothing);
       expect(find.text(es.deleteAccountSubscription), findsNothing);
-      expect(find.byKey(const ValueKey('delete-account-play-help')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('delete-account-manage-subscription')),
+        findsNothing,
+      );
       expect(find.byType(GoogleLoginButton), findsNothing);
       expect(
         find.descendant(of: confirm, matching: find.text('Eliminar mi cuenta')),
@@ -406,7 +478,7 @@ void main() {
   );
 
   testWidgets(
-    'one task kept for the others reads in the singular, and with nothing of their own to delete there is no list',
+    'one task kept for the others reads in the singular under its own heading, and with nothing of their own to delete there is no first list',
     (tester) async {
       await open(
         tester,
@@ -419,9 +491,10 @@ void main() {
           handovers: [],
         ),
       );
+      expect(find.text(es.deleteAccountWhatStays), findsOneWidget);
       expect(
         find.text(
-          '1 tarea que añadiste a proyectos compartidos se queda para los demás, sin tu nombre.',
+          '1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre',
         ),
         findsOneWidget,
       );
@@ -432,16 +505,22 @@ void main() {
   );
 
   testWidgets(
-    'with Pro, the page says deleting doesn’t cancel the Google Play subscription, and its link opens Google Play’s help page',
+    'with Pro, the page says in plain weight that deleting doesn’t cancel a Google Play subscription; Gestionar suscripción opens Google Play’s subscriptions page while billing knows of no purchase',
     (tester) async {
       final phone = await open(tester, preview: previewJson(pro: true));
-      expect(
-        find.text('Eliminar tu cuenta no cancela tu suscripción de Google Play.'),
-        findsOneWidget,
+      final line = find.text(
+        'Si pagas TaskFlow Pro en Google Play, eliminar tu cuenta no cancela la suscripción.',
       );
-      final link = find.byKey(const ValueKey('delete-account-play-help'));
+      expect(line, findsOneWidget);
       expect(
-        find.descendant(of: link, matching: find.text(es.deleteAccountSubscriptionHelp)),
+        tester.widget<Text>(line).style?.fontWeight,
+        isNot(FontWeight.w700),
+      );
+      final link = find.byKey(
+        const ValueKey('delete-account-manage-subscription'),
+      );
+      expect(
+        find.descendant(of: link, matching: find.text('Gestionar suscripción')),
         findsOneWidget,
       );
       // Before the copy link and the password.
@@ -451,8 +530,11 @@ void main() {
       );
       await tapVisible(tester, link);
       await tester.pumpAndSettle();
-      expect(phone.opened.single.toString(),
-          'https://support.google.com/googleplay/answer/7018481');
+      expect(
+        phone.opened.single.toString(),
+        'https://play.google.com/store/account/subscriptions',
+      );
+      expect(phone.billing.centers, 0);
 
       // Nothing could open it: say so briefly.
       phone.opens = false;
@@ -464,16 +546,21 @@ void main() {
   );
 
   testWidgets(
-    'Guardar antes una copia de tus tareas opens Exportar e importar, and Back returns to the page',
+    'Guardar antes una copia de tus tareas saves the export file from the page itself; once saved, Copia guardada takes its place',
     (tester) async {
-      await open(tester);
-      await tapVisible(tester, find.byKey(const ValueKey('delete-account-export')));
+      final phone = await open(tester);
+      final link = find.byKey(const ValueKey('delete-account-export'));
+      expect(find.text(es.deleteAccountCopyNoFiles), findsOneWidget);
+      await tapVisible(tester, link);
       await tester.pumpAndSettle();
-      expect(find.byType(DataTransferScreen), findsOneWidget);
-      expect(find.text(es.exportTaskFlowFile), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      expect(phone.archive.exports, 1);
+      expect(phone.saveScreen.saved, [_Archive.contents]);
+      expect(find.byType(DataTransferScreen), findsNothing);
       expect(find.byType(DeleteAccountScreen), findsOneWidget);
+      expect(link, findsNothing);
+      expect(find.text(es.deleteAccountCopySaved), findsOneWidget);
+      expect(find.text(es.deleteAccountCopyNoFiles), findsOneWidget);
+      expect(find.text(es.exportSaved), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -486,9 +573,9 @@ void main() {
       phone.api
         ..holdPreview = Completer<void>()
         ..previewError = ApiException(0, ApiClient.offlineMessage);
-      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(
-        '/deleteAccount',
-      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/deleteAccount');
       await frames(tester);
       expect(
         find.descendant(
@@ -505,7 +592,10 @@ void main() {
       phone.api.holdPreview!.complete();
       await tester.pumpAndSettle();
       expect(find.text(es.loadFailed), findsOneWidget);
-      expect(find.text('No se ha podido cargar. Revisa la conexión.'), findsOneWidget);
+      expect(
+        find.text('No se ha podido cargar. Revisa la conexión.'),
+        findsOneWidget,
+      );
       final retry = find.text(es.retry);
       expect(retry, findsOneWidget);
       expect(es.retry, 'Reintentar');
@@ -572,8 +662,11 @@ void main() {
       );
       expect(spinner, findsOneWidget);
       expect(
-        tester.widget<CircularProgressIndicator>(spinner).semanticsLabel,
-        es.deleteAccountDeleting,
+        find.descendant(
+          of: confirm,
+          matching: find.text(es.deleteAccountDeleting),
+        ),
+        findsOneWidget,
       );
       expect(enabled(tester), isFalse, reason: 'it can’t be sent twice');
       expect(tester.widget<TextField>(passwordField).enabled, isFalse);
@@ -617,9 +710,17 @@ void main() {
     (tester) async {
       final phone = await open(tester, preview: previewJson(reauth: 'google'));
       expect(passwordField, findsNothing);
-      expect(find.text(es.deleteAccountGoogleHelp), findsOneWidget);
       expect(
-        find.descendant(of: googleButton, matching: find.text('Confirmar con Google')),
+        find.text(
+          'Para confirmar, elige ana@example.invalid cuando Google te lo pida. Tu cuenta de Google no se elimina.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: googleButton,
+          matching: find.text('Confirmar con Google'),
+        ),
         findsOneWidget,
       );
       expect(enabled(tester), isFalse);
@@ -662,7 +763,10 @@ void main() {
       phone.google.answers.add(const GoogleSignInProblem('google_unavailable'));
       await tapVisible(tester, googleButton);
       await tester.pumpAndSettle();
-      expect(find.text(es.googleSignInError('google_unavailable')), findsOneWidget);
+      expect(
+        find.text(es.googleSignInError('google_unavailable')),
+        findsOneWidget,
+      );
       expect(googleButton, findsOneWidget);
       expect(enabled(tester), isFalse);
       expect(phone.api.count('POST'), 0);
@@ -671,7 +775,7 @@ void main() {
   );
 
   testWidgets(
-    'google_reauth_failed says to choose the same Google account, under the Google button, and asks for Google again',
+    'google_reauth_failed names the Google account to choose, under the Google button, and asks for Google again',
     (tester) async {
       final phone = await open(tester, preview: previewJson(reauth: 'google'));
       phone.google.answers.add('other-google-id-token');
@@ -684,7 +788,7 @@ void main() {
       await tapVisible(tester, confirm);
       await tester.pumpAndSettle();
       final message = find.text(
-        'Elige la misma cuenta de Google con la que entras en TaskFlow.',
+        'Elige ana@example.invalid, la cuenta de Google con la que entras en TaskFlow.',
       );
       expect(message, findsOneWidget);
       expect(googleButton, findsOneWidget, reason: 'confirm again');
@@ -716,7 +820,11 @@ void main() {
       await tester.enterText(passwordField, 'not-the-password');
       await tapVisible(tester, confirm);
       await tester.pumpAndSettle();
-      expect(fieldError(tester), 'La contraseña no es correcta.');
+      expect(
+        fieldError(tester),
+        'La contraseña no es correcta. Si no la recuerdas, cierra sesión y '
+        'toca «¿Has olvidado tu contraseña?».',
+      );
       expect(
         tester.widget<TextField>(passwordField).controller!.text,
         'not-the-password',
@@ -815,7 +923,7 @@ void main() {
   );
 
   testWidgets(
-    'plan_changed (409): nothing is deleted; the page reloads in place keeping the password, says so above the button, and sends nothing by itself; the next tap sends the new plan',
+    'plan_changed (409): nothing is deleted; the page reloads in place keeping the password, says what changed above the button and in bold in the list, and sends nothing by itself; the next tap sends the new plan',
     (tester) async {
       final phone = await open(tester);
       await tester.enterText(passwordField, password);
@@ -839,7 +947,7 @@ void main() {
       );
       // While it reloads, the page stays as it was, and can't be confirmed.
       expect(line, findsOneWidget);
-      expect(find.text('El proyecto «Casa» pasará a Ana.'), findsOneWidget);
+      expect(find.text('El proyecto «Casa» pasará a Ana'), findsOneWidget);
       expect(passwordField, findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(enabled(tester), isFalse);
@@ -847,21 +955,33 @@ void main() {
 
       phone.api.holdPreview!.complete();
       await tester.pumpAndSettle();
-      expect(find.text('El proyecto «Casa» pasará a Luis.'), findsOneWidget);
-      expect(find.text('El proyecto «Casa» pasará a Ana.'), findsNothing);
+      final moved = find.text('El proyecto «Casa» pasará a Luis');
+      expect(moved, findsOneWidget);
+      expect(find.text('El proyecto «Casa» pasará a Ana'), findsNothing);
+      expect(
+        tester.widget<Text>(moved).style?.fontWeight,
+        FontWeight.w700,
+        reason: 'the changed line stands out',
+      );
       expect(find.byType(LinearProgressIndicator), findsNothing);
       expect(
         tester.widget<TextField>(passwordField).controller!.text,
         password,
       );
-      expect(line, findsOneWidget);
+      final changed = find.text(
+        'Algo ha cambiado desde que abriste esta pantalla:\n'
+        '• El proyecto «Casa» pasará a Luis\n'
+        'Revísalo y vuelve a confirmar.',
+      );
+      expect(line, findsNothing);
+      expect(changed, findsOneWidget);
       expect(
-        tester.getBottomLeft(line).dy,
+        tester.getBottomLeft(changed).dy,
         lessThan(tester.getTopLeft(confirm).dy),
         reason: 'above the button',
       );
       expect(
-        tester.getTopLeft(line).dy,
+        tester.getTopLeft(changed).dy,
         greaterThan(tester.getBottomLeft(passwordField).dy),
       );
       expect(enabled(tester), isTrue);
@@ -944,15 +1064,18 @@ void main() {
             preview: previewJson(groups: 2, pro: true),
           );
           for (final text in [
+            'ana@example.invalid',
             l.deleteAccountIntro,
             l.deleteAccountTasks(12),
             l.deleteAccountGroups(2),
+            l.deleteAccountWhatStays,
             l.deleteAccountKeptShared(4),
             l.deleteAccountHandover('project', 'Casa', 'Ana'),
             l.deleteAccountHandover('group', 'Matemáticas', 'Luis'),
             l.deleteAccountSubscription,
-            l.deleteAccountSubscriptionHelp,
+            l.billingManage,
             l.deleteAccountSaveCopy,
+            l.deleteAccountCopyNoFiles,
             l.deleteAccountPasswordHelp,
             l.deleteAccountButton,
           ]) {
@@ -994,7 +1117,9 @@ void main() {
             size: const Size(320, 640),
             preview: previewJson(reauth: 'google'),
           );
-          await fits(find.text(l.deleteAccountGoogleHelp));
+          await fits(
+            find.text(l.deleteAccountGoogleHelp('ana@example.invalid')),
+          );
           await fits(find.text(l.deleteAccountConfirmGoogle));
           google.google.answers.add('fresh-google-id-token');
           await tapVisible(tester, googleButton);
@@ -1005,7 +1130,9 @@ void main() {
           });
           await tapVisible(tester, confirm);
           await tester.pumpAndSettle();
-          await fits(find.text(l.deleteAccountOtherGoogle));
+          await fits(
+            find.text(l.deleteAccountOtherGoogle('ana@example.invalid')),
+          );
           await fits(find.text(l.deleteAccountConfirmGoogle));
           expect(tester.takeException(), isNull);
         },
@@ -1201,10 +1328,16 @@ void main() {
           }, 401);
         },
       );
-      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(
-        '/deleteAccount',
-      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/deleteAccount');
       await tester.pumpAndSettle();
+      // On a phone-sized screen the field is below the fold.
+      await tester.scrollUntilVisible(
+        passwordField,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.enterText(passwordField, password);
       await tapVisible(tester, confirm);
       await tester.pumpAndSettle();
@@ -1297,14 +1430,20 @@ void main() {
       final owner = '${api.baseUrl}/users/1';
       expect(log, ['reminders $owner']);
 
-      tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(
-        '/account',
-      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/account');
       await tester.pumpAndSettle();
       await tapVisible(tester, find.byKey(const ValueKey('account-delete')));
       await tester.pumpAndSettle();
       expect(find.byType(DeleteAccountScreen), findsOneWidget);
       expect(find.text('12 tareas'), findsOneWidget);
+      // On a phone-sized screen the field is below the fold.
+      await tester.scrollUntilVisible(
+        passwordField,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.enterText(passwordField, password);
       await tapVisible(tester, confirm);
       await tester.pumpAndSettle();
@@ -1356,34 +1495,1640 @@ void main() {
     },
   );
 
-  test('the Spanish copy reads as the owner’s brief', () {
-    expect(es.deleteAccount, 'Eliminar cuenta');
-    expect(es.deleteAccountButton, 'Eliminar mi cuenta');
-    expect(es.deleteAccountConfirmGoogle, 'Confirmar con Google');
-    expect(es.accountDeleted, 'Tu cuenta se ha eliminado.');
-    expect(
-      es.deleteAccountKeptShared(3),
-      '3 tareas que añadiste a proyectos compartidos se quedan para los demás, sin tu nombre.',
-    );
-    expect(
-      es.deleteAccountHandover('group', 'Matemáticas', 'Luis'),
-      'El grupo «Matemáticas» pasará a Luis.',
-    );
-    expect(
-      es.deleteAccountPlanChanged,
-      'Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.',
-    );
-    for (final language in ['en', 'es', 'ca']) {
-      final l = lookupAppLocalizations(Locale(language));
-      // Offline names the connection and that nothing was deleted; a lost
-      // answer can't say that.
-      expect(l.deleteAccountOffline, isNot(l.deleteAccountNoAnswer));
-      expect(l.deleteAccountTasks(1), isNot(l.deleteAccountTasks(2)));
+  test(
+    'the Spanish copy keeps its names and the ending from ACCOUNT_DELETION.md, and says what stays and what changed',
+    () {
+      expect(es.deleteAccount, 'Eliminar cuenta');
+      expect(es.deleteAccountButton, 'Eliminar mi cuenta');
+      expect(es.deleteAccountConfirmGoogle, 'Confirmar con Google');
+      expect(es.accountDeleted, 'Tu cuenta se ha eliminado.');
       expect(
-        l.deleteAccountHandover('group', 'G', 'P'),
-        isNot(l.deleteAccountHandover('project', 'G', 'P')),
+        es.deleteAccountKeptShared(3),
+        '3 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+      );
+      expect(
+        es.deleteAccountHandover('group', 'Matemáticas', 'Luis'),
+        'El grupo «Matemáticas» y sus proyectos pasarán a Luis',
+      );
+      expect(
+        es.deleteAccountHandover('project', 'Casa', 'Luis'),
+        'El proyecto «Casa» pasará a Luis',
+      );
+      expect(
+        es.deleteAccountChangedIntro,
+        'Algo ha cambiado desde que abriste esta pantalla:',
+      );
+      expect(es.deleteAccountChangedCheck, 'Revísalo y vuelve a confirmar.');
+      expect(
+        es.deleteAccountPlanChanged,
+        'Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.',
+      );
+      for (final language in ['en', 'es', 'ca']) {
+        final l = lookupAppLocalizations(Locale(language));
+        // Offline names the connection and that nothing was deleted; a lost
+        // answer can't say that.
+        expect(l.deleteAccountOffline, isNot(l.deleteAccountNoAnswer));
+        expect(l.deleteAccountTasks(1), isNot(l.deleteAccountTasks(2)));
+        expect(
+          l.deleteAccountHandover('group', 'G', 'P'),
+          isNot(l.deleteAccountHandover('project', 'G', 'P')),
+        );
+      }
+    },
+  );
+
+  // ---- Acceptance: UX loop 2026-10-15-deletion, round 1 ----
+
+  final copyLink = find.byKey(const ValueKey('delete-account-export'));
+  final copySaved = find.byKey(const ValueKey('delete-account-copy-saved'));
+  final manageLink = find.byKey(
+    const ValueKey('delete-account-manage-subscription'),
+  );
+  final googleConfirmed = find.byKey(
+    const ValueKey('delete-account-google-confirmed'),
+  );
+  final pageScroll = find
+      .descendant(
+        of: find.byType(DeleteAccountScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  final backArrow = find.descendant(
+    of: find.byType(DeleteAccountScreen),
+    matching: find.byType(BackButton),
+  );
+
+  /// Inside a live region, so TalkBack says it when it appears.
+  bool inLiveRegion(Finder target) => find
+      .ancestor(
+        of: target,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics && widget.properties.liveRegion == true,
+        ),
+      )
+      .evaluate()
+      .isNotEmpty;
+
+  /// Brings [target] on screen, building it first if it is far below.
+  Future<void> reach(WidgetTester tester, Finder target) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(target, 120, scrollable: pageScroll);
+    }
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+  }
+
+  /// On screen, and within the width of a [width] dp phone.
+  Future<void> fitsWidth(
+    WidgetTester tester,
+    Finder target, {
+    double width = 320,
+  }) async {
+    await reach(tester, target);
+    expect(target, findsOneWidget);
+    final rect = tester.getRect(target);
+    expect(rect.left, greaterThanOrEqualTo(0), reason: '$target');
+    expect(rect.right, lessThanOrEqualTo(width + 0.5), reason: '$target');
+  }
+
+  bool bold(WidgetTester tester, Finder text) =>
+      tester.widget<Text>(text).style?.fontWeight == FontWeight.w700;
+
+  bool linkEnabled(WidgetTester tester) =>
+      tester.widget<ButtonStyleButton>(copyLink).onPressed != null;
+
+  // P120 · UX-807, UX-802: save a copy from the delete page itself.
+
+  testWidgets(
+    'UX-807: one tap on Guardar antes una copia saves the export through Android’s save screen, and Copia guardada takes the link’s place after a check icon, in a live region',
+    (tester) async {
+      final phone = await open(tester);
+      await reach(tester, copyLink);
+      expect(
+        find.descendant(
+          of: copyLink,
+          matching: find.text(es.deleteAccountSaveCopy),
+        ),
+        findsOneWidget,
+      );
+      final linkIcon = find.descendant(
+        of: copyLink,
+        matching: find.byIcon(Icons.download_outlined),
+      );
+      expect(linkIcon, findsOneWidget);
+      final iconLeft = tester.getTopLeft(linkIcon).dx;
+      final linkCenter = tester.getCenter(copyLink).dy;
+
+      await tester.tap(copyLink);
+      await tester.pumpAndSettle();
+      expect(phone.archive.exports, 1);
+      expect(phone.saveScreen.saved, [_Archive.contents]);
+      expect(find.byType(DataTransferScreen), findsNothing);
+      expect(find.byType(DeleteAccountScreen), findsOneWidget);
+      expect(copyLink, findsNothing);
+
+      final saved = find.text('Copia guardada');
+      expect(find.descendant(of: copySaved, matching: saved), findsOneWidget);
+      final check = find.descendant(
+        of: copySaved,
+        matching: find.byIcon(Icons.check_circle_outline),
+      );
+      expect(check, findsOneWidget);
+      final colors = Theme.of(tester.element(saved)).colorScheme;
+      expect(tester.widget<Icon>(check).color, colors.primary);
+      expect(
+        tester.getTopLeft(check).dx,
+        moreOrLessEquals(iconLeft, epsilon: 1),
+        reason: 'the check sits where the link’s icon was',
+      );
+      expect(
+        tester.getTopLeft(saved).dx,
+        greaterThanOrEqualTo(tester.getTopRight(check).dx),
+        reason: 'after the check icon',
+      );
+      expect(
+        tester.getCenter(copySaved).dy,
+        moreOrLessEquals(linkCenter, epsilon: 4),
+        reason: 'in place of the link',
+      );
+      expect(inLiveRegion(saved), isTrue);
+      expect(
+        inLiveRegion(find.text(es.deleteAccountQuestion)),
+        isFalse,
+        reason: 'the check is specific, not the whole page',
+      );
+      expect(find.text(es.exportSaved), findsNothing, reason: 'no snackbar');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-807: backing out of Android’s save screen changes nothing: the link stays, enabled, with no Copia guardada and no error',
+    (tester) async {
+      final phone = await open(tester);
+      phone.saveScreen.answer = false;
+      await tapVisible(tester, copyLink);
+      await tester.pumpAndSettle();
+      expect(phone.saveScreen.saved, hasLength(1));
+      expect(copyLink, findsOneWidget);
+      expect(linkEnabled(tester), isTrue);
+      expect(copySaved, findsNothing);
+      expect(find.text(es.deleteAccountCopySaved), findsNothing);
+      expect(find.text(es.transferError), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-807: a failed save, or an export too large, says so under the link in the error colour, in a live region; the next tap clears it',
+    (tester) async {
+      final phone = await open(tester);
+      phone.saveScreen.error = Exception('the save screen failed');
+      await tapVisible(tester, copyLink);
+      await tester.pumpAndSettle();
+      final failed = find.text(
+        'No se pudo completar la operación. Tus tareas y notas no han cambiado. Inténtalo de nuevo.',
+      );
+      expect(failed, findsOneWidget);
+      expect(copyLink, findsOneWidget, reason: 'the link stays');
+      expect(linkEnabled(tester), isTrue);
+      expect(copySaved, findsNothing);
+      final colors = Theme.of(tester.element(failed)).colorScheme;
+      expect(tester.widget<Text>(failed).style?.color, colors.error);
+      expect(inLiveRegion(failed), isTrue);
+      expect(
+        tester.getTopLeft(failed).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(copyLink).dy - 0.5),
+        reason: 'under the link',
+      );
+
+      // The next tap clears it (backed out this time).
+      phone.saveScreen
+        ..error = null
+        ..answer = false;
+      await tapVisible(tester, copyLink);
+      await tester.pumpAndSettle();
+      expect(failed, findsNothing);
+
+      // Too much to export: that diagnostic's own words instead.
+      phone.archive.error = const ArchiveDiagnostic(ArchiveCode.exportTooLarge);
+      await tapVisible(tester, copyLink);
+      await tester.pumpAndSettle();
+      final tooLarge = find.text(es.archiveExportTooLarge);
+      expect(tooLarge, findsOneWidget);
+      expect(failed, findsNothing);
+      expect(copyLink, findsOneWidget);
+      expect(tester.widget<Text>(tooLarge).style?.color, colors.error);
+      expect(inLiveRegion(tooLarge), isTrue);
+      expect(phone.saveScreen.saved, hasLength(2), reason: 'nothing to save');
+
+      phone.archive.error = null;
+      await tapVisible(tester, copyLink);
+      await tester.pumpAndSettle();
+      expect(tooLarge, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-807: with no tasks and no notes there is nothing of their own to copy, so no link; one note is enough for it',
+    (tester) async {
+      await open(tester, preview: previewJson(tasks: 0, notes: 0, files: 0));
+      expect(copyLink, findsNothing);
+      expect(copySaved, findsNothing);
+      expect(find.text(es.deleteAccountSaveCopy), findsNothing);
+      expect(find.text(es.deleteAccountCopyNoFiles), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await open(tester, preview: previewJson(tasks: 0, notes: 1));
+      expect(copyLink, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-807: while the account is being deleted, the copy link is disabled',
+    (tester) async {
+      final phone = await open(tester);
+      await tester.enterText(passwordField, password);
+      phone.api.holdDelete = Completer<void>();
+      await tapVisible(tester, confirm);
+      await frames(tester);
+      expect(copyLink, findsOneWidget);
+      expect(linkEnabled(tester), isFalse);
+
+      phone.api.deleteError = ApiException(0, ApiClient.offlineMessage);
+      phone.api.holdDelete!.complete();
+      await tester.pumpAndSettle();
+      expect(linkEnabled(tester), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-802: with files, «La copia no incluye los archivos.» sits directly under the link, then under Copia guardada; with no files it isn’t there; EN and CA say it too',
+    (tester) async {
+      await open(tester);
+      await reach(tester, copyLink);
+      final noFiles = find.text('La copia no incluye los archivos.');
+      expect(noFiles, findsOneWidget);
+      final linkIcon = find.descendant(
+        of: copyLink,
+        matching: find.byIcon(Icons.download_outlined),
+      );
+      final gap =
+          tester.getTopLeft(noFiles).dy - tester.getBottomLeft(copyLink).dy;
+      expect(gap, inInclusiveRange(-0.5, 8), reason: 'directly under the link');
+      expect(
+        tester.getTopLeft(noFiles).dx,
+        moreOrLessEquals(tester.getTopLeft(linkIcon).dx, epsilon: 1),
+        reason: 'where the link’s icon starts',
+      );
+      final colors = Theme.of(tester.element(noFiles)).colorScheme;
+      expect(
+        tester.widget<Text>(noFiles).style?.color,
+        colors.onSurfaceVariant,
+      );
+
+      await tester.tap(copyLink);
+      await tester.pumpAndSettle();
+      expect(copySaved, findsOneWidget);
+      expect(noFiles, findsOneWidget);
+      final savedGap =
+          tester.getTopLeft(noFiles).dy - tester.getBottomLeft(copySaved).dy;
+      expect(
+        savedGap,
+        inInclusiveRange(-0.5, 8),
+        reason: 'under Copia guardada',
+      );
+      expect(
+        tester.getTopLeft(noFiles).dx,
+        moreOrLessEquals(
+          tester
+              .getTopLeft(
+                find.descendant(
+                  of: copySaved,
+                  matching: find.byIcon(Icons.check_circle_outline),
+                ),
+              )
+              .dx,
+          epsilon: 1,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+
+      await open(tester, preview: previewJson(files: 0));
+      expect(copyLink, findsOneWidget);
+      expect(noFiles, findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await open(tester, language: 'en');
+      expect(find.text('The copy doesn’t include files.'), findsOneWidget);
+      await open(tester, language: 'ca');
+      expect(find.text('La còpia no inclou els fitxers.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-807, UX-802: Copia guardada and the files line read exactly as planned in EN, ES and CA',
+    () {
+      for (final (language, saved, noFiles) in [
+        ('en', 'Copy saved', 'The copy doesn’t include files.'),
+        ('es', 'Copia guardada', 'La copia no incluye los archivos.'),
+        ('ca', 'Còpia desada', 'La còpia no inclou els fitxers.'),
+      ]) {
+        final l = lookupAppLocalizations(Locale(language));
+        expect(l.deleteAccountCopySaved, saved);
+        expect(l.deleteAccountCopyNoFiles, noFiles);
+      }
+    },
+  );
+
+  // Both lists, the Google Play line and the copy, at 2× on a 320 dp phone.
+  for (final language in ['es', 'en', 'ca']) {
+    for (final dark in [false, true]) {
+      testWidgets(
+        'UX-802, UX-804, UX-806, UX-807: at 2× on 320 dp in $language (dark=$dark), both headings and every bullet, the Google Play line and Gestionar suscripción, the copy link, Copia guardada and the files line fit the width',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await open(
+            tester,
+            language: language,
+            dark: dark,
+            textScale: 2,
+            size: const Size(320, 640),
+            preview: previewJson(groups: 2, pro: true),
+          );
+          for (final text in [
+            l.deleteAccountWhatGoes,
+            l.deleteAccountTasks(12),
+            l.deleteAccountNotes(3),
+            l.deleteAccountFiles(2),
+            l.deleteAccountProjects(1),
+            l.deleteAccountGroups(2),
+            l.deleteAccountWhatStays,
+            l.deleteAccountKeptShared(4),
+            l.deleteAccountHandover('project', 'Casa', 'Ana'),
+            l.deleteAccountHandover('group', 'Matemáticas', 'Luis'),
+            l.deleteAccountSubscription,
+          ]) {
+            await fitsWidth(tester, find.text(text));
+          }
+          await fitsWidth(tester, manageLink);
+          await fitsWidth(
+            tester,
+            find.descendant(
+              of: manageLink,
+              matching: find.text(l.billingManage),
+            ),
+          );
+          await fitsWidth(tester, copyLink);
+          await fitsWidth(tester, find.text(l.deleteAccountSaveCopy));
+          await fitsWidth(tester, find.text(l.deleteAccountCopyNoFiles));
+          expect(tester.takeException(), isNull);
+
+          await tapVisible(tester, copyLink);
+          await tester.pumpAndSettle();
+          await fitsWidth(tester, copySaved);
+          await fitsWidth(tester, find.text(l.deleteAccountCopySaved));
+          await fitsWidth(tester, find.text(l.deleteAccountCopyNoFiles));
+          expect(tester.takeException(), isNull);
+        },
       );
     }
+  }
+
+  // P121 · UX-801, UX-808, UX-809, UX-810.
+
+  for (final (language, expected) in [
+    (
+      'es',
+      'La contraseña no es correcta. Si no la recuerdas, cierra sesión y toca «¿Has olvidado tu contraseña?».',
+    ),
+    (
+      'en',
+      'That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”',
+    ),
+    (
+      'ca',
+      'La contrasenya no és correcta. Si no te’n recordes, tanca la sessió i toca «Has oblidat la contrasenya?».',
+    ),
+  ]) {
+    testWidgets(
+      'UX-801: in $language a wrong password says how to recover it, under the field; the typed password stays and typing clears it',
+      (tester) async {
+        final phone = await open(tester, language: language);
+        phone.api.deleteError = ApiException(400, 'Wrong password.', {
+          'code': 'wrong_password',
+          'detail': 'Wrong password.',
+        });
+        await tester.enterText(passwordField, 'not-the-password');
+        await tapVisible(tester, confirm);
+        await tester.pumpAndSettle();
+        expect(fieldError(tester), expected);
+        expect(find.text(expected), findsOneWidget);
+        expect(
+          tester.widget<TextField>(passwordField).controller!.text,
+          'not-the-password',
+        );
+        await tester.enterText(passwordField, password);
+        await tester.pump();
+        expect(fieldError(tester), isNull);
+        expect(find.text(expected), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test(
+    'UX-801: in EN, ES and CA the wrong-password message names sign-in’s own Forgot password? and the Account screen’s sign-out',
+    () {
+      for (final (language, forgot) in [
+        ('en', 'Forgot password?'),
+        ('es', '¿Has olvidado tu contraseña?'),
+        ('ca', 'Has oblidat la contrasenya?'),
+      ]) {
+        final l = lookupAppLocalizations(Locale(language));
+        expect(l.forgotPassword, forgot);
+        expect(l.deleteAccountWrongPassword, contains(l.forgotPassword));
+      }
+      expect(
+        lookupAppLocalizations(const Locale('en')).deleteAccountWrongPassword,
+        contains('sign out'),
+      );
+      expect(es.deleteAccountWrongPassword, contains('cierra sesión'));
+      expect(
+        lookupAppLocalizations(const Locale('ca')).deleteAccountWrongPassword,
+        contains('tanca la sessió'),
+      );
+    },
+  );
+
+  for (final (language, deleting) in [
+    ('es', 'Eliminando tu cuenta…'),
+    ('en', 'Deleting your account…'),
+    ('ca', 'S’està suprimint el compte…'),
+  ]) {
+    testWidgets(
+      'UX-808: in $language, while deleting the button reads “$deleting” after a spinner, TalkBack hears it once, and there is no back arrow; after an error the arrow and the button’s name come back',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final l = lookupAppLocalizations(Locale(language));
+        final phone = await open(tester, language: language);
+        expect(backArrow, findsOneWidget, reason: 'there before deleting');
+        await tester.enterText(passwordField, password);
+        phone.api.holdDelete = Completer<void>();
+        await tapVisible(tester, confirm);
+        await frames(tester);
+
+        final text = find.descendant(
+          of: confirm,
+          matching: find.text(deleting),
+        );
+        expect(text, findsOneWidget);
+        expect(
+          find.descendant(
+            of: confirm,
+            matching: find.text(l.deleteAccountButton),
+          ),
+          findsNothing,
+        );
+        final spinner = find.descendant(
+          of: confirm,
+          matching: find.byType(CircularProgressIndicator),
+        );
+        expect(spinner, findsOneWidget);
+        expect(
+          tester.getTopRight(spinner).dx,
+          lessThanOrEqualTo(tester.getTopLeft(text).dx),
+          reason: 'the spinner comes first',
+        );
+        expect(enabled(tester), isFalse);
+        final label = tester.getSemantics(text).label;
+        expect(
+          RegExp(RegExp.escape(deleting)).allMatches(label).length,
+          1,
+          reason: label,
+        );
+        expect(backArrow, findsNothing);
+        // System Back still leaves the page in place.
+        await tester.binding.handlePopRoute();
+        await frames(tester);
+        expect(find.byType(DeleteAccountScreen), findsOneWidget);
+
+        phone.api.deleteError = ApiException(0, ApiClient.offlineMessage);
+        phone.api.holdDelete!.complete();
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: confirm,
+            matching: find.text(l.deleteAccountButton),
+          ),
+          findsOneWidget,
+        );
+        expect(text, findsNothing);
+        expect(backArrow, findsOneWidget);
+        expect(find.text(l.deleteAccountOffline), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  for (final (message, expected) in [
+    (
+      'Too many failed attempts. Try again in 15 minutes. Expected available in 900 seconds.',
+      'Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.',
+    ),
+    (
+      'Request was throttled. Expected available in 40 seconds.',
+      'Demasiados intentos. Espera un minuto y vuelve a intentarlo.',
+    ),
+    (
+      'Request was throttled. Expected available in 61 seconds.',
+      'Demasiados intentos. Espera 2 minutos y vuelve a intentarlo.',
+    ),
+    ('Request was throttled.', 'Demasiados intentos. Inténtalo más tarde.'),
+  ]) {
+    testWidgets(
+      'UX-809: a 429 saying “$message” shows «$expected» under the button and keeps the password',
+      (tester) async {
+        final phone = await open(tester);
+        phone.api.deleteError = ApiException(429, message);
+        await tester.enterText(passwordField, password);
+        await tapVisible(tester, confirm);
+        await tester.pumpAndSettle();
+        final banner = find.widgetWithText(MessageBanner, expected);
+        expect(banner, findsOneWidget);
+        expect(
+          tester.getTopLeft(banner).dy,
+          greaterThan(tester.getBottomLeft(confirm).dy),
+        );
+        expect(
+          tester.widget<TextField>(passwordField).controller!.text,
+          password,
+        );
+        expect(enabled(tester), isTrue);
+        expect(phone.auth.account, isNotNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-809: at 2× on 320 dp in Catalan, the 15-minute wait fits under the button; English reads “Too many tries. Wait 15 minutes and try again.”',
+    (tester) async {
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(
+        en.deleteAccountThrottledWait(15),
+        'Too many tries. Wait 15 minutes and try again.',
+      );
+      expect(
+        en.deleteAccountThrottledWait(1),
+        'Too many tries. Wait a minute and try again.',
+      );
+      final phone = await open(
+        tester,
+        language: 'ca',
+        textScale: 2,
+        size: const Size(320, 640),
+      );
+      phone.api.deleteError = ApiException(
+        429,
+        'Too many failed attempts. Try again in 15 minutes. Expected available in 900 seconds.',
+      );
+      await reach(tester, passwordField);
+      await tester.enterText(passwordField, password);
+      await tapVisible(tester, confirm);
+      await tester.pumpAndSettle();
+      final wait = find.text(
+        'Massa intents. Espera 15 minuts i torna-ho a provar.',
+      );
+      await fitsWidth(tester, wait);
+      expect(
+        tester.getTopLeft(wait).dy,
+        greaterThan(tester.getBottomLeft(confirm).dy),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-810: once Google returns a token, Confirmado con Google is in a live region',
+    (tester) async {
+      final phone = await open(tester, preview: previewJson(reauth: 'google'));
+      phone.google.answers.add('fresh-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      expect(googleConfirmed, findsOneWidget);
+      expect(
+        find.descendant(
+          of: googleConfirmed,
+          matching: find.text(es.deleteAccountGoogleConfirmed),
+        ),
+        findsOneWidget,
+      );
+      expect(inLiveRegion(googleConfirmed), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-810: at 2× on 320 dp in Spanish, once Google returns a token, Eliminar mi cuenta comes fully into view, enabled',
+    (tester) async {
+      final phone = await open(
+        tester,
+        textScale: 2,
+        size: const Size(320, 640),
+        preview: previewJson(reauth: 'google'),
+      );
+      phone.google.answers.add('fresh-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      expect(googleConfirmed, findsOneWidget);
+      expect(confirm, findsOneWidget);
+      final viewport = tester.getRect(pageScroll);
+      final button = tester.getRect(confirm);
+      expect(button.top, greaterThanOrEqualTo(viewport.top - 0.5));
+      expect(button.bottom, lessThanOrEqualTo(viewport.bottom + 0.5));
+      expect(button.left, greaterThanOrEqualTo(0));
+      expect(button.right, lessThanOrEqualTo(320.5));
+      expect(enabled(tester), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // P122 · UX-803, UX-804, UX-805.
+
+  testWidgets(
+    'UX-803: under ¿Eliminar tu cuenta? the account’s email, in onSurfaceVariant, then the intro naming TaskFlow',
+    (tester) async {
+      await open(tester);
+      final heading = find.text('¿Eliminar tu cuenta?');
+      final email = find.text('ana@example.invalid');
+      final intro = find.text(
+        'Se eliminarán tu cuenta de TaskFlow y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.',
+      );
+      for (final item in [heading, email, intro]) {
+        expect(item, findsOneWidget);
+      }
+      expect(
+        tester.getTopLeft(email).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(heading).dy),
+      );
+      expect(
+        tester.getTopLeft(intro).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(email).dy),
+      );
+      final colors = Theme.of(tester.element(email)).colorScheme;
+      expect(tester.widget<Text>(email).style?.color, colors.onSurfaceVariant);
+      expect(tester.takeException(), isNull);
+
+      await open(tester, language: 'en');
+      expect(
+        find.text(
+          'This deletes your TaskFlow account and your tasks, notes and files on all your devices. It can’t be undone.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('ana@example.invalid'), findsOneWidget);
+      await open(tester, language: 'ca');
+      expect(
+        find.text(
+          'Es suprimiran el compte de TaskFlow i les teves tasques, notes i fitxers a tots els dispositius. No es pot desfer.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('ana@example.invalid'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (language, help, other) in [
+    (
+      'es',
+      'Para confirmar, elige ana@example.invalid cuando Google te lo pida. Tu cuenta de Google no se elimina.',
+      'Elige ana@example.invalid, la cuenta de Google con la que entras en TaskFlow.',
+    ),
+    (
+      'en',
+      'To confirm, choose ana@example.invalid when Google asks. Your Google account isn’t deleted.',
+      'Choose ana@example.invalid, the Google account you use for TaskFlow.',
+    ),
+    (
+      'ca',
+      'Per confirmar-ho, tria ana@example.invalid quan Google t’ho demani. El compte de Google no se suprimeix.',
+      'Tria ana@example.invalid, el compte de Google amb què entres a TaskFlow.',
+    ),
+  ]) {
+    testWidgets(
+      'UX-803: in $language, the Google help names the account’s email and says Google stays; google_reauth_failed names it under the Google button',
+      (tester) async {
+        final phone = await open(
+          tester,
+          language: language,
+          preview: previewJson(reauth: 'google'),
+        );
+        final helpLine = find.text(help);
+        expect(helpLine, findsOneWidget);
+        expect(
+          tester.getBottomLeft(helpLine).dy,
+          lessThanOrEqualTo(tester.getTopLeft(googleButton).dy),
+          reason: 'above Confirmar con Google',
+        );
+        phone.google.answers.add('other-google-id-token');
+        await tapVisible(tester, googleButton);
+        await tester.pumpAndSettle();
+        phone.api.deleteError = ApiException(400, 'Google account mismatch.', {
+          'code': 'google_reauth_failed',
+        });
+        await tapVisible(tester, confirm);
+        await tester.pumpAndSettle();
+        final otherLine = find.text(other);
+        expect(otherLine, findsOneWidget);
+        expect(googleButton, findsOneWidget);
+        expect(
+          tester.getTopLeft(otherLine).dy,
+          greaterThanOrEqualTo(tester.getBottomLeft(googleButton).dy),
+          reason: 'under the Google button',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-803: at 2× on 320 dp in $language, a 34-character email fits in the heading area, the intro, the Google help and the other-Google error',
+      (tester) async {
+        const longEmail = 'maria.dolores.garcia1957@gmail.com';
+        expect(longEmail.length, 34);
+        final l = lookupAppLocalizations(Locale(language));
+        final phone = await open(
+          tester,
+          language: language,
+          textScale: 2,
+          size: const Size(320, 640),
+          email: longEmail,
+          preview: previewJson(reauth: 'google'),
+        );
+        await fitsWidth(tester, find.text(l.deleteAccountQuestion));
+        await fitsWidth(tester, find.text(longEmail));
+        await fitsWidth(tester, find.text(l.deleteAccountIntro));
+        await fitsWidth(
+          tester,
+          find.text(l.deleteAccountGoogleHelp(longEmail)),
+        );
+        expect(tester.takeException(), isNull);
+
+        phone.google.answers.add('other-google-id-token');
+        await tapVisible(tester, googleButton);
+        await tester.pumpAndSettle();
+        phone.api.deleteError = ApiException(400, 'Mismatch.', {
+          'code': 'google_reauth_failed',
+        });
+        await tapVisible(tester, confirm);
+        await tester.pumpAndSettle();
+        await fitsWidth(
+          tester,
+          find.text(l.deleteAccountOtherGoogle(longEmail)),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-804: two lists, What goes then What stays for the others, each line after a bullet TalkBack doesn’t read and with no final full stop, before the copy link and the password help',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester);
+      final lines = [
+        '12 tareas',
+        '3 notas',
+        '2 archivos',
+        '1 proyecto',
+        '4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+        'El proyecto «Casa» pasará a Ana',
+        'El grupo «Matemáticas» y sus proyectos pasarán a Luis',
+      ];
+      final order = [
+        find.text('Lo que se eliminará:'),
+        ...lines.take(4).map(find.text),
+        find.text('Lo que se queda para los demás:'),
+        ...lines.skip(4).map(find.text),
+        copyLink,
+        find.text('Para confirmar, escribe tu contraseña.'),
+      ];
+      var top = double.negativeInfinity;
+      for (final item in order) {
+        expect(item, findsOneWidget, reason: '$item');
+        final y = tester.getTopLeft(item).dy;
+        expect(y, greaterThan(top), reason: '$item');
+        top = y;
+      }
+      final headingStyle = tester
+          .widget<Text>(find.text('Lo que se eliminará:'))
+          .style;
+      expect(
+        tester.widget<Text>(find.text('Lo que se queda para los demás:')).style,
+        headingStyle,
+        reason: 'the same heading style',
+      );
+      for (final line in lines) {
+        expect(line.endsWith('.'), isFalse, reason: line);
+        final text = find.text(line);
+        final row = find.ancestor(of: text, matching: find.byType(Row)).first;
+        final dot = find.descendant(of: row, matching: find.text('•'));
+        expect(dot, findsOneWidget, reason: line);
+        expect(
+          tester.getTopRight(dot).dx,
+          lessThanOrEqualTo(tester.getTopLeft(text).dx),
+          reason: line,
+        );
+        expect(
+          find.ancestor(
+            of: dot,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is ExcludeSemantics && widget.excluding,
+            ),
+          ),
+          findsWidgets,
+          reason: line,
+        );
+      }
+      expect(find.bySemanticsLabel(RegExp('•')), findsNothing);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'UX-804: one kept task in the singular; nothing kept and no handovers, no second heading; no counts, one kept task, only the second list',
+    (tester) async {
+      await open(tester, preview: previewJson(kept: 1, handovers: []));
+      expect(find.text('Lo que se queda para los demás:'), findsOneWidget);
+      expect(
+        find.text(
+          '1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+        ),
+        findsOneWidget,
+      );
+
+      await open(tester, preview: previewJson(kept: 0, handovers: []));
+      expect(find.text('Lo que se eliminará:'), findsOneWidget);
+      expect(find.text('Lo que se queda para los demás:'), findsNothing);
+
+      await open(
+        tester,
+        preview: previewJson(
+          tasks: 0,
+          notes: 0,
+          files: 0,
+          projects: 0,
+          groups: 0,
+          kept: 1,
+          handovers: [],
+        ),
+      );
+      final heading = find.text('Lo que se queda para los demás:');
+      expect(heading, findsOneWidget);
+      expect(find.text('Lo que se eliminará:'), findsNothing);
+      expect(find.text('•'), findsOneWidget, reason: 'its one bullet');
+      expect(
+        tester.getTopLeft(find.text('•')).dy,
+        greaterThan(tester.getTopLeft(heading).dy),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (language, stays, kept, project, group) in [
+    (
+      'en',
+      'What stays for the others:',
+      '4 tasks and the files you added to shared projects, without your name',
+      'The project “Casa” will go to Ana',
+      'The group “Matemáticas” and its projects will go to Luis',
+    ),
+    (
+      'ca',
+      'El que es queda per als altres:',
+      '4 tasques i els fitxers que vas afegir a projectes compartits, sense el teu nom',
+      'El projecte «Casa» passarà a Ana',
+      'El grup «Matemáticas» i els seus projectes passaran a Luis',
+    ),
+  ]) {
+    testWidgets(
+      'UX-804: in $language, the second heading, the kept line and each handover read as planned, in that order',
+      (tester) async {
+        await open(tester, language: language);
+        var top = double.negativeInfinity;
+        for (final line in [stays, kept, project, group]) {
+          final item = find.text(line);
+          expect(item, findsOneWidget, reason: line);
+          final y = tester.getTopLeft(item).dy;
+          expect(y, greaterThan(top), reason: line);
+          top = y;
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  /// Password typed, then a 409 whose new preview is [after].
+  Future<_Phone> planChanged(
+    WidgetTester tester,
+    Map<String, dynamic> after, {
+    double textScale = 1,
+    Size size = const Size(390, 1600),
+  }) async {
+    final phone = await open(tester, textScale: textScale, size: size);
+    await reach(tester, passwordField);
+    await tester.enterText(passwordField, password);
+    phone.api
+      ..deleteError = ApiException(409, 'Plan changed.', {
+        'code': 'plan_changed',
+        'detail': 'Plan changed.',
+      })
+      ..preview = after;
+    await tapVisible(tester, confirm);
+    await tester.pumpAndSettle();
+    return phone;
+  }
+
+  final casaToLuis = previewJson(
+    plan: 'plan-2',
+    handovers: [
+      {'kind': 'project', 'id': 'p-1', 'name': 'Casa', 'to': 'Luis'},
+    ],
+  );
+  const changedBanner =
+      'Algo ha cambiado desde que abriste esta pantalla:\n'
+      '• El proyecto «Casa» pasará a Luis\n'
+      'Revísalo y vuelve a confirmar.';
+  const listLines = [
+    '12 tareas',
+    '3 notas',
+    '2 archivos',
+    '1 proyecto',
+    '4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+  ];
+
+  testWidgets(
+    'UX-805: after a 409 where Casa now goes to Luis, the banner says what changed on three lines, above the button; only that list line is bold; the password stays',
+    (tester) async {
+      await planChanged(tester, casaToLuis);
+      final banner = find.text(changedBanner);
+      expect(banner, findsOneWidget);
+      expect(
+        find.ancestor(of: banner, matching: find.byType(MessageBanner)),
+        findsOneWidget,
+      );
+      expect(inLiveRegion(banner), isTrue);
+      expect(
+        tester.getBottomLeft(banner).dy,
+        lessThan(tester.getTopLeft(confirm).dy),
+      );
+      final moved = find.text('El proyecto «Casa» pasará a Luis');
+      expect(moved, findsOneWidget, reason: 'in the list');
+      expect(bold(tester, moved), isTrue);
+      for (final line in listLines) {
+        expect(bold(tester, find.text(line)), isFalse, reason: line);
+      }
+      expect(
+        tester.widget<TextField>(passwordField).controller!.text,
+        password,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-805: the next tap on Eliminar mi cuenta, answered with an error, leaves no list line bold',
+    (tester) async {
+      final phone = await planChanged(tester, casaToLuis);
+      final moved = find.text('El proyecto «Casa» pasará a Luis');
+      expect(bold(tester, moved), isTrue);
+      phone.api.deleteError = ApiException(0, ApiClient.offlineMessage);
+      await tapVisible(tester, confirm);
+      await tester.pumpAndSettle();
+      expect(find.text(es.deleteAccountOffline), findsOneWidget);
+      expect(bold(tester, moved), isFalse);
+      for (final line in listLines) {
+        expect(bold(tester, find.text(line)), isFalse, reason: line);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-805: when a handover only disappeared, the banner keeps the general line and nothing is bold',
+    (tester) async {
+      await planChanged(
+        tester,
+        previewJson(
+          plan: 'plan-2',
+          handovers: [
+            {'kind': 'project', 'id': 'p-1', 'name': 'Casa', 'to': 'Ana'},
+          ],
+        ),
+      );
+      expect(
+        find.text(
+          'Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Revísalo y vuelve a confirmar.'),
+        findsNothing,
+      );
+      final casa = find.text('El proyecto «Casa» pasará a Ana');
+      expect(casa, findsOneWidget);
+      expect(bold(tester, casa), isFalse);
+      expect(find.textContaining('Matemáticas'), findsNothing);
+      for (final line in listLines) {
+        expect(bold(tester, find.text(line)), isFalse, reason: line);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-804, UX-805: the second heading and the changed banner’s lines read exactly as planned in EN, ES and CA',
+    () {
+      for (final (language, stays, intro, check) in [
+        (
+          'en',
+          'What stays for the others:',
+          'Something has changed since you opened this screen:',
+          'Check it and confirm again.',
+        ),
+        (
+          'es',
+          'Lo que se queda para los demás:',
+          'Algo ha cambiado desde que abriste esta pantalla:',
+          'Revísalo y vuelve a confirmar.',
+        ),
+        (
+          'ca',
+          'El que es queda per als altres:',
+          'Alguna cosa ha canviat des que has obert aquesta pantalla:',
+          'Revisa-ho i torna a confirmar-ho.',
+        ),
+      ]) {
+        final l = lookupAppLocalizations(Locale(language));
+        expect(l.deleteAccountWhatStays, stays);
+        expect(l.deleteAccountChangedIntro, intro);
+        expect(l.deleteAccountChangedCheck, check);
+      }
+    },
+  );
+
+  // P123 · UX-806: the Google Play line.
+
+  const playLine =
+      'Si pagas TaskFlow Pro en Google Play, eliminar tu cuenta no cancela la suscripción.';
+
+  testWidgets(
+    'UX-806: complimentary Pro sees neither the Google Play line nor Gestionar suscripción',
+    (tester) async {
+      await open(tester, preview: previewJson(pro: true), complimentary: true);
+      expect(find.text(playLine), findsNothing);
+      expect(find.text('Gestionar suscripción'), findsNothing);
+      expect(manageLink, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-806: with a purchase billing knows of, the line reads in normal weight and Gestionar suscripción under it opens the Customer Center once, and no web page',
+    (tester) async {
+      final phone = await open(
+        tester,
+        preview: previewJson(pro: true),
+        purchases: billingInfo(active: true),
+      );
+      final line = find.text(playLine);
+      expect(line, findsOneWidget);
+      expect(
+        tester.widget<Text>(line).style?.fontWeight,
+        isNot(FontWeight.w700),
+      );
+      final label = find.descendant(
+        of: manageLink,
+        matching: find.text('Gestionar suscripción'),
+      );
+      expect(label, findsOneWidget);
+      expect(
+        find.descendant(
+          of: manageLink,
+          matching: find.byIcon(Icons.manage_accounts_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(manageLink).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(line).dy - 0.5),
+        reason: 'under the line',
+      );
+      await tapVisible(tester, manageLink);
+      await tester.pumpAndSettle();
+      expect(phone.billing.centers, 1);
+      expect(phone.opened, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (name, purchases) in [
+    ('billing not ready', null),
+    ('billing ready with no purchase', billingInfo()),
+  ]) {
+    testWidgets(
+      'UX-806: with $name, Gestionar suscripción opens Google Play’s subscriptions page; when nothing opens it, the page says so',
+      (tester) async {
+        final phone = await open(
+          tester,
+          preview: previewJson(pro: true),
+          purchases: purchases,
+        );
+        await tapVisible(tester, manageLink);
+        await tester.pumpAndSettle();
+        expect(phone.opened.map((uri) => uri.toString()), [
+          'https://play.google.com/store/account/subscriptions',
+        ]);
+        expect(phone.billing.centers, 0);
+
+        phone.opens = false;
+        await tapVisible(tester, manageLink);
+        await tester.pumpAndSettle();
+        expect(find.text('No se ha podido abrir la página.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-806: without Pro, neither the Google Play line nor the link',
+    (tester) async {
+      await open(tester, preview: previewJson(pro: false));
+      expect(find.text(playLine), findsNothing);
+      expect(manageLink, findsNothing);
+      expect(find.text('Gestionar suscripción'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UX-806: the Google Play line reads as planned in EN, ES and CA', () {
+    for (final (language, line) in [
+      (
+        'en',
+        'If you pay for TaskFlow Pro on Google Play, deleting your account doesn’t cancel the subscription.',
+      ),
+      ('es', playLine),
+      (
+        'ca',
+        'Si pagues TaskFlow Pro a Google Play, suprimir el compte no cancel·la la subscripció.',
+      ),
+    ]) {
+      expect(
+        lookupAppLocalizations(Locale(language)).deleteAccountSubscription,
+        line,
+      );
+    }
+  });
+
+  // P124 · UX-811: Eliminar cuenta apart from Cerrar sesión.
+
+  testWidgets(
+    'UX-811: on Account, Eliminar cuenta sits at least 24 dp below Cerrar sesión with a divider between, last, in the error colour',
+    (tester) async {
+      await open(tester, onAccount: true);
+      final signOut = find.ancestor(
+        of: find.text(es.signOut),
+        matching: find.byType(TextButton),
+      );
+      final delete = find.byKey(const ValueKey('account-delete'));
+      await tester.ensureVisible(delete);
+      await tester.pumpAndSettle();
+      final signOutBottom = tester.getBottomLeft(signOut).dy;
+      final deleteTop = tester.getTopLeft(delete).dy;
+      expect(deleteTop - signOutBottom, greaterThanOrEqualTo(24));
+      final dividers = tester
+          .widgetList<Divider>(find.byType(Divider))
+          .map((divider) => tester.getRect(find.byWidget(divider)))
+          .where(
+            (rect) => rect.top >= signOutBottom && rect.bottom <= deleteTop,
+          );
+      expect(dividers, hasLength(1), reason: 'a divider between them');
+      for (final button in tester.widgetList<ButtonStyleButton>(
+        find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+      )) {
+        expect(
+          tester.getTopLeft(find.byWidget(button)).dy,
+          lessThanOrEqualTo(deleteTop),
+          reason: 'Eliminar cuenta is last',
+        );
+      }
+      final label = find.descendant(
+        of: delete,
+        matching: find.text('Eliminar cuenta'),
+      );
+      expect(label, findsOneWidget);
+      expect(
+        tester.widget<Text>(label).style?.color,
+        Theme.of(tester.element(delete)).colorScheme.error,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-811: at 2× on 320 dp in $language, Eliminar cuenta fits, below the divider, last',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        await open(
+          tester,
+          onAccount: true,
+          language: language,
+          textScale: 2,
+          size: const Size(320, 640),
+        );
+        final delete = find.byKey(const ValueKey('account-delete'));
+        await tester.scrollUntilVisible(
+          delete,
+          120,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: delete, matching: find.text(l.deleteAccount)),
+          findsOneWidget,
+        );
+        final rect = tester.getRect(delete);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        final signOutBottom = tester.getRect(find.text(l.signOut)).bottom;
+        final divider = tester
+            .widgetList<Divider>(find.byType(Divider))
+            .map((divider) => tester.getRect(find.byWidget(divider)))
+            .where((box) => box.top >= signOutBottom && box.bottom <= rect.top);
+        expect(divider, hasLength(1), reason: 'below the divider');
+        for (final button in tester.widgetList<ButtonStyleButton>(
+          find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+        )) {
+          expect(
+            tester.getTopLeft(find.byWidget(button)).dy,
+            lessThanOrEqualTo(rect.top),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // P125 · UX-816: the title holds still while deleting. UX-817: the
+  // changed-plan banner is spoken once, with its final text, without bullets.
+
+  final deleteAppBar = find.descendant(
+    of: find.byType(DeleteAccountScreen),
+    matching: find.byType(AppBar),
+  );
+  Finder appBarTitle(AppLocalizations l) =>
+      find.descendant(of: deleteAppBar, matching: find.text(l.deleteAccount));
+
+  /// [node] and every node under it.
+  List<SemanticsData> semanticsUnder(SemanticsNode node) {
+    final all = [node.getSemanticsData()];
+    node.visitChildren((child) {
+      all.addAll(semanticsUnder(child));
+      return true;
+    });
+    return all;
+  }
+
+  testWidgets(
+    'UX-816: in Spanish at 1×, while deleting the back arrow goes but «Eliminar cuenta» stays where it was; after an offline error the arrow is back and the title still hasn’t moved',
+    (tester) async {
+      final phone = await open(tester);
+      final title = appBarTitle(es);
+      expect(title, findsOneWidget);
+      expect(backArrow, findsOneWidget, reason: 'there before deleting');
+      final before = tester.getTopLeft(title).dx;
+
+      await tester.enterText(passwordField, password);
+      phone.api.holdDelete = Completer<void>();
+      await tapVisible(tester, confirm);
+      await frames(tester);
+      expect(find.text(es.deleteAccountDeleting), findsOneWidget);
+      expect(backArrow, findsNothing);
+      expect(tester.getTopLeft(title).dx, closeTo(before, 0.5));
+
+      phone.api.deleteError = ApiException(0, ApiClient.offlineMessage);
+      phone.api.holdDelete!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text(es.deleteAccountOffline), findsOneWidget);
+      expect(backArrow, findsOneWidget);
+      expect(tester.getTopLeft(title).dx, closeTo(before, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-816: at 2× on 320 dp in Spanish, the title’s left edge is the same before the tap, while deleting and after the error, and the app bar fits the width',
+    (tester) async {
+      final phone = await open(
+        tester,
+        textScale: 2,
+        size: const Size(320, 640),
+      );
+      final title = appBarTitle(es);
+      void barFits(String when) {
+        final bar = tester.getRect(deleteAppBar);
+        expect(bar.left, greaterThanOrEqualTo(-0.5), reason: when);
+        expect(bar.right, lessThanOrEqualTo(320.5), reason: when);
+        final rect = tester.getRect(title);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: when);
+        expect(rect.right, lessThanOrEqualTo(320.5), reason: when);
+      }
+
+      expect(title, findsOneWidget);
+      barFits('before the tap');
+      final before = tester.getTopLeft(title).dx;
+
+      await reach(tester, passwordField);
+      await tester.enterText(passwordField, password);
+      phone.api.holdDelete = Completer<void>();
+      await reach(tester, confirm);
+      await tester.tap(confirm);
+      await frames(tester);
+      expect(backArrow, findsNothing);
+      barFits('while deleting');
+      expect(tester.getTopLeft(title).dx, closeTo(before, 0.5));
+
+      phone.api.deleteError = ApiException(0, ApiClient.offlineMessage);
+      phone.api.holdDelete!.complete();
+      await tester.pumpAndSettle();
+      expect(backArrow, findsOneWidget);
+      barFits('after the error');
+      expect(tester.getTopLeft(title).dx, closeTo(before, 0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-816: while deleting, nothing in the app bar is a back button TalkBack can focus or tap (no «Atrás» tooltip, no tap action)',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final phone = await open(tester);
+      final back = MaterialLocalizations.of(
+        tester.element(appBarTitle(es)),
+      ).backButtonTooltip;
+      expect(back, 'Atrás');
+      bool backInBar() => semanticsUnder(
+        tester.getSemantics(deleteAppBar),
+      ).any((data) => data.tooltip == back);
+      bool tapInBar() => semanticsUnder(
+        tester.getSemantics(deleteAppBar),
+      ).any((data) => data.hasAction(SemanticsAction.tap));
+      // The check can see the arrow when it is there.
+      expect(backInBar(), isTrue, reason: 'before deleting');
+      expect(tapInBar(), isTrue, reason: 'before deleting');
+
+      await tester.enterText(passwordField, password);
+      phone.api.holdDelete = Completer<void>();
+      await tapVisible(tester, confirm);
+      await frames(tester);
+      expect(backInBar(), isFalse);
+      expect(tapInBar(), isFalse);
+
+      phone.api.deleteError = ApiException(0, ApiClient.offlineMessage);
+      phone.api.holdDelete!.complete();
+      await tester.pumpAndSettle();
+      expect(backInBar(), isTrue, reason: 'after the error');
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  /// In [language], password typed, then a 409 whose new preview is [after].
+  /// With [holdReload] the reload waits until the test completes it.
+  Future<_Phone> changedPlan(
+    WidgetTester tester,
+    Map<String, dynamic> after, {
+    String language = 'es',
+    bool holdReload = false,
+  }) async {
+    final phone = await open(tester, language: language);
+    await reach(tester, passwordField);
+    await tester.enterText(passwordField, password);
+    phone.api
+      ..deleteError = ApiException(409, 'Plan changed.', {
+        'code': 'plan_changed',
+        'detail': 'Plan changed.',
+      })
+      ..preview = after;
+    if (holdReload) phone.api.holdPreview = Completer<void>();
+    await tapVisible(tester, confirm);
+    if (holdReload) {
+      await frames(tester);
+    } else {
+      await tester.pumpAndSettle();
+    }
+    return phone;
+  }
+
+  Finder bannerWith(String visible) => find.ancestor(
+    of: find.text(visible),
+    matching: find.byType(MessageBanner),
+  );
+
+  for (final (language, spoken) in [
+    (
+      'es',
+      'Algo ha cambiado desde que abriste esta pantalla:\n'
+          'El proyecto «Casa» pasará a Luis\n'
+          'Revísalo y vuelve a confirmar.',
+    ),
+    (
+      'en',
+      'Something has changed since you opened this screen:\n'
+          'The project “Casa” will go to Luis\n'
+          'Check it and confirm again.',
+    ),
+    (
+      'ca',
+      'Alguna cosa ha canviat des que has obert aquesta pantalla:\n'
+          'El projecte «Casa» passarà a Luis\n'
+          'Revisa-ho i torna a confirmar-ho.',
+    ),
+  ]) {
+    testWidgets(
+      'UX-817: in $language, after a 409 where Casa now goes to Luis, the banner is read as its three lines without the bullet, in a live region; the bullet still shows',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final l = lookupAppLocalizations(Locale(language));
+        await changedPlan(tester, casaToLuis, language: language);
+        final handover = l.deleteAccountHandover('project', 'Casa', 'Luis');
+        final visible = [
+          l.deleteAccountChangedIntro,
+          '• $handover',
+          l.deleteAccountChangedCheck,
+        ].join('\n');
+        final banner = bannerWith(visible);
+        expect(banner, findsOneWidget, reason: 'the bullet still shows');
+        expect(inLiveRegion(find.text(visible)), isTrue);
+
+        final node = tester.getSemantics(banner);
+        expect(
+          node.label,
+          [
+            l.deleteAccountChangedIntro,
+            handover,
+            l.deleteAccountChangedCheck,
+          ].join('\n'),
+        );
+        expect(node.label, spoken, reason: 'as planned');
+        expect(node.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
+        for (final data in semanticsUnder(node)) {
+          expect(data.label.contains('•'), isFalse, reason: data.label);
+          expect(data.value.contains('•'), isFalse, reason: data.value);
+        }
+        expect(find.bySemanticsLabel(RegExp('•')), findsNothing);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-817: in Spanish, while the reload is held the banner shows the general line and is not a live region; once it ends with the same handovers, it is live with that same label',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final phone = await changedPlan(
+        tester,
+        previewJson(plan: 'plan-2'),
+        holdReload: true,
+      );
+      expect(
+        es.deleteAccountPlanChanged,
+        'Algo ha cambiado desde que abriste esta pantalla. Revisa lo que pasará y vuelve a confirmar.',
+      );
+      final text = find.text(es.deleteAccountPlanChanged);
+      expect(bannerWith(es.deleteAccountPlanChanged), findsOneWidget);
+      expect(inLiveRegion(text), isFalse, reason: 'silent while reloading');
+      expect(
+        tester
+            .getSemantics(bannerWith(es.deleteAccountPlanChanged))
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isFalse,
+      );
+
+      phone.api.holdPreview!.complete();
+      await tester.pumpAndSettle();
+      final banner = bannerWith(es.deleteAccountPlanChanged);
+      expect(banner, findsOneWidget);
+      expect(inLiveRegion(text), isTrue);
+      final node = tester.getSemantics(banner);
+      expect(node.label, es.deleteAccountPlanChanged);
+      expect(node.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'UX-817: when the new preview only drops Matemáticas, after the reload the banner is live and reads the general line',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await changedPlan(
+        tester,
+        previewJson(
+          plan: 'plan-2',
+          handovers: [
+            {'kind': 'project', 'id': 'p-1', 'name': 'Casa', 'to': 'Ana'},
+          ],
+        ),
+      );
+      final banner = bannerWith(es.deleteAccountPlanChanged);
+      expect(banner, findsOneWidget);
+      expect(inLiveRegion(find.text(es.deleteAccountPlanChanged)), isTrue);
+      final node = tester.getSemantics(banner);
+      expect(node.label, es.deleteAccountPlanChanged);
+      expect(node.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  // UX-801 and UX-805 at 2×, with the app's own font, so the line count is real. Last,
+  // because the font stays loaded for whatever runs after.
+  group('with Manrope', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-801: at 2× on 320 dp in $language, the whole wrong-password message shows under the field, within its lines and the width',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final phone = await open(
+            tester,
+            language: language,
+            textScale: 2,
+            size: const Size(320, 640),
+          );
+          phone.api.deleteError = ApiException(400, 'Wrong password.', {
+            'code': 'wrong_password',
+          });
+          await reach(tester, passwordField);
+          await tester.enterText(passwordField, 'not-the-password');
+          await tapVisible(tester, confirm);
+          await tester.pumpAndSettle();
+          final message = find.text(l.deleteAccountWrongPassword);
+          await fitsWidth(tester, message);
+          final paragraph = tester.renderObject<RenderParagraph>(message);
+          expect(paragraph.didExceedMaxLines, isFalse, reason: 'no ellipsis');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-805: at 2× on 320 dp in Spanish, with Manrope, after the reload the banner is in view, above Eliminar mi cuenta',
+      (tester) async {
+        await planChanged(
+          tester,
+          casaToLuis,
+          textScale: 2,
+          size: const Size(320, 640),
+        );
+        final banner = find.text(changedBanner);
+        expect(banner, findsOneWidget);
+        final viewport = tester.getRect(pageScroll);
+        final rect = tester.getRect(banner);
+        expect(rect.top, greaterThanOrEqualTo(viewport.top - 0.5));
+        expect(rect.bottom, lessThanOrEqualTo(viewport.bottom + 0.5));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        // The button follows, built just below the screen.
+        final button = find.byKey(
+          const ValueKey('delete-account-confirm'),
+          skipOffstage: false,
+        );
+        expect(button, findsOneWidget);
+        expect(rect.bottom, lessThan(tester.getTopLeft(button).dy));
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 
