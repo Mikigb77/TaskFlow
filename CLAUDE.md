@@ -74,6 +74,23 @@ docker compose up -d --build
 docker compose exec -T api python manage.py test core --settings=config.test_settings
 ```
 
+## Email
+
+These addresses are public and listed on the website's privacy page. All three reach the company mailbox.
+
+| Address | Used for | Setting |
+|---|---|---|
+| `taskflow.noreply@garbar.tech` | The sender of every automatic email: invitations, password recovery, and next the account-deletion confirmation. Not monitored. | `DEFAULT_FROM_EMAIL` (`TaskFlow <taskflow.noreply@garbar.tech>`) |
+| `taskflow.support@garbar.tech` | Support, privacy rights and account-deletion requests. Automatic emails set it as Reply-To. | `EMAIL_SUPPORT_ADDRESS` |
+| `taskflow@garbar.tech` | General inquiries, on the website only. The app never sends from it. | — |
+
+How email is sent:
+- `Backend/core/email_delivery.py` queues each email, applies the sending limits and delivers it.
+- Staging and production send through Resend (`EMAIL_BACKEND=core.email_delivery.ResendBackend`). The key lives in the environment, never in code.
+- Local Docker sends to Mailpit, readable at http://localhost:8026.
+- `Backend/docs/STAGING.md` (Email and invitation flow) covers DNS, Reply-To and the footer.
+- A new automatic email sends from `DEFAULT_FROM_EMAIL` with Reply-To `EMAIL_SUPPORT_ADDRESS`, like the invitation and recovery emails.
+
 ## Rules
 
 - **Branches.** Work on `dev`. Never merge into or push `main`, and never deploy, unless the owner asks.
