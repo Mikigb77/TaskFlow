@@ -2,6 +2,22 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-15 — Several tasks in one dictation is a must
+- **The owner:** saying a few things at once must create one task per thing, and that's "absolutely a must". His example: "go to the doctor on Friday at 5 and bring my blood test, and also finish the front-end design with mock-ups by Thursday at 5, and buy groceries, like tomatoes, potatoes, carrots, by tomorrow" gives three tasks:
+  - the doctor on Friday at 17:00, with the blood test as a note;
+  - the design, with a deadline of Thursday at 17:00;
+  - groceries tomorrow, with a checklist of tomatoes, potatoes and carrots.
+- **This answers UX-617.** The first-run line's spoken example now names two tasks («Llamar al dentista el viernes a las 10 y comprar pan mañana»).
+  - The typed example stays one task, because a free account's typed words are parsed on the phone, and that can't split one line into several tasks.
+  - Typed words go to the assistant only with Pro.
+- **Decided by the main session (reversible):**
+  - A bare hour in a dictation is read from context. Appointments, work and errands at 1 to 7 are in the afternoon, so «el médico el viernes a las 5» is 17:00 with no question.
+  - The assistant asks only when both readings are plausible, such as waking up, or a flight at 5.
+  - Why: the owner's example says "at 5" twice, and each question costs a tap (the speed bar).
+- **What the main session found (backend commit 140f5cc):**
+  - The free model understood the example. The server then threw the whole dictation away for two format slips: an extra array around the answer, and the AM/PM question written into the wrong field. Both are fixed.
+  - The free model also failed most calls on 2026-10-15, with 500/504 errors and then quota exhaustion (429). With `AI_ROUTE=ai_studio` there is no fallback, so those dictations fail. This makes the UX-616 decision (below) urgent: configure the paid Vertex fallback.
+
 ## 2026-10-14 — Decided by the main session while the owner was away (reversible; tell the owner)
 - **UX-609, the Catalan used-up line.** At 2× text on 320 dp, «Fins al dia {date} no tens dictats gratuïts.» takes 3 lines, where Spanish and English take 2. Accepted as it is: Catalan runs longer, and the typing field stays above a 300 dp keyboard in all three languages. The test allows 3 lines in Catalan and 2 in the others. Rejected: a shorter Catalan line that no native speaker has read.
 
@@ -126,9 +142,9 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - **UX-616: should the assistant's wait be cut on the server,** with a faster model, or by understanding while the person is still speaking? Staging took 1.3, 4.8, 4.8, 4.8 and once 20.5 s. Recommendation: measure first (P101 adds the phone's share to Diagnóstico de captura). Then, if the server is most of the wait, try a faster extraction model on staging and compare cost and accuracy.
     - What the server does today (main session, read from `Backend/config/settings.py` and `core/ai_routing.py`; no calls made, and `.env` not read): task extraction uses the free AI Studio model (`AI_TEXT_MODEL`, `gemma-4-26b-a4b-it`). Under `AI_ROUTE=auto`, each free attempt gets up to `AI_FREE_ATTEMPT_SECONDS` (10 s), with up to two attempts before falling back to paid Vertex (`gemini-3.1-flash-lite`, minimal thinking). Under `ai_studio`, the code default, there is no paid fallback, and one capture can take up to the 45 s stage budget. Either way, a slow free call explains the 20.5 s seen on staging.
     - Settings-only options, with no code change:
-      - under `auto`, lower `AI_FREE_ATTEMPT_SECONDS` (for example to 4), so slow free calls fall back sooner;
+      - under `auto`, lower `AI_FREE_ATTEMPT_SECONDS` to 10 (the minimum, because Google refuses a request deadline under 10 s; since 140f5cc the code raises lower values to 10), so slow free calls fall back sooner;
       - set `AI_ROUTE=vertex` to always use the paid model, which is the fastest and most predictable but costs money on every dictation.
       Both trade money for speed, so they are the owner's call.
-  - **UX-617: should the app teach that one dictation can hold several tasks?** Three tasks take 3 taps in one dictation and 9 taps as three. Recommendation: not in the first-run line yet (P41 keeps one task); decide after §7 task 3.
+  - ~~UX-617~~: answered by the owner on 2026-10-15 (see above).
 - **Finding the tasks that hold files** (from UX-506, b7). When a free account's file space is full, the message asks people to remove files from other tasks, but nothing lists which tasks have files. Whether to add a way to find them is the owner's call: it adds a feature, so the loop doesn't.
 - **The two-tab layout** (U13, D7a): after the UX loop and the owner's tests with his father, family and friends.

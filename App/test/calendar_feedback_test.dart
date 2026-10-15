@@ -2382,7 +2382,7 @@ void main() {
       final l = tester.element(find.byType(CalendarScreen)).l10n;
       expect(
         l.calendarTrySaying,
-        'Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10».',
+        'Prueba: toca Añadir tarea y di «Llamar al dentista el viernes a las 10 y comprar pan mañana».',
       );
       expect(
         find.descendant(of: emptyState(), matching: find.text(l.rememberPrompt)),
@@ -2435,7 +2435,7 @@ void main() {
     final ca = lookupAppLocalizations(const Locale('ca'));
     expect(
       en.calendarTrySaying,
-      'Try it: tap Add a task and say “Call the dentist on Friday at 10.”',
+      'Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”',
     );
     expect(
       en.calendarTryTyping,
@@ -2443,7 +2443,7 @@ void main() {
     );
     expect(
       ca.calendarTrySaying,
-      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10».',
+      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10 i comprar pa demà».',
     );
     expect(
       ca.calendarTryTyping,

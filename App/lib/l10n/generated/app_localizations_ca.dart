@@ -736,7 +736,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get calendarTrySaying =>
-      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10».';
+      'Prova-ho: toca Afegeix una tasca i digues «Trucar al dentista divendres a les 10 i comprar pa demà».';
 
   @override
   String get calendarTryTyping =>

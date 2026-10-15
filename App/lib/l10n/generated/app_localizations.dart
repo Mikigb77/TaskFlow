@@ -1291,7 +1291,7 @@ abstract class AppLocalizations {
   /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic.
   ///
   /// In en, this message translates to:
-  /// **'Try it: tap Add a task and say “Call the dentist on Friday at 10.”'**
+  /// **'Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”'**
   String get calendarTrySaying;
 
   /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing.

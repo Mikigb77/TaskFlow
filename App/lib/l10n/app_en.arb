@@ -310,7 +310,7 @@
   "tryAgain": "Try again",
   "rememberPrompt": "What would you like to remember?",
   "calendarEmpty": "Nothing planned for this day.",
-  "calendarTrySaying": "Try it: tap Add a task and say “Call the dentist on Friday at 10.”",
+  "calendarTrySaying": "Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”",
   "@calendarTrySaying": {
     "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic."
   },

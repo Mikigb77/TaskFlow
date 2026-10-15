@@ -729,7 +729,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calendarTrySaying =>
-      'Try it: tap Add a task and say “Call the dentist on Friday at 10.”';
+      'Try it: tap Add a task and say “Call the dentist on Friday at 10 and buy bread tomorrow.”';
 
   @override
   String get calendarTryTyping =>

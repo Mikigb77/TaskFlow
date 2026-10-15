@@ -2,7 +2,7 @@
 
 Everything here is fixed in code and covered by widget or unit tests, but only a real phone can confirm it. Generated from the `Device check` section of `ISSUES.md`; when a check passes, move its line there to Verified. Most urgent first within each area.
 
-## A · Capture (voice and typing) (43)
+## A · Capture (voice and typing) (44)
 
 - [ ] **U1** (P0) The mic stops after a ~3 s pause.
   - Physical Android 13+ phone: a 10-second silent pause mid-sentence doesn't stop listening; a 5-second hesitation before the first word doesn't either; the words before and after the pause end up in one text; 60 seconds of speech continues to the result (U1's done-when). Android 12 (API 31–32): the restart fallback keeps listening across pauses (inferred from the AOSP documentation). Pull down the notification shade for 3 s mid-sentence → it keeps listening. Fresh install: allow the microphone at the first ask and speak at once → it keeps listening (the race after the first permission answer is inferred). Deny the microphone twice, open capture, use `Abrir Ajustes`, allow → back in the app, listening starts.
@@ -90,6 +90,8 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - Catalan at 360 dp, and "Torna-ho a provar" and "Desa-ho tal com està" each fit on one line
 - [ ] **UX-494** (S1) Empty share says 'Share a shorter text'.
   - share an empty text to TaskFlow, and the toast says there's no text
+- [ ] **UX-617** (S1) Nothing teaches that one dictation can hold several tasks.
+  - on a new account, say the example; two tasks are saved and both are lit.
 
 ## B · Calendar, Tareas and the task form (17)
 
