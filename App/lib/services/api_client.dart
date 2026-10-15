@@ -10,7 +10,11 @@ class ApiException implements Exception {
   final int status;
   final String message;
   final Map<String, dynamic>? body;
-  ApiException(this.status, this.message, [this.body]);
+
+  /// How long the server asked to wait (`Retry-After`, in seconds), when it
+  /// said.
+  final Duration? retryAfter;
+  ApiException(this.status, this.message, [this.body, this.retryAfter]);
   @override
   String toString() => message;
 }
@@ -463,10 +467,16 @@ class ApiClient {
                         '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}',
                   )
                   .join('\n');
+        final retryAfter = int.tryParse(
+          response.headers['retry-after']?.trim() ?? '',
+        );
         throw ApiException(
           response.statusCode,
           message.isEmpty ? 'The request failed. Please try again.' : message,
           map,
+          retryAfter == null || retryAfter < 0
+              ? null
+              : Duration(seconds: retryAfter),
         );
       }
       return body;

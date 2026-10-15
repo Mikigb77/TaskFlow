@@ -47,6 +47,7 @@ class DeletionPreview {
     this.projects = 0,
     this.groups = 0,
     this.keptInShared = 0,
+    this.keptFilesInShared = 0,
     this.handovers = const [],
     this.pro = false,
     this.google = false,
@@ -61,6 +62,10 @@ class DeletionPreview {
 
   /// Tasks they added to other people's projects: they stay, unsigned.
   final int keptInShared;
+
+  /// Files they added in shared projects that stay, on their own tasks or on
+  /// other people's. 0 from an older server, which doesn't count them.
+  final int keptFilesInShared;
   final List<Handover> handovers;
 
   /// Has Pro, or billing couldn't be checked: a Google Play subscription may
@@ -99,6 +104,9 @@ class DeletionPreview {
       projects: count(personal['projects']),
       groups: count(personal['groups']),
       keptInShared: count(data['kept_in_shared']),
+      keptFilesInShared: data.containsKey('kept_files_in_shared')
+          ? count(data['kept_files_in_shared'])
+          : 0,
       handovers: handovers.map(Handover.parse).toList(),
       pro: pro,
       google: reauth == 'google',

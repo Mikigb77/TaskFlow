@@ -5446,11 +5446,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 group} other{{count} groups}}'**
   String deleteAccountGroups(int count);
 
-  /// A bullet under 'What stays for the others:' on the delete-account page, when tasks the person added to other people's shared projects stay after the account is deleted; the files they added there stay too. No final full stop.
+  /// A bullet under 'What stays for the others:' on the delete-account page, when tasks the person added to other people's shared projects stay after the account is deleted. The files they added there have their own bullet, deleteAccountKeptFiles. No final full stop.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 task and the files you added to shared projects, without your name} other{{count} tasks and the files you added to shared projects, without your name}}'**
+  /// **'{count, plural, =1{1 task you added to shared projects, without your name} other{{count} tasks you added to shared projects, without your name}}'**
   String deleteAccountKeptShared(int count);
+
+  /// A bullet under 'What stays for the others:' on the delete-account page, after deleteAccountKeptShared, when files the person added in shared projects (on their own tasks or on other people's) stay after the account is deleted. Same wording as deleteAccountKeptShared, with files. No final full stop.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file you added to shared projects, without your name} other{{count} files you added to shared projects, without your name}}'**
+  String deleteAccountKeptFiles(int count);
 
   /// A bullet under 'What stays for the others:' on the delete-account page, one per project or group the person owns that passes to someone else when the account is deleted; a group's projects go with it. Also a line of the banner after the page reloaded, when this handover is new or changed. {kind} is 'group' or 'project' and is never translated. {name} is the project or group; {person} is who receives it (a name or an email). No final full stop.
   ///

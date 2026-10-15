@@ -176,14 +176,16 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     return _Problem.failed;
   }
 
-  /// The wait a refusal names, in whole minutes rounded up: the server
-  /// (English only) ends it with "Expected available in N seconds."
+  /// The wait a refusal names, in whole minutes rounded up: from its
+  /// `Retry-After` header, or else the English detail's ending, "Expected
+  /// available in N seconds."
   static int? _waitMinutesFor(Object error) {
     if (error is! ApiException || error.status != 429) return null;
     final match = RegExp(
       r'Expected available in (\d+) seconds?',
     ).firstMatch(error.message);
-    final seconds = int.tryParse(match?.group(1) ?? '');
+    final seconds =
+        error.retryAfter?.inSeconds ?? int.tryParse(match?.group(1) ?? '');
     if (seconds == null) return null;
     return max(1, (seconds + 59) ~/ 60);
   }
@@ -499,6 +501,8 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     final stays = [
       if (preview.keptInShared > 0)
         _bullet(strings.deleteAccountKeptShared(preview.keptInShared)),
+      if (preview.keptFilesInShared > 0)
+        _bullet(strings.deleteAccountKeptFiles(preview.keptFilesInShared)),
       for (final handover in preview.handovers)
         _bullet(
           _handoverText(strings, handover),

@@ -1960,9 +1960,18 @@
       }
     }
   },
-  "deleteAccountKeptShared": "{count, plural, =1{1 task and the files you added to shared projects, without your name} other{{count} tasks and the files you added to shared projects, without your name}}",
+  "deleteAccountKeptShared": "{count, plural, =1{1 task you added to shared projects, without your name} other{{count} tasks you added to shared projects, without your name}}",
   "@deleteAccountKeptShared": {
-    "description": "A bullet under 'What stays for the others:' on the delete-account page, when tasks the person added to other people's shared projects stay after the account is deleted; the files they added there stay too. No final full stop.",
+    "description": "A bullet under 'What stays for the others:' on the delete-account page, when tasks the person added to other people's shared projects stay after the account is deleted. The files they added there have their own bullet, deleteAccountKeptFiles. No final full stop.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountKeptFiles": "{count, plural, =1{1 file you added to shared projects, without your name} other{{count} files you added to shared projects, without your name}}",
+  "@deleteAccountKeptFiles": {
+    "description": "A bullet under 'What stays for the others:' on the delete-account page, after deleteAccountKeptShared, when files the person added in shared projects (on their own tasks or on other people's) stay after the account is deleted. Same wording as deleteAccountKeptShared, with files. No final full stop.",
     "placeholders": {
       "count": {
         "type": "int"

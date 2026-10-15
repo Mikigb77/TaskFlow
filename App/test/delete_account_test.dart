@@ -55,6 +55,8 @@ Map<String, dynamic> previewJson({
   int projects = 1,
   int groups = 0,
   int kept = 4,
+  // Absent unless given, as from a server older than kept_files_in_shared.
+  int? keptFiles,
   List<Map<String, dynamic>> handovers = const [
     {'kind': 'project', 'id': 'p-1', 'name': 'Casa', 'to': 'Ana'},
     {'kind': 'group', 'id': 'g-1', 'name': 'Matemáticas', 'to': 'Luis'},
@@ -71,6 +73,7 @@ Map<String, dynamic> previewJson({
     'groups': groups,
   },
   'kept_in_shared': kept,
+  if (keptFiles != null) 'kept_files_in_shared': keptFiles,
   'handovers': handovers,
   'pro': pro,
   'reauth': reauth,
@@ -435,7 +438,7 @@ void main() {
         find.text('1 proyecto'),
         find.text('Lo que se queda para los demás:'),
         find.text(
-          '4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+          '4 tareas que añadiste a proyectos compartidos, sin tu nombre',
         ),
         find.text('El proyecto «Casa» pasará a Ana'),
         find.text('El grupo «Matemáticas» y sus proyectos pasarán a Luis'),
@@ -494,7 +497,7 @@ void main() {
       expect(find.text(es.deleteAccountWhatStays), findsOneWidget);
       expect(
         find.text(
-          '1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+          '1 tarea que añadiste a proyectos compartidos, sin tu nombre',
         ),
         findsOneWidget,
       );
@@ -1504,7 +1507,7 @@ void main() {
       expect(es.accountDeleted, 'Tu cuenta se ha eliminado.');
       expect(
         es.deleteAccountKeptShared(3),
-        '3 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+        '3 tareas que añadiste a proyectos compartidos, sin tu nombre',
       );
       expect(
         es.deleteAccountHandover('group', 'Matemáticas', 'Luis'),
@@ -2310,7 +2313,7 @@ void main() {
         '3 notas',
         '2 archivos',
         '1 proyecto',
-        '4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+        '4 tareas que añadiste a proyectos compartidos, sin tu nombre',
         'El proyecto «Casa» pasará a Ana',
         'El grupo «Matemáticas» y sus proyectos pasarán a Luis',
       ];
@@ -2372,7 +2375,7 @@ void main() {
       expect(find.text('Lo que se queda para los demás:'), findsOneWidget);
       expect(
         find.text(
-          '1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+          '1 tarea que añadiste a proyectos compartidos, sin tu nombre',
         ),
         findsOneWidget,
       );
@@ -2409,14 +2412,14 @@ void main() {
     (
       'en',
       'What stays for the others:',
-      '4 tasks and the files you added to shared projects, without your name',
+      '4 tasks you added to shared projects, without your name',
       'The project “Casa” will go to Ana',
       'The group “Matemáticas” and its projects will go to Luis',
     ),
     (
       'ca',
       'El que es queda per als altres:',
-      '4 tasques i els fitxers que vas afegir a projectes compartits, sense el teu nom',
+      '4 tasques que vas afegir a projectes compartits, sense el teu nom',
       'El projecte «Casa» passarà a Ana',
       'El grup «Matemáticas» i els seus projectes passaran a Luis',
     ),
@@ -2474,7 +2477,7 @@ void main() {
     '3 notas',
     '2 archivos',
     '1 proyecto',
-    '4 tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+    '4 tareas que añadiste a proyectos compartidos, sin tu nombre',
   ];
 
   testWidgets(
@@ -3066,6 +3069,302 @@ void main() {
       semantics.dispose();
     },
   );
+
+  // P126 · UX-804, UX-809: the files that stay are named; the lock's wait
+  // comes from Retry-After.
+
+  test(
+    'UX-804: the preview reads kept_files_in_shared, and 0 from an older server that leaves it out',
+    () {
+      expect(
+        DeletionPreview.parse(previewJson(keptFiles: 2)).keptFilesInShared,
+        2,
+      );
+      expect(
+        DeletionPreview.parse(previewJson(keptFiles: 0)).keptFilesInShared,
+        0,
+      );
+      expect(DeletionPreview.parse(previewJson()).keptFilesInShared, 0);
+    },
+  );
+
+  for (final (language, one, two) in [
+    ('es', '1 archivo ', '2 archivos '),
+    ('en', '1 file ', '2 files '),
+    ('ca', '1 fitxer ', '2 fitxers '),
+  ]) {
+    test(
+      'UX-804: in $language, the kept-files line counts files, singular and plural, in the tasks line’s words and without a final full stop',
+      () {
+        final l = lookupAppLocalizations(Locale(language));
+        final single = l.deleteAccountKeptFiles(1);
+        final plural = l.deleteAccountKeptFiles(2);
+        expect(single, startsWith(one));
+        expect(plural, startsWith(two));
+        for (final line in [single, plural]) {
+          expect(line.endsWith('.'), isFalse, reason: line);
+          expect(line.trim(), line, reason: line);
+        }
+        // Same tone as the tasks line: everything after the count and noun
+        // reads the same.
+        String tail(String line) => line.substring(line.indexOf(' ', 2));
+        expect(tail(plural), tail(l.deleteAccountKeptShared(2)));
+        expect(tail(single), tail(l.deleteAccountKeptShared(1)));
+      },
+    );
+
+    testWidgets(
+      'UX-804: in $language, no kept tasks but 2 kept files shows the second heading and the files line under it, and 1 file reads in the singular',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        await open(
+          tester,
+          language: language,
+          preview: previewJson(kept: 0, keptFiles: 2, handovers: []),
+        );
+        final heading = find.text(l.deleteAccountWhatStays);
+        final files = find.text(l.deleteAccountKeptFiles(2));
+        await reach(tester, files);
+        expect(heading, findsOneWidget);
+        expect(files, findsOneWidget);
+        expect(
+          tester.getTopLeft(files).dy,
+          greaterThan(tester.getTopLeft(heading).dy),
+        );
+        expect(find.text(l.deleteAccountKeptShared(0)), findsNothing);
+
+        await open(
+          tester,
+          language: language,
+          preview: previewJson(kept: 0, keptFiles: 1, handovers: []),
+        );
+        expect(find.text(l.deleteAccountWhatStays), findsOneWidget);
+        expect(find.text(l.deleteAccountKeptFiles(1)), findsOneWidget);
+        expect(find.text(l.deleteAccountKeptFiles(2)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  /// Any line naming what the person added to shared projects.
+  Finder addedToShared(AppLocalizations l) {
+    final files = l.deleteAccountKeptFiles(7);
+    final tail = files.substring(files.indexOf(' ', 2));
+    return find.byWidgetPredicate(
+      (widget) => widget is Text && (widget.data ?? '').endsWith(tail),
+    );
+  }
+
+  testWidgets(
+    'UX-804: with no kept tasks and no kept files (0, or absent from an older server), there is no files line and, without handovers, no second heading',
+    (tester) async {
+      await open(
+        tester,
+        preview: previewJson(kept: 0, keptFiles: 0, handovers: []),
+      );
+      expect(find.text(es.deleteAccountWhatStays), findsNothing);
+      expect(addedToShared(es), findsNothing);
+      expect(find.text(es.deleteAccountKeptFiles(0)), findsNothing);
+
+      await open(tester, preview: previewJson(kept: 0, handovers: []));
+      expect(find.text(es.deleteAccountWhatStays), findsNothing);
+      expect(addedToShared(es), findsNothing);
+
+      // An older server with kept tasks: their line, and no files line.
+      await open(tester, preview: previewJson(handovers: []));
+      expect(find.text(es.deleteAccountKeptShared(4)), findsOneWidget);
+      expect(addedToShared(es), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-804: kept tasks and kept files each get their line under Lo que se queda para los demás, tasks then files, before the handovers',
+    (tester) async {
+      await open(tester, preview: previewJson(keptFiles: 2));
+      var top = double.negativeInfinity;
+      for (final line in [
+        es.deleteAccountWhatStays,
+        es.deleteAccountKeptShared(4),
+        es.deleteAccountKeptFiles(2),
+        es.deleteAccountHandover('project', 'Casa', 'Ana'),
+        es.deleteAccountHandover('group', 'Matemáticas', 'Luis'),
+      ]) {
+        final item = find.text(line);
+        await reach(tester, item);
+        expect(item, findsOneWidget, reason: line);
+        final y = tester.getTopLeft(item).dy;
+        expect(y, greaterThan(top), reason: line);
+        top = y;
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-804: at 2× on 320 dp in Catalan, the kept-files line fits the width',
+    (tester) async {
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      await open(
+        tester,
+        language: 'ca',
+        textScale: 2,
+        size: const Size(320, 640),
+        preview: previewJson(keptFiles: 2),
+      );
+      await fitsWidth(tester, find.text(ca.deleteAccountKeptFiles(2)));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  /// A 429 from the server, with [retryAfter] as its header when given.
+  http.Response throttled(String detail, {String? retryAfter}) =>
+      http.Response.bytes(
+        utf8.encode(jsonEncode({'detail': detail})),
+        429,
+        headers: {
+          'content-type': 'application/json',
+          if (retryAfter != null) 'retry-after': retryAfter,
+        },
+      );
+
+  const spanishDetail =
+      'Solicitud fue regulada (throttled). Se espera que esté disponible en 900 segundos.';
+
+  test(
+    'UX-809: the API client keeps a 429’s Retry-After as the wait, and none when the header is missing or not whole seconds',
+    () async {
+      Future<ApiException> answer(http.Response response) async {
+        final api = ApiClient(
+          transport: MockClient((request) async => response),
+          url: 'http://test.invalid',
+        );
+        addTearDown(api.close);
+        try {
+          await api.request(
+            'POST',
+            'auth/delete-account/',
+            data: {},
+            authenticated: false,
+          );
+        } on ApiException catch (error) {
+          return error;
+        }
+        fail('expected an ApiException');
+      }
+
+      final withWait = await answer(
+        throttled(spanishDetail, retryAfter: '900'),
+      );
+      expect(withWait.status, 429);
+      expect(withWait.retryAfter, const Duration(seconds: 900));
+      expect((await answer(throttled(spanishDetail))).retryAfter, isNull);
+      expect(
+        (await answer(
+          throttled(spanishDetail, retryAfter: 'Wed, 21 Oct 2026 07:28:00 GMT'),
+        )).retryAfter,
+        isNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'UX-809: in the app, a 429 with Retry-After: 900 and a Spanish detail shows the 15-minute wait under the button and keeps the password',
+    (tester) async {
+      final sent = <String>[];
+      final log = <String>[];
+      await openApp(
+        tester,
+        sent: sent,
+        log: log,
+        answer: (request, path) async {
+          if (path != 'auth/delete-account/') return null;
+          if (request.method == 'GET') return json(previewJson());
+          return throttled(spanishDetail, retryAfter: '900');
+        },
+      );
+      tester
+          .state<NavigatorState>(find.byType(Navigator))
+          .pushNamed('/deleteAccount');
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        passwordField,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(passwordField, password);
+      await tapVisible(tester, confirm);
+      await tester.pumpAndSettle();
+      expect(sent.last, 'POST auth/delete-account/');
+      expect(
+        es.deleteAccountThrottledWait(15),
+        contains('15 minutos'),
+        reason: 'the wait is named in minutes',
+      );
+      final banner = find.widgetWithText(
+        MessageBanner,
+        es.deleteAccountThrottledWait(15),
+      );
+      expect(banner, findsOneWidget);
+      expect(
+        tester.getTopLeft(banner).dy,
+        greaterThan(tester.getBottomLeft(confirm).dy),
+      );
+      expect(find.text(es.deleteAccountThrottled), findsNothing);
+      expect(
+        tester.widget<TextField>(passwordField).controller!.text,
+        password,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (label, error, expected) in [
+    (
+      'Retry-After 40 s with a Spanish detail',
+      ApiException(429, spanishDetail, null, const Duration(seconds: 40)),
+      es.deleteAccountThrottledWait(1),
+    ),
+    (
+      'Retry-After 900 s with a detail carrying no wait',
+      ApiException(
+        429,
+        'Demasiadas solicitudes.',
+        null,
+        const Duration(seconds: 900),
+      ),
+      es.deleteAccountThrottledWait(15),
+    ),
+    (
+      'Retry-After 60 s while the English detail says 900 s',
+      ApiException(
+        429,
+        'Request was throttled. Expected available in 900 seconds.',
+        null,
+        const Duration(seconds: 60),
+      ),
+      es.deleteAccountThrottledWait(1),
+    ),
+    (
+      'no Retry-After and a Spanish detail',
+      ApiException(429, spanishDetail),
+      es.deleteAccountThrottled,
+    ),
+  ]) {
+    testWidgets('UX-809: a 429 with $label shows «$expected»', (tester) async {
+      final phone = await open(tester);
+      phone.api.deleteError = error;
+      await tester.enterText(passwordField, password);
+      await tapVisible(tester, confirm);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(MessageBanner, expected), findsOneWidget);
+      expect(
+        tester.widget<TextField>(passwordField).controller!.text,
+        password,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   // UX-801 and UX-805 at 2×, with the app's own font, so the line count is real. Last,
   // because the font stays loaded for whatever runs after.

@@ -3596,9 +3596,20 @@ class AppLocalizationsEs extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count tareas y los archivos que añadiste a proyectos compartidos, sin tu nombre',
-      one:
-          '1 tarea y los archivos que añadiste a proyectos compartidos, sin tu nombre',
+          '$count tareas que añadiste a proyectos compartidos, sin tu nombre',
+      one: '1 tarea que añadiste a proyectos compartidos, sin tu nombre',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountKeptFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count archivos que añadiste a proyectos compartidos, sin tu nombre',
+      one: '1 archivo que añadiste a proyectos compartidos, sin tu nombre',
     );
     return '$_temp0';
   }

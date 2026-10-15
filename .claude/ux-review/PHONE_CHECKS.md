@@ -161,7 +161,7 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
 - [ ] **UX-630** (S1) A gone project's page offers adding, task lands elsewhere. _(needs: two accounts)_
   - While a member has a shared project's page open, remove them from the project. Their page should show the read-only line and "Este proyecto aún no tiene tareas.", with no Añadir tarea. On the same two-account setup, accept an invitation while the refresh fails: the joined project shows read-only until the next sync, which is expected.
 
-## D · Sign-in, settings, notifications and the rest (23)
+## D · Sign-in, settings, notifications and the rest (30)
 
 - [ ] **UX-401** (S4) Reminders off by default; nothing asks to turn them on. _(needs: TalkBack)_
   - TalkBack reads the question once; after "Sí", the Android 13+ notification dialog appears; the reminder arrives on time
@@ -193,8 +193,18 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - the server expires the session while a task is being typed
 - [ ] **UX-631** (S2) Notification Undo ignores the accessibility timeout.
   - with Tiempo para actuar at 1 minute, `Completada:` with Deshacer stays about a minute
+- [ ] **UX-803** (S2) Page doesn't name the account, or say Google stays.
+  - Google's chooser lists the email shown
+- [ ] **UX-806** (S2) Google Play line can be untrue; link opens a how-to.
+  - a sandbox subscriber reaches cancel in 2 taps; Play's subscriptions page opens
+- [ ] **UX-807** (S2) Saving a copy detours through Export & import, unconfirmed. _(needs: TalkBack)_
+  - Android's save screen opens, the saved file imports again, TalkBack says «Copia guardada»
+- [ ] **UX-808** (S2) While deleting, the page looks frozen and Back does nothing. _(needs: TalkBack)_
+  - TalkBack hears the deleting text once
+- [ ] **UX-810** (S2) Confirming with Google is silent to TalkBack. _(needs: TalkBack)_
+  - TalkBack hears «Confirmado con Google»
 - [ ] **U14** (P2) Google sign-in first, or local use before sign-in.
-  - Google sign-in completes from the first button. Option 2 (using the app before signing in) is rejected for now (DECISIONS.md: the login stays a hard wall) and comes back after the §7 test
+  - Google sign-in completes from the first button. Option 2 (using the app before signing in) is rejected for now (DECISIONS.md: the login stays a hard wall) and comes back after the §7 test. 2026-10-15-deletion (review D): holds; «Tu cuenta se ha eliminado.» sits above the sign-in card, so Google is still first inside it. No preview renders that notice (`login-light.png`, 23:02, is plain sign-in)
 - [ ] **UX-420** (S1) iOS microphone prompt mentions a "task draft". _(needs: iOS)_
   - the Spanish microphone prompt shows the new text.
 - [ ] **UX-423** (S1) Long export intro; four extra buttons on the Pro screen.
@@ -209,3 +219,7 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - with TalkBack on, the current language is announced as selected, and a double-tap closes the sheet
 - [ ] **UX-513** (S1) The sign-out, Sincronizar and Importar spinners have no TalkBack label. _(needs: TalkBack)_
   - with TalkBack on, tap Sincronizar, Importar and Cerrar sesión, and each says what it is doing
+- [ ] **UX-816** (S1) Title jumps sideways while the account is deleting.
+  - in airplane mode, tap Eliminar mi cuenta; the title doesn't move
+- [ ] **UX-817** (S1) Changed-plan banner reads «viñeta» aloud, may announce twice. _(needs: TalkBack)_
+  - TalkBack speaks the banner once, without «viñeta»

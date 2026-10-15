@@ -3589,9 +3589,20 @@ class AppLocalizationsCa extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count tasques i els fitxers que vas afegir a projectes compartits, sense el teu nom',
-      one:
-          '1 tasca i els fitxers que vas afegir a projectes compartits, sense el teu nom',
+          '$count tasques que vas afegir a projectes compartits, sense el teu nom',
+      one: '1 tasca que vas afegir a projectes compartits, sense el teu nom',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteAccountKeptFiles(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count fitxers que vas afegir a projectes compartits, sense el teu nom',
+      one: '1 fitxer que vas afegir a projectes compartits, sense el teu nom',
     );
     return '$_temp0';
   }
