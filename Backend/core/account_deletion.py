@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
-from .billing import has_pro
+from .billing import delete_customer, has_pro
 from .collaboration import clear_assignments
 from .google_auth import verify_google_identity
 from .invitation_email import unsigned_invitation
@@ -213,6 +213,12 @@ def _scrub_activity(user):
     TaskEvent.objects.filter(actor=user).update(actor=None)
 
 
+def _delete_billing_customer(billing_id):
+    if delete_customer(billing_id) is False:
+        # Without the ID: once the account is gone, nothing here should name it again.
+        logger.warning("Account deleted; its RevenueCat customer could not be deleted.")
+
+
 def _remove_files(storage, names):
     # Runs after the commit: the account is already gone, whatever happens here.
     for name in names:
@@ -291,9 +297,12 @@ def delete_account(user, expected_plan=None):
             version=F("version") + 1, updated_at=now)
 
         OutstandingToken.objects.filter(user=user).delete()
+        billing_id = user.billing_id
         # Cascades the rest of the account: Google link, sessions, free dictations,
         # notifications and project preferences.
         user.delete()
+        # The subscription provider's customer goes too, once the deletion has committed.
+        transaction.on_commit(partial(_delete_billing_customer, billing_id))
 
         # Never remove a file that an attachment still uses.
         stored -= set(Attachment.objects.filter(file__in=stored).values_list("file", flat=True))

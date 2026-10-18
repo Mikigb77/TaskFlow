@@ -24,7 +24,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import get_md5_hash_password
 
 from .email_verification import (MAX_WRONG_ATTEMPTS, code_matches, email_language, has_live_code, issue_code,
-                                 mark_verified, send_code, send_new_code, take_over_unconfirmed, unconfirmed,
+                                 mark_verified, resend_code, send_code, send_new_code, take_over_unconfirmed, unconfirmed,
                                  verification_required)
 from .models import EmailVerification, User, LoginSession
 from .serializers import EMAIL_EXISTS, RegistrationSerializer, UserSerializer
@@ -153,8 +153,13 @@ class ResendVerificationView(PublicAuthView):
         email = serializers.EmailField(max_length=254).run_validation(request.data.get("email")).strip().casefold()
         user = User.objects.filter(email__iexact=email, is_active=True, email_verified=False).first()
         if user is not None:
-            send_new_code(user, email_language(request.data.get("language")))
-        # The same answer whether or not the account exists, is confirmed or was sent a code.
+            wait = resend_code(user, email_language(request.data.get("language")))
+            if wait:
+                # Said rather than a 204, so the app never claims a code went out (D9, 2026-10-18).
+                return Response({"code": "resend_limited", "retry_after": wait,
+                                 "detail": "Too many codes asked for. Wait before asking for another."},
+                                status=429, headers={"Retry-After": str(wait)})
+        # Otherwise the same answer whether or not the account exists or is confirmed.
         return Response(status=204)
 
 
@@ -220,6 +225,19 @@ class LogoutView(APIView):
 
 class MeView(APIView):
     def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        """Set the first name people see in shared projects; nothing else changes here.
+
+        The app asks a password account for it once, when it first shares or joins a project
+        (D8, 2026-10-18). Blank clears it, and the email's first part shows again."""
+        fields = set(request.data) if isinstance(request.data, dict) else set()
+        if fields != {"first_name"}:
+            raise ValidationError({"detail": "Send first_name, and nothing else."})
+        name = serializers.CharField(max_length=150, allow_blank=True).run_validation(request.data["first_name"])
+        request.user.first_name = " ".join(name.split())
+        request.user.save(update_fields=["first_name"])
         return Response(UserSerializer(request.user).data)
 
 

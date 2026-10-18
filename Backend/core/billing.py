@@ -44,6 +44,28 @@ def _customer(billing_id):
         connection.close()
 
 
+def delete_customer(billing_id):
+    """Delete this account's RevenueCat customer, once the account itself is gone.
+
+    Best effort: Google Play keeps its own purchase records, and a failure here never undoes or
+    blocks a deletion. True when RevenueCat confirms it, or never had that customer; None when
+    billing isn't configured here."""
+    key = settings.REVENUECAT_API_KEY
+    if not key:
+        return None
+    connection = http.client.HTTPSConnection("api.revenuecat.com", timeout=6)
+    try:
+        connection.request("DELETE", f"/v1/subscribers/{quote(str(billing_id), safe='')}",
+                           headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
+        response = connection.getresponse()
+        response.read(64 * 1024)
+        return response.status in (200, 201, 204, 404)
+    except (OSError, http.client.HTTPException):
+        return False
+    finally:
+        connection.close()
+
+
 def _date(value):
     if value is None:
         return None

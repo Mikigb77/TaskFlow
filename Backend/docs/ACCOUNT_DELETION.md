@@ -29,7 +29,8 @@ Everything runs in one transaction on the server. Stored files are removed only 
 | Pending invitations to the person's email | Deleted, together with their `EmailDelivery` rows. |
 | Invitations the person sent | They stay valid for the project or group (`invited_by` is set to null). An unsent invitation email that names them is signed «Someone», «Alguien» or «Algú» instead, in its language. |
 | Queued or old emails to the person's address (`EmailDelivery`) | Deleted. |
-| RevenueCat customer, and store purchase records | Not touched in this step; to do later with the owner (see below). The store keeps its own legally required records. |
+| RevenueCat customer | Deleted at RevenueCat (`DELETE /v1/subscribers/{billing_id}`) once the deletion has committed, when the server has the RevenueCat key. Best effort: a failure is logged without the ID and never undoes or blocks the deletion. Decided 2026-10-18. |
+| Store purchase records | Not touched. Google Play keeps its own legally required records. |
 
 **Showing what will happen before deleting.** `GET /api/auth/delete-account/` returns a preview, and the app shows it before the person confirms. It lists:
 - what will be deleted, as counts;
@@ -60,7 +61,7 @@ If the request fails, nothing changes on the phone. Deleting needs a connection;
 
 ## Out of scope for this step, to decide with the owner
 1. **The confirmation email** from `taskflow.noreply@garbar.tech`: the next step. The address is in memory at deletion time; nothing is kept for it.
-2. **Deleting the RevenueCat customer** (`DELETE /v1/subscribers/{billing_id}`). The delete-account page says subscription-provider data is deleted subject to payment, accounting and anti-fraud duties.
+2. ~~**Deleting the RevenueCat customer**~~: done (see the table), decided by the main session on 2026-10-18 while the owner was away.
 3. **A cleanup job for tasks.** The owner described completed tasks being removed after 1 month (free) or 3 months (Pro). That job doesn't exist, and the privacy page currently says the opposite: "Las tareas completadas no se eliminan automáticamente a los 30 o 90 días". The owner has to choose, and the website text must match.
 4. **Free-dictation reuse.** Deleting an account and signing up again gives 10 new free dictations. Preventing that means keeping a hash of the email, which must then be disclosed.
 5. **The website.** Once the in-app option ships, the delete-account page's line "La versión de pruebas actual todavía no tiene una opción de eliminación dentro de la app" must change (separate repo).
@@ -68,4 +69,4 @@ If the request fails, nothing changes on the phone. Deleting needs a connection;
 ## Implementation
 - Module: `core/account_deletion.py` (`deletion_preview`, `delete_account` and the view).
 - Endpoint: `GET` and `POST /api/auth/delete-account/`.
-- Tests: `core/test_account_deletion.py`; the creator of kept tasks in `core/test_task_creator.py`.
+- Tests: `core/test_account_deletion.py`; the creator of kept tasks in `core/test_task_creator.py`; the RevenueCat customer in `core/test_billing_deletion.py`.

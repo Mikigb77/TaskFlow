@@ -199,7 +199,11 @@ class EmailVerificationTests(VerificationTestCase):
         self.assertFalse(User.objects.exists())
         with codes(111111, 222222):
             self.register()
-            self.assertEqual(self.resend().status_code, 204)  # within a minute: nothing
+            within_a_minute = self.resend()  # nothing is sent, and the wait is said
+            self.assertEqual(within_a_minute.status_code, 429)
+            self.assertEqual(within_a_minute.data["code"], "resend_limited")
+            self.assertTrue(0 < within_a_minute.data["retry_after"] <= 60)
+            self.assertEqual(within_a_minute["Retry-After"], str(within_a_minute.data["retry_after"]))
             self.assertEqual(len(mail.outbox), 1)
             self.age_last_code()
             self.assertEqual(self.resend().status_code, 204)
@@ -216,11 +220,22 @@ class EmailVerificationTests(VerificationTestCase):
             self.resend()
             self.assertEqual(len(mail.outbox), sent)
         self.age_last_code()
-        self.resend()  # a sixth code in the same hour
+        sixth = self.resend()  # a sixth code in the same hour
+        self.assertEqual(sixth.status_code, 429)
+        self.assertTrue(60 < sixth.data["retry_after"] <= 3600)
         self.assertEqual(len(mail.outbox), 5)
         EmailVerification.objects.update(hour_started_at=F("hour_started_at") - timedelta(hours=1))
         self.resend()
         self.assertEqual(len(mail.outbox), 6)
+
+    def test_resend_says_nothing_new_about_who_has_an_account(self):
+        User.objects.create_user("confirmed@example.invalid", PASSWORD, email_verified=True)
+        for email in ("unknown@example.invalid", "confirmed@example.invalid"):
+            with self.subTest(email=email):
+                for _ in range(7):  # far past one a minute and five an hour
+                    cache.clear()  # the endpoint's general rate limit isn't what's tested here
+                    self.assertEqual(self.resend(email).status_code, 204)
+        self.assertFalse(mail.outbox)
 
     def test_the_outbox_limits_apply_too(self):
         for _ in range(8):  # this address's emails for today are used up
@@ -232,7 +247,9 @@ class EmailVerificationTests(VerificationTestCase):
         for _ in range(7):
             reserve_email("other@example.invalid")
         self.age_last_code()
-        self.assertEqual(self.resend("other@example.invalid").status_code, 204)
+        limited = self.resend("other@example.invalid")
+        self.assertEqual((limited.status_code, limited.data["code"]), (429, "resend_limited"))
+        self.assertEqual(limited.data["retry_after"], 3600)
         self.assertEqual(self.login("other@example.invalid").status_code, 403)
         self.assertEqual(len(mail.outbox), 1)
 

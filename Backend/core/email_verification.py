@@ -141,6 +141,24 @@ def send_new_code(user, language=None):
     send_code(delivery)
 
 
+def resend_code(user, language=None):
+    """Email a fresh code for «Reenviar código»: 0 once one is on its way, else the seconds to wait.
+
+    Unlike send_new_code, the wait is told, so the app never says a code was sent when it wasn't.
+    It gives nothing away: registering the same address already answers 429 while a recent
+    code for an unconfirmed sign-up stands."""
+    with transaction.atomic():
+        locked = User.objects.select_for_update().filter(pk=user.pk, is_active=True, email_verified=False).first()
+        if locked is None:
+            return 0
+        try:
+            delivery = issue_code(locked, language)
+        except Throttled as error:
+            return max(1, math.ceil(error.wait or 3600))
+    send_code(delivery)
+    return 0
+
+
 def mark_verified(user):
     """The address is proven: the account counts as confirmed and its code stops working.
 

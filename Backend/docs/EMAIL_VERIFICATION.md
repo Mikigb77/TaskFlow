@@ -48,8 +48,10 @@ It checks, in this order:
 Spaces, hyphens and a code sent as a JSON number are accepted.
 
 **`POST /api/auth/verify-email/resend/`**: `{"email", "language"?}`.
-- Always `204`, whether or not the account exists.
-- It sends a new code only to an unconfirmed account, within the limits. The new code replaces the last one.
+- `204` when a new code is on its way, and for any address with no unconfirmed account: an unknown address or a confirmed one gets `204` and nothing is sent.
+- For an unconfirmed account past a limit (below), nothing is sent and the answer is `429 {"code": "resend_limited", "retry_after": <seconds>, "detail"}`, with a `Retry-After` header. The app then says how long to wait and keeps «Reenviar código» off, instead of claiming a code went out (D9, decided 2026-10-18).
+  - This tells nothing new about who has signed up: registering the same address already answers `429` while a recent code for an unconfirmed sign-up stands.
+- The new code replaces the last one.
 
 ## The code
 
