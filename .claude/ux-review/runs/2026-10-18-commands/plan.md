@@ -253,3 +253,97 @@ Round 2 (P148, P149) passed its round check with no failing test, and both revie
 
 ### Phone checks added
 - P151: after a restart, Back from «Confirma tu correo» closes with the same animation as Back from any other screen.
+
+## Re-plan after decisions (2026-10-19)
+
+**Summary.** The owner is away, so the main session answered D1–D11 with the organizer's recommendations (DECISIONS.md, 2026-10-18 night). It also decided UX-815, two items from the website review and a list of the tasks that hold files. They become 13 fixes in 8 packages (P152–P159), which run after b3 (P139–P144, unchanged). D5, D10 and D11 need no work and are closed, so no owner question is left from this run.
+
+Nothing here slows a capture. A command result with nothing to add closes without a question, a dictation carried into the form keeps its day, and a task added under a person's chip needs no extra tap.
+
+### Decisions
+None open. Where each answer went:
+- **D1 (UX-917):** Cancelar on a result with nothing to add just closes → P152.
+- **D2 (UX-918):** dictated words carried into the form by «Escribir» get their day and time read; typed titles stay as typed → P153.
+- **D3 (UX-919):** «Guardar como tarea» / "Save as a task" / «Desa-ho com a tasca» → P152.
+- **D4 (UX-920):** a search with a period lists by day and time, soonest first → P152.
+- **D5 (UX-921):** the button stays «Nueva tarea» → closed, no work.
+- **D6 (UX-1010):** Back on a new task shows the add message → P153.
+- **D7 (UX-1111):** a task added under a person's chip is that person's → P159.
+- **D8 (UX-1102, UX-1112):** Google names come from the server (41c00f3); password accounts are asked once → P155.
+- **D9 (UX-1206):** the resend limit says how long to wait; the server half is d447c5c → P156.
+- **D10 (UX-1211):** no «Abrir el correo» → closed, no work.
+- **D11 (UX-912):** measured, no slowdown, so the flag stays → closed, no work.
+
+Also decided for the owner the same night, and packaged here:
+- **UX-815:** confirm a deletion with Google → P157. It keeps its ID from run 2026-10-15-deletion.
+- **UX-1221 (new, website review WD7):** the app says subscriptions come on iOS too → P158.
+- **UX-1222 (new, website review WD11):** no link to the Privacy Policy or the Terms → P158.
+- **UX-1223 (new, from UX-506):** a full file space gives no way to find the files → P154.
+
+### Packages, in order
+b3 runs first: P139–P144, as planned above and unchanged. Then b4 and b5. The full briefs are in `plan.json`.
+
+#### b4
+
+### P152 · S2 · A · M · Command results: Cancelar just closes, «Guardar como tarea», a period's search by day
+- **UX-917 (S2, D1):** with no task or note to add, Cancelar, Back and the scrim discard the result at once. Results with a task still ask.
+- **UX-919 (S2, D3):** the fallback is renamed «Guardar como tarea» / "Save as a task" / «Desa-ho com a tasca» in the catalogs, comments, previews and tests.
+- **UX-920 (S1, D4):** a search with a period lists by day and time, soonest first, as Calendar orders a day. Other searches stay newest first.
+
+### P153 · S2 · A · M · The new-task form: dictated words keep their day; Back says what was added
+- **UX-918 (S2, D2):** words dictated before «Escribir» open the form with their day and time read. «a las 5» keeps its words in the title and sets no time. Typed titles, shares and typed captures stay as typed.
+- **UX-1010 (S1, D6):** Back on a new task says «Añadida al lun, 19 oct», «Añadida · vence el …» or «Añadida sin fecha», with Deshacer. A deadline-only task lands on its due day.
+
+### P154 · S2 · B · M · A full file space lists the tasks that hold files
+- **UX-1223 (S2):** when the account's own space is full, «Ver tareas con archivos» shows beside «Ver Pro» and on the Pro screen's storage line. It opens a list of the account's tasks with files, largest first, and each row opens its task.
+
+### P155 · S2 · C · L · Real names: Google's at sign-in, and a password account asked once
+- **UX-1112 (S2, D8):** right after its first invitation or its first join, an account with no first name is asked «¿Cómo te llamas?», once. The name is prefilled from the email, can be skipped, and is sent with `PATCH /api/auth/me/`.
+- **UX-1102 (S2, D8):** Google's half is on the server (41c00f3). The package checks that every place shows the server's name.
+
+### P156 · S2 · D · M · «Reenviar código» past the server's limit says how long to wait
+- **UX-1206 (S2, D9):** a 429 `resend_limited` of over a minute shows «Has pedido muchos códigos. Espera 30 minutos para pedir otro.». «Reenviar código» stays off and counts minutes, then seconds. It builds on P143's countdown.
+
+#### b5
+
+### P157 · S2 · D · M · Delete my account: confirm with Google instead of a forgotten password
+- **UX-815 (S2):** an account with a password and Google linked can confirm with «Confirmar con Google», under the password. A wrong password there names that button.
+
+### P158 · S2 · D · M · Links to the Privacy Policy and Terms; the app says Android only
+- **UX-1222 (S2):** «Política de privacidad» and «Términos y condiciones» show under sign-in's card and in Otros ajustes. Each opens the site's page in the app's language.
+- **UX-1221 (S1):** the line reads «Las suscripciones están disponibles en la app para Android.», without iOS.
+
+### P159 · S1 · C · L · A task added under a person's chip is that person's
+- **UX-1111 (S1, D7):** on a project page with Ana's chip on, the form and the capture card start the task as Ana's, and one tap changes it. A person named in the words wins, and the page keeps Ana's chip.
+
+### Settled here
+- **D1 and the keep question:** the question depends on whether a task or a note is still to add. Command cards on their own never ask.
+- **D2's bare hour:** «a las 5» keeps its words in the title and sets no time. The form has no morning-or-afternoon question, and the phone doesn't guess.
+- **D2's deadlines:** «antes del viernes» becomes the task's deadline. So P153 also makes the form's message and landing handle a deadline-only task, as P129 did for the sheet.
+- **D7 in the capture sheet:** it applies there too, for Pro and for free accounts with dictations left. A person named in the words wins.
+- **D8's moment:** the name is asked after the first invitation goes out or after the first join, not before. So the first invitation carries the email's first part. No way to change the name later is added.
+- **D8's prefill:** the part of the email before the @, cut at the first dot, underscore, hyphen, plus or digit, with a capital first letter («paul.smith84» → «Paul»).
+- **D9's short wait:** a refusal of a minute or less (the one-a-minute limit) gets no «Has pedido muchos códigos» line, only the countdown. One early tap isn't many codes.
+- **"The Account storage row":** Cuenta has none. The account's storage shows on the Pro screen, so the link goes there.
+- **The files list:** it lists only tasks whose files use the account's own space (no project, or a project it owns), because storage is charged to the project's owner.
+- **The legal links:** they go on the first screen as well as «Crea tu cuenta», because Google sign-in there creates accounts too. In Ajustes they go in Otros ajustes, not among the six main rows. No consent sentence is added.
+- **The packages:** D1, D3 and D4 share one package (the command result). D2 and D6 share another (the form), and WD7 and WD11 a third (what the app says about itself).
+
+### Closed
+- **No change, by decision:** UX-921 (D5), UX-1211 (D10) and UX-912 (D11) move to Won't fix.
+- **Recorded from the same DECISIONS entry, outside this run's findings:**
+  - UX-616: server settings at the next deploy, cause server-side. It moves to Won't fix.
+  - UX-812 and UX-814: not now. They move to Won't fix.
+  - UX-813: later, with the deferred confirmation email. It moves to Won't fix.
+  - UX-615 stays a decision until the §7 test with the owner's father.
+
+### Notes for the main session
+- **Batches:** b3 = P139–P144, b4 = P152–P156, b5 = P157–P159, each run with `only`. Set `recordMemory: false` on every batch except b5.
+- **Server docs:** `Backend/docs/VOICE_COMMANDS.md:100` still says a search lists newest first. After P152, a search with a period lists soonest first.
+- **The old name:** after P152, the phone checks that name «Guardar tal cual» (U7, UX-469, UX-701, UX-901) mean «Guardar como tarea». Regenerate PHONE_CHECKS.md after the run. The reviewer's memory names it too.
+- **Deploys the phone checks need:**
+  - P156 needs d447c5c on staging;
+  - P155's Google names need 41c00f3 on staging;
+  - P158's links load only once the site's legal pages are published (WD13).
+- **Catalan the organizer wrote, to read with a native speaker:** `tasksWithFiles`, `tasksWithFilesHelp`, `tasksWithFilesRow`, `tasksWithFilesEmpty`, `storageSeeTasks`, `nameAskTitle`, `nameAskBody`, `verifyEmailResendInMinutes`, `deleteAccountGoogleInstead` and `deleteAccountWrongPasswordGoogle`. «Desa-ho com a tasca» comes from the decision.
+- **Evidence:** this is a plan only, read from the code at 8993690. Nothing was run.
