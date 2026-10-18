@@ -1,6 +1,6 @@
 # Voice commands and projects: the list
 
-The owner asked for these on 2026-10-18, with "first create a list of things to include… then implementation… then all the test suites and the UX reviewer." The main session wrote this list, which is waiting for the owner's answers in "Decisions for the owner". Nothing here is built yet.
+The owner asked for these on 2026-10-18, with "first create a list of things to include… then implementation… then all the test suites and the UX reviewer." The main session wrote this list. **The owner approved every recommendation on 2026-10-18 and asked for all of it** (DECISIONS.md, 2026-10-18 later), together with a form for free accounts.
 
 ## Already in the app (verified in the code on 2026-10-18)
 - **Naming a project in a dictation.**

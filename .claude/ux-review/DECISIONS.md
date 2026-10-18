@@ -2,6 +2,28 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-18 (later) — A form for free accounts, and voice commands for projects and tasks
+- **The owner approved all seven recommendations** in `.claude/ux-review/voice-commands-plan.md`:
+  1. «Proyecto» in the app, with «grupo», «proyecto» and «lista» understood in dictations;
+  2. a project named in a dictation is created only on the confirming tap;
+  3. no inviting by voice;
+  4. everyone in a project sees all of its tasks, plus a filter by person;
+  5. changing and deleting by voice always show the before and after, need a tap, and offer «Deshacer»;
+  6. search includes completed tasks, and tasks show «Creada por»;
+  7. free typing creates tasks only.
+- **The owner:** "I want everything fully tested, fully implemented, all the things on the list… and make sure that we are passing the UX review."
+- **Free accounts don't create tasks from free text. They get a form** (this replaces the 2026-10-18 «Escribir tarea» typing).
+  - The owner: "they are gonna just fill in the… form, like… title, notes, side notes, attachments, hour, day". Turning free text or speech into tasks is the paid capability.
+  - The 10 free dictations a month stay; the owner offered "give them 10 tries" earlier the same day.
+  - With dictations left, «Añadir tarea» opens the capture sheet as today. The sheet's keyboard option opens the form for free accounts, instead of free typing.
+  - At 0 left, the button opens the form directly. The once-a-month pop-up explains it.
+  - The phone's parser no longer turns a free account's typed text into tasks. It stays only as the fallback for a dictation («Guardar tal cual»).
+  - The form is the existing task form in create mode:
+    - title first, then day and time;
+    - notes, files, repeat, project and the rest under «Más detalles»;
+    - simple enough for the owner's father.
+  - Pro is unchanged: dictation, and typed words read by the assistant.
+
 ## 2026-10-18 — Manual tasks for free accounts, open sign-up on staging, and email verification
 The owner asked for these before going away, saying "don't ask me any questions". The main session filled in the details; each is reversible.
 - **Free accounts get a clear manual way to create tasks once their 10 dictations run out.** The owner: "keep the button, give them 10 tries, and then change it to a button to manually create the tasks… maybe a pop-up". He likes the current layout.
