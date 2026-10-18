@@ -26,6 +26,8 @@ urlpatterns = [
     path("api/billing/access/", BillingAccessView.as_view()),
     path("api/auth/register/", auth_views.RegisterView.as_view()),
     path("api/auth/login/", auth_views.LoginView.as_view()),
+    path("api/auth/verify-email/", auth_views.VerifyEmailView.as_view()),
+    path("api/auth/verify-email/resend/", auth_views.ResendVerificationView.as_view()),
     path("api/auth/google/", GoogleLoginView.as_view()),
     path("api/auth/google/link/", GoogleLinkView.as_view()),
     path("api/auth/refresh/", auth_views.RefreshView.as_view()),

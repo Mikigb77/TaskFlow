@@ -8,6 +8,10 @@ from .models import GroupInvitation, ListInvitation
 def ensure_registration_allowed(email):
     if settings.DEPLOYMENT_ENVIRONMENT != "staging":
         return
+    # Anyone can sign up on staging (owner, 2026-10-18). STAGING_INVITE_ONLY brings back the
+    # invited-testers gate below: the allowlist or a live invitation.
+    if not getattr(settings, "STAGING_INVITE_ONLY", False):
+        return
     email = email.strip().casefold()
     if email in settings.STAGING_ALLOWED_EMAILS:
         return

@@ -1,4 +1,5 @@
 import hashlib
+import re
 from datetime import timedelta
 from urllib.parse import urlencode
 
@@ -22,9 +23,22 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import get_md5_hash_password
 
-from .models import User, LoginSession
-from .serializers import RegistrationSerializer, UserSerializer
+from .email_verification import (MAX_WRONG_ATTEMPTS, code_matches, email_language, has_live_code, issue_code,
+                                 mark_verified, send_code, send_new_code, take_over_unconfirmed, unconfirmed,
+                                 verification_required)
+from .models import EmailVerification, User, LoginSession
+from .serializers import EMAIL_EXISTS, RegistrationSerializer, UserSerializer
 from .staging import ensure_registration_allowed
+
+CODE_INVALID = {"code": "code_invalid", "detail": "That code isn't right. Check the email and try again."}
+CODE_EXPIRED = {"code": "code_expired", "detail": "That code has expired. Ask for a new one."}
+SIGNUP_REPLACED = {"code": "signup_replaced",
+                   "detail": "This email was signed up again with another password. Sign up again to get a new code."}
+
+
+def login_fail_key(email):
+    # Sign-in's lock: after five wrong passwords, 15 minutes' wait. Email verification shares it.
+    return "login-fail:" + hashlib.sha256(email.strip().casefold().encode()).hexdigest()
 
 
 def issue_session(user):
@@ -45,17 +59,103 @@ class PublicAuthView(APIView):
 
 class RegisterView(PublicAuthView):
     def post(self, request):
-        serializer = RegistrationSerializer(data=request.data)
+        required = verification_required()
+        serializer = RegistrationSerializer(data=request.data, context={"replace_unconfirmed": required})
         try:
             serializer.is_valid(raise_exception=True)
-            ensure_registration_allowed(serializer.validated_data["email"])
+            data = serializer.validated_data
+            ensure_registration_allowed(data["email"])
+            if not required:
+                with transaction.atomic():
+                    # Usable at once, so it stays confirmed if verification is turned on later.
+                    user = serializer.save(email_verified=True)
+                    return Response(issue_session(user), status=201)
             with transaction.atomic():
-                user = serializer.save()
-                return Response(issue_session(user), status=201)
+                # A new sign-up's email follows its own request, else English.
+                delivery = register_unconfirmed(data, email_language(request.data.get("language")) or "en")
+            send_code(delivery)
+            return Response({"verification_required": True, "email": data["email"]}, status=201)
         except DjangoValidationError as error:
             raise ValidationError({"password": error.messages})
         except IntegrityError:
-            raise ValidationError({"email": ["An account with this email already exists."]})
+            raise ValidationError({"email": [EMAIL_EXISTS]})
+
+
+def register_unconfirmed(data, language):
+    """Create an unconfirmed account, or replace one nobody confirmed, and queue its code."""
+    user = User.objects.select_for_update().filter(email__iexact=data["email"]).first()
+    if user is None:
+        user = User.objects.create_user(**data, email_verified=False)
+        return issue_code(user, language)
+    if not unconfirmed(user):
+        raise ValidationError({"email": [EMAIL_EXISTS]})
+    try:
+        delivery = issue_code(user, language)
+    except Throttled:
+        # A second tap with the same password keeps the code already on its way.
+        if has_live_code(user) and user.check_password(data["password"]):
+            return None
+        raise
+    take_over_unconfirmed(user, password=data["password"], first_name=data.get("first_name", ""),
+                          time_zone=data.get("timezone"))
+    return delivery
+
+
+class VerifyEmailView(PublicAuthView):
+    def post(self, request):
+        email = serializers.EmailField(max_length=254).run_validation(request.data.get("email")).strip().casefold()
+        raw = request.data.get("code")
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            raw = f"{raw:06d}"  # a code sent as a JSON number loses its leading zeros
+        code = re.sub(r"[\s-]", "", serializers.CharField(max_length=32).run_validation(raw))
+        password = request.data.get("password")
+        password = password if isinstance(password, str) else ""
+        key = login_fail_key(email)
+        if password and cache.get(key, 0) >= 5:
+            # Sign-in's lock applies here too, so this can't be used to guess the password instead.
+            raise Throttled(wait=900, detail="Too many failed attempts. Try again in 15 minutes.")
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(
+                email__iexact=email, is_active=True, email_verified=False).first()
+            if user is None:
+                # Unknown and already confirmed look the same as an expired code.
+                return Response(CODE_EXPIRED, status=400)
+            # The password first: if this address was signed up again with another password, the
+            # person entering the code isn't the one who chose the password now in place. That
+            # spends no code try, and confirms nothing.
+            if user.has_usable_password():
+                if not password:
+                    return Response(SIGNUP_REPLACED, status=400)
+                if len(password) > 128 or not user.check_password(password):
+                    if not cache.add(key, 1, 900):
+                        cache.incr(key)
+                    return Response(SIGNUP_REPLACED, status=400)
+                cache.delete(key)
+            if not re.fullmatch(r"[0-9]{6}", code):
+                return Response(CODE_INVALID, status=400)
+            row = EmailVerification.objects.select_for_update().filter(user=user).first()
+            # Expired and locked after 5 wrong tries look the same.
+            if row is None or row.expires_at <= timezone.now() or row.attempts >= MAX_WRONG_ATTEMPTS:
+                return Response(CODE_EXPIRED, status=400)
+            if not code_matches(row, code):
+                row.attempts += 1
+                row.save(update_fields=["attempts"])
+                # Returned, not raised, so the wrong try is still counted when the block commits.
+                return Response(CODE_INVALID, status=400)
+            mark_verified(user)
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+            return Response(issue_session(user))
+
+
+class ResendVerificationView(PublicAuthView):
+    def post(self, request):
+        email = serializers.EmailField(max_length=254).run_validation(request.data.get("email")).strip().casefold()
+        user = User.objects.filter(email__iexact=email, is_active=True, email_verified=False).first()
+        if user is not None:
+            send_new_code(user, email_language(request.data.get("language")))
+        # The same answer whether or not the account exists, is confirmed or was sent a code.
+        return Response(status=204)
 
 
 class LoginView(PublicAuthView):
@@ -63,7 +163,7 @@ class LoginView(PublicAuthView):
         email = serializers.EmailField(max_length=254).run_validation(request.data.get("email"))
         password = serializers.CharField(max_length=128, trim_whitespace=False).run_validation(request.data.get("password"))
         email = email.strip().casefold()
-        key = "login-fail:" + hashlib.sha256(email.encode()).hexdigest()
+        key = login_fail_key(email)
         if cache.get(key, 0) >= 5:
             raise Throttled(wait=900, detail="Too many failed attempts. Try again in 15 minutes.")
         user = authenticate(request, email=email, password=password)
@@ -72,6 +172,13 @@ class LoginView(PublicAuthView):
                 cache.incr(key)
             raise AuthenticationFailed("Email or password is incorrect.")
         cache.delete(key)
+        if verification_required() and not user.email_verified:
+            # The right password, but the address isn't confirmed: no session, and a fresh code
+            # when the limits allow one. A wrong password never gets this far.
+            send_new_code(user, email_language(request.data.get("language")))
+            return Response({"code": "email_unverified", "email": user.email,
+                             "detail": "Confirm your email to sign in. Enter the 6-digit code we emailed you."},
+                            status=403)
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
         return Response(issue_session(user))
@@ -156,6 +263,8 @@ class ResetConfirmView(PublicAuthView):
                 validate_password(password, user)
                 user.set_password(password)
                 user.save(update_fields=["password"])
+                # The recovery email proved the address, which confirms an unconfirmed sign-up.
+                mark_verified(user)
                 LoginSession.objects.filter(user=user).update(revoked=True)
         except DjangoValidationError as error:
             raise ValidationError({"password": error.messages})

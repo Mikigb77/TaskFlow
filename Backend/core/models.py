@@ -36,6 +36,8 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password, **extra):
+        # Made by the owner on the server, so the address counts as confirmed.
+        extra.setdefault("email_verified", True)
         return self.create_user(email, password, is_staff=True, is_superuser=True, **extra)
 
 
@@ -45,12 +47,31 @@ class User(AbstractUser):
     timezone = models.CharField(max_length=64, default="UTC")
     # Stable, opaque RevenueCat App User ID, shared across this account's devices.
     billing_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    # False for a password sign-up until its emailed code is entered. Google, a completed
+    # password reset and accounts made before verification existed count as confirmed.
+    email_verified = models.BooleanField(default=False)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = UserManager()
 
     class Meta:
         constraints = [models.UniqueConstraint(Lower("email"), name="unique_email_case_insensitive")]
+
+
+class EmailVerification(models.Model):
+    # The live sign-up code of an unconfirmed account: only a salted digest, never the code.
+    # A new code replaces the last one.
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="email_verification")
+    code_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)  # wrong guesses at this code
+    sent_at = models.DateTimeField()  # the latest code; one a minute at most
+    hour_started_at = models.DateTimeField()  # with sent_this_hour: five codes an hour at most
+    sent_this_hour = models.PositiveSmallIntegerField(default=0)
+    language = models.CharField(max_length=2, default="en")  # "en", "es" or "ca", from the sign-up
+    # The outbox row of the latest code, so its code-bearing subject can be scrubbed. Not a
+    # foreign key: the outbox removes its rows on its own schedule.
+    delivery_id = models.UUIDField(null=True, blank=True)
 
 
 class GoogleIdentity(models.Model):

@@ -1,13 +1,24 @@
 """Run explicitly against the local Docker API. Uses synthetic accounts and tasks.
 
-python scripts/smoke_test.py [--audio /tmp/doctor.wav]
+docker compose exec -T api python scripts/smoke_test.py [--audio /tmp/doctor.wav]
 Calls the configured Google models; it never prints keys, passwords or tokens.
+Its accounts are made already confirmed through Django: signing up through the
+API now waits for the code emailed to the address.
 """
 import argparse
 import json
+import os
 import secrets
+import sys
 import uuid
+from pathlib import Path
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+import django
+django.setup()
+from core.models import User
 
 
 def main():
@@ -25,14 +36,16 @@ def main():
         assert response.status_code == expected, f"{path}: HTTP {response.status_code}: {response.text[:300]}"
         return response.json() if response.content else None
 
-    session = call("auth/register/", {"email": email, "password": password, "timezone": "Europe/Madrid"}, expected=201)
+    signup = call("auth/register/", {"email": f"signup-{uuid.uuid4().hex}@example.invalid", "password": password}, expected=201)
+    assert signup.get("verification_required") is True and not {"access", "refresh"} & set(signup), "Sign-up must wait for the emailed code"
+    User.objects.create_user(email, password, timezone="Europe/Madrid", email_verified=True)
     session = call("auth/login/", {"email": email.upper(), "password": password})
     rotated = call("auth/refresh/", {"refresh": session["refresh"]})
     call("auth/refresh/", {"refresh": session["refresh"]}, expected=401)
     session.update(rotated)
     token = session["access"]
     assert call("auth/me/", token=token, method="GET")["email"] == email
-    print("PASS registration, login, authenticated profile, refresh rotation and replay prevention")
+    print("PASS sign-up waits for the emailed code; login, authenticated profile, refresh rotation and replay prevention")
 
     sample = {"text": "On Friday at 5 p.m. I have an appointment with the doctor. I need to bring the blood test results from last month.",
               "timezone": "Europe/Madrid", "reference_time": "2026-09-20T12:00:00+02:00"}
@@ -45,7 +58,9 @@ def main():
     recovered = call("auth/login/", {"email": email, "password": password})
     assert call("tasks/", token=recovered["access"], method="GET")["results"][0]["id"] == task["id"]
     print("PASS task saved and recovered in a new session")
-    other = call("auth/register/", {"email": f"other-{uuid.uuid4().hex}@example.invalid", "password": secrets.token_urlsafe(24)}, expected=201)
+    other_email, other_password = f"other-{uuid.uuid4().hex}@example.invalid", secrets.token_urlsafe(24)
+    User.objects.create_user(other_email, other_password, email_verified=True)
+    other = call("auth/login/", {"email": other_email, "password": other_password})
     assert call("tasks/", token=other["access"], method="GET")["count"] == 0
     call(f"tasks/{task['id']}/", token=other["access"], method="GET", expected=404)
     print("PASS cross-account isolation")

@@ -33,8 +33,11 @@ def main():
     try:
         for name in ['owner', 'editor']:
             email = f'sharing-race-{stamp}-{name}@example.invalid'
-            session = call('POST', 'auth/register/', data={'email': email, 'password': secrets.token_urlsafe(24)}, expected=201)
-            accounts.append((session['user']['id'], email, session['access']))
+            password = secrets.token_urlsafe(24)
+            # Made already confirmed: signing up through the API now waits for the emailed code.
+            user = User.objects.create_user(email, password, email_verified=True)
+            accounts.append([user.pk, email, None])  # recorded first, so cleanup always removes it
+            accounts[-1][2] = call('POST', 'auth/login/', data={'email': email, 'password': password})['access']
         owner, editor = [account[2] for account in accounts]
         root = f'lists/{list_id}/'
         call('PUT', root, owner, {'name': 'Race fixture', 'version': 0}, 201)

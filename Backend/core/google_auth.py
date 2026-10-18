@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .auth_views import PublicAuthView, issue_session
+from .email_verification import mark_verified, take_over_unconfirmed, unconfirmed, verification_required
 from .models import GoogleIdentity, User
 from .serializers import UserSerializer, validate_timezone
 
@@ -68,15 +69,27 @@ class GoogleLoginView(PublicAuthView):
                 if identity:
                     user = User.objects.select_for_update().get(pk=identity.user_id)
                 else:
-                    # Matching email alone is not authorization to merge accounts.
-                    if User.objects.filter(email__iexact=email).exists():
-                        return conflict()
                     from .staging import ensure_registration_allowed
-                    ensure_registration_allowed(email)
-                    user = User.objects.create_user(email, timezone=serializer.validated_data["timezone"])
+                    existing = User.objects.select_for_update().filter(email__iexact=email).first()
+                    if existing is None:
+                        ensure_registration_allowed(email)
+                        # verify_google_identity accepts only an address Google has verified.
+                        user = User.objects.create_user(
+                            email, timezone=serializer.validated_data["timezone"], email_verified=True)
+                    elif verification_required() and unconfirmed(existing):
+                        # A password sign-up nobody confirmed: nobody could sign in to it, and
+                        # Google has proven this person owns the address, so it becomes theirs.
+                        ensure_registration_allowed(email)
+                        user = existing
+                        take_over_unconfirmed(user, time_zone=serializer.validated_data["timezone"])
+                    else:
+                        # Matching email alone is not authorization to merge accounts.
+                        return conflict()
                     GoogleIdentity.objects.create(user=user, subject=subject)
                 if not user.is_active:
                     raise AuthenticationFailed("This account is unavailable.")
+                if user.email.casefold() == email:
+                    mark_verified(user)  # Google says it has verified this address
                 user.last_login = timezone.now()
                 user.save(update_fields=["last_login"])
                 return Response(issue_session(user))
@@ -115,6 +128,8 @@ class GoogleLinkView(APIView):
                 identity, _ = GoogleIdentity.objects.get_or_create(subject=subject, defaults={"user": user})
                 if identity.user_id != user.pk:
                     return conflict("google_already_linked")
+                # The Google address is this account's (checked above), and Google verified it.
+                mark_verified(user)
                 cache.delete(key)
                 return Response(UserSerializer(user).data)
         except IntegrityError:

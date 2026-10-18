@@ -4,7 +4,10 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 from .models import User, Task, TaskList, TaskGroup, ProjectPreference
 from .billing import complimentary_pro
+from .email_verification import unconfirmed
 from .free_tier import free_voice
+
+EMAIL_EXISTS = "An account with this email already exists."
 
 
 def validate_timezone(value):
@@ -49,11 +52,17 @@ class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["email", "password", "first_name", "timezone"]
+        # validate_email checks uniqueness itself, ignoring case. The model's exact-case check
+        # would also refuse a sign-up that replaces an unconfirmed one.
+        extra_kwargs = {"email": {"validators": []}}
 
     def validate_email(self, value):
         value = value.strip().casefold()
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
+        existing = User.objects.filter(email__iexact=value).first()
+        # With email verification, nobody could sign in to an unconfirmed sign-up, so a new
+        # sign-up replaces it (RegisterView).
+        if existing is not None and not (self.context.get("replace_unconfirmed") and unconfirmed(existing)):
+            raise serializers.ValidationError(EMAIL_EXISTS)
         return value
 
     def validate(self, attrs):

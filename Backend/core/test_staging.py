@@ -37,23 +37,31 @@ class StagingTests(TestCase):
             self.assertEqual(self.client.get('/').status_code, 404)
 
     @override_settings(DEPLOYMENT_ENVIRONMENT='staging', STAGING_ALLOWED_EMAILS={'owner@example.invalid'})
-    def test_staging_registration_requires_allowlist_or_live_invitation(self):
-        ensure_registration_allowed('OWNER@example.invalid')
-        with self.assertRaises(PermissionDenied):
-            ensure_registration_allowed('outsider@example.invalid')
-        owner = User.objects.create_user('owner@example.invalid', 'Fixture-password!2026')
-        group = TaskGroup.objects.create(owner=owner, name='Staging group')
-        invitation = GroupInvitation.objects.create(group=group, email='invited@example.invalid',
-            role='editor', code_digest='fixture', expires_at=timezone.now()+timedelta(days=1))
-        ensure_registration_allowed(invitation.email)
-        invitation.state = 'revoked'
-        invitation.save()
-        with self.assertRaises(PermissionDenied):
-            ensure_registration_allowed(invitation.email)
+    def test_staging_registration_is_open_unless_invite_only(self):
+        # Anyone can sign up by default (owner, 2026-10-18).
+        ensure_registration_allowed('newcomer@example.invalid')
         response = APIClient().post('/api/auth/register/', {
-            'email':'outsider@example.invalid', 'password':'Fixture-password!2026'}, format='json')
-        self.assertEqual(response.status_code, 403)
-        self.assertFalse(User.objects.filter(email='outsider@example.invalid').exists())
+            'email':'newcomer@example.invalid', 'password':'Fixture-password!2026'}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(email='newcomer@example.invalid').exists())
+        # STAGING_INVITE_ONLY brings back the gate: the allowlist or a live invitation.
+        with self.settings(STAGING_INVITE_ONLY=True):
+            ensure_registration_allowed('OWNER@example.invalid')
+            with self.assertRaises(PermissionDenied):
+                ensure_registration_allowed('outsider@example.invalid')
+            owner = User.objects.create_user('owner@example.invalid', 'Fixture-password!2026')
+            group = TaskGroup.objects.create(owner=owner, name='Staging group')
+            invitation = GroupInvitation.objects.create(group=group, email='invited@example.invalid',
+                role='editor', code_digest='fixture', expires_at=timezone.now()+timedelta(days=1))
+            ensure_registration_allowed(invitation.email)
+            invitation.state = 'revoked'
+            invitation.save()
+            with self.assertRaises(PermissionDenied):
+                ensure_registration_allowed(invitation.email)
+            response = APIClient().post('/api/auth/register/', {
+                'email':'outsider@example.invalid', 'password':'Fixture-password!2026'}, format='json')
+            self.assertEqual(response.status_code, 403)
+            self.assertFalse(User.objects.filter(email='outsider@example.invalid').exists())
 
     def message(self):
         return EmailDelivery.objects.create(recipient='tester@example.invalid', subject='Test invitation',

@@ -1,13 +1,15 @@
 """Opt-in local integration fixture. Creates isolated synthetic accounts only.
 
-Run from the repository root. Test Store purchases follow RevenueCat's official
-CLI receipt flow (internal/api/sdk.go and internal/cli/customers.go). A test_
-SDK key cannot charge a real payment method. No credentials are printed.
+Run from the repository root, with the local Docker stack running. Test Store
+purchases follow RevenueCat's official CLI receipt flow (internal/api/sdk.go and
+internal/cli/customers.go). A test_ SDK key cannot charge a real payment method.
+No credentials are printed.
 """
 import argparse
 import json
 from pathlib import Path
 import secrets
+import subprocess
 import time
 import uuid
 from urllib.error import HTTPError
@@ -16,6 +18,22 @@ from urllib.request import Request, urlopen
 
 # A fixed Sunday keeps relative-date assertions reproducible on every run.
 REFERENCE_TIME = "2026-10-11T12:00:00+02:00"
+BACKEND = Path(__file__).resolve().parents[1]
+
+
+def create_confirmed_accounts(emails, password):
+    """Make the accounts already confirmed, through Django in the local API container.
+
+    Signing up through the API now waits for the code emailed to the address. The password
+    reaches the container on stdin, never on a command line."""
+    program = ("import json, sys\n"
+               "from core.models import User\n"
+               "data = json.load(sys.stdin)\n"
+               "for email in data['emails']:\n"
+               "    User.objects.create_user(email, data['password'], timezone='Europe/Madrid', email_verified=True)\n")
+    subprocess.run(["docker", "compose", "exec", "-T", "api", "python", "manage.py", "shell", "-c", program],
+                   input=json.dumps({"emails": emails, "password": password}), text=True, check=True,
+                   cwd=BACKEND, stdout=subprocess.DEVNULL)
 
 
 def call(base, method, path, data=None, token=None, expect=200, headers=None):
@@ -46,11 +64,10 @@ def main():
         return
     suffix = uuid.uuid4().hex[:8]
     password = secrets.token_urlsafe(24) + "4!"
-    people = []
-    for prefix in ("project-owner", "ana-project", "project-outsider"):
-        email = f"{prefix}-{suffix}@example.invalid"
-        response = call(base, "POST", "auth/register/", {"email": email, "password": password, "timezone": "Europe/Madrid"}, expect=201)
-        people.append({"email": email, **response})
+    emails = [f"{prefix}-{suffix}@example.invalid" for prefix in ("project-owner", "ana-project", "project-outsider")]
+    create_confirmed_accounts(emails, password)
+    people = [{"email": email, **call(base, "POST", "auth/login/", {"email": email, "password": password})}
+              for email in emails]
     owner, member, outsider = people
     own, mem, out = [person["access"] for person in people]
     group = call(base, "POST", "groups/", {"name": f"Master {suffix}", "version": 0}, own, expect=201)

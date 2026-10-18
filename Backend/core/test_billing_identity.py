@@ -49,7 +49,9 @@ class BillingIdentityMigrationTests(TransactionTestCase):
         finally:
             executor = MigrationExecutor(connection)
             executor.migrate(after)
-        users = list(User.objects.filter(pk__in=ids).order_by("pk"))
+        # The model as of that migration: today's model has columns added since.
+        MigratedUser = executor.loader.project_state(after).apps.get_model("core", "User")
+        users = list(MigratedUser.objects.filter(pk__in=ids).order_by("pk"))
         self.assertEqual(len({user.billing_id for user in users}), 2)
         self.assertTrue(all(user.billing_id.version == 4 for user in users))
         self.assertTrue(all(user.timezone == "Europe/Madrid" for user in users))

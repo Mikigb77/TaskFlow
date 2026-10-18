@@ -28,10 +28,11 @@ def main():
     password = secrets.token_urlsafe(24)
     account = None
     try:
-        registration = requests.post(base + 'auth/register/', json={'email': email, 'password': password}, timeout=30)
-        assert registration.status_code == 201, registration.status_code
-        account = registration.json()
-        headers = {'Authorization': f"Bearer {account['access']}"}
+        # Made already confirmed: signing up through the API now waits for the emailed code.
+        account = User.objects.create_user(email, password, email_verified=True)
+        login = requests.post(base + 'auth/login/', json={'email': email, 'password': password}, timeout=30)
+        assert login.status_code == 200, login.status_code
+        headers = {'Authorization': f"Bearer {login.json()['access']}"}
         started = time.monotonic()
         with args.audio.open('rb') as recording:
             response = requests.post(base + 'ai/drafts/', headers=headers,
@@ -55,7 +56,7 @@ def main():
         print(f'PASS live synthetic WAV to one unchanged note; new-session HTTP restoration; {elapsed} ms, {len(note["notes"])} characters')
     finally:
         if account is not None:
-            query = User.objects.filter(pk=account['user']['id'], email=email)
+            query = User.objects.filter(pk=account.pk, email=email)
             assert not query.filter(attachments__isnull=False).exists()
             query.delete()
             print('Removed exact synthetic note account and records; no server file fixtures')

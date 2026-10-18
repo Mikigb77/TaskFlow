@@ -1,7 +1,8 @@
 """Run with Django shell in the staging container, with /fixtures mounted privately.
 
-Creates two isolated synthetic users, never the owner's personal account. The
-result contains credentials and belongs in ignored App/build, never Git/logs.
+Creates three isolated synthetic users (owner, outsider and invited member),
+already confirmed, never the owner's personal account. The result contains
+credentials and belongs in ignored App/build, never Git/logs.
 """
 import json
 from pathlib import Path
@@ -9,6 +10,7 @@ import secrets
 import uuid
 from django.conf import settings
 from django.db import connection
+from core.email_verification import mark_verified
 from core.models import User
 
 assert settings.DEPLOYMENT_ENVIRONMENT == 'staging'
@@ -20,8 +22,9 @@ if path.exists():
 else:
     suffix = uuid.uuid4().hex[:10]
     password = secrets.token_urlsafe(24) + '9!'
-    owner = User.objects.create_user(f'delivered+tf-owner-{suffix}@resend.dev', password)
-    outsider = User.objects.create_user(f'delivered+tf-outsider-{suffix}@resend.dev', password)
+    # Already confirmed: signing up through the API now waits for the emailed code.
+    owner = User.objects.create_user(f'delivered+tf-owner-{suffix}@resend.dev', password, email_verified=True)
+    outsider = User.objects.create_user(f'delivered+tf-outsider-{suffix}@resend.dev', password, email_verified=True)
     fixture = {
         'PROJECT_E2E_EMAIL': owner.email, 'PROJECT_E2E_PASSWORD': password,
         'PROJECT_E2E_MEMBER_EMAIL': f'delivered+tf-member-{suffix}@resend.dev',
@@ -30,4 +33,12 @@ else:
         'APP_ENV': 'staging', 'DEV_LOGIN_ENABLED': False,
     }
     path.write_text(json.dumps(fixture, indent=2) + '\n')
+# validate_staging.py signs in as the invited member instead of signing up. An earlier run may
+# already have signed it up, possibly without confirming it.
+member = User.objects.filter(email=fixture['PROJECT_E2E_MEMBER_EMAIL']).first()
+if member is None:
+    User.objects.create_user(fixture['PROJECT_E2E_MEMBER_EMAIL'], fixture['PROJECT_E2E_PASSWORD'],
+                             timezone='Europe/Madrid', email_verified=True)
+else:
+    mark_verified(member)
 print('Isolated staging fixture ready; credentials saved privately.')

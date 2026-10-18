@@ -1,7 +1,8 @@
 """Opt-in real HTTPS staging smoke test. Uses Resend's simulated recipients only.
 
-Seed with seed_staging_check.py first. Credentials/invitation codes remain in
-the ignored fixture; stdout reports checks, never tokens or provider payloads.
+Seed with seed_staging_check.py first: it also creates the invited member, already
+confirmed. Credentials/invitation codes remain in the ignored fixture; stdout
+reports checks, never tokens or provider payloads.
 """
 import argparse
 import hashlib
@@ -48,16 +49,19 @@ def main():
         call('POST', 'auth/refresh/', {'refresh': owner['refresh']}, expect=401)
         own = rotated['access']
         owner['access'] = own
-        call('POST', 'auth/register/', {'email': 'delivered+tf-not-invited@resend.dev', 'password': f['PROJECT_E2E_PASSWORD']}, expect=403)
+        # Staging sign-up is open, and waits for the emailed code. The sign-up is never finished.
+        signup = call('POST', 'auth/register/', {'email': 'delivered+tf-not-invited@resend.dev', 'password': f['PROJECT_E2E_PASSWORD']}, expect=201)
+        assert signup.get('verification_required') is True and not {'access', 'refresh'} & set(signup), 'Sign-up must wait for the emailed code.'
         outsider = call('POST', 'auth/login/', {'email': f['STAGING_OUTSIDER_EMAIL'], 'password': f['PROJECT_E2E_PASSWORD']})
         out = outsider['access']
-        print('HTTPS, Neon health, login, refresh rotation and staging signup gate passed.', flush=True)
+        print('HTTPS, Neon health, login, refresh rotation and open sign-up waiting for the email code passed.', flush=True)
         group = call('POST', 'groups/', {'name': '[Staging check] Master', 'version': 0}, own, 201)
         invitation = call('POST', f"groups/{group['id']}/invite/", {'email': f['PROJECT_E2E_MEMBER_EMAIL'], 'role': 'editor'}, own, 201)
         assert invitation['email_status'] == 'sent', 'Invitation has not reached Resend yet.'
         f.update({'PROJECT_E2E_GROUP': group['id'], 'STAGING_INVITATION_ID': invitation['id'], 'STAGING_INVITATION_CODE': invitation['code']})
         path.write_text(json.dumps(f, indent=2) + '\n')
-        member = call('POST', 'auth/register/', {'email': f['PROJECT_E2E_MEMBER_EMAIL'], 'password': f['PROJECT_E2E_PASSWORD'], 'timezone': 'Europe/Madrid'}, expect=201)
+        # The invited member is a seeded, confirmed account: signing up would need the emailed code.
+        member = call('POST', 'auth/login/', {'email': f['PROJECT_E2E_MEMBER_EMAIL'], 'password': f['PROJECT_E2E_PASSWORD']})
         mem = member['access']
         call('POST', f"group-invitations/{invitation['id']}/respond/", {'decision':'accept', 'code': invitation['code']}, out, 404)
         call('POST', f"group-invitations/{invitation['id']}/respond/", {'decision':'accept', 'code': 'wrong-code'}, mem, 400)
@@ -88,7 +92,7 @@ def main():
         assert {'limit', 'left', 'resets_at'} <= set(me['free_voice']) and {'used_bytes', 'limit_bytes'} <= set(me['storage'])
         f.update({'PROJECT_E2E_MEMBER_ID':str(member['user']['id']), 'PROJECT_E2E_PROJECT':project['id'], 'PROJECT_E2E_TASK':task['id']})
         path.write_text(json.dumps(f, indent=2) + '\n')
-        print('Real Resend invitation, invited signup, acceptance proof, shared tasks, private Neon files, deletion, recovery and logout passed.', flush=True)
+        print('Real Resend invitation, invited member, acceptance proof, shared tasks, private Neon files, deletion, recovery and logout passed.', flush=True)
     config = json.loads((Path(__file__).parents[2] / 'App/config/staging.json').read_text())
     f.update({key:config[key] for key in ('GOOGLE_SERVER_CLIENT_ID','REVENUECAT_TEST_API_KEY')})
     path.write_text(json.dumps(f, indent=2) + '\n')
