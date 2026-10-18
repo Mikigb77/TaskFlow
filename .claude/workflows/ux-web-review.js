@@ -118,7 +118,7 @@ function reviewPrompt(s) {
     others.length
       ? `Other areas are reviewed in parallel (${others.join('; ')}). Stay in yours; put anything else in one line under "Cross-slice notes".`
       : 'You are the only reviewer in this run.',
-    `The pages were rendered from the current working tree just before this run. Start with ${WEB}/artifacts/ux-web/INDEX.md, then read the renders you need; crop tall ones with crop.mjs. Do not run npm, Playwright or the build.`,
+    `The pages were rendered and measured from the current working tree just before this run. Start with ${WEB}/artifacts/ux-web/INDEX.md and AUDIT.md, then read the renders you need, including the demo states; crop tall ones with crop.mjs. Do not run npm, Playwright or the build, and never call the live voice demo: its state renders stub the API.`,
     `Number new findings from WEB-${s.idStart} upward. Anything already in .claude/ux-web/ISSUES.md keeps its ID and is not reported as new.`,
     'Another step records memory: skip the memory update and end your report with a "Memory notes" section.',
     `Write your full report to ${a.runDir}/review-${s.key}.md, then return the structured result. If writing the file is refused, put the full report in "reportText" instead.`,

@@ -50,18 +50,22 @@ You write only in the website's `tests/` folder: spec files, and helpers in `tes
    - Assert what a visitor sees and can do: roles and accessible names, visible text, positions inside the viewport, URLs reached. Don't assert private state or CSS class names unless no visible property can show it.
    - Read copy from the site's content modules when they hold it (`src/content/…` can be imported, as `tests/voice.spec.ts` imports from `src/lib/`), so a correct rewording elsewhere never breaks a test. Assert exact wording only when the check is about the wording.
    - Keep each test independent and deterministic: mock `/api/voice/*` and the Turnstile script with `page.route`, as `tests/voice.spec.ts` does; allow no requests to other origins; use `page.clock` for dates.
-4. **Keep the renders complete.** `tests/ux-renders.spec.ts` is yours. When a package adds or removes a page or a language version, update its `PAGES` table: its coverage test fails while a page file under `src/app` is missing from it.
+4. **Keep the renders complete.** `tests/ux-renders.spec.ts` and its helpers in `tests/support/ux-*.ts` are yours.
+   - When a package adds or removes a page or a language version, update the `PAGES` table: its coverage test fails while a page file under `src/app` is missing from it.
+   - When a package changes the demos' structure or adds a state, update the scenarios in `tests/support/ux-voice.ts`. They find the demo by classes and `data-stage`, not by its copy, and the API's errors are read from the server code, so a rewording needs nothing.
+   - Never let a scenario call the real voice API: every `/api/voice/*` request is answered by `VoiceStub`.
 
 # Then run the round's check
 
 In WSL, in this order:
 1. `npm run check`.
 2. `npm run legal:check`.
-3. `npm run build`.
+3. `SITE_URL=https://taskflow.garbar.tech npm run build`: production's `SITE_URL`, as the `Dockerfile` sets it, so the pages carry the canonical, hreflang and `og:url` production serves. The suite passes on this build too.
 4. Your new tests: `npx playwright test tests/ux-web-<area>.spec.ts --reporter=dot`.
 5. The whole suite: `npm test -- --reporter=dot`. The dot reporter prints only failures in detail.
 6. `npm run test:unit`.
-7. The renders, from scratch: `rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --reporter=dot`.
+7. The renders and the audit, from scratch, then lab performance on its own (about 3.5 + 2 minutes; give it a 10-minute timeout): `rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert "perf " --reporter=dot && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf " --reporter=dot`.
+8. **Check the audit's numbers** against the round's acceptance checks. `artifacts/ux-web/AUDIT.md` measures what many checks name: contrast (§7, §8), target sizes (§5), text sizes (§6), text at 200% and overflow at 320 px (§3), axe (§4), names, alt text and landmarks (§9), focus visibility and the keyboard path (§10), metadata (§11), headings (§12), each demo state (§13) and lab LCP and CLS (§2). For each such check, quote the row that shows it met or not. A number in the audit is evidence, not a lock: still write the test that keeps it true.
 
 Compare the failures with `.claude/ux-web/KNOWN_FAILURES.md`. Failures listed there don't count.
 
@@ -88,7 +92,7 @@ A failing build or type check caused by the round's files is a `site` failure: i
 # Report
 
 Return the structured result the workflow asks for:
-- **For each finding:** the tests you wrote, with file and name, and pass or fail; or why it can only be checked by render or on a device.
+- **For each finding:** the tests you wrote, with file and name, and pass or fail; the `AUDIT.md` row that measures it, when there is one; or why it can only be checked by render or on a device.
 - **Every failure:** whose it is (`site` or `infrastructure`), with the evidence.
 - **The checks you ran,** with their results.
 - **Every file you changed,** as website paths.

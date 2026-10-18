@@ -3,11 +3,12 @@
 //
 // Run it in WSL: sharp comes from the website's node_modules, which hold Linux binaries.
 //   wsl -e bash -lc 'source ~/.nvm/nvm.sh && node /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-web/crop.mjs <render> <screen> [screens] [zoom]'
-//     <render>   a PNG in TaskFlowWeb/artifacts/ux-web, by file name or path,
-//                e.g. privacy.es.mobile.light.full.png
+//     <render>   a full-page render or a demo card in TaskFlowWeb/artifacts/ux-web, by file
+//                name or path, e.g. privacy.es.mobile.light.full.png or
+//                voice-result-six.en.mobile.light.panel.png
 //     <screen>   the screenful to start at; 1 is the first viewport
 //     [screens]  how many screenfuls to include; default 1
-//     [zoom]     enlargement; default 2 for mobile renders, 1 for desktop
+//     [zoom]     enlargement; default 1 for desktop renders at 100%, 2 for the rest
 //
 // Writes TaskFlowWeb/artifacts/ux-web/crops/<render>.s<screen>[-<last>].png (ignored by git,
 // cleared with the renders) and prints its Windows path.
@@ -21,8 +22,16 @@ const web = path.resolve(
   process.env.TASKFLOW_WEB || path.join(here, "..", "..", "..", "TaskFlowWeb"),
 );
 const renders = path.join(web, "artifacts", "ux-web");
-// Screenful heights in CSS px; keep them in step with the projects in playwright.config.ts.
-const SCREEN = { desktop: 1000, mobile: 664 };
+// Screenful heights in CSS px, by the render's viewport (its third name part); keep them in
+// step with the projects in playwright.config.ts and VARIANTS in tests/ux-renders.spec.ts.
+const SCREEN = {
+  desktop: 1000,
+  mobile: 664,
+  "desktop-text200": 1000,
+  "mobile-text200": 664,
+  "desktop-zoom200": 500,
+  "mobile-w320": 568,
+};
 
 const [name, screenArg, countArg, zoomArg] = process.argv.slice(2);
 if (!name || !screenArg) {
@@ -31,15 +40,21 @@ if (!name || !screenArg) {
 }
 const file = path.isAbsolute(name) ? name : path.join(renders, path.basename(name));
 const base = path.basename(file, ".png");
-if (!base.endsWith(".full")) {
-  console.error(`${base}.png isn't a full-page render; a fold render is already one screen.`);
+if (!base.endsWith(".full") && !base.endsWith(".panel")) {
+  console.error(
+    `${base}.png isn't a full-page render or a demo card; fold and view renders are already one screen.`,
+  );
   process.exit(2);
 }
-const mobile = base.includes(".mobile.");
-const step = mobile ? SCREEN.mobile : SCREEN.desktop;
+const viewport = base.split(".")[2];
+const step = SCREEN[viewport];
+if (!step) {
+  console.error(`${base}.png: unknown viewport "${viewport}"; add it to SCREEN in crop.mjs.`);
+  process.exit(2);
+}
 const screen = Number(screenArg);
 const count = Number(countArg || 1);
-const zoom = Number(zoomArg || (mobile ? 2 : 1));
+const zoom = Number(zoomArg || (viewport === "desktop" || viewport === "desktop-text200" ? 1 : 2));
 
 const sharp = createRequire(path.join(web, "package.json"))("sharp");
 const { width, height } = await sharp(file).metadata();

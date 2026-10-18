@@ -76,16 +76,27 @@ Shared files:
 - Let B be 0 when N is 0, otherwise `floor(N / 100) + 1`.
 - Reviewer k (0-based) gets `idStart = (B + k) * 100 + 1`. The first whole-site run numbers its four areas from WEB-1, WEB-101, WEB-201 and WEB-301.
 
-## 4. Render the pages
+## 4. Render and measure the pages
 
-Before any reviewer starts, make sure nothing listens on port 3000 (`WSL: ss -ltn | grep ':3000 ' || echo free`). Playwright would reuse that server, which may serve an older build. Then, in WSL:
+Before any reviewer starts, make sure nothing listens on port 3000 (`WSL: ss -ltn | grep ':3000 ' || echo free`). Playwright would reuse that server, which may serve an older build. Then, in WSL, two commands; give the second a 10-minute timeout:
 
 ```
-WSL: npm run build && rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --reporter=dot
+WSL: SITE_URL=https://taskflow.garbar.tech npm run build
+WSL: rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert "perf " --reporter=dot && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf " --reporter=dot
 ```
 
-- The build comes first because the Playwright config serves the last production build (`npm run start`); without it the renders show old code. The build takes about 1.5 minutes and the renders about 1.
-- The renders land in `../TaskFlowWeb/artifacts/ux-web/` (git ignores `artifacts/`): for every public page, in each language it exists in, on desktop (1440 × 1000) and mobile (iPhone 13 in Chromium, 390 × 664), in light and dark, a first-viewport PNG and a full-page PNG with a magenta line at the fold, plus the link preview and `INDEX.md`. On 2026-10-18 that was 113 PNGs.
+- **The build comes first,** because the Playwright config serves the last production build (`npm run start`); without it the renders show old code. `SITE_URL` is production's, as the `Dockerfile` sets it: without it the pages have no canonical, hreflang or `og:url`, and the audit can't judge them. The build takes 1.5 to 6 minutes.
+- **The renders and the audit** take about 3.5 minutes on 6 workers. **Lab performance** follows on its own, about 2 minutes, because other work running alongside slows its throttled CPU.
+- Everything lands in `../TaskFlowWeb/artifacts/ux-web/` (git ignores `artifacts/`), and its `INDEX.md` explains every file:
+  - every public page, in each language it exists in, on desktop (1440 × 1000) and mobile (iPhone 13 in Chromium, 390 × 664), in light and dark: a first-viewport PNG and a full-page PNG with a magenta line at the fold;
+  - the same pages with the browser's text size doubled (`text200`), at 200% zoom (`zoom200`) and 320 px wide (`w320`);
+  - every state of both demos on the home page, with the voice API stubbed and never called: recording, microphone refused, waiting, the timeout, results, every error the API sends, the sample walkthrough, and more;
+  - the home without JavaScript, the phone menu open, an FAQ answer open;
+  - `AUDIT.md` and `audit.json`, the measured audit: axe, target sizes, text sizes, contrast, what a screen reader gets (with `aria/`), the keyboard path (with `focus/`), headings, metadata, overflow, and lab performance;
+  - the link preview.
+
+  On 2026-10-18 that was 550 PNGs, 446 focus screenshots and 103 ARIA snapshots.
+- **Safari:** with Playwright's WebKit installed in WSL, the same command adds first-viewport renders in WebKit on the iPhone 13 profile. It isn't installed, and installing it is the owner's call: `npx playwright install webkit` downloads about 107 MB, and WSL here runs Kali Linux, where Playwright's `install-deps` can't find WebKit's libraries (it only knows Ubuntu), so they would need installing by hand with `sudo`.
 - If the build or a render fails, mention it but keep going: renders are evidence, not a gate. A failing build is itself something to tell the owner.
 
 ## 5. Review and plan — workflow `ux-web-review`
@@ -160,6 +171,6 @@ Keep it short; the details live in `report.md`.
 
 - **Scoped run, one area:** 1 reviewer, 1 organizer, 1–3 implementers, 1 tester, 1 verifier, 2 recording steps. That's about 7–8 agents.
 - **Whole site:** 4 reviewers and 1 organizer, then one implementer per approved package, one tester per round, and one verifier per area touched.
-- Every implementer and tester builds the site (about 1.5 minutes) and runs Playwright in WSL.
+- Every implementer and tester builds the site (1.5 to 6 minutes) and runs Playwright in WSL; the tester's full renders and audit add about 5.5 minutes.
 
 Models and effort are set in each agent's frontmatter in `.claude/agents/web-ux-*.md`.

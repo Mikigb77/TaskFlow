@@ -238,7 +238,7 @@ function testPrompt(round, impl, files) {
     `Files changed this round: ${files.length ? files.join(', ') : 'none reported'}.`,
     LEAN,
     `Run npm, npx and Playwright only in WSL, as: ${IN_WSL('<command>')}.`,
-    'The round check, in order: npm run check; npm run legal:check; npm run build; your new tests; npm test -- --reporter=dot (only failures print in detail); npm run test:unit; rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --reporter=dot.',
+    'The round check, in order: npm run check; npm run legal:check; SITE_URL=https://taskflow.garbar.tech npm run build; your new tests; npm test -- --reporter=dot (only failures print in detail); npm run test:unit; rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert "perf " --reporter=dot && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf " --reporter=dot (about 5.5 minutes); then check the acceptance checks that artifacts/ux-web/AUDIT.md measures against its rows.',
     'Parts of a package marked "waits on WD#" were left out on purpose; do not test them.',
     'Class every failure as the site\'s or the infrastructure\'s. Return the structured result.',
   ].join('\n')
