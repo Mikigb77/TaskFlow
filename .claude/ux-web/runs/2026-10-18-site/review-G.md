@@ -1,564 +1,728 @@
-## UX web review — G (global: navigation, header and footer, languages, performance, accessibility, SEO and meta, light and dark) — 2026-10-18
+## UX web review — G (global: navigation, header and footer, languages, performance, accessibility, SEO and meta, light and dark) — recheck — 2026-10-19
 
-**Verdict:** Ship after fixes. The shared frame works: contrast passes, the keyboard path works and the footer has every legal link. But the Spanish or Catalan newcomer gets an English home and an English link preview that doesn't say what TaskFlow is. On a phone, the menu's "Get TaskFlow" promises a download that doesn't exist.
+**Verdict:** Ship after fixes. Measured, the frame is sound:
+- axe found 0 violations on all 56 page states;
+- every text colour pair passes in both themes;
+- focus is visible at all 2,148 measured Tab stops;
+- nothing scrolls sideways at 320 px or at 200% zoom.
 
-**Walked:**
-1. **A wrong URL:** 404 → "Back to TaskFlow" → the English home. 1 step, and the language is lost.
-2. **The Leaver, coming in as the Play listing will send them:** `/delete-account/` → «Español» → «Volver a TaskFlow». 2 steps, and they end on the English home.
-3. **The Newcomer on a phone:** menu → "Get TaskFlow" → the closing card → "Find your flow" → back up to `#demo`. 3 steps that loop.
-4. **The Comparer on desktop:** "Explore the app ↗" → the website's sample walkthrough. 1 step, and the label doesn't match the destination.
-5. **Keyboard:** skip link → header → page → footer, on `/`, `/es/privacy/` and the 404.
-6. **Screen reader:** landmarks, names and `lang`, read from the code and the built HTML.
-7. **320 px and text at 200%:** worked out from the CSS.
-8. **Light and dark, no JavaScript, slow network:** from the built HTML and the CSS.
-9. **Sharing:** the home and legal-page previews, from the built `<head>`s and `opengraph-image.png`.
+But the Spanish or Catalan newcomer still meets:
+- an English home and an English slogan as the link preview;
+- a phone menu that promises a download that doesn't exist;
+- a 404 page that's a pun;
+- frame text of 8–11 px that doesn't grow when they ask the browser for bigger text.
 
+**Walked** (journey, steps, people):
+1. **A wrong URL** (`/es/eliminar-cuenta`), as the Leaver on a phone:
+   - English 404 → "Back to TaskFlow" → the English home: 1 step, and the language is lost.
+   - "Delete account" sits below the fold: y ≈ 760 at 390 px and y ≈ 782 at 320 px, so it takes 1 scroll and 1 tap.
+2. **The Leaver from the Play listing** (WD13: `/delete-account/`):
+   - «Español» is 1 tap, at y ≈ 154–200 on a phone;
+   - on the Spanish page, the request button sits in the bottom third (y ≈ 569–623);
+   - «Volver a TaskFlow» then lands on the English home.
+3. **Arriving from the app** (WD11: the app will open `/es/privacy/` and `/es/terms/` in its own language):
+   - the document is Spanish, but the header, the menu and the footer are English;
+   - the footer's "Privacy" and "Delete account" open English pages.
+4. **The newcomer on a phone:** menu → "Get TaskFlow" → the closing card → "Find your flow" → back up to `#demo`. 3 steps, and they loop.
+5. **The Comparer on desktop:** "Explore the app ↗" lands on the website's sample walkthrough, which WD1 removes. 1 step, and the label doesn't match the place.
+6. **Keyboard:** every page × viewport × theme (AUDIT §10, §14).
+7. **Screen reader:** Chromium's accessibility tree and Playwright's ARIA snapshots (AUDIT §9, `aria/`).
+8. **320 px, 200% zoom and doubled default text:** AUDIT §3, plus the `w320`, `zoom200` and `text200` renders.
+9. **Light and dark, no JavaScript, a throttled phone:**
+   - the renders, the `home-nojs` renders and lab performance (AUDIT §2);
+   - all 56 WebKit renders, compared pixel by pixel with Chromium.
+10. **Sharing:** AUDIT §11, `opengraph-image.png`, and the built `<head>`s in `.next/server/app/`.
 - **People:** Newcomer (Spanish or Catalan, phone), Comparer (desktop), assistive-technology user, Leaver.
-- **Viewports:** 1440 × 1000 and 390 × 664 renders; 360 and 320 px from the code.
-- **Languages:** EN on every page. ES and CA exist only for the legal pages, because the home and the 404 have no ES or CA version.
-- **Themes:** light and dark.
+- **Languages:** EN on all 14 pages. ES and CA only on the 12 legal page versions; the home and the 404 have none (INDEX.md).
 - **Evidence:**
-  - the renders of 2026-10-18 (files stamped 19:24), all newer than the code they show (last code change 2026-10-16);
-  - the prerendered HTML of the same build, in `.next/server/app/`;
-  - the code.
-  - No device, no screen reader and no lab run were used.
+  - Chromium renders and audit: built 20:45 UTC, measured 21:52–21:56 UTC on 2026-10-18, with `SITE_URL`;
+  - WebKit renders: 00:19 on 2026-10-19, from a rebuild of the same source at 00:03 without `SITE_URL`;
+  - all of them are newer than the newest website source (2026-10-16 08:01).
+  - No device, no screen reader and no field data. Performance is lab data.
 
-**Numbers:**
-- **Words in the frame:** the desktop header has 10 words, in English on all 14 pages. The phone header has 0 words: 2 icon-only buttons and the wordmark.
-- **Filled buttons in the desktop first viewport:**
-  - home 2, both going to `#demo`;
-  - 404: 2;
-  - delete-account: 2;
-  - privacy, terms and legal: 1, and that one is the header's English "Explore the app".
-- **One destination, many names:** `#demo` has 5 labels, `#features` 2, `#voice` 2.
+**Numbers** (first review → now, measured):
 - **Languages:**
-  - 14 of 18 page × language versions exist; the home and the 404 are English only;
-  - 0 of 8 ES or CA pages have a translated frame: each shows the same 28 English strings (12 header, 15 footer, 1 skip link);
-  - `<html lang>` is right on 6 of 14 pages;
-  - a language switcher appears on 12 of 14 pages, none on the home or the 404.
-- **Link previews:** `og:image` on 2 of 14 pages. `og:locale` on 0 of 14. `twitter:title` matches the page on 2 of 14.
+  - page × language versions that exist: 14 of 18;
+  - `<html lang>` right: 6 of 14 (AUDIT §11: "lang is en" on all 8 ES and CA pages);
+  - about 30 English strings in the frame of every ES and CA page (header, menu, footer, skip link and their accessible names);
+  - a language switch on 12 of 14 pages, never in the header, the menu or the footer.
+- **Link previews:**
+  - `og:image` on 2 of 14 pages, `og:locale` on 0 of 14;
+  - `twitter:title` matches the page on 2 of 14, and one of those two is the 404, which borrows the home's title;
+  - the 404 also declares the home as its canonical URL.
+- **Filled buttons in the desktop first viewport:**
+  - home 2 and 404 2, both counting the header's "Explore the app";
+  - delete-account 2;
+  - privacy, terms and legal 1, the header's English button.
+- **Names:**
+  - `#demo` has 5 labels;
+  - the phone header has 1 word, the wordmark, plus 2 icon-only 42 × 42 px buttons 11 px apart.
 - **Steps to account deletion:**
-  - from any footer: 1 tap, and it lands on the English page;
-  - in Spanish or Catalan through the footer: 2 (English page → «Español»), or 1 through the legal page's own link;
-  - from the 404 on a phone: 1 scroll + 1 tap, because the link sits at y ≈ 760 of a 664-px screen.
-- **Phone header:** sticky, 73 px tall, which is 11% of a 664-px screen.
-- **Type:** 7 styles in the frame are under 12 px, the smallest 8 px. Every size is in px.
-- **Contrast:**
-  - muted text: 5.48:1 light, 8.86:1 dark;
-  - focus ring on the page: 5.76:1 light, 10.47:1 dark;
-  - focus ring on the closing card, light theme: **1.58:1**.
-- **First-view downloads:** a 164,700-byte TTF font, and 2 hero images preloaded where only 1 is shown.
-- **Claims checked:** 5. False 2, misnamed 2, true 1.
+  - from any footer: 1, but it lands on the English page;
+  - in ES or CA: 2 through the footer, or 1 through the legal page's own link;
+  - from the 404 on a phone: 1 scroll and 1 tap.
+- **Type:**
+  - 8 frame and eyebrow text styles are under 12 px; the smallest is 8 px;
+  - 40–41% of the 404's characters are under 12 px (AUDIT §6);
+  - with the browser's default text doubled, none of the 23–145 text elements per page grows (AUDIT §3). The `text200` renders I diffed are pixel-identical to the 100% ones: `home` mobile, `privacy.es` mobile, `not-found` desktop and `delete-account.ca` mobile full.
+- **Contrast (AUDIT §7, §10):**
+  - muted text 5.47:1 light and 8.86:1 dark;
+  - the focus ring 5.76:1 and 10.47:1;
+  - the closing card's ring **1.58:1** in light.
+- **Keyboard:** 2,148 Tab stops; 0 with focus not visible; 0 hidden behind the sticky header; 1 element whose ring is under 3:1 (on desktop and mobile).
+- **Lab performance (mobile, Lighthouse's throttling):**
+  - home: LCP 1.82 s (1.77–1.98 s over 3 runs), CLS 0.000;
+  - other pages: LCP 1.54–1.96 s, CLS 0.000;
+  - Manrope TTF: 68 KB over the wire (164,700 bytes on disk), arriving 23–195 ms after first paint;
+  - the home fetches both theme screenshots, 61 KB;
+  - TBT is 125–817 ms with the same JavaScript on every page, which is single-run noise, not a finding.
+- **WebKit (56 renders):**
+  - every one draws Manrope at its thinnest weight;
+  - 43 of 56, including 27 of 28 iPhone-profile renders, were captured with the theme switch still disabled (pre-hydration);
+  - in Chromium, that happened in 0 of 84 fold renders.
+- **Claims checked:** 6. False 2, misnamed 2, true 2.
 
-**Attention:** predicted from the renders with GUIDELINES §21.4; nothing here was measured.
-- **`home.en.desktop.*.fold`** (the frame's share of it):
+**Attention** (predicted from the renders with GUIDELINES §21.4; nothing here is measured eye-tracking):
+- **`home.en.desktop.*.fold`:**
   1. the H1, top-left;
-  2. the hero screenshot, right half, first looked at after about 2–3 s;
-  3. two filled green buttons competing for the same `#demo`: the hero's "See it in action" and the header's "Explore the app" in the top-right corner.
-  - The wordmark is seen early but names no product type. The header nav (muted, 13 px) is low salience.
-  - "For Android" isn't among the first three.
+  2. the hero screenshot in the right half, first looked at after about 2–3 s;
+  3. two filled green buttons for the same `#demo`: "See it in action" and the header's "Explore the app ↗" in the top-right corner.
+  - The muted 13 px nav is low salience. "For Android" isn't on screen.
 - **`home.en.mobile.*.fold`:**
   1. the H1, in the top half;
-  2. "See it in action";
-  3. the wordmark and two 42-px icon circles (moon, menu).
-  - The frame adds no words to the 5-second test. The screenshot only peeks into the bottom third, a discounted zone.
-- **`privacy.es` and `delete-account.ca`, `.desktop.light.fold`:**
+  2. "See it in action", mid-screen;
+  3. the wordmark and two unlabelled circles, a moon and a menu.
+  - The frame adds no words, and the screenshot only enters the bottom third.
+- **`privacy.es.desktop.light.fold`:**
   1. the H1;
-  2. the header's English "Explore the app". It is the only filled button on the privacy, terms and legal pages; on the delete page it competes with «Escriure sol·licitud d'eliminació»;
-  3. the language pill and the «Eliminar cuenta» link.
-  - An English nav row sits above the Spanish or Catalan H1.
+  2. the header's English "Explore the app", the only filled button;
+  3. the language pill.
+  - An English nav sits above a Spanish H1.
+- **`delete-account.ca.desktop.light.fold`:**
+  1. the H1;
+  2. «Escriure sol·licitud d'eliminació», which competes with the header's filled English button;
+  3. the pill.
 - **`delete-account.es.mobile.light.fold`:**
   1. the H1;
-  2. the language pill, large and bordered, which is good for language;
+  2. the language pill, which is good;
   3. «Volver a TaskFlow».
-  - The filled request button is at y ≈ 570–622, in the bottom third (about 14% of gaze per Lagun 2014).
+  - The request button is in the bottom third, where Lagun 2014 measured about 14% of gaze.
 - **`not-found.en.desktop.*`:**
   1. "Let's find your flow again.";
   2. "Back to TaskFlow";
-  3. the header's filled "Explore the app", which competes.
-  - "404" is in a 10-px eyebrow and is likely missed.
+  3. the header's filled "Explore the app": two filled buttons (CT-1).
+  - "404" is in a 10 px eyebrow.
 - **`not-found.en.mobile.*`:**
   1. the H1, an idiom;
-  2. the button, whose arrow glyph renders as a box in the render;
-  3. the header icons.
-  - Nothing large says "page not found". "Delete account" is below the fold.
+  2. the button;
+  3. the header circles.
+  - Nothing large says "not found", and deletion is below the fold.
 - **`opengraph-image.png`:**
   1. "Make room for a clearer day.";
   2. the wordmark;
-  3. "A LITTLE FOCUS. A LITTLE FLOW."
-  - Nothing shows an app, a phone, a task, a calendar or Android.
+  3. "A LITTLE FOCUS. A LITTLE FLOW.", which can't be read at thumbnail size.
+  - No phone, task, calendar or Android.
+- **WebKit, the same folds:** the same order, but with ExtraLight type and a faded moon (WEB-701, WEB-313).
+
+### Rechecks at a glance
+| ID | First | Now | What the new evidence says |
+|---|---|---|---|
+| WEB-301 | S3 | **S3, confirmed** | INDEX.md: no ES or CA home or 404; AUDIT §11: the home has no hreflang. WD5 now decides the bare `/`. Ledger: merged into WEB-2 |
+| WEB-302 | S3 | **S3, confirmed** | AUDIT §11; `opengraph-image.png`. WD4 now decides the image |
+| WEB-303 | S3 | **S3, confirmed** | `home-menu.en.mobile.*` and `privacy-menu.es.mobile.light`: "Get TaskFlow" is the last menu row, in English on the Spanish page. WD9: no pre-registration yet. Ledger: merged into WEB-3 |
+| WEB-304 | S2 | **S2, confirmed** | AUDIT §11: lang "en" on 8 of 8 ES and CA pages; §9 and §14: English names; WD11 adds a journey from the app |
+| WEB-305 | S2 | **S2, confirmed; fix updated for WD1** | AUDIT §14: stop 8 on every desktop page; §6: 11 px; `zoom200`: shown next to the menu at 720 px. Ledger: merged into WEB-4 |
+| WEB-306 | S2 | **S2, confirmed; one point corrected** | AUDIT §11: the title and canonical are the home's; §6: 40–41% of characters under 12 px. The "box" glyph comes from the render machine, not phones |
+| WEB-307 | S2 | **S2, confirmed** | Renders; AUDIT §5: 42 × 42, 11 px apart; §9: "Open navigation"; §14: the theme switch comes before the menu. Forced colours still inferred |
+| WEB-308 | S2 | **S2, confirmed, now measured** | AUDIT §10: 1.58:1 on desktop and mobile, light; `focus/home.en.desktop.light.31.png` |
+| WEB-309 | S2 | **S2, confirmed, measured; citation corrected** | AUDIT §3: nothing grows at text200; pixel-identical renders. Not a 1.4.4 failure, because zoom works |
+| WEB-310 | S2 | **Withdrawn** | AUDIT §3: no sideways scroll at text200, zoom200 or w320 on any page. Its check moves into WEB-309 |
+| WEB-311 | S1 | **S1, corrected** | AUDIT §2: the font is 68 KB over the wire, not 165 KB; CLS 0.000; LCP passes. The double image fetch is confirmed |
+| WEB-312 | S1 | **S1, confirmed** | AUDIT §11 |
+| WEB-313 | S1 | **S1, confirmed, more evidence** | Built HTML; the no-JS renders; WebKit: 43 of 56 renders show the disabled switch |
+| WEB-701 | — | **S2, new (device check)** | WebKit draws all type at weight 200 |
+| WEB-702 | — | **S1, new** | Taps give no feedback on links without hover styles |
+| WEB-703 | — | **S1, new** | Logo, footer and "Back to top" targets under 44 px |
+| WEB-704 | — | **S1, new** | No Android trademark line (owner decision, 2026-10-18) |
 
 ### Findings (most severe first)
 
 **WEB-301 · Severity 3 · No Spanish or Catalan home, and no way to switch**
+*(Recheck: confirmed. Ledger: merged into WEB-2; written in full here so the plan has the G half.)*
 - **Where:**
-  - `src/app/page.tsx`: the home is English only, and there is no `src/app/[language]/page.tsx`. `/es/` and `/ca/` return the English 404.
-  - `src/app/not-found.tsx`: English only.
-  - `src/components/Header.tsx:28-69` and `src/components/Footer.tsx:4-46` have no language switcher.
-  - The only switcher is inside the legal pages (`src/components/LegalPage.tsx:113-125`). Their back link (`:110-112`) and the logo go to the English `/`.
-  - Evidence: INDEX.md, "Languages the site doesn't have"; `home.en.mobile.light.fold.png`; `privacy.es.mobile.light.fold.png`. The build has no `es/index.html` or `ca/index.html`.
+  - `src/app/page.tsx` is English only. `src/app/[language]/` holds only `[document]/page.tsx`, so `/es/` and `/ca/` return the English 404.
+  - `src/components/Header.tsx:28-69` and `src/components/Footer.tsx:4-46` have no language switch. The only one is the legal pages' (`src/components/LegalPage.tsx:113-125`).
+  - Their back link (`LegalPage.tsx:110-112`) and every logo go to the English `/`.
+  - Evidence: INDEX.md, "Languages the site doesn't have"; AUDIT §11 (the home has no hreflang); renders `home.en.mobile.light.fold.png` and `privacy.es.mobile.light.fold.png`.
 - **The moment:**
-  - The Newcomer arrives from a WhatsApp link: «Esto está en inglés… ¿qué es?»
-  - The Leaver on `/es/delete-account/` taps «Volver a TaskFlow»: «¿Por qué ahora está en inglés?»
+  - The newcomer opens a WhatsApp link: «Esto está en inglés… ¿qué es?»
+  - The Leaver on `/es/delete-account/` taps «Volver a TaskFlow»: «¿Por qué ahora en inglés?»
 - **What happens:**
-  - The main entry page exists only in English.
-  - Nothing on it, in the header or in the footer offers Español or Català.
+  - The main entry page exists only in English, and nothing in the header, the menu or the footer offers Español or Català.
   - A language picked on a legal page is lost on the next tap home.
 - **Why it fails:**
-  - ML-5 (CSA 2020: 76% prefer their own language and 40% never buy in another; self-reported).
-  - ML-4 (a switcher in the header or menu of every page).
-  - ML-1 (stable URLs per language).
-  - NV-7 (the switcher belongs in every footer).
-  - The owner decided the site's copy is written in English, Spanish and Catalan (`.claude/ux-web/DECISIONS.md:21`).
-  - The reviewer's scale lists "an entry page that isn't in the newcomer's language" as Major.
+  - ML-5 (CSA 2020: 76% prefer their own language and 40% never buy in another; self-reported);
+  - ML-4 (a switch in the header or menu of every page);
+  - ML-1 (stable URLs per language; only the bare root may choose);
+  - ML-3;
+  - NV-7;
+  - the owner wants the site's copy in three languages (`.claude/ux-web/DECISIONS.md:75`) and decided how the bare `/` behaves (WD5, `:39-41`);
+  - the reviewer's scale rates "an entry page not in the newcomer's language" as Major.
 - **Fix:**
-  1. Add `/es/` and `/ca/` homes, written by a fluent speaker from the home copy area H settles, not word for word from today's idioms. The app already has its key lines in all three languages, for example `authPitch` (`App/lib/l10n/app_es.arb:412`, `app_ca.arb:391`).
-  2. Put a switcher in the shared frame of every page, keeping the visitor on the same page:
-     - on desktop, in the header, in the space WEB-305 frees;
-     - on phones, as the first rows of the menu;
-     - in the footer.
-
-     Use plain links "Español · Català · English", each with its own `lang` and `hreflang`. No `<select>` and no flags (OL-3). Reuse the legal pages' pattern (`LegalPage.tsx:113-125`). Name it "Language" · «Idioma» · «Idioma».
-  3. Every link in the frame keeps the language prefix: the logo, the nav anchors (`/es/#…`), the footer links and «Volver a TaskFlow».
-  4. Give the home `alternates.languages` (en, es, ca, x-default), and list `/es/` and `/ca/` in `sitemap.ts:13-20`.
+  1. **The homes:** `/es/` and `/ca/`, written by a fluent speaker from the copy area H settles, not from today's idioms. Each sets its own canonical and `alternates.languages`: `en` → `/`, `es` → `/es/`, `ca` → `/ca/`, `x-default` → `/`.
+  2. **The bare `/` only (WD5):**
+     - a server-side check (Next 16 `src/proxy.ts`, matching `/` exactly; docs in `node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md`);
+     - it answers 307 → `/es/` or `/ca/` when the visitor's stored choice says so, or, with no choice, when `Accept-Language` prefers es or ca;
+     - never by IP, and English otherwise;
+     - the response carries `Vary: Accept-Language, Cookie` and `Cache-Control: private, no-store`, so a CDN never serves one visitor's redirect to another;
+     - no other path ever redirects.
+  3. **A language switch in the frame of every page:** "English · Español · Català" as plain links, with no `<select>` and no flags (OL-3).
+     - **Where:** in the desktop header, where "Explore the app" was (WEB-305); as the phone menu's first row; and in the footer.
+     - **Each link:** carries its own `lang` and `hreflang`, and keeps the visitor on the same page (`/privacy/` ↔ `/es/privacy/`, `/` ↔ `/es/`).
+     - **The current language:** `aria-current="page"` plus a cue that isn't colour (bold and a check icon). The legal pill today shows it only by a fill of 1.12:1 light and 1.43:1 dark (AUDIT §8; WEB-208), so fix that pattern once for both.
+     - **The name:** "Language" · «Idioma» · «Idioma».
+  4. **Remember the choice (WD5):** a tap stores it in a first-party preference cookie (for example `taskflow-lang`, 12 months), which step 2 reads. Privacy §8 lists it beside `taskflow-theme`; that's area L (WD3).
+  5. **Every frame link keeps the prefix:** the logo, the nav anchors (`/es/#voice`), the footer links and «Volver a TaskFlow». The sitemap lists `/es/` and `/ca/` (`src/app/sitemap.ts:13-20`).
+  6. **Fit:** the desktop header must fit in Catalan at 801 px with the new labels (WEB-305) and the switch. If it doesn't, show the phone menu up to 1024 px (the breakpoint is 800 px today, `src/styles/global.css:1640`).
 - **Files:**
-  - committed and clean: `page.tsx`, `Header.tsx`;
-  - holding the other session's uncommitted lines: `Footer.tsx`, `layout.tsx`, `sitemap.ts`;
-  - untracked, the other session's: `src/app/[language]/`, `LegalPage.tsx`.
-  - Tests that pin today's frame: `tests/website.spec.ts:111-146`, `tests/legal.spec.ts:24`.
+  - clean: `page.tsx`, `Header.tsx`, `global.css`;
+  - new: `src/proxy.ts`;
+  - the other session's uncommitted lines: `Footer.tsx`, `layout.tsx` (line 8), `sitemap.ts`;
+  - the other session's untracked files: `src/app/[language]/`, `LegalPage.tsx`, `legal.css`;
+  - tests that pin today's frame: `tests/website.spec.ts:84, 114-130, 143`; `tests/legal.spec.ts:24`.
 - **Verify:**
-  - `home.es.*` and `home.ca.*` renders exist, and INDEX.md no longer lists the home under missing languages.
-  - `/es/` returns 200 with `<html lang="es">`.
-  - Playwright on `/`, `/es/`, `/ca/privacy/` and the 404: links named «Español», «Català» and "English", with `hreflang`, are visible on desktop and inside the open menu on mobile.
-  - From `/es/privacy/`, the logo, «Volver a TaskFlow» and every footer link stay under `/es/`.
-- **Evidence:** verified in code and in the build; seen in current renders.
+  - `/es/` and `/ca/` return 200 with `<html lang="es">` and `lang="ca"`;
+  - INDEX.md no longer lists the home under missing languages;
+  - AUDIT §11 shows en, es, ca and x-default on all three homes;
+  - `/` answers 307 to `/es/` for `Accept-Language: es-ES` and 200 for `en`, and a stored "English" choice beats an `es` header; the response has `Vary` and `Cache-Control: private`;
+  - Playwright on `/`, `/es/`, `/ca/privacy/` and the 404: the switch is visible on desktop and inside the open menu on mobile, with `hreflang` set;
+  - from `/es/privacy/`, the logo, «Volver a TaskFlow» and every footer link stay under `/es/`;
+  - renders at 801, 1024 and 1100 px in Catalan: nothing scrolls sideways.
+- **Evidence:** verified in the code and the build; seen in current renders; measured (AUDIT §11).
 
 **WEB-302 · Severity 3 · The link preview doesn't say what TaskFlow is**
+*(Recheck: confirmed. WD4 now decides the image.)*
 - **Where:**
-  - `src/app/layout.tsx:11-13, 24-31`: title, description, Open Graph and X/Twitter;
-  - `src/app/opengraph-image.tsx:57-83`;
-  - render `opengraph-image.png`; built `<head>` in `.next/server/app/index.html`.
-- **The moment:** the Newcomer gets a WhatsApp link showing a big slogan and "A little focus. A little flow. Meet the calm task planner that brings your calendar, priorities, and voice-to-task capture together." «¿Qué es esto? ¿Una app? ¿De qué?»
+  - `src/app/layout.tsx:11-13, 24-31`: the title, description, Open Graph and X tags;
+  - `src/app/opengraph-image.tsx:3`: the alt text, the slogan;
+  - `opengraph-image.tsx:57-83`: the wordmark, the slogan and the tagline, drawn in a generic `sans-serif` (`:18`), not Manrope;
+  - AUDIT §11; render `opengraph-image.png`.
+- **The moment:** a WhatsApp link shows a big slogan and "A little focus. A little flow. Meet the calm task planner…": «¿Qué es esto? ¿Una app? ¿De qué?»
 - **What happens:**
-  - The preview image shows only the wordmark, "Make room for a clearer day." and "A LITTLE FOCUS. A LITTLE FLOW.": no phone, no task, no Android.
-  - The tab title and search title are the same slogan.
-  - The description says "voice-to-task capture". The app's words are "dictation", «dictado» and «dictat».
-  - Everything is in English, and there is no `og:locale`.
+  - The image shows no phone, no task and no Android.
+  - The tab and search title is the same slogan.
+  - The description says "voice-to-task capture", where the app says "dictation", «dictado» and «dictat».
+  - Everything is in English, with no `og:locale` on any of the 14 pages (AUDIT §11).
 - **Why it fails:**
-  - ML-9: the preview should show the product and the promise, in the page's language.
-  - HE-1 and HE-2: the slogan fails the competitor test, since any planner could say it.
-  - HE-10: "capture" is jargon.
-  - ML-8: each page needs a descriptive title.
-  - FN-2 and FN-3: use the app's own words.
-  - GUIDELINES §21.3: for the Newcomer, the shared-link preview comes before the page.
-- **Fix** (match the H1 area H settles; until then, lead with the app's own sign-in line):
+  - ML-9 (the product and the promise, in the page's language);
+  - HE-1 and HE-2: the competitor test fails, because any planner could say it;
+  - HE-10 ("capture");
+  - ML-8;
+  - FN-2;
+  - EY-3;
+  - GUIDELINES §21.3: for the newcomer, the preview comes before the page.
+- **Fix** (the title follows the H1 that H settles; this copy matches WP3's "Say it, and it's on your calendar"):
   - **`<title>` and `og:title`:**
-    - EN: "TaskFlow — say it, and it's on your calendar"
-    - ES: «TaskFlow — dilo y ya está en tu calendario»
-    - CA: «TaskFlow — digues-ho i ja és al teu calendari»
-  - **Description and `og:description`:**
-    - EN: "Note down what you need to do, and TaskFlow puts it on your calendar. You can say several things at once. Android app, coming soon."
-    - ES: «Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario. Puedes decir varias cosas a la vez. App para Android, muy pronto.»
-    - CA: «Apunta el que has de fer i TaskFlow ho posa al teu calendari. Pots dir diverses coses alhora. App per a Android, molt aviat.»
-    - The first sentence is the app's `authPitch` (`App/lib/l10n/app_en.arb:674`, `app_es.arb:412`, `app_ca.arb:391`). The rest of the Catalan needs a native check, and "coming soon" must match the availability line areas H and F settle.
-  - **Image:**
-    - Replace the slogan card with the title line and a current app screen showing a spoken sentence and the dated tasks it became. Use the app's own example (`calendarTrySaying`, `app_en.arb:312`, `app_es.arb:221`, `app_ca.arb:200`):
-      - EN: "Tomorrow, call the dentist and buy bread"
-      - ES: «Mañana, llamar al dentista y comprar pan»
-      - CA: «Demà, trucar al dentista i comprar pa»
-    - Make one image per language: `src/app/[language]/opengraph-image.tsx`, once the ES and CA homes exist.
-    - Keep it legible at 300 px wide, drop "A LITTLE FOCUS. A LITTLE FLOW.", and translate the `alt`.
-  - **Locale:** `openGraph.locale` en_US, es_ES or ca_ES, with `alternateLocale`.
-- **Files:** `opengraph-image.tsx` is committed and clean. `layout.tsx` holds the other session's line 8 only.
+    - EN: "TaskFlow — Say it, and it's on your calendar"
+    - ES: «TaskFlow — Dilo y ya está en tu calendario»
+    - CA: «TaskFlow — Digues-ho i ja és al teu calendari»
+  - **Description and `og:description`** (the first sentence is the app's `authPitch`: `App/lib/l10n/app_en.arb:674`, `app_es.arb:412`, `app_ca.arb:391`):
+    - EN: "Note down what you need to do, and TaskFlow puts it on your calendar. Say several things at once. For Android phones, coming soon to Google Play."
+    - ES: «Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario. Di varias cosas a la vez. Para móviles Android, muy pronto en Google Play.»
+    - CA: «Apunta el que has de fer i TaskFlow ho posa al teu calendari. Digues diverses coses alhora. Per a mòbils Android, aviat a Google Play.» The Catalan needs a native read.
+  - **Image (WD4):**
+    - 1200 × 630, with the title line in Manrope at 64 px or more on the left;
+    - on the right, the top of `public/images/hero-calendar-<language>-light.png` in a phone outline, showing "Call the dentist" and "Buy bread" on tomorrow;
+    - no tagline, and legible at 300 px wide;
+    - one per language: `src/app/opengraph-image.tsx` for `/`, plus `src/app/[language]/opengraph-image.tsx` alongside WEB-301's homes.
+  - **The image's `alt`,** matching the text in WD4's renders:
+    - EN: "TaskFlow's calendar on an Android phone, with “Call the dentist” and “Buy bread” on tomorrow"
+    - ES: «El calendario de TaskFlow en un móvil Android, con «Llamar al dentista» y «Comprar pan» para mañana»
+    - CA: «El calendari de TaskFlow en un mòbil Android, amb «Trucar al dentista» i «Comprar pa» per a demà»
+  - **Locale:** `openGraph.locale` en_US (the site's English is American), es_ES or ca_ES, with `alternateLocale` the other two. `twitter` carries the same title and description.
+  - **A note on the bare domain (WD5):** a link-preview fetcher rarely sends a Spanish `Accept-Language`, so `taskflow.garbar.tech` will usually preview in English.
+    - The switch keeps the language in the URL, so links copied from a Spanish page carry `/es/`.
+    - Links the owner shares himself should be `/es/` or `/ca/`.
+- **Files:** `opengraph-image.tsx` (clean); `layout.tsx` (the other session's line 8 only); new files under `src/app/[language]/` (that folder is the other session's and untracked).
 - **Verify:**
-  - the built `<head>` of each home carries the new title, description and `og:locale`;
-  - `opengraph-image.png` shows a phone screen and the promise, and reads at 300 px wide;
-  - after the owner deploys, paste the URL into WhatsApp on a phone (device check).
-- **Evidence:** verified in the built `<head>` and the current `opengraph-image.png`.
+  - the built `<head>` of each home carries the new title and description, `og:locale` and an `og:image` of its own language;
+  - `opengraph-image.png`, and its ES and CA versions, show the phone screen and read at 300 px wide;
+  - device check after the owner deploys: paste `…/es/` and the bare domain into WhatsApp on a Spanish phone.
+- **Evidence:** measured (AUDIT §11); seen in the current `opengraph-image.png`; verified in the code.
 
 **WEB-303 · Severity 3 · "Get TaskFlow" promises a download that doesn't exist**
+*(Recheck: confirmed by the menu renders. Ledger: merged into WEB-3.)*
 - **Where:**
-  - `src/components/Header.tsx:62-64`: the phone menu, at 800 px and narrower;
-  - it leads to `src/app/page.tsx:399-428` (`#get-taskflow`);
-  - seen in `crops/home.en.mobile.light.full.s11-13.png`.
-- **The moment:** the Newcomer opens the menu to download it: «Get TaskFlow, ¡ahí!» They land on "Less on your mind. More room for life." with a "Find your flow" button that sends them back up to the demo. «¿Dónde se descarga?»
-- **What happens:** the site's only "get it" item leads to a card whose button loops back to `#demo`. The truth ("Android app in development · Public download coming soon") is 10-px text under that button (`global.css:1398-1407`).
+  - `src/components/Header.tsx:62-64`, in the phone menu at 800 px and narrower;
+  - it leads to `src/app/page.tsx:399-428` (`#get-taskflow`), whose button (`:419`) goes back to `#demo`;
+  - renders `home-menu.en.mobile.light.fold.png` and `privacy-menu.es.mobile.light.fold.png`: the last row, in English on the Spanish page.
+- **The moment:** «Get TaskFlow, ¡ahí!» They land on "Less on your mind. More room for life." and a "Find your flow" button that scrolls them back up: «¿Dónde se descarga?»
+- **What happens:**
+  - The only "get it" item in the frame lands on a card whose button loops.
+  - The truth, "Android app in development · Public download coming soon", is 10 px text under that button (AUDIT §6, `.launch-note`).
 - **Why it fails:**
-  - CT-4: the destination must keep the label's promise.
-  - AP-5: before launch, say "Coming soon to Android" in plain text.
-  - Lens C: nothing may imply the app can be installed today.
-  - The owner: "Until then, the calls to action must be honest" (`.claude/ux-web/DECISIONS.md:14`).
+  - CT-4 (the destination keeps the label's promise);
+  - AP-5 (before launch, say "Coming soon to Android" in plain text);
+  - CT-3;
+  - the owner: "Until then, the calls to action must be honest" (`.claude/ux-web/DECISIONS.md:68`); no pre-registration yet (WD9, `:45-46`).
 - **Fix:**
-  - Rename the item to "Coming soon to Android" · «Próximamente en Android» · «Properament a Android», or remove it until the Play listing exists.
-  - Areas H and F own the card. Its first view should say, in body-size text, that the app can't be downloaded yet, with no button that loops back.
-  - When the listing exists, the item becomes the Play link (AP-3); the package ID is still open.
-- **Files:** `Header.tsx` (clean).
+  - Rename the row "Coming soon to Android" · «Próximamente en Android» · «Properament a Android», still to `#get-taskflow`.
+  - Area H's closing card must open with that line, in body-size text, and nothing on it may loop back.
+  - The Android ™ goes on the first "Android" in the page's main content, not on this row (WEB-704).
+  - When Play has the app (package `tech.garbar.taskflow`, `.claude/ux-review/DECISIONS.md:53`), the row becomes the Play link (AP-3).
+- **Files:** `Header.tsx` (clean); `tests/website.spec.ts:114-130`.
 - **Verify:**
-  - at 390 px, the open menu has no "Get" item;
-  - the availability item lands on a view whose first line says the app isn't downloadable yet (Playwright text check);
-  - walking it, nothing loops back to `#demo`.
-- **Evidence:** verified in code; the destination is seen in the current render.
+  - at 390 px, the open menu has no "Get" row;
+  - the row lands on a view whose first line says the app can't be downloaded yet (Playwright text check);
+  - walking it, nothing loops back.
+- **Evidence:** verified in the code; seen in current renders.
 
 **WEB-304 · Severity 2 · Spanish and Catalan pages keep an English frame**
+*(Recheck: confirmed and measured.)*
 - **Where:**
-  - `src/app/layout.tsx:43`: `<html lang="en">` on every page. `:56-58`: "Skip to content".
-  - `src/components/Header.tsx:7-12, 31, 39, 49, 52, 56, 63`; `src/components/ThemeProvider.tsx:82-85`.
-  - `src/components/Footer.tsx:9-43`. The legal links at `:27-30` point to `/privacy/` … `/delete-account/` from every language.
-  - Built: `.next/server/app/es/privacy.html` and `ca/delete-account.html` have `<html lang="en">`.
-  - Renders:
-    - `privacy.es.desktop.light.fold.png`: an English nav and "Explore the app" above «Tu privacidad, con claridad.»;
-    - `crops/privacy.es.mobile.light.full.s21-22.png`: an English footer.
+  - `src/app/layout.tsx:43`: `<html lang="en">`; `:56-58`: "Skip to content";
+  - `src/components/Header.tsx:7-12, 31, 39, 49, 52, 56, 63`; `src/components/ThemeProvider.tsx:82-85`;
+  - `src/components/Footer.tsx:9-43`, whose legal links (`:27-31`) always open the English pages;
+  - AUDIT §11 ("lang is en, not es/ca" on 8 of 8 pages), §9 (landmarks "Main navigation", "Footer navigation" and "Legal and privacy") and §14 (English names in the tab order of `/es/…` and `/ca/…`);
+  - render `privacy-menu.es.mobile.light.fold.png`.
 - **The moment:**
   - The Leaver, reading in Spanish, taps "Delete account" in the footer and gets an English page: «¿Me he equivocado?»
-  - A screen-reader user hears the Spanish `<title>` read with an English voice.
+  - From the app (WD11), «Privacidad» opens `/es/privacy/` inside an English header, menu and footer.
 - **What happens:**
-  - The 28 frame strings stay English on all 8 ES and CA pages.
-  - The footer's legal links leave the language: from `/es/privacy/`, "Delete account" opens the English `/delete-account/`.
-  - Only the `<article lang>` (`LegalPage.tsx:107`) is right, so the `<title>` and the frame are announced in English.
+  - About 30 frame strings stay English on all 8 ES and CA pages.
+  - The `<title>` is Spanish but sits under `lang="en"`, so it's announced with an English voice.
+  - Only `<article lang>` (`LegalPage.tsx:107`) is right.
 - **Why it fails:**
-  - ML-5: translate everything, including `aria-label`s and the skip link.
-  - ML-2 and WCAG 3.1.1, Language of Page (A).
-  - PV-7: the deletion link in each language.
-  - NV-7.
-  - FN-2: the app's Catalan name for deletion is «Suprimeix el compte» (`App/lib/l10n/app_ca.arb:909`).
+  - ML-5 (translate everything, including names and the skip link);
+  - ML-2 and WCAG 3.1.1. The page-level failure is arguable while the frame really is English, but the title isn't;
+  - PV-7 (deletion in each language);
+  - NV-7;
+  - TR-3 (untranslated strings are trust bugs);
+  - FN-2: the app's Catalan for deletion is «Suprimeix el compte» (`App/lib/l10n/app_ca.arb:910`).
 - **Fix:**
-  1. `<html lang>` follows the route (es, ca or en), for example with a root layout per language. The `<article lang>` then becomes unnecessary.
-  2. The header, menu, footer, skip link and theme switch take the page's language. The footer's legal links use `legalPath(document, language)`.
-  3. Subtract before translating: delete "A little focus. A little flow." (`Footer.tsx:17`) and "Made for a little more headspace." (`Footer.tsx:37-42`). Neither says anything a visitor needs.
-  4. The strings, EN · ES · CA (nav labels: see WEB-305):
+  1. `<html lang>` follows the route: es, ca or en. WP2's pre-paint approach is fine; without JavaScript it stays `en`, an accepted remainder.
+  2. The header, menu, footer, skip link, theme switch and every `aria-label` take the page's language, and the footer's legal links use `legalPath(document, language)`.
+  3. Subtract before translating: "A little focus. A little flow." (`Footer.tsx:17`, WD6) and "Made for a little more headspace." (`:37-42`) go.
+  4. Rename "Contact support" to say what happens, since it opens an email draft (RD-7).
+  5. The strings (nav labels in WEB-305; appearance words from the app, `app_en.arb:245-247`, `app_es.arb:180-182`, `app_ca.arb:159-161`):
 
      | EN | ES | CA |
      |---|---|---|
      | Skip to content | Saltar al contenido | Salta al contingut |
      | TaskFlow home | Inicio de TaskFlow | Inici de TaskFlow |
-     | Main navigation | Navegación principal | Navegació principal |
+     | Main navigation (also the phone menu's nav) | Navegación principal | Navegació principal |
      | Menu | Menú | Menú |
+     | Appearance · Light · Dark | Apariencia · Claro · Oscuro | Aparença · Clar · Fosc |
      | Switch to dark mode / light mode | Cambiar a modo oscuro / claro | Canvia al mode fosc / clar |
+     | Language | Idioma | Idioma |
      | A product by {company} | Un producto de {company} | Un producte de {company} |
+     | Footer navigation | Navegación del pie de página | Navegació del peu de pàgina |
+     | Legal and privacy | Legal y privacidad | Legal i privacitat |
      | Privacy | Privacidad | Privacitat |
      | Terms and Conditions | Términos y condiciones | Termes i condicions |
      | Legal Notice | Aviso legal | Avís legal |
      | Delete account | Eliminar cuenta | Suprimeix el compte |
-     | Contact support | Contactar con soporte | Contacta amb el suport |
+     | Email support | Escribir a soporte | Escriu al suport |
      | Back to top | Volver arriba | Torna a dalt |
-     | Legal and privacy | Legal y privacidad | Legal i privacitat |
 - **Files:**
-  - holding the other session's uncommitted lines: `layout.tsx` (line 8), `Footer.tsx` (lines 2, 18, 26-32, 35);
+  - the other session's uncommitted lines: `layout.tsx` (line 8), `Footer.tsx` (lines 2, 18, 26-32, 34-36);
   - clean: `Header.tsx`, `ThemeProvider.tsx`;
-  - `tests/website.spec.ts:114-131` pins "Open navigation", "Main navigation" and "Mobile navigation".
+  - tests: `tests/website.spec.ts:114-130`.
 - **Verify:**
-  - on `/es/privacy/` and `/ca/delete-account/`, `html[lang]` is es or ca;
-  - a Playwright text scan finds no English in the header, the open menu or the footer;
-  - the footer's deletion link reads «Eliminar cuenta» or «Suprimeix el compte» and goes to `/es/delete-account/` or `/ca/delete-account/`;
-  - axe `html-has-lang` and `valid-lang` pass;
-  - TalkBack reads the title in Spanish (device check).
-- **Evidence:** verified in the build and in code; seen in current renders.
+  - `html[lang]` is es or ca on `/es/privacy/` and `/ca/delete-account/` (AUDIT §11 problem column empty);
+  - a Playwright text and name scan finds no English in the header, the open menu, the footer or their accessible names on ES and CA pages;
+  - the footer's deletion link reads «Eliminar cuenta» or «Suprimeix el compte» and stays in the language;
+  - device check: TalkBack reads the title in Spanish.
+- **Evidence:** measured (AUDIT §9, §11, §14); verified in the build and the code; seen in renders.
 
-**WEB-305 · Severity 2 · The header button misnames the demo, and one place has five names**
+**WEB-305 · Severity 2 · The header button misnames the demo; one place has five names**
+*(Recheck: confirmed. Fix updated for WD1: the walkthrough is removed, so `#demo` disappears. Ledger: merged into WEB-4.)*
 - **Where:**
-  - `src/components/Header.tsx:48-50`: a filled "Explore the app" with a ↗ icon, on every page 581 px and wider;
-  - the nav, `Header.tsx:7-12`, and the footer, `Footer.tsx:21-23`;
-  - the same `#demo` is also reached from `page.tsx:68` ("See it in action") and `:419` ("Find your flow").
-  - Renders:
-    - `home.en.desktop.light.fold.png`: two filled buttons, both going to `#demo`;
-    - `delete-account.ca.desktop.light.fold.png`: an English filled button above the Catalan request button.
-- **The moment:**
-  - The Comparer clicks "Explore the app ↗" expecting the app or its store page, and lands on "02 / FROM THOUGHT TO TASK", a sample on the website: "So where's the app?"
-  - On the Catalan delete page, the most prominent control at the top is an English button that leads away.
+  - `src/components/Header.tsx:48-50`: a filled "Explore the app" with a north-east arrow (`Icon.tsx:4`, the "leaves the site" glyph), at 581 px and wider;
+  - AUDIT §14: stop 8 on every desktop page; §6: 11 px; the `zoom200` render shows it next to the menu at 720 px;
+  - `#demo` is also reached from `Header.tsx:9`, `Footer.tsx:22` ("Try the demo"), `page.tsx:68` and `:419`;
+  - renders `home.en.desktop.light.fold.png` and `delete-account.ca.desktop.light.fold.png`, where it's an English filled button above the Catalan request button.
+- **The moment:** the Comparer clicks "Explore the app ↗" expecting the app or its store page, and lands on a sample form on the website: "So where's the app?"
 - **What happens:**
-  - `#demo` has 5 labels: "Explore the app", "How it works", "Try the demo", "See it in action", "Find your flow".
-  - `#features` has 2: "Features", "Meet TaskFlow". `#voice` has 2: "Try voice", "Give it a try".
-  - The nav lists "How it works" (`#demo`) before "Try voice" (`#voice`), though the page shows the voice demo first.
-  - The labels don't match the section headings: "Questions" lands on "Glad you asked."
+  - `#demo` has 5 labels, `#features` 2 and `#voice` 2.
+  - The nav order doesn't follow the page.
+  - "Questions" lands on "Glad you asked."
 - **Why it fails:**
-  - CT-1 and CT-2: one primary action per view, never two in one view.
-  - CT-3 and CT-4: "the app" and the ↗ icon promise something else.
-  - NV-4: anchor text should match the heading it leads to.
-  - Lens G: one concept, one name.
+  - CT-1 and CT-2 (one primary per view);
+  - CT-3 ("Explore");
+  - CT-4;
+  - NV-4 (anchor text matches the heading);
+  - lens G (one concept, one name).
 - **Fix:**
-  1. Remove the header button (`Header.tsx:48-50` and the `.header-cta` CSS) until Google Play has the app. That slot later becomes the store link (AP-1 to AP-3), and in the meantime it frees room for WEB-301's switcher.
-  2. Give each destination one label, in page order, in the header, menu and footer:
+  1. Remove the header button (`Header.tsx:48-50`; `.header-cta`, `global.css:1968-1970`). Its slot takes the language switch (WEB-301). When Play has the app, the store link may come back (AP-1 to AP-3).
+  2. One label per destination, in page order once WP1 moves the live demo under the hero, the same in the header, the menu and the footer:
 
      | Destination | EN | ES | CA |
      |---|---|---|---|
-     | `#features` | What it does | Qué hace | Què fa |
      | `#voice` | Try it with your voice | Pruébalo con tu voz | Prova-ho amb la teva veu |
-     | `#demo` | See an example | Mira un ejemplo | Mira un exemple |
+     | `#features` | What it does | Qué hace | Què fa |
      | `#questions` | Questions | Preguntas | Preguntes |
+     | `#get-taskflow` (phone menu only) | Coming soon to Android | Próximamente en Android | Properament a Android |
 
-     If area H merges or renames the demos, these labels follow the headings it settles. The hero and closing buttons are H's.
-- **Files:** `Header.tsx`, `global.css` (clean); `Footer.tsx` (holds the other session's changes elsewhere).
+     The section headings H settles should start with the same words (NV-4).
+- **Files:** `Header.tsx`, `global.css` (clean); `Footer.tsx` (the other session's lines elsewhere).
 - **Verify:**
-  - the desktop fold renders of the home, legal pages and 404 show no filled button in the header;
+  - no filled button in the header of any desktop fold render;
   - each anchor has one label across `Header.tsx`, `Footer.tsx` and `page.tsx`;
-  - the nav order matches the section order.
-- **Evidence:** verified in code; seen in current renders.
+  - the nav order matches the section order;
+  - no link points at `#demo`.
+- **Evidence:** measured (AUDIT §6, §14); verified in the code; seen in renders.
 
-**WEB-306 · Severity 2 · The 404 page is an English idiom that hides "not found"**
+**WEB-306 · Severity 2 · The 404 page is an English pun that hides "not found"**
+*(Recheck: confirmed, with one correction: the missing-glyph box in the Chromium render comes from the render machine. WebKit on Windows draws "↗" from a fallback font. Phones depend on their system fonts. The point stands that "↗" isn't in Manrope and reads as "leaves the site".)*
 - **Where:**
   - `src/app/not-found.tsx:4-13`;
-  - built `.next/server/app/_not-found.html`, whose title is `<title>TaskFlow — Make room for a clearer day</title>`;
-  - renders `not-found.en.mobile.light.fold.png`, `not-found.en.desktop.light.full.png`.
+  - AUDIT §11: the title, description, canonical (`https://taskflow.garbar.tech/`) and `og:url` are the home's, inherited from `layout.tsx:11-31`;
+  - AUDIT §6: the "404 / A LITTLE OFF TRACK" eyebrow is 10 px (8 px on phones), and 40–41% of the page's characters are under 12 px;
+  - renders `not-found.en.mobile.light.full.png` (deletion at y ≈ 760) and `mobile-w320` (y ≈ 782);
+  - `webkit/not-found.*`.
 - **The moment:** the Leaver types `/es/eliminar-cuenta` and reads "Let's find your flow again.": «¿Qué flujo? ¿Funciona la web?»
 - **What happens:**
-  - The H1 is a pun, and "404 / A LITTLE OFF TRACK" is 8–10 px. The only plain sentence is muted.
-  - The page is English for every URL, including `/es/…` and `/ca/…`.
-  - Browser tabs and screen readers get the home page's title.
-  - The button's "↗" isn't in Manrope (its character map has no U+2197). It renders as a box in the Chromium render, and ↗ suggests leaving the site.
+  - The H1 is a pun, and the only plain sentence is muted.
+  - It's English for every URL, `/es/…` and `/ca/…` included.
+  - Tabs, screen readers and link previews get the home's title; the page even declares the home as its canonical URL.
+  - Two filled buttons: "Back to TaskFlow" and the header's.
   - On phones, "Delete account" is below the fold.
 - **Why it fails:**
-  - HE-3: clear beats clever.
-  - RD-1: lead with the conclusion.
-  - ML-5: every page translated.
-  - AX-5 and WCAG 2.4.2, Page Titled (A).
-  - OL-2: say what happened and what to do.
-- **Fix:** remove the eyebrow and the pun. Write one short block per language: English first, because the page is `lang="en"`, and the others marked with their own `lang`:
-  - **EN:** H1 "Page not found". "This address doesn't exist on the TaskFlow website." Links: "TaskFlow home page" (`/`) and "Delete account" (`/delete-account/`).
-  - **ES:** «Página no encontrada. Esta dirección no existe en la web de TaskFlow.» Links: «Inicio de TaskFlow» (`/es/` once it exists) and «Eliminar cuenta» (`/es/delete-account/`).
-  - **CA:** «No hem trobat aquesta pàgina. Aquesta adreça no existeix al web de TaskFlow.» Links: «Inici de TaskFlow» (`/ca/`) and «Suprimeix el compte» (`/ca/delete-account/`).
-  - Add `export const metadata = { title: "Page not found · Página no encontrada · Pàgina no trobada — TaskFlow" }`.
-  - Replace the "↗" glyph with `<Icon name="arrow">`.
-- **Files:** `not-found.tsx` (clean). `tests/website.spec.ts:143` pins "Back to TaskFlow".
+  - HE-3;
+  - RD-1;
+  - OL-2 (say what happened and what to do);
+  - ML-5;
+  - AX-5 and WCAG 2.4.2 Page Titled (A);
+  - ML-8;
+  - PV-7 (deletion in one step).
+- **Fix:** remove the eyebrow, the pun and the glyph, and write one short block per language. The page's language comes first as the `h1`; the other two are `h2`s, each with its own `lang`.
+  - **EN:** "Page not found". "This address doesn't exist on the TaskFlow website." Links: "Go to the TaskFlow home page" (`/`) and "Delete account" (`/delete-account/`).
+  - **ES:** «Página no encontrada». «Esta dirección no existe en la web de TaskFlow.» Links: «Ir al inicio de TaskFlow» (`/es/`) and «Eliminar cuenta» (`/es/delete-account/`).
+  - **CA:** «No hem trobat aquesta pàgina». «Aquesta adreça no existeix al web de TaskFlow.» Links: «Ves a l'inici de TaskFlow» (`/ca/`) and «Suprimeix el compte» (`/ca/delete-account/`).
+  - **Metadata:** the root not-found file supports `export const metadata` (`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md:185-187`):
+    - title "Page not found · Página no encontrada · No hem trobat la pàgina — TaskFlow";
+    - no canonical (`alternates: { canonical: null }`) and no `og:url`.
+  - **Layout:** the deletion links sit above the fold at 390 × 664 and at 320 × 568.
+- **Files:** `not-found.tsx` (clean); `tests/website.spec.ts:143` pins "Back to TaskFlow".
 - **Verify:**
-  - the title in `_not-found.html`;
-  - the 404 renders show the three lines, with the deletion links above the fold at 390 × 664;
-  - no missing-glyph box;
+  - AUDIT §11's 404 row shows its own title and no canonical;
+  - the 404 renders show the three blocks, with deletion links above the fold at both widths;
+  - no "↗" anywhere on the page;
   - axe `document-title` passes.
-- **Evidence:** seen in current renders; verified in the build and in the font's character map.
+- **Evidence:** measured (AUDIT §6, §11); seen in Chromium and WebKit renders; the font's character map has no U+2197 (parsed from `public/fonts/Manrope.ttf`).
 
 **WEB-307 · Severity 2 · Phone header: two unlabelled icons, and the theme switch outranks the menu**
+*(Recheck: confirmed. Forced colours still inferred.)*
 - **Where:**
-  - `src/components/Header.tsx:47, 51-55`;
-  - `src/components/ThemeProvider.tsx:86-105`;
-  - `src/styles/global.css:313-321, 1653-1680`;
-  - renders `home.en.mobile.light.fold.png`, `delete-account.es.mobile.light.fold.png`.
-- **The moment:** the Newcomer: «¿Qué es la luna? ¿Y las dos rayas?» They don't open menus.
+  - `src/components/Header.tsx:47, 51-55`; `src/components/ThemeProvider.tsx:87-105`; `src/styles/global.css:313-321, 1656-1680`;
+  - AUDIT §5: both 42 × 42 px, 11 px apart; §9: the summary is named "Open navigation", even when open; §14: the theme switch is the stop before the menu;
+  - renders `home.en.mobile.light.fold.png` and `delete-account.es.mobile.light.fold.png`.
+- **The moment:** «¿Qué es la luna? ¿Y las dos rayas?» The newcomer doesn't open menus.
 - **What happens:**
-  - On phones, the header's only controls are a moon or sun circle and a two-line circle, each 42 × 42 px, with no words. The theme switch carries the same weight as the menu.
-  - The menu's name stays "Open navigation" while it's open, and a tap outside doesn't close it.
-  - The two lines are `<span>` backgrounds (`global.css:1668-1674`). In forced-colours mode those turn into the page colour, so the button looks empty (inferred).
+  - The phone header's only controls are a moon or sun and two lines, with no words.
+  - The theme switch has the same weight as the menu.
+  - A tap outside doesn't close the menu (no handler in `Header.tsx`).
+  - The two lines are `<span>` backgrounds (`global.css:1668-1674`), which forced-colours mode repaints in the page colour. That's inferred: there's no forced-colours render.
 - **Why it fails:**
-  - AX-8: the theme, language and menu controls should show words (Harley 2014: few icons are universally understood).
-  - NV-1: visible menus get used 86% of the time on phones, against 57% for hidden ones (Pernice 2016a).
-  - CT-6: TaskFlow's bar is 44–48 px. WCAG 2.5.8 (AA) passes.
-  - Lens N: the theme switch shouldn't compete for attention.
-- **Fix,** on phones (800 px and narrower):
-  1. The menu button shows a word, "Menu" · «Menú» · «Menú», with an SVG icon from `Icon.tsx`, which keeps its colour in forced-colours mode. Drop `aria-label="Open navigation"` so the visible word is the name.
-  2. Move the theme switch into the menu, as a labelled row (strings in WEB-304). Keep it in the desktop header.
-  3. Make both targets 48 × 48 px.
-  4. Optionally, close the menu on a tap outside it.
-- **Files:** `Header.tsx`, `ThemeProvider.tsx`, `global.css` (clean). Update `tests/website.spec.ts:114, 122`.
+  - AX-8 (controls show words; Harley 2014);
+  - NV-1 (visible navigation used 86% vs 57% hidden on phones; Pernice 2016a);
+  - CT-6 and CT-7 (44–48 px; WCAG 2.5.8 passes);
+  - OL-4;
+  - lens N.
+- **Fix,** at 800 px and narrower:
+  1. The menu button shows a word, "Menu" · «Menú» · «Menú», next to an SVG icon. Add a `menu` path to `Icon.tsx`; `currentColor` survives forced colours. Drop `aria-label` so the word is the name.
+  2. The theme switch moves into the menu as an "Appearance" row with two buttons, "Light" and "Dark", in the app's words (WEB-304's table). It uses `aria-pressed` and a check on the current one. Desktop keeps the icon.
+  3. The language row (WEB-301) is the menu's first row.
+  4. Make both header targets 48 × 48 px.
+  5. Optionally, close the menu on a tap outside it.
+- **Files:** `Header.tsx`, `ThemeProvider.tsx`, `Icon.tsx`, `global.css` (all clean); update `tests/website.spec.ts:114-130`.
 - **Verify:**
-  - the mobile fold renders show «Menú» or "Menu" and a single header control;
-  - Playwright at 390 px: the summary's name is «Menú» on `/es/…`, and the theme switch is inside the open menu;
-  - a Playwright screenshot with `forcedColors: 'active'` shows the menu icon;
-  - both targets measure 48 px or more.
-- **Evidence:** seen in current renders and verified in code. The forced-colours behaviour is inferred and needs a browser check.
+  - the mobile fold renders show «Menú» or "Menu" and one header control;
+  - Playwright at 390 px: the summary's name is «Menú» on `/es/…`, and the theme row is inside the open menu;
+  - a screenshot with `forcedColors: 'active'` shows the menu icon;
+  - AUDIT §5 measures 48 px.
+- **Evidence:** measured (AUDIT §5, §9, §14); seen in renders; forced colours inferred, so a browser check.
 
-**WEB-308 · Severity 2 · Keyboard focus vanishes on the closing card in light mode**
+**WEB-308 · Severity 2 · Keyboard focus nearly vanishes on the closing card in light mode**
+*(Recheck: confirmed, now measured.)*
 - **Where:**
-  - `src/styles/global.css:99-102`: the focus style, a 3-px `var(--green)` outline offset by 5 px;
-  - it lands on `.closing-card` (`global.css:1358-1367`), whose background is `#214c38` in both themes;
-  - the "Find your flow" button (`page.tsx:419-421`), in light mode.
+  - `src/styles/global.css:99-102`: a 3 px `var(--green)` outline, 5 px out;
+  - it lands on `.closing-card`, which is `#214c38` in both themes (`global.css:1358-1367`), around "Find your flow" (`page.tsx:419-421`);
+  - AUDIT §10, "Focus ring under 3:1": 1.58:1 on desktop and mobile, light; `focus/home.en.desktop.light.31.png`.
 - **The moment:** a keyboard user tabs to the page's last call to action: "Where am I?"
-- **What happens:** the ring `#176e59` sits on `#214c38` at 1.58:1. In dark mode it's 5.86:1, and elsewhere in light mode 5.76:1.
-- **Why it fails:** AX-4 and AX-2: WCAG 2.4.7, Focus Visible (AA), and 1.4.11, Non-text Contrast (AA, 3:1).
-- **Fix:** `.closing-card :focus-visible { outline-color: #d4eca3; }`, which gives 7.57:1 on `#214c38`.
+- **What happens:** the ring is `#176e59` on `#214c38`, at 1.58:1. In dark it's 5.86:1, and elsewhere in light 5.76:1.
+- **Why it fails:** AX-4 and AX-2: WCAG 2.4.7 (AA) and 1.4.11 (AA, 3:1).
+- **Fix:** `.closing-card :focus-visible { outline-color: var(--lime); }`, which is `#d4eca3` on `#214c38` at 7.57:1 in both themes. It applies to whatever control H's new closing card keeps.
 - **Files:** `global.css` (clean).
-- **Verify:** Playwright in light mode: Tab to the card's button and check that the computed `outline-color` has at least 3:1 against `#214c38`; take a screenshot.
-- **Evidence:** computed from the CSS tokens; needs a keyboard check in a browser.
+- **Verify:** AUDIT §10 lists no ring under 3:1, and `focus/home.en.*.light.*` shows a pale ring.
+- **Evidence:** measured (AUDIT §10); seen in the focus screenshot.
 
-**WEB-309 · Severity 2 · The frame's small print is 8–11 px and ignores text-size settings**
+**WEB-309 · Severity 2 · The frame's small print is 8–11 px and ignores the text-size setting**
+*(Recheck: confirmed and measured. Citation corrected: it isn't a WCAG 1.4.4 failure, because page zoom works (the `zoom200` renders reflow, AUDIT §3); it fails RD-5 and the older-reader evidence. It now carries WEB-310's check.)*
 - **Where:**
-  - `src/styles/global.css`:
+  - in `src/styles/global.css`:
     - `:59`: body text 15 px;
-    - `:121-126` and `:2088-2091`: `.eyebrow` at 10 px (8 px on phones), with 1.75-px letter spacing;
-    - `:176-182`: `.button-small` at 11 px;
-    - `:1458-1462`: the footer tagline at 10 px;
-    - `:1468-1477` and `:2321-2325`: the footer's bottom row at 10 px.
-  - `src/styles/legal.css:322-326`: the operator line at 11 px.
-  - Every size is in px.
-  - Renders: `crops/home.en.mobile.light.full.s11-13.png`; `not-found.en.desktop.light.full.png`; `privacy.es.mobile.light.fold.png`, where the eyebrow's wide letter spacing pulls the letters of «Política de privacidad» apart.
-- **The moment:** the 60+ Newcomer: «No leo eso». The line that tells them who runs TaskFlow, "A product by GARBAR, IN-TEC, S.L.", is among the smallest text on the page.
-- **What happens:**
-  - 7 frame styles are under 12 px.
-  - Because every size is in px, a visitor who sets a larger default font in Chrome, Edge or Firefox gets no larger text; only page zoom helps.
-  - The eyebrow's capitals spacing is applied to mixed-case legal labels.
+    - `:121-126` and `:2088-2091`: the eyebrow, 10 px and 8 px on phones, with 1.75 px tracking;
+    - `:176-182`: `.button-small`, 11 px;
+    - `:1458-1462`: the footer's lines, 10 px;
+    - `:1468-1477` and `:2321-2325`: the footer's bottom row, 10 px;
+  - `src/styles/legal.css:322-326`: the operator line, 11 px;
+  - every size is in px.
+- **Measured:**
+  - AUDIT §6: footer tagline, ©, note and "Back to top" 10 px; operator 11 px; header button 11 px; legal and 404 eyebrows 10/8 px; 40–41% of the 404's characters and 38–39% of the home's are under 12 px.
+  - AUDIT §3: with the default font doubled (root 32 px), body stays 15 px and **none** of the 23–145 text elements per page grows.
+  - `home.en.mobile`, `privacy.es.mobile`, `not-found.en.desktop` and `delete-account.ca.mobile` (full) are pixel-identical between 100% and `text200`.
+  - On phones the eyebrow's tracking pulls «E l i m i n a r  c o m p t e» apart (`delete-account.ca.mobile-w320.light.fold.png`).
+- **The moment:** the 60+ newcomer: «No leo eso». "A product by GARBAR, IN-TEC, S.L.", which says who runs TaskFlow, is among the smallest text on the page.
 - **Why it fails:**
-  - RD-5: body text at least 16 CSS px in rem or em; small print at least 12 px.
-  - AX-3 and WCAG 1.4.4.
-  - Nielsen 2013 and Kane 2019: tiny type is a recurring problem for older users.
-  - TR-1: the company line has to be readable.
+  - RD-5 (body 16 px or more in rem; small print 12 px or more);
+  - OL-1 (Nielsen 2013; Kane 2019: tiny type stays older adults' recurring problem);
+  - TR-1 (the operator line must be readable);
+  - ML-7.
 - **Fix:**
-  1. Size the frame in rem, with the root at 100%: body text 1rem, and a floor of 0.75rem (12 px) for the eyebrow, the footer lines, the operator line and small buttons.
-  2. Remove the footer's decorative lines (WEB-304) instead of enlarging them.
-  3. Add `.eyebrow { text-transform: uppercase; }`, and write eyebrow strings in sentence case.
-- **Files:** `global.css` (clean); `legal.css` (untracked, the other session's).
+  1. Size the frame in rem with the root at 100%: body 1rem, and a floor of 0.75rem (12 px) for eyebrows, footer lines, the operator line and small buttons.
+  2. Remove the footer's decorative lines (WEB-304, WD6) instead of enlarging them.
+  3. `.eyebrow { text-transform: uppercase; }`, with eyebrow strings written in sentence case, so translations don't hard-code capitals.
+- **Files:** `global.css` (clean); `legal.css` (the other session's, untracked).
 - **Verify:**
-  - every footer, eyebrow and header text computes to 12 px or more at 390 and 1440 px;
-  - with Chrome's Settings › Appearance › Font size set to "Very large", the footer text grows;
-  - the legal eyebrows render in capitals.
-- **Evidence:** verified in code; seen in current renders.
+  - AUDIT §6 lists no frame text under 12 px;
+  - AUDIT §3's "Text that grew" is no longer "none" on any page;
+  - **WEB-310's check:** at `text200` on mobile and at 320 px, nothing scrolls sideways (§3), the header fits and the language switch wraps;
+  - device check: Android at its largest font size on a 360 px phone.
+- **Evidence:** measured (AUDIT §3, §6); pixel diff of the renders; verified in the code.
 
-**WEB-310 · Severity 2 · At 200% text, the header and language switcher overflow on phones**
+**WEB-701 · Severity 2 · WebKit draws every weight at Manrope's thinnest (device check)**
+*(New.)*
 - **Where:**
-  - `src/styles/global.css:262-269, 1958-1970`: the header holds the brand, a 42-px theme switch and a 42-px menu in a fixed 73-px bar;
-  - `src/styles/legal.css:12-23, 386-389`: the language pill is `display: flex` with no wrapping.
-  - Worked out from the code; there is no render at 200% text.
-- **The moment:** the Newcomer has set large text on the phone. The page slides sideways and «Català» is cut off.
+  - `src/styles/global.css:3-9`: one variable TTF, `font-weight: 200 800`;
+  - the font's weight axis defaults to 200 (parsed from `public/fonts/Manrope.ttf`'s `fvar`: wght 200–800, default 200);
+  - all 56 renders in `artifacts/ux-web/webkit/`, for example `webkit/home.en.mobile.light.fold.png`, `webkit/not-found.en.mobile.light.fold.png` and `webkit/privacy.es.mobile.light.fold.png`.
+- **The moment:** on an iPhone, if this is real: a thin H1, thin buttons, and an 8–10 px eyebrow and footer that almost disappear (crop `crops/not-found.en.mobile.light.full.s1-2.png` from the WebKit 404).
 - **What happens:**
-  - At 2× text the wordmark can't wrap. The header needs about 347 px: the brand ≈ 227, the gap 25 and the controls 95. That's wider than the content box: 288 px at 320 px and 328 px at 360 px.
-  - The language pill needs about 412 px, against 288–372 px on phones.
-  - Either way, the page scrolls sideways.
-- **Why it fails:**
-  - AX-3: WCAG 1.4.4, and no two-direction scrolling (1.4.10 at 320 CSS px).
-  - ML-7: leave room for the text to grow.
-  - CT-7: labels should survive 200% text.
+  - Chromium draws the specified weights: headings 650, buttons 750, wordmark 800.
+  - Playwright's WebKit on Windows draws every text element at ExtraLight, the font's default instance, on every page, viewport and theme.
+- **Why it fails, if it's real:** RD-5 and OL-1 (Kane 2019: pale, thin type is a recurring barrier for older readers); TR-3.
+- **Likely cause:** Playwright's Windows WebKit build not applying variable-font weights. Safari on iPhone and Mac uses Core Text, which does apply them, so it's probably not what iPhone visitors see.
 - **Fix:**
-  - `.legal-languages { flex-wrap: wrap; }`.
-  - On phones, the theme switch leaves the header (WEB-307), and the header's gaps drop to 12 px. That gives 227 + 12 + 48 = 287 px, which fits.
-- **Files:** `global.css` (clean); `legal.css` (untracked, the other session's).
-- **Verify:**
-  - after WEB-309, Playwright at 320 × 664 with the root font at 200%: `scrollWidth <= clientWidth` on `/`, `/es/privacy/` and the 404;
-  - device check: Android at the largest font size, with Chrome › Accessibility › Text scaling at 200%, on a 360-px phone.
-- **Evidence:** inferred from code, with widths scaled from the 100% renders; needs a device check.
+  - **First, the device check:** open `/`, `/es/privacy/` and the 404 in Safari on an iPhone (and on a Mac).
+  - **If the type is bold there:** no site change. Close this as a WebKit-on-Windows artifact, and note it in `artifacts/ux-web/webkit/INDEX.md` (main session) so future WebKit renders aren't misread for weight.
+  - **If it's thin there:** load Manrope through `next/font/local` as static WOFF2 files for the weights the CSS uses (400, 600, 700, 800; round 650 to 600 and 750 to 700). Then raise this to Severity 3.
+- **Files:** `global.css`, `layout.tsx` (with WEB-311).
+- **Verify:** the device check above, with a photo of the iPhone home fold.
+- **Evidence:** seen in all 56 WebKit renders, against Chromium's; the font axis verified from the file; the cause inferred, so it needs a real iPhone.
 
-**WEB-311 · Severity 1 · The first view downloads a 165 KB font file and both screenshots**
+**WEB-311 · Severity 1 · First view fetches both theme screenshots and a TTF font**
+*(Recheck: corrected. AUDIT §2's lab run withdraws the "headline jumps" claim (CLS 0.000) and the 165 KB figure.)*
 - **Where:**
-  - `src/styles/global.css:3-9` and `src/app/layout.tsx:45-51`: `/fonts/Manrope.ttf` is a 164,700-byte variable TTF with `font-display: swap`, and the built `<head>` preloads it twice;
-  - `src/components/Phone.tsx:22-39`: the light image has `preload` and the dark one `loading="eager"`, which makes React preload it too. `.next/server/app/index.html` preloads both `agenda-light` and `agenda-dark`.
-- **The moment:** the Newcomer on mobile data: the headline appears, then jumps to another font.
-- **What happens:** every first visit fetches a TTF font with no size-matched fallback, so text moves when it arrives. It also fetches, at high priority, the hero screenshot for the theme that isn't showing.
+  - `src/styles/global.css:3-9` and `src/app/layout.tsx:45-51`: `/fonts/Manrope.ttf`, `font-display: swap`;
+  - the built `<head>` preloads it twice; browsers fetch it once;
+  - `src/components/Phone.tsx:29` (`preload`) and `:38` (`loading="eager"`): the built `index.html` preloads both `agenda-light` and `agenda-dark`;
+  - AUDIT §2: home LCP 1.82 s (1.77–1.98 s over 3 runs), CLS 0.000, the font 68 KB over the wire arriving 195 ms after first paint, 2 images at 61 KB;
+  - the LCP element is `img.light-only`.
+- **The moment:** on mobile data, the first paint shows the fallback typeface and swaps to Manrope about 0.2 s later. A light-theme visitor also downloads the dark screenshot they never see.
 - **Why it fails:**
-  - PF-5: the font shouldn't move the page; Next.js recommends `next/font`.
-  - PF-3: the image that's shown should load first. Next.js's image docs advise against eager loading or preloading a light/dark pair (`[Next.js Image]`, not re-checked today).
+  - PF-5 (`next/font`, variable fonts and subsets);
+  - PF-3 and the installed Next 16.4 docs: "You cannot use `preload` or `loading="eager"` because that would cause both images to load. Instead, you can use `fetchPriority="high"`" (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md:1266-1331`);
   - PF-7.
+  - The lab passes PF-1 today, so this is waste, not a slow page (PF-2: lab, not field).
 - **Fix:**
-  - Load Manrope through `next/font/local` as a WOFF2 Latin subset with its automatic fallback, and delete the manual preload and the `@font-face`.
-  - In `Phone.tsx`, drop `preload` and `loading="eager"` from the light/dark pair and use `fetchPriority="high"`. While the hidden image is `display: none` and lazy, it isn't fetched.
-- **Files:** `layout.tsx` (the other session's line 8 only); `global.css` and `Phone.tsx` (clean).
-- **Verify:**
-  - the built `<head>` has one font preload (WOFF2) and no image preload for the hidden theme;
-  - a lab Lighthouse run (mobile, slow 4G), labelled as lab: CLS ≤ 0.1 and LCP ≤ 2.5 s. Raise this to Severity 2 if it fails.
-- **Evidence:** verified in the build. The impact is inferred: there is no lab or field data.
+  - Load Manrope with `next/font/local` as a WOFF2 Latin and Latin-1 subset (Catalan's `l·l`, `ª` and `º` are in it), with its automatic fallback.
+  - Delete the manual preload and the `@font-face`.
+  - For the light/dark pair, and for WD4's new `hero-calendar-<language>-<theme>.png` that replace it: no `preload`, no `eager`, `fetchPriority="high"` on both.
+- **Files:** `layout.tsx` (the other session's line 8 only); `global.css`, `Phone.tsx` (clean).
+- **Verify:** AUDIT §2 on the home shows:
+  - one font request (WOFF2) and one hero image request;
+  - lab LCP at most 2.5 s, and no worse than today's 1.82 s median;
+  - CLS at most 0.1.
+- **Evidence:** measured (AUDIT §2); verified in the build and the docs.
 
-**WEB-312 · Severity 1 · Legal pages share without an image, and their X tags are in English**
+**WEB-312 · Severity 1 · Legal pages share without an image; their X tags are the home's**
+*(Recheck: confirmed and measured.)*
 - **Where:**
-  - `src/content/legal/index.ts:190-194`: `openGraph` has no `images`, `locale`, `siteName` or `type`, and there is no `twitter` entry;
-  - built `privacy.html`, `es/privacy.html` and `ca/delete-account.html`: no `og:image`, and `twitter:title` is "TaskFlow — Make room for a clearer day", with the English home description, on every legal page.
-- **The moment:** someone shares `/es/privacy/` on WhatsApp and gets a bare text link. On X or Slack, an English slogan sits over a Spanish page.
+  - `src/content/legal/index.ts:190-194`: `openGraph` has no `images`, `locale`, `siteName` or `type`, and there's no `twitter`;
+  - AUDIT §11 on all 12 legal pages: "no og:image; no og:locale; twitter:title isn't this page's title";
+  - built `es/privacy.html`: `twitter:title` "TaskFlow — Make room for a clearer day", with the English home description.
+- **The moment:** `/es/privacy/` shared on WhatsApp is a bare text link. On X or Slack, an English slogan sits over a Spanish page.
 - **Why it fails:** ML-9 and ML-5.
 - **Fix:** in `legalMetadata`, add:
-  - `images`: the language's preview image from WEB-302;
-  - `locale`;
+  - `openGraph.images`: the language's preview image from WEB-302;
+  - `locale`, with `alternateLocale`;
   - `siteName: "TaskFlow"` and `type: "website"`;
-  - `twitter: { card: "summary_large_image", title, description }`, with the document's own title and description.
-- **Files:** `src/content/legal/index.ts` (untracked, the other session's).
-- **Verify:** the built `<head>` of all 12 legal pages carries `og:image` and `og:locale`, and a `twitter:title` equal to `og:title`.
-- **Evidence:** verified in the build.
+  - `twitter: { card: "summary_large_image", title, description }` with the document's own title and description.
+- **Files:** `src/content/legal/index.ts` (the other session's, untracked: stays uncommitted).
+- **Verify:** AUDIT §11 shows no problems in the og or twitter columns for all 12 legal pages.
+- **Evidence:** measured (AUDIT §11); verified in the build.
 
-**WEB-313 · Severity 1 · Dark first visit: a light toolbar and a greyed-out theme switch**
+**WEB-313 · Severity 1 · Before the scripts run: a greyed-out switch and a light toolbar**
+*(Recheck: confirmed, with more evidence.)*
 - **Where:**
   - `src/app/layout.tsx:33-38`: one `theme-color`, `#f7f8f2`;
-  - `layout.tsx:39`: the inline theme script sets `data-theme` but not the meta;
-  - `src/components/ThemeProvider.tsx:24-30, 93`: `disabled={!ready}`. In the built `index.html`, the theme switch is `disabled` and labelled "Switch to dark mode", even for a dark-mode visitor.
-- **The moment:** the Newcomer, with a phone in dark mode on slow data, sees a light address bar over a dark page, and a faded moon button that doesn't work yet.
-- **What happens:** until the scripts load (seconds on a slow network; never without JavaScript), the toolbar is light, and the switch sits at 55% opacity with the wrong label.
-- **Why it fails:** lens N, both themes look designed; AX-8, the accessible name matches the state.
+  - `layout.tsx:39`: the inline script sets `data-theme`, not the meta;
+  - `src/components/ThemeProvider.tsx:24-30` (`apply()` updates one meta after hydration) and `:93` (`disabled={!ready}`);
+  - `src/styles/global.css:91-94`: disabled is 55% opacity.
+- **Measured:**
+  - The built HTML of every page ships the switch `disabled` and labelled "Switch to dark mode", even for dark visitors.
+  - After hydration, dark renders carry `#121c18` (audit meta), so the mismatch lasts until the scripts run.
+  - Without JavaScript, it lasts forever: `home-nojs.en.mobile.dark` is identical to light, a light page with a dead, faded switch.
+  - In WebKit, 43 of 56 renders, including 27 of 28 iPhone-profile ones, were taken after network idle with the switch still disabled. The sampled icon colour is `#828e86`, the same as the no-JS render. Chromium: 0 of 84.
+- **The moment:** on a slow phone in dark mode: a light address bar over a dark page, and a faded moon that doesn't respond.
+- **Why it fails:** lens N (both themes look designed); AX-8 and WCAG 4.1.2 (the name must match the state).
 - **Fix:**
-  - Give `viewport.themeColor` two entries, `media: "(prefers-color-scheme: light)"` and `"(prefers-color-scheme: dark)"`, and have `apply()` update both metas when the visitor chooses.
-  - Hide the switch until it's ready (`visibility: hidden`), and with a `<noscript>` style.
-- **Files:** `layout.tsx` (the other session's line 8 only), `ThemeProvider.tsx` (clean).
+  1. `viewport.themeColor`: two entries with `media` (light `#f7f8f2`, dark `#121c18`; documented in `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/generate-viewport.md:95-119`). `apply()` sets every `theme-color` meta to the chosen colour.
+  2. The dark tokens also apply under `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { … } }`, so a dark-mode visitor without JavaScript gets the dark page the toolbar now matches.
+  3. The switch is `visibility: hidden` until it works (no layout shift), and absent without JavaScript.
+- **Files:** `layout.tsx` (the other session's line 8 only); `ThemeProvider.tsx`, `global.css` (clean).
 - **Verify:**
-  - the built `<head>` has two `theme-color` metas with `media`;
-  - the server-rendered `.theme-toggle` is never shown disabled;
-  - device check: a phone in dark mode on a throttled network shows a dark toolbar from the first paint.
-- **Evidence:** verified in the build; the toolbar effect needs a device check.
+  - two `theme-color` metas with `media` in the built `<head>`;
+  - no render, Chromium or WebKit, shows a 55% switch;
+  - `home-nojs.*.dark` renders are dark;
+  - device check: a dark-mode phone on a throttled network shows a dark toolbar from first paint.
+- **Evidence:** verified in the build; seen in the no-JS and WebKit renders (pixel-sampled); the toolbar is a device check.
+
+**WEB-702 · Severity 1 · Taps on frame links give no visible feedback**
+*(New.)*
+- **Where:**
+  - `src/styles/global.css:67-71` turns off the tap highlight for every link, button and summary;
+  - no `:active` style exists in any stylesheet (`global.css`, `legal.css`, `voice.css`);
+  - the footer's legal links (`legal.css:316-321`), the logo, "Back to top" and the menu button have no hover style either;
+  - meanwhile `.button:hover` (`global.css:171-175`) and `.theme-toggle:hover` (`:322-324`) stick on touch after a tap.
+- **The moment:** on mobile data, the Leaver taps "Delete account". Nothing changes for 1.5–2 s (lab LCP of the delete page: 1.74–1.96 s), so they tap again: «¿Lo he pulsado?»
+- **Why it fails:** PF-8 (Nielsen 1993: answer within about 0.1 s); OL-1 (older users are slower and repeat actions).
+- **Fix:** subtract the override at `global.css:67-71`, which restores the browser's tap highlight. Wrap the hover-only effects (lift, colour, mint fill) in `@media (hover: hover)`.
+- **Files:** `global.css` (clean).
+- **Verify:**
+  - Playwright on the mobile project: the tap highlight isn't `transparent`, and hover rules sit under `(hover: hover)`;
+  - device check: tap a footer link on a throttled Android phone.
+- **Evidence:** verified in the code; the effect needs a device, since renders can't show taps.
+
+**WEB-703 · Severity 1 · Logo, footer links and "Back to top" are under the 44 px bar**
+*(New.)*
+- **Where** (AUDIT §5, every page):
+  - the header logo, 135.7 × 34.5 px;
+  - the footer logo, 129.7 × 33;
+  - "Back to top ↑", 62 × 33 at 10 px;
+  - the footer's "Privacy", 40 × 44;
+  - footer legal rows 6 px apart on phones (`legal.css:419-421`);
+  - the two header circles, 42 × 42 (WEB-307).
+  - The accessible name "Back to top ↑" includes the arrow (AUDIT §14), so it's read as "…up arrow".
+- **Why it fails:**
+  - CT-6 and CT-7: TaskFlow's bar is 44–48 px with 8 px between neighbours (Hoober 2017c);
+  - WCAG 2.5.8 (AA) passes (AUDIT §5: 0 fails), so this is the site's own bar, not a WCAG failure.
+- **Fix:**
+  - `.brand { min-height: 48px; }` in the header and the footer;
+  - "Back to top": `display: inline-flex; min-height: 44px; align-items: center`, with the arrow in an `aria-hidden` span;
+  - `.footer-legal a { min-width: 44px; justify-content: center; }`;
+  - the footer legal gap 8 px or more on phones.
+- **Files:** `global.css`, `Footer.tsx` (the other session's lines elsewhere); `legal.css` (untracked).
+- **Verify:** AUDIT §5 lists none of these under 44 × 44, and §14 names the link "Back to top".
+- **Evidence:** measured (AUDIT §5, §14).
+
+**WEB-704 · Severity 1 · No Android trademark line where the site names Android**
+*(New. The owner's decision of 2026-10-18 makes this a fix, not a question.)*
+- **Where:**
+  - the home names Android in the FAQ (`page.tsx:8, 24`), the closing card (`:423`) and the screenshot alt text (`src/components/Phone.tsx:4-7`), with no ™ and no trademark line;
+  - after WEB-303 and WP3, every page's menu and hero will name it too.
+- **Why it fails:** AP-7 (Android Brand) and `.claude/ux-web/DECISIONS.md:58-59`: the line "and ™ on first use, added wherever the site names Android".
+- **Fix:**
+  - **The footer of every page,** at 12 px or more (WEB-309):
+    - EN: "Android is a trademark of Google LLC."
+    - ES: «Android es una marca comercial de Google LLC.»
+    - CA: «Android és una marca comercial de Google LLC.»
+  - **™ on the first "Android" in each page's main content,** such as the hero line, not in the nav (H and F own that copy). Manrope has U+2122.
+  - Approval by Google's Android brand team stays the owner's action at launch.
+- **Files:** `Footer.tsx` (the other session's lines elsewhere: stays uncommitted).
+- **Verify:** a Playwright text check finds the line in the right language on every page whose text contains "Android".
+- **Evidence:** verified in the code and in `DECISIONS.md`.
+
+**Withdrawn — WEB-310 · At 200% text, the header and language switcher overflow on phones**
+- **Withdrawn because:** measured (AUDIT §3), no page scrolls sideways or clips text:
+  - at 320 px (`mobile-w320`);
+  - at 200% zoom (`desktop-zoom200`, 720 CSS px);
+  - with the default font doubled (`text200`, desktop and mobile).
+- The first review computed widths for text that grows. Today nothing grows (WEB-309), so the overflow can't happen.
+- The risk returns only once WEB-309 moves sizes to rem, so its check is now part of WEB-309's Verify.
+- The legal pill's `flex-wrap` stays in WEB-208 (area L).
+
+### Device checks (for the owner)
+- **WEB-701:** iPhone Safari, `/`, `/es/privacy/` and the 404: is the type bold?
+- **WEB-302:** WhatsApp previews of `/es/` and of the bare domain, after a deploy.
+- **WEB-313:** a dark-mode phone on a throttled network: the toolbar colour, and when the switch appears.
+- **WEB-702:** a footer tap on a throttled Android phone.
+- **WEB-309:** Android at its largest font size.
+- **WEB-304:** TalkBack reading an ES page's title.
 
 ### Claims checked
 | Claim (page, `path:line`) | Source of truth (`path:line`) | Verdict |
 |---|---|---|
-| The tab title, search description and preview of every page say the site is "the calm task planner that brings your calendar, priorities, and voice-to-task capture together" (`src/app/layout.tsx:12-13`) | Calendar is the first screen: `.claude/ux-review/DECISIONS.md:170`. Priority: `App/lib/l10n/app_en.arb:214`. Dictation: `app_en.arb:1891`. The app's pitch line: `app_en.arb:674` | True in substance, but misnamed: the app says "dictation", «dictado», «dictat» |
-| Header button "Explore the app" (every page, `src/components/Header.tsx:49`) | It leads to the site's sample walkthrough (`src/app/page.tsx:287-309`). The app isn't downloadable (`.claude/ux-web/DECISIONS.md:14`) | False |
-| Phone menu "Get TaskFlow" (`src/components/Header.tsx:63`) | Not on Google Play (`.claude/ux-web/DECISIONS.md:14`; the site's own `page.tsx:8, 423-424`) | False |
+| Title, description and preview of the home and the 404: "the calm task planner that brings your calendar, priorities, and voice-to-task capture together" (`src/app/layout.tsx:12-13`; AUDIT §11) | Calendar is the first screen: `.claude/ux-review/DECISIONS.md:223`. Priority: `App/lib/l10n/app_en.arb:214`. The app says "dictation": `app_en.arb:1899`, `app_es.arb:1188`, `app_ca.arb:892`. Pitch: `app_en.arb:674` | True in substance, misnamed ("capture") |
+| Header button "Explore the app" (every desktop page, `src/components/Header.tsx:49`) | It opens the website's sample walkthrough (`src/app/page.tsx:287-318`), which WD1 removes; the app can't be downloaded (`.claude/ux-web/DECISIONS.md:68`) | False |
+| Phone menu "Get TaskFlow" (`Header.tsx:63`) | Not on Google Play (`.claude/ux-web/DECISIONS.md:68`; WD9 `:45-46`; the site's own `page.tsx:8, 423`) | False |
 | "A product by GARBAR, IN-TEC, S.L." (`src/components/Footer.tsx:18`) | `src/content/legal/company.json:2` | True |
-| The site's Catalan name for deletion, «Eliminar compte» (`src/content/legal/index.ts:156`; the CA footer link per WEB-304) | The app: «Suprimeix el compte» (`App/lib/l10n/app_ca.arb:909`). ES «Eliminar cuenta» matches `app_es.arb:1205`; EN matches `app_en.arb:2034` | Misnamed in CA |
+| "Contact support" → `mailto:taskflow.support@garbar.tech` (`Footer.tsx:31`) | `company.json:7`; CLAUDE.md, Email (support and account-deletion address) | True |
+| The Catalan deletion name «Eliminar compte» (`src/content/legal/index.ts:156`; the title of `/ca/delete-account/`, AUDIT §11) | The app: «Suprimeix el compte» (`App/lib/l10n/app_ca.arb:910`); ES «Eliminar cuenta» matches `app_es.arb:1206`, EN `app_en.arb:2038` | Misnamed in CA (WEB-206, area L; the footer adopts the app's word in WEB-304) |
 
 ### Missing from the site (app features worth telling)
-- **The app's own one-line pitch:** «Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario.» It is the `authPitch` the newcomer reads at the app's sign-in (decision D8), in all three languages (`App/lib/l10n/app_en.arb:674`, `app_es.arb:412`, `app_ca.arb:391`). It belongs in the site's description and link preview (WEB-302), so the site's first words match the app's.
-- **Several tasks in one dictation** (owner's "absolutely a must", `.claude/ux-review/DECISIONS.md:46-51`). The preview image can show the app's own example becoming two tasks (`calendarTrySaying`, `app_es.arb:221`). This sharpens the preview without adding a section.
+- **The app's one-line pitch,** `authPitch`: «Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario.» (`App/lib/l10n/app_es.arb:412`, `app_en.arb:674`, `app_ca.arb:391`). It's what the newcomer reads at the app's sign-in; it belongs in the description and the preview (WEB-302), so the site's first words are the app's.
+- **Several tasks in one dictation,** the owner's "must" (`.claude/ux-review/DECISIONS.md:99`). WD4's preview image shows "Tomorrow, call the dentist and buy bread" as two tasks (`calendarTrySaying`, `app_en.arb:312`, `app_es.arb:221`, `app_ca.arb:200`). This sharpens the preview without a new section.
 
 ### Keep
-- The legal pages' language switcher (`LegalPage.tsx:113-125`): each language named in itself, `lang` and `hreflang` on each link, `aria-current`, at the top of the page. It's the model for WEB-301.
-- The footer's legal row on every page (`Footer.tsx:26-32`): Privacy, Terms, Legal Notice, Delete account and Contact support, with targets of 44 px or more, in the same order everywhere (WCAG 3.2.6).
-- The colour tokens:
-  - muted text 5.48:1 light and 8.86:1 dark; the focus ring 5.76:1 and 10.47:1;
-  - the reduced-motion block (`global.css:2407-2415`);
-  - `scroll-padding-top` under the sticky header;
-  - the existing test already proves there's no sideways scrolling at 320 px with 100% text.
-- The `<details>` menu works without JavaScript, and Escape closes it and returns focus to its button (`Header.tsx:15-24`).
-- The legal pages' metadata: translated titles and descriptions, and reciprocal `hreflang` including `x-default` (`content/legal/index.ts:172-189`).
+- **The footer's legal row on every page:** Privacy, Terms, Legal Notice, Delete account, Contact. Same order everywhere (WCAG 3.2.6), 44 px tall.
+- **Measured accessibility basics:**
+  - 0 axe violations;
+  - 0 text-contrast failures in either theme (muted text 5.47:1 and 8.86:1);
+  - focus visible at all 2,148 stops, never hidden behind the sticky header (`scroll-padding-top` works);
+  - no sideways scrolling at 320 px or 200% zoom.
+- **The `<details>` menu:** works without JavaScript, and Escape closes it and returns focus (`Header.tsx:15-24`).
+- **The legal pages' metadata:** translated titles and descriptions, canonical, and reciprocal hreflang with `x-default` (AUDIT §11).
+- **The legal switch's naming:** each language named in itself, with `lang` and `hreflang` (`LegalPage.tsx:113-125`). It's the model for WEB-301, once its current-language cue gets more than a 1.12:1 fill (WEB-208).
 
 ### Questions for the owner (product decisions only)
-1. **Which language should the bare `/` show?**
-   - **The options:** pick Spanish, Catalan or English from the browser's language, or always show English, with `/es/` and `/ca/` beside it.
-   - **The evidence:** the bar newcomer is Spanish or Catalan, and links shared on WhatsApp will mostly be the bare domain. ML-1 allows choosing on the bare root only, from the browser's language and never from the IP address, with a visible switch always available (W3C Conneg).
-   - **Recommendation:** choose on `/` from the browser's language, fall back to English, and remember a choice the visitor makes.
-2. **Which delete-account URL goes into the Play Console** (one URL for all users)?
-   - **The options:** `/delete-account/` (English, with the switcher at the top), or `/es/delete-account/`.
-   - It can be settled with the package ID, which is still `com.example.agenda` and blocks any Play link anyway.
-   - **Recommendation:** `/delete-account/`, keeping the language pill as the first control on that page (PV-7, ML-1).
+None new. WD5 (the bare `/`) and WD13 (the Play Console URL, `/delete-account/`) answered both of the first review's questions, and the new evidence raises no product decision. The device checks above are his, on his own phone.
 
 ### Cross-slice notes
-- **H:** the home copy is English and full of idioms. The ES and CA homes (WEB-301) should translate the copy H settles, not today's.
-- **H:** the hero's "See it in action" (`page.tsx:68`) and the closing "Find your flow" (`page.tsx:419`) are two of `#demo`'s five names; align them with WEB-305.
-- **H:** screen readers ignore `aria-label` on plain `<div>`s (`page.tsx:87, 129`). Decorative captions are read aloud ("JUST SAY THE WORD", "YOUR DAY, LOOKING A LITTLE LIGHTER.").
-- **H:** home text at 5–9 px:
-  - `.appearance-tag` 5 px (`global.css:1910`);
-  - `.hero-art-label` 6–7 px;
-  - the floating-note labels 6–7 px;
-  - the promise bar 7–8 px (`global.css:2074, 2371`);
-  - `.demo-preview-badge` 6–7 px.
-- **H/F:** the `#get-taskflow` card (`page.tsx:399-428`) is WEB-303's destination. Its button loops back to `#demo`, and its "not downloadable yet" line is 10 px (`global.css:1402-1407`).
-- **F:** FAQ answers contradict the app on dev:
-  - using it without an account (`page.tsx:12, 20`), against the login wall (`.claude/ux-review/DECISIONS.md:73-76`);
-  - "Choose Task or Note when capturing" (`page.tsx:28`), against D3 (`DECISIONS.md:123`);
-  - "shared lists", against projects (`DECISIONS.md:172-178`);
-  - "Launch pricing has not been announced" (`page.tsx:32`), against the free tier (`DECISIONS.md:77-99`).
-- **F:** the hero and appearance screenshots (`public/images/*.png`, 2026-09-21) predate October's app changes; compare them with `App/build/*.png`.
+- **H:**
+  - In WebKit's iPhone profile, the walkthrough's controls (`TaskDemo.tsx`, `disabled={!ready}`) render faded before hydration (`crops/home.en.mobile.light.full.s7-9.png`, from `webkit/`).
+  - The live demo's start button does nothing until hydration (WEB-18). Check both on a real iPhone.
+- **H:** AUDIT §9 names the hero region "Make room for aclearer day." (Chromium's tree joins the `<br>` and the span without a space). WP3's H1 should avoid a `<br>` inside the heading.
+- **H:** the closing card is WEB-303's destination; its "not yet" line is 10 px (AUDIT §6). WEB-308's ring fix must cover whatever control the card keeps.
 - **L:**
-  - the Catalan deletion title «Eliminar compte» (`content/legal/index.ts:156`) differs from the app's «Suprimeix el compte» (`App/lib/l10n/app_ca.arb:909`);
-  - the legal pages use the ↗ "leaves the site" icon on internal links (`LegalPage.tsx:139, 189, 222`).
-- **L** (no finding): `legalMetadata` sets `robots: undefined` once publication is approved (`content/legal/index.ts:180`), so the legal pages drop the root `noindex`. It's harmless while `robots.txt` disallows everything.
-- **H:** "Try real voice-to-task" (`VoiceDemo.tsx:373`) is jargon (HE-10).
+  - The legal sidebar's 15 focus rings are clipped by up to 6 px on desktop (AUDIT §10), so WEB-205's inferred clipping is now measured.
+  - The language pill's state is a 1.12:1 fill (AUDIT §8, WEB-208); WEB-301 reuses that pill, so fix it once.
+- **L:** privacy §8 must list the language-preference cookie (WEB-301, WD5) beside `taskflow-theme`.
+- **L:** the delete page's request button sits in the bottom third on phones (y ≈ 569–623, `delete-account.es.mobile.light.fold.png`).
+- **F:** nothing new in the frame. The free-plan line (WD2) stays in H and F's copy, not the header.
 
 ### Memory notes
-- **Site map:**
-  - Home anchors in page order: `#features` (`page.tsx:145`), `#voice` (`VoiceDemo.tsx:363`), `#demo` (`page.tsx:288`), `#appearance`, `#questions` (`page.tsx:361`), `#get-taskflow` (`page.tsx:400`).
-  - Legal pages: English at `/<doc>/` and ES/CA at `/<lang>/<doc>/`, with English slugs, from `src/app/[language]/[document]/page.tsx` (`dynamicParams = false`).
-  - There is no `[language]/page.tsx` or `[language]/layout.tsx`, so `/es/` and `/ca/` return 404.
-  - The 404 is root-only and English.
-- **The frame:**
-  - `<html lang="en">` is hard-coded (`layout.tsx:43`).
-  - `Header` and `Footer` are English-only, with unprefixed links.
-  - The header CTA "Explore the app" goes to `#demo`, and the phone menu's "Get TaskFlow" to `#get-taskflow`.
-  - The theme switch is in the header (icon only) and in the appearance section (the "mood" variant).
-  - The only language switcher is `LegalPage.tsx:113-125`.
+- **Site map (G):**
+  - Frame: `layout.tsx` (html lang, skip link, metadata, `theme-color`, the font preload), `Header.tsx` (nav, CTA, theme switch, `<details>` menu), `Footer.tsx` (tagline, operator, nav, legal row, Back to top).
+  - Home anchors in page order: `#features` `page.tsx:145`, `#voice` `VoiceDemo.tsx:363`, `#demo` `:288`, `#appearance` `:321`, `#questions` `:361`, `#get-taskflow` `:400`.
+  - `src/app/[language]/` holds only `[document]/page.tsx`, so `/es/` and `/ca/` 404.
+  - The 404 is root-only, inherits the home's title and canonical, and supports `export const metadata`.
 - **Claims map:**
-  - the meta and OG description: `layout.tsx:12-13`;
-  - the OG image slogan: `opengraph-image.tsx:71-82`;
-  - the header CTA: `Header.tsx:49`; the menu's "Get TaskFlow": `Header.tsx:63`;
-  - the footer operator: `Footer.tsx:18`;
-  - the deletion names: `content/legal/index.ts:70, 113, 156`.
-  - The app's `authPitch` (`app_en.arb:674`, `app_es.arb:412`, `app_ca.arb:391`) and `calendarTrySaying` (`app_en.arb:312`, `app_es.arb:221`, `app_ca.arb:200`) are ready-made, three-language copy for the site's meta.
+  - meta and OG: `layout.tsx:11-13`;
+  - OG image: `opengraph-image.tsx:3, 57-83`;
+  - header CTA `Header.tsx:49`; "Get TaskFlow" `:63`;
+  - operator `Footer.tsx:18`; contact `:31`;
+  - "Android" mentions: `page.tsx:8, 24, 423`, `Phone.tsx:4-7`;
+  - the app's three-language copy for meta: `authPitch` (`app_en.arb:674`, `app_es.arb:412`, `app_ca.arb:391`), `calendarTrySaying` (`:312`, `:221`, `:200`), Appearance/Light/Dark (`app_en.arb:245-247`), `deleteAccount` (`app_en.arb:2038`, `app_es.arb:1206`, `app_ca.arb:910`).
+- **Settled patterns** (plan-first):
+  - one label per anchor: "Try it with your voice", "What it does", "Questions", "Coming soon to Android";
+  - `<html lang>` set before first paint (WP2) rather than a root layout per language, because the legal pages are the other session's;
+  - the language switch as plain links, in the header, the menu and the footer.
 - **Techniques that worked:**
-  - Read the build's prerendered `<head>`s in `../TaskFlowWeb/.next/server/app/*.html` (same build as the renders; no npm needed) for `lang`, title, OG, Twitter, preloads and `disabled` attributes. They had no `SITE_URL`, so canonical and `hreflang` don't appear, and `og:image` points to localhost.
-  - Contrast from the tokens with a Python WCAG formula.
-  - Glyph coverage from the TTF's character map: Manrope lacks U+2197 ↗ and U+0140 ŀ; Catalan uses U+00B7, which is covered.
-  - Widths at 200% text scaled from the 100% renders.
+  - Pixel-diffing the `text200` renders against 100% (PIL `ImageChops`) proves px sizing in one line.
+  - Sampling the theme switch's icon colour (`#828e86` = 55% opacity) detects pre-hydration renders: WebKit 43 of 56, Chromium 0.
+  - Parsing the TTF's `fvar` and `cmap` with `struct`: wght default 200; no U+2197 or U+0140; has ™, ↑, ←, →, ·.
+  - Reading the built `<head>`s in `.next/server/app/*.html`, which can come from a later build without `SITE_URL`: check its time.
+  - The version-matched Next.js docs are in `node_modules/next/dist/docs/` (16.4.0).
+  - `crop.mjs` takes an absolute WSL path for `webkit/` renders, but writes the same crop name as the Chromium render.
 - **Recurring problems:**
-  - English chrome around translated content;
-  - one anchor with many labels;
+  - English frame around translated content;
+  - one anchor with many names;
   - px-only type with 8–11 px small print;
-  - text glyphs (↗ ↑ ←) used instead of `Icon`.
-- **Tests that pin frame strings:** `tests/website.spec.ts:111-146` ("Open navigation", "Main navigation", "Mobile navigation", the 404's "Back to TaskFlow") and `tests/legal.spec.ts:24` (`article[lang]`).
+  - text glyphs (↗) instead of `Icon`;
+  - the 404 inheriting the home's metadata;
+  - controls rendered disabled until hydration;
+  - Playwright's Windows WebKit drawing variable fonts at their default (thinnest) weight. Don't read weight from WebKit renders without a device check.
+- **Tests pinning frame strings:** `tests/website.spec.ts:84` (legal "Back to TaskFlow", "Try a different mood"), `:114-130` ("Open navigation", "Mobile navigation", "Main navigation"), `:143` (the 404's "Back to TaskFlow"); `tests/legal.spec.ts:24` (`article[lang]`).

@@ -1,254 +1,253 @@
-# UX web plan — 2026-10-18-site (whole site)
+# UX web plan — 2026-10-18-site (whole site, recheck)
 
-59 findings from the four reviews: 40 fixes in 13 packages, 12 that wait on you (13 questions below), and 7 duplicates.
-The fixes make the home say what TaskFlow is and that it isn't on Google Play yet, send every button to the live demo, put the home and the frame in Spanish and Catalan, and correct six false or outdated FAQ answers. Five packages touch the other session's files, so they stay uncommitted for you.
+72 findings from the four rechecked reviews: 62 fixes in 19 packages (WP14–WP32), 1 that waits on you (WD15), and 9 skipped (8 duplicates, 1 withdrawn). WD1–WD13 are decided, so everything that waited on them is now a fix.
+The fixes make the home say what TaskFlow is and that it isn't on Google Play yet, send every button to the live demo, put the home, the frame and the demo in Spanish and Catalan, make the demo look and talk like the app, and bring the legal pages up to date with the app (RevenueCat, email codes, speech on the phone). Ten packages touch the other session's files and stay uncommitted for you.
+
+This plan replaces the first one (`plan-first.md`, WP1–WP13, now history). New numbers start at WP14 and WD14 so the two can't be confused.
 
 **How it runs**
-- Answer WD1–WD7 when you approve: they change this plan. WD8–WD13 can wait.
-- The main session then records your answers in `.claude/ux-web/DECISIONS.md` and runs `/ux-web plan 2026-10-18-site`, which turns the answered parts into packages, before `/ux-web fix`.
-- To run the packages as they are: `/ux-web fix`. To hold some back: `/ux-web fix skip WP4`, or `/ux-web fix only WP1 WP2 WP3`.
-- **Commits.** WP1–WP6, WP9 and WP12 commit on `dev`. WP7, WP8, WP10, WP11 and WP13 change the other session's files, or lines next to theirs, so they **stay uncommitted for you**: `VoiceDemo.tsx` (line 396 is theirs; `voice.css` waits with it), `Footer.tsx`, `sitemap.ts`, `LegalPage.tsx`, `src/content/legal/`, `legal.css` and `tests/legal.spec.ts`.
+- No approval this time (your instruction): the plan goes straight to the implementers, in batches of about five, in this order.
+- **Commits.** WP14–WP21 and WP25 commit on `dev`. WP22–WP24 and WP26–WP32 change the other session's files, so those files **stay uncommitted for you** (each package's `commit` field in `plan.json` lists them). For WP30–WP32, your review of the uncommitted legal change is the sign-off WD3 asked for.
 
 ## Decisions
 
-### These change this plan
+### WD14 · Should “unlimited” carry its safety limit? (new, from review F)
+WD2 publishes "TaskFlow Pro: unlimited dictation and file space", as the app says. Every account, Pro included, also has a safety limit of 50 dictations a day, a 200-a-day budget shared by everyone, and 6 MB a file, 20 files a task and 1,000 files.
+- **WEB-104** (S3, part) the FAQ's pricing answer.
 
-#### WD1 · Remove the sample walkthrough, or keep a trimmed one?
-The walkthrough (`#demo`) is a form with Task title, Date, Time, Priority and a note, then a pretend saved task you can tick. Removing a demo is your call.
-- **WEB-6** (S3) it teaches a form, not the app; three of the four buttons land on it.
-- **WEB-108** (S2) both demos show a review step the app doesn't have. The live demo's half is fixed with WEB-9 (WP8).
-- Parts of WEB-4 (its menu item), WEB-12 (server messages that name it), WEB-16 (its fake microphone), WEB-18 (a static example without JavaScript) and WEB-114 (its September dates).
+**Recommend:** yes, once, in the FAQ only: "(with a safety limit of 50 dictations a day)" / «(con un límite de seguridad de 50 dictados al día)» / «(amb un límit de seguretat de 50 dictats al dia)».
+- The closing card and the line under the demo keep WD2's short wording.
+- Raise the shared 200-a-day budget before launch, so one busy day can't block Pro customers.
+- It's also a consumer-law wording check for you.
 
-**Recommend:** remove it (review H).
-- It copies the app's editor and list, which the site isn't meant to provide; its examples are dated September 2026; its green microphone does nothing.
-- In its place, one static example inside the live demo's intro, with no inputs: the spoken "Tomorrow, call the dentist and buy bread." and its two task cards. It shows without JavaScript and whenever the live demo can't run.
-- If you keep it (review F): no Priority field, dates relative to today, no "September 2026", no fake microphone, translated.
+Until it's recorded, WP18 publishes WD2's wording without the clause. Once it is, the clause is a one-line change in a scoped run.
 
-Until you answer, it stays as it is, in English on the Spanish and Catalan homes too.
+### WD15 · Is TaskFlow's type thin in Safari on your iPhone? (new, from review G; needs your phone)
+In Playwright's WebKit on Windows, all 56 renders draw Manrope at its thinnest weight, so headings and buttons look thin and the small print nearly disappears. Chromium is fine. Safari on iPhone most likely isn't affected, but only a real device can tell.
+- **WEB-701** (S2) WebKit draws every weight at Manrope's thinnest.
 
-#### WD2 · Publish the free plan and TaskFlow Pro on the site now?
-Saying what's free is your call. Today the site says nothing about it; the FAQ only says launch pricing isn't announced.
-- **WEB-104** (S3) free plan and Pro missing; the pricing answer is outdated.
-- Parts of WEB-7 (a line after the demo) and WEB-11 (a strip where the "at a glance" bar was).
+**Recommend:** open `/`, `/es/privacy/` and a missing page in Safari on your iPhone.
+- **Bold:** close WEB-701 as a Windows-WebKit artifact.
+- **Thin:** a small package loads Manrope as static font files for the weights the site uses.
 
-**Recommend:** yes, with no price, and without "100 MB" until that's final.
-- On dev: 10 dictations a month without Pro (one dictation can hold several tasks), tasks by hand with no limit, and TaskFlow Pro, a monthly subscription, for unlimited dictation and file space.
-- The new hero says "say it". Not saying there are 10 a month hides a limit the app shows as soon as they're used.
-- Where: the FAQ answer, one line in the closing card and one after the demo, in three languages, with the reports' copy.
+The main session can't answer this one for you.
 
-Until you answer, the FAQ keeps today's answer, which is still true.
-
-#### WD3 · May the loop edit the legal documents you approved for 16 October?
-Review L asked before touching them. All of them are the other session's untracked files, so every change stays uncommitted for your review either way.
-- **WEB-113** (S2; merged WEB-201) the privacy policy is behind the app on five points: email-confirmation codes, the first name kept from Google, speech recognised on the phone, phone calendars stay on the phone, «Creada por».
-- **WEB-202** (S2) the delete page explains what goes in database and provider terms.
-- **WEB-203** (S2) the privacy page's first phone screen has no privacy facts; the H1s are slogans.
-- **WEB-206** (S2) Catalan uses «Eliminar», «Elimina» and «Suprimeix» for one action; the app says «Suprimeix el compte».
-- **WEB-209** (S2) engineering words: TTL, keyed hashes, endpoint, SDK, APK, staging, Test Store.
-- **WEB-211** (S1) the legal notice: a placeholder-sounding line, a mislabelled button, the registry line in Catalan on every page.
-- **WEB-212** (S1) internal links carry the "leaves the site" ↗; the support link opens email without saying so.
-- **WEB-213** (S1) "Versión 2026-10-16" doesn't read as "in force since".
-- Parts of WEB-207 (the demo's facts first in privacy §8), WEB-210 (also WD7) and WEB-109 (§8 quotes the demo's old "Create drafts" button).
-
-**Recommend:** yes.
-- The loop moves `company.version` to the day of the edit. Your review of the uncommitted change, before you commit it, is the new sign-off.
-- A re-plan puts them into three packages: privacy, the delete page, terms and the legal notice.
-
-Until then, WP7–WP8 rename the demo's button to "Done" while privacy §8 still says "Create drafts".
-
-#### WD4 · Which app screen should the hero show, and the link preview with it?
-Reviews H and F disagree. The new images have to come from the app, rendered by the main session as Flutter previews with chosen text; today's `App/build` renders hold test text.
-- Part of **WEB-5** (S3; merged WEB-103): the hero image.
-- Part of **WEB-302** (S3): an app screen in the preview image.
-
-**Recommend:** the Calendar, with the hero card's example done: "Call the dentist" and "Buy bread" on tomorrow, under the week strip, with the one «Añadir tarea» button.
-- One image per language and theme: 6 PNGs at 780 × 1688.
-- It proves the H1, shows what the spoken sentence becomes, and shows the one button a newcomer has to find.
-- Review H's alternative: the result sheet ("2 things to add", "Add 2 tasks"). Review F's: the Calendar with today's tasks, English only.
-
-Until then, the hero keeps today's screenshot, with the old separate microphone button, three tabs and a moon switch.
-
-#### WD5 · Which language does a first visit to the bare address get?
-Today `/` is always English. This plan adds `/es/` and `/ca/`, with a language switch in the header, the phone menu and the footer.
-- Part of **WEB-2** (S3; merged WEB-301).
-
-**Recommend:** choose on `/` only, from the browser's language (Spanish → `/es/`, Catalan → `/ca/`), falling back to English.
-- Never by IP address.
-- Never redirect someone who picked a language in the switch: remember that choice in the browser, as the theme is, and list it in privacy §8 (with WD3).
-- Shared links will mostly be the bare address, and on a phone the switch sits inside the menu.
-- If you'd rather the site stored nothing more, keep `/` English.
-
-#### WD6 · Keep "A little focus. A little flow." as the brand line in the footer?
-After this plan it appears nowhere else: the hero, the link preview and the description drop it.
-- Part of **WEB-304** (S2): the footer tagline.
-
-**Recommend:** drop it (review G). It doesn't say what TaskFlow is, and in Spanish and Catalan it either stays English or loses its sound. Review H asked whether you want it as the brand. Until you answer, it stays, in English.
-
-#### WD7 · Say "for Android phones" only, and remove the Apple mentions?
-- **WEB-210** (S1) the legal pages mention Apple subscriptions and link to "Manage Apple subscriptions"; there's no iPhone app.
-
-**Recommend:** yes.
-- This plan already says "An app for Android phones", which is true today and doesn't rule out an iPhone version.
-- Editing the legal pages also needs WD3.
-- The app itself says "available in the Android and iOS app" (`App/lib/l10n/app_en.arb:1695`): fix that with `/ux`.
-
-### For later: nothing in this plan waits on these
-
-#### WD8 · How should the live demo compare with the free app?
-The demo uses Gemini Flash-Lite on Vertex; the app's dictations use the free AI Studio model by default (UX-616 is open). The demo gives 3 tries a day per browser with no account, up to about 90 a month; the free app gives 10 dictations a month.
-
-**Recommend:** keep the demo as it is for now. This plan labels its tries as the demo's and says nothing there is saved to the app. Once UX-616 settles the app's route, give the demo the same one, so it's never faster or more accurate than the app people install.
-
-#### WD9 · A way to hear when TaskFlow launches?
-**Recommend:** not yet; the site says "coming soon to Google Play" and offers the live demo.
-- Once the package ID is final, use Google Play pre-registration: the same link, a 90-day window per country.
-- A personal developer account created after 13 November 2023 first needs a closed test with 12 testers for 14 days.
-- An email list would add a form, consent, stored addresses and a privacy update.
-
-#### WD10 · A section on sharing with family?
-With a real screenshot of a shared project («Creada por», the filter by person), in the space the appearance section frees.
-
-**Recommend:** not now; subtract first. This plan rewrites the FAQ's sharing answer (WEB-107).
-
-#### WD11 · The app links to neither the privacy policy nor the terms
-Play's User Data policy asks for a privacy-policy link or text inside the app, and Terms §1 says the terms are available before an account is created, but sign-up shows none.
-
-**Recommend:** a "Privacy" and a "Terms" link at sign-up and in the app's settings, opening the site's page in the app's language. It's an app change: run it through `/ux`.
-
-#### WD12 · Two facts only you can give
-- How long backups keep deleted data: the pages only promise "the provider's rolling window".
-- Whether the app's dictations use a paid Gemini key or the free quota.
-
-**Recommend:** give both when you can.
-- With a number, both pages can say "Backups are deleted within N days", which Play asks for.
-- With paid or EEA terms, privacy §4 can say Google doesn't use dictations to train its models.
-- Both edits go with WD3.
-
-#### WD13 · At release
-- Publish the site only with, or after, the app and backend it describes? The site will describe in-app deletion, email codes, several tasks per dictation and voice commands: all on dev, none deployed. Testers' APK 1.0.5 and staging predate them.
-- Which deletion URL goes into Play Console?
-
-**Recommend:**
-- Publish them together.
-- For Play Console, `/delete-account/` (review G), whose first control is the language switch; review L suggested `/es/delete-account/`.
-- Decide the URL with the package ID.
-
-### Already open in the app's decisions
-No new question here. The legal pages keep today's wording on each of these until you decide:
-- the clean-up of completed tasks;
-- deleting the RevenueCat customer;
-- free dictations after deleting and re-creating an account;
-- the package ID (`com.example.agenda`), which blocks any Play link or badge;
-- analytics.
+### Still yours from earlier
+- **WD12's two facts:** the backup window, and paid or free Gemini. The legal pages keep today's cautious wording.
+- **Legal checks:**
+  - WD14's wording;
+  - the legal notice's "features are only those expressly offered" next to the home's free-plan lines (review F);
+  - the registry line's English and Spanish translation (WEB-211, WP30).
+- **At launch:** Google's approval of the Android trademark line.
 
 ## Packages, in run order
-Severity 4 first, then 3, then 2; a package's prerequisites run before it, even when they're less severe. Sizes: S, M, L. Each line: finding (severity) problem → fix.
+Severity 4 first, then 3, then 2. A package's prerequisites run before it, even when they're less severe. Each line reads: finding (severity), the problem, then the fix.
 
-### WP1 · Subtract: the appearance section and unused screenshots go; the live demo moves up · H · M · commits
-- **WEB-17** (S2; merged WEB-112) a whole section sells the website's dark mode → it goes, with its "mood" button, CSS and tilted screenshot.
-- **WEB-5** (S3; merged WEB-103) the screenshots show the old app → the unused `calendar-*` and `tasks-*` are deleted; the hero image waits on WD4.
-- **WEB-10** (S2) the live demo sits 4½ phone screens below the hero → it moves right under the hero.
+### WP14 · Subtract: the walkthrough, the appearance section, the slogan bar and a fake microphone go; the live demo moves under the hero · H · M · commits
+- **WEB-6** (S3) the sample walkthrough teaches a form → removed (WD1); WP26 adds the static example.
+- **WEB-17** (S2; merged WEB-112) a section sells the website's dark mode → removed, with its "mood" button and screenshot.
+- **WEB-11** (S2) the "at a glance" bar is four slogans at 7–11 px → removed.
+- **WEB-10** (S2) the live demo starts 5.4 phone screens down → it follows the hero.
+- **WEB-16** (S2) a features drawing is a fourth fake microphone → removed.
+- **WEB-114** (S1) the drawing says "September 2026" → gone.
 
-### WP2 · Spanish and Catalan homes at /es/ and /ca/, and the page's language in the HTML · G · M · commits · after WP1
-- **WEB-2** (S3; merged WEB-301) the home exists only in English → `/es/` and `/ca/`, built from one copy table per language; each section gets its words in its own package. The bare `/` waits on WD5.
-- **WEB-304** (S2) every page says `lang="en"` and the skip link is English → the page's language is set before the first paint and on the content; the skip link is translated.
+### WP15 · Spanish and Catalan homes at /es/ and /ca/; the bare address picks the visitor's language · G · L · commits · after WP14
+- **WEB-2** (S3; merged WEB-301) the home exists only in English → `/es/` and `/ca/` from one copy table per language, with hreflang.
+  - The bare `/` follows the browser's language, or the language you picked, never the IP (WD5).
+  - The page's language comes from its address.
 
-### WP3 · Hero and closing card: what TaskFlow is, that it isn't out yet, one button to the live demo · H · L · commits · after WP2
-- **WEB-1** (S4) the hero never says what TaskFlow is → H1 "Say it, and it's on your calendar." and a subheadline that names one button, several things at once, reminders and Android. The decorative slogans go.
-- **WEB-3** (S3; merged WEB-102, WEB-303) nothing near a button says the app isn't out → "Coming soon to Google Play. You can't download it yet." under the hero button; the closing card becomes "Coming soon to Android."
-- **WEB-4** (S3; merged WEB-305) every button loops back to the sample form → one label, "Try it with your voice", one destination, the live demo.
-- **WEB-11** (S2) the "at a glance" bar is slogans at 7–8 px → removed.
-- **WEB-19** (S1) decorative hero text is read aloud → hidden from screen readers; no labels on plain divs.
-- **WEB-308** (S2) keyboard focus vanishes on the closing card in light mode → a pale ring at 7.57:1.
+### WP16 · Hero: what TaskFlow is, that it isn't out yet, today's app · H · L · commits · after WP15
+- **WEB-1** (S4) the hero never says what TaskFlow is → "Say it, and it's on your calendar.", then one button, several things at once, reminders, "An app for Android™ phones".
+- **WEB-3** (S3) nothing near a button says it isn't out → "Coming soon to Google Play. You can't download it yet." under the button.
+- **WEB-4** (S3) the button went to a sample form → "Try it with your voice", to the live demo.
+- **WEB-5** (S3; merged WEB-103) the screenshot shows an old app, tilted and unreadable → WD4's Calendar in the page's language and theme, upright, at least 272 px wide.
+- **WEB-19** (S1) decorative captions are read aloud, and the name glues "aclearer" → removed or hidden; spaces kept.
+- **WEB-311** (S1) both theme screenshots download → only the visible one.
 
-### WP4 · Features: headings and cards say what TaskFlow does, truthfully · F · M · commits · after WP2
-- **WEB-101** (S4) the cards say signing in is optional → bodies that say files and tasks are kept in your account.
-- **WEB-105** (S3) several tasks in one dictation is never told → the voice card shows the app's own example becoming one task each.
-- **WEB-106** (S2) reminders are never told → the calendar card says TaskFlow asks once, at the first dated task.
-- **WEB-111** (S2) headings are mood lines → "Say it. See it on your calendar. Get reminded." and plain card headings.
-- **WEB-114** (S1) the drawing says "September 2026" → no month or year; the walkthrough's dates wait on WD1.
-- **WEB-16** (S2) a 75 px microphone circle looks tappable and does nothing → the drawing goes.
+### WP17 · Features: plain headings and true cards · F · M · commits · after WP15
+- **WEB-101** (S4) the cards say signing in is optional → files and tasks are kept in your account.
+- **WEB-105** (S3) several tasks at once is never told → "Say several things at once".
+- **WEB-106** (S2) reminders are never told → "it asks once, the first time you add one".
+- **WEB-504** (S2) your phone's calendars are never mentioned → "beside the events from your phone's calendars".
+- **WEB-111** (S2) the headings are mood lines → "What TaskFlow does" and four plain card headings.
+- **WEB-4** (S3) "Give it a try" is another name for the demo → "Try it with your voice".
 
-### WP5 · FAQ: answers match today's app, in the app's words · F · M · commits · after WP2
-- **WEB-101** (S4) "You can create tasks… without an account" → "Yes. You sign in once: with Google in one tap, or with your email and a 6-digit code…".
-- **WEB-3** (S3) the download answer hints at other platforms and old screens → "Not yet. TaskFlow is an app for Android phones, coming soon to Google Play…".
-- **WEB-105** (S3) the voice answer misses several tasks and voice changes → "How do I add tasks by voice?" with Add a task, Done, one tap, and Undo.
-- **WEB-107** (S2) the sharing answer says "lists" and describes the old invitation → "Can I share tasks with my family?" with projects, Share, «Creada por» and the person filter.
-- **WEB-110** (S2) the notes answer describes a Task/Note choice the app removed → the Notes tab and Add a note.
-- **WEB-109** (S2) the site names features differently from the app → the offline answer in the app's words, and a check across the page. The pricing answer waits on WD2.
+### WP18 · Closing card and the first FAQ answers: how to get it, what's free, why an account · F · M · commits · after WP15
+- **WEB-3** (S3; merged WEB-102) "not yet" was 10 px on screen 12 → the card says "Coming soon to Android." The download answer says Android only, in three languages.
+- **WEB-4** (S3) "Find your flow" loops back up → "Try it with your voice".
+- **WEB-104** (S3) nothing about the free plan or Pro → WD2's line in the card, and a "Is TaskFlow free?" answer, second in the FAQ. The safety-limit clause waits on WD14.
+- **WEB-101** (S4) the FAQ says no account is needed → "Yes. You sign in once: Continue with Google, or your email and a 6-digit code".
+- **WEB-503** (S1) opening one answer closes the other → several can be open.
+- **WEB-308** (S2) keyboard focus on the card is 1.58:1 → a lime ring at 7.57:1.
 
-### WP6 · Header: honest labels, a language switch, a worded phone menu · G · L · commits · after WP2
-- **WEB-4** (S3) the filled "Explore the app ↗" opens the sample form → removed; one label per destination, in page order.
-- **WEB-3** (S3) the menu's "Get TaskFlow" promises a download → "Coming soon to Android".
-- **WEB-2** (S3) no page but the legal ones offers another language → "English · Español · Català" in the header and the menu, keeping the page.
-- **WEB-304** (S2) the header is English on Spanish and Catalan pages → translated, with the language prefix on every link.
-- **WEB-307** (S2) on phones, two unlabelled icon circles → a "Menu" button with a word; the theme switch moves into the menu; 48 px targets.
-- **WEB-310** (S2) at 200% text the header scrolls sideways → it fits at 320 px.
+### WP19 · FAQ: what TaskFlow does, in the app's words · F · M · commits · after WP18
+- **WEB-105** (S3) the voice answer misses several tasks, changes by voice and Undo → "How do I add tasks by voice?"
+- **WEB-107** (S2) the sharing answer says "list" and the old invitation → "Can I share tasks with my family?", with projects, Share, «Creada por» and one person's tasks.
+- **WEB-110** (S2) the notes answer describes a removed choice → the Notes tab and Add a note.
+- **WEB-109** (S2) "sync", "shared-list", "transcribes" → the app's words, checked across the home.
+- **WEB-111** (S2) "Glad you asked." → "Questions".
 
-### WP7 · Live demo, capture: one tap to talk, Done sends, clear waits and errors · H · L · **stays uncommitted** · after WP1, WP2
-- **WEB-9** (S2) twice the app's taps, different words → one tap to talk, "Done" stops and sends, the app's words; no listen-back; the security box shows only when needed.
-- **WEB-16** (S2) the real microphone is the palest of four → a solid green "Tap to talk" button.
-- **WEB-13** (S2) waiting has no update and no way out → at 10 s, a new line and "Stop waiting"; the timeout goes from 55 s to 40 s.
-- **WEB-14** (S2) microphone errors are raw English or dead ends → plain steps in three languages, and the text box opens.
-- **WEB-15** (S2) the timer is announced every second → three announcements only.
+### WP20 · Header: honest labels, a language switch, a worded phone menu · G · L · commits · after WP15
+- **WEB-4** (S3; merged WEB-305) the filled "Explore the app ↗" → removed; one label per place, in page order.
+- **WEB-3** (S3; merged WEB-303) "Get TaskFlow" promises a download → "Coming soon to Android".
+- **WEB-2** (S3) no way to change language → "English · Español · Català" in the header and the menu, remembered in a cookie.
+- **WEB-304** (S2) the header is English on Spanish and Catalan pages → translated, names included.
+- **WEB-307** (S2) two unlabelled icons on phones → a "Menu" button with a word; Light and Dark move into the menu; 48 px targets.
+
+### WP21 · Titles, link previews and the 404 say what TaskFlow is, in each language · G · M · commits · after WP15, WP16
+- **WEB-302** (S3) the WhatsApp preview is an English slogan → "TaskFlow — Say it, and it's on your calendar", the app's own pitch, og:locale, and a preview image per language with the app's Calendar.
+- **WEB-306** (S2) the 404 is an English pun → "Page not found" in three languages, with home and deletion links above the fold.
+
+### WP22 · The page's head: its language before first paint, a translated skip link, two theme colours, the font · G · M · **layout.tsx stays uncommitted** · after WP15, WP21
+- **WEB-2** (S3) `<html lang>` is "en" on Spanish and Catalan pages → set from the address before first paint.
+- **WEB-304** (S2) "Skip to content" is English → translated.
+- **WEB-313** (S1) dark-mode visitors get a light toolbar → two theme colours.
+- **WEB-311** (S1) a hand-preloaded TTF → Next's font loader, a smaller file if the tool installs.
+- **WEB-302** (S3) the layout's defaults are the old slogan → the English home's.
+
+### WP23 · Footer in the page's language, with the switch, the trademark line and bigger targets · G · M · **Footer.tsx and legal.css stay uncommitted** · after WP20
+- **WEB-304** (S2) the footer is English and its legal links open English pages → translated; links keep the language («Suprimeix el compte» in Catalan).
+- **WEB-2** (S3) no switch in the footer → the same switch.
+- **WEB-4** (S3) "Try the demo" points at the removed `#demo` → "Try it with your voice".
+- **WEB-704** (S1) Android named without the trademark line → "Android is a trademark of Google LLC." in three languages.
+- **WEB-703** (S1) "Back to top" 62 × 33 px → 44 px targets, 8 px apart.
+- **WEB-309** (S2) the operator line is 11 px → 12 px or more, in rem. WD6's "A little focus. A little flow." goes.
+
+### WP24 · Legal pages keep the visitor's language · L · S · **uncommitted** · after WP15, WP20
+- **WEB-2** (S3) «Volver a TaskFlow» goes to the English home; the sitemap lacks `/es/` and `/ca/` → the language's home; both added.
+- **WEB-208** (S1, was S2; its overflow half withdrawn by review L) the current language is shown by a 1.12:1 fill → the shared switch's ring and bold, remembered like the header's.
+
+### WP25 · Readable type in rem, tap feedback, a 48 px logo, and dark mode without JavaScript · G · L · commits · after WP16–WP21, WP23
+- **WEB-8** (S3) 39% of the home's text is under 12 px; 0 of 137 texts grow with the browser's text size → 16 px body in rem, nothing under 12 px.
+- **WEB-309** (S2) the frame's small print is 8–11 px in px → rem. Withdrawn WEB-310's overflow check now lives here.
+- **WEB-313** (S1) without JavaScript, a dead faded switch on a light page → dark tokens follow the system; the theme controls are hidden until they work.
+- **WEB-702** (S1) taps give no feedback → the tap highlight returns; hover effects only where hover exists.
+- **WEB-703** (S1) the logo is 34 px tall → 48 px.
+
+### WP26 · Live demo, intro: what it is, a static example, the privacy line where you talk · H · M · **uncommitted** · after WP14, WP15
+- **WEB-6** (S3) → WD1's static example: "For example, say: “Tomorrow, call the dentist and buy bread.”" and its two task cards, visible without JavaScript.
+- **WEB-12** (S2) jargon and slogans → "Try it with your voice"; badge "This demo: 3 tries a day, no sign-up" (WD8).
 - **WEB-18** (S1) without JavaScript the button does nothing → disabled, with a line saying why.
+- **WEB-207** (S2) "How we use your data" lands on the app's section → the demo's section, in the page's language, next to the talk button.
+- **WEB-16** (S2) the intro's 78 px microphone orb → removed.
+- **WEB-4** (S3) on phones the hero's button lands below the demo's button → it's in view.
 
-### WP8 · Live demo, words and result: plain words, the app's result, an honest hand-over · H · L · **stays uncommitted** · after WP7
-- **WEB-7** (S3) the demo ends in a toy list → it ends at the result, then "In the app: tap Add a task, say it and tap Done… Coming soon to Google Play." The free-plan line waits on WD2.
-- **WEB-12** (S2) jargon (allowance, rolling 24 hours, drafts) → "Try it with your voice", "3 tries a day · no sign-up", plain fine print.
-- **WEB-9** (S2) the result doesn't look or talk like the app's → "2 things to add", the date line, "Say it again", "See what I said".
-- **WEB-2** (S3) the demo is English and dates follow the browser → every string, error and date in the page's language.
-- **WEB-207** (S2) "How we use your data" opens the app's section → it opens the demo's section; §8's new first sentence waits on WD3.
+### WP27 · Live demo, talking and typing: one tap, Done sends, the app's words · H · L · **uncommitted** · after WP26
+- **WEB-9** (S2) three taps, a listen-back stage, a near-invisible switch → "Tap to talk", then "Done" sends; "Type instead" as a link.
+- **WEB-16** (S2) the real record button is the palest control → a solid green 72 px button with words.
+- **WEB-14** (S2) microphone errors in the browser's English → plain steps in three languages, and the text box opens.
+- **WEB-15** (S2) the timer is announced every second → three announcements, and "10 seconds left".
+- **WEB-402** (S2) the text box's edge is 1.31:1 → 3:1; the counter leaves the label.
+- **WEB-502** (S2) typed sentences become tasks, which is Pro in the app → one line says so.
 
-### WP9 · Titles, link previews and the 404 say what TaskFlow is; a lighter first load · G · M · commits · after WP2, WP3
-- **WEB-302** (S3) the WhatsApp preview is a slogan → "TaskFlow — say it, and it's on your calendar", the app's own pitch, and a preview image per language. An app screen in it waits on WD4.
-- **WEB-306** (S2) the 404 is an English pun → "Page not found" in three languages, with links home and to account deletion.
-- **WEB-311** (S1) the first visit loads a 165 KB font and both screenshots → `next/font` and one image.
-- **WEB-313** (S1) dark visitors get a light toolbar and a greyed-out switch → two theme colours; the switch is hidden until it works.
+### WP28 · Live demo, the result: as the app shows it, then an honest hand-over · H · L · **uncommitted** · after WP27
+- **WEB-7** (S3) the result becomes a toy task manager → it ends at the result, then "In the app: tap Add a task, say it, tap Done… Coming soon to Google Play."
+- **WEB-108** (S2) "Task N" and a priority chip → title, date line, notes, like the app.
+- **WEB-104** (S3) → WD2's line under the demo, in every state.
+- **WEB-9** (S2) → "2 things to add", "No date", "See what I said", "Say it again".
+- **WEB-2** (S3) dates follow the browser and mix 12- and 24-hour times → the page's language, one format.
+- **WEB-12** (S2) "no tasks" shows a success tick → "No tasks were found. Your words are kept. That used a try."
 
-### WP10 · Footer in the page's language · G · M · **stays uncommitted** · after WP2, WP6
-- **WEB-304** (S2) the footer is English everywhere and its legal links open English pages → translated; links keep the language («Suprimeix el compte» in Catalan).
-- **WEB-2** (S3) no language switch in the footer → the same switch as the header.
-- **WEB-4** (S3) "Try the demo" is a fifth name for one place → the header's labels. "Made for a little more headspace." goes; the tagline waits on WD6.
+### WP29 · Live demo, waiting and failures: plain messages, a way forward, readable type · H · L · **uncommitted** · after WP28
+- **WEB-13** (S2) the same spinner from 1 s to 54 s, no way out → a new line and "Stop waiting" at 10 s; 40 s timeout.
+- **WEB-401** (S2) "Failed to fetch" and JSON errors → plain messages and "Try again".
+- **WEB-403** (S2) the security check greys the button with no reason → a line, "Try again", and the static example after two failures.
+- **WEB-12** (S2) server messages shown as they are (PCM, chunk, "tomorrow") → a message per code, in three languages.
+- **WEB-8** (S3) the demo's text is 11–13 px in px → rem, nothing under 12 px.
+- **WEB-2** (S3) → no English left in any demo state on `/es/` and `/ca/`.
 
-### WP11 · Legal pages and the sitemap keep the visitor's language; legal previews · G · S · **stays uncommitted** · after WP2, WP9
-- **WEB-2** (S3) «Volver a TaskFlow» leads to the English home; the sitemap lists only `/` → the page's own home; `/es/` and `/ca/` in the sitemap.
-- **WEB-312** (S1) legal pages share without an image, with English X tags → the language's preview image and the document's own titles.
+### WP30 · Legal template: each page names its document, readable text, plain labels, link previews · L · L · **uncommitted** · after WP21, WP24
+- **WEB-203** (S2) the privacy page's first screen has no privacy fact → H1 "TaskFlow Privacy Policy", and the summary leads with "We don't sell your data or show you ads."
+- **WEB-205** (S2) 14 px grey text in ≈140-character lines that doesn't grow → 16 px in rem, 68 characters wide, 44 px rows, no clipped focus.
+- **WEB-212** (S1) ↗ on links that stay on the site → → for pages, ↗ for other sites, none for email.
+- **WEB-213** (S1) "Versión 2026-10-16" → "In force since 19 October 2026" (the edit's date, WD3).
+- **WEB-211** (S1) a placeholder-like line, a mislabelled button, a Catalan-only registry line → fixed; you confirm the registry translation.
+- **WEB-312** (S1) legal pages share with no image and English X tags → their language's preview and their own titles.
 
-### WP12 · Type you can read: 16 px body in rem, nothing under 12 px · H · M · commits (`voice.css` waits with VoiceDemo) · after WP3–WP8, WP10
-- **WEB-8** (S3) text in the hero, demos and closing card goes down to 5 px → body 16 px, subheadline 18 px on phones, nothing under 12 px.
-- **WEB-309** (S2) the frame's small print is 8–11 px, in px → rem, so a browser's text-size setting works.
+### WP31 · Privacy and terms say what the app and the site do today · L · L · **uncommitted** · after WP14, WP20, WP27, WP30
+- **WEB-113** (S2; merged WEB-201) six points behind the app → email codes, Google's first name, speech on the phone, phone calendars stay on the phone, names on shared tasks, "we never delete your tasks on our own".
+- **WEB-501** (S2; merged WEB-601) "RevenueCat keeps your record" → "we also ask RevenueCat … to delete its record of you".
+- **WEB-207** (S2) → §8 opens with "we don't keep your recording".
+- **WEB-602** (S2) §8 describes the removed walkthrough and "Create drafts" → gone. Adds the language cookie and the bare address's choice (WD5).
+- **WEB-209** (S2) TTL, keyed hashes, endpoint, SDK, APK, staging → plain words.
+- **WEB-210** (S1) Apple in privacy and terms → Google Play only (WD7).
 
-### WP13 · Legal pages: the in-app route first, readable text, a clear language state · L · M · **stays uncommitted**
-- **WEB-204** (S2) the instant in-app route looks like small print → "With the app: Settings → Account → Delete account. You'll see what goes before you confirm." in ink at 16 px; "No app, or can't sign in? Email us:" above the button.
-- **WEB-205** (S2) legal text is grey 14 px in 130-character lines → 16 px, 68 characters wide, 44 px rows.
-- **WEB-208** (S2) the current language is shown by colour only, and the switch can't wrap → a ring, wrapping, breakable H1s.
+### WP32 · Delete page: the app's route first, plain words, the app's Catalan · L · M · **uncommitted** · after WP30, WP31
+- **WEB-202** (S2) what goes, explained in database words → the app's own lines: "Deleted: your account and your tasks, notes and files…"
+- **WEB-204** (S2) the in-app route is 14 px grey under the email button → "With the app: Settings → Account → Delete account…" first, in ink; "No app, or can't sign in? Email us:".
+- **WEB-206** (S2) Catalan «Eliminar» vs the app's «Suprimeix» → «Suprimeix el compte» throughout.
+- **WEB-501** (S2) §3's RevenueCat bullet → the record is deleted on request.
+- **WEB-210** (S1) "Manage Apple subscriptions" → gone.
 
 ## How the reports were settled
 Say if any of these is wrong; only the package named changes.
-- **The button label** is review H's and G's "Try it with your voice" (WP3), not review F's "Try the live demo": the live demo's own start button goes in WP7.
-- **The menu item** is "Coming soon to Android" (WP6). That's review G's wording, matching the closing card's heading; review H proposed "Download: coming soon" and review F "How to get TaskFlow".
-- **The demo's send button** is the app's "Done" (review H, WP7), not review F's "Make tasks". Its tries are «intentos» / «intents», not «pruebas».
-- **Nav order** follows the page once the demo moves up: Try it with your voice, What it does, See an example, Questions (WP6). The hero's secondary link is "What it does" too, so each place has one name.
-- **The demo's hand-over line** (WP8) names Done and not "Add to calendar", because the app's last button is «Añadir 2 tareas» when there are several tasks.
-- **`<html lang>`** is set before the first paint, and the content, header and footer carry their language in the HTML (WP2). A root layout per language would mean moving the other session's untracked legal pages, which the loop won't do.
-- **Removals the organizer added** (strike them if you want any kept):
-  - the remaining section eyebrows on the home ("01 / FIND YOUR EVERYDAY FLOW", "04 / A FEW GOOD QUESTIONS", "YOUR WORDS. YOUR NEXT STEP.");
-  - the FAQ's intro line and its "Less guesswork. More clarity." doodle;
-  - the hero card's "JUST SAY THE WORD" label.
-- **Copy the reports didn't give** (labels, error lines, translations of strings nobody rewrote) is the organizer's. Each brief marks it, and its Catalan wants a native read.
+- **The main label** is "Try it with your voice" (reviews H and G). The demo's own start button keeps "Try the live demo" (WP26).
+- **The menu row and closing heading** are «Muy pronto en Android» / «Molt aviat a Android» (review H, matching the hero's «Muy pronto en Google Play»). Review G proposed «Próximamente» / «Properament».
+- **The closing card** takes review H's heading and paragraph. Review F's "an app for Android phones" is already in the hero and the download answer.
+- **WD2's line** is one line, the same words in the closing card and under the demo:
+  - "Free with an account" comes from review F;
+  - "a monthly subscription" comes from review H;
+  - the line sits under the demo's card, visible in every demo state, as review F asked.
+- **Privacy §5's name sentence** merges both reviews: review L's assigned tasks with review F's "the start of your email" and one person's tasks.
+- **RevenueCat** uses review L's wording on both pages, because it says who RevenueCat is.
+- **Privacy §8's first sentence** is review L's, with two changes: "drafts" becomes the app's word, and «en directo» / «en directe» is how the demo says it (instead of «en vivo»).
+- **"Email support"** is «Escriu al suport» in Catalan, in the footer and on the legal pages (review G wrote «al», review L «a»).
+- **The current-language cue** is review L's 2 px ring plus bold, in the header, the menu, the footer and the legal pill. Review G asked for one pattern; its check icon would widen the pill.
+- **The footer's labels** are review G's ("Privacy", not "Privacy Policy").
+- **«l'aplicació» or «l'app» in Catalan:** the home, the frame and the demo say «l'aplicació», as the app does; the legal documents keep their own «l'app».
+- **The demo's capture heading** is the app's «¿Qué quieres recordar?», instead of "What's on your mind?".
+- **The line under the talk button** drops review H's "Tap to talk," because the button now says it.
+- **The hero's alt text** is review H's (it names the button in the app's words).
+- **The hero's height:** review H wanted the demo above y = 1328 on a phone, which was measured before WD4 made the phone 272 px and upright. The checks allow 1400, about two screens.
+
+**Removals the organizer added** (strike any you want kept):
+- the home's remaining eyebrows (features, FAQ, demo);
+- the FAQ's intro and its doodle;
+- the hero card's "JUST SAY THE WORD";
+- the features' "High priority" and "Bring the results" chips and "Your plans can come along.";
+- the demo's "Your drafts will appear right here";
+- privacy §8's repeated sentence about the 24-hour transcript.
+
+**Copy the reports didn't give** (the demo's buttons and labels, some FAQ questions, the drawing's words) is the organizer's. Each brief marks it "(organizer's)", and its Catalan wants a native read.
 
 ## Skipped
-- **WEB-102, WEB-303** → duplicates of WEB-3 (WP3, WP5, WP6).
-- **WEB-103** → duplicate of WEB-5 (WP1; WD4).
-- **WEB-112** → duplicate of WEB-17 (WP1).
-- **WEB-201** → duplicate of WEB-113 (WD3).
-- **WEB-301** → duplicate of WEB-2 (WP2, WP6, WP8, WP10, WP11).
-- **WEB-305** → duplicate of WEB-4 (WP3, WP6, WP10).
+- **WEB-102, WEB-303** → duplicates of WEB-3 (WP16, WP18, WP20).
+- **WEB-103** → duplicate of WEB-5 (WP16).
+- **WEB-112** → duplicate of WEB-17 (WP14).
+- **WEB-201** → duplicate of WEB-113 (WP31).
+- **WEB-301** → duplicate of WEB-2 (WP15, WP20, WP22–WP24, WP28, WP29).
+- **WEB-305** → duplicate of WEB-4 (WP16–WP18, WP20, WP23, WP26).
+- **WEB-601** → duplicate of WEB-501: reviews F and L found the same RevenueCat sentence (WP31, WP32).
+- **WEB-310** → withdrawn by review G. Measured: nothing scrolls sideways at 320 px, 200% zoom or doubled text, because no text grows yet. Its check moves into WEB-309 (WP25).
 
 ## For the main session
-- **WD4 needs app renders**: once the owner picks the screen, make them with the app's preview tests (English, Spanish and Catalan; light and dark; chosen text, not test text) before the package that swaps the hero image.
-- **Stale records**: the delegation, the Open list of `.claude/ux-review/DECISIONS.md` ("Also for later") and `Backend/docs/ACCOUNT_DELETION.md:66` say the website's delete page has no in-app option. Reviews F and L found the page already describes in-app deletion correctly in all three languages (version 2026-10-16). The loop doesn't edit either file.
-- **Committing**:
-  - `VoiceDemo.tsx` can't be separated from the other session's line 396, so hold `voice.css` with it, keeping the committed demo and its styles in step.
-  - `layout.tsx` stays committable as long as packages keep off lines 5–11, as their briefs say.
+- **What stays uncommitted** (never stage these):
+  - `layout.tsx` (WP22);
+  - `Footer.tsx` (WP23);
+  - `LegalPage.tsx`, `legal.css`, `sitemap.ts`, `src/content/legal/`, `tests/legal.spec.ts` and `docs/LEGAL_RELEASE.md` (WP23, WP24, WP30–WP32);
+  - `VoiceDemo.tsx` (WP26–WP29), and with it `src/styles/voice.css`, the demo packages' changes to `tests/voice.spec.ts` and `tests/support/ux-voice.ts`, and the tester's `tests/ux-web-voice.spec.ts`, `tests/ux-web-frame.spec.ts` and `tests/ux-web-legal.spec.ts`.
+
+  In the first batch, WP14's own changes to `tests/voice.spec.ts` and `tests/support/ux-voice.ts` do commit. New files (`src/content/site/`, `src/components/*`, `src/app/[language]/page.tsx`, `src/app/[language]/opengraph-image.tsx`, `src/proxy.ts`) commit.
+- **WD14:** record it, then the clause is a one-line scoped run.
+- **WD15:** waits on the owner's iPhone.
+- **When the owner commits `layout.tsx` (WP22):**
+  - delete `global.css`'s `@font-face` (lines 3–9), and the TTF if next/font uses a new file (keep `OFL.txt`);
+  - once the demo and legal packages are committed too, check whether `.eyebrow` and `.section-eyebrow` are unused, and delete them if so.
+- **The WD4 images show "October" and "Tuesday, October 20".** They date the page, as WEB-114 warns. Re-render them shortly before publishing (WD13). The README gives the command.
+- **Stale records outside the website** (the loop doesn't edit them):
+  - `Backend/docs/ACCOUNT_DELETION.md:65-67`;
+  - the Open list of `.claude/ux-review/DECISIONS.md` (still lists decided items, and says the website's delete page has no in-app route; it has one).
+- **For `/ux` in the app:**
+  - `app_en.arb:1703` still says "available in the Android and iOS app" (WD7);
+  - WD11's Privacy and Terms links aren't in `App/lib` yet. Play requires a privacy-policy link inside the app.
+- **Checks only you can do** (also in each package):
+  - Safari on an iPhone: type weight (WD15) and the FAQ jump;
+  - TalkBack: the hero, the recording, a Spanish title;
+  - Android at its largest font size;
+  - a dark-mode phone on a slow network;
+  - denying the microphone on Android and iPhone;
+  - the live demo with the real AI;
+  - Turnstile with a content blocker, after a deploy;
+  - WhatsApp previews, after a deploy;
+  - a native Catalan read;
+  - the delete summary read aloud to someone over 60.

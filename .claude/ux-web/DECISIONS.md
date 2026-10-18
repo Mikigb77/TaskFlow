@@ -51,6 +51,16 @@ The owner also asked that the reviewers get every tool they need before they jud
   - Ask him when he's back.
 - **WD13 — publishing:** the site goes out together with, or after, the app and backend it describes. Play Console gets `/delete-account/`. Nothing is deployed now.
 
+**From the recheck (2026-10-19), decided the same way:**
+- **WD14 — "unlimited" and its safety limit:** yes, once, in the FAQ only.
+  - After "unlimited dictation and file space" it says EN "(with a safety limit of 50 dictations a day)", ES «(con un límite de seguridad de 50 dictados al día)», CA «(amb un límit de seguretat de 50 dictats al dia)».
+  - The closing card and the line under the demo keep WD2's short wording.
+  - Raising the shared 200-a-day dictation budget before launch is the owner's: it's a server setting in `Backend/config/settings.py`, which another session is editing.
+- **WD15 — thin type in WebKit:** treated as an artifact of Playwright's WebKit build for Windows. Nothing changes.
+  - The site's `@font-face` already declares the variable font's weight range (`font-weight: 200 800`, `src/styles/global.css:7`), and Safari on iOS has supported variable fonts since iOS 11.
+  - Reviewers: weight differences in `webkit/` aren't findings unless they're seen on a real iPhone.
+  - The owner can confirm on his iPhone (/, /es/privacy/ and a missing page) when he's back.
+
 **Also decided:**
 - **Analytics:** none before launch.
   - At launch, the first choice is server-log or first-party audience measurement within the AEPD's 2024 conditions (the guide's PV-6 and FN-9): no consent banner, own audience only, anonymous, cookies at most 13 months.

@@ -1,0 +1,655 @@
+{
+  "runId": "2026-10-18-site",
+  "mode": "site",
+  "created": "2026-10-18",
+  "conventions": [
+    "Paths are relative to the website root, C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb; app-repo paths start with `App/`, `Backend/` or `.claude/`. Line numbers come from the 2026-10-18 reports, before any package ran. Earlier packages move them (WP2 moves the home from `src/app/page.tsx` into `src/components/HomePage.tsx`), so search for the code a line number points at.",
+    "Copy is shown between backticks as EN / ES / CA and is exact; the backticks aren't part of it. Write apostrophes and quotes as the site does: ’ in English and Catalan, “ ” for quotations in English, « » in Spanish and Catalan. Catalan «l·l» uses the middle dot U+00B7 (Manrope has no ŀ). In Catalan the app always calls itself «l’aplicació», so the site does too. Where a brief marks Catalan as the organizer's, write it as given and list it in your notes for a native read.",
+    "Every visible string, alt text, accessible name, title and message that a package adds or touches exists in English, Spanish and Catalan. The site's pattern: English at `/`, Spanish at `/es/…`, Catalan at `/ca/…`, as the legal pages already do. Home and frame copy lives in `src/content/site/` (WP2 creates it): one object per language with the same TypeScript type, so a missing string fails `npm run check`. New files never import from `src/content/legal/` or `src/components/LegalPage.tsx` (the other session's untracked work), so they can be committed on their own. Dates, times and numbers are formatted with the page's language through `Intl`, never the browser's. Developer-only text shown with `?developer=1` may stay English.",
+    "Use the app's own words (`App/lib/l10n/app_{en,es,ca}.arb`): `Add a task` / `Añadir tarea` / `Afegeix una tasca`; `Done` / `Listo` / `Fet`; `Listening` / `Escuchando` / `S’està escoltant`; `Understanding…` / `Entendiendo…` / `Entenent…`; `{n} things to add` / `{n} cosas para añadir` / `{n} coses per afegir`; `Say it again` / `Volver a decirlo` / `Torna-ho a dir`; `See what I said` / `Ver lo que dije` / `Mostra què he dit`; `No date` / `Sin fecha` / `Sense data`; `Type instead` / `Escribir` / `Escriu`; `One moment…` / `Un momento…` / `Un moment…`; `Undo` / `Deshacer` / `Desfés`; `Projects` / `Proyectos` / `Projectes`; `Share` / `Compartir` / `Comparteix`; `Add a note` / `Añadir nota` / `Afegeix una nota`; `Settings → Account → Delete account` / `Ajustes → Cuenta → Eliminar cuenta` / `Configuració → Compte → Suprimeix el compte`. The app's teaching example is `Tomorrow, call the dentist and buy bread.` / `Mañana, llamar al dentista y comprar pan.` / `Demà, trucar al dentista i comprar pa.` Visible text never says draft, voice-to-task, allowance, transcript, sync, or list for a project.",
+    "One label per destination, in the header, the phone menu, the footer and in-page links: `#voice` `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu`; `#features` `What it does` / `Qué hace` / `Què fa`; `#demo` `See an example` / `Mira un ejemplo` / `Mira un exemple` (whether the walkthrough stays waits on WD1); `#questions` `Questions` / `Preguntas` / `Preguntes`; `#get-taskflow` `Coming soon to Android` / `Muy pronto en Android` / `Molt aviat a Android`. Links from the frame keep the page's language prefix (`/es/#voice`, `/ca/#questions`).",
+    "TaskFlow isn't on Google Play yet. Say it's coming soon in plain text. Never a Google Play badge, logo, store link or `play.google.com` URL, never a price, and no label that promises a download or ‘the app’.",
+    "Type floor for any text a package adds or restyles: sizes in rem, with the root at 100%; body text and paragraphs at least 1rem (16 px); button labels at least 1rem; small print at least 0.875rem (14 px) where it fits; nothing visible under 0.75rem (12 px). Text contrast at least 4.5:1; controls, states and focus rings at least 3:1; in light and dark. Use the site's tokens in `src/styles/global.css` (`--green`, `--ink`, `--muted`, `--paper`, `--soft` and the rest), its `.button` and `.text-link` styles, and `Icon` for every arrow or symbol: no ↗ ↑ ← text glyphs (Manrope lacks some). Keep reduced motion and the focus-to-stage-heading behaviour working.",
+    "Subtract first. Removing something means its markup, its CSS (with the responsive blocks at `@media (max-width: 1100px)`, `800px`, `580px` and `360px`), its images, strings and tests: leave no dead code. Don't add sections, pages, forms, sign-ups, tracking, settings or features that a brief doesn't name.",
+    "Another session's uncommitted work is in TaskFlowWeb; never stage, commit, revert or reformat it. Untracked (theirs): `docs/`, `scripts/check-legal.mjs`, `src/app/[language]/[document]/`, `src/app/terms/`, `src/app/legal/`, `src/app/delete-account/`, `src/components/LegalPage.tsx`, `src/content/legal/`, `src/styles/legal.css`, `tests/legal.spec.ts`. Their uncommitted lines: `src/app/layout.tsx:8` (the legal.css import), `src/components/Footer.tsx` lines 2, 18, 26–32 and 34–36, `src/components/VoiceDemo.tsx:396` (the privacy link), the body of `src/app/sitemap.ts`, `src/app/privacy/page.tsx`, `Dockerfile`, `README.md`, `package.json`, `scripts/deploy-cloud-run.ps1`. A change within 3 lines of one of their lines can't be committed apart from it: in `src/app/layout.tsx`, stay off lines 5–11. Where a brief changes their files, do it; those changes stay uncommitted for the owner. New files you create, even inside `src/app/[language]/` or `src/content/site/`, can be committed.",
+    "Checks run in WSL from the website root: `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command>'`, with `npm run check`, `npm run legal:check`, `npm run build` (before any Playwright run; stop anything listening on port 3000 first), `npm test`, `npm run test:unit` and the renders `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts`. Git runs on Windows. Keep every check passing, and update the existing tests that pin text or flows you change (`tests/website.spec.ts`, `tests/voice.spec.ts`; `tests/legal.spec.ts` is the other session's, so changes there stay uncommitted). Keep `PAGES` in `tests/ux-renders.spec.ts` current. `web-ux-tester` writes the acceptance tests, in `tests/ux-web-*.spec.ts`.",
+    "Today is 2026-10-18. Sample content never names a fixed month or year; anything date-dependent is relative to today.",
+    "A part marked ‘waits on WD#’ stays exactly as it is today: don't implement it. The tester and the verifier leave it out.",
+    "Every claim must be true of the app on `dev` today (`.claude/ux-review/DECISIONS.md`, the ARB files, `Backend/docs/`). If a brief's copy seems to contradict the app, keep the brief's copy and say so in your notes; don't improvise."
+  ],
+  "packages": [
+    {
+      "id": "WP1",
+      "title": "Subtract: the appearance section and unused screenshots go; the live demo moves up",
+      "area": "H",
+      "size": "M",
+      "severity": 3,
+      "findings": ["WEB-5", "WEB-17", "WEB-10"],
+      "aliases": {"WEB-5": ["WEB-103"], "WEB-17": ["WEB-112"]},
+      "files": [
+        "src/app/page.tsx",
+        "src/components/ThemeProvider.tsx (the ‘mood’ variant)",
+        "src/components/Phone.tsx",
+        "src/styles/global.css (`.appearance-*` and their responsive rules)",
+        "public/images/tasks-light.png, tasks-dark.png, calendar-light.png, calendar-dark.png (delete)",
+        "tests/website.spec.ts"
+      ],
+      "brief": [
+        "Why: about 1.7 phone screens of the home sell the website's own light/dark switch, with a tilted screenshot of an app screen that no longer exists (WEB-17, merged WEB-112); two screenshots ship unused and two are outdated (WEB-5, merged WEB-103); and the live demo, the page's only proof, sits 4½ phone screens below the hero (WEB-10). This package only removes and moves; it adds nothing.",
+        "Remove the `#appearance` section (`src/app/page.tsx:320-358`) and its `ThemeToggle variant='mood'`. In `src/components/ThemeProvider.tsx:75-107`, delete the ‘mood’ variant, its prop and its label (‘Try a different mood…’); keep only the icon switch and its two labels. Delete every `.appearance-*` rule in `src/styles/global.css` (`:1193-1280`, plus their responsive rules, such as `.appearance-tag` near `:1910`) and the `.button-outline` rules if nothing else uses them.",
+        "Delete `public/images/tasks-light.png`, `tasks-dark.png`, `calendar-light.png` and `calendar-dark.png`. In `src/components/Phone.tsx`, drop the `calendar` and `tasks` screens from the `screen` type and from `descriptions`, so only `agenda` remains. Leave `agenda-*.png` and the hero's `<Phone eager … />` as they are: replacing the hero image waits on WD4.",
+        "Move `<VoiceDemo />` (`page.tsx:286`) to directly after the hero section (after its `</section>` at `:127`, before the promise bar, which WP3 removes). Nothing else moves: `#features` now follows the live demo, and the walkthrough (`#demo`) still follows `#features`.",
+        "Tests: in `tests/website.spec.ts`, replace the mood-button step (`:85-88`) with the header's theme switch, and replace the appearance-phone check (`:176-179`) with a check that the visible hero image has loaded.",
+        "Don't touch: the walkthrough (`TaskDemo`, `#demo`; its fate waits on WD1), the hero's copy (WP3), the header's theme switch."
+      ],
+      "acceptance": [
+        "On / at 1440 × 1000 and 390 × 664, in light and dark: there is no `#appearance` element, no button whose accessible name contains ‘mood’, and exactly one theme control on the page (the header's).",
+        "Loading / on both projects requests no URL containing `/images/tasks-` or `/images/calendar-`, and those four files no longer exist in `public/images/`.",
+        "In the DOM of /, the section right after the hero is `#voice`, and `#voice` comes before `#features`.",
+        "After WP3 (round end), on the full mobile render of / (390 × 664, light), `#voice` starts above y = 1328.",
+        "axe (wcag2a, wcag2aa, wcag21aa, wcag22aa) reports no violations on / on both projects in light and dark, and / doesn't scroll sideways at 320, 768 or 1024 px."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    },
+    {
+      "id": "WP2",
+      "title": "Spanish and Catalan homes at /es/ and /ca/, and the page's language in the HTML",
+      "area": "G",
+      "size": "M",
+      "severity": 3,
+      "findings": ["WEB-2", "WEB-304"],
+      "aliases": {"WEB-2": ["WEB-301"]},
+      "files": [
+        "src/components/HomePage.tsx (new)",
+        "src/app/page.tsx",
+        "src/app/[language]/page.tsx (new file, next to the other session's untracked `[document]/`; it can be committed)",
+        "src/content/site/index.ts, en.ts, es.ts, ca.ts (new)",
+        "src/components/SkipLink.tsx (new) or src/components/Header.tsx",
+        "src/app/layout.tsx (lines 39 and below only; line 8 is the other session's)",
+        "tests/ux-renders.spec.ts (PAGES)",
+        "tests/website.spec.ts"
+      ],
+      "brief": [
+        "Why: the home exists only in English, and `/es/` and `/ca/` return the 404 (WEB-2, merged WEB-301); every page says `<html lang='en'>` and the skip link is English (WEB-304). This package builds the mechanism the later packages fill: the routes, the copy tables and the page's language in the HTML. The header's strings and the language switch are WP6, the footer is WP10, and each home section gets its three languages in its own package (hero and closing WP3, features WP4, FAQ WP5, live demo WP7–WP8).",
+        "Copy tables: create `src/content/site/` with `index.ts` holding the languages `en`, `es`, `ca`; `languageNames` (`English`, `Español`, `Català`); `homePath(language)` → `/`, `/es/`, `/ca/`; `languageOfPath(pathname)`, which returns `es` or `ca` only for the site's known routes (`/es/`, `/ca/`, and `/es/` or `/ca/` followed by `privacy/`, `terms/`, `legal/` or `delete-account/`) and `en` for everything else; and `localisedPath(pathname, language)`, which swaps the prefix on those routes. Put one copy object per language in `en.ts`, `es.ts` and `ca.ts`, typed from the English one so Spanish and Catalan must have every key. Don't import from `src/content/legal/`.",
+        "Home: move today's home markup from `src/app/page.tsx` into `src/components/HomePage.tsx`, which takes a `language` prop and sets `lang={language}` on its outermost element. `src/app/page.tsx` renders `<HomePage language='en' />`. Create `src/app/[language]/page.tsx` with `generateStaticParams` returning `es` and `ca`, `dynamicParams = false`, a `generateMetadata`, and `<HomePage language={language} />`. `/fr/` must stay a 404 and `/es/privacy/` must keep rendering the Spanish privacy page.",
+        "Section strings: leave them where they are, in English, for now. The package that rewrites a section moves its strings into the tables in all three languages, so nothing gets translated twice. The sample walkthrough (`TaskDemo`, `#demo`) stays English on all three homes: whether it stays at all waits on WD1.",
+        "`<html lang>`: the root layout can't know the route, and a root layout per language would mean moving the other session's untracked legal pages, which this loop must not do. So (a) in the server HTML, every element holding visible text carries the page's language: `HomePage`'s wrapper here, the header in WP6 and the footer in WP10; the legal pages already set it on `<article>`; and (b) before first paint, set `document.documentElement.lang` from the address with the same known-routes rule as `languageOfPath` (es or ca only on those routes, en otherwise), in the inline script beside `themeInit` (`src/app/layout.tsx:39`) or a second inline script. `<html>` already has `suppressHydrationWarning`.",
+        "Skip link (`layout.tsx:56-58`): render it from a small client component (or from `Header`) that reads `usePathname()` through `languageOfPath`: `Skip to content` / `Saltar al contenido` / `Salta al contingut`, with `lang` set. It still targets `#main-content`. The 404 isn't a known route, so it keeps the English frame and hydrates without a mismatch.",
+        "Metadata: when `SITE_URL` is set, give `/`, `/es/` and `/ca/` `alternates` with `canonical` and `languages` for `en` (`/`), `es` (`/es/`), `ca` (`/ca/`) and `x-default` (`/`), following `legalMetadata`'s pattern. Titles and descriptions are WP9's; until then the Spanish and Catalan homes inherit the layout's.",
+        "`src/app/layout.tsx` holds the other session's uncommitted line 8: don't change lines 5–11, or the file can't be committed apart from it. Your edits (the language script, the skip link) sit at line 39 and below.",
+        "Renders: add the home's `es` (`/es/`) and `ca` (`/ca/`) versions to `PAGES` in `tests/ux-renders.spec.ts`, with `src/app/[language]/page.tsx`, `src/components/HomePage.tsx` and `src/content/site/<language>.ts` as sources; the coverage check fails otherwise. Listing `/es/` and `/ca/` in the sitemap is WP11's (`src/app/sitemap.ts` holds the other session's lines).",
+        "The bare `/` stays English. Picking the language from the browser on `/` waits on WD5."
+      ],
+      "acceptance": [
+        "`/es/` and `/ca/` return 200 on both projects and render the home's hero, live demo, features, FAQ and closing card; `/fr/` returns 404; `/es/privacy/` still renders the Spanish privacy page.",
+        "After the page loads, `<html lang>` is `es` on /es/ and /es/privacy/, `ca` on /ca/ and /ca/delete-account/, and `en` on /, /privacy/ and /a-page-that-does-not-exist/. With JavaScript off, the home's outermost element carries `lang='es'` on /es/ and `lang='ca'` on /ca/.",
+        "The skip link reads `Saltar al contenido` on /es/ and /es/terms/, `Salta al contingut` on /ca/, and `Skip to content` on / and on the 404, and pressing it moves focus to `#main-content`.",
+        "axe (wcag2a, wcag2aa, wcag21aa, wcag22aa, with html-has-lang and valid-lang) reports no violations on /es/ and /ca/ on both projects, in light and dark; no page error is logged on /es/, /ca/ or /es/no-existe/ after hydration.",
+        "After `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts`, `home.es.*` and `home.ca.*` renders exist and INDEX.md no longer lists the home under missing languages.",
+        "In the code, the three homes' metadata carries `alternates.languages` for en, es, ca and x-default when `SITE_URL` is set.",
+        "After WP3–WP8 (round end): the visible text of `main` on /es/ and /ca/, leaving out `#demo` (waits on WD1), contains none of the English words ‘the’, ‘your’, ‘and’, ‘with’, ‘you’ as whole words."
+      ],
+      "deviceChecks": [
+        "TalkBack on an Android phone reads /es/ (its title and its content) with a Spanish voice."
+      ],
+      "dependsOn": ["WP1"]
+    },
+    {
+      "id": "WP3",
+      "title": "Hero and closing card: what TaskFlow is, that it isn't out yet, one button to the live demo",
+      "area": "H",
+      "size": "L",
+      "severity": 4,
+      "findings": ["WEB-1", "WEB-3", "WEB-4", "WEB-11", "WEB-19", "WEB-308"],
+      "aliases": {"WEB-3": ["WEB-102", "WEB-303"], "WEB-4": ["WEB-305"]},
+      "files": [
+        "src/components/HomePage.tsx (hero, promise bar, closing card)",
+        "src/content/site/en.ts, es.ts, ca.ts",
+        "src/components/Phone.tsx (alt text in the page's language)",
+        "src/styles/global.css (hero, promise bar, closing card, focus)",
+        "tests/website.spec.ts"
+      ],
+      "brief": [
+        "Why: from the first screen a newcomer can't tell what TaskFlow is: 0 of 56 words on the phone fold say app, phone, Android, task, calendar or voice (WEB-1, Severity 4). Nothing near a button says the app can't be installed yet; the only line is 10 px, 11 phone screens down (WEB-3, with WEB-102 and WEB-303). The hero's and the closing card's buttons loop back to the sample form (WEB-4, with WEB-305). The ‘at a glance’ bar is four slogans at 7–8 px (WEB-11). Decorative captions are read aloud (WEB-19). Keyboard focus disappears on the closing card in light mode (WEB-308). Replace, don't add. Every string goes into the copy tables in all three languages.",
+        "Hero, remove: the eyebrow (`page.tsx:43-45`), the footnote (`:78-83`), the stage caption ‘A LITTLE SPACE TO THINK.’ (`:94`), the ‘Make a little time for you’ card (`:111-122`), the art label (`:123-125`), the `aria-label` on the `.hero-art` div (`:85-88`), and their CSS. The decorative orbits stay, `aria-hidden`.",
+        "H1: `Say it, and it’s on your calendar.` / `Dilo y ya está en tu calendario.` / `Digues-ho i ja és al teu calendari.` Keep the underline accent only if it sits on the last phrase in each language without breaking a word; otherwise drop it and its SVG.",
+        "Subheadline (`.hero-description`), at least 1.125rem (18 px) on phones: `Tap one button and say what you need to do, even several things at once. TaskFlow puts each one on the day you say and can remind you before it. An app for Android phones.` / `Toca un botón y di lo que tienes que hacer, aunque sean varias cosas a la vez. TaskFlow pone cada una en el día que digas y puede avisarte antes. Una app para móviles Android.` / `Toca un botó i digues el que has de fer, encara que siguin diverses coses alhora. TaskFlow posa cada una el dia que diguis i et pot avisar abans. Una aplicació per a mòbils Android.`",
+        "Buttons: the filled button goes to `#voice`: `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu`. The text link goes to `#features`: `What it does` / `Qué hace` / `Què fa` (the same label the header will use).",
+        "Availability line, in the footnote's place under the buttons, at least 0.875rem (14 px), in a colour with at least 4.5:1, with no icon that looks like a store badge: `Coming soon to Google Play. You can’t download it yet.` / `Muy pronto en Google Play. Todavía no se puede descargar.` / `Molt aviat a Google Play. Encara no es pot descarregar.` No Google Play badge, logo or link.",
+        "Voice card (`.note-voice`, `:96-109`): keep its place, its microphone icon and its waveform (`aria-hidden`). Remove the ‘JUST SAY THE WORD’ label. The quote becomes the app's own example (`calendarTrySaying`): `“Tomorrow, call the dentist and buy bread.”` / `«Mañana, llamar al dentista y comprar pan.»` / `«Demà, trucar al dentista i comprar pa.»`, at least 0.875rem.",
+        "Hero image: today's `agenda-*.png` stays (replacing it waits on WD4). Give `Phone` the page's language and its alt text from the tables: `TaskFlow Android app showing a weekly calendar and today’s tasks with times, priorities, and notes.` / `La app TaskFlow en Android, con un calendario semanal y las tareas de hoy con su hora, prioridad y notas.` / `L’aplicació TaskFlow a Android, amb un calendari setmanal i les tasques d’avui amb l’hora, la prioritat i les notes.` (Spanish and Catalan: the organizer's).",
+        "Promise bar (`:129-142`): remove it and its CSS (`global.css:607-627, 1601-1604, 1773-1781, 2068-2080, 2370-2372`). A free-plan strip in its place waits on WD2.",
+        "Closing card (`#get-taskflow`, `:399-428`): delete the eyebrow (`:408`), the old H2 (`:409-413`), the ‘next chapter’ line (`:414-418`) and the 10 px launch note (`:422-425`) with its CSS (`global.css:1398-1407, 2302-2306`). H2: `Coming soon to Android.` / `Muy pronto en Android.` / `Molt aviat a Android.` Paragraph, at least 1rem: `TaskFlow isn’t on Google Play yet. Until then, you can try it with your voice on this page.` / `TaskFlow todavía no está en Google Play. Mientras tanto, puedes probarlo con tu voz en esta página.` / `TaskFlow encara no és a Google Play. Mentrestant, el pots provar amb la teva veu en aquesta pàgina.` Its button keeps `button-lime`, goes to `#voice` and carries the hero button's label. Keep the id `get-taskflow`: the phone menu points at it. A free-plan line in the card waits on WD2.",
+        "Focus on the closing card (WEB-308): add `.closing-card :focus-visible { outline-color: #d4eca3; }` (7.57:1 on #214c38).",
+        "Decorative text (WEB-19): any decorative caption left in the hero gets `aria-hidden='true'`; no `aria-label` on a plain `div` (use `role='group'` if a name is needed); text is sentence case in the source, with capitals only through CSS.",
+        "Type: size what you touch by the type floor in the conventions; WP12 sweeps what remains.",
+        "Tests: `tests/website.spec.ts` clicks ‘See it in action’ (`:19-20`) and expects ‘Make room’ in the H1 (`:144-146`, `:233-235`). Go to `/#demo` directly for the walkthrough test, and expect the new H1.",
+        "Don't touch: the header (WP6), the features (WP4), the FAQ (WP5), the live demo (WP7–WP8)."
+      ],
+      "acceptance": [
+        "On /, /es/ and /ca/, at 1440 × 1000 and 390 × 664, in light and dark: the h1 reads exactly the given H1 in that language; `.hero` contains ‘Android’; no `.hero` text matches /a little/i; the hero has no eyebrow, no ‘JUST SAY THE WORD’, no ‘Make a little time for you’ card, no stage caption and no art label.",
+        "At 390 × 664, in light and dark, on /, /es/ and /ca/: the h1, the subheadline, the primary button and the availability line are fully inside the first viewport.",
+        "The availability line reads the given text in each language and computes to at least 14 px; no element on any home links to `play.google.com`, and no text says ‘Get it on Google Play’.",
+        "After WP6 (round end), at 1440 × 1000 the first viewport of each home holds exactly one filled `.button`, the hero's, in light and dark.",
+        "On each home, every link labelled `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu` has an href ending in `#voice`, and the hero's text link `What it does` / `Qué hace` / `Què fa` ends in `#features`.",
+        "The hero's voice card shows the app's example in the page's language, exactly as given.",
+        "No `.promise-bar` on any home.",
+        "On each home, the closing card's H2 and paragraph read the given text, the paragraph computes to at least 16 px, its button carries the primary label and ends in `#voice`, and it has no ‘Find your flow’, no `.launch-note` and no eyebrow.",
+        "Desktop, light theme: Tab to the closing card's button; its computed outline colour has at least 3:1 contrast against #214c38.",
+        "axe reports no violations, aria-prohibited-attr included, on /, /es/ and /ca/ on both projects, in light and dark.",
+        "The hero image's alt text is in the page's language."
+      ],
+      "deviceChecks": [
+        "Safari on a real iPhone and Chrome on an Android phone, on /es/: at arm's length, the first screen shows the heading, the subheadline, the button and the ‘coming soon’ line, and they're readable.",
+        "A five-second test on /es/ on a phone with someone over 60: they can say what TaskFlow is, that it's for Android phones, and what they would tap."
+      ],
+      "dependsOn": ["WP2"]
+    },
+    {
+      "id": "WP4",
+      "title": "Features: headings and cards say what TaskFlow does, truthfully",
+      "area": "F",
+      "size": "M",
+      "severity": 4,
+      "findings": ["WEB-101", "WEB-105", "WEB-106", "WEB-111", "WEB-114", "WEB-16"],
+      "aliases": {},
+      "files": [
+        "src/components/HomePage.tsx (the `#features` section)",
+        "src/content/site/en.ts, es.ts, ca.ts",
+        "src/styles/global.css (features, `.voice-illustration`)"
+      ],
+      "brief": [
+        "Why: two cards say signing in is optional (‘Sign in to upload files…’, ‘Sign in to back them up…’), but the app opens on Sign in (WEB-101, Severity 4); the selling point, several tasks in one dictation, is never told (WEB-105), and neither are reminders (WEB-106); the headings are mood lines (WEB-111); the calendar drawing says ‘September 2026’ (WEB-114); and the voice card's 75 px microphone circle looks tappable and does nothing (WEB-16). Its cards' bodies are true once rewritten; the copy is review F's.",
+        "Section heading: remove the eyebrow ‘01 / FIND YOUR EVERYDAY FLOW’ (`page.tsx:151-153`), the second line ‘A little space for you.’ and the intro paragraph (`:160-164`). H2: `Say it. See it on your calendar. Get reminded.` / `Dilo. Míralo en tu calendario. Recibe un aviso.` / `Digues-ho. Mira-ho al calendari. Rep un avís.`",
+        "Calendar card (`:167-224`). H3: `Your day on one calendar` / `Tu día en un calendario` / `El teu dia en un calendari`. Body: `See your tasks by day, week or month. TaskFlow can remind you of each task: it asks once, the first time you add one with a date.` / `Mira tus tareas por día, semana o mes. TaskFlow puede recordarte cada tarea: te lo pregunta una vez, la primera vez que añades una con fecha.` / `Mira les tasques per dia, setmana o mes. TaskFlow et pot recordar cada tasca: t’ho pregunta una vegada, la primera vegada que n’afegeixes una amb data.` Drawing: remove ‘September 2026’ (`:181-183`); translate its labels: `A good week ahead` / `Una buena semana por delante` / `Una bona setmana per endavant`; day letters `M T W T F S S` / `L M X J V S D` / `dl dt dc dj dv ds dg`; `A fresh start` / `Un buen comienzo` / `Un bon començament`; `Review this week’s plans` / `Repasar los planes de la semana` / `Repassar els plans de la setmana`; `Some time outside` / `Un rato al aire libre` / `Una estona a l’aire lliure`; `Your favorite walking route` / `Tu paseo favorito` / `La teva passejada preferida` (the drawing's Spanish and Catalan are the organizer's). The day numbers stay.",
+        "Voice card (`:225-249`). H3: `Say several things at once` / `Di varias cosas a la vez` / `Digues diverses coses alhora`. Body (review F's, starting with the example because the heading already says ‘several things at once’): `For example: “Tomorrow, call the dentist and buy bread.” TaskFlow makes one task for each thing, on its day. Check them, then add them all with one tap.` / `Por ejemplo: «Mañana, llamar al dentista y comprar pan». TaskFlow crea una tarea para cada cosa, en su día. Revísalas y añádelas todas con un toque.` / `Per exemple: «Demà, trucar al dentista i comprar pa». TaskFlow crea una tasca per a cada cosa, al seu dia. Revisa-les i afegeix-les totes amb un toc.` Its link (`:235-237`, ‘Give it a try’) gets the primary label and goes to `#voice` (WEB-4). Remove the drawing `.voice-illustration` (`:239-248`: the orbits, the 75 px microphone circle and ‘One less thing to hold in your head.’) and its CSS (`global.css:808-846` and responsive rules): it's a microphone that looks tappable and does nothing (WEB-16). Let the card's layout close the gap.",
+        "Details card (`:250-269`). H3: `Notes, checklists and files` / `Notas, listas de pasos y archivos` / `Notes, llistes de passos i fitxers`. Body: `Add notes, a checklist or files to any task. Files are backed up to your account, up to 6 MB each.` / `Añade notas, una lista de pasos o archivos a cualquier tarea. Los archivos se guardan en tu cuenta, hasta 6 MB cada uno.` / `Afegeix notes, una llista de passos o fitxers a qualsevol tasca. Els fitxers es desen al teu compte, fins a 6 MB cadascun.` Chips: `High priority` / `Prioridad alta` / `Prioritat alta` (the app's `highPriority`); `Bring the results` / `Llevar los resultados` / `Portar els resultats`.",
+        "Offline card (`:270-282`). H3: `Your tasks, even offline` / `Tus tareas, también sin conexión` / `Les tasques, també sense connexió`. Body: `Your tasks are saved on your phone, so you can check and add them without internet. They’re saved to your account when you’re back online.` / `Tus tareas se guardan en el móvil, así puedes consultarlas y añadirlas sin internet. Se guardan en tu cuenta cuando vuelves a tener conexión.` / `Les tasques es desen al mòbil, així pots consultar-les i afegir-ne sense internet. Es desen al teu compte quan tornes a tenir connexió.` Status line: `Your plans can come along.` / `Tus planes te acompañan.` / `Els teus plans t’acompanyen.`",
+        "The walkthrough's fixed September dates, its ‘sample week in September 2026’ line and its fake microphone are in `TaskDemo` and wait on WD1.",
+        "Type: headings and bodies in rem, by the type floor."
+      ],
+      "acceptance": [
+        "On /, /es/ and /ca/ (both projects, light): the `#features` h2 and the four h3s read exactly the given text in that language, and `#features` has no eyebrow, no intro paragraph and no ‘A little space for you’.",
+        "The visible text of `#features` contains none of ‘Sign in to’, ‘without an account’, ‘allowance’, ‘MiB’, ‘September’ or ‘2026’; the details card says ‘6 MB’; the calendar card says TaskFlow can remind you (EN ‘remind’, ES ‘recordarte’, CA ‘recordar’).",
+        "The voice card quotes the app's example in the page's language, and its link carries the primary label and ends in `#voice`.",
+        "There is no `.voice-illustration` in the DOM, and nothing in `#features` that isn't a button draws a microphone inside a circle 48 px or larger.",
+        "The calendar drawing's labels are in the page's language on /es/ and /ca/.",
+        "axe reports no violations on /, /es/ and /ca/ on both projects, in light and dark, and none of them scrolls sideways at 320 px."
+      ],
+      "deviceChecks": [
+        "A native Catalan speaker reads `#features` on /ca/."
+      ],
+      "dependsOn": ["WP2"]
+    },
+    {
+      "id": "WP5",
+      "title": "FAQ: answers match today's app, in the app's words",
+      "area": "F",
+      "size": "M",
+      "severity": 4,
+      "findings": ["WEB-101", "WEB-3", "WEB-105", "WEB-107", "WEB-110", "WEB-109"],
+      "aliases": {"WEB-3": ["WEB-102"]},
+      "files": [
+        "src/components/HomePage.tsx (the `faqs` array and `#questions`)",
+        "src/content/site/en.ts, es.ts, ca.ts",
+        "src/styles/global.css (`.faq-intro`, `.faq-doodle`)",
+        "tests/website.spec.ts"
+      ],
+      "brief": [
+        "Why: six of seven answers say something false or outdated about today's app. One says you can use it without an account (WEB-101, Severity 4: the app opens on Sign in); one calls projects ‘lists’ and describes the old invitation (WEB-107); one describes a Task/Note choice the app removed (WEB-110); none tells several tasks in one dictation or voice changes (WEB-105); the download answer hints at other platforms and the outdated screens (WEB-3, with WEB-102); and the page names things differently from the app (WEB-109).",
+        "Heading: the H2 ‘Glad you asked.’ becomes `Questions` / `Preguntas` / `Preguntes`, the nav's label for this section. Remove the eyebrow ‘04 / A FEW GOOD QUESTIONS’, the intro paragraph (‘A little more about TaskFlow…’) and the doodle (‘Less guesswork. More clarity.’), with their CSS (the organizer's subtraction; plan.md lets the owner strike it).",
+        "Keep `<details name='questions'>`, the order and one question per item. Questions and answers, exact:",
+        "1. `Can I download TaskFlow yet?` / `¿Ya puedo descargar TaskFlow?` / `Ja puc descarregar TaskFlow?` — `Not yet. TaskFlow is an app for Android phones, coming soon to Google Play. Until then, try it with your voice on this page: say a few things and see the tasks TaskFlow makes.` / `Todavía no. TaskFlow es una app para móviles Android y llegará pronto a Google Play. Mientras tanto, pruébalo con tu voz en esta página: di varias cosas y mira las tareas que crea TaskFlow.` / `Encara no. TaskFlow és una aplicació per a mòbils Android i arribarà aviat a Google Play. Mentrestant, prova-ho amb la teva veu en aquesta pàgina: digues diverses coses i mira les tasques que crea TaskFlow.`",
+        "2. `How do I add tasks by voice?` / `¿Cómo añado tareas hablando?` / `Com afegeixo tasques parlant?` — `Tap Add a task and say what you need to do, in your own words. Several things at once is fine. Tap Done: TaskFlow shows one task for each thing, with its day and time. Check them and add them with one tap. You can also move, change or delete a task by voice; TaskFlow shows the change first, and you can undo it. Understanding your words needs an internet connection.` / `Toca Añadir tarea y di lo que tienes que hacer, con tus palabras. Puedes decir varias cosas a la vez. Toca Listo: TaskFlow te muestra una tarea por cada cosa, con su día y su hora. Revísalas y añádelas con un toque. También puedes mover, cambiar o borrar una tarea hablando; TaskFlow te enseña el cambio antes y puedes deshacerlo. Para entender tus palabras necesita conexión a internet.` / `Toca Afegeix una tasca i digues el que has de fer, amb les teves paraules. Pots dir diverses coses alhora. Toca Fet: TaskFlow et mostra una tasca per cada cosa, amb el seu dia i la seva hora. Revisa-les i afegeix-les amb un toc. També pots moure, canviar o esborrar una tasca parlant; TaskFlow t’ensenya el canvi abans i el pots desfer. Per entendre les teves paraules necessita connexió a internet.`",
+        "3. `Can I use it offline?` / `¿Puedo usarla sin conexión?` / `La puc fer servir sense connexió?` — `Yes. Your tasks are saved on your phone, so you can check, add and complete them without internet. Saving to your account, understanding what you say, and uploading files need a connection.` / `Sí. Tus tareas se guardan en el móvil: puedes consultarlas, añadirlas y completarlas sin internet. Guardar en tu cuenta, entender lo que dices y subir archivos necesitan conexión.` / `Sí. Les tasques es desen al mòbil: pots consultar-les, afegir-ne i completar-les sense internet. Desar al compte, entendre el que dius i pujar fitxers necessiten connexió.`",
+        "4. `Do I need an account?` / `¿Necesito una cuenta?` / `Necessito un compte?` — `Yes. You sign in once: with Google in one tap, or with your email and a 6-digit code we send you to confirm it. Your tasks are kept in your account, so you don’t lose them if you change phones.` / `Sí. Inicias sesión una vez: con Google, en un toque, o con tu correo y un código de 6 cifras que te enviamos para confirmarlo. Tus tareas se guardan en tu cuenta, así no las pierdes si cambias de móvil.` / `Sí. Inicies la sessió una vegada: amb Google, en un toc, o amb el teu correu i un codi de 6 xifres que t’enviem per confirmar-lo. Les tasques es desen al teu compte, així no les perds si canvies de mòbil.`",
+        "5. `Can I share tasks with my family?` / `¿Puedo compartir tareas con mi familia?` / `Puc compartir tasques amb la meva família?` — `Yes. Share a project, such as Home or Shopping: tap Share and invite someone by email. Once they accept, you both see all its tasks; each task shows who created it, and you can see just one person’s tasks.` / `Sí. Comparte un proyecto, como Casa o Compras: toca Compartir e invita a alguien por correo. Cuando acepte, los dos veréis todas sus tareas; cada tarea muestra quién la creó y puedes ver solo las de una persona.` / `Sí. Comparteix un projecte, com Casa o Compres: toca Comparteix i convida algú per correu. Quan accepti, tots dos en veureu totes les tasques; cada tasca mostra qui l’ha creada i pots veure només les d’una persona.`",
+        "6. `Can I keep notes as well as tasks?` / `¿Puedo guardar notas además de tareas?` / `Puc desar notes a més de tasques?` — `Yes. The Notes tab keeps what you want to remember that isn’t a task, like a Wi-Fi password. Tap Add a note, then write or dictate it; add links or a checklist if you like.` / `Sí. La pestaña Notas guarda lo que quieres recordar y no es una tarea, como la clave del wifi. Toca Añadir nota y escríbela o díctala; si quieres, añade enlaces o una lista de pasos.` / `Sí. La pestanya Notes desa el que vols recordar i no és una tasca, com la contrasenya del wifi. Toca Afegeix una nota i escriu-la o dicta-la; si vols, afegeix-hi enllaços o una llista de passos.`",
+        "7. Pricing: keep today's question and answer; rewriting it waits on WD2. Translate them as they are: `Will TaskFlow be free?` / `¿TaskFlow será gratis?` / `TaskFlow serà gratuït?` — English unchanged; `Todavía no hemos anunciado los precios de lanzamiento. Seguimos probando la app y sus funciones de IA, así que en esta web no hay planes de pago ni suscripciones que contratar.` / `Encara no hem anunciat els preus de llançament. Continuem provant l’aplicació i les seves funcions d’IA, així que en aquest web no hi ha plans de pagament ni subscripcions per contractar.` (Spanish and Catalan: the organizer's.) The Spanish and Catalan questions in items 1, 3 and 6 are the organizer's too.",
+        "Names (WEB-109): the home's visible text never says voice-to-task, draft, allowance, sync or shared list. WEB-109's live-demo rows are done in WP7–WP8 with WEB-9 and WEB-12, its metadata row in WP9 with WEB-302. Privacy §8 quoting the old ‘Create drafts’ button waits on WD3.",
+        "Tests: `tests/website.spec.ts:135-140` and `:236-237` look for ‘A public download is coming later’ and ‘Downloaded files work offline’; point them at the new answers."
+      ],
+      "acceptance": [
+        "On /, /es/ and /ca/: the `#questions` h2 reads `Questions` / `Preguntas` / `Preguntes`, and `#questions` has no eyebrow, intro paragraph or doodle.",
+        "On each home, opening each item shows exactly the given question and answer for items 1–6; item 7 keeps today's English answer and shows the given Spanish and Catalan.",
+        "With every item open, the text of `#questions` contains none of ‘without an account’, ‘allowance’, ‘voice-to-task’, ‘draft’, ‘shared list’, ‘list owner’, ‘Choose Task or Note’, ‘sync’ or ‘first testing platform’ on /, and none of ‘sin cuenta’ or ‘lista compartida’ on /es/ or ‘sense compte’ or ‘llista compartida’ on /ca/.",
+        "With JavaScript off, on /es/, an FAQ item opens and shows its answer.",
+        "After WP7–WP9 (round end): the visible text of /, /es/ and /ca/, with every FAQ item open and the live demo in each state the tests render, leaving out `#demo` (waits on WD1) and the developer-only panel, contains none of ‘voice-to-task’, ‘draft’, ‘allowance’ or ‘shared list’."
+      ],
+      "deviceChecks": [
+        "A native Catalan speaker reads the FAQ on /ca/."
+      ],
+      "dependsOn": ["WP2"]
+    },
+    {
+      "id": "WP6",
+      "title": "Header: honest labels, a language switch, a worded phone menu",
+      "area": "G",
+      "size": "L",
+      "severity": 3,
+      "findings": ["WEB-4", "WEB-3", "WEB-2", "WEB-304", "WEB-307", "WEB-310"],
+      "aliases": {"WEB-4": ["WEB-305"], "WEB-3": ["WEB-303"], "WEB-2": ["WEB-301"]},
+      "files": [
+        "src/components/Header.tsx",
+        "src/components/LanguageSwitch.tsx (new; WP10 reuses it in the footer)",
+        "src/components/ThemeProvider.tsx (the switch's labels and its place on phones)",
+        "src/components/Icon.tsx (a menu icon, if there's none)",
+        "src/content/site/index.ts, en.ts, es.ts, ca.ts (the header's strings)",
+        "src/styles/global.css (header, menu, switch; `@media (max-width: 800px)` and `580px`)",
+        "tests/website.spec.ts"
+      ],
+      "brief": [
+        "Why: the header's filled ‘Explore the app ↗’ promises the app and opens the sample form, on every page (WEB-4, with WEB-305); the phone menu's ‘Get TaskFlow’ promises a download that doesn't exist (WEB-3, with WEB-303); the header is English on the Spanish and Catalan pages and no page but the legal ones offers another language (WEB-304, WEB-2); on phones the header is two unlabelled icon circles, and the theme switch weighs as much as the menu (WEB-307); at 200% text it scrolls sideways (WEB-310).",
+        "Language: `Header` (already a client component) takes the page's language from `usePathname()` through `languageOfPath` (WP2) and sets `lang` on `<header>`. Every link keeps the language: the logo goes to `homePath(language)`, the nav anchors to `/es/#voice` and so on.",
+        "Remove the header button (`Header.tsx:48-50`) and the `.header-cta` CSS; drop `.button-small` if nothing else uses it. The slot becomes the store link once there is one.",
+        "Nav (desktop) and menu (phone), in page order after WP1, with the conventions' labels: `#voice` `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu`; `#features` `What it does` / `Qué hace` / `Què fa`; `#demo` `See an example` / `Mira un ejemplo` / `Mira un exemple` (whether this item stays waits on WD1); `#questions` `Questions` / `Preguntas` / `Preguntes`. The desktop nav is named `Main navigation` / `Navegación principal` / `Navegació principal`; the logo link `TaskFlow home` / `Inicio de TaskFlow` / `Inici de TaskFlow`.",
+        "The menu's last item (`:62-64`), still pointing to `#get-taskflow` with the prefix: `Coming soon to Android` / `Muy pronto en Android` / `Molt aviat a Android`. Nothing on the site says ‘Get TaskFlow’ or ‘Download’.",
+        "Language switch, a new `LanguageSwitch.tsx`: plain links `English`, `Español`, `Català`, each with its own `lang` and `hrefLang`, the current one with `aria-current='page'` and a cue beyond colour (a 2 px ring or underline, with at least 3:1, plus a heavier weight), inside a `nav` named `Language` / `Idioma` / `Idioma`. Each link keeps the visitor on the same page through `localisedPath`: from /es/privacy/, `Català` goes to /ca/privacy/ and `English` to /privacy/; from /, `Español` goes to /es/. On the 404, the links go to the three homes. No `<select>`, no flags. On desktop it sits in the header, in the slot the button leaves; on phones it's the first rows of the open menu. Follow the legal pages' switcher (`src/components/LegalPage.tsx:113-125`) without importing from it.",
+        "Phone header (800 px and narrower), WEB-307: the menu button shows a word, `Menu` / `Menú` / `Menú`, beside an SVG icon from `Icon.tsx` drawn in `currentColor`, so it survives forced-colours mode; remove `aria-label='Open navigation'` so the visible word is the name, and name the mobile nav `Menu` / `Menú` / `Menú`. The theme switch leaves the phone header bar and becomes a labelled row in the open menu: `Switch to dark mode` / `Switch to light mode`; `Cambiar a modo oscuro` / `Cambiar a modo claro`; `Canvia al mode fosc` / `Canvia al mode clar`. The desktop header keeps the icon switch, with the same names. The menu button and the theme row are at least 48 × 48 px. A tap outside the open menu closes it; Escape still closes it and returns focus to the button (`:15-24`).",
+        "Large text, WEB-310: 12 px header gaps on phones, so that at 320 px with the root font at 200% the header fits (the brand ≈ 227 px + 12 + 48 ≈ 287 px). The legal pages' own switcher wrapping is WP13's (WEB-208).",
+        "Desktop width: no sideways scroll at 820, 1024 and 1440 px with the longer Spanish and Catalan labels. If nav and switch don't fit between 801 and 1024 px, move the switch into the menu breakpoint there, but keep every label a word.",
+        "`ThemeToggle` takes the language for its name. Its `ready`/disabled behaviour is WP9's (WEB-313).",
+        "Tests: update `tests/website.spec.ts:111-133` (‘Open navigation’, ‘Mobile navigation’) and the theme steps on the mobile project, where the switch now sits inside the menu."
+      ],
+      "acceptance": [
+        "On /, /es/, /ca/, /es/privacy/ and /ca/delete-account/ at 1440 × 1000, in light and dark: there is no `.header-cta` and no link named ‘Explore the app’; the desktop nav's links read, in this order, the given labels in the page's language and point to `#voice`, `#features`, `#demo` and `#questions` with the page's prefix (`/es/#voice` on Spanish pages, `/#voice` on English ones).",
+        "At 390 × 664, the open menu holds the language links, the same four items, the theme row and, last, `Coming soon to Android` / `Muy pronto en Android` / `Molt aviat a Android` pointing to `#get-taskflow` with the prefix; no menu item contains ‘Get’ or ‘Download’.",
+        "A `Language` / `Idioma` nav with links named `English`, `Español` and `Català` (each with `lang` and `hreflang`, the current one with `aria-current='page'`) is visible in the desktop header and inside the open phone menu on /, /es/, /ca/privacy/ and the 404; from /es/privacy/ `Català` leads to /ca/privacy/ and `English` to /privacy/; from / `Español` leads to /es/.",
+        "The current language link differs from the others by more than colour (a ring, border or underline with at least 3:1 against the header), in light and dark.",
+        "From /es/ the logo links to /es/; from /ca/privacy/ it links to /ca/.",
+        "At 390 × 664: the header bar shows the wordmark and a single control whose visible text and accessible name are `Menu` / `Menú`; the bar has no theme switch; the menu button and the theme row each measure at least 48 × 48 px; a click outside the open menu closes it; Escape closes it and focus returns to the button.",
+        "With `forcedColors: 'active'`, a screenshot of the phone header shows the menu icon.",
+        "At 320 × 664 with `html { font-size: 200% }`, `document.documentElement.scrollWidth <= innerWidth` on /, /es/ and the 404; at 820, 1024 and 1440 px with normal text, /es/ and /ca/ don't scroll sideways.",
+        "The theme switch's accessible name is in the page's language (`Cambiar a modo oscuro` in light on /es/).",
+        "axe reports no violations on /, /es/ and /ca/privacy/ with the menu open and closed, on both projects, in light and dark."
+      ],
+      "deviceChecks": [
+        "Android with the largest font size and Chrome › Accessibility › Text scaling at 200%, on a 360 px phone: the header fits and the menu opens.",
+        "Windows High Contrast (forced colours) in Edge: the menu icon and the theme row show."
+      ],
+      "dependsOn": ["WP2"]
+    },
+    {
+      "id": "WP7",
+      "title": "Live demo, capture: one tap to talk, Done sends, clear waits and errors",
+      "area": "H",
+      "size": "L",
+      "severity": 2,
+      "findings": ["WEB-9", "WEB-16", "WEB-13", "WEB-14", "WEB-15", "WEB-18"],
+      "aliases": {},
+      "files": [
+        "src/components/VoiceDemo.tsx (holds the other session's uncommitted line 396: stays uncommitted)",
+        "src/styles/voice.css (changes with VoiceDemo.tsx; keep them together)",
+        "src/lib/voice/recorder.ts (only if error names need passing through)",
+        "src/content/site/en.ts, es.ts, ca.ts (the demo's strings)",
+        "src/components/HomePage.tsx (pass `language` to `VoiceDemo`)",
+        "tests/voice.spec.ts"
+      ],
+      "brief": [
+        "Why: from the intro to a result takes 4 taps plus the browser's microphone prompt and a Cloudflare box; the app takes 2, «Añadir tarea» then «Listo», and the words differ at every step (WEB-9). Four microphones on the page look tappable and only the palest works (WEB-16). Waiting shows one unchanging line and no way out for up to 55 s (WEB-13). Microphone errors are raw English or dead ends (WEB-14). A screen reader announces the timer every second (WEB-15). Without JavaScript the start button does nothing (WEB-18). This package reshapes capture and waiting; WP8 does the section's words, the result and the hand-over.",
+        "Uncommitted: `VoiceDemo.tsx:396` is the other session's uncommitted line, and this package must change lines around it, so `VoiceDemo.tsx` stays uncommitted for the owner; keep `voice.css` with it. Don't change line 396 itself, and leave the intro's privacy line (`:393-397`) and the section heading to WP8.",
+        "Intro, in this order: the section heading (WP8 rewrites its words), the microphone button, a `Type instead` / `Escribir` / `Escriu` text link, then the fine print. Remove the decorative orb `.voice-mic-orb` (`:382-384`) and the ‘Try the live demo’ button (`:390-392`); the microphone button takes their place. (The H3 ‘A minute is plenty.’ is WP8's.)",
+        "Microphone button (WEB-16): a `button`, a solid `--green` circle at least 72 px across with the paper-coloured microphone, its fill at least 3:1 against the panel, and its visible label inside it or directly attached and part of its accessible name: `Tap to talk` / `Toca para hablar` / `Toca per parlar`. One tap opens the demo (status and Turnstile) and starts listening; the browser asks for the microphone the first time. If the status says no tries are left, don't record: show WP8's tries-used text instead.",
+        "Listening: the same button reads `Done` / `Listo` / `Fet` and stops and sends. The visible timer reads `Listening · 0:12` / `Escuchando · 0:12` / `S’està escoltant · 0:12` (minutes and seconds, like the app's `listeningSeconds`). At 60 s, stop and send as if Done had been tapped. `Close demo` (WP8 translates it) stays available while listening and discards the recording; nothing is sent.",
+        "Remove the listen-back stage: ‘Ready when you are.’ (`:473-480`), the audio player and ‘Record again’ (`:541-556`); and the two-button switch ‘Record a thought / Type it instead’ (`:483-507`).",
+        "Typing: `Type instead` shows the text box with the label `What do you need to do?` / `¿Qué tienes que hacer?` / `Què has de fer?`, the app's example as placeholder (`Tomorrow, call the dentist and buy bread.` / `Mañana, llamar al dentista y comprar pan.` / `Demà, trucar al dentista i comprar pa.`), the counter in the page's number format (`12 / 1,500 characters` / `12 / 1.500 caracteres` / `12 / 1.500 caràcters`) and a `Done` button that sends it. A text link goes back to the microphone: `Use your voice` / `Usar la voz` / `Fes servir la veu`. (Label, link and counter: the organizer's.)",
+        "Turnstile (`:36-102`): render it with `appearance: 'interaction-only'` and `language` set to the page's language, so the box shows only when Cloudflare needs a tap; when it does show, it fits a 320 px screen (`size: 'flexible'` or `'compact'`; confirm both options in Cloudflare's Turnstile documentation). If the token isn't ready when Done is tapped, keep the recording, show `One moment…` / `Un momento…` / `Un moment…`, and send as soon as the token arrives.",
+        "Connecting (`:431-446`): ‘Getting your demo ready…’ becomes `One moment…` (as above); delete ‘Checking your allowance…’ (`:439`). On failure, ‘Let’s try that again.’ / ‘Try connecting again’ become `That didn’t work.` / `Try again`; `No ha funcionado.` / `Volver a intentarlo`; `No ha funcionat.` / `Torna-ho a provar`.",
+        "Waiting (WEB-13): heading `Understanding…` / `Entendiendo…` / `Entenent…`; the line under it `Finding the tasks, dates and details in your words.` / `Buscando las tareas, las fechas y los detalles en tus palabras.` / `Cercant les tasques, les dates i els detalls en les teves paraules.` (Spanish and Catalan: the organizer's). After 10 s, replace that line with `Still understanding. This can take up to half a minute.` / `Sigo entendiendo. Puede tardar hasta medio minuto.` / `Encara ho estic entenent. Pot trigar fins a mig minut.` and show a text button `Stop waiting` / `Dejar de esperar` / `Deixa d’esperar`. It aborts the request, keeps the recording or the text, and returns to capture with the `Try again` button above, which resends through the existing `retryPending` path without spending a try (`:289`, `:309-310`). Delete ‘Your drafts will appear right here. You’ll have the final say.’ (`:463-466`). Bring the page's timeout down from 55 s to 40 s (`:285`).",
+        "Announcements (WEB-15): drop `aria-live` from the timer line (`:532-540`). Add one visually hidden `role='status'` that speaks only three times: at the start `Listening` / `Escuchando` / `S’està escoltant`; at 50 s `10 seconds left` / `Quedan 10 segundos` / `Queden 10 segons`; on sending `Understanding…` / `Entendiendo…` / `Entenent…`. Keep focus moving to each stage's heading and errors as `role='alert'` (`:195-204`, `:421-430`).",
+        "Microphone errors (WEB-14): map by error name and show the message with `role='alert'` next to the microphone button, switching to the text box (shown and focused) in the same step. `NotAllowedError`: `The microphone is off for this page. Turn it on in your browser’s settings for this site, or type instead.` / `El micrófono está desactivado para esta página. Actívalo en los ajustes del navegador para este sitio o escribe.` / `El micròfon està desactivat per a aquesta pàgina. Activa’l a la configuració del navegador per a aquest lloc o escriu.` `NotFoundError`: `We can’t find a microphone on this device. You can type instead.` / `No encontramos ningún micrófono en este dispositivo. Puedes escribir.` / `No trobem cap micròfon en aquest dispositiu. Pots escriure.` Anything else (`NotReadableError`, `AbortError`, AudioWorklet failures): `The microphone isn’t responding. Close other apps that may be using it and try again, or type instead.` / `El micrófono no responde. Cierra otras apps que puedan estar usándolo y vuelve a probar, o escribe.` / `El micròfon no respon. Tanca altres aplicacions que el puguin estar fent servir i torna-ho a provar, o escriu.` No `getUserMedia`: `This browser can’t record your voice. You can type instead.` / `Este navegador no puede grabar tu voz. Puedes escribir.` / `Aquest navegador no pot gravar la teva veu. Pots escriure.`",
+        "Without JavaScript (WEB-18): render the microphone button `disabled` until the component has mounted, and add a `<noscript>` line: `Turn on JavaScript to try it with your voice.` / `Activa JavaScript para probarlo con tu voz.` / `Activa JavaScript per provar-ho amb la teva veu.` A static example of the app's result for this case waits on WD1.",
+        "Landing from the hero (WEB-4's last part): delete `scroll-margin-top: 80px` (`voice.css:3`); the root's `scroll-padding-top` already clears the header. With the microphone button at the top of the panel, a jump to `#voice` on a phone shows it.",
+        "Language: `HomePage` passes `language` to `VoiceDemo`; this package's strings go into the site tables in all three languages.",
+        "Tests: rewrite the flows in `tests/voice.spec.ts` that use ‘Try the live demo’, ‘Start recording’, ‘Stop recording’, ‘Type it instead’, ‘Create drafts’, ‘Record again’ or the listen-back (`:77-95`, `:205-214`, `:231`, `:273-310`, `:361-387`) for the new flow, keeping the mocked API and the fake AudioWorklet.",
+        "Don't touch: the result, the tries-used text and the error-code messages (WP8), the intro's privacy line and link (WP8), and the server's messages in `src/lib/voice/policy.ts` and `security.ts` (the ones naming the walkthrough wait on WD1)."
+      ],
+      "acceptance": [
+        "With the API mocked (3 tries left; a 2-task result) and a fake microphone, on / at both viewports: the intro shows a `button` named `Tap to talk`, at least 72 × 72 px; one click on it starts listening (the timer shows) and one click on `Done` sends; a result appears after exactly those 2 clicks. The same on /es/ (`Toca para hablar`, then `Listo`) and /ca/ (`Toca per parlar`, then `Fet`).",
+        "The microphone button's fill has at least 3:1 contrast against the panel in light and dark, and its accessible name contains its visible label.",
+        "`#voice` contains, in no state, ‘Try the live demo’, ‘Record a thought’, ‘Type it instead’, ‘Create drafts’, ‘Record again’, ‘Ready when you are.’ or an `audio` element.",
+        "While listening, the timer reads `Listening · 0:0N` / `Escuchando · 0:0N` / `S’està escoltant · 0:0N` and has no `aria-live`; with a fake clock, the visually hidden status text changes only at the start, at 50 s and on sending.",
+        "`Type instead` / `Escribir` / `Escriu` shows the text box with the given label and placeholder, and `Done` sends the text.",
+        "Turnstile is rendered with `appearance: 'interaction-only'` and the page's language (assert on a stubbed `window.turnstile`); with the always-pass test key, no `.voice-verification` box is visible.",
+        "With the API delayed by 15 s: after 10 s the second waiting line and `Stop waiting` appear; clicking it returns to capture with the typed text kept, and `Try again` resends with the same request id.",
+        "With `getUserMedia` stubbed to reject with `NotAllowedError`, `NotFoundError` and `NotReadableError`, and with `navigator.mediaDevices` missing: the mapped message shows with `role='alert'`, and the text box is visible and focused, on / and /es/.",
+        "With JavaScript off, on / and /es/, the microphone button is disabled and the noscript line is visible.",
+        "On the mobile project, after a click on the hero's `Try it with your voice`, the microphone button is in the viewport.",
+        "At 320 px wide, nothing inside `#voice` is wider than the panel, in the intro, listening and waiting states.",
+        "axe reports no violations in `#voice` in the intro, listening, waiting and error states, on both projects, in light and dark."
+      ],
+      "deviceChecks": [
+        "The live demo with the real AI and a microphone, in Chrome on an Android phone and in Safari on a real iPhone: one tap on `Toca para hablar` brings the browser's microphone prompt; after allowing it, speaking and tapping `Listo` gives a result.",
+        "Deny the microphone prompt in Chrome on Android: the Spanish message says how to turn it back on, and the text box is ready.",
+        "TalkBack: silence while recording, and no screen-reader speech in what the demo hears.",
+        "Turnstile on a real network: no box for an ordinary visit; when Cloudflare asks, the box fits a 320–360 px phone."
+      ],
+      "dependsOn": ["WP1", "WP2"]
+    },
+    {
+      "id": "WP8",
+      "title": "Live demo, words and result: plain words, the app's result, an honest hand-over",
+      "area": "H",
+      "size": "L",
+      "severity": 3,
+      "findings": ["WEB-7", "WEB-12", "WEB-9", "WEB-2", "WEB-207"],
+      "aliases": {"WEB-2": ["WEB-301"]},
+      "files": [
+        "src/components/VoiceDemo.tsx (line 396 is the other session's; this package changes it: stays uncommitted)",
+        "src/styles/voice.css (with VoiceDemo.tsx)",
+        "src/content/site/en.ts, es.ts, ca.ts (the demo's strings)",
+        "tests/voice.spec.ts"
+      ],
+      "brief": [
+        "Why: after a result, the demo turns into a small task manager (edit forms, a preview list to tick) and never says what the app does or that it's coming (WEB-7). Its copy is jargon: allowance, rolling 24 hours, drafts, transcript, sync (WEB-12). Its result doesn't look or talk like the app's (WEB-9, the result rows). Every label, hint and error is English, dates follow the browser's locale, and the API's messages show raw (WEB-2). Its privacy link opens the app's section of the privacy page, not the demo's (WEB-207).",
+        "Uncommitted: as in WP7, `VoiceDemo.tsx` holds the other session's line 396, which this package changes, so it stays uncommitted for the owner, with `voice.css`.",
+        "Heading (`:368-378`): remove the eyebrow ‘YOUR WORDS. YOUR NEXT STEP.’. H2: `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu` (it matches the buttons that land here). Line: `Say a few things you need to do, and when. You’ll see the tasks TaskFlow would add.` / `Di algunas cosas que tengas que hacer y cuándo. Verás las tareas que TaskFlow añadiría.` / `Digues algunes coses que hagis de fer i quan. Veuràs les tasques que TaskFlow afegiria.` Badge: `3 tries a day · no sign-up` / `3 intentos al día · sin registrarte` / `3 intents al dia · sense registrar-te`.",
+        "Intro: delete ‘A minute is plenty.’ (`:385`). Its text: `Speak in English, Spanish or Catalan, for up to a minute.` / `Habla en español, catalán o inglés, hasta un minuto.` / `Parla en català, castellà o anglès, fins a un minut.` Privacy line (`:393-397`): `Up to 60 seconds. Your voice or text goes to Google’s AI only when you tap Done.` / `Hasta 60 segundos. Tu voz o tu texto solo van a la IA de Google cuando tocas Listo.` / `Fins a 60 segons. La teva veu o el teu text només van a la IA de Google quan toques Fet.` (the organizer's, from today's line with WP7's button name), then the link `How we use your data` / `Cómo usamos tus datos` / `Com fem servir les teves dades`, which goes to the privacy page's demo section in the page's language (WEB-207): `/privacy/#website`, `/es/privacy/#website`, `/ca/privacy/#website`. The sentence §8 should open with (‘we don’t keep your recording…’) is in the other session's legal content and waits on WD3.",
+        "Top line (`:401-420`): the counter `{n} of 3 tries left today` / `Te quedan {n} de 3 intentos hoy` (for 1: `Te queda 1 de 3 intentos hoy`) / `Et queden {n} de 3 intents avui` (for 1: `Et queda 1 de 3 intents avui`); while connecting, `Live demo` / `Demo en vivo` / `Demo en viu`; `Close demo` / `Cerrar la demo` / `Tanca la demo`. The developer-testing badge may stay English.",
+        "Fine print under capture (`:597-603`), replacing both variants for visitors: `3 tries a day. It can get dates wrong, so check them. Nothing here is saved to the app.` / `3 intentos al día. Puede equivocarse con las fechas: revísalas. Nada de esto se guarda en la app.` / `3 intents al dia. Es pot equivocar amb les dates: revisa-les. Res d’això es desa a l’aplicació.` The developer-window variant may stay English.",
+        "Result (WEB-7, WEB-9): remove the preview list and its ticking (the saved branch `:611-627`, `:636-661`, `:780-786`), the per-task edit forms (`:696-768`), ‘Add to preview list’ (`:772-776`), ‘Edit original thought’ and ‘Try a new thought’ (`:788-806`), the small-caps label (`:609-616`), the line ‘A little structure for your thoughts…’ (`:624-628`) and each card's ‘Task N’ and priority line (`:672-679`). What stays:",
+        "• Heading, the app's `captureThingsToAdd`: `1 thing to add` / `{n} things to add`; `1 cosa para añadir` / `{n} cosas para añadir`; `1 cosa per afegir` / `{n} coses per afegir`.",
+        "• Each task, as the app's result shows it: the title (if empty: `Untitled task` / `Tarea sin título` / `Tasca sense títol`), then one line with the date and time formatted with `Intl.DateTimeFormat` in the page's language (not `undefined`), or `No date` / `Sin fecha` / `Sense data`; then the notes. A model question keeps its prefix: `Check this:` / `Revisa esto:` / `Revisa això:`.",
+        "• Below the tasks, the hand-over block: `In the app: tap Add a task, say it and tap Done. One more tap puts the tasks on your calendar. Coming soon to Google Play.` / `En la app: toca Añadir tarea, dilo y toca Listo. Con un toque más, las tareas quedan en tu calendario. Muy pronto en Google Play.` / `A l’aplicació: toca Afegeix una tasca, digues-ho i toca Fet. Amb un toc més, les tasques queden al teu calendari. Molt aviat a Google Play.` (Adapted from review H's line: the app's last button is «Añadir 2 tareas» for several tasks and «Añadir al calendario» for one, so the line names neither.)",
+        "• Then `Say it again` / `Volver a decirlo` / `Torna-ho a dir`, which records again (disabled when no tries are left), and a collapsed `See what I said` / `Ver lo que dije` / `Mostra què he dit` holding the words.",
+        "• No tasks: heading `No tasks were found` / `No se encontraron tareas` / `No s’ha trobat cap tasca` (the app's `captureNoTasks`), line `Try saying something you need to do, and when.` / `Prueba a decir algo que tengas que hacer y cuándo.` / `Prova de dir alguna cosa que hagis de fer i quan.` (the organizer's).",
+        "• The result's fine print (`:812-815`) becomes the same line as the capture's.",
+        "A free-plan line after the hand-over block waits on WD2.",
+        "Tries used (`:818-830`): `You’ve used today’s 3 tries. You can try again on {weekday} at {time}.` / `Ya has usado los 3 intentos de hoy. Podrás volver a probar el {día} a las {hora}.` / `Ja has fet servir els 3 intents d’avui. Hi podràs tornar a provar {dia} a les {hora}.`, with the weekday and time in the page's language (Spanish and Catalan say `a la 1:30`, not `a las 1:30`). Without a reset time: `You can try again tomorrow.` / `Podrás volver a probar mañana.` / `Hi podràs tornar a provar demà.` Then the same hand-over block. Remove ‘The sample walkthrough below is always available.’",
+        "Errors (WEB-2): show the page's own message for each API `code` (sent as `data.code` from `src/lib/voice/*.ts`), and the server's text for any other code; no server change. `visitor_limit`: the tries-used text. `network_limit`: `Many people on this network have tried the demo today. Please try again tomorrow.` / `Mucha gente de esta red ha probado la demo hoy. Vuelve a probar mañana.` / `Molta gent d’aquesta xarxa ha provat la demo avui. Torna-ho a provar demà.` `budget_pause`, `paused`, `not_ready`, `budget_config`, `unavailable`, `edge_required`, `origin`, and a failed status request: `The live demo isn’t available right now. Please try again later.` / `La demo en vivo no está disponible ahora mismo. Vuelve a probar más tarde.` / `La demo en viu no està disponible ara mateix. Torna-ho a provar més tard.` `verification`, `session_required` and Turnstile's load errors (`:61-62`, `:84-86`): `The security check didn’t finish. Please try again.` / `La comprobación de seguridad no ha terminado. Vuelve a intentarlo.` / `La comprovació de seguretat no ha acabat. Torna-ho a provar.` `invalid_audio`, `audio_length`, `too_large`: `We couldn’t use that recording. Please say it again, for up to a minute.` / `No hemos podido usar esa grabación. Vuelve a decirlo, hasta un minuto.` / `No hem pogut fer servir aquesta gravació. Torna-ho a dir, fins a un minut.` `empty`: the app's `captureEmptyInput`, `Say or type what you need to do first.` / `Primero di o escribe lo que necesitas hacer.` / `Primer digues o escriu què has de fer.` `invalid_draft`: `TaskFlow couldn’t make tasks from that. Try a shorter sentence.` / `TaskFlow no ha podido crear tareas con eso. Prueba con una frase más corta.` / `TaskFlow no n’ha pogut crear tasques. Prova-ho amb una frase més curta.` `processing` and the page's own timeout (`:309-315`): `This is taking too long. Try again in a moment; it won’t count as another try.` / `Está tardando demasiado. Vuelve a probar en un momento; no contará como otro intento.` / `Està trigant massa. Torna-ho a provar d’aquí a un moment; no comptarà com un altre intent.` (The error lines other than the last are the organizer's.) The server's own texts that mention ‘the sample walkthrough’ (`policy.ts:87`, `security.ts:18`, `:101`) wait on WD1; the page's messages never mention it.",
+        "Keep: focus moving to each stage's heading, errors with `role='alert'`, reduced motion.",
+        "Tests: update the result steps in `tests/voice.spec.ts` (`:99-195`: ‘drafts, ready for you’, ‘Edit task’, ‘Add to preview list’, ‘Your preview list’, ‘Edit drafts’, ‘Edit original thought’, ‘Try a new thought’, ‘0 of 3 tries left’)."
+      ],
+      "acceptance": [
+        "On /, /es/ and /ca/, `#voice` has no eyebrow; its h2, line and badge read the given text; the intro has no ‘A minute is plenty.’ and shows the given intro and privacy lines.",
+        "The intro's `How we use your data` / `Cómo usamos tus datos` / `Com fem servir les teves dades` links to `/privacy/#website` / `/es/privacy/#website` / `/ca/privacy/#website`, and following it puts `#website-title` in the viewport.",
+        "With a mocked 2-task result (one dated, one undated) on each home: the heading reads `2 things to add` / `2 cosas para añadir` / `2 coses per afegir`; each card shows the title, then one date line in the page's language (a Spanish weekday on /es/ even with the browser's locale set to en-US), then the notes; the undated task shows `No date` / `Sin fecha` / `Sense data`; there is no ‘Task 1’, no priority, no input and no ‘Add to preview list’.",
+        "Below the tasks, the hand-over block shows exactly as given, then `Say it again` and a closed `See what I said` that opens to the words; `#voice` contains ‘Google Play’.",
+        "With a 1-task result the heading reads `1 thing to add` / `1 cosa para añadir` / `1 cosa per afegir`; with no tasks, the no-tasks heading and line show.",
+        "With `remaining: 0` and a reset time, the tries-used text (exact, with the weekday and time in the page's language) and the hand-over block are visible and the microphone is disabled; without a reset time it says ‘tomorrow’ in the page's language.",
+        "Mocked errors: `visitor_limit` on /es/, and `network_limit` and `budget_pause` on /ca/, show the given messages; an unknown code shows the server's text.",
+        "The text of `#voice` across every state the tests render, leaving out the developer-only panel, contains none of ‘allowance’, ‘rolling’, ‘submission’, ‘sync’, ‘AI call’, ‘voice-to-task’, ‘draft’, ‘transcript’ or ‘walkthrough’.",
+        "axe reports no violations in `#voice` in the result, no-tasks, tries-used and error states, on both projects, in light and dark."
+      ],
+      "deviceChecks": [
+        "The live demo with the real AI on a phone, in Spanish and in Catalan: say «Mañana, llamar al dentista y comprar pan»; the result shows two tasks with a Spanish or Catalan date line, then the hand-over block.",
+        "A native Catalan speaker reads the demo's text on /ca/, the error lines included."
+      ],
+      "dependsOn": ["WP7"]
+    },
+    {
+      "id": "WP9",
+      "title": "Titles, link previews and the 404 say what TaskFlow is; a lighter first load",
+      "area": "G",
+      "size": "M",
+      "severity": 3,
+      "findings": ["WEB-302", "WEB-306", "WEB-311", "WEB-313"],
+      "aliases": {},
+      "files": [
+        "src/app/page.tsx and src/app/[language]/page.tsx (metadata)",
+        "src/content/site/en.ts, es.ts, ca.ts (titles, descriptions, the 404's and the preview's strings)",
+        "src/app/opengraph-image.tsx",
+        "src/app/[language]/opengraph-image.tsx (new file; it can be committed)",
+        "src/app/not-found.tsx",
+        "src/app/layout.tsx (line 12 and below only; line 8 is the other session's)",
+        "src/components/ThemeProvider.tsx",
+        "src/components/Phone.tsx",
+        "src/styles/global.css (`@font-face`, `--font-sans`)",
+        "tests/website.spec.ts"
+      ],
+      "brief": [
+        "Why: the tab title, the search snippet and the WhatsApp preview are English slogans that don't say what TaskFlow is, and the preview image shows no product (WEB-302). The 404 is an English pun that hides ‘not found’ and carries the home's title (WEB-306). A first visit downloads a 165 KB TTF and both theme screenshots (WEB-311). A dark-mode visitor gets a light toolbar and a greyed-out switch with the wrong name until scripts load (WEB-313).",
+        "Home metadata, per language, in `src/app/page.tsx` and `src/app/[language]/page.tsx`. Title and `og:title`: `TaskFlow — say it, and it’s on your calendar` / `TaskFlow — dilo y ya está en tu calendario` / `TaskFlow — digues-ho i ja és al teu calendari`. Description and `og:description`: `Note down what you need to do, and TaskFlow puts it on your calendar. You can say several things at once. Android app, coming soon.` / `Apunta lo que tienes que hacer y TaskFlow lo pone en tu calendario. Puedes decir varias cosas a la vez. App para Android, muy pronto.` / `Apunta el que has de fer i TaskFlow ho posa al teu calendari. Pots dir diverses coses alhora. Aplicació per a Android, molt aviat.` (The first sentence is the app's `authPitch`; the rest of the Catalan wants a native read.) `openGraph.locale` `en_US` / `es_ES` / `ca_ES`, with `alternateLocale` the other two, `type: 'website'`, `siteName: 'TaskFlow'`; `twitter` with the same title and description; keep WP2's `alternates`.",
+        "Layout defaults (`layout.tsx`): don't edit lines 5–11 (line 8 is the other session's). Change the default `description` (`:12-13`) to the English description above; define the English title as a new constant below it and use it for `metadata.title`, `openGraph.title` and `twitter` (`:15`, `:27`, `:31`). The old `title` constant at `:11` stays for the owner to delete together with line 8.",
+        "Preview image (`opengraph-image.tsx`): replace the slogan card with the wordmark, the page's H1 (`Say it, and it’s on your calendar.` / `Dilo y ya está en tu calendario.` / `Digues-ho i ja és al teu calendari.`), the app's example in quotes (`“Tomorrow, call the dentist and buy bread.”` / `«Mañana, llamar al dentista y comprar pan.»` / `«Demà, trucar al dentista i comprar pa.»`) and a short line `Android app · coming soon` / `App para Android · muy pronto` / `Aplicació per a Android · molt aviat`. Drop ‘A LITTLE FOCUS. A LITTLE FLOW.’ and ‘Make room for a clearer day.’ It must stay legible at 300 px wide: the title at least 64 px tall in the 1200 × 630 image. Add `src/app/[language]/opengraph-image.tsx` for Spanish and Catalan, with a translated `alt` (the H1). An app screen in the image waits on WD4.",
+        "404 (`not-found.tsx`): remove the eyebrow ‘404 / A LITTLE OFF TRACK’ and the pun. One block per language, English first (the page is `lang='en'`), the others with their own `lang`. EN: h1 `Page not found`; `This address doesn’t exist on the TaskFlow website.`; links `TaskFlow home page` → `/` and `Delete account` → `/delete-account/`. ES (`lang='es'`): `Página no encontrada. Esta dirección no existe en la web de TaskFlow.`; links `Inicio de TaskFlow` → `/es/` and `Eliminar cuenta` → `/es/delete-account/`. CA (`lang='ca'`): `No hem trobat aquesta pàgina. Aquesta adreça no existeix al web de TaskFlow.`; links `Inici de TaskFlow` → `/ca/` and `Suprimeix el compte` → `/ca/delete-account/` (the app's name; the Catalan delete page's own title changes only with WD3). Title: `Page not found · Página no encontrada · Pàgina no trobada — TaskFlow`, through `export const metadata`; if Next.js ignores it in `not-found.tsx`, render React's `<title>` in the component. The ‘↗’ text glyph becomes `Icon name='arrow'` (`aria-hidden`). All six links fit in the first phone screen.",
+        "Theme colour (WEB-313): `viewport.themeColor` gets two entries, `#f7f8f2` for `(prefers-color-scheme: light)` and `#121c18` for `(prefers-color-scheme: dark)` (`layout.tsx:33-38`), and `apply()` (`ThemeProvider.tsx:24-30`) sets both metas to the chosen theme's colour when the visitor chooses. Hide the theme switch until it's ready (`visibility: hidden` while `!ready`, and a `<noscript>` style that keeps it hidden), so it's never shown disabled or with the wrong name.",
+        "Font (WEB-311): load Manrope through `next/font/local`, as a WOFF2 Latin subset if you can make one with tools already installed in WSL, otherwise from the existing TTF (`next/font` still adds size-matched fallback metrics); point `--font-sans` at its variable; delete the manual preload (`layout.tsx:45-51`) and the `@font-face` (`global.css:3-9`). Keep the characters Catalan and Spanish need (accented vowels, ç, ñ, ·, « »). Don't add npm packages.",
+        "Hero images (WEB-311): in `Phone.tsx`, drop `preload` and `loading='eager'` from the light/dark pair, give the pair `fetchPriority='high'`, and keep the hidden theme's image from loading (`display: none` and lazy), so a first visit requests one hero image.",
+        "Tests: `tests/website.spec.ts:141-146` (‘Back to TaskFlow’ on the 404, then ‘Make room’) → the new 404 links and the new H1."
+      ],
+      "acceptance": [
+        "The built `<head>` of /, /es/ and /ca/ has the given title and description; `og:title` and `twitter:title` equal the title; `og:locale` is en_US, es_ES or ca_ES, with the other two as `og:locale:alternate`.",
+        "`/opengraph-image`, `/es/opengraph-image` and `/ca/opengraph-image` show the wordmark, the H1 and the example in that language, with no ‘A LITTLE FOCUS’ and no ‘Make room’; scaled to 300 px wide, the title is still legible (render review).",
+        "`/a-page-that-does-not-exist/` and `/es/eliminar-cuenta/` return 404 with the title `Page not found · Página no encontrada · Pàgina no trobada — TaskFlow` and the h1 `Page not found`; the Spanish and Catalan blocks carry `lang='es'` and `lang='ca'`; the six links go where given and are all inside the first viewport at 390 × 664; there is no ‘↗’ character, no eyebrow and no ‘find your flow’; axe (document-title included) reports no violations on both projects, in light and dark.",
+        "The built `<head>` has two `theme-color` metas with `media` for light and dark; after a visitor on a light system picks dark, the meta in use reads `#121c18`.",
+        "With JavaScript off, the theme switch isn't visible; with JavaScript on and a dark system, once it's visible its name is `Switch to light mode` (or its Spanish or Catalan) and it isn't disabled.",
+        "The built `<head>` of / preloads exactly one font file, no CSS `@font-face` points at `/fonts/Manrope.ttf`, at most one hero image is preloaded, and a first visit in light mode requests `agenda-light` and not `agenda-dark` (and the reverse in dark)."
+      ],
+      "deviceChecks": [
+        "After the owner deploys: paste the home's URL and /es/ into WhatsApp on a phone; each preview names TaskFlow, the promise and Android, in its language.",
+        "A lab Lighthouse run of / on mobile with slow 4G, reported as lab data: CLS at most 0.1 and LCP at most 2.5 s (if it fails, WEB-311 becomes Severity 2).",
+        "A phone in dark mode on a throttled network: the browser toolbar is dark from the first paint."
+      ],
+      "dependsOn": ["WP2", "WP3"]
+    },
+    {
+      "id": "WP10",
+      "title": "Footer in the page's language, with the language switch and language-keeping links",
+      "area": "G",
+      "size": "M",
+      "severity": 3,
+      "findings": ["WEB-304", "WEB-2", "WEB-4"],
+      "aliases": {"WEB-2": ["WEB-301"], "WEB-4": ["WEB-305"]},
+      "files": [
+        "src/components/Footer.tsx (holds the other session's uncommitted lines 2, 18, 26–32, 34–36, which this package changes: stays uncommitted)",
+        "src/components/LanguageSwitch.tsx (from WP6)",
+        "src/content/site/en.ts, es.ts, ca.ts (the footer's strings; new files, committable)",
+        "src/styles/global.css (footer rules)",
+        "src/styles/legal.css (`.site-footer .footer-operator`, `:322-326`; the other session's untracked file)"
+      ],
+      "brief": [
+        "Why: the footer is English on every Spanish and Catalan page, and its legal links always open the English pages, so a Spanish visitor who taps ‘Delete account’ lands in English (WEB-304). It has no language switch and its links drop the language (WEB-2). Its nav calls `#demo` ‘Try the demo’, a fifth name for one place (WEB-4).",
+        "Uncommitted: `Footer.tsx` holds the other session's uncommitted lines (the `company` import, the operator line, the legal links, the copyright), and this package changes them, so `Footer.tsx` and the `legal.css` rule stay uncommitted for the owner. Keep what they added: the company name, the five legal links in their order, the support mailto.",
+        "Make the footer follow the page's language: a client component that reads `usePathname()` through `languageOfPath`, as the header does, with `lang` on `<footer>`.",
+        "Strings: footer nav name `Footer navigation` / `Navegación del pie de página` / `Navegació del peu de pàgina` (the organizer's); `A product by {company}` / `Un producto de {company}` / `Un producte de {company}`; legal nav name `Legal and privacy` / `Legal y privacidad` / `Legal i privacitat`; `Privacy` / `Privacidad` / `Privacitat`; `Terms and Conditions` / `Términos y condiciones` / `Termes i condicions`; `Legal Notice` / `Aviso legal` / `Avís legal`; `Delete account` / `Eliminar cuenta` / `Suprimeix el compte`; `Contact support` / `Contactar con soporte` / `Contacta amb el suport`; `Back to top` / `Volver arriba` / `Torna a dalt`; logo `TaskFlow home` / `Inicio de TaskFlow` / `Inici de TaskFlow`.",
+        "Links: the nav goes to the page's home with the anchor (`/es/#voice` and so on), in the header's order and with its labels: `Try it with your voice`, `What it does`, `See an example` (whether it stays waits on WD1), `Questions`. The legal links use `legalPath(document, language)` from `src/content/legal/types.ts`. The logo goes to the page's home. Add the `LanguageSwitch` from WP6.",
+        "Subtract: delete ‘Made for a little more headspace.’ (`:37-42`) and its CSS. Leave the tagline ‘A little focus. A little flow.’ (`:17`) exactly as it is: keeping, translating or deleting it waits on WD6.",
+        "‘Back to top ↑’ becomes the label above with an `Icon` (`aria-hidden`) instead of the ↑ character; it still goes to `#main-content`.",
+        "Type (WEB-309's footer part): the footer's bottom row (`global.css:1468-1477`, `2321-2325`) and the operator line (`legal.css:322-326`) at least 0.75rem.",
+        "The Catalan link reads `Suprimeix el compte`, the app's name; the Catalan delete page's own title says «Eliminar compte» until WD3.",
+        "Tests: `tests/legal.spec.ts:146-159` (the other session's) checks the English footer on `/`; keep it passing."
+      ],
+      "acceptance": [
+        "On /es/, /es/privacy/, /ca/ and /ca/delete-account/ (both projects): the footer carries the page's `lang`, and its visible text and link names are the given Spanish or Catalan strings; the only English left is ‘TaskFlow’, the company name and the tagline (waits on WD6).",
+        "The footer's deletion link reads `Eliminar cuenta` and goes to `/es/delete-account/` on Spanish pages, and reads `Suprimeix el compte` and goes to `/ca/delete-account/` on Catalan ones; Privacy, Terms and Legal Notice likewise stay in the page's language; on English pages the five links are as today.",
+        "The footer nav's labels and order equal the header's, with the page's prefix; there is no ‘Try the demo’.",
+        "The footer holds the language switch (three links with `lang`, `hreflang`, and `aria-current` on the current one), which keeps the page.",
+        "There is no ‘Made for a little more headspace’; the back-to-top link has no ‘↑’ character and still moves to `#main-content`.",
+        "Every footer text computes to at least 12 px at 390 and 1440 px.",
+        "`tests/legal.spec.ts` still passes."
+      ],
+      "deviceChecks": [],
+      "dependsOn": ["WP2", "WP6"]
+    },
+    {
+      "id": "WP11",
+      "title": "Legal pages and the sitemap keep the visitor's language; legal pages share with a preview",
+      "area": "G",
+      "size": "S",
+      "severity": 3,
+      "findings": ["WEB-2", "WEB-312"],
+      "aliases": {"WEB-2": ["WEB-301"]},
+      "files": [
+        "src/components/LegalPage.tsx (the other session's untracked file: stays uncommitted)",
+        "src/content/legal/index.ts (the other session's untracked file: stays uncommitted)",
+        "src/app/sitemap.ts (the other session's uncommitted function: stays uncommitted)"
+      ],
+      "brief": [
+        "Why: «Volver a TaskFlow» on the Spanish and Catalan legal pages leads to the English home (WEB-2); the sitemap lists only `/` (WEB-2); legal pages are shared without an image, and their X tags carry the English home's slogan (WEB-312).",
+        "Uncommitted: all three files are the other session's (two untracked, one with their uncommitted function body), so everything here stays uncommitted for the owner. Change only what's named; don't change any document text.",
+        "`LegalPage.tsx:110-112`: the back link goes to the page language's home: `/`, `/es/` or `/ca/`. Its label and arrow stay (the legal pages' icons wait on WD3).",
+        "`sitemap.ts`: when it lists URLs, list `/es/` and `/ca/` right after `/`.",
+        "`legalMetadata` (`index.ts:172-196`): add to `openGraph` the page language's preview image from WP9 (`/opengraph-image`, `/es/opengraph-image` or `/ca/opengraph-image`, 1200 × 630, with the translated alt), `locale` (`en_US`, `es_ES`, `ca_ES`) with `alternateLocale`, `siteName: 'TaskFlow'` and `type: 'website'`; and add `twitter: { card: 'summary_large_image', title, description }` with the document's own title and description."
+      ],
+      "acceptance": [
+        "From /es/privacy/, «Volver a TaskFlow» goes to /es/; from /ca/terms/, «Tornar a TaskFlow» goes to /ca/; from /privacy/, ‘Back to TaskFlow’ goes to /.",
+        "The built `<head>` of each of the 12 legal pages has `og:image` (the page language's preview), `og:locale`, `og:site_name` TaskFlow and `og:type` website, and its `twitter:title` and `twitter:description` equal its `og:title` and `og:description`.",
+        "With `SITE_INDEXABLE=true` and `SITE_URL` set, `sitemap.xml` lists `/es/` and `/ca/` (from the code, or a build with those variables).",
+        "`npm run legal:check` and `tests/legal.spec.ts` still pass."
+      ],
+      "deviceChecks": [
+        "After the owner deploys: share /es/privacy/ on WhatsApp; the preview shows the image and the Spanish title."
+      ],
+      "dependsOn": ["WP2", "WP9"]
+    },
+    {
+      "id": "WP12",
+      "title": "Type you can read: 16 px body in rem, nothing under 12 px",
+      "area": "H",
+      "size": "M",
+      "severity": 3,
+      "findings": ["WEB-8", "WEB-309"],
+      "aliases": {},
+      "files": [
+        "src/styles/global.css",
+        "src/styles/voice.css (only px sizes WP7–WP8 left; goes with VoiceDemo.tsx)"
+      ],
+      "brief": [
+        "Why: body text is 15 px, the hero, demos, closing card and frame have dozens of sizes under 12 px down to 5 px, and every size is in px, so a browser's text-size setting doesn't help the newcomer who reads larger text (WEB-8, WEB-309). WP1 and WP3–WP11 removed most of the tiniest text; size what remains.",
+        "Root and body: `html { font-size: 100%; }` and `body { font-size: 1rem; }` (from 15 px at `global.css:59`).",
+        "Convert the remaining `font-size` declarations in `global.css` to rem, and in `voice.css` any px sizes WP7–WP8 left. Floors: paragraphs and body copy at least 1rem; the hero subheadline at least 1.125rem on phones; button labels at least 1rem; small print (fine print, the availability line, footer rows) at least 0.875rem where it fits and never under 0.75rem; nothing visible under 0.75rem. Body line height at least 1.5.",
+        "Eyebrows that remain (the walkthrough's, while WD1 is open, and the legal pages'): at least 0.75rem, letter-spacing at most 0.08em, `text-transform: uppercase` in CSS, so mixed-case text renders in capitals without wide spacing. Their wording stays (the legal ones wait on WD3).",
+        "Check each viewport you change at 320 px: nothing scrolls sideways.",
+        "Don't touch `legal.css`: WP13 sizes the legal pages."
+      ],
+      "acceptance": [
+        "On /, /es/ and /ca/ at 390 × 664 and 1440 × 1000 (light): every visible text node inside `.hero`, `#voice` (intro and result states), `#features`, `#questions` (items open), `.closing-card`, `.site-header` and `.site-footer` computes to at least 12 px; every `p` in `.hero`, `#voice` and `.closing-card` computes to at least 16 px; the hero subheadline computes to at least 18 px at 390 px; `body` computes to 16 px.",
+        "Setting `document.documentElement.style.fontSize = '20px'` makes the hero subheadline and the footer text grow by about 25% (sizes in rem).",
+        "Every `.eyebrow` left on the site computes to at least 12 px and renders in capitals.",
+        "/, /es/ and /ca/ don't scroll sideways at 320, 768 or 1024 px."
+      ],
+      "deviceChecks": [
+        "Chrome on Android with Settings › Appearance › Font size set to ‘Very large’: the home's text grows.",
+        "The Spanish home on a real phone at arm's length: the subheadline, the buttons and the small print are readable."
+      ],
+      "dependsOn": ["WP3", "WP4", "WP5", "WP6", "WP7", "WP8", "WP10"]
+    },
+    {
+      "id": "WP13",
+      "title": "Legal pages: the in-app route first, readable text, a clear language state",
+      "area": "L",
+      "size": "M",
+      "severity": 2,
+      "findings": ["WEB-204", "WEB-205", "WEB-208"],
+      "aliases": {},
+      "files": [
+        "src/styles/legal.css (the other session's untracked file)",
+        "src/components/LegalPage.tsx (the other session's untracked file)",
+        "src/content/legal/index.ts (`requestIntro`, and a new line above the email button; the other session's untracked file)",
+        "tests/legal.spec.ts (the other session's untracked file)"
+      ],
+      "brief": [
+        "Why: on the delete page, the immediate in-app route is a 14 px grey line that predicted attention skips, while the only button is the email request, which can take up to a month (WEB-204). Legal body text is grey 14 px in lines of about 130 characters on desktop (WEB-205). The language switcher shows the current language by colour alone (1.12:1), can't wrap at large text, and long words in the H1 can't break (WEB-208).",
+        "Uncommitted: all four files are the other session's untracked work, so this package stays uncommitted for the owner. Don't change any document text (`en.ts`, `es.ts`, `ca.ts`) or company facts: rewording those waits on WD3.",
+        "Delete page (WEB-204): stop rendering the hero description on the delete page only (`LegalPage.tsx:130`; the other three pages wait on WD3). `requestIntro` (`index.ts:47-48`, `90-91`, `133-134`), in the ink colour at 1rem (`legal.css:94-99`): `With the app: Settings → Account → Delete account. You’ll see what goes before you confirm.` / `Con la app: Ajustes → Cuenta → Eliminar cuenta. Verás qué se borra antes de confirmar.` / `Amb l’aplicació: Configuració → Compte → Suprimeix el compte. Veuràs què se suprimeix abans de confirmar.` Directly above the email button (`LegalPage.tsx:70`), one new line in the `ui` strings: `No app, or can’t sign in? Email us:` / `¿Sin la app o no puedes entrar? Escríbenos:` / `Sense l’aplicació o no pots entrar? Escriu-nos:`. The email button stays fully inside the first phone screen in all three languages: Play needs a request route that doesn't need the app.",
+        "Readable text (WEB-205), in `legal.css`: `.legal-body p, .legal-body li` at 1rem with `line-height: 1.7` and `max-width: 68ch` (`:217-223`); `.legal-request p` at 1rem (`:94-99`); `.legal-toc a` and `.legal-related a` at 0.875rem, with `padding-block: 12px` on phones so rows are at least 44 px (`:171-177`, `:188-194`); `dt` labels and `.legal-version` at 0.8125rem (`:113-117`, `:254-258`, `:49-56`); `.legal-sidebar` padding 8 px, so its scroll container doesn't clip the 3 px focus ring and its 5 px offset (`:155-162`; the clipping is inferred).",
+        "Language state and wrapping (WEB-208): `.legal-languages { flex-wrap: wrap; max-width: 100%; }` (`:12-30`); `.legal-languages a[aria-current] { box-shadow: inset 0 0 0 2px var(--green); font-weight: 800; }` (5.76:1 light, 10.47:1 dark); `.legal-hero h1 { overflow-wrap: break-word; hyphens: auto; }` (`:35-41`). This also covers the legal switcher's part of WEB-310.",
+        "Tests: update `tests/legal.spec.ts` where it pins `requestIntro`; keep `:206-209` (the email button inside the first phone screen) and run it for Spanish and Catalan too."
+      ],
+      "acceptance": [
+        "On /delete-account/, /es/delete-account/ and /ca/delete-account/ at 390 × 664, in light and dark: the hero description isn't rendered; the in-app line reads the given text in that language and computes to at least 16 px in the ink colour; the line above the email button reads the given text; the email button is fully inside the first viewport.",
+        "On /privacy/ and /es/terms/ at 1440 × 1000: `.legal-body p` computes to at least 16 px with a line height of at least 1.6, and no line of `.legal-body` text is longer than 80 characters (measured with Range rects); at 390 × 664 each `.legal-toc a` row is at least 44 px tall; `.legal-version` and `dt` compute to at least 13 px.",
+        "On every legal page, the `aria-current` language link has a 2 px inset ring in light and dark; at 390 px, with `.legal-utility` and `.legal-hero h1` at twice their font size, `scrollWidth <= innerWidth` on /es/privacy/, /ca/privacy/, /es/delete-account/ and /ca/delete-account/.",
+        "Tabbing into the contents sidebar on /privacy/, in light and dark, shows the whole focus ring (screenshot).",
+        "`npm run legal:check` and `tests/legal.spec.ts` pass, and axe reports no violations on the privacy and delete pages in Spanish and Catalan, on both projects."
+      ],
+      "deviceChecks": [
+        "Android with the largest font size, in Chrome: the legal pages' language switcher wraps and «Català» stays on screen.",
+        "Read the delete page's in-app line to someone over 60: they can say where to tap in the app."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [
+    {
+      "id": "WD1",
+      "question": "Remove the sample walkthrough (`#demo`: a form with Task title, Date, Time, Priority and a note, then a pretend saved task you can tick), or keep a trimmed one? Removing a demo is your call.",
+      "findings": ["WEB-6", "WEB-108", "WEB-4 (part: the menu's ‘See an example’ item)", "WEB-12 (part: server messages that name the walkthrough)", "WEB-16 (part: the walkthrough's fake microphone)", "WEB-18 (part: a static example for visitors without JavaScript)", "WEB-114 (part: its September dates)"],
+      "recommendation": "Remove it (review H, WEB-6). It copies the app's editor and task list, which the site isn't meant to provide (‘the site teaches; the app provides’); its examples are dated September 2026; its green microphone does nothing; and the live demo, now right under the hero, teaches the real loop. In its place, add one static example inside the live demo's intro, laid out as the app shows it, with no inputs: the spoken “Tomorrow, call the dentist and buy bread.” and its two task cards. It shows without JavaScript and whenever the live demo can't run, and the four messages that point to ‘the sample walkthrough’ point to it instead. If you keep the walkthrough (review F, WEB-108): drop its Priority field and ‘· High priority’, make its dates relative to today, delete ‘a sample week in September 2026’ and its fake microphone, and translate it. Until you answer, it stays as it is, in English on the Spanish and Catalan homes too, with a ‘See an example’ item in the menu."
+    },
+    {
+      "id": "WD2",
+      "question": "Publish the free plan and TaskFlow Pro on the site now? Saying what's free is your call. Today the site says nothing about it, and its FAQ only says launch pricing isn't announced.",
+      "findings": ["WEB-104", "WEB-7 (part: a free-plan line after the demo's hand-over)", "WEB-11 (part: a free-plan strip where the bar was)"],
+      "recommendation": "Yes, without a price, and without ‘100 MB’ until that's final. On dev, accounts without Pro get 10 dictations a month (one dictation can hold several tasks) and can always add tasks by hand with the form, with no limit; TaskFlow Pro is a monthly subscription with unlimited dictation and file space. The new hero says ‘say it’; leaving out that there are 10 a month hides a limit the app shows as soon as they're used (review F: PR-2, TR-2). Where: the FAQ answer `Is TaskFlow free?` (review F's copy, minus its 100 MB clause), one line in the closing card (`Free: 10 dictations a month, and tasks by hand with no limit. TaskFlow Pro: unlimited dictation.`) and one line after the demo's hand-over (`In the app you get 10 free dictations a month, and you can add tasks by hand any time.`), all three in English, Spanish and Catalan from the reports. Until you answer, the FAQ keeps today's answer, which is still true."
+    },
+    {
+      "id": "WD3",
+      "question": "May the loop edit the legal documents you approved for 16 October? Eight findings change their wording; review L asked before touching them.",
+      "findings": ["WEB-113", "WEB-202", "WEB-203", "WEB-206", "WEB-209", "WEB-211", "WEB-212", "WEB-213", "WEB-207 (part: the first sentence of privacy §8)", "WEB-210 (also WD7)", "WEB-109 (part: privacy §8 quotes the demo's old ‘Create drafts’ button)"],
+      "recommendation": "Yes. Five points are app features already on dev that the privacy policy misses: email-confirmation codes, the first name kept from Google, speech recognised on the phone, phone calendars staying on the phone, and «Creada por». The rest replace jargon, the Catalan «Eliminar» (the app says «Suprimeix»), a placeholder-like line and ‘Versión 2026-10-16’ with plain words. The files are the other session's untracked work, so every change stays uncommitted for your review either way. The loop would move `company.version` to the day of the edit; your review of the uncommitted change, before you commit it, is the new sign-off. After you answer, `/ux-web plan 2026-10-18-site` puts these into packages (privacy; the delete page; terms and the legal notice). Until then, WP7–WP8 rename the demo's button to Done while privacy §8 still says ‘Create drafts’."
+    },
+    {
+      "id": "WD4",
+      "question": "Which app screen should the hero show, and the link preview with it? Reviews H and F disagree, and the new images have to be rendered from the app by the main session (Flutter previews with chosen text): today's `App/build` renders hold test text.",
+      "findings": ["WEB-5 (part: the hero image)", "WEB-302 (part: an app screen in the preview image)"],
+      "recommendation": "The Calendar with the hero card's example done: ‘Call the dentist’ and ‘Buy bread’ on tomorrow, under the week strip, with the one «Añadir tarea» button. One image per language and theme (6 PNGs, at the `App/build` size of 780 × 1688), and alt text that says exactly that. It proves the H1 (‘it's on your calendar’), shows what the spoken sentence becomes (review H: one input and the tasks it becomes) and shows the one button a newcomer has to find (review F: what the site shows first, the app shows first). Review H's alternative is the result sheet (‘2 things to add’, ‘Add 2 tasks’); review F's is the Calendar with today's tasks, in English only. Until the images exist, the hero keeps today's screenshot, which shows the old separate microphone button, three tabs and a moon switch."
+    },
+    {
+      "id": "WD5",
+      "question": "Which language should a first visit to the bare address (`/`) get? Today it's always English. This plan adds `/es/` and `/ca/`, with a language switch in the header, the phone menu and the footer.",
+      "findings": ["WEB-2 (part: the bare `/`)"],
+      "recommendation": "Choose on `/` only, from the browser's language (Spanish → `/es/`, Catalan → `/ca/`), never from the IP address, falling back to English; and never redirect a visitor who chose a language in the switch (remember that choice in the browser, as the theme is, and add it to privacy §8 with WD3). Spanish- and Catalan-speaking newcomers will mostly get the bare address on WhatsApp, and on a phone the switch sits inside the menu (review G). If you'd rather the site stored nothing more, keep `/` English: the switch is there."
+    },
+    {
+      "id": "WD6",
+      "question": "Keep “A little focus. A little flow.” as TaskFlow's brand line in the footer? After this plan it appears nowhere else: the hero, the link preview and the description drop it.",
+      "findings": ["WEB-304 (part: the footer tagline, `src/components/Footer.tsx:17`)"],
+      "recommendation": "Drop it (review G). It doesn't say what TaskFlow is, and in Spanish and Catalan it either stays English or loses its sound. Review H asked whether you want it as the brand. Until you answer, it stays in the footer, in English, on every page."
+    },
+    {
+      "id": "WD7",
+      "question": "Say ‘for Android phones’ and nothing more until an iPhone version is decided, and remove the Apple mentions from the legal pages?",
+      "findings": ["WEB-210"],
+      "recommendation": "Yes. The delete page links to ‘Manage Apple subscriptions’ and speaks of ‘your Google or Apple account’, and the terms and privacy pages mention Apple payments, but there's no iPhone app. This plan already says ‘An app for Android phones’ (true today, and it doesn't rule out an iPhone version) and drops the FAQ's ‘first testing platform’. Editing the legal pages also needs WD3. The app itself says ‘available in the Android and iOS app’ (`App/lib/l10n/app_en.arb:1695`): fix that through `/ux`."
+    },
+    {
+      "id": "WD8",
+      "question": "How should the live demo compare with the free app? It uses Gemini Flash-Lite on Vertex, while the app's dictations use the free AI Studio model by default (UX-616 is open); and it gives 3 tries a day per browser with no account, up to about 90 a month, while the free app gives 10 dictations a month.",
+      "findings": [],
+      "recommendation": "Keep the demo as it is for now: this plan labels its tries as the demo's (‘3 tries a day · no sign-up’) and says nothing there is saved to the app. Once UX-616 settles the app's route, give the demo the same route, so it's never faster or more accurate than the app people install (FN-4). Nothing in this plan waits on it."
+    },
+    {
+      "id": "WD9",
+      "question": "Should visitors be able to hear when TaskFlow launches?",
+      "findings": [],
+      "recommendation": "Not yet: this plan says ‘coming soon to Google Play’ in plain text and offers the live demo. Once the package ID is final (`com.example.agenda` must change before the first upload), use Google Play pre-registration: the same `details?id=` link, a 90-day window per country, and a personal developer account created after 13 November 2023 first needs a closed test with 12 testers for 14 days. An email list would add a form, consent, stored addresses and a privacy update."
+    },
+    {
+      "id": "WD10",
+      "question": "Add a section on sharing with family, with a real screenshot of a shared project («Creada por», the filter by person), in the space the appearance section frees?",
+      "findings": [],
+      "recommendation": "Not now: subtract first. This plan rewrites the FAQ's sharing answer (WEB-107). Revisit once testers have seen the new home."
+    },
+    {
+      "id": "WD11",
+      "question": "The app links to neither the privacy policy nor the terms. Play's User Data policy asks for a privacy-policy link or text inside the app, and Terms §1 says the terms are available before an account is created, but sign-up shows none. Add them? It's an app change, for `/ux`.",
+      "findings": [],
+      "recommendation": "Yes: a ‘Privacy’ and a ‘Terms’ link on the sign-up screen and in the app's settings, opening the site's pages in the app's language (`/es/privacy/` and so on). Run it through `/ux`."
+    },
+    {
+      "id": "WD12",
+      "question": "Two facts only you can give, for the privacy and delete pages: how long backups keep deleted data (the pages promise only ‘the provider's rolling window’), and whether the app's dictations use a paid Gemini key or the free quota.",
+      "findings": [],
+      "recommendation": "Give both when you can. With a number, both pages can say ‘Backups are deleted within N days’, which Play asks for; with paid or EEA terms, privacy §4 can say plainly that Google doesn't use dictations to train its models. Both edits go with WD3."
+    },
+    {
+      "id": "WD13",
+      "question": "At release: publish the site only together with, or after, the app and backend it describes? And which deletion URL goes into Play Console?",
+      "findings": [],
+      "recommendation": "Publish them together. The site will describe in-app deletion, email codes, several tasks per dictation and voice commands: all on dev, none deployed, and testers' APK 1.0.5 and staging predate them. For Play Console, `/delete-account/` (review G): its first control is the language switch. Review L suggested `/es/delete-account/`. Decide with the package ID."
+    }
+  ],
+  "skipped": [
+    {"id": "WEB-102", "reason": "Duplicate: merged into WEB-3 (no honest ‘coming soon’ near a button; the menu's ‘Get TaskFlow’), fixed in WP3, WP5 and WP6."},
+    {"id": "WEB-103", "reason": "Duplicate: merged into WEB-5 (outdated screenshots). The unused files go in WP1; the hero image waits on WD4."},
+    {"id": "WEB-112", "reason": "Duplicate: merged into WEB-17 (the appearance section), removed in WP1."},
+    {"id": "WEB-201", "reason": "Duplicate: merged into WEB-113 (the privacy policy behind the app; review L's five points are the merged fix). Waits on WD3."},
+    {"id": "WEB-301", "reason": "Duplicate: merged into WEB-2 (no Spanish or Catalan home; the switch and language-keeping links are part of the merged fix), fixed in WP2, WP6, WP8, WP10 and WP11. The bare `/` waits on WD5."},
+    {"id": "WEB-303", "reason": "Duplicate: merged into WEB-3 (the menu's ‘Get TaskFlow’), fixed in WP6."},
+    {"id": "WEB-305", "reason": "Duplicate: merged into WEB-4 (the header's ‘Explore the app’; one label per destination), fixed in WP3, WP6 and WP10."}
+  ]
+}
