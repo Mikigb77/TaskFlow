@@ -119,6 +119,7 @@ TaskFlowWeb holds another session's uncommitted and untracked work: the legal pa
 | `ux-web.sh` | Snapshots (`refs/ux-web/last` in the website, `refs/ux-web/app-last` here) and the run's own changes (`refs/ux-web/base`). It never moves a branch or touches a working tree, and it leaves both indexes alone, except `stage`, which stages the run's own changes in the website's index. |
 | `crop.mjs` | Cuts screenfuls out of a full-page render or a demo card. |
 | `webkit_renders.py` | WebKit renders of every page, from Windows (the skill's §4). |
+| App images for the site | The hero's Calendar screenshots (`public/images/hero-calendar-<language>-<theme>.png`) come from the real app: in `App/`, `flutter test --no-pub --dart-define=WRITE_WEB_ASSETS=true test/ux_previews/website_assets_test.dart` writes them to `App/build/web-assets/`; copy them over when the app's Calendar changes. |
 
 Shared with the app loop: `.claude/ux-review/pkg.py`, which prints a plan's packages from any run folder.
 
