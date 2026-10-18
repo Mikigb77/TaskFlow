@@ -2,6 +2,25 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-18 — Manual tasks for free accounts, open sign-up on staging, and email verification
+The owner asked for these before going away, saying "don't ask me any questions". The main session filled in the details; each is reversible.
+- **Free accounts get a clear manual way to create tasks once their 10 dictations run out.** The owner: "keep the button, give them 10 tries, and then change it to a button to manually create the tasks… maybe a pop-up". He likes the current layout.
+  - While dictations are left, nothing changes.
+  - At 0 left, the Añadir tarea button becomes «Escribir tarea» with a pencil icon. It opens the capture sheet in typing mode: the phone's own parser, no AI, no limit.
+  - A pop-up explains it once per month, the first time a free account is out of dictations. It names the reset date and offers «Escribir una tarea» and «Ver Pro».
+  - Context: free typing already never uses the AI (2026-10-13). The owner most likely saw typed words go to the AI on a Pro or complimentary account, where that is intended.
+- **Staging lets anyone create an account.**
+  - The invited-testers-only gate (`Backend/core/staging.py`) is off by default.
+  - It can come back with `STAGING_INVITE_ONLY`.
+  - Nothing was deployed: deploying is still the owner's call.
+- **New accounts must confirm their email.**
+  - A password sign-up gets a 6-digit code by email, from `taskflow.noreply@garbar.tech`. It's valid for 30 minutes.
+  - The person can't sign in until they confirm it.
+  - Google sign-in accounts are confirmed by Google.
+  - Accounts that already exist count as confirmed.
+  - Re-registering an address that was never confirmed replaces that placeholder, so someone who typed another person's address can't block them.
+  - Completing a password reset also confirms the address.
+
 ## 2026-10-15 — Several tasks in one dictation is a must
 - **The owner:** saying a few things at once must create one task per thing, and that's "absolutely a must". His example: "go to the doctor on Friday at 5 and bring my blood test, and also finish the front-end design with mock-ups by Thursday at 5, and buy groceries, like tomatoes, potatoes, carrots, by tomorrow" gives three tasks:
   - the doctor on Friday at 17:00, with the blood test as a note;
