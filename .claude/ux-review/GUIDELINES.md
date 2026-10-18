@@ -6,6 +6,10 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **The bar:** a first-time, non-technical user aged 60+, Spanish interface, large text, often one-handed (the reviewer's Newcomer). Capture must be super quick.
 - **Owner decisions win.** `.claude/ux-review/DECISIONS.md` and `../UX_REVIEW.md` override this guide. When a rule here conflicts with one, raise it under "Questions for the owner" with the rule ID; don't file it as a finding.
 - **Cite by ID** in findings, e.g. "Why it fails: RE-2 (Hoober 2017a; Parhi 2006)".
+- **Verification pass, 2026-10-18 (second).** The first pass ran into the research's shared search cap, so every source marked †, ‡ or ~, the §19 notes and the research reports' open items were re-checked on primary sources: publishers' pages, authors' and repository copies of papers, Android and Play pages, EUR-Lex and BOE.
+  - Corrected: CO-6, SC-3, SC-6, SC-12, RE-5, VO-6, VO-10, VO-14, VO-15, ON-6, TA-4, TA-7, NO-7, SH-2, SH-3, OL-7, FO-9, PR-1 and SU-10, plus §0, §18 and §19. Oviatt's 1999 "Ten myths" was dropped from VO-16, which it didn't support.
+  - A remaining ‡ means the abstract confirmed the claim and the full text was paywalled or blocked to automated readers.
+  - Still open (each entry says why): the keystroke-level operator times in CO-10 [Card 1980], [Karat 1999], Gray's five strategies [Gray 2018], [Markey 2000], [Wohl 2010], [Carroll 1987], [Raskin 2000], [von Restorff 1933] and [Wharton 1994]; SU-10's legal questions stay with the owner.
 
 **Rule format.** **Do** says what good looks like. **Check** says how to test it, then gives the key evidence. Each rule ends with its evidence strength and source keys; every key has a full entry (title, authors or organisation, year, URL) under [Sources](#sources).
 
@@ -25,9 +29,9 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 | Touch target floor | 48 × 48 dp hit area (padding counts), ≥ 8 dp apart | Android Touch targets; M3 Structure |
 | WCAG target size | 24 × 24 CSS px ≈ dp (2.5.8, AA); 44 × 44 (2.5.5, AAA) | WCAG 2.2; WCAG2ICT 2025 |
 | Apple | 44 × 44 pt default control size; 28 × 28 pt minimum | Apple A11y |
-| Physical size | 1 dp ≈ 1/160 in ≈ 0.16 mm; 48 dp ≈ 7.6 mm; real phones vary ≈ ±20% | Android dp; Hoober 2017a |
+| Physical size | 1 dp ≈ 1/160 in ≈ 0.16 mm; 48 dp ≈ 7.6 mm (Material 3 rounds it to about 9 mm); real phones vary ≈ ±20% | Android dp; M3 Structure; Hoober 2017a |
 | Touch accuracy | ≈ 7 mm at the centre, ≈ 12 mm at corners; rows with edge targets 9–10 mm | Hoober 2017a; Hoober 2017c |
-| One-handed thumb | 9.2 mm for single taps, 9.6 mm for tap sequences | Parhi 2006 |
+| One-handed thumb | 9.2 mm for single taps, 9.6 mm for tap sequences (20 people) | Parhi 2006 |
 | Older adults' targets | 39% errors at ≈ 4.6 mm vs 6.5% at ≈ 7.7 mm (adults in their 60s–70s); 13 mm smallest reliable and 15 mm most comfortable (7 adults 60+) | Kobayashi 2011; Franz 2019 |
 | Grip | 49% one-handed, 36% cradled, 15% two-handed (780 touch observations, 2012–13) | Hoober 2013 |
 | Text contrast | 4.5:1; 3:1 for large text = ≥ 18 pt (≈ 24 px) or ≥ 14 pt bold (≈ 18.5 px); 7:1 for AAA; never rounded | WCAG 2.2 |
@@ -39,7 +43,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 | Turn-taking | ≈ 200 ms gap between turns (mean 208 ms, 10 languages) | Stivers 2009 |
 | Speech vs typing | 2.9× faster (153 vs 52 wpm), young adults copying set phrases | Ruan 2017 |
 | Fixing by re-speaking | 35% of errors fixed, vs 75–87% by handwriting, spelling or typing | Suhm 2001 |
-| Older voices | ≈ 10 points higher word error rate | Vipperla 2010 |
+| Older voices | ≈ 9–10 points higher word error rate | Vipperla 2010 |
 | Android vitals, bad behaviour | User-perceived crash rate ≥ 1.09% (≥ 8% on one phone model); ANR rate ≥ 0.47% (≥ 8%); excessive partial wake locks in > 5% of sessions (enforced from 1 Mar 2026) | Android Vitals; Android Wake locks 2026 |
 | Slow start-up | Cold ≥ 5 s, warm ≥ 2 s, hot ≥ 1.5 s (Play Console Help says 1 s for hot) | Android Launch time; Play Vitals help |
 | Rendering | Slow session: > 50% of frames over 16 ms; frozen: > 0.1% of frames over 700 ms | Play Vitals help |
@@ -56,7 +60,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 | Plans | When-and-where plans: d = .65 across 94 tests | Gollwitzer 2006 |
 | Older adults online | Success 55% vs 75%; ≈ 43% slower; 2.4 vs 1.1 errors per task; self-blame 90% vs 58% (2013) | Nielsen 2013 |
 | Adoption | 78% of US adults 65+ own a smartphone (2025); Spain 2025: 83.6% of 65–74s use the internet on a phone, 49.2% of 75–89s used the internet in the last 3 months | Pew 2025; Eurostat 2025 |
-| Dark patterns | ≥ 1 in 95% of 240 popular apps (2020) and in 97% of popular EU sites and apps (2022) | Di Geronimo 2020; EC Dark patterns 2022 |
+| Dark patterns | ≥ 1 in 95% of 240 popular apps (2020) and in 97% of popular EU sites and apps (73 of 75 checked, 2022) | Di Geronimo 2020; EC Dark patterns 2022 |
 | Play target API | New apps and updates must target API 36 from 31 Aug 2026 | Play Target API |
 
 ## 1. Load, choice and memory (CO)
@@ -72,7 +76,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **CO-5 Cut extraneous load.** Do: remove decoration, repeated explanations and technical options from action screens.
   Check: every word and control helps the current decision; no text explains a control that could explain itself. — *study/data* · [Sweller 1988]
 - **CO-6 Defaults decide.** Do: pre-fill the value most people want (day, time, project, reminder).
-  Check: list each default the flow applies and ask whether it suits the newcomer. People who never customised their task tools never changed the default reminder; a top search result kept 34% of clicks even when secretly swapped. Large effects from hypothetical framing didn't hold for real organ-donor registrations, so defaults matter most where people don't care to decide. — *study/data* · [Haraty 2016] [Nielsen 2005] [Johnson 2003] [Kessler 2025]
+  Check: list each default the flow applies and ask whether it suits the newcomer. People who never customised their task tools never changed the default reminder; a top search result kept 34% of clicks even when secretly swapped. Default effects can be large (opt-out gave 82% donor consent vs 42% for opt-in in a 161-person online experiment), but a framing effect seen in hypothetical choices (yes/no vs opt-in) didn't hold for 1,043 real organ-donor registrations, where opt-out wasn't tested. — *study/data* · [Haraty 2016] [Nielsen 2005] [Johnson 2003] [Kessler 2025]
 - **CO-7 Progressive disclosure, two levels at most.** Do: show what most people need; put the rest behind one clearly labelled control that says what's inside; never a third level.
   Check: "Más detalles" names or shows its contents; a filled field stays visible when its section is collapsed. — *expert guideline* · [Nielsen 2006] [COGA 2021]
 - **CO-8 Recognition over recall.** Do: show what can be done — visible controls, an example sentence, recent items — instead of relying on remembered commands or gestures.
@@ -89,13 +93,13 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **SC-2 One or two lines where people decide.** Do: short lines on action screens, one point per sentence, no paragraphs.
   Check: count words at each decision point. Concise, scannable, objective rewrites measured 124% better usability; short text is understood as well on phones as on desktop, but hard text reads slower. — *study/data* · [Nielsen 1997] [Moran 2016] [COGA 2021]
 - **SC-3 Name and day at the top-left.** Do: put the screen's name, or the day it shows, as text at the top-left.
-  Check: cover the rest of the render; the top-left block still says where you are. In 193 mobile UIs (30 participants), gaze went first to the top-left, to text and to images; colour and size pulled less than designers assume. — *study/data* · [Leiva 2020]
+  Check: cover the rest of the render; the top-left block still says where you are. Across 193 app screens viewed by 30 participants (Chinese-language screens and viewers), most fixations fell on the top-left, on text and on images; colour brightness had no effect and element size mattered little. — *study/data* · [Leiva 2020]
 - **SC-4 One primary action, set apart by label, position and isolation.** Do: one filled button or one extended FAB per screen or group, labelled with a verb that names the result.
-  Check: count filled buttons and accent-coloured elements in view; two competing is a finding. Material's filled button is the strongest emphasis after the FAB, meant for final actions that complete a flow. — *platform guideline* · [M3 Buttons] [M3 FAB] [von Restorff 1933]
+  Check: count filled buttons and accent-coloured elements in view; two competing is a finding. Material's filled button is the strongest emphasis after the FAB, meant for final actions that complete a flow, used sparingly and ideally for one action per page. — *platform guideline* · [M3 Buttons] [M3 FAB] [von Restorff 1933]
 - **SC-5 Key content and action on the first screen.** Do: what the user came for, and the button that completes it, show without scrolling at 2× text on a small phone; otherwise pin the button.
   Check: render at 2× on 360 dp. People scroll, but attention falls off fast below the first screen (desktop data: 57% of viewing time above the fold, 74% within two screenfuls). — *study/data* + *expert guideline* · [Fessenden 2018] [COGA 2021]
 - **SC-6 Label icons on the default path.** Do: put a word with every icon the newcomer needs; tooltips don't count on touch.
-  Check: list icon-only controls (app bar, chips, row buttons). Only a few icons are universally understood; older adults misread unfamiliar icons more, and labels, familiar and concrete pictures help. — *expert guideline* + *study/data* · [Harley 2014] [Leung 2011]
+  Check: list icon-only controls (app bar, chips, row buttons). Only a few icons are universally understood; older adults had more trouble with icons; pictures that plainly match their meaning, and concrete pictures, helped them more; labels helped every age, older adults no more than others (36 people). — *expert guideline* + *study/data* · [Harley 2014] [Leung 2011]
 - **SC-7 Don't hide core destinations.** Do: frequent destinations stay visible; any overflow menu carries a word ("Más").
   Check: what sits behind ⋮, the avatar or a drawer. On phones hidden navigation was used in 57% of cases vs 86% with visible plus hidden, and discoverability fell by more than 20%; a tiny unlabelled menu icon got 44% use vs 89% for a prominent one. — *study/data* · [Pernice 2016a] [Pernice 2016b]
 - **SC-8 Don't make guidance look like an ad.** Do: put essential guidance beside the control it explains, in plain styling.
@@ -107,7 +111,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **SC-11 End on visible success.** Do: add, move, complete and delete end with the result in view.
   Check: the last frame of each flow. People judge an experience largely by its most intense moment and its end. — *study/data* · [Kahneman 1993]
 - **SC-12 Polish is not proof.** Do: walk the flow even when the render looks good.
-  Check: don't downgrade a finding because the screen is attractive; attractive interfaces are rated easier to use than they are. — *study/data* · [Kurosu 1995]
+  Check: don't downgrade a finding because the screen is attractive; when 252 people rated 26 cash-machine layouts, how easy a layout looked tracked its beauty more than most of its usability properties (actual use wasn't tested). — *study/data* · [Kurosu 1995]
 
 ## 3. Android and Material 3 conventions (PL)
 
@@ -139,13 +143,13 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **RE-1 Primary actions low and central; rare ones high.** Do: put primary and frequent actions in the middle half to two-thirds of the screen height, low-centre for capture; secondary paths along the top and bottom edges; rare actions in a corner menu.
   Check: mark the primary action on the render. People look at and touch the centre most and are most accurate there; Material puts important actions at the top or bottom, where they are easiest to reach — one-handed, that means the bottom. — *study/data* + *platform guideline* · [Hoober 2017a] [Hoober 2017c] [M3 Structure]
 - **RE-2 Size targets by position; 48 dp is the floor.** Do: centre targets ≥ 7 mm (≈ 44 dp), corner targets ≈ 12 mm (≈ 76 dp), rows with targets at the screen edge 9–10 mm (≈ 57–63 dp) tall, and nothing under 48 dp (≈ 7.6 mm).
-  Check: measure hit areas (semantics bounds), not icons; a primary action in a bottom corner needs more than 48 dp — an extended FAB or a wide button. One-handed thumb tests found 9.2 mm (single taps) and 9.6 mm (sequences) enough. — *study/data* + *platform guideline* · [Hoober 2017a] [Hoober 2017c] [Parhi 2006] [Android Touch targets]
+  Check: measure hit areas (semantics bounds), not icons; a primary action in a bottom corner needs more than 48 dp — an extended FAB or a wide button. One-handed thumb tests (20 people) found 9.2 mm (single taps) and 9.6 mm (sequences) enough. — *study/data* + *platform guideline* · [Hoober 2017a] [Hoober 2017c] [Parhi 2006] [Android Touch targets]
 - **RE-3 Bigger, and spaced, for older hands.** Do: make primary and frequent controls clearly larger than 48 dp (aim for ≥ 10 mm ≈ 63 dp — a synthesis, not a tested number) and keep visible gaps between adjacent buttons such as chip rows.
   Check: chip rows with no gap; small trailing icons on rows. Adults in their 60s–70s made 39% errors on ≈ 4.6 mm targets vs 6.5% on ≈ 7.7 mm, and a week's practice didn't help tapping; a small study found 13 mm the smallest reliable and 15 mm the most comfortable size for adults 60+; zero spacing gave older adults the worst accuracy on a kiosk; NN/g recommends at least 1 × 1 cm. — *study/data* + *expert guideline* · [Kobayashi 2011] [Franz 2019] [Jin 2007] [Harley 2019]
 - **RE-4 Work for either hand and changing grips.** Do: the key action is reachable by a left or a right thumb.
   Check: mirror the layout; a bottom-right-only key action suits one grip. Of 780 observed touch interactions (public places, 2012–13, no demographics, phones up to a Galaxy Note 2), 49% were one-handed, 36% cradled and 15% two-handed, and people changed grip often. — *study/data* · [Hoober 2013]
 - **RE-5 Large phones force grip shifts.** Do: no step of capture needs a tap in the top band of the screen.
-  Check: on a 6.7" frame (≈ 70 × 155 mm), list taps above the top third during capture. Reach depends on hand size, phone size and grip, and larger phones increase tilting and grip changes. — *study/data* · [Bergstrom-Lehtovirta 2014] [Eardley 2017]
+  Check: on a 6.7" frame (≈ 70 × 155 mm), list taps above the top third during capture. Reach depends on hand size, phone size and grip (a model fitted to 20 people), and phone size and reach distance change how much people tilt and turn the phone, with grips shifting by task. — *study/data* · [Bergstrom-Lehtovirta 2014] [Eardley 2017]
 - **RE-6 Keep destructive actions apart.** Do: keep Delete or Discard away from Save, Add and other frequent targets, never in one group with equal weight.
   Check: adjacent destructive and frequent buttons. Older adults hit neighbouring buttons by mistake (for example 0 and Call). — *expert guideline* + *study/data* · [Hoober 2017c] [Harada 2013]
 - **RE-7 Leave the edges to the system.** Do: no swipe that must start at the left or right edge; no control under the bottom gesture area.
@@ -168,7 +172,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **VO-5 Show the interpretation, date first.** Do: each result shows what and when as its largest lines, with weekday and full date ("Fri 17 Oct · 5:00 PM"); the transcript is one tap away.
   Check: on the result render, the date line is the most prominent after the title. Users distrusted results they couldn't check and wanted visual confirmation of complex or precise tasks; 80% of Baymard's test users weren't sure which date "this Friday" meant. — *study/data* · [Budiu 2018ia] [Luger 2016] [Baymard 2015f]
 - **VO-6 Fix by touch, not by saying it again.** Do: tapping any field of a result (title, day, time, project, person) edits it in place; typing is one tap away; "say it again" is secondary.
-  Check: a wrong day is fixed in ≤ 2 taps without the keyboard. Re-speaking fixed 35% of errors vs 75–87% for handwriting, spelling or typing, and a second try in the same mode did worse; users try re-speaking first anyway, and over-enunciating lowers accuracy. — *study/data* · [Suhm 2001] [Karat 1999] [Microsoft Speech]
+  Check: a wrong day is fixed in ≤ 2 taps without the keyboard. Re-speaking fixed 35% of errors vs 75–87% for handwriting, spelling or typing, and a second try in the same mode did worse; users prefer speech at first and learn only with experience to avoid it for fixes, and over-enunciating lowers accuracy. — *study/data* · [Suhm 2001] [Karat 1999] [Microsoft Speech]
 - **VO-7 Several tasks: a count, then one row each.** Do: "3 tasks", then one row per task, each editable and removable alone; details that belong to one task (a note, a checklist) attach only to it.
   Check: fixing one task never means re-dictating the others; a shared time lands on the right task. Users split multi-clause requests because they expect assistants to fail, while older first-time users speak in long, nested sentences; one detail can belong to several intents. — *study/data* · [Budiu 2018ia] [Kim 2021] [Gangadharaiah 2019] [Cowan 2017]
 - **VO-8 Match the confirmation to the cost.** Do: for new tasks, show the result and confirm with one tap; for changes and deletions, show before → after, name the affected tasks on the button ("Delete 3 tasks"), and offer Undo afterwards.
@@ -176,21 +180,21 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **VO-9 Ask only real questions, with tappable answers.** Do: when a value is truly ambiguous (5:00 or 17:00?), ask one plain question on the card with the answers as buttons.
   Check: questions look like questions, not footnotes; nothing is asked that the context settles. Platform guides confirm explicitly when confidence is low or a mistake costly, implicitly otherwise. — *platform guideline* · [Google Confirmations] [Nuance Confirm] [Microsoft Speech]
 - **VO-10 Don't flag "uncertain" words.** Do: rely on the date-first card and easy edits, not on confidence shading.
-  Check: underlined or coloured low-confidence words. Shading didn't improve error finding overall, and unshaded errors were found less often because users trusted the marking; highlighting slowed correction in Suhm's study. — *study/data* · [Vertanen 2008] [Suhm 2001]
+  Check: underlined or coloured low-confidence words. Shading didn't improve error finding overall (84% vs 81% found, 16 people); errors left unshaded were found less often (71% vs 82%, not significant), which the authors put down to trust in the shading; highlighting slowed correction in Suhm's study. — *study/data* · [Vertanen 2008] [Suhm 2001]
 - **VO-11 Failures say what was heard and what's missing.** Do: name the problem and the next step; never "speak louder" or "speak more clearly"; after two failed tries, offer typing or the form.
-  Check: every failure string in three languages. Failures with no visible reason frustrated more than misrecognitions; Google's guide ends repeated no-match loops with another way to finish. — *study/data* + *platform guideline* · [Goetsu 2020] [Google Errors] [Suhm 2001]
+  Check: every failure string in three languages. Failures with no visible reason frustrated more than misrecognitions (4.4 vs 2.7 on a 5-point scale, 30 people, a preprint); Google's guide ends repeated no-match loops with another way to finish. — *study/data* + *platform guideline* · [Goetsu 2020] [Google Errors] [Suhm 2001]
 - **VO-12 Design the wait.** Do: acknowledge Done within 0.1 s; while understanding, keep the words on screen with a moving indicator that names the step; after about 8–10 s explain and offer a way on that keeps the words.
   Check: the slow-AI state and its timers. Gaps between turns in conversation average about 200 ms, so a silent wait feels long; Alexa's interim ("progressive") responses all have to come within about 8 s. — *study/data* + *expert guideline* · [Stivers 2009] [Nielsen 1993] [Alexa Progressive] [Sherwin 2014pr]
 - **VO-13 Detect a silent microphone.** Do: if the audio is silent — the phone's microphone toggle is off, a call holds the mic, another app records — say so plainly and offer typing, instead of "I didn't catch that".
   Check: the empty-audio path. Android 12+ delivers silent audio when the global microphone toggle is off; since Android 10 a call or a foreground app can silence capture. — *platform guideline* · [Android Sensitive access] [Android Audio sharing]
 - **VO-14 Expect more errors from older voices.** Do: make recovery cheap (VO-6) and test with older Spanish and Catalan speakers.
-  Check: accuracy claims based on the developers' own voices. Word error rates were about 10 points higher for older speakers; in 1995 recognition varied widely between speaker groups and predicted satisfaction poorly. — *study/data* · [Vipperla 2010] [Yankelovich 1995]
+  Check: accuracy claims based on the developers' own voices. Word error rates were about 9–10 points higher for older speakers (12 aged 60–85 vs 27 aged 30–45); in 1995 recognition varied widely between speaker groups and predicted satisfaction poorly. — *study/data* · [Vipperla 2010] [Yankelovich 1995]
 - **VO-15 The first dictation must visibly succeed.** Do: the first result lands on the calendar with its day; a reminder, if set, says when it will fire.
-  Check: walk the first-run capture end to end. Expectations of voice assistants far exceed experience, most for less technical users; older owners doubted reminders would work and used them little; most older long-term owners in one study cut back or stopped. — *study/data* · [Luger 2016] [Pradhan 2020] [Trajkova 2020]
+  Check: walk the first-run capture end to end. Expectations of voice assistants far exceed experience, most for less technical users; older adults given a smart speaker for 3 weeks found reminders useful at first but used them little, doubting their reliability (7 people); most of 36 older long-term owners in another study had stopped using theirs. — *study/data* · [Luger 2016] [Pradhan 2020] [Trajkova 2020]
 - **VO-16 Voice is never required.** Do: typing, or the form, is always one tap away, including when the microphone is denied.
-  Check: the mic-denied, offline and no-dictations-left paths each reach a working way to add a task. Users go back to touch when voice saves no time; Android says text input must stay usable when the microphone is refused. — *study/data* + *platform guideline* · [Luger 2016] [Android Permissions] [Oviatt 1999]
+  Check: the mic-denied, offline and no-dictations-left paths each reach a working way to add a task. Users go back to touch when voice saves no time; Android says text input must stay usable when the microphone is refused. — *study/data* + *platform guideline* · [Luger 2016] [Android Permissions]
 - **VO-17 Measure time to a correct task, not speaking speed.** Do: judge capture speed by the total time including review and fixes.
-  Check: the basis of any speed claim. Speech was 2.9× faster than typing for young adults copying set phrases; the advantage shrank when composing; corrections can cancel it. — *study/data* · [Ruan 2017] [Foley 2020] [Suhm 2001]
+  Check: the basis of any speed claim. Speech was 2.9× faster than typing for young adults copying set phrases; the advantage shrank when composing (total time 29% shorter vs 45% when transcribing, 28 people); corrections can cancel it. — *study/data* · [Ruan 2017] [Foley 2020] [Suhm 2001]
 - **VO-18 Show results; don't make people hold spoken ones.** Do: anything said aloud also appears on screen, shorter; never read a list aloud.
   Check: spoken read-backs and their on-screen version. Speaking and listening compete with working memory, and spoken output is fleeting. — *expert guideline* + *platform guideline* · [Shneiderman 2000] [Google Scale]
 
@@ -207,7 +211,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **ON-5 Ask for a permission when its feature is used.** Do: the microphone on the first tap of the mic; notifications after the first dated task (owner decision D2); calendar access only when the user turns on device calendars.
   Check: count system dialogs before the first saved task; the target is zero. — *platform guideline* · [Android Permissions] [Android Permission practices] [Android Notif permission] [Apple Privacy] [Play Permissions]
 - **ON-6 Give the benefit first, in one sentence.** Do: before the system dialog, one sentence on what the user gains, with a single "Continue" button (Apple: never "Allow"); if the user dismisses it, don't show the system dialog.
-  Check: the explainer's copy and buttons in three languages. Giving a reason raised grant rates by 12% in a CHI study, as NN/g reports it. — *platform guideline* + *expert guideline* · [Apple Privacy] [Android Notif design] [Rosala 2019] [Tan 2014]
+  Check: the explainer's copy and buttons in three languages. In a CHI survey study of 772 people, requests that gave a reason were approved 74% of the time vs 66% without (the 12% NN/g cites is that relative rise), but what the reason said made no measurable difference. — *platform guideline* + *expert guideline* + *study/data* · [Apple Privacy] [Android Notif design] [Rosala 2019] [Tan 2014]
 - **ON-7 A denial is not a dead end.** Do: keep the app working; where the missing feature would be, say what's unavailable and offer the alternative (typing, the form); offer Settings when the user tries the feature again.
   Check: the denied and denied-twice states; from Android 11 a second denial stops the system dialog for good. — *platform guideline* · [Android Permissions] [Android 11 Permissions] [Rosala 2019]
 - **ON-8 Ask for notifications with the reason attached.** Do: tie the request to the action that needs it and say what will arrive ("a reminder before each task").
@@ -226,13 +230,13 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **TA-3 Accept terse tasks; never block saving on details.** Do: a title alone, or a vague cue with a day, saves; durations, assignees and checklists are optional or inferred.
   Check: required fields in create flows. People disliked entering extra details; remembered durations matched estimates in only 25% of cases; students took 55.5 days for theses they expected to finish in 33.9. — *study/data* · [Bellotti 2004] [Buehler 1994]
 - **TA-4 The day is the part that works.** Do: make attaching a day (and a time, for appointments) the most prominent part of creating a task.
-  Check: the date line on cards and forms. If-then plans saying when and where to act had a medium-to-large effect on reaching goals (d = .65, 94 tests), most for hard-to-start tasks. — *study/data* · [Gollwitzer 2006] [Gollwitzer 1999]
+  Check: the date line on cards and forms. If-then plans saying when and where to act had a medium-to-large effect on reaching goals (d = .65, 94 tests, 8,461 people), helped people get started (d = .61), and helped most those with self-regulation problems (d = 1.10 vs .66). — *study/data* · [Gollwitzer 2006] [Gollwitzer 1999]
 - **TA-5 Choose the reminder default deliberately.** Do: one sensible, editable default — minutes before a timed task, a morning time for a date-only task (D2b uses 9:00).
   Check: the default and where it shows. People who didn't customise their tools never changed the default reminder yet complained about it; 15 minutes was the most common lead time; reminders to prepare came the evening before or that morning. — *study/data* · [Haraty 2016] [Tungare 2008]
 - **TA-6 Reminders fire on time, or the app says why not.** Do: when exact alarms or notifications aren't allowed, say so where reminders are set, with one tap to the right setting, and re-check on return.
-  Check: the denied paths in code and copy. On Android 12+ inexact alarms can arrive up to an hour late; Android 14 denies exact alarms by default to most new installs; on Android 13 an app unused for about 8 days may get one alarm a day. Plain timed reminders measurably help people with memory problems. — *platform guideline* + *study/data* · [Android Alarms] [Android 14 Exact alarms] [Android Standby] [Wilson 2001] [Jamieson 2014]
+  Check: the denied paths in code and copy. On Android 12+ inexact alarms can arrive up to an hour late; Android 14 denies exact alarms by default to most new installs; on Android 13 an app unused for about 8 days may get one alarm a day. Plain timed reminders measurably help people with memory problems: with a reminder pager, over 80% of those who finished a 143-person trial did better at everyday tasks, and a meta-analysis found large benefits from memory-aid technology (d = 1.27 across 7 group studies). — *platform guideline* + *study/data* · [Android Alarms] [Android 14 Exact alarms] [Android Standby] [Wilson 2001] [Jamieson 2014]
 - **TA-7 A reminder carries everything.** Do: what, when and with whom in the notification itself, with "Done" and "Move" actions.
-  Check: reminder text and actions. People rarely open the app from calendar-type notifications; marking a task done from its reminder stops it nagging. — *study/data* · [Pielot 2018] [White 2019]
+  Check: reminder text and actions. People rarely open the app from calendar-type notifications; reminders about tasks already done waste time and frustrate, which a "Done" action on the reminder prevents. — *study/data* · [Pielot 2018] [White 2019]
 - **TA-8 Postpone to times of day.** Do: offer "this evening", "tomorrow morning" or "pick a day" rather than "+3 h".
   Check: snooze and move options. In a year-long study 79% of snoozes were to later the same day; people thought in times of day, and durations made them calculate. — *study/data* · [Weber 2018]
 - **TA-9 Overdue: calm, forgiving, one step.** Do: neutral wording and styling (no alarm red), one concrete action per item (move to a day, done, delete), and a calm way to let old items go.
@@ -242,7 +246,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **TA-11 Near-term is the common case.** Do: "today", "later today" and "tomorrow" are the fastest days to set and to read; relative times ("in 20 minutes") work.
   Check: the first options in day pickers and the parser. About a quarter of 576,080 assistant reminders were due within the hour and about 80% within a day. — *study/data* · [Graus 2016]
 - **TA-12 More reminder options are a product decision.** Do: don't add reminder options in a review; if the owner asks, evidence favours two reminders for appointments days ahead.
-  Check: route it to "Questions for the owner". Text reminders raised clinic attendance from 67.8% to 78.6%; in a 54,066-patient trial, reminders 3 days and 1 day before cut no-shows to 4.4% vs 5.3–5.8% for a single one. — *study/data* · [Cochrane 2013] [Steiner 2018] [Robotham 2016]
+  Check: route it to "Questions for the owner". Text reminders raised clinic attendance from 67.8% to 78.6%; in a 54,066-patient trial, reminders 3 days and 1 day before cut no-shows to 4.4% vs 5.3–5.8% for a single one; across studies, more than one notification raised attendance more than one did (RR 1.49 vs 1.09). — *study/data* · [Cochrane 2013] [Steiner 2018] [Robotham 2016]
 
 ## 8. Notifications (NO)
 
@@ -259,7 +263,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **NO-6 Bundle bursts.** Do: group reminders that fire together, or update one notification instead of posting many.
   Check: five tasks due at 9:00 read well as a group and one by one; Android groups four or more automatically. — *platform guideline* + *expert guideline* · [Android Notif group] [Kendrick 2018]
 - **NO-7 Defer what isn't urgent.** Do: shared-project activity can wait or be summarised; reminders fire on time.
-  Check: which notification types are time-critical. Holding notifications until a natural break cut frustration and reaction time; digests were the most popular option for shared-document updates. — *study/data* · [Iqbal 2008] [Okoshi 2017] [Brush 2001]
+  Check: which notification types are time-critical. Holding desktop notifications until a natural break cut frustration and reaction time; with over 680,000 phone users, delivering at predicted breaks cut response time by 49.7% and more notifications were opened; digests were the most popular option for shared-document updates. — *study/data* · [Iqbal 2008] [Okoshi 2017] [Brush 2001]
 - **NO-8 Notification controls inside the app.** Do: reminder settings are reachable in the app and say whether reminders will actually arrive.
   Check: the notification settings screen states the permission and exact-alarm status in words. Hard-to-find controls are one of NN/g's five push mistakes. — *expert guideline* · [Kendrick 2018]
 - **NO-9 Lock-screen privacy is the owner's call.** Do: whether task titles show on the lock screen (public, private or secret visibility) is a product decision.
@@ -306,8 +310,8 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
   Check: how errors render. — *expert guideline* + *standard/law* · [Krause 2019] [WCAG 2.2] (1.4.1, 3.3.1, 3.3.3)
 - **FO-8 The keyboard never hides the field, its error or the main button.** Do: scroll the focused field and its message into view above the keyboard, and keep the main button reachable.
   Check: render with the keyboard open at 2× on 360 dp; the keyboard can cover half the screen. — *study/data* + *standard/law* · [Baymard 2015f] [WCAG 2.2] (2.4.11)
-- **FO-9 Codes paste and autofill.** Do: one-time codes accept paste and autofill (`AutofillHints.oneTimeCode`), use the number pad and submit once complete.
-  Check: the code field. Typing a code by hand counts as a cognitive test under WCAG 3.3.8 unless paste or autofill works. — *standard/law* + *convention/opinion* · [WCAG 2.2] (3.3.8) [Visa OTP]
+- **FO-9 Codes paste and autofill.** Do: one-time codes accept paste and autofill (`AutofillHints.oneTimeCode`) and use the number pad; submitting as soon as the code is complete is optional.
+  Check: the code field. Typing a code by hand counts as a cognitive test under WCAG 3.3.8 unless paste or autofill works; Visa's pattern also supports paste and autofill from SMS or notifications, and keeps a submit button. — *standard/law* + *convention/opinion* · [WCAG 2.2] (3.3.8) [Visa OTP] [Baymard 2015k]
 - **FO-10 Don't ask twice.** Do: carry what the user already said or typed into the next step (dictated words into the form, the email onto the code screen).
   Check: steps that ask again for known information. — *standard/law* · [WCAG 2.2] (3.3.7)
 - **FO-11 One screen for everyday creation.** Do: daily task creation is a single screen, not a wizard.
@@ -360,10 +364,10 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
   Check: each sheet and menu. — *study/data* · [Harada 2013]
 - **OL-6 Keep what works where it is.** Do: avoid moving or renaming working controls between versions.
   Check: changes to stable navigation in the diff. Older users keep their own written instructions. — *study/data* + *expert guideline* · [Nielsen 2013] [COGA 2021]
-- **OL-7 Fewer words.** Do: cut copy; plan about 11% fewer words for readers over 50.
-  Check: word counts at decision points. Reading speed fell about 1.5 words a minute per year of age among 352 readers aged 18–71. — *study/data* · [Nielsen 2022]
+- **OL-7 Fewer words.** Do: cut copy; NN/g's own estimate is about 11% fewer words for readers over 50.
+  Check: word counts at decision points. Reading speed fell about 1.5 words a minute per year of age among 352 readers aged 18–71 (only 26 were over 50). — *study/data* + *expert guideline* · [Wallace 2022] [Nielsen 2022]
 - **OL-8 Help inside the app, when needed.** Do: short, repeatable help where the question arises, not a manual or a one-off tutorial.
-  Check: where help lives and whether it can be found again. Half of older respondents preferred the device's built-in help; later work found older adults value self-paced, flexible learning. — *study/data* · [Leung 2012] [Pang 2021]
+  Check: where help lives and whether it can be found again. Half of older respondents preferred the device's built-in help; later work (42 people aged 65–83 surveyed, 27 interviewed) found older adults value self-paced, flexible learning and rely less on manuals. — *study/data* · [Leung 2012] [Pang 2021]
 - **OL-9 Dark mode is not an accessibility aid.** Do: follow the system theme (D5) and make the light theme as strong as the dark one.
   Check: contrast in both themes. Dark text on a light background gave better proofreading and acuity results for younger and older adults alike. — *study/data* · [Piepenbrock 2013]
 - **OL-10 Taps over drags.** Do: make a tap the main way to do everything; dragging and pinching are optional.
@@ -371,7 +375,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **OL-11 First run without a helper.** Do: assume WhatsApp-level skills and nobody to ask.
   Check: the Newcomer's walkthrough of first run. In Spain 84% of 65–74-year-olds use the internet on a phone, but only about half of 75–89-year-olds used the internet in the last three months (2025); in the US, 77% of people 65+ said they'd need help to learn a new device (2014). — *study/data* · [Eurostat 2025] [Pew 2014] [Pew 2025]
 - **OL-12 Honour the phone's settings.** Do: respect system text size, display size, bold text and contrast settings; never override them.
-  Check: overrides of text scaling or fonts. Interfaces adapted to users' measured abilities made motor-impaired users 26% faster, with 73% fewer errors. — *study/data* · [Gajos 2008]
+  Check: overrides of text scaling or fonts. Interfaces adapted to users' measured abilities made 11 motor-impaired users 26% faster, with 73% fewer errors. — *study/data* · [Gajos 2008]
 
 ## 13. Subscriptions, limits and paywalls (SU)
 
@@ -393,8 +397,8 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
   Check: the walkthrough appears in the report. — *expert guideline* · [Rosala 2023] [Di Geronimo 2020]
 - **SU-9 Payment problems never block the free path.** Do: grace-period and account-hold messages explain and link to Play while free features keep working.
   Check: those states. — *platform guideline* · [Play Billing subscriptions]
-- **SU-10 Legal points go to the owner.** Do: report these as questions, not findings: Spain's 15-day notice before a renewal deadline (TRLGDCU art. 97.1 p); the EU withdrawal function that applies from 19 June 2026 (a 14-day withdrawal right, not a cancel button); who owes them when Google sells the subscription; Catalan versions of offers and terms. The EU Digital Fairness Act isn't proposed yet (indicative Q4 2026).
-  Check: not a screen check. — *standard/law* · [BOE TRLGDCU] [EU 2023/2673] [Play ToS 2025] [Catalan Code 22/2010] [EP DFA 2026]
+- **SU-10 Legal points go to the owner.** Do: report these as questions, not findings: Spain's 15-day notice before a renewal deadline (TRLGDCU art. 97.1 p); the EU withdrawal function that applies from 19 June 2026 (a "withdraw from contract here" function for the 14-day withdrawal right, not a cancel button), for which no Spanish transposition was found by 18 Oct 2026; the "order with obligation to pay" button (TRLGDCU art. 98.2, «pedido con obligación de pago»); who owes them when Google sells the subscription — in the EEA, Play's terms make Google Commerce Limited the contracting party, and Google is the merchant of record in Spain; Catalan versions of offers and terms. The EU Digital Fairness Act isn't proposed yet (indicative Q4 2026).
+  Check: not a screen check. — *standard/law* + *platform guideline* · [BOE TRLGDCU] [EU 2023/2673] [EU 2023/2673 NIM] [Play ToS 2025] [Play Merchant of Record] [Catalan Code 22/2010] [EP DFA 2026]
 - **SU-11 Read vendor benchmarks as context only.** Do: never use conversion benchmarks to justify blocking the bar user.
   Check: not a screen check. Median download-to-paid by day 35 was 10.7% with hard paywalls vs 2.1% for freemium (2025 data) — vendor correlations, not causes. — *convention/opinion* · [RevenueCat 2026]
 
@@ -422,9 +426,9 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **SH-1 Viewers need no training.** Do: a shared project reads correctly to someone who only looks.
   Check: a member's view of a project they didn't create. Families usually have one main organiser and mostly passive viewers. — *study/data* · [Neustaedter 2006]
 - **SH-2 Awareness in place, not by ping.** Do: show who created, assigned or changed something on the item itself.
-  Check: "Created by", assignee and "changed by" lines. Awareness picked up from the shared workspace beat explicit update messages. — *study/data* · [Dourish 1992] [Neustaedter 2006b]
+  Check: "Created by", assignee and "changed by" lines. Awareness picked up from the shared workspace beat explicit update messages; families read each other's whereabouts off the shared calendar at a glance, but feared unnoticed changes and wanted to see what changed and who changed it (20 mothers). — *study/data* · [Dourish 1992] [Neustaedter 2006b]
 - **SH-3 One named person.** Do: assignment names one person, and messages to others name them.
-  Check: "everyone" assignments and project-wide pings. Help came less often as groups grew unless one person was named; tasks someone was expecting got done more often (77% vs 53%). — *study/data* · [Darley 1968] [Markey 2000] [Bellotti 2004]
+  Check: "everyone" assignments and project-wide pings. Help came later as groups grew, unless one person was named; tasks someone was expecting got done more often (77% vs 53%). — *study/data* · [Darley 1968] [Markey 2000] [Bellotti 2004]
 - **SH-4 Don't notify the actor; say who did what.** Do: never notify the person who made a change; each notification names who and what; non-urgent activity is bundled.
   Check: the triggers for shared-change notifications. Group messages were seen and read later than one-to-one ones. — *study/data* · [Brush 2001] [Pielot 2018]
 - **SH-5 Minimal roles, changed in place.** Do: owner and member at most, changeable on the person's row (D15b).
@@ -462,7 +466,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 ## 17. Privacy in the app (PR)
 
 - **PR-1 Explain at the moment of use.** Do: at the first dictation, one sentence on where the audio goes, what it's for and how long it's kept, with a link to more; the same text stays findable in Settings.
-  Check: first microphone use and the voice settings. Information must be concise and plain when it's collected; regulators favour layered and just-in-time notices on mobile. — *standard/law* + *expert guideline* · [GDPR] (arts. 12, 13) [WP260 2018] [Schaub 2015] [EDPB VVA 2021]
+  Check: first microphone use and the voice settings. Information must be concise and plain when it's collected; regulators recommend layered notices and describe just-in-time ("push") notices as another option, and privacy-notice research pairs an app's first access to recording with a just-in-time notice. — *standard/law* + *expert guideline* · [GDPR] (arts. 12, 13) [WP260 2018] [Schaub 2015] [EDPB VVA 2021]
 - **PR-2 Disclosure before the microphone prompt, where Play requires one.** Do: if audio leaves the phone in ways users might not expect, show an in-app disclosure naming the data and its use, then a deliberate "Continue", then the system prompt; Back or leaving isn't consent; never imitate the system dialog.
   Check: wording and order. Whether TaskFlow needs it is a policy call for the owner. — *platform guideline* · [Play User Data] [Play Disclosure practices]
 - **PR-3 Minimal by default.** Do: keeping recordings, human review and training use are off unless needed and chosen, each with its own explanation.
@@ -490,16 +494,16 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **"An Undo snackbar is enough."** It can vanish before the user knows they need it. [Rosala 2020] [Android Snackbar action]
 - **"Speech is three times faster, so voice always wins."** That figure is young adults copying phrases; composing and correcting shrink or erase the gain. [Ruan 2017] [Foley 2020] [Suhm 2001]
 - **"If it misheard, just say it again."** Re-speaking fixed 35% of errors and got worse on each retry. [Suhm 2001]
-- **"Voice is naturally easy for older adults."** First impressions turned negative, most long-term owners cut back, and older voices are misrecognised more. [Kim 2021] [Trajkova 2020] [Vipperla 2010]
+- **"Voice is naturally easy for older adults."** First impressions turned negative, most long-term owners stopped using their speaker, and older voices are misrecognised more. [Kim 2021] [Trajkova 2020] [Vipperla 2010]
 - **"Older people don't use smartphones."** 78% of US adults 65+ own one, and 84% of Spanish 65–74-year-olds use the internet on a phone; the drop comes after 75. [Pew 2025] [Eurostat 2025]
 - **"Older adults can't do gestures."** They can; they can't discover them. [Kobayashi 2011] [Findlater 2013]
 - **"Dark mode is easier on older eyes."** Dark text on light performed better at all ages. [Piepenbrock 2013]
-- **"Bigger, brighter elements always catch the eye first."** On phones, expectations — the top-left, text, images — mattered more than colour and size. [Leiva 2020]
+- **"Bigger, brighter elements always catch the eye first."** On phone screens, fixations favoured the top-left, text and images; brightness had no effect and size mattered little. [Leiva 2020]
 - **"People don't scroll" and "the fold doesn't matter."** Both are wrong: people scroll, but attention concentrates at the top. [Fessenden 2018]
 - **"Design for the F-pattern."** It's a symptom of poorly formatted text. [Pernice 2017]
 - **"Everyone understands the hamburger menu."** Hidden navigation is used far less. [Pernice 2016a]
 - **"Translations are about 30% longer."** Short labels can grow 200–300%. [W3C Text size]
-- **"0.1 / 1 / 10 s and 400 ms are measured human limits."** They are rules of thumb from an essay and an IBM white paper. [Nielsen 1993] [Dubuc 2018] [Doherty 1982]
+- **"0.1 / 1 / 10 s and 400 ms are measured human limits."** 0.1 / 1 / 10 s are rules of thumb from an essay; the 400 ms "Doherty threshold" doesn't appear in the 1982 IBM brochure it's named after, which argued for sub-second responses from productivity data. [Nielsen 1993] [Dubuc 2018] [Doherty 1982]
 - **"Skeleton screens always feel faster."** The evidence is mixed. [Tankala 2023] [Viget 2017]
 - **"Ask for every permission at first launch."** Android says not to, and from Android 11 two denials end the conversation. [Android Permission practices] [Android 11 Permissions]
 - **"An inexact reminder is only a few minutes late."** It can be up to an hour on Android 12+, more under Doze. [Android Alarms]
@@ -514,8 +518,8 @@ Read with `.claude/agents/frontend-ux-reviewer.md`, "What the research says".
 - **Thumb zone.** Cite Hoober 2017's accuracy data (≈ 7 mm centre, ≈ 12 mm corners; people prefer the centre), not thumb-sweep maps; Hoober asks readers to ignore his 2013 reach drawings. Bergstrom-Lehtovirta & Oulasvirta 2014 is a reach model, not a zone map. (RE-1, RE-2)
 - **Older adults.** "Nielsen 2013" is *Usability for Senior Citizens: Improved, But Still Lacking*; NN/g has replaced it with Kane 2019. (OL-1)
 - **Error messages.** Nielsen's 2001 article is no longer retrievable; cite Neusesser & Sunwall 2023. (UN-7)
-- **Banner blindness.** Benway & Lane 1998 couldn't be verified; cite Pernice 2018. (SC-8)
-- **Speech correction.** Karat et al. 1999 was reachable only second-hand; Suhm, Myers & Waibel 2001 carries the verified numbers. (VO-6)
+- **Banner blindness.** Benway & Lane 1998 is now verified through the Internet Archive: 6 experienced users found links placed in banners about 58% of the time vs 94% for menu links. It's old desktop data, so cite Pernice 2018 for current evidence. [Benway 1998] (SC-8)
+- **Speech correction.** Karat et al. 1999 is still second-hand: its abstract gives only the design (24 first-time and 4 extended users of three dictation products), and its correction figures appear only in other papers. Suhm, Myers & Waibel 2001 carries the verified numbers. (VO-6)
 - **Snackbar timing.** Flutter's snackbar code shows no sign of reading Android's accessibility timeout (source check, not device-tested); TaskFlow bridges it in `App/lib/services/feedback_timeout.dart` (4 s base). Since Flutter 3.38 a snackbar with an action persists unless `persist: false`, and Material says such snackbars should stay until used or dismissed. (UN-5)
 - **Apple targets.** The HIG now lists 44 × 44 pt as the default control size and 28 × 28 pt as the minimum. (§0)
 - **Response times.** 0.1 / 1 / 10 s are Nielsen's rules of thumb built on Miller's 1968 essay; delays near 60 ms are already noticeable. (PE-1)
@@ -523,7 +527,7 @@ Read with `.claude/agents/frontend-ux-reviewer.md`, "What the research says".
 - **WCAG 2.2** is now the 12 Dec 2024 edition; 4.1.1 Parsing is obsolete, so never raise it.
 - **Material navigation.** A navigation bar is for 3–5 destinations, and Material points to tabs below 3: relevant to U13. (PL-2)
 - **Hick–Hyman.** "It grows faster for unfamiliar options" holds: novices search menus linearly, experts follow Hick–Hyman (Cockburn et al. 2007). (CO-2)
-- **ISO 24495-1:2023.** Its "relevant" and "findable" principles were confirmed from the table of contents; "understandable" and "usable" weren't seen (the standard is paywalled).
+- **ISO 24495-1:2023.** Its four governing principles are relevant, findable, understandable and usable, confirmed in ISO's preview of the contents; the text itself is paywalled. [ISO 24495-1]
 
 ## 20. How to review a screen with this guide
 
@@ -631,7 +635,8 @@ Keys are listed alphabetically. m3.material.io pages render only in a browser, s
 - [Baymard 2015k] 'Touch Keyboard' Implementations Have Improved Just 9% Since 2013 — Christian Holst, Baymard Institute — 2015 — https://baymard.com/blog/mobile-touch-keyboards
 - [Baymard 2024] Usability Testing of Inline Form Validation: 31% Don't Have It, 4% Get It Wrong — Edward Scott, Baymard Institute — 2024 — https://baymard.com/blog/inline-form-validation
 - [Bellotti 2004] What a to-do: studies of task management towards the design of a personal task list manager — Bellotti, Dalal, Good, Flynn, Bobrow & Ducheneaut, CHI — 2004 — https://hci.rwth-aachen.de/materials/conferences/CHI2004/1p735.pdf
-- [Bergstrom-Lehtovirta 2014] Modeling the functional area of the thumb on mobile touchscreen surfaces — Bergstrom-Lehtovirta & Oulasvirta, CHI — 2014 — https://doi.org/10.1145/2556288.2557354 ‡
+- [Benway 1998] Banner blindness: Web searchers often miss "obvious" links — Jan Panero Benway & David M. Lane, Internetworking (ITG newsletter) 1.3 — 1998 — http://www.internettg.org/newsletter/dec98/banner_blindness.html (read via the Internet Archive: https://web.archive.org/web/20010223220039/http://www.internettg.org/newsletter/dec98/banner_blindness.html)
+- [Bergstrom-Lehtovirta 2014] Modeling the functional area of the thumb on mobile touchscreen surfaces — Bergstrom-Lehtovirta & Oulasvirta, CHI, pp. 1991–2000 — 2014 — https://doi.org/10.1145/2556288.2557354 ‡
 - [BOE TRLGDCU] Real Decreto Legislativo 1/2007 (consumer law; arts. 62, 97, 98) — BOE, consolidated 28 Feb 2026 — 2007 — https://www.boe.es/buscar/act.php?id=BOE-A-2007-20555
 - [Brush 2001] Notification for shared annotation of digital documents — Brush, Bargeron, Gupta & Grudin, Microsoft Research MSR-TR-2001-87 — 2001 — https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tr-2001-87.pdf
 - [Brush 2005] A survey of personal and household scheduling — Brush & Combs Turner, GROUP — 2005 — https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/pp17brush.pdf
@@ -642,30 +647,31 @@ Keys are listed alphabetically. m3.material.io pages render only in a browser, s
 - [Budiu 2018ia] Intelligent Assistants Have Poor Usability: A User Study of Alexa, Google Assistant, and Siri — Budiu & Laubheimer, NN/g — 2018 — https://www.nngroup.com/articles/intelligent-assistant-usability/
 - [Budiu 2024] Memory Recognition and Recall in User Interfaces — Raluca Budiu, NN/g — page dated 2024 — https://www.nngroup.com/articles/recognition-and-recall/
 - [Buehler 1994] Exploring the "planning fallacy": why people underestimate their task completion times — Buehler, Griffin & Ross, JPSP 67(3) — 1994 — https://bear.warrington.ufl.edu/brenner/mar7588/Papers/buehler-et-al-1994.pdf
-- [Card 1980] The keystroke-level model for user performance time with interactive systems — Card, Moran & Newell, CACM 23(7) — 1980 — https://doi.org/10.1145/358886.358895 ‡
-- [Carroll 1987] The paradox of the active user — Carroll & Rosson, in *Interfacing Thought* (MIT Press) — 1987 — https://www.nngroup.com/articles/paradox-of-the-active-user/ (summary) †
-- [Carroll 1987m] The Minimal Manual — Carroll, Smith-Kerker, Ford & Mazur-Rimetz, Human–Computer Interaction 3(2) — 1987 — https://doi.org/10.1207/s15327051hci0302_2 ‡
+- [Card 1980] The keystroke-level model for user performance time with interactive systems — Card, Moran & Newell, CACM 23(7):396–410 — 1980 — https://doi.org/10.1145/358886.358895 (paywalled; the operator times are known through secondary sources, and the 1979 Xerox PARC report SSL-79-1 isn't online) †
+- [Carroll 1987] The paradox of the active user — Carroll & Rosson, in *Interfacing Thought* (ed. J. M. Carroll, MIT Press) — 1987 — https://www.nngroup.com/articles/paradox-of-the-active-user/ (NN/g's summary by Jakob Nielsen, 1998; the chapter itself wasn't reachable) †
+- [Carroll 1987m] The Minimal Manual — Carroll, Smith-Kerker, Ford & Mazur-Rimetz, Human–Computer Interaction 3(2):123–153 — 1987 — https://doi.org/10.1207/s15327051hci0302_2 ‡
 - [Catalan Code 22/2010] Llei 22/2010, Codi de consum de Catalunya (art. 128-1) — BOE, consolidated 2025 — 2010 — https://www.boe.es/buscar/act.php?id=BOE-A-2010-13115
-- [Chernev 2015] Choice overload: a conceptual review and meta-analysis — Chernev, Böckenholt & Goodman, Journal of Consumer Psychology 25(2) — 2015 — https://doi.org/10.1016/j.jcps.2014.08.002 ‡
+- [Chernev 2015] Choice overload: a conceptual review and meta-analysis — Chernev, Böckenholt & Goodman, Journal of Consumer Psychology 25(2):333–358 (99 observations, N = 7,202) — 2015 — https://doi.org/10.1016/j.jcps.2014.08.002 ‡
 - [CLDR Plurals] Language Plural Rules — Unicode CLDR — current — https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html
 - [Cochrane 2013] Mobile phone messaging reminders for attendance at healthcare appointments — Gurol-Urganci, de Jongh, Vodopivec-Jamsek, Atun & Car, Cochrane — 2013 — https://www.cochrane.org/evidence/CD007458_mobile-phone-messaging-reminders-attendance-healthcare-appointments
-- [Cockburn 2007] A predictive model of menu performance — Cockburn, Gutwin & Greenberg, CHI — 2007 — https://doi.org/10.1145/1240624.1240723 ‡
+- [Cockburn 2007] A predictive model of menu performance — Cockburn, Gutwin & Greenberg, CHI, pp. 627–636 — 2007 — https://doi.org/10.1145/1240624.1240723 (read via https://grouplab.cpsc.ucalgary.ca/grouplab/uploads/Publications/Publications/2007-PredictiveModelMenus.CHI.pdf)
 - [COGA 2021] Making Content Usable for People with Cognitive and Learning Disabilities — W3C COGA Task Force, Working Group Note — 2021 — https://www.w3.org/TR/coga-usable/
-- [Cowan 2001] The magical number 4 in short-term memory: a reconsideration of mental storage capacity — Nelson Cowan, Behavioral and Brain Sciences 24(1) — 2001 — https://pubmed.ncbi.nlm.nih.gov/11515286/ ‡
+- [Cowan 2001] The magical number 4 in short-term memory: a reconsideration of mental storage capacity — Nelson Cowan, Behavioral and Brain Sciences 24(1):87–114 — 2001 — https://doi.org/10.1017/S0140525X01003922 (read via Cambridge's free copy: https://www.cambridge.org/core/services/aop-cambridge-core/content/view/44023F1147D4A1D44BDC0AD226838496/S0140525X01003922a.pdf/div-class-title-the-magical-number-4-in-short-term-memory-a-reconsideration-of-mental-storage-capacity-div.pdf)
 - [Cowan 2017] "What can I help you with?": infrequent users' experiences of intelligent personal assistants — Cowan et al., MobileHCI — 2017 — https://doi.org/10.1145/3098279.3098539
-- [Darley 1968] Bystander intervention in emergencies: diffusion of responsibility — Darley & Latané, JPSP 8(4) — 1968 — https://doi.org/10.1037/h0025589 †
-- [Di Geronimo 2020] UI Dark Patterns and Where to Find Them: A Study on Mobile Applications and User Perception — Di Geronimo, Braz, Fregnan, Palomba & Bacchelli, CHI — 2020 — https://doi.org/10.1145/3313831.3376600 ‡
-- [Doherty 1982] The Economic Value of Rapid Response Time — Doherty & Thadani, IBM (GE20-0752) — 1982 — original not retrievable ~
+- [Darley 1968] Bystander intervention in emergencies: diffusion of responsibility — Darley & Latané, JPSP 8(4):377–383 — 1968 — https://doi.org/10.1037/h0025589 ‡
+- [Di Geronimo 2020] UI Dark Patterns and Where to Find Them: A Study on Mobile Applications and User Perception — Di Geronimo, Braz, Fregnan, Palomba & Bacchelli, CHI, pp. 1–14 — 2020 — https://doi.org/10.1145/3313831.3376600 ‡
+- [Doherty 1982] The Economic Value of Rapid Response Time — Doherty & Thadhani, IBM — 1982 — https://archive.computerhistory.org/resources/access/text/2024/03/102751398-05-01-acc.pdf (Computer History Museum scan, read through its OCR text; the IBM form number GE20-0752 and the 1982 date come only from search snippets)
 - [Dourish 1992] Awareness and coordination in shared workspaces — Dourish & Bellotti, CSCW — 1992 — https://www.dourish.com/publications/1992/cscw92-awareness.pdf
 - [Dubuc 2018] Magic numbers — Gilles Dubuc, Web Performance Calendar — 2018 — https://calendar.perfplanet.com/2018/magic-numbers/
-- [Eardley 2017] Understanding Grip Shifts: How Form Factors Impact Hand Movements on Mobile Phones — Eardley, Roudaut, Gill & Thompson, CHI — 2017 — https://doi.org/10.1145/3025453.3025835 ‡
-- [EC Dark patterns 2022] Behavioural study on unfair commercial practices in the digital environment: dark patterns and manipulative personalisation — Lupiáñez-Villanueva et al., European Commission — 2022 — https://op.europa.eu/en/publication-detail/-/publication/606365bc-d58b-11ec-a95f-01aa75ed71a1/language-en
+- [Eardley 2017] Understanding Grip Shifts: How Form Factors Impact Hand Movements on Mobile Phones — Eardley, Roudaut, Gill & Thompson, CHI, pp. 4680–4691 — 2017 — https://doi.org/10.1145/3025453.3025835 ‡
+- [EC Dark patterns 2022] Behavioural study on unfair commercial practices in the digital environment: dark patterns and manipulative personalisation — Lupiáñez-Villanueva et al., European Commission (mystery shopping of 75 sites and apps; experiment with 7,430 people) — 2022 — https://op.europa.eu/en/publication-detail/-/publication/606365bc-d58b-11ec-a95f-01aa75ed71a1/language-en
 - [EC Fitness 2024] Fitness Check of EU consumer law on digital fairness, SWD(2024) 230 — European Commission — 2024 — https://commission.europa.eu/document/download/707d7404-78e5-4aef-acfa-82b4cf639f55_en
 - [EC Sweep 2023] Manipulative online practices found on 148 out of 399 online shops screened — European Commission — 2023 — https://cyprus.representation.ec.europa.eu/news/consumer-protection-manipulative-online-practices-found-148-out-399-online-shops-screened-2023-01-30_en
 - [EDPB 03/2022] Guidelines 03/2022 on deceptive design patterns in social media platform interfaces, v2.0 — EDPB — 2023 — https://www.edpb.europa.eu/our-work-tools/our-documents/guidelines/guidelines-032022-deceptive-design-patterns-social-media_en
 - [EDPB VVA 2021] Guidelines 02/2021 on virtual voice assistants, v2.0 — EDPB — 2021 — https://www.edpb.europa.eu/system/files/2021-07/edpb_guidelines_202102_on_vva_v2.0_adopted_en.pdf
 - [EP DFA 2026] Legislative Train: Digital Fairness Act — European Parliament — 2026 — https://www.europarl.europa.eu/legislative-train/theme-protecting-our-democracy-upholding-our-values/file-digital-fairness-act
-- [EU 2023/2673] Directive (EU) 2023/2673 (new Art. 11a of the Consumer Rights Directive) — EU — 2023 — https://eur-lex.europa.eu/eli/dir/2023/2673/oj/eng
+- [EU 2023/2673] Directive (EU) 2023/2673 (new art. 11a of the Consumer Rights Directive) — EU — 2023 — https://eur-lex.europa.eu/eli/dir/2023/2673/oj/eng
+- [EU 2023/2673 NIM] National transposition measures for Directive (EU) 2023/2673 (none listed for Spain) — EUR-Lex — checked 18 Oct 2026 — https://eur-lex.europa.eu/legal-content/EN/NIM/?uri=CELEX:32023L2673
 - [Eurostat 2025] Individuals' internet use (isoc_ci_ifp_iu, isoc_ci_dev_i) — Eurostat — 2025 — https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/isoc_ci_ifp_iu
 - [Fessenden 2018] Scrolling and Attention — Therese Fessenden, NN/g — 2018 — https://www.nngroup.com/articles/scrolling-and-attention/
 - [Findlater 2013] Age-related differences in performance with touchscreens compared to traditional mouse input — Findlater, Froehlich, Fattal, Wobbrock & Dastyar, CHI — 2013 — https://doi.org/10.1145/2470654.2470703
@@ -687,20 +693,20 @@ Keys are listed alphabetically. m3.material.io pages render only in a browser, s
 - [Flutter showTimePicker] showTimePicker and showDatePicker — Flutter API — current — https://api.flutter.dev/flutter/material/showTimePicker.html
 - [Flutter SnackBar persist] SnackBar with action no longer auto-dismisses — Flutter docs — 2026 — https://docs.flutter.dev/release/breaking-changes/snackbar-with-action-behavior-update
 - [Flutter SnackBar src] snack_bar.dart — Flutter — current — https://github.com/flutter/flutter/blob/master/packages/flutter/lib/src/material/snack_bar.dart
-- [Foley 2020] Comparing Smartphone Speech Recognition and Touchscreen Typing for Composition and Transcription — Foley, Casiez & Vogel, CHI — 2020 — https://doi.org/10.1145/3313831.3376861 ‡
-- [Forch 2017] Are 100 ms Fast Enough? Characterizing Latency Perception Thresholds in Mouse-Based Interaction — Forch, Franke, Rauh & Krems, EPCE (LNCS 10276) — 2017 — https://research.uni-luebeck.de/en/publications/are-100-ms-fast-enough-characterizing-latency-perception-threshol/ ‡
+- [Foley 2020] Comparing Smartphone Speech Recognition and Touchscreen Typing for Composition and Transcription — Foley, Casiez & Vogel, CHI — 2020 — https://doi.org/10.1145/3313831.3376861 (abstract read; the figures come from the first author's thesis, which extends the paper: https://uwspace.uwaterloo.ca/handle/10012/16184) ‡
+- [Forch 2017] Are 100 ms Fast Enough? Characterizing Latency Perception Thresholds in Mouse-Based Interaction — Forch, Franke, Rauh & Krems, EPCE (LNCS 10276), pp. 45–56 — 2017 — https://doi.org/10.1007/978-3-319-58475-1_4 (abstract: https://research.uni-luebeck.de/en/publications/are-100-ms-fast-enough-characterizing-latency-perception-threshol/) ‡
 - [Franz 2019] Just Ask Me: Comparing Older and Younger Individuals' Knowledge of Their Optimal Touchscreen Target Sizes — Franz, Findlater & Wobbrock, ASSETS poster — 2019 — https://faculty.washington.edu/wobbrock/pubs/assets-19.06.pdf
-- [Gajos 2008] Improving the performance of motor-impaired users with automatically-generated, ability-based interfaces — Gajos, Wobbrock & Weld, CHI — 2008 — https://doi.org/10.1145/1357054.1357250 ‡
+- [Gajos 2008] Improving the performance of motor-impaired users with automatically-generated, ability-based interfaces — Gajos, Wobbrock & Weld, CHI, pp. 1257–1266 — 2008 — https://doi.org/10.1145/1357054.1357250 (read via https://faculty.washington.edu/wobbrock/pubs/chi-08.02.pdf)
 - [Gangadharaiah 2019] Joint Multiple Intent Detection and Slot Labeling for Goal-Oriented Dialog — Gangadharaiah & Narayanaswamy, NAACL — 2019 — https://doi.org/10.18653/v1/N19-1055
 - [GDPR] Regulation (EU) 2016/679 (arts. 7, 12, 13, 25) — EU — 2016 — https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng
-- [Goetsu 2020] Different Types of Voice User Interface Failures May Cause Different Degrees of Frustration — Goetsu & Sakai, arXiv preprint — 2020 — https://arxiv.org/abs/2002.03582 ‡
+- [Goetsu 2020] Different Types of Voice User Interface Failures May Cause Different Degrees of Frustration — Goetsu & Sakai, arXiv preprint (v1, 10 Feb 2020; not peer-reviewed) — 2020 — https://arxiv.org/abs/2002.03582
 - [Gollwitzer 1999] Implementation intentions: strong effects of simple plans — Peter Gollwitzer, American Psychologist 54(7) — 1999 — https://www.socmot.uni-konstanz.de/sites/default/files/99_Gollwitzer_Implementation_Intentions.pdf
-- [Gollwitzer 2006] Implementation intentions and goal achievement: a meta-analysis of effects and processes — Gollwitzer & Sheeran, Advances in Experimental Social Psychology 38 — 2006 — https://doi.org/10.1016/S0065-2601(06)38002-1 ‡
+- [Gollwitzer 2006] Implementation intentions and goal achievement: a meta-analysis of effects and processes — Gollwitzer & Sheeran, Advances in Experimental Social Psychology 38:69–119 — 2006 — https://doi.org/10.1016/S0065-2601(06)38002-1 (read via the Konstanz repository copy: https://kops.uni-konstanz.de/bitstreams/d4f710b4-a505-49ef-a831-5b8d7675100b/download)
 - [Google Confirmations] Confirmations (conversation design, archived; platform retired 2023) — Google — page updated 2024 — https://developers.google.com/assistant/conversation-design/confirmations
 - [Google Errors] Errors (conversation design, archived) — Google — current — https://developers.google.com/assistant/conversation-design/errors
 - [Google Scale] Scale your design (conversation design, archived) — Google — current — https://developers.google.com/assistant/conversation-design/scale-your-design
 - [Graus 2016] Analyzing and predicting task reminders — Graus, Bennett, White & Horvitz, UMAP — 2016 — https://www.erichorvitz.com/Cortana-reminders_UM_2016.pdf
-- [Gray 2018] The Dark (Patterns) Side of UX Design — Gray, Kou, Battles, Hoggatt & Toombs, CHI — 2018 — https://doi.org/10.1145/3173574.3174108 ‡
+- [Gray 2018] The Dark (Patterns) Side of UX Design — Gray, Kou, Battles, Hoggatt & Toombs, CHI, Paper 534 — 2018 — https://doi.org/10.1145/3173574.3174108 (abstract read; the five strategies and the 118-artifact corpus are known only through deceptive.design, as the full text was blocked) †
 - [Harada 2013] Characteristics of Elderly User Behavior on Mobile Multi-touch Devices — Harada, Sato, Takagi & Asakawa, INTERACT — 2013 — https://doi.org/10.1007/978-3-642-40498-6_25
 - [Haraty 2012] Individual differences in personal task management — Haraty, Tam, Haddad, McGrenere & Tang, Graphics Interface — 2012 — https://www.cs.ubc.ca/~joanna/papers/GI2012_Haraty.pdf
 - [Haraty 2016] How personal task management differs across individuals — Haraty, McGrenere & Tang, IJHCS 88 — 2016 — https://doi.org/10.1016/j.ijhcs.2015.11.006
@@ -709,65 +715,66 @@ Keys are listed alphabetically. m3.material.io pages render only in a browser, s
 - [Harley 2018] Visibility of System Status (Usability Heuristic #1) — Aurora Harley, NN/g — 2018 — https://www.nngroup.com/articles/visibility-system-status/
 - [Harley 2019] Touch Targets on Touchscreens — Aurora Harley, NN/g — 2019 — https://www.nngroup.com/articles/touch-target-size/
 - [Harrison 2007] Rethinking the Progress Bar — Harrison, Amento, Kuznetsov & Bell, UIST — 2007 — https://www.chrisharrison.net/projects/progressbars/ProgBarHarrison.pdf
-- [Hick 1952] On the rate of gain of information — W. E. Hick, Quarterly Journal of Experimental Psychology 4(1) — 1952 — https://doi.org/10.1080/17470215208416600 ‡
+- [Hick 1952] On the rate of gain of information — W. E. Hick, Quarterly Journal of Experimental Psychology 4(1):11–26 — 1952 — https://doi.org/10.1080/17470215208416600 ‡
 - [Hoober 2013] How Do Users Really Hold Mobile Devices? — Steven Hoober, UXmatters — 2013 — https://www.uxmatters.com/mt/archives/2013/02/how-do-users-really-hold-mobile-devices.php
 - [Hoober 2017a] Design for Fingers, Touch, and People, Part 1 — Steven Hoober, UXmatters — 2017 — https://www.uxmatters.com/mt/archives/2017/03/design-for-fingers-touch-and-people-part-1.php
 - [Hoober 2017c] Design for Fingers, Touch, and People, Part 3 — Steven Hoober, UXmatters — 2017 — https://www.uxmatters.com/mt/archives/2017/07/design-for-fingers-touch-and-people-part-3.php
-- [Hyman 1953] Stimulus information as a determinant of reaction time — Ray Hyman, Journal of Experimental Psychology 45(3) — 1953 — https://doi.org/10.1037/h0056940 ‡
+- [Hyman 1953] Stimulus information as a determinant of reaction time — Ray Hyman, Journal of Experimental Psychology 45(3):188–196 — 1953 — https://doi.org/10.1037/h0056940 ‡
 - [ICU Messages] Formatting Messages — ICU User Guide, Unicode — current — https://unicode-org.github.io/icu/userguide/format_parse/messages/
 - [IEC 2017] Ortografia catalana — Institut d'Estudis Catalans — 2017 — https://www.iec.cat/llengua/documents/ortografia_catalana_versio_digital.pdf
 - [intl CLDR data] intl 0.20.2 date symbols and patterns (es, ca, en), derived from CLDR — Dart team, read locally — 2025 — https://pub.dev/packages/intl
 - [Iqbal 2008] Effects of intelligent notification management on users and their tasks — Iqbal & Bailey, CHI — 2008 — https://www.interruptions.net/literature/Iqbal-CHI08.pdf
-- [Jamieson 2014] The efficacy of cognitive prosthetic technology for people with memory impairments — Jamieson, Cullen, McGee-Lennon, Brewster & Evans, Neuropsychological Rehabilitation 24 — 2014 — https://strathprints.strath.ac.uk/53584/ ‡
+- [ISO 24495-1] Plain language — Part 1: Governing principles and guidelines (ISO 24495-1:2023; contents read in ISO's preview, text paywalled) — ISO/TC 37 — 2023 — https://www.iso.org/standard/78907.html
+- [Jamieson 2014] The efficacy of cognitive prosthetic technology for people with memory impairments — Jamieson, Cullen, McGee-Lennon, Brewster & Evans, Neuropsychological Rehabilitation 24(3–4):419–444 — 2014 — https://doi.org/10.1080/09602011.2013.825632 (abstract: https://strathprints.strath.ac.uk/53584/) ‡
 - [Jin 2007] Touch Screen User Interfaces for Older Adults: Button Size and Spacing — Jin, Plocher & Kiff, UAHCI (LNCS 4554) — 2007 — https://doi.org/10.1007/978-3-540-73279-2_104
-- [Johnson 2003] Do Defaults Save Lives? — Johnson & Goldstein, Science 302 — 2003 — https://doi.org/10.1126/science.1091721 (figures checked in their 2004 follow-up) ‡
-- [Kahneman 1993] When more pain is preferred to less: adding a better end — Kahneman, Fredrickson, Schreiber & Redelmeier, Psychological Science 4(6) — 1993 — https://doi.org/10.1111/j.1467-9280.1993.tb00589.x ‡
+- [Johnson 2003] Do Defaults Save Lives? — Johnson & Goldstein, Science 302(5649):1338–1339 — 2003 — https://doi.org/10.1126/science.1091721 (read via the author's copy: http://www.dangoldstein.com/papers/DefaultsScience.pdf)
+- [Kahneman 1993] When more pain is preferred to less: adding a better end — Kahneman, Fredrickson, Schreiber & Redelmeier, Psychological Science 4(6):401–405 — 1993 — https://doi.org/10.1111/j.1467-9280.1993.tb00589.x ‡
 - [Kane 2019] Usability for Older Adults: Challenges and Changes — Lexie Kane, NN/g — 2019 — https://www.nngroup.com/articles/usability-for-senior-citizens/
 - [Kaplan 2021] Designing Empty States in Complex Applications: 3 Guidelines — Kate Kaplan, NN/g — 2021 — https://www.nngroup.com/articles/empty-state-interface-design/
-- [Karat 1999] Patterns of entry and correction in large vocabulary continuous speech recognition systems — Karat, Halverson, Horn & Karat, CHI — 1999 — https://doi.org/10.1145/302979.303160 †
+- [Karat 1999] Patterns of entry and correction in large vocabulary continuous speech recognition systems — Karat, Halverson, Horn & Karat, CHI, pp. 568–575 — 1999 — https://doi.org/10.1145/302979.303160 (abstract read; its findings are known only through Suhm 2001, Shneiderman 2000 and Ruan 2017) †
 - [Kendrick 2018] Five Mistakes in Designing Mobile Push Notifications — Alita Kendrick, NN/g — 2018 — https://www.nngroup.com/articles/push-notification/
 - [Kendrick 2020o] Mobile-App Onboarding: An Analysis of Components and Techniques — Alita Kendrick, NN/g — 2020 — https://www.nngroup.com/articles/mobile-app-onboarding/
 - [Kendrick 2020t] Mobile Tutorials: Wasted Effort or Efficiency Boost? — Alita Kendrick, NN/g — 2020 — https://www.nngroup.com/articles/mobile-tutorials/
-- [Kessler 2025] Field and natural experiments on organ-donor registration (title not recorded) — Kessler & Roth, American Economic Journal: Economic Policy 17(2) — 2025 — https://users.nber.org/~kesslerj/papers/KesslerRoth_2025.pdf
+- [Kessler 2025] Increasing Organ Donor Registration as a Means to Increase Transplantation: An Experiment with Actual Organ Donor Registrations — Kessler & Roth, American Economic Journal: Economic Policy 17(2):60–83 — 2025 — https://doi.org/10.1257/pol.20220760 (read via https://users.nber.org/~kesslerj/papers/KesslerRoth_2025.pdf)
 - [Kim 2021] Exploring How Older Adults Use a Smart Speaker–Based Voice Assistant in Their First Interactions — Sunyoung Kim, JMIR mHealth and uHealth 9(1) — 2021 — https://doi.org/10.2196/20427
 - [Kobayashi 2011] Elderly User Evaluation of Mobile Touchscreen Interactions — Kobayashi, Hiyama, Miura, Asakawa, Hirose & Ifukube, INTERACT (LNCS 6946) — 2011 — https://doi.org/10.1007/978-3-642-23774-4_9
 - [Krause 2019] 10 Design Guidelines for Reporting Errors in Forms — Rachel Krause, NN/g — 2019 — https://www.nngroup.com/articles/errors-forms-design-guidelines/
-- [Kurosu 1995] Apparent usability vs. inherent usability — Kurosu & Kashimura, CHI '95 Conference Companion — 1995 — https://doi.org/10.1145/223355.223680 ‡
+- [Kurosu 1995] Apparent usability vs. inherent usability: experimental analysis on the determinants of the apparent usability — Kurosu & Kashimura, CHI '95 Conference Companion, pp. 292–293 — 1995 — https://doi.org/10.1145/223355.223680 (read via https://chi1995.acm.org/proceedings/shortppr/mk_bdy.htm)
 - [Kushlev 2016] "Silence your phones": smartphone notifications increase inattention and hyperactivity symptoms — Kushlev, Proulx & Dunn, CHI — 2016 — https://www.interruptions.net/literature/Kushlev-CHI16.pdf
 - [Laubheimer 2015] Preventing User Errors: Avoiding Unconscious Slips — Page Laubheimer, NN/g — 2015 — https://www.nngroup.com/articles/slips/
 - [Laubheimer 2018a] Intelligent Assistants: Creepy, Childish, or a Tool? Users' Attitudes Toward Alexa, Google Assistant, and Siri — Laubheimer & Budiu, NN/g — 2018 — https://www.nngroup.com/articles/voice-assistant-attitudes/
 - [Laubheimer 2019] The 3-Click Rule for Navigation Is False — Page Laubheimer, NN/g — 2019 — https://www.nngroup.com/articles/3-click-rule/
 - [Laubheimer 2023] Onboarding Tutorials vs. Contextual Help — Page Laubheimer, NN/g — page dated 2023 — https://www.nngroup.com/articles/onboarding-tutorials/
-- [Leiva 2020] Understanding Visual Saliency in Mobile User Interfaces — Leiva, Xue, Bansal, Tavakoli, Köroğlu, Du, Dayama & Oulasvirta, MobileHCI — 2020 — https://arxiv.org/abs/2101.09176 ‡
-- [Leung 2011] Age-related differences in the initial usability of mobile device icons — Leung, McGrenere & Graf, Behaviour & Information Technology 30(5) — 2011 — https://doi.org/10.1080/01449290903171308 ‡
+- [Leiva 2020] Understanding Visual Saliency in Mobile User Interfaces — Leiva, Xue, Bansal, Tavakoli, Köroğlu, Du, Dayama & Oulasvirta, MobileHCI, pp. 1–12 — 2020 — https://doi.org/10.1145/3379503.3403557 (read via arXiv: https://arxiv.org/abs/2101.09176)
+- [Leung 2011] Age-related differences in the initial usability of mobile device icons — Leung, McGrenere & Graf, Behaviour & Information Technology 30(5):629–642 — 2011 — https://doi.org/10.1080/01449290903171308 (read via the lab's copy: https://www.cs.ubc.ca/labs/edapt/papers/leung2011.pdf)
 - [Leung 2012] How Older Adults Learn to Use Mobile Devices: Survey and Field Investigations — Leung, Tang, Haddad, McGrenere, Graf & Ingriany, ACM TACCESS 4(3) — 2012 — https://doi.org/10.1145/2399193.2399195
 - [Li 2017d] Date-Input Form Fields: UX Design Guidelines — Angie Li, NN/g — 2017 — https://www.nngroup.com/articles/date-input/
 - [Li 2017s] Using Swipe to Trigger Contextual Actions — Angie Li, NN/g — 2017 — https://www.nngroup.com/articles/contextual-swipe/
 - [Luger 2016] "Like Having a Really Bad PA": The Gulf between User Expectation and Experience of Conversational Agents — Luger & Sellen, CHI — 2016 — https://doi.org/10.1145/2858036.2858288
 - [M1 Empty states] Empty states (patterns) — Material Design v1, legacy — undated — https://m1.material.io/patterns/empty-states.html
-- [M2 Confirmation] Confirmation & acknowledgement — Material Design 2 — undated — https://m2.material.io/design/communication/confirmation-acknowledgement.html ~
+- [M2 Confirmation] Confirmation & acknowledgement — Material Design 2 — undated — https://m2.material.io/design/communication/confirmation-acknowledgement.html (the live page no longer shows its content; read via the Internet Archive capture of 18 Nov 2019: https://web.archive.org/web/20191118144210/https://material.io/design/communication/confirmation-acknowledgement.html)
 - [M3 Bottom sheets] Bottom sheets: guidelines and accessibility — Material Design 3 — current — https://m3.material.io/components/bottom-sheets/guidelines
-- [M3 Buttons] Button (Material Web docs for Material 3) — Google — current — https://github.com/material-components/material-web/blob/main/docs/components/button.md
+- [M3 Buttons] Button (Material Web docs for Material 3) — Google — current — https://github.com/material-components/material-web/blob/main/docs/components/button.md (and the guidelines page, read in a browser: https://m3.material.io/components/buttons/guidelines)
 - [M3 Color roles] Color roles — Material Design 3 — current — https://m3.material.io/styles/color/roles
 - [M3 Dialogs] Dialogs: guidelines and accessibility — Material Design 3 — current — https://m3.material.io/components/dialogs/guidelines
 - [M3 FAB] Floating action button: guidelines and accessibility — Material Design 3 — current — https://m3.material.io/components/floating-action-button/guidelines
 - [M3 Navigation bar] Navigation bar: guidelines — Material Design 3 — current — https://m3.material.io/components/navigation-bar/guidelines
 - [M3 Snackbar] Snackbar: guidelines and accessibility — Material Design 3 — current — https://m3.material.io/components/snackbar/guidelines
-- [M3 Structure] Accessibility designing: structure — Material Design 3 — current — https://m3.material.io/foundations/designing/structure
+- [M3 Structure] Accessibility designing: structure (touch targets ≥ 48 × 48 dp, 8 dp apart) — Material Design 3 — current — https://m3.material.io/foundations/designing/structure
 - [M3 Transitions] Applying transitions — Material Design 3 — current — https://m3.material.io/styles/motion/transitions/applying-transitions
 - [Malkin 2019] Privacy Attitudes of Smart Speaker Users — Malkin et al., PoPETs 2019(4) — 2019 — https://doi.org/10.2478/popets-2019-0068
-- [Markey 2000] Bystander intervention in computer-mediated communication — P. M. Markey, Computers in Human Behavior 16(2) — 2000 — no URL verified †
+- [Markey 2000] Bystander intervention in computer-mediated communication — P. M. Markey, Computers in Human Behavior 16(2):183–188 — 2000 — https://doi.org/10.1016/S0747-5632(99)00056-4 (paywalled; known through secondary sources and a search snippet of the abstract) †
 - [Mathur 2019] Dark Patterns at Scale: Findings from a Crawl of 11K Shopping Websites — Mathur et al., PACM HCI (CSCW) — 2019 — https://arxiv.org/abs/1907.07032
 - [MDC Snackbar] Snackbar (Material Components for Android docs) — Google — current — https://github.com/material-components/material-components-android/blob/master/docs/components/Snackbar.md
 - [Microsoft Speech] Speech interactions (Windows app design) — Microsoft Learn — 2017 — https://learn.microsoft.com/en-us/windows/apps/design/input/speech-interactions
 - [Moran 2016] Reading Content on Mobile Devices — Kate Moran, NN/g — 2016 — https://www.nngroup.com/articles/mobile-content/
 - [Mozilla es] Spanish style guides (es and es-ES) — Mozilla l10n — current — https://github.com/mozilla-l10n/styleguides
-- [Myers 2018] Patterns for How Users Overcome Obstacles in Voice User Interfaces — Myers, Furqan, Nebolsky, Caro & Zhu, CHI — 2018 — https://doi.org/10.1145/3173574.3173580 ‡
-- [Myers 2021] "Try, Try, Try Again": Sequence Analysis of User Interaction Data with a Voice User Interface — Myers et al., CUI — 2021 — https://doi.org/10.1145/3469595.3469613 ‡
+- [Myers 2018] Patterns for How Users Overcome Obstacles in Voice User Interfaces — Myers, Furqan, Nebolsky, Caro & Zhu, CHI, pp. 1–7 — 2018 — https://doi.org/10.1145/3173574.3173580 ‡
+- [Myers 2021] "Try, Try, Try Again": Sequence Analysis of User Interaction Data with a Voice User Interface — Myers, Laris Pardo, Acosta-Ruiz, Canossa & Zhu, CUI, pp. 1–8 — 2021 — https://doi.org/10.1145/3469595.3469613 ‡
 - [NEI 2025] Color Blindness — National Eye Institute (NIH) — 2025 — https://www.nei.nih.gov/learn-about-eye-health/eye-conditions-and-diseases/color-blindness
 - [Neusesser 2023] Error-Message Guidelines — Neusesser & Sunwall, NN/g — 2023 — https://www.nngroup.com/articles/error-message-guidelines/
 - [Neustaedter 2006] "The calendar is crucial": coordination and awareness through the family calendar — Neustaedter, Brush & Greenberg, MSR-TR-2006-107 (later ACM TOCHI 2009) — 2006 — https://www.microsoft.com/en-us/research/wp-content/uploads/2006/07/tr-2006-107.pdf
-- [Neustaedter 2006b] "LINC-ing" the family: the participatory design of an inkable family calendar — Neustaedter & Brush, CHI — 2006 — https://www.microsoft.com/en-us/research/publication/linc-ing-the-family-the-participatory-design-of-an-inkable-family-calendar/ ‡
+- [Neustaedter 2006b] "LINC-ing" the family: the participatory design of an inkable family calendar — Neustaedter & Brush, CHI, pp. 141–150 — 2006 — https://doi.org/10.1145/1124772.1124796 (read via https://www.microsoft.com/en-us/research/wp-content/uploads/2006/04/lincchi2006.pdf)
 - [Nielsen 1993] Response Times: The 3 Important Limits — Jakob Nielsen, NN/g (from *Usability Engineering*) — 1993, updated 2014 — https://www.nngroup.com/articles/response-times-3-important-limits/
 - [Nielsen 1994h] 10 Usability Heuristics for User Interface Design — Jakob Nielsen, NN/g — 1994, wording updated 2020 — https://www.nngroup.com/articles/ten-usability-heuristics/
 - [Nielsen 1994s] Severity Ratings for Usability Problems — Jakob Nielsen, NN/g — 1994 — https://www.nngroup.com/articles/how-to-rate-the-severity-of-usability-problems/
@@ -780,15 +787,14 @@ Keys are listed alphabetically. m3.material.io pages render only in a browser, s
 - [Nielsen 2013] Usability for Senior Citizens: Improved, But Still Lacking — Jakob Nielsen, NN/g — 2013 — https://www.nngroup.com/articles/usability-seniors-improvements/
 - [Nielsen 2017j] Jakob's Law of Internet User Experience (video) — Jakob Nielsen, NN/g — 2017 — https://www.nngroup.com/videos/jakobs-law-internet-ux/
 - [Nielsen 2018c] Confirmation Dialogs Can Prevent User Errors — If Not Overused — Jakob Nielsen, NN/g — 2018 — https://www.nngroup.com/articles/confirmation-dialog/
-- [Nielsen 2022] Best Font for Online Reading: No Single Answer (summarising Wallace et al., ACM TOCHI 2022) — Jakob Nielsen, NN/g — 2022 — https://www.nngroup.com/articles/best-font-for-online-reading/ †
-- [Norman 2010] Gestural interfaces: a step backward in usability — Norman & Nielsen, ACM Interactions 17(5) — 2010 — https://jnd.org/gestural-interfaces-a-step-backwards-in-usability/ ‡
+- [Nielsen 2022] Best Font for Online Reading: No Single Answer (summarising Wallace 2022; the 11% estimate is NN/g's own) — Jakob Nielsen, NN/g — 2022 — https://www.nngroup.com/articles/best-font-for-online-reading/
+- [Norman 2010] Gestural interfaces: a step backwards in usability — Norman & Nielsen, ACM Interactions 17(5):46–49 — 2010 — https://jnd.org/gestural-interfaces-a-step-backwards-in-usability/ (DOI: https://doi.org/10.1145/1836216.1836228)
 - [Nuance Confirm] Requesting confirmation — Nuance Mix best practices (vendor) — undated — https://docs.nuance.com/mix/best-practices/dialog-planning/confirm/
-- [Okoshi 2017] Attention and engagement-awareness in the wild — Okoshi, Tsubouchi, Taji, Ichikawa & Tokuda, IEEE PerCom — 2017 — https://doi.org/10.1109/PERCOM.2017.7917856 ‡
-- [Oviatt 1999] Ten myths of multimodal interaction — Sharon Oviatt, CACM 42(11) — 1999 — https://doi.org/10.1145/319382.319398 †
+- [Okoshi 2017] Attention and engagement-awareness in the wild — Okoshi, Tsubouchi, Taji, Ichikawa & Tokuda, IEEE PerCom, pp. 100–110 — 2017 — https://doi.org/10.1109/PERCOM.2017.7917856 ‡
 - [Pan 2018] Panoptispy: Characterizing Audio and Video Exfiltration from Android Applications — Pan et al., PoPETs 2018(4) — 2018 — https://doi.org/10.1515/popets-2018-0030
-- [Pang 2021] Technology Adoption and Learning Preferences for Older Adults — Pang, Wang, McGrenere, Leung, Dai & Moffatt, CHI — 2021 — https://doi.org/10.1145/3411764.3445702 ‡
-- [Parhi 2006] Target size study for one-handed thumb use on small touchscreen devices — Parhi, Karlson & Bederson, MobileHCI — 2006 — https://doi.org/10.1145/1152215.1152260 ‡
-- [Payne 1993] Understanding calendar use — S. J. Payne, Human–Computer Interaction 8(2) — 1993 — summarised in https://arxiv.org/abs/0809.3447 †
+- [Pang 2021] Technology Adoption and Learning Preferences for Older Adults: Evolving Perceptions, Ongoing Challenges, and Emerging Design Opportunities — Pang, Wang, McGrenere, Leung, Dai & Moffatt, CHI — 2021 — https://doi.org/10.1145/3411764.3445702 (read via the lab's copy: https://www.cs.ubc.ca/labs/edapt/papers/pang2021.pdf)
+- [Parhi 2006] Target size study for one-handed thumb use on small touchscreen devices — Parhi, Karlson & Bederson, MobileHCI, pp. 203–210 — 2006 — https://doi.org/10.1145/1152215.1152260 (read via the HCIL tech report: https://www.cs.umd.edu/hcil/trs/2006-11/2006-11.pdf)
+- [Payne 1993] Understanding calendar use — S. J. Payne, Human–Computer Interaction 8(2):83–100 — 1993 — https://doi.org/10.1207/s15327051hci0802_1 (abstract; its sample size is known only through Tungare 2008) ‡
 - [Pernice 2016a] Hamburger Menus and Hidden Navigation Hurt UX Metrics — Pernice & Budiu, NN/g — 2016 — https://www.nngroup.com/articles/hamburger-menus/
 - [Pernice 2016b] How to Make Navigation (Even a Hamburger) Discoverable on Mobile — Pernice & Budiu, NN/g — 2016 — https://www.nngroup.com/articles/find-navigation-mobile-even-hamburger/
 - [Pernice 2017] F-Shaped Pattern of Reading on the Web: Misunderstood, But Still Relevant (Even on Mobile) — Kara Pernice, NN/g — 2017 — https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/
@@ -798,61 +804,63 @@ Keys are listed alphabetically. m3.material.io pages render only in a browser, s
 - [Pielot 2014] An in-situ study of mobile phone notifications — Pielot, Church & de Oliveira, MobileHCI — 2014 — https://ic.unicamp.br/~oliveira/doc/MHCI2014_An-in-situ-study-of-mobile-phone-notifications.pdf
 - [Pielot 2017] Productive, anxious, lonely: 24 hours without push notifications — Pielot & Rello, MobileHCI — 2017 — https://arxiv.org/abs/1612.02314
 - [Pielot 2018] Dismissed! A detailed exploration of how mobile phone users handle push notifications — Pielot, Vradi & Park, MobileHCI — 2018 — https://www.interruptions.net/literature/Pielot-MobileHCI18.pdf
-- [Piepenbrock 2013] Positive display polarity is advantageous for both younger and older adults — Piepenbrock, Mayr, Mund & Buchner, Ergonomics 56(7) — 2013 — https://doi.org/10.1080/00140139.2013.790485 ‡
+- [Piepenbrock 2013] Positive display polarity is advantageous for both younger and older adults — Piepenbrock, Mayr, Mund & Buchner, Ergonomics 56(7):1116–1124 — 2013 — https://doi.org/10.1080/00140139.2013.790485 ‡
 - [Play Billing subscriptions] About subscriptions (Google Play Billing) — Android Developers — 2026 — https://developer.android.com/google/play/billing/subscriptions
 - [Play Disclosure practices] Best practices for prominent disclosure and consent — Google Play Console Help — undated — https://support.google.com/googleplay/android-developer/answer/11150561
+- [Play Merchant of Record] Merchant of Record (Google is merchant of record in Spain and the rest of the EEA) — Google Play Console Help — current — https://support.google.com/googleplay/android-developer/answer/7645364 (applied by the Developer Distribution Agreement §3.4, effective 15 Sep 2025: https://play.google/developer-distribution-agreement.html)
 - [Play Payments] Payments policy — Google Play Developer Policy Center — undated — https://support.google.com/googleplay/android-developer/answer/9858738
 - [Play Permissions] Permissions and APIs that Access Sensitive Information — Google Play Console Help — undated — https://support.google.com/googleplay/android-developer/answer/9888170
 - [Play Subscriptions] Subscriptions policy — Google Play Developer Policy Center — undated — https://support.google.com/googleplay/android-developer/answer/9900533
 - [Play Target API] Target API level requirements for Google Play apps — Google Play Console Help — undated — https://support.google.com/googleplay/android-developer/answer/11926878
-- [Play ToS 2025] Google Play Terms of Service (Spanish version) — Google — 2025 — https://play.google.com/about/play-terms/index.html
+- [Play ToS 2025] Google Play Terms of Service (EEA version, read in Spanish, dated 5 Nov 2025: Google Commerce Limited provides Play content and is the contracting party) — Google — 2025 — https://play.google.com/about/play-terms/index.html
 - [Play User Data] User Data policy — Google Play Developer Policy Center — undated — https://support.google.com/googleplay/android-developer/answer/10144311
 - [Play Vitals help] Monitor your app's technical quality with Android vitals — Google Play Console Help — undated — https://support.google.com/googleplay/android-developer/answer/7385505
-- [Pradhan 2020] Use of Intelligent Voice Assistants by Older Adults with Low Technology Use — Pradhan, Lazar & Findlater, ACM TOCHI — 2020 — https://doi.org/10.1145/3373759 ‡
-- [Raskin 2000] The Humane Interface — Jef Raskin, Addison-Wesley — 2000 — book; known through summaries †
-- [Rensink 1997] To See or Not to See: The Need for Attention to Perceive Changes in Scenes — Rensink, O'Regan & Clark, Psychological Science 8(5) — 1997 — https://doi.org/10.1111/j.1467-9280.1997.tb00427.x ‡
+- [Pradhan 2020] Use of Intelligent Voice Assistants by Older Adults with Low Technology Use — Pradhan, Lazar & Findlater, ACM TOCHI 27(4):1–27 — 2020 — https://doi.org/10.1145/3373759 ‡
+- [Raskin 2000] The Humane Interface — Jef Raskin, Addison-Wesley — 2000 — book with no open copy; known through summaries †
+- [Rensink 1997] To See or Not to See: The Need for Attention to Perceive Changes in Scenes — Rensink, O'Regan & Clark, Psychological Science 8(5):368–373 — 1997 — https://doi.org/10.1111/j.1467-9280.1997.tb00427.x ‡
 - [RevenueCat 2026] State of Subscription Apps 2026 — RevenueCat (vendor) — 2026 — https://www.revenuecat.com/state-of-subscription-apps/
 - [RevenueCat Paywalls] Hard paywall vs soft paywall — Peter Meinertzhagen, RevenueCat (vendor) — 2023 — https://www.revenuecat.com/blog/growth/hard-paywall-vs-soft-paywall/
-- [Robotham 2016] Using digital notifications to improve attendance in clinic — Robotham, Satkunanathan, Reynolds, Stahl & Wykes, BMJ Open 6(10) — 2016 — https://europepmc.org/article/MED/27798006 ‡
+- [Robotham 2016] Using digital notifications to improve attendance in clinic: systematic review and meta-analysis — Robotham, Satkunanathan, Reynolds, Stahl & Wykes, BMJ Open 6(10):e012116 — 2016 — https://doi.org/10.1136/bmjopen-2016-012116 (full text via Europe PMC: https://europepmc.org/article/MED/27798006)
 - [Rosala 2019] 3 Design Considerations for Effective Mobile-App Permission Requests — Maria Rosala, NN/g — 2019 — https://www.nngroup.com/articles/permission-requests/
 - [Rosala 2020] User Control and Freedom (Usability Heuristic #3) — Maria Rosala, NN/g — 2020 — https://www.nngroup.com/articles/user-control-and-freedom/
 - [Rosala 2023] Deceptive Patterns in UX — Maria Rosala, NN/g — 2023 — https://www.nngroup.com/articles/deceptive-patterns/
 - [Ruan 2017] Comparing Speech and Keyboard Text Entry for Short Messages in Two Languages on Touchscreen Phones — Ruan, Wobbrock, Liou, Ng & Landay, PACM IMWUT 1(4) — 2017 — https://doi.org/10.1145/3161187
-- [Schaub 2015] A Design Space for Effective Privacy Notices — Schaub, Balebako, Durity & Cranor, SOUPS — 2015 — https://www.usenix.org/conference/soups2015/proceedings/presentation/schaub ‡
-- [Scheibehenne 2010] Can There Ever Be Too Many Options? A Meta-Analytic Review of Choice Overload — Scheibehenne, Greifeneder & Todd, Journal of Consumer Research 37(3) — 2010 — https://doi.org/10.1086/651235 ‡
+- [Schaub 2015] A Design Space for Effective Privacy Notices — Schaub, Balebako, Durity & Cranor, SOUPS, pp. 1–17 — 2015 — https://www.usenix.org/system/files/conference/soups2015/soups15-paper-schaub.pdf
+- [Scheibehenne 2010] Can There Ever Be Too Many Options? A Meta-Analytic Review of Choice Overload — Scheibehenne, Greifeneder & Todd, Journal of Consumer Research 37(3) (63 conditions from 50 experiments, N = 5,036; mean D = 0.02) — 2010 — https://doi.org/10.1086/651235 (read via https://archive-ouverte.unige.ch/unige:76440)
 - [Sherwin 2014pl] Placeholders in Form Fields Are Harmful — Katie Sherwin, NN/g — 2014 — https://www.nngroup.com/articles/form-design-placeholders/
 - [Sherwin 2014pr] Progress Indicators Make a Slow System Less Insufferable — Katie Sherwin, NN/g — 2014 — https://www.nngroup.com/articles/progress-indicators/
 - [Shneiderman 2000] The Limits of Speech Recognition — Ben Shneiderman, CACM 43(9) — 2000 — https://doi.org/10.1145/348941.348990
 - [Smetters 2009] How users use access control — Smetters & Good, SOUPS — 2009 — https://cups.cs.cmu.edu/soups/2009/proceedings/a15-smetters.pdf
 - [Softcatalà] Guia d'estil — Softcatalà — undated — https://www.softcatala.org/guia-estil-de-softcatala/tota-la-guia/
-- [Spencer 2000] The streamlined cognitive walkthrough method — Rick Spencer, CHI — 2000 — https://doi.org/10.1145/332040.332456 ‡
-- [Steiner 2018] Optimizing number and timing of appointment reminders: a randomized trial — Steiner, Shainline, Dahlgren, Kroll & Xu, American Journal of Managed Care 24(8) — 2018 — https://www.ajmc.com/view/optimizing-number-and-timing-of-appointment-reminders-a-randomized-trial ‡
+- [Spencer 2000] The streamlined cognitive walkthrough method, working around social constraints encountered in a software development company — Rick Spencer, CHI, pp. 353–359 — 2000 — https://doi.org/10.1145/332040.332456 (read via a course copy of the ACM PDF: http://facweb.cs.depaul.edu/cmiller/eval/p353-spencer.pdf)
+- [Steiner 2018] Optimizing number and timing of appointment reminders: a randomized trial — Steiner, Shainline, Dahlgren, Kroll & Xu, American Journal of Managed Care 24(8):377–384 — 2018 — https://www.ajmc.com/view/optimizing-number-and-timing-of-appointment-reminders-a-randomized-trial
 - [Stivers 2009] Universals and cultural variation in turn-taking in conversation — Stivers et al., PNAS 106(26) — 2009 — https://doi.org/10.1073/pnas.0903616106
-- [Stothart 2015] The attentional cost of receiving a cell phone notification — Stothart, Mitchum & Yehnert, J. Exp. Psychology: HPP 41(4) — 2015 — https://europepmc.org/article/MED/26121498 ‡
-- [Suhm 2001] Multimodal error correction for speech user interfaces — Suhm, Myers & Waibel, ACM TOCHI 8(1) — 2001 — https://doi.org/10.1145/371127.371166
-- [Sweller 1988] Cognitive load during problem solving: effects on learning — John Sweller, Cognitive Science 12(2) — 1988 — https://doi.org/10.1207/s15516709cog1202_4 ‡
-- [Syrek 2017] Zeigarnik's sleepless nights — Syrek, Weigelt, Peifer & Antoni, Journal of Occupational Health Psychology 22(2) — 2017 — https://research.uni-luebeck.de/en/publications/zeigarniks-sleepless-nights-how-unfinished-tasks-at-the-end-of-th/ ‡
-- [Tan 2014] The effect of developer-specified explanations for permission requests on smartphone user behavior — Tan et al., CHI — 2014 — reported in Rosala 2019 †
+- [Stothart 2015] The attentional cost of receiving a cell phone notification — Stothart, Mitchum & Yehnert, J. Exp. Psychology: HPP 41(4):893–897 — 2015 — https://doi.org/10.1037/xhp0000100 (abstract: https://europepmc.org/article/MED/26121498) ‡
+- [Suhm 2001] Multimodal error correction for speech user interfaces — Suhm, Myers & Waibel, ACM TOCHI 8(1):60–98 — 2001 — https://doi.org/10.1145/371127.371166
+- [Sweller 1988] Cognitive load during problem solving: effects on learning — John Sweller, Cognitive Science 12(2):257–285 — 1988 — https://doi.org/10.1207/s15516709cog1202_4 ‡
+- [Syrek 2017] Zeigarnik's sleepless nights — Syrek, Weigelt, Peifer & Antoni, Journal of Occupational Health Psychology 22(2):225–238 — 2017 — https://doi.org/10.1037/ocp0000031 (abstract: https://research.uni-luebeck.de/en/publications/zeigarniks-sleepless-nights-how-unfinished-tasks-at-the-end-of-th/) ‡
+- [Tan 2014] The effect of developer-specified explanations for permission requests on smartphone user behavior — Tan et al., CHI, pp. 91–100 — 2014 — https://doi.org/10.1145/2556288.2557400 (read via the authors' copy: https://people.eecs.berkeley.edu/~daw/papers/perm-chi14.pdf)
 - [Tankala 2023] Skeleton Screens 101 — Samhita Tankala, NN/g — 2023 — https://www.nngroup.com/articles/skeleton-screens/
-- [Thompson 2005] Feature Fatigue: When Product Capabilities Become Too Much of a Good Thing — Thompson, Hamilton & Rust, Journal of Marketing Research 42(4) — 2005 — https://doi.org/10.1509/jmkr.2005.42.4.431 ‡
-- [Trajkova 2020] "Alexa is a Toy": Exploring Older Adults' Reasons for Using, Limiting, and Abandoning Echo — Trajkova & Martin-Hammond, CHI — 2020 — https://doi.org/10.1145/3313831.3376760 ‡
+- [Thompson 2005] Feature Fatigue: When Product Capabilities Become Too Much of a Good Thing — Thompson, Hamilton & Rust, Journal of Marketing Research 42(4):431–442 — 2005 — https://doi.org/10.1509/jmkr.2005.42.4.431 ‡
+- [Trajkova 2020] "Alexa is a Toy": Exploring Older Adults' Reasons for Using, Limiting, and Abandoning Echo — Trajkova & Martin-Hammond, CHI, pp. 1–13 — 2020 — https://doi.org/10.1145/3313831.3376760 ‡
 - [Tungare 2008] An Exploratory Study of Calendar Use — Tungare, Pérez-Quiñones & Sams, arXiv — 2008 — https://arxiv.org/abs/0809.3447
 - [Unicode UCD] Unicode Character Database 15.1 (U+0140, U+00B7) — Unicode, read locally — 2023 — https://www.unicode.org/ucd/
-- [Vertanen 2008] On the benefits of confidence visualization in speech recognition — Vertanen & Kristensson, CHI — 2008 — https://keithv.com/pub/confshade/ ‡
+- [Vertanen 2008] On the benefits of confidence visualization in speech recognition — Vertanen & Kristensson, CHI, pp. 1497–1500 — 2008 — https://doi.org/10.1145/1357054.1357288 (read via https://keithv.com/pub/confshade/conf_vis_speech_rec.pdf)
 - [Viget 2017] A Bone to Pick with Skeleton Screens — Faulkner & Olvera, Viget (agency; not peer-reviewed) — 2017 — https://viget.com/articles/a-bone-to-pick-with-skeleton-screens
-- [Vipperla 2010] Ageing voices: the effect of changes in voice parameters on ASR performance — Vipperla, Renals & Frankel, EURASIP Journal on Audio, Speech, and Music Processing — 2010 — https://doi.org/10.1155/2010/525783 ‡
-- [Visa OTP] One-time passcode pattern — Visa Design System (vendor) — undated — https://design.visa.com/patterns/one-time-passcode/ ~
-- [von Restorff 1933] Über die Wirkung von Bereichsbildungen im Spurenfeld — Hedwig von Restorff, Psychologische Forschung 18 — 1933 — classic; not re-checked in this round
+- [Vipperla 2010] Ageing voices: the effect of changes in voice parameters on ASR performance — Vipperla, Renals & Frankel, EURASIP Journal on Audio, Speech, and Music Processing, article 525783 — 2010 — https://doi.org/10.1155/2010/525783 (the published abstract gives 10 points; the authors' preprint, read in full, gives 9.3: https://era.ed.ac.uk/handle/1842/4658)
+- [Visa OTP] One-time passcode pattern (supports paste and autofill; keeps a submit button) — Visa Design System (vendor) — undated — https://design.visa.com/patterns/one-time-passcode/
+- [von Restorff 1933] Über die Wirkung von Bereichsbildungen im Spurenfeld — Hedwig von Restorff, Psychologische Forschung 18(1):299–342 — 1933 — https://doi.org/10.1007/BF02409636 (bibliographic details checked; the content is known second-hand) †
 - [W3C Mobile 2015] Mobile Accessibility: How WCAG 2.0 and Other W3C/WAI Guidelines Apply to Mobile (First Public Working Draft) — W3C — 2015 — https://www.w3.org/TR/mobile-accessibility-mapping/
 - [W3C Text size] Text size in translation — W3C Internationalization — undated — https://www.w3.org/International/articles/article-text-size.en
+- [Wallace 2022] Towards Individuated Reading Experiences: Different Fonts Increase Reading Speed for Different Individuals — Wallace et al., ACM TOCHI 29(4), Article 38 — 2022 — https://doi.org/10.1145/3502222 (read via the author copy: https://jeffhuang.com/papers/Readability_TOCHI22.pdf)
 - [WCAG 2.2] Web Content Accessibility Guidelines 2.2 — W3C Recommendation (2023; edition of 12 Dec 2024), with its Understanding documents — 2024 — https://www.w3.org/TR/WCAG22/
 - [WCAG2ICT 2025] Guidance on Applying WCAG 2 to Non-Web Information and Communications Technologies — W3C Group Note — 2025 — https://www.w3.org/TR/wcag2ict-22/
 - [Weber 2018] Snooze! Investigating the user-defined deferral of mobile notifications — Weber, Voit, Auda, Schneegass & Henze, MobileHCI — 2018 — https://www.interruptions.net/literature/Weber-MobileHCI18.pdf
-- [Wharton 1994] The cognitive walkthrough method: a practitioner's guide — Wharton, Rieman, Lewis & Polson, in *Usability Inspection Methods* (Wiley) — 1994 — book chapter †
-- [White 2019] Task completion detection — White, Hassan Awadallah & Sim, SIGIR — 2019 — https://www.microsoft.com/en-us/research/publication/task-completion-detection/ ‡
+- [Wharton 1994] The cognitive walkthrough method: a practitioner's guide — Wharton, Rieman, Lewis & Polson, in Nielsen & Mack (eds.), *Usability Inspection Methods* (Wiley), pp. 105–140 — 1994 — book chapter; the four questions are known through Spencer 2000, Table 1 †
+- [White 2019] Task Completion Detection: A Study in the Context of Intelligent Systems — White, Hassan Awadallah & Sim, SIGIR, pp. 405–414 — 2019 — https://doi.org/10.1145/3331184.3331187 (summary: https://www.microsoft.com/en-us/research/publication/task-completion-detection/) ‡
 - [Whitenton 2014] 3 Guidelines for Search Engine "No Results" Pages — Kathryn Whitenton, NN/g — 2014 — https://www.nngroup.com/articles/search-no-results-serp/
-- [Wilson 2001] Reducing everyday memory and planning problems by means of a paging system — Wilson, Emslie, Quirk & Evans, J. Neurol. Neurosurg. Psychiatry 70(4) — 2001 — https://pmc.ncbi.nlm.nih.gov/articles/PMC1737307 ‡
-- [Wohl 2010] I forgive myself, now I can study — Wohl, Pychyl & Bennett, Personality and Individual Differences 48(7) — 2010 — https://bps.org.uk/research-digest/cure-procrastination-forgive-yourself †
-- [WP260 2018] Guidelines on transparency under Regulation 2016/679 (WP260 rev.01) — Article 29 Working Party, endorsed by the EDPB — 2018 — https://ec.europa.eu/newsroom/article29/items/622227/en
+- [Wilson 2001] Reducing everyday memory and planning problems by means of a paging system — Wilson, Emslie, Quirk & Evans, J. Neurol. Neurosurg. Psychiatry 70(4):477–482 — 2001 — https://doi.org/10.1136/jnnp.70.4.477 (PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC1737307) ‡
+- [Wohl 2010] I forgive myself, now I can study — Wohl, Pychyl & Bennett, Personality and Individual Differences 48(7):803–808 — 2010 — https://doi.org/10.1016/j.paid.2010.01.029 (paywalled; known through the BPS Research Digest: https://bps.org.uk/research-digest/cure-procrastination-forgive-yourself) †
+- [WP260 2018] Guidelines on transparency under Regulation 2016/679 (WP260 rev.01; adopted 29 Nov 2017, revised 11 Apr 2018) — Article 29 Working Party, endorsed by the EDPB on 25 May 2018 — 2018 — https://ec.europa.eu/newsroom/article29/items/622227/en
 - [Wroblewski 2009] Inline Validation in Web Forms — Luke Wroblewski, A List Apart — 2009 — https://alistapart.com/article/inline-validation-in-web-forms/
 - [Yankelovich 1995] Designing SpeechActs: issues in speech user interfaces — Yankelovich, Levow & Marx, CHI — 1995 — https://doi.org/10.1145/223904.223952
