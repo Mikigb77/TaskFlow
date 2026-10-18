@@ -29,7 +29,10 @@ How the loop runs until he's back:
 
   The server goes first.
 - **D10 — «Abrir el correo»:** not now.
-- **D11 — does the commands flag slow every dictation?** Staging can't be used without a deploy, so the main session measures it locally with the real model, then decides together with UX-616.
+- **D11 — does the commands flag slow every dictation?** No. The flag stays on for every dictation.
+  - Measured locally on 2026-10-18, because staging would need a deploy: the real free model (`gemma-4-26b-a4b-it` on AI Studio), 12 one-task Spanish dictations each way, alternated, with no failures. This is the server's extraction time only, without transcription or the phone's network.
+  - With commands: median 3.5 s, p95 3.8 s. Without: median 4.3 s, p95 4.6 s.
+  - All 24 gave one task and no false commands.
 
 **Other open items, decided:**
 - **Cleaning up completed tasks** (the owner floated 1 month on free, 3 months on Pro): **none for now**, so nothing is ever deleted on its own.
