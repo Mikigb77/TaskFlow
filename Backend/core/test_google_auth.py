@@ -158,3 +158,43 @@ class GoogleAuthTests(TestCase):
         result = self.client.post('/api/auth/google/', {'id_token': self.token(), 'timezone': 'Not/AZone'}, format='json')
         self.assertEqual(result.status_code, 400)
         self.transport.assert_not_called()
+
+    def test_a_new_account_takes_its_first_name_from_google(self):
+        result = self.login(given_name='Ana', family_name='García', name='Ana García')
+        self.assertEqual(result.status_code, 200, result.data)
+        self.assertEqual(result.data['user']['first_name'], 'Ana')
+        user = User.objects.get()
+        self.assertEqual((user.first_name, user.last_name), ('Ana', ''))
+
+    def test_google_name_falls_back_to_the_full_name_and_is_tidied(self):
+        cases = [({'name': '  Paul  Smith '}, 'Paul Smith'), ({'given_name': ' ', 'name': 'Paul'}, 'Paul'),
+                 ({'given_name': 'x' * 300}, 'x' * 150), ({'given_name': 42}, ''), ({}, '')]
+        for claims, expected in cases:
+            with self.subTest(claims=claims):
+                User.objects.all().delete()
+                cache.clear()
+                result = self.login(**claims)
+                self.assertEqual(result.status_code, 200, result.data)
+                self.assertEqual(User.objects.get().first_name, expected)
+
+    def test_a_nameless_account_gets_googles_name_but_a_name_is_never_replaced(self):
+        self.assertEqual(self.login().status_code, 200)
+        self.assertEqual(User.objects.get().first_name, '')
+        self.login(given_name='Ana')
+        self.assertEqual(User.objects.get().first_name, 'Ana')
+        renamed = self.login(given_name='Anita')
+        self.assertEqual(renamed.data['user']['first_name'], 'Ana')
+        self.assertEqual(User.objects.get().first_name, 'Ana')
+
+    def test_linking_google_names_only_a_nameless_account(self):
+        nameless = User.objects.create_user('person@example.invalid', PASSWORD)
+        named = User.objects.create_user('named@example.invalid', PASSWORD, first_name='Paco')
+        cases = [(nameless, self.token(given_name='Ana'), 'Ana'),
+                 (named, self.token(sub='google-subject-2', email='named@example.invalid', given_name='Francisco'), 'Paco')]
+        for user, token, expected in cases:
+            with self.subTest(user=user.email):
+                self.client.force_authenticate(user)
+                result = self.client.post('/api/auth/google/link/', {'id_token': token, 'password': PASSWORD}, format='json')
+                self.assertEqual(result.status_code, 200, result.data)
+                self.assertEqual(result.data['first_name'], expected)
+                self.assertEqual(User.objects.get(pk=user.pk).first_name, expected)

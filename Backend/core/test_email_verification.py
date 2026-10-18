@@ -454,15 +454,15 @@ class GoogleVerificationTests(VerificationTestCase):
         certificates = type("CertResponse", (), {"status": 200, "data": self.certificates})()
         self.enterContext(patch("core.google_auth.Request")).return_value.return_value = certificates
 
-    def token(self, email=EMAIL):
+    def token(self, email=EMAIL, **claims):
         now = int(time.time())
         return jwt.encode(self.signer, {
             "iss": "https://accounts.google.com", "aud": AUDIENCE, "iat": now - 1, "exp": now + 300,
-            "sub": "google-subject-1", "email": email, "email_verified": True}).decode()
+            "sub": "google-subject-1", "email": email, "email_verified": True, **claims}).decode()
 
-    def google(self, email=EMAIL):
-        return self.client.post("/api/auth/google/", {"id_token": self.token(email), "timezone": "Europe/Madrid"},
-                                format="json")
+    def google(self, email=EMAIL, **claims):
+        return self.client.post("/api/auth/google/", {"id_token": self.token(email, **claims),
+                                                      "timezone": "Europe/Madrid"}, format="json")
 
     def test_a_google_account_counts_as_verified(self):
         response = self.google()
@@ -484,6 +484,12 @@ class GoogleVerificationTests(VerificationTestCase):
         self.assertEqual(GoogleIdentity.objects.get().user_id, user.pk)
         self.assertFalse(EmailVerification.objects.exists())
         self.assertEqual(self.login().status_code, 401)
+
+    def test_google_names_the_sign_up_it_claims_with_its_own_name(self):
+        self.register(first_name="Somebody else")
+        response = self.google(given_name="Ana")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(User.objects.get().first_name, "Ana")
 
     def test_google_never_claims_a_confirmed_account(self):
         User.objects.create_user(EMAIL, PASSWORD, email_verified=True)
