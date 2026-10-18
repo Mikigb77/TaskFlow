@@ -96,7 +96,16 @@ WSL: rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-render
   - the link preview.
 
   On 2026-10-18 that was 550 PNGs, 446 focus screenshots and 103 ARIA snapshots.
-- **Safari:** with Playwright's WebKit installed in WSL, the same command adds first-viewport renders in WebKit on the iPhone 13 profile. It isn't installed, and installing it is the owner's call: `npx playwright install webkit` downloads about 107 MB, and WSL here runs Kali Linux, where Playwright's `install-deps` can't find WebKit's libraries (it only knows Ubuntu), so they would need installing by hand with `sudo`.
+- **Safari's engine (WebKit), from Windows, after the renders above.** Those start by deleting `artifacts/ux-web/`, so WebKit goes second. WSL here can't run Playwright's WebKit (its libraries aren't packaged for this Kali Linux), so it runs on Windows with Playwright for Python, in `C:\Users\mikig\.taskflow-tools\webkit`, set up on 2026-10-18.
+  1. **Serve the build from WSL** as a background Bash job: `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && exec npm run start'`. A server started with `nohup` dies when its `wsl` call returns.
+  2. **Render.** Once http://localhost:3000 answers from Windows, run `C:\Users\mikig\.taskflow-tools\webkit\venv\Scripts\python.exe -X utf8 .claude/ux-web/webkit_renders.py`. It takes about 2 minutes and writes 112 PNGs to `artifacts/ux-web/webkit/`, with an `INDEX.md` that lists any console errors.
+  3. **Stop the server.**
+  4. **If the tools folder is missing,** rebuild it:
+     - create it with `python -m venv C:\Users\mikig\.taskflow-tools\webkit\venv`;
+     - install Playwright with `…\venv\Scripts\python.exe -m pip install playwright`;
+     - install WebKit with `PLAYWRIGHT_BROWSERS_PATH=C:\Users\mikig\.taskflow-tools\webkit\browsers …\venv\Scripts\python.exe -m playwright install webkit`.
+
+     Don't put it under `AppData\Local`, because the Store's Python silently redirects it there.
 - If the build or a render fails, mention it but keep going: renders are evidence, not a gate. A failing build is itself something to tell the owner.
 
 ## 5. Review and plan — workflow `ux-web-review`
