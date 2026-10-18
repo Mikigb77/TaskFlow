@@ -23,7 +23,7 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
      - **B** — calendar, home and tasks;
      - **C** — lists, notes, groups and sharing;
      - **D** — first run, sign-in, settings, notifications, native surfaces and theme.
-2. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder.
+2. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder. It reviews against `GUIDELINES.md` and cites its rule IDs.
 3. **Plan.** `ux-organizer` (Opus, max effort):
    - merges duplicates;
    - sends product decisions to you;
@@ -51,6 +51,7 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
 |---|---|
 | `ISSUES.md` | Every issue and its current status. |
 | `DECISIONS.md` | Your decisions. Every agent reads it first. |
+| `GUIDELINES.md` | The research-backed guide the reviewer reviews against: checkable rules with IDs, evidence strength and sources. |
 | `KNOWN_FAILURES.md` | Checks that were already failing before the loop started. |
 | `runs/<run id>/` | One run: `review-*.md`, `plan.md`, `plan.json`, `verify-*.md`, `report.md`. |
 | `ux.sh` | The snapshot helper (`refs/ux-review/last`). It never touches your branch or files. |
