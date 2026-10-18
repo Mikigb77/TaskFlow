@@ -149,11 +149,11 @@ The site may only say what the app does today, in the words the app uses.
 
 # Checklist — every finding maps to one of these lenses
 
-GUIDELINES.md holds the research and sources behind them; cite from it.
+GUIDELINES.md holds the research and sources behind them; cite its rule IDs and sources. Where a lens below and the guide differ, the guide wins.
 
 **A. First impression**
 - In the first viewport, on a phone and on desktop: what TaskFlow is, who it's for, why it matters to them, and the one next step.
-- The newcomer gets it in about five seconds, without scrolling.
+- The newcomer gets it at a glance, without scrolling. Use the five-second test as a test, not a law: it's a practitioner convention, and dwell-time data put the critical window at about 10 s (AT-7).
 
 **B. Desire**
 - Benefits before features, as concrete outcomes in the visitor's own words.
@@ -176,7 +176,7 @@ GUIDELINES.md holds the research and sources behind them; cite from it.
 **F. Scanning and hierarchy**
 - Headings and lines front-load the words that matter; paragraphs are short.
 - One accent colour; size and weight follow importance; one idea per section.
-- What the visitor came for sits above the fold.
+- What the visitor came for sits above the fold. The 57% / 74% figures are desktop data; for phones cite Lagun 2014 (about 70% of gaze on the top half) (AT-1, AT-2).
 
 **G. Copy and language**
 - Plain, specific, and natural in Spanish, Catalan and English; never a literal translation.
@@ -189,27 +189,28 @@ GUIDELINES.md holds the research and sources behind them; cite from it.
 
 **I. Trust and legal**
 - Who runs TaskFlow, privacy, terms and contact are reachable from every page.
-- Account deletion is findable in one step, in each language (Google Play requires a deletion link).
+- Account deletion is findable in one step, in each language. Google Play requires a deletion link, and that the page names the app or developer as on the listing, works without reinstalling the app, and says what is deleted and what is kept (PV-7).
 - A plain summary comes before the legal text; no dark patterns.
 - What the site says about data matches the privacy policy and the app.
 
 **J. Phone and touch**
-- The primary action is within thumb reach; targets are at least 44–48 px, never under 24 px (WCAG 2.2, 2.5.8).
+- The primary action is easy to reach and to hit. Don't cite thumb-zone maps (opinion): taps are most accurate at the centre, about 7 mm, and least at the corners, about 12 mm (Hoober 2017; CT-8).
+- Targets are at least 44–48 px: TaskFlow's bar, from WCAG 2.5.5 (AAA, 44 px), Apple (44 pt) and Android (48 dp). WCAG 2.5.8 (AA) asks only 24 × 24 px and has exceptions, so links inside sentences aren't 2.5.8 failures (CT-6).
 - No horizontal scrolling at 320 px; sticky elements never cover content; the menu works one-handed.
 
 **K. Accessibility (WCAG 2.2 AA)**
-- Contrast 4.5:1 for text, 3:1 for large text and controls, in light **and** dark.
-- Visible focus and a logical order; landmarks; one `h1` and a sensible heading outline; `alt` text that says what the image shows.
-- Reflow at 320 CSS px and text at 200% without loss; reduced motion respected; never colour alone.
+- Contrast 4.5:1 for text, 3:1 for large text (≥ 24 CSS px, or ≥ 18.5 px bold), in light **and** dark; ratios aren't rounded. 1.4.11 asks 3:1 only for what identifies a control or its state, so a ghost button can pass and still be a weak signifier (AX-2, CT-5).
+- Visible focus and a logical order; landmarks; a sensible heading outline (1.3.1) with descriptive headings (2.4.6), one `h1` by convention, not by WCAG (AX-5); `alt` text that says what the image shows.
+- Reflow at 320 CSS px and text at 200% without loss; never colour alone. Motion: at level A, anything moving over 5 s can be paused (2.2.2) and nothing flashes (2.3.1). Respecting reduced motion is TaskFlow's policy; cite it as AAA (2.3.3), not AA (AX-7).
 - `lang` set correctly on every page and on any passage in another language.
 
 **L. Speed and feedback**
 - The first viewport appears quickly: hero image, fonts, no layout shift.
-- The demos show progress beyond about 1 s, and give an explanation and a way forward beyond about 10 s.
+- The demos show progress beyond about 1 s, and give an explanation and a way forward beyond about 10 s (Nielsen's 1993 rules of thumb). Page loading is judged by Core Web Vitals at the 75th percentile: LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1 (PF-1, PF-8).
 - Nothing waits without saying why.
 
 **M. Search and sharing**
-- Each page and language has its own title, description, canonical URL, `hreflang` alternates and `lang`.
+- Each page and language has its own title, description, canonical URL, `hreflang` alternates with `x-default`, and `lang`. Google detects a page's language from its visible text, so tags can't fix untranslated text; `lang` is for assistive technology (3.1.1) (ML-2, ML-3, ML-5).
 - A link preview (image and text) that sells, in the page's language.
 - Indexing is off on purpose until launch; don't report it.
 
