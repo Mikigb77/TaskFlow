@@ -2,14 +2,36 @@
 // filters by person in one row of chips, «Todas · Para mí · Ana · Paul…»,
 // in place of «Para mí» and «Todas». People come from the project's people
 // list; a personal project shows nothing.
+//
+// 2026-10-18-commands, P131 (UX-1101): the chips wrap onto two rows, and
+// Tareas completadas moved into the app bar to pay for the second row.
+// Before the change, the first task row's top on a shared project page with
+// two tasks and «Ana» and «Paul» as other editors, ES, Manrope (AppTheme.light):
+//   2× text on 320×640: 420.0 dp
+//   1.3× text on 393×851: 393.0 dp
+// After it: 418.0 dp (two chip rows) and 329.0 dp (one row) — no lower.
+//
+// 2026-10-18-commands, P145 (UX-1214): the chosen chip shows ✓ again, and
+// every chip in the people row and the «Todas»/«Para mí» pair has 4 dp side
+// padding (Material's is 8) to pay for it. Manrope, 2× text on 320 dp, the
+// selected «Todas» + 8 + «Para mí», against the 272 dp the page leaves:
+//   ES «Todas» + «Para mí»: 147.1 + 8 + 125.9 = 281.0 dp with Material's
+//     padding; 139.1 + 8 + 117.9 = 265.0 dp with 4 dp — fits.
+//   CA «Totes» + «Per a mi»: 141.9 + 8 + 132.8 = 282.7 dp with Material's
+//     padding; 133.9 + 8 + 124.8 = 266.7 dp with 4 dp — fits.
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:agenda/widgets/task_tile.dart';
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -98,6 +120,10 @@ void main() {
     String language = 'es',
     Size size = const Size(390, 844),
     double textScale = 1,
+    // The app's own theme (Manrope), where a test measures.
+    ThemeData? theme,
+    // Another screen instead of the project's page.
+    Widget? home,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -116,6 +142,8 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          theme: theme,
+          routes: {'/completedTasks': (_) => const CompletedTasksScreen()},
           locale: Locale(language),
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -125,7 +153,7 @@ void main() {
             ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: HomeScreen(isRoot: false, listId: id),
+          home: home ?? HomeScreen(isRoot: false, listId: id),
         ),
       ),
     );
@@ -152,7 +180,7 @@ void main() {
   }
 
   testWidgets(
-    'a shared project with 2 or more people shows one row: Todas · Para mí · Ana · Paul, in that order, with no chip for a viewer; Todas is chosen and lists every task',
+    'a shared project with 2 or more people shows Todas · Para mí · Ana · Paul, in that order, with no chip for a viewer; Todas is chosen and lists every task',
     (tester) async {
       await openProject(tester);
       expect(row(), findsOneWidget);
@@ -191,12 +219,11 @@ void main() {
       expect(find.widgetWithText(ChoiceChip, es.forTeam), findsOneWidget);
       expect(chosen(tester, 'people-all'), isTrue);
       expect(listed(tester), hasLength(4));
-      // All the chips sit on one line.
-      final tops = {
-        for (final key in ['people-all', 'people-me', 'people-2', 'people-3'])
-          tester.getRect(chip(key)).top,
-      };
-      expect(tops, hasLength(1));
+      // Every chip shows on the screen, without a drag.
+      for (final key in ['people-all', 'people-me', 'people-2', 'people-3']) {
+        expect(chip(key).hitTestable(), findsOneWidget);
+        expect(tester.getRect(chip(key)).right, lessThanOrEqualTo(390.5));
+      }
       expect(tester.takeException(), isNull);
     },
   );
@@ -397,6 +424,496 @@ void main() {
       },
     );
   }
+
+  // ---- Run 2026-10-18-commands, P131: UX-1101, UX-1108, UX-1110 ----
+
+  /// The first two ChoiceChips on screen, by their text, top to bottom.
+  List<String> firstTwoChips(WidgetTester tester) {
+    final chips = find.byType(ChoiceChip);
+    return [
+      for (var i = 0; i < 2; i++)
+        tester
+            .widgetList<Text>(
+              find.descendant(of: chips.at(i), matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? '')
+            .join(),
+    ];
+  }
+
+  for (final language in ['es', 'ca']) {
+    final l = lookupAppLocalizations(Locale(language));
+    testWidgets(
+      'UX-1108: Todas first, then Para mí, on Calendar, on the Tareas root, on a shared project whose others are viewers, and on one with two other editors ($language)',
+      (tester) async {
+        await openProject(
+          tester,
+          language: language,
+          home: const CalendarScreen(),
+        );
+        expect(firstTwoChips(tester), [l.forTeam, l.forMe]);
+        await tester.pumpWidget(const SizedBox());
+
+        await openProject(tester, language: language, home: const HomeScreen());
+        expect(firstTwoChips(tester), [l.forTeam, l.forMe]);
+        await tester.pumpWidget(const SizedBox());
+
+        await openProject(
+          tester,
+          language: language,
+          projects: [
+            familia(people: const [miki, vera]),
+          ],
+        );
+        expect(row(), findsNothing);
+        expect(firstTwoChips(tester), [l.forTeam, l.forMe]);
+        await tester.pumpWidget(const SizedBox());
+
+        await openProject(tester, language: language);
+        expect(firstTwoChips(tester), [l.forTeam, l.forMe]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1108: the chips read Todas and Para mí in Spanish, Totes and Per a mi in Catalan',
+    (tester) async {
+      expect([es.forTeam, es.forMe], ['Todas', 'Para mí']);
+      expect([ca.forTeam, ca.forMe], ['Totes', 'Per a mi']);
+    },
+  );
+
+  testWidgets(
+    'UX-1110: Ana’s chip is named «Tareas de Ana»-style for TalkBack and reports selected once tapped; the people row’s Todas is «Todas las tareas»; the visible text doesn’t change',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openProject(tester);
+      SemanticsFinder named(String label) => find.semantics.byPredicate(
+        (node) => node.label == label || node.label.startsWith('$label\n'),
+      );
+      SemanticsData chipData(String key) =>
+          tester.getSemantics(chip(key)).getSemanticsData();
+      expect(chipData('people-2').label, es.commandFindPerson('Ana'));
+      expect(chipData('people-all').label, es.allTasks);
+      expect(es.allTasks, 'Todas las tareas');
+      expect(named(es.commandFindPerson('Ana')), findsOne);
+      expect(named(es.commandFindPerson('Paul')), findsOne);
+      expect(
+        chipData('people-2').flagsCollection.isSelected,
+        isNot(Tristate.isTrue),
+      );
+      expect(
+        chipData('people-all').flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+      // What shows stays the same.
+      expect(
+        find.descendant(of: chip('people-2'), matching: find.text('Ana')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: chip('people-all'),
+          matching: find.text(es.forTeam),
+        ),
+        findsOneWidget,
+      );
+      await choose(tester, 'people-2');
+      expect(chipData('people-2').flagsCollection.isSelected, Tristate.isTrue);
+      expect(chipData('people-2').label, es.commandFindPerson('Ana'));
+      expect(
+        chipData('people-all').flagsCollection.isSelected,
+        isNot(Tristate.isTrue),
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'UX-1101: on a project page Tareas completadas is an app-bar action that opens Tareas completadas, and no header row holds only that button',
+    (tester) async {
+      await openProject(tester);
+      final completed = find.byTooltip(es.completedTasks);
+      expect(completed, findsOneWidget);
+      expect(
+        find.ancestor(of: completed, matching: find.byType(AppBar)),
+        findsOneWidget,
+      );
+      expect(es.completedTasks, 'Tareas completadas');
+      await tester.tap(completed);
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(CompletedTasksScreen),
+          matching: find.text(es.completedTasks),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1101: an archived project still says «Proyecto archivado» as text under the people filter, with ✓ in the app bar',
+    (tester) async {
+      await openProject(
+        tester,
+        projects: [
+          TaskListInfo(
+            id: 'familia',
+            name: 'Familia',
+            version: 1,
+            shared: true,
+            role: 'owner',
+            ownerId: 1,
+            archived: true,
+            people: const [miki, ana, paul],
+          ),
+        ],
+      );
+      expect(find.text(es.archivedList), findsOneWidget);
+      expect(es.archivedList, 'Proyecto archivado');
+      expect(
+        find.ancestor(
+          of: find.text(es.archivedList),
+          matching: find.byType(AppBar),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.ancestor(
+          of: find.byTooltip(es.completedTasks),
+          matching: find.byType(AppBar),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1101: on the root Tareas page Tareas completadas is still beside «Proyectos», not in the app bar',
+    (tester) async {
+      await openProject(tester, home: const HomeScreen());
+      final completed = find.byTooltip(es.completedTasks);
+      expect(completed, findsOneWidget);
+      expect(
+        find.ancestor(of: completed, matching: find.byType(AppBar)),
+        findsNothing,
+      );
+      final projects = find.widgetWithText(TextButton, es.lists);
+      expect(projects, findsOneWidget);
+      final button = tester.getRect(completed);
+      final link = tester.getRect(projects);
+      expect(button.center.dy, closeTo(link.center.dy, 4));
+      expect(button.left, greaterThanOrEqualTo(link.right - 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, round 2, P145: UX-1214 ----
+
+  /// Every ChoiceChip in the «Todas»/«Para mí» pair on Calendar.
+  List<ChoiceChip> pairChips(WidgetTester tester) => tester
+      .widgetList<ChoiceChip>(
+        find.descendant(
+          of: find.byType(ProjectScopeControl),
+          matching: find.byType(ChoiceChip),
+        ),
+      )
+      .toList();
+
+  const sharedPadding = EdgeInsets.symmetric(horizontal: 4, vertical: 8);
+
+  testWidgets(
+    'UX-1214: every chip in the people row and the Todas/Para mí pair on Calendar keeps Material’s ✓; tapping Ana widens her chip by the ✓ that leaves Todas',
+    (tester) async {
+      await openProject(
+        tester,
+        projects: [
+          familia(people: const [miki, ana, paul]),
+        ],
+      );
+      const keys = ['people-all', 'people-me', 'people-2', 'people-3'];
+      for (final key in keys) {
+        expect(
+          tester.widget<ChoiceChip>(chip(key)).showCheckmark,
+          anyOf(isNull, isTrue),
+          reason: key,
+        );
+      }
+      final allBefore = tester.getSize(chip('people-all')).width;
+      final anaBefore = tester.getSize(chip('people-2')).width;
+      expect(chosen(tester, 'people-all'), isTrue);
+      await tester.tap(chip('people-2'));
+      await tester.pumpAndSettle();
+      expect(chosen(tester, 'people-2'), isTrue);
+      expect(chosen(tester, 'people-all'), isFalse);
+      final allAfter = tester.getSize(chip('people-all')).width;
+      final anaAfter = tester.getSize(chip('people-2')).width;
+      // Material paints the ✓ inside the chosen chip; it isn't an Icon.
+      final mark = allBefore - allAfter;
+      expect(mark, greaterThan(8), reason: 'Todas lost its ✓');
+      expect(anaAfter - anaBefore, closeTo(mark, 0.5), reason: 'Ana got it');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+
+      await openProject(tester, home: const CalendarScreen());
+      final pair = pairChips(tester);
+      expect(pair, hasLength(2));
+      for (final chip in pair) {
+        expect(chip.showCheckmark, anyOf(isNull, isTrue));
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1214: the people row’s chips and the pair’s chips on Calendar all have padding EdgeInsets.symmetric(horizontal: 4, vertical: 8)',
+    (tester) async {
+      await openProject(
+        tester,
+        projects: [
+          familia(people: const [miki, ana, paul]),
+        ],
+      );
+      for (final key in ['people-all', 'people-me', 'people-2', 'people-3']) {
+        expect(
+          tester.widget<ChoiceChip>(chip(key)).padding,
+          sharedPadding,
+          reason: key,
+        );
+      }
+      await tester.pumpWidget(const SizedBox());
+      await openProject(tester, home: const CalendarScreen());
+      final pair = pairChips(tester);
+      expect(pair, hasLength(2));
+      for (final chip in pair) {
+        expect(chip.padding, sharedPadding);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // Manrope from here on, as on the phone: the tests above measure with
+  // the test font.
+  group('UX-1101 with Manrope', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    List<Task> twoTasks() => [
+      Task(
+        id: 1,
+        title: 'Comprar pan',
+        priority: 1,
+        listId: 'familia',
+        assignment: 'group',
+      ),
+      Task(
+        id: 2,
+        title: 'Recoger a los niños',
+        priority: 1,
+        listId: 'familia',
+        assignment: 'member',
+        assigneeId: 2,
+        assigneeName: 'Ana',
+      ),
+    ];
+
+    for (final language in ['es', 'ca']) {
+      for (final (size, scale, people) in [
+        (
+          const Size(393, 851),
+          1.3,
+          const [
+            miki,
+            ProjectMember(id: 2, name: 'Ana García', role: 'editor'),
+            paul,
+          ],
+        ),
+        (const Size(320, 640), 2.0, const [miki, ana, paul]),
+      ]) {
+        testWidgets(
+          'UX-1101: at $scale× on ${size.width.toInt()}×${size.height.toInt()} ($language), with ${people[1].name} and Paul, every person chip is hit-testable and wholly on screen, with no drag',
+          (tester) async {
+            await openProject(
+              tester,
+              language: language,
+              size: size,
+              textScale: scale,
+              theme: AppTheme.light,
+              projects: [familia(people: people)],
+              given: twoTasks(),
+            );
+            expect(row(), findsOneWidget);
+            for (final key in [
+              'people-all',
+              'people-me',
+              'people-2',
+              'people-3',
+            ]) {
+              expect(chip(key).hitTestable(), findsOneWidget, reason: key);
+              final rect = tester.getRect(chip(key));
+              expect(rect.left, greaterThanOrEqualTo(-0.5), reason: key);
+              expect(
+                rect.right,
+                lessThanOrEqualTo(size.width + 0.5),
+                reason: key,
+              );
+              expect(rect.top, greaterThanOrEqualTo(-0.5), reason: key);
+              expect(
+                rect.bottom,
+                lessThanOrEqualTo(size.height + 0.5),
+                reason: key,
+              );
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+
+        testWidgets(
+          'UX-1214: at $scale× on ${size.width.toInt()}×${size.height.toInt()} ($language), with ${people[1].name} and Paul, Todas chosen and again Paul chosen (✓ on each): every person chip is hit-testable and wholly on screen, with no drag',
+          (tester) async {
+            await openProject(
+              tester,
+              language: language,
+              size: size,
+              textScale: scale,
+              theme: AppTheme.light,
+              projects: [familia(people: people)],
+              given: twoTasks(),
+            );
+            expect(row(), findsOneWidget);
+            final scrollable = tester.state<ScrollableState>(
+              find.descendant(of: row(), matching: find.byType(Scrollable)),
+            );
+            void allOnScreen(String state) {
+              expect(scrollable.position.pixels, 0, reason: state);
+              for (final key in [
+                'people-all',
+                'people-me',
+                'people-2',
+                'people-3',
+              ]) {
+                final why = '$key, $state';
+                final shown = tester.widget<ChoiceChip>(chip(key));
+                expect(shown.showCheckmark, anyOf(isNull, isTrue), reason: why);
+                expect(chip(key).hitTestable(), findsOneWidget, reason: why);
+                final rect = tester.getRect(chip(key));
+                expect(rect.left, greaterThanOrEqualTo(-0.5), reason: why);
+                expect(
+                  rect.right,
+                  lessThanOrEqualTo(size.width + 0.5),
+                  reason: why,
+                );
+                expect(rect.top, greaterThanOrEqualTo(-0.5), reason: why);
+                expect(
+                  rect.bottom,
+                  lessThanOrEqualTo(size.height + 0.5),
+                  reason: why,
+                );
+              }
+            }
+
+            expect(chosen(tester, 'people-all'), isTrue);
+            allOnScreen('Todas chosen');
+            // No ensureVisible, no drag: Paul's chip is tapped where it is.
+            await tester.tap(chip('people-3'));
+            await tester.pumpAndSettle();
+            expect(chosen(tester, 'people-3'), isTrue);
+            allOnScreen('Paul chosen');
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    // The tops P131's implementer measured before the change, recorded at
+    // the top of this file: 2× on 320×640, 420.0 dp; 1.3× on 393×851,
+    // 393.0 dp.
+    for (final (size, scale, before) in [
+      (const Size(320, 640), 2.0, 420.0),
+      (const Size(393, 851), 1.3, 393.0),
+    ]) {
+      testWidgets(
+        'UX-1101: ES, Manrope, a shared project page with two tasks and Ana and Paul: at $scale× on ${size.width.toInt()}×${size.height.toInt()} the first task row’s top is no lower than before the change ($before dp)',
+        (tester) async {
+          await openProject(
+            tester,
+            size: size,
+            textScale: scale,
+            theme: AppTheme.light,
+            projects: [
+              familia(people: const [miki, ana, paul]),
+            ],
+            given: twoTasks(),
+          );
+          final first = find.byType(TaskTile).first;
+          expect(first, findsOneWidget);
+          final top = tester.getRect(first).top;
+          expect(top, lessThanOrEqualTo(before + 0.5));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1101: ES at 2× on 320×640 with 8 other editors, the people row scrolls sideways and the last chip it shows is cut at the screen’s right edge',
+      (tester) async {
+        final others = [
+          for (final (id, name) in [
+            (2, 'Ana'),
+            (3, 'Paul'),
+            (5, 'Marta'),
+            (6, 'Jordi'),
+            (7, 'Lucía'),
+            (8, 'Pere'),
+            (9, 'Núria'),
+            (10, 'Carlos'),
+          ])
+            ProjectMember(id: id, name: name, role: 'editor'),
+        ];
+        await openProject(
+          tester,
+          size: const Size(320, 640),
+          textScale: 2,
+          theme: AppTheme.light,
+          projects: [
+            familia(people: [miki, ...others]),
+          ],
+          given: twoTasks(),
+        );
+        expect(row(), findsOneWidget);
+        final scrollable = tester.state<ScrollableState>(
+          find.descendant(of: row(), matching: find.byType(Scrollable)),
+        );
+        expect(scrollable.position.axis, Axis.horizontal);
+        expect(scrollable.position.maxScrollExtent, greaterThan(0));
+        final rects = [
+          for (final key in [
+            'people-all',
+            'people-me',
+            for (final person in others) 'people-${person.id}',
+          ])
+            tester.getRect(chip(key)),
+        ];
+        // One row.
+        expect(rects.map((rect) => rect.top.round()).toSet(), hasLength(1));
+        final cut = rects.where((rect) => rect.left < 320 && rect.right > 320);
+        expect(cut, hasLength(1), reason: 'the next chip shows, cut');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 class _Given extends DesignTaskNotifier {

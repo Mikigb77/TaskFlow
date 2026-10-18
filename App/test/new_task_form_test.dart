@@ -14,6 +14,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -32,6 +33,7 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
+import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
@@ -988,6 +990,319 @@ void main() {
       },
     );
   }
+
+  // ---- Run 2026-10-18-commands, P130 (UX-1001): a task for someone else
+  // lands in view, under Calendar's and Tareas' «Para mí» ----
+
+  TaskListInfo familia() => TaskListInfo(
+    id: 'familia',
+    name: 'Familia',
+    version: 1,
+    shared: true,
+    role: 'owner',
+    ownerId: 1,
+    people: const [
+      ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+      ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+    ],
+  );
+  final casa = TaskListInfo(id: 'casa', name: 'Casa', version: 1);
+
+  /// The scope chip [label] (`Todas`, `Para mí`) on the screen in front.
+  ChoiceChip scopeChip(WidgetTester tester, String label) => tester
+      .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label).hitTestable());
+
+  /// Nueva tarea: [title], Mañana, and under Más detalles the project
+  /// [project] and, when given, the person [person].
+  Future<void> addTomorrow(
+    WidgetTester tester,
+    String title, {
+    String? project,
+    String? person,
+  }) async {
+    await openForm(tester);
+    await typeTitle(tester, title);
+    await tester.tap(chip('new-task-tomorrow'));
+    await tester.pumpAndSettle();
+    if (project != null) {
+      await showDetails(tester);
+      final picker = find.byType(TaskAssignmentPicker);
+      final row = find.descendant(of: picker, matching: find.byType(ListTile));
+      await tester.ensureVisible(row.first);
+      await tester.pumpAndSettle();
+      await tester.tap(row.first);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(project),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (person != null) {
+        final who = find.descendant(
+          of: picker,
+          matching: find.widgetWithText(ActionChip, es.assignedToGroup),
+        );
+        await tester.ensureVisible(who);
+        await tester.pumpAndSettle();
+        await tester.tap(who);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(BottomSheet),
+            matching: find.text(person),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+    }
+    await tapSave(tester);
+  }
+
+  testWidgets(
+    'UX-1001: a free account on Calendar’s default «Para mí» adds «Llamar al médico» for Ana in Familia tomorrow: Mañana is selected, «Todas» is selected, the row is lit, and «Añadida al …» shows with Deshacer',
+    (tester) async {
+      final app = await _App.open(tester, projects: [familia()]);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await addTomorrow(
+        tester,
+        'Llamar al médico',
+        project: 'Familia',
+        person: 'Ana',
+      );
+      final saved = app.tasks.state.requireValue.single;
+      expect(saved.listId, 'familia');
+      expect(saved.assignment, 'member');
+      expect(saved.assigneeId, 2);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+      expect(
+        find.text(DateFormat.MMMMEEEEd('es').format(tomorrow)),
+        findsOneWidget,
+      );
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      expect(scopeChip(tester, es.forMe).selected, isFalse);
+      final saved0 = row('Llamar al médico');
+      expect(saved0.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(saved0).color, lit(tester));
+      final calendar = tester.element(find.byType(CalendarScreen));
+      expect(
+        find.text(es.taskAddedOn(calendar.weekdayDate(tomorrow))),
+        findsOneWidget,
+      );
+      expect(find.text(es.undo), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1001: the same task for Ana saved from the Tareas root, on its default «Para mí»: afterwards «Todas» is selected and the row is lit',
+    (tester) async {
+      await _App.open(tester, projects: [familia()]);
+      await openTasksTab(tester);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await addTomorrow(
+        tester,
+        'Llamar al médico',
+        project: 'Familia',
+        person: 'Ana',
+      );
+      expect(find.byType(HomeScreen).hitTestable(), findsWidgets);
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      expect(scopeChip(tester, es.forMe).selected, isFalse);
+      final saved = row('Llamar al médico');
+      expect(saved.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(saved).color, lit(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1001: Calendar filtered to «Casa», a task for the account itself saved into Familia: the project filter shows «Todos los proyectos» and the row is lit',
+    (tester) async {
+      final app = await _App.open(tester, projects: [casa, familia()]);
+      app.container.read(projectScopeProvider.notifier).state =
+          const ProjectScope(projectId: 'casa');
+      await tester.pumpAndSettle();
+      final filter = find.descendant(
+        of: find.byType(ProjectScopeControl),
+        matching: find.byType(ActionChip),
+      );
+      expect(
+        find.descendant(of: filter, matching: find.text('Casa')),
+        findsOneWidget,
+      );
+      await addTomorrow(tester, 'Comprar pan', project: 'Familia');
+      final saved = app.tasks.state.requireValue.single;
+      expect(saved.listId, 'familia');
+      expect(saved.isForAccount(1), isTrue);
+      expect(
+        find.descendant(of: filter, matching: find.text(es.projectsAll)),
+        findsOneWidget,
+      );
+      expect(es.projectsAll, 'Todos los proyectos');
+      expect(app.container.read(projectScopeProvider).projectId, isNull);
+      final shown = row('Comprar pan');
+      expect(shown.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(shown).color, lit(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1001: a task for the account itself saved under «Para mí» leaves «Para mí» selected',
+    (tester) async {
+      final app = await _App.open(tester, projects: [familia()]);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await addTomorrow(tester, 'Regar las plantas');
+      expect(app.tasks.state.requireValue.single.listId, isNull);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      expect(scopeChip(tester, es.forTeam).selected, isFalse);
+      final shown = row('Regar las plantas');
+      expect(shown.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(shown).color, lit(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, round 2, P147 (UX-1213): Deshacer puts
+  // back the filter a landing widened ----
+
+  Future<void> undo(WidgetTester tester) async {
+    expect(find.text(es.undo), findsOneWidget);
+    await tester.tap(find.text(es.undo));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'UX-1213: Calendar on «Para mí», «Llamar al médico» saved for Ana in Familia for Mañana: «Todas» is selected; after «Deshacer» the task is gone and «Para mí» is selected again',
+    (tester) async {
+      final app = await _App.open(tester, projects: [familia()]);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await addTomorrow(
+        tester,
+        'Llamar al médico',
+        project: 'Familia',
+        person: 'Ana',
+      );
+      expect(app.tasks.state.requireValue, hasLength(1));
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      await undo(tester);
+      expect(app.tasks.state.requireValue, isEmpty);
+      expect(row('Llamar al médico'), findsNothing);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      expect(scopeChip(tester, es.forTeam).selected, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1213: the same task for Ana saved from the Tareas root on its default «Para mí»: after «Deshacer» «Para mí» is selected again',
+    (tester) async {
+      final app = await _App.open(tester, projects: [familia()]);
+      await openTasksTab(tester);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await addTomorrow(
+        tester,
+        'Llamar al médico',
+        project: 'Familia',
+        person: 'Ana',
+      );
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      await undo(tester);
+      expect(app.tasks.state.requireValue, isEmpty);
+      expect(row('Llamar al médico'), findsNothing);
+      expect(find.byType(HomeScreen).hitTestable(), findsWidgets);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      expect(scopeChip(tester, es.forTeam).selected, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1213: Calendar filtered to «Casa», a task for the account itself saved into Familia: «Todos los proyectos» shows; after «Deshacer» the filter shows «Casa» again',
+    (tester) async {
+      final app = await _App.open(tester, projects: [casa, familia()]);
+      app.container.read(projectScopeProvider.notifier).state =
+          const ProjectScope(projectId: 'casa');
+      await tester.pumpAndSettle();
+      final filter = find.descendant(
+        of: find.byType(ProjectScopeControl),
+        matching: find.byType(ActionChip),
+      );
+      await addTomorrow(tester, 'Comprar pan', project: 'Familia');
+      expect(
+        find.descendant(of: filter, matching: find.text(es.projectsAll)),
+        findsOneWidget,
+      );
+      await undo(tester);
+      expect(app.tasks.state.requireValue, isEmpty);
+      expect(
+        find.descendant(of: filter, matching: find.text('Casa')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: filter, matching: find.text(es.projectsAll)),
+        findsNothing,
+      );
+      expect(app.container.read(projectScopeProvider).projectId, 'casa');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1213: after the landing switches Calendar to «Todas», the person taps «Para mí» and then «Todas»; «Deshacer» takes the task away and «Todas» stays selected',
+    (tester) async {
+      final app = await _App.open(tester, projects: [familia()]);
+      await addTomorrow(
+        tester,
+        'Llamar al médico',
+        project: 'Familia',
+        person: 'Ana',
+      );
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      await tester.tap(find.widgetWithText(ChoiceChip, es.forMe).hitTestable());
+      await tester.pumpAndSettle();
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await tester.tap(
+        find.widgetWithText(ChoiceChip, es.forTeam).hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      await undo(tester);
+      expect(app.tasks.state.requireValue, isEmpty);
+      expect(scopeChip(tester, es.forTeam).selected, isTrue);
+      expect(scopeChip(tester, es.forMe).selected, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1213: a task for the account itself saved under «Para mí», then «Deshacer»: «Para mí» stays selected and the filter is unchanged',
+    (tester) async {
+      final app = await _App.open(tester, projects: [familia()]);
+      final scope = app.container.read(projectScopeProvider);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      await addTomorrow(tester, 'Regar las plantas');
+      expect(app.tasks.state.requireValue, hasLength(1));
+      expect(
+        identical(app.container.read(projectScopeProvider), scope),
+        isTrue,
+      );
+      await undo(tester);
+      expect(app.tasks.state.requireValue, isEmpty);
+      expect(scopeChip(tester, es.forMe).selected, isTrue);
+      expect(scopeChip(tester, es.forTeam).selected, isFalse);
+      expect(
+        identical(app.container.read(projectScopeProvider), scope),
+        isTrue,
+        reason: 'nothing else changes',
+      );
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   // ---- Renders, on request: --dart-define=WRITE_FORM_PREVIEWS=true ----
   // Last in the file: they load the app's fonts, which every later test

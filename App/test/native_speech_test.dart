@@ -1087,7 +1087,7 @@ void main() {
     }
 
     testWidgets(
-      'U2: with words, Cancelar asks ¿Quieres conservarlo para más tarde?; Conservar is the filled button and keeps the capture',
+      'U2: with words, Cancelar asks ¿Conservar lo que has dicho para más tarde?; Conservar is the filled button and keeps the capture',
       (tester) async {
         final store = await withWords(tester);
         await tester.tap(find.widgetWithText(TextButton, es.cancel));

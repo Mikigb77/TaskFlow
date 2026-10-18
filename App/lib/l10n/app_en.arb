@@ -238,7 +238,6 @@
   "save": "Save",
   "delete": "Delete",
   "keepChanges": "Keep changes",
-  "saveChanges": "Save Changes",
   "taskTitle": "Task title",
   "additionalNotes": "Additional Notes",
   "moreDetails": "More details",
@@ -543,6 +542,15 @@
   "taskAddedOn": "Added to {date}",
   "@taskAddedOn": {
     "description": "After saving a new task with a date. The date is a weekday and date such as Fri, Oct 17, never Today or Tomorrow.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "taskAddedDue": "Added · due {date}",
+  "@taskAddedDue": {
+    "description": "After saving one new task that has no day but a deadline; the app lands on the deadline's day. The date is the deadline's weekday and date such as Thu, 12 Nov, never Today or Tomorrow.",
     "placeholders": {
       "date": {
         "type": "String"
@@ -1443,9 +1451,13 @@
   "@captureTimeLeft": {
     "description": "Shown 10 seconds before the 60-second listening limit."
   },
-  "captureKeepQuestion": "Keep it for later?",
+  "captureKeepQuestion": "Keep what you said for later?",
   "@captureKeepQuestion": {
-    "description": "The one question asked when leaving the capture sheet with something said or written: by Cancel, Back, a tap above the sheet or a swipe down, while listening, while typing and on a result. No body text; its buttons are discard and keep."
+    "description": "The question asked when leaving the capture sheet with something said: by Cancel, Back, a tap above the sheet or a swipe down, while listening, or on the result of spoken words. No body text; its buttons are discard and keep."
+  },
+  "captureKeepTextQuestion": "Keep the text for later?",
+  "@captureKeepTextQuestion": {
+    "description": "The question asked when leaving the capture sheet with something typed or shared: by Cancel, Back, a tap above the sheet or a swipe down, while typing, or on the result of written words. No body text; its buttons are discard and keep."
   },
   "captureRecordingFirst": "Retry this recording or discard it before recording another.",
   "captureEmptyInput": "Say or type what you need to do first.",
@@ -1535,7 +1547,7 @@
   },
   "captureConfirmDetails": "Use the details shown",
   "captureNothingToReview": "Nothing left to review",
-  "captureRemovedDraftsHelp": "Nothing will be added.",
+  "captureRemovedDraftsHelp": "Nothing will change.",
   "captureFinish": "Done",
   "captureYourWords": "Your words",
   "captureCheckDetails": "Check the details above",
@@ -2187,9 +2199,9 @@
   "@deleteAccountThrottled": {
     "description": "Under Delete my account when the server refuses more attempts for now."
   },
-  "deleteAccountThrottledWait": "{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}",
-  "@deleteAccountThrottledWait": {
-    "description": "Under Delete my account when the server refuses more attempts for {minutes} minutes, rounded up, at least 1. After five wrong passwords it is 15 minutes, and signing in waits too.",
+  "tooManyTriesWait": "{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}",
+  "@tooManyTriesWait": {
+    "description": "When the server refuses more attempts for {minutes} minutes, rounded up, at least 1: under Delete my account, and on sign-in, Create your account and the email-confirmation screen. After five wrong passwords it is 15 minutes.",
     "placeholders": {
       "minutes": {
         "type": "int"
@@ -2273,9 +2285,60 @@
       }
     }
   },
-  "commandApply": "Apply",
-  "@commandApply": {
-    "description": "The confirming button of a dictation's result that changes or deletes tasks and adds none."
+  "commandAddAndChange": "Add and change",
+  "@commandAddAndChange": {
+    "description": "The confirming button of a dictation's result that adds tasks and changes tasks, and deletes none."
+  },
+  "commandAddAndDelete": "Add and delete",
+  "@commandAddAndDelete": {
+    "description": "The confirming button of a dictation's result that adds tasks and deletes tasks, and changes none."
+  },
+  "commandChangeAndDelete": "Change and delete",
+  "@commandChangeAndDelete": {
+    "description": "The confirming button of a dictation's result that changes tasks and deletes tasks, and adds none."
+  },
+  "commandAddChangeAndDelete": "Add, change and delete",
+  "@commandAddChangeAndDelete": {
+    "description": "The confirming button of a dictation's result that adds, changes and deletes tasks."
+  },
+  "commandDontDelete": "Don’t delete {title}",
+  "@commandDontDelete": {
+    "description": "Tooltip and screen-reader label of the ✕ on a deletion's card in a dictation's result: the task is kept. {title} is the task's title, or the words said for it.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDontChange": "Don’t change {title}",
+  "@commandDontChange": {
+    "description": "Tooltip and screen-reader label of the ✕ on a change's card in a dictation's result: the task stays as it is. {title} is the task's title, or the words said for it.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDontCreate": "Don’t create {name}",
+  "@commandDontCreate": {
+    "description": "Tooltip and screen-reader label of the ✕ on a new project's card in a dictation's result: the project isn't created. {name} is the project's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandWontDelete": "Won’t be deleted",
+  "@commandWontDelete": {
+    "description": "Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the task is kept."
+  },
+  "commandWontChange": "Won’t be changed",
+  "@commandWontChange": {
+    "description": "Message, with Undo, after the ✕ on a change's card in a dictation's result: the task stays as it is."
+  },
+  "commandWontCreate": "Won’t be created",
+  "@commandWontCreate": {
+    "description": "Message, with Undo, after the ✕ on a new project's card in a dictation's result: the project isn't created."
   },
   "commandFindWords": "Tasks with “{words}”",
   "@commandFindWords": {

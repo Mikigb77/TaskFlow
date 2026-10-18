@@ -14,6 +14,7 @@ import 'package:agenda/services/text_search.dart';
 import 'package:agenda/widgets/schedule_editor.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -404,7 +405,7 @@ class ProjectCommandCard extends ConsumerWidget {
             icon: Icons.create_new_folder_outlined,
             text: l.commandCreateProjectQuestion(name),
             onRemove: onRemove,
-            removeLabel: l.removeCaptureItem(name),
+            removeLabel: l.commandDontCreate(name),
             enabled: enabled,
           ),
           Padding(
@@ -430,7 +431,7 @@ class ProjectCommandCard extends ConsumerWidget {
           icon: Icons.create_new_folder_outlined,
           text: l.commandNewProject(name),
           onRemove: onRemove,
-          removeLabel: l.removeCaptureItem(name),
+          removeLabel: l.commandDontCreate(name),
           enabled: enabled,
         ),
       ],
@@ -536,7 +537,7 @@ class _FoundRow extends ConsumerWidget {
       if (day.displayDate != null)
         taskDayLine(context, day)
       else if (task.deadline != null)
-        context.weekdayDate(task.deadline!),
+        taskDeadlineLabel(context, task),
       ?project?.name,
       if (project?.shared == true)
         responsibilityLabel(context, task, ref.watch(authProvider).account?.id),
@@ -599,6 +600,13 @@ class _FoundRow extends ConsumerWidget {
   }
 }
 
+/// Completed, as a found row says: the repetition shown, or the task (a
+/// repeating one when none is left open).
+bool _completed(Task task) => task.occurrenceDate != null
+    ? task.isCompleted
+    : (task.isRecurring ? task.nextOpenOccurrence() : task)?.isCompleted ??
+          true;
+
 /// Several tasks match: a short list to tap the one meant.
 class _Choice extends StatelessWidget {
   const _Choice({
@@ -634,7 +642,12 @@ class _Choice extends StatelessWidget {
                 children: [
                   Text(task.title, style: theme.textTheme.bodyLarge),
                   Text(
-                    taskDayLine(context, task),
+                    [
+                      task.displayDate == null && task.deadline != null
+                          ? taskDeadlineLabel(context, task)
+                          : taskDayLine(context, task),
+                      if (_completed(task)) l.commandCompleted,
+                    ].join(' · '),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -716,7 +729,7 @@ class UpdateCommandCard extends ConsumerWidget {
             icon: Icons.edit_outlined,
             text: l.commandWhichToChange,
             onRemove: onRemove,
-            removeLabel: l.removeCaptureItem(_words(command.target.words)),
+            removeLabel: l.commandDontChange(_words(command.target.words)),
             enabled: enabled,
           ),
           _Choice(view: view, onChanged: onChanged, enabled: enabled),
@@ -781,9 +794,10 @@ class UpdateCommandCard extends ConsumerWidget {
           icon: Icons.edit_outlined,
           text: shown.title,
           onRemove: onRemove,
-          removeLabel: l.removeCaptureItem(shown.title),
+          removeLabel: l.commandDontChange(shown.title),
           enabled: enabled,
         ),
+        if (_completed(shown)) _Note(l.commandCompleted),
         if (plan.title != null)
           line(Icons.short_text_rounded, l.taskTitle, task.title, plan.title!),
         if (plan.schedule case final schedule?)
@@ -956,7 +970,7 @@ class DeleteCommandCard extends StatelessWidget {
             icon: Icons.delete_outline_rounded,
             text: l.commandWhichToDelete,
             onRemove: onRemove,
-            removeLabel: l.removeCaptureItem(_words(command.target.words)),
+            removeLabel: l.commandDontDelete(_words(command.target.words)),
             enabled: enabled,
           ),
           _Choice(view: view, onChanged: onChanged, enabled: enabled),
@@ -981,9 +995,10 @@ class DeleteCommandCard extends StatelessWidget {
               : l.commandWillDeleteOn(stored.title, when),
           color: error,
           onRemove: onRemove,
-          removeLabel: l.removeCaptureItem(stored.title),
+          removeLabel: l.commandDontDelete(stored.title),
           enabled: enabled,
         ),
+        if (_completed(shown)) _Note(l.commandCompleted),
         if (view.matches.length > 1)
           _another(context, view, onChanged, enabled),
       ],

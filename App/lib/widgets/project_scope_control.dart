@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:agenda/models/task_list_info.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/text_search.dart';
@@ -17,6 +18,12 @@ List<ProjectMember> projectPeopleToFilter(TaskListInfo? project, int? me) =>
     project == null || !project.shared || project.people.length < 2
     ? const []
     : project.people.where((p) => p.id != me && p.canEdit).toList();
+
+/// The padding of the «Todas» and «Para mí» chips, and of every chip in the
+/// people row: 4 dp less on each side than Material's 8, which pays for the
+/// ✓ on the chosen chip, so «Todas» and «Para mí» still share a row at 2×
+/// text on 320 dp.
+const _chipPadding = EdgeInsets.symmetric(horizontal: 4, vertical: 8);
 
 class ProjectScopeControl extends ConsumerWidget {
   const ProjectScopeControl({
@@ -36,9 +43,9 @@ class ProjectScopeControl extends ConsumerWidget {
   final ValueChanged<bool>? onTeamChanged;
 
   /// A shared project page's person: their tasks only. With
-  /// [onPeopleChanged], a project shared with 2 or more people shows one row
-  /// of chips, `Todas · Para mí · Ana · Paul…`, in place of `Para mí` and
-  /// `Todas`. It gets the page's `Todas`/`Para mí` choice ([team]) and the
+  /// [onPeopleChanged], a project shared with 2 or more people shows chips,
+  /// `Todas · Para mí · Ana · Paul…`, in place of `Todas` and `Para mí`.
+  /// It gets the page's `Todas`/`Para mí` choice ([team]) and the
   /// person (null for none).
   final int? person;
   final void Function(bool team, int? person)? onPeopleChanged;
@@ -68,14 +75,12 @@ class ProjectScopeControl extends ConsumerWidget {
             ref.watch(authProvider.select((s) => s.account?.id)),
           );
     if (people.isNotEmpty) {
-      return Padding(
+      return _PeopleFilter(
+        people: people,
+        team: team,
+        person: people.any((p) => p.id == person) ? person : null,
+        onChanged: onPeopleChanged!,
         padding: padding,
-        child: _PeopleFilter(
-          people: people,
-          team: team,
-          person: people.any((p) => p.id == person) ? person : null,
-          onChanged: onPeopleChanged!,
-        ),
       );
     }
     // A scope chip means nothing until there is a project to scope to.
@@ -196,16 +201,19 @@ class ProjectScopeControl extends ConsumerWidget {
                 );
               },
             ),
+          // The people row's order: Todas, then Para mí.
           if (shared) ...[
             ChoiceChip(
-              label: Text(context.l10n.forMe),
-              selected: !team,
-              onSelected: (_) => setTeam(false),
-            ),
-            ChoiceChip(
+              padding: _chipPadding,
               label: Text(context.l10n.forTeam),
               selected: team,
               onSelected: (_) => setTeam(true),
+            ),
+            ChoiceChip(
+              padding: _chipPadding,
+              label: Text(context.l10n.forMe),
+              selected: !team,
+              onSelected: (_) => setTeam(false),
             ),
           ],
         ],
@@ -214,32 +222,44 @@ class ProjectScopeControl extends ConsumerWidget {
   }
 }
 
-/// One row of chips on a shared project's page: everyone's tasks, the
-/// account's own, then each other person's. It scrolls sideways when the
-/// names don't fit, so it never pushes the tasks down.
+/// The chips on a shared project's page: everyone's tasks, the account's
+/// own, then each other person's. They wrap onto a second row, so every
+/// name shows; past two rows they run in one row that scrolls sideways, to
+/// the screen's edges, so the next chip shows cut at the edge.
 class _PeopleFilter extends StatelessWidget {
   const _PeopleFilter({
     required this.people,
     required this.team,
     required this.person,
     required this.onChanged,
+    required this.padding,
   });
   final List<ProjectMember> people;
   final bool team;
   final int? person;
   final void Function(bool team, int? person) onChanged;
 
+  /// The page's padding. Its sides go inside the scroll view.
+  final EdgeInsetsGeometry padding;
+
   @override
   Widget build(BuildContext context) {
+    final inset = padding.resolve(Directionality.of(context));
     final chips = [
       ChoiceChip(
         key: const ValueKey('people-all'),
-        label: Text(context.l10n.forTeam),
+        padding: _chipPadding,
+        label: Semantics(
+          label: context.l10n.allTasks,
+          excludeSemantics: true,
+          child: Text(context.l10n.forTeam),
+        ),
         selected: team && person == null,
         onSelected: (_) => onChanged(true, null),
       ),
       ChoiceChip(
         key: const ValueKey('people-me'),
+        padding: _chipPadding,
         label: Text(context.l10n.forMe),
         selected: !team && person == null,
         onSelected: (_) => onChanged(false, null),
@@ -247,30 +267,95 @@ class _PeopleFilter extends StatelessWidget {
       for (final member in people)
         ChoiceChip(
           key: ValueKey('people-${member.id}'),
-          label: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 160),
-            child: Text(
-              member.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          padding: _chipPadding,
+          label: Semantics(
+            label: context.l10n.commandFindPerson(member.name),
+            excludeSemantics: true,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                member.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           selected: person == member.id,
           onSelected: (_) => onChanged(true, member.id),
         ),
     ];
-    return SingleChildScrollView(
-      key: const ValueKey('people-filter'),
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (var i = 0; i < chips.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            chips[i],
-          ],
-        ],
+    return Padding(
+      padding: EdgeInsets.only(top: inset.top, bottom: inset.bottom),
+      child: LayoutBuilder(
+        builder: (context, space) => SingleChildScrollView(
+          key: const ValueKey('people-filter'),
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.only(left: inset.left, right: inset.right),
+          child: _AtMostTwoRows(
+            width: math.max(0, space.maxWidth - inset.horizontal),
+            runSpacing: 4,
+            child: Wrap(spacing: 8, runSpacing: 4, children: chips),
+          ),
+        ),
       ),
     );
+  }
+}
+
+/// Lays its [Wrap] out in rows [width] wide while two rows hold it, and in
+/// one row otherwise.
+class _AtMostTwoRows extends SingleChildRenderObjectWidget {
+  const _AtMostTwoRows({
+    required this.width,
+    required this.runSpacing,
+    required Wrap super.child,
+  });
+  final double width;
+  final double runSpacing;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderAtMostTwoRows(width, runSpacing);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderAtMostTwoRows renderObject,
+  ) => renderObject
+    ..width = width
+    ..runSpacing = runSpacing;
+}
+
+class _RenderAtMostTwoRows extends RenderProxyBox {
+  _RenderAtMostTwoRows(this._width, this._runSpacing);
+
+  double _width;
+  set width(double value) {
+    if (value == _width) return;
+    _width = value;
+    markNeedsLayout();
+  }
+
+  double _runSpacing;
+  set runSpacing(double value) {
+    if (value == _runSpacing) return;
+    _runSpacing = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    final child = this.child!;
+    final oneRow = BoxConstraints(maxHeight: constraints.maxHeight);
+    child.layout(oneRow, parentUsesSize: true);
+    final rowHeight = child.size.height;
+    if (child.size.width > _width) {
+      child.layout(oneRow.copyWith(maxWidth: _width), parentUsesSize: true);
+      if (child.size.height > 2 * rowHeight + _runSpacing + 0.5) {
+        child.layout(oneRow, parentUsesSize: true);
+      }
+    }
+    size = constraints.constrain(child.size);
   }
 }
 

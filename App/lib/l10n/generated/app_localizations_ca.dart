@@ -588,9 +588,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get keepChanges => 'Conserva els canvis';
 
   @override
-  String get saveChanges => 'Desa els canvis';
-
-  @override
   String get taskTitle => 'Títol de la tasca';
 
   @override
@@ -1218,6 +1215,11 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String taskAddedOn(String date) {
     return 'Afegida al $date';
+  }
+
+  @override
+  String taskAddedDue(String date) {
+    return 'Afegida · venç el $date';
   }
 
   @override
@@ -2691,7 +2693,12 @@ class AppLocalizationsCa extends AppLocalizations {
   String get captureTimeLeft => 'Queden 10 segons';
 
   @override
-  String get captureKeepQuestion => 'Ho vols conservar per a més tard?';
+  String get captureKeepQuestion =>
+      'Vols conservar el que has dit per a més tard?';
+
+  @override
+  String get captureKeepTextQuestion =>
+      'Vols conservar el text per a més tard?';
 
   @override
   String get captureRecordingFirst =>
@@ -2839,7 +2846,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get captureNothingToReview => 'No queda res per revisar';
 
   @override
-  String get captureRemovedDraftsHelp => 'No s’afegirà res.';
+  String get captureRemovedDraftsHelp => 'No es farà cap canvi.';
 
   @override
   String get captureFinish => 'Fet';
@@ -3777,7 +3784,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'Massa intents. Torna-ho a provar més tard.';
 
   @override
-  String deleteAccountThrottledWait(int minutes) {
+  String tooManyTriesWait(int minutes) {
     String _temp0 = intl.Intl.pluralLogic(
       minutes,
       locale: localeName,
@@ -3846,7 +3853,40 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get commandApply => 'Aplica';
+  String get commandAddAndChange => 'Afegeix i canvia';
+
+  @override
+  String get commandAddAndDelete => 'Afegeix i suprimeix';
+
+  @override
+  String get commandChangeAndDelete => 'Canvia i suprimeix';
+
+  @override
+  String get commandAddChangeAndDelete => 'Afegeix, canvia i suprimeix';
+
+  @override
+  String commandDontDelete(String title) {
+    return 'No suprimeixis $title';
+  }
+
+  @override
+  String commandDontChange(String title) {
+    return 'No canviïs $title';
+  }
+
+  @override
+  String commandDontCreate(String name) {
+    return 'No creïs $name';
+  }
+
+  @override
+  String get commandWontDelete => 'No es suprimirà';
+
+  @override
+  String get commandWontChange => 'No es canviarà';
+
+  @override
+  String get commandWontCreate => 'No es crearà';
 
   @override
   String commandFindWords(String words) {

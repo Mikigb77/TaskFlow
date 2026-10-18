@@ -368,10 +368,15 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
 
   /// The date is the result's main line; a collapsed row shows it smaller.
   /// Tapping it opens the date sheet. TalkBack says what the line is:
-  /// `Fecha y hora: Hoy`.
+  /// `Fecha y hora: Hoy`. A collapsed row for a task with only a deadline
+  /// shows the deadline (`Vence jue, 12 nov`) instead of `Sin fecha`; the
+  /// opened card keeps `Sin fecha` with its deadline row under it.
   Widget _dateLine({required bool main}) {
     final text = Theme.of(context).textTheme;
-    final day = taskDayLine(context, task);
+    final due = !main && task.dueDate == null && task.deadline != null;
+    final day = due
+        ? taskDeadlineLabel(context, task)
+        : taskDayLine(context, task);
     return Semantics(
       label: '${context.l10n.reviewSchedule}: $day',
       button: true,
@@ -386,7 +391,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         horizontalTitleGap: main ? 12 : 8,
         minLeadingWidth: 0,
         leading: Icon(
-          Icons.calendar_today_outlined,
+          due ? Icons.flag_outlined : Icons.calendar_today_outlined,
           color: Theme.of(context).colorScheme.primary,
           size: main ? 24 : 18,
         ),

@@ -2085,11 +2085,11 @@ void main() {
     (tester) async {
       final en = lookupAppLocalizations(const Locale('en'));
       expect(
-        en.deleteAccountThrottledWait(15),
+        en.tooManyTriesWait(15),
         'Too many tries. Wait 15 minutes and try again.',
       );
       expect(
-        en.deleteAccountThrottledWait(1),
+        en.tooManyTriesWait(1),
         'Too many tries. Wait a minute and try again.',
       );
       final phone = await open(
@@ -3297,13 +3297,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(sent.last, 'POST auth/delete-account/');
       expect(
-        es.deleteAccountThrottledWait(15),
+        es.tooManyTriesWait(15),
         contains('15 minutos'),
         reason: 'the wait is named in minutes',
       );
       final banner = find.widgetWithText(
         MessageBanner,
-        es.deleteAccountThrottledWait(15),
+        es.tooManyTriesWait(15),
       );
       expect(banner, findsOneWidget);
       expect(
@@ -3323,7 +3323,7 @@ void main() {
     (
       'Retry-After 40 s with a Spanish detail',
       ApiException(429, spanishDetail, null, const Duration(seconds: 40)),
-      es.deleteAccountThrottledWait(1),
+      es.tooManyTriesWait(1),
     ),
     (
       'Retry-After 900 s with a detail carrying no wait',
@@ -3333,7 +3333,7 @@ void main() {
         null,
         const Duration(seconds: 900),
       ),
-      es.deleteAccountThrottledWait(15),
+      es.tooManyTriesWait(15),
     ),
     (
       'Retry-After 60 s while the English detail says 900 s',
@@ -3343,7 +3343,7 @@ void main() {
         null,
         const Duration(seconds: 60),
       ),
-      es.deleteAccountThrottledWait(1),
+      es.tooManyTriesWait(1),
     ),
     (
       'no Retry-After and a Spanish detail',

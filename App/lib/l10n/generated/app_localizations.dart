@@ -1012,12 +1012,6 @@ abstract class AppLocalizations {
   /// **'Keep changes'**
   String get keepChanges;
 
-  /// No description provided for @saveChanges.
-  ///
-  /// In en, this message translates to:
-  /// **'Save Changes'**
-  String get saveChanges;
-
   /// No description provided for @taskTitle.
   ///
   /// In en, this message translates to:
@@ -2073,6 +2067,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Added to {date}'**
   String taskAddedOn(String date);
+
+  /// After saving one new task that has no day but a deadline; the app lands on the deadline's day. The date is the deadline's weekday and date such as Thu, 12 Nov, never Today or Tomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Added · due {date}'**
+  String taskAddedDue(String date);
 
   /// No description provided for @changesSaved.
   ///
@@ -4330,11 +4330,17 @@ abstract class AppLocalizations {
   /// **'10 seconds left'**
   String get captureTimeLeft;
 
-  /// The one question asked when leaving the capture sheet with something said or written: by Cancel, Back, a tap above the sheet or a swipe down, while listening, while typing and on a result. No body text; its buttons are discard and keep.
+  /// The question asked when leaving the capture sheet with something said: by Cancel, Back, a tap above the sheet or a swipe down, while listening, or on the result of spoken words. No body text; its buttons are discard and keep.
   ///
   /// In en, this message translates to:
-  /// **'Keep it for later?'**
+  /// **'Keep what you said for later?'**
   String get captureKeepQuestion;
+
+  /// The question asked when leaving the capture sheet with something typed or shared: by Cancel, Back, a tap above the sheet or a swipe down, while typing, or on the result of written words. No body text; its buttons are discard and keep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the text for later?'**
+  String get captureKeepTextQuestion;
 
   /// No description provided for @captureRecordingFirst.
   ///
@@ -4519,7 +4525,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureRemovedDraftsHelp.
   ///
   /// In en, this message translates to:
-  /// **'Nothing will be added.'**
+  /// **'Nothing will change.'**
   String get captureRemovedDraftsHelp;
 
   /// No description provided for @captureFinish.
@@ -5698,11 +5704,11 @@ abstract class AppLocalizations {
   /// **'Too many tries. Try again later.'**
   String get deleteAccountThrottled;
 
-  /// Under Delete my account when the server refuses more attempts for {minutes} minutes, rounded up, at least 1. After five wrong passwords it is 15 minutes, and signing in waits too.
+  /// When the server refuses more attempts for {minutes} minutes, rounded up, at least 1: under Delete my account, and on sign-in, Create your account and the email-confirmation screen. After five wrong passwords it is 15 minutes.
   ///
   /// In en, this message translates to:
   /// **'{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}'**
-  String deleteAccountThrottledWait(int minutes);
+  String tooManyTriesWait(int minutes);
 
   /// Above Delete my account when the server refused because what the page showed changed meanwhile (for example, the person who would receive a project left it). The page has just reloaded; nothing was deleted. Used when no handover is new or changed.
   ///
@@ -5782,11 +5788,65 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{Create project} other{Create {count} projects}}'**
   String commandCreateProjects(int count);
 
-  /// The confirming button of a dictation's result that changes or deletes tasks and adds none.
+  /// The confirming button of a dictation's result that adds tasks and changes tasks, and deletes none.
   ///
   /// In en, this message translates to:
-  /// **'Apply'**
-  String get commandApply;
+  /// **'Add and change'**
+  String get commandAddAndChange;
+
+  /// The confirming button of a dictation's result that adds tasks and deletes tasks, and changes none.
+  ///
+  /// In en, this message translates to:
+  /// **'Add and delete'**
+  String get commandAddAndDelete;
+
+  /// The confirming button of a dictation's result that changes tasks and deletes tasks, and adds none.
+  ///
+  /// In en, this message translates to:
+  /// **'Change and delete'**
+  String get commandChangeAndDelete;
+
+  /// The confirming button of a dictation's result that adds, changes and deletes tasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Add, change and delete'**
+  String get commandAddChangeAndDelete;
+
+  /// Tooltip and screen-reader label of the ✕ on a deletion's card in a dictation's result: the task is kept. {title} is the task's title, or the words said for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t delete {title}'**
+  String commandDontDelete(String title);
+
+  /// Tooltip and screen-reader label of the ✕ on a change's card in a dictation's result: the task stays as it is. {title} is the task's title, or the words said for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t change {title}'**
+  String commandDontChange(String title);
+
+  /// Tooltip and screen-reader label of the ✕ on a new project's card in a dictation's result: the project isn't created. {name} is the project's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t create {name}'**
+  String commandDontCreate(String name);
+
+  /// Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the task is kept.
+  ///
+  /// In en, this message translates to:
+  /// **'Won’t be deleted'**
+  String get commandWontDelete;
+
+  /// Message, with Undo, after the ✕ on a change's card in a dictation's result: the task stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Won’t be changed'**
+  String get commandWontChange;
+
+  /// Message, with Undo, after the ✕ on a new project's card in a dictation's result: the project isn't created.
+  ///
+  /// In en, this message translates to:
+  /// **'Won’t be created'**
+  String get commandWontCreate;
 
   /// Heading of a dictation's search results. {words} are the words searched for.
   ///

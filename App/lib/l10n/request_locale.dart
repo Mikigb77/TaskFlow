@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'generated/app_localizations.dart';
@@ -5,7 +7,8 @@ import 'generated/app_localizations.dart';
 /// Keep server diagnostics separate from UI copy. Unknown responses must not
 /// leak raw English, internal field names or exception details into the UI.
 /// Outside sign-in, connection and unknown failures also say the tasks are
-/// still on the phone; [onSignIn] leaves that out where there are none yet.
+/// still on the phone; [onSignIn] leaves that out where there are none yet,
+/// and says how long to wait when the server refused more tries and said.
 String requestProblemText(
   AppLocalizations strings,
   Object error, {
@@ -41,6 +44,8 @@ String requestProblemText(
   };
   if (sync != null) return strings.syncProblem(sync);
   final reason = requestProblem(error);
+  final wait = onSignIn && reason == 'rateLimit' ? waitMinutesFor(error) : null;
+  if (wait != null) return strings.tooManyTriesWait(wait);
   final kept = !onSignIn && (reason == 'network' || reason == 'other');
   return strings.requestError(kept ? '${reason}Kept' : reason);
 }
@@ -66,7 +71,24 @@ String? sharingProblemReason(Object error) {
   };
 }
 
+/// The wait a 429 names, in whole minutes rounded up, at least 1: from its
+/// `Retry-After` header, or else the English detail's ending, "Expected
+/// available in N seconds." Null when it names none.
+int? waitMinutesFor(Object error) {
+  if (error is! ApiException || error.status != 429) return null;
+  final match = RegExp(
+    r'Expected available in (\d+) seconds?',
+  ).firstMatch(error.message);
+  final seconds =
+      error.retryAfter?.inSeconds ?? int.tryParse(match?.group(1) ?? '');
+  if (seconds == null) return null;
+  return max(1, (seconds + 59) ~/ 60);
+}
+
 String requestProblem(Object error) {
+  // Sign-in's own refusal, read before any wording: the server's text may
+  // be anything.
+  if (error is WrongCredentials) return 'credentials';
   final message = error.toString().toLowerCase();
   final status = error is ApiException ? error.status : null;
   final body = error is ApiException ? error.body : null;

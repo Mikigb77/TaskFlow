@@ -126,7 +126,8 @@ class CaptureStore {
       timezone: timezone,
       text: text,
       capturedAt: capturedAt.toUtc(),
-      source: 'typed',
+      // Someone else's words: the assistant reads them for tasks only.
+      source: 'shared',
     );
     return (await database.database).transaction((tx) async {
       await tx.insert('captures', {

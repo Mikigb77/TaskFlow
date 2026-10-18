@@ -116,22 +116,44 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     });
   }
 
-  void _land(CalendarFocus focus) => setState(() {
-    final day = focus.day;
-    if (day != null) {
-      // A landing on another day shows the tasks; it doesn't choose that day
-      // for the next capture.
-      if (!isSameDay(day, _selectedDay)) _picked = false;
-      _select(day);
+  /// Shows [focus]'s just-saved tasks on their day, lit.
+  void _land(CalendarFocus focus) {
+    // A filter that hides a saved task, as `Para mí` does a task for
+    // someone else, widens to show it.
+    final scope = ref.read(projectScopeProvider);
+    final wider = scopeShowing(
+      (ref.read(taskProvider).valueOrNull ?? const <Task>[]).where(
+        (task) => focus.taskIds.contains(task.id),
+      ),
+      scope,
+      ref.read(authProvider).account?.id,
+      ref.read(taskListsProvider).valueOrNull ?? const [],
+    );
+    if (!identical(wider, scope)) {
+      ref.read(projectScopeProvider.notifier).state = wider;
+      ref.read(scopeWideningProvider.notifier).state = ScopeWidening(
+        focus,
+        scope,
+        wider,
+      );
     }
-    _landingIds = day == null ? {} : focus.taskIds;
-    _landingInbox = day == null || focus.undated;
-    _landedIds = {};
-    _landedInbox = false;
-    _end = 20;
-    _highlight = false;
-    _highlightTimer?.cancel();
-  });
+    setState(() {
+      final day = focus.day;
+      if (day != null) {
+        // A landing on another day shows the tasks; it doesn't choose that
+        // day for the next capture.
+        if (!isSameDay(day, _selectedDay)) _picked = false;
+        _select(day);
+      }
+      _landingIds = day == null ? {} : focus.taskIds;
+      _landingInbox = day == null || focus.undated;
+      _landedIds = {};
+      _landedInbox = false;
+      _end = 20;
+      _highlight = false;
+      _highlightTimer?.cancel();
+    });
+  }
 
   /// Brings the new task's row (the first, for several) into view, clear of the save message, then
   /// lets its highlight fade.

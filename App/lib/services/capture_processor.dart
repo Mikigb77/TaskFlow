@@ -52,10 +52,13 @@ class CaptureProcessor {
 
   /// `Guardar tal cual`: the words as written, understood on the phone, while
   /// the assistant is slow or after it failed. Its answer, if one still
-  /// comes, is ignored.
+  /// comes, is ignored. On a result whose commands found nothing, [text] is
+  /// its words (a dictation transcribed online has no text of its own); the
+  /// commands are dropped, none applied.
   Future<CaptureSession> asWritten(
     CaptureSession session, {
     DateTime? now,
+    String? text,
   }) async {
     final key = _key(session);
     _written.add(key);
@@ -65,7 +68,10 @@ class CaptureProcessor {
       if (existing == null || existing.terminal) {
         throw StateError('Capture is no longer available.');
       }
-      final next = _local(existing, now ?? DateTime.now());
+      final words = text != null && text.trim().isNotEmpty
+          ? existing.copyWith(text: text)
+          : existing;
+      final next = _local(words, now ?? DateTime.now());
       await store.update(next);
       return next;
     } finally {
@@ -145,6 +151,8 @@ class CaptureProcessor {
     return existing.copyWith(
       status: 'ready',
       transcript: existing.text,
+      // Only tasks: a result's commands, if any, aren't kept.
+      commands: const [],
       drafts: localDrafts(
         existing.text,
         existing.capturedAt.toLocal(),
@@ -205,6 +213,7 @@ class CaptureProcessor {
       // and a cancel can find the request.
       final captureId = _renewed[key] ?? existing.id;
       _asking[key] = captureId;
+      final shared = existing.audioPath == null && existing.source == 'shared';
       final dynamic raw;
       try {
         raw = await api.request(
@@ -222,14 +231,15 @@ class CaptureProcessor {
             'capture_type': existing.kind,
             'reference_time': existing.capturedAt.toUtc().toIso8601String(),
             if (existing.audioPath == null) 'text': existing.text,
-            'source': existing.audioPath != null
+            // The server knows speech and typed: shared text is typed.
+            'source': existing.audioPath != null || existing.source == 'speech'
                 ? 'speech'
-                : existing.source ?? 'typed',
+                : 'typed',
             if (existing.language != null) 'language': existing.language,
             // Create a project, find, change or delete a task, besides tasks
             // (Backend/docs/VOICE_COMMANDS.md). A multipart form sends it as
-            // `true` too.
-            'commands': true,
+            // `true` too. Shared text is someone else's words: only tasks.
+            if (!shared) 'commands': true,
           },
         );
       } finally {

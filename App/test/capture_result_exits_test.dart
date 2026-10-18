@@ -514,17 +514,23 @@ void main() {
 
   Finder dialog() => find.byType(AlertDialog);
 
-  /// The one question, with its two buttons and no second line.
-  void expectKeepQuestion(WidgetTester tester) {
+  /// The one question, with its two buttons and no second line. It names
+  /// the words: said, or typed.
+  void expectKeepQuestion(WidgetTester tester, {bool spoken = true}) {
+    final question = spoken
+        ? es.captureKeepQuestion
+        : es.captureKeepTextQuestion;
     expect(dialog(), findsOneWidget);
     expect(
-      find.descendant(
-        of: dialog(),
-        matching: find.text(es.captureKeepQuestion),
-      ),
+      find.descendant(of: dialog(), matching: find.text(question)),
       findsOneWidget,
     );
-    expect(es.captureKeepQuestion, '¿Quieres conservarlo para más tarde?');
+    expect(
+      question,
+      spoken
+          ? '¿Conservar lo que has dicho para más tarde?'
+          : '¿Conservar el texto para más tarde?',
+    );
     expect(tester.widget<AlertDialog>(dialog()).content, isNull);
     expect(
       find.descendant(
@@ -546,7 +552,7 @@ void main() {
   Finder pendingLink(int count) => find.text(es.pendingCaptureCount(count));
 
   testWidgets(
-    'UX-605: on a spoken result, Cancelar asks ¿Quieres conservarlo para más tarde? with Descartar and Conservar and no second line; Descartar closes the sheet and nothing is pending',
+    'UX-605: on a spoken result, Cancelar asks ¿Conservar lo que has dicho para más tarde? with Descartar and Conservar and no second line; Descartar closes the sheet and nothing is pending',
     (tester) async {
       final app = await _App.open(tester);
       app.api.found = [_found('Comprar pan')];
@@ -617,7 +623,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-605: while typing, Cancelar with words asks ¿Quieres conservarlo para más tarde?',
+    'UX-605: while typing, Cancelar with words asks ¿Conservar el texto para más tarde?',
     (tester) async {
       await _App.open(tester);
       await tester.tap(find.text(es.addTask).hitTestable());
@@ -631,13 +637,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, es.cancel));
       await tester.pumpAndSettle();
-      expectKeepQuestion(tester);
+      expectKeepQuestion(tester, spoken: false);
       expect(tester.takeException(), isNull);
     },
   );
 
   testWidgets(
-    'UX-605: while listening with words, Cancelar asks ¿Quieres conservarlo para más tarde?',
+    'UX-605: while listening with words, Cancelar asks ¿Conservar lo que has dicho para más tarde?',
     (tester) async {
       final app = await _App.open(tester);
       await tester.tap(find.text(es.addTask).hitTestable());

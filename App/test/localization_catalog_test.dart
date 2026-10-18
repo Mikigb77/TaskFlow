@@ -216,7 +216,7 @@ void main() {
           es.captureRemovedDraftsHelp,
           ca.captureRemovedDraftsHelp,
         ],
-        ['Nothing will be added.', 'No se añadirá nada.', 'No s’afegirà res.'],
+        ['Nothing will change.', 'No se hará ningún cambio.', 'No es farà cap canvi.'],
       );
       expect(
         [en.capturesEmptyHelp, es.capturesEmptyHelp, ca.capturesEmptyHelp],
@@ -257,9 +257,9 @@ void main() {
           ca.captureKeepQuestion,
         ],
         [
-          'Keep it for later?',
-          '¿Quieres conservarlo para más tarde?',
-          'Ho vols conservar per a més tard?',
+          'Keep what you said for later?',
+          '¿Conservar lo que has dicho para más tarde?',
+          'Vols conservar el que has dit per a més tard?',
         ],
       );
       expect([en.discard, es.discard, ca.discard], [
@@ -504,5 +504,136 @@ void main() {
       ].map(plain).toList();
       expect(actual, expected, reason: l.localeName);
     }
+  });
+
+  // ---- Run 2026-10-18-commands, round 1 (P128, P129, P132) ----
+
+  Map<String, dynamic> catalog(String code) =>
+      jsonDecode(File('${directory.path}/app_$code.arb').readAsStringSync())
+          as Map<String, dynamic>;
+
+  test('UX-905 and UX-1208: commandApply, saveChanges and '
+      'deleteAccountThrottledWait are gone from all three catalogs', () {
+    for (final code in ['en', 'es', 'ca']) {
+      final arb = catalog(code);
+      for (final gone in [
+        'commandApply',
+        'saveChanges',
+        'deleteAccountThrottledWait',
+      ]) {
+        expect(arb.containsKey(gone), isFalse, reason: '$gone in $code');
+        expect(arb.containsKey('@$gone'), isFalse, reason: '@$gone in $code');
+      }
+    }
+  });
+
+  test('UX-903, UX-905, UX-902 and UX-1208: every new key is in all three '
+      'catalogs, described in English, with the plan’s copy', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    final added = [
+      'commandDontDelete',
+      'commandDontChange',
+      'commandDontCreate',
+      'commandWontDelete',
+      'commandWontChange',
+      'commandWontCreate',
+      'captureKeepTextQuestion',
+      'commandAddAndChange',
+      'commandAddAndDelete',
+      'commandChangeAndDelete',
+      'commandAddChangeAndDelete',
+      'taskAddedDue',
+      'tooManyTriesWait',
+    ];
+    for (final code in ['en', 'es', 'ca']) {
+      final arb = catalog(code);
+      for (final key in added) {
+        expect(arb.containsKey(key), isTrue, reason: '$key in $code');
+      }
+    }
+    final english = catalog('en');
+    for (final key in added) {
+      final description =
+          (english['@$key'] as Map<String, dynamic>?)?['description'];
+      expect(description, isA<String>(), reason: '@$key');
+      expect((description as String).trim(), isNotEmpty, reason: '@$key');
+    }
+    String all(String Function(AppLocalizations l) text) =>
+        [en, es, ca].map(text).join(' / ');
+    expect(
+      all((l) => l.commandDontDelete('Dentista')),
+      'Don’t delete Dentista / No eliminar Dentista / No suprimeixis Dentista',
+    );
+    expect(
+      all((l) => l.commandDontChange('Informe')),
+      'Don’t change Informe / No cambiar Informe / No canviïs Informe',
+    );
+    expect(
+      all((l) => l.commandDontCreate('Física')),
+      'Don’t create Física / No crear Física / No creïs Física',
+    );
+    expect(
+      all((l) => l.commandWontDelete),
+      'Won’t be deleted / No se eliminará / No es suprimirà',
+    );
+    expect(
+      all((l) => l.commandWontChange),
+      'Won’t be changed / No se cambiará / No es canviarà',
+    );
+    expect(
+      all((l) => l.commandWontCreate),
+      'Won’t be created / No se creará / No es crearà',
+    );
+    expect(
+      all((l) => l.captureKeepQuestion),
+      'Keep what you said for later? / ¿Conservar lo que has dicho para '
+      'más tarde? / Vols conservar el que has dit per a més tard?',
+    );
+    expect(
+      all((l) => l.captureKeepTextQuestion),
+      'Keep the text for later? / ¿Conservar el texto para más tarde? / '
+      'Vols conservar el text per a més tard?',
+    );
+    expect(
+      all((l) => l.captureRemovedDraftsHelp),
+      'Nothing will change. / No se hará ningún cambio. / '
+      'No es farà cap canvi.',
+    );
+    expect(
+      all((l) => l.commandAddAndChange),
+      'Add and change / Añadir y cambiar / Afegeix i canvia',
+    );
+    expect(
+      all((l) => l.commandAddAndDelete),
+      'Add and delete / Añadir y eliminar / Afegeix i suprimeix',
+    );
+    expect(
+      all((l) => l.commandChangeAndDelete),
+      'Change and delete / Cambiar y eliminar / Canvia i suprimeix',
+    );
+    expect(
+      all((l) => l.commandAddChangeAndDelete),
+      'Add, change and delete / Añadir, cambiar y eliminar / '
+      'Afegeix, canvia i suprimeix',
+    );
+    expect(
+      all((l) => l.taskAddedDue('jue, 12 nov')),
+      'Added · due jue, 12 nov / Añadida · vence el jue, 12 nov / '
+      'Afegida · venç el jue, 12 nov',
+    );
+    expect(
+      all((l) => l.tooManyTriesWait(1)),
+      'Too many tries. Wait a minute and try again. / Demasiados intentos. '
+      'Espera un minuto y vuelve a intentarlo. / Massa intents. Espera un '
+      'minut i torna-ho a provar.',
+    );
+    expect(
+      all((l) => l.tooManyTriesWait(15)),
+      'Too many tries. Wait 15 minutes and try again. / Demasiados '
+      'intentos. Espera 15 minutos y vuelve a intentarlo. / Massa intents. '
+      'Espera 15 minuts i torna-ho a provar.',
+    );
   });
 }

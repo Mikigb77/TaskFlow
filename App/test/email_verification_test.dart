@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:ui' show Tristate;
 
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -1036,5 +1037,260 @@ void main() {
         'language': 'ca',
       });
     });
+  });
+
+  // ---- Run 2026-10-18-commands, P132 (UX-402, UX-1208): sign-in errors
+  // name the problem, from the server's real answers ----
+
+  /// The server's own answer to a wrong password, or an address with no
+  /// account (Backend/core/auth_views.py).
+  http.Response wrongPassword(Map<String, dynamic> _) =>
+      _json(401, {'detail': 'Email or password is incorrect.'});
+
+  /// A refusal for too many tries, with [retryAfter] seconds when given.
+  http.Response throttled({int? retryAfter, String? detail}) =>
+      http.Response.bytes(
+        utf8.encode(jsonEncode({'detail': detail ?? 'Request was throttled.'})),
+        429,
+        headers: {
+          'content-type': 'application/json',
+          if (retryAfter != null) 'retry-after': '$retryAfter',
+        },
+      );
+
+  /// [text] is on screen: as a line, or as a field's error.
+  bool says(WidgetTester tester, String text) =>
+      find.text(text).evaluate().isNotEmpty ||
+      tester
+          .widgetList<TextField>(find.byType(TextField))
+          .any((field) => field.decoration?.errorText == text);
+
+  final createWithEmail = find.byKey(
+    const ValueKey('create-account-with-email'),
+  );
+  final signInWithEmail = find.byKey(const ValueKey('sign-in-with-email'));
+  final recoverWithEmail = find.byKey(const ValueKey('recover-with-email'));
+
+  testWidgets(
+    'UX-402: sign-in answered 401 «Email or password is incorrect.» says «No encontramos esa cuenta o la contraseña no es correcta.» with «Crear una cuenta con este correo», keeps the email, and never says «Vuelve a iniciar sesión…»',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.server.login = wrongPassword;
+      await signIn(tester, address: 'nueva@example.invalid');
+      expect(app.server.paths.last, 'auth/login/');
+      expect(
+        es.requestError('credentials'),
+        'No encontramos esa cuenta o la contraseña no es correcta.',
+      );
+      expect(says(tester, es.requestError('credentials')), isTrue);
+      expect(says(tester, es.requestError('session')), isFalse);
+      expect(find.text('Email or password is incorrect.'), findsNothing);
+      expect(createWithEmail, findsOneWidget);
+      expect(
+        find.descendant(
+          of: createWithEmail,
+          matching: find.text(es.createAccountWithEmail),
+        ),
+        findsOneWidget,
+      );
+      expect(es.createAccountWithEmail, 'Crear una cuenta con este correo');
+      expect(formText(tester, email), 'nueva@example.invalid');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-402 + UX-488: create → «Ya existe una cuenta…» → «Iniciar sesión con este correo» → the server’s 401 offers «¿Has olvidado tu contraseña?», not «Crear una cuenta con este correo»',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.server.register = (_) => _json(400, {
+        'email': ['An account with this email already exists.'],
+      });
+      app.server.login = wrongPassword;
+      await createAccount(tester, es, address: 'ana@example.invalid');
+      expect(says(tester, es.requestError('emailUsed')), isTrue);
+      expect(signInWithEmail, findsOneWidget);
+      await tapVisible(tester, signInWithEmail);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      await tapVisible(tester, submit);
+      expect(app.server.paths.last, 'auth/login/');
+      expect(says(tester, es.requestError('credentials')), isTrue);
+      expect(says(tester, es.requestError('session')), isFalse);
+      expect(recoverWithEmail, findsOneWidget);
+      expect(
+        find.descendant(
+          of: recoverWithEmail,
+          matching: find.text(es.forgotPassword),
+        ),
+        findsOneWidget,
+      );
+      expect(createWithEmail, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  group('UX-402: what a 401 means depends on where it came from', () {
+    test('sign-in’s 401, whatever its wording, is wrong credentials; the '
+        'same answer to an account being created is not', () async {
+      final server = _Server()..login = wrongPassword;
+      final api = ApiClient(
+        transport: server.transport,
+        url: 'http://api.test',
+      );
+      addTearDown(api.close);
+      Object? signingIn;
+      try {
+        await api.signIn('ana@example.invalid', typedPassword);
+      } catch (error) {
+        signingIn = error;
+      }
+      expect(signingIn, isA<ApiException>());
+      expect((signingIn as ApiException).status, 401);
+      expect(signingIn.message, 'Email or password is incorrect.');
+      expect(requestProblem(signingIn), 'credentials');
+
+      server.register = wrongPassword;
+      Object? creating;
+      try {
+        await api.signIn('ana@example.invalid', typedPassword, register: true);
+      } catch (error) {
+        creating = error;
+      }
+      expect(creating, isA<ApiException>());
+      expect(requestProblem(creating!), isNot('credentials'));
+    });
+
+    test('an authenticated request elsewhere answered 401 still means the '
+        'session ended', () {
+      expect(
+        requestProblem(
+          ApiException(401, 'Email or password is incorrect.', {
+            'detail': 'Email or password is incorrect.',
+          }),
+        ),
+        'session',
+      );
+      expect(
+        requestProblem(
+          ApiException(401, 'Given token not valid for any token type', {
+            'detail': 'Given token not valid for any token type',
+          }),
+        ),
+        'session',
+      );
+      // Older servers' simplejwt wording still reads as credentials.
+      expect(
+        requestProblem(
+          ApiException(
+            401,
+            'No active account found with the given credentials',
+          ),
+        ),
+        'credentials',
+      );
+    });
+  });
+
+  testWidgets(
+    'UX-1208: Confirmar answered 429 with Retry-After 42 says «Demasiados intentos. Espera un minuto y vuelve a intentarlo.»',
+    (tester) async {
+      final app = await _App.open(tester);
+      await createAccount(tester, es);
+      expect(screen(), findsOneWidget);
+      app.server.verify = (_) => throttled(retryAfter: 42);
+      await tester.enterText(code, '333333');
+      await tester.pumpAndSettle();
+      if (app.server.paths.last != 'auth/verify-email/') {
+        await tapVisible(tester, confirm);
+      }
+      expect(
+        es.tooManyTriesWait(1),
+        'Demasiados intentos. Espera un minuto y vuelve a intentarlo.',
+      );
+      expect(says(tester, es.tooManyTriesWait(1)), isTrue);
+      expect(says(tester, es.requestError('rateLimit')), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1208: sign-in answered 429 with Retry-After 900 says «Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.»',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.server.login = (_) => throttled(retryAfter: 900);
+      await signIn(tester);
+      expect(
+        es.tooManyTriesWait(15),
+        'Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.',
+      );
+      expect(says(tester, es.tooManyTriesWait(15)), isTrue);
+      expect(says(tester, es.requestError('rateLimit')), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1208: «Crea tu cuenta» answered 429 with Retry-After 60 says «Demasiados intentos. Espera un minuto y vuelve a intentarlo.»',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.server.register = (_) => throttled(retryAfter: 60);
+      await createAccount(tester, es);
+      expect(find.text(es.registerHeading), findsOneWidget);
+      expect(says(tester, es.tooManyTriesWait(1)), isTrue);
+      expect(says(tester, es.requestError('rateLimit')), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1208: a 429 with no Retry-After and no wait in its text keeps «Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.»; DRF’s English «Expected available in 120 seconds.» reads as 2 minutes',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.server.login = (_) => throttled();
+      await signIn(tester);
+      expect(
+        es.requestError('rateLimit'),
+        'Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.',
+      );
+      expect(says(tester, es.requestError('rateLimit')), isTrue);
+      expect(find.textContaining('Demasiados intentos'), findsNothing);
+
+      app.server.login = (_) => throttled(
+        detail: 'Request was throttled. Expected available in 120 seconds.',
+      );
+      await tapVisible(tester, submit);
+      expect(says(tester, es.tooManyTriesWait(2)), isTrue);
+      expect(find.textContaining('Expected available'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UX-1208: the wait is whole minutes rounded up, at least 1, and only '
+      'on the sign-in screens', () {
+    ApiException wait(int seconds) => ApiException(
+      429,
+      'Request was throttled.',
+      {},
+      Duration(seconds: seconds),
+    );
+    expect(waitMinutesFor(wait(1)), 1);
+    expect(waitMinutesFor(wait(42)), 1);
+    expect(waitMinutesFor(wait(60)), 1);
+    expect(waitMinutesFor(wait(61)), 2);
+    expect(waitMinutesFor(wait(900)), 15);
+    expect(waitMinutesFor(ApiException(429, 'Request was throttled.')), isNull);
+    expect(
+      waitMinutesFor(ApiException(400, 'x', {}, const Duration(seconds: 60))),
+      isNull,
+    );
+    expect(
+      requestProblemText(es, wait(900), onSignIn: true),
+      es.tooManyTriesWait(15),
+    );
+    expect(
+      requestProblemText(es, wait(900)),
+      es.requestError('rateLimit'),
+      reason: 'other screens keep today’s line',
+    );
   });
 }

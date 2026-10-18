@@ -19,6 +19,7 @@ import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/repeat_rule_control.dart';
 import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -435,13 +436,14 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       } else {
         navigator.pop();
       }
-      container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+      final focus = CalendarFocus(
         day,
         {id},
         page: widget.page,
         showCalendar: widget.showCalendar,
         undated: day == null,
       );
+      container.read(calendarFocusProvider.notifier).state = focus;
       final feedback = showFeedback(
         messenger,
         message,
@@ -453,6 +455,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           }
           try {
             await notifier.deleteTask(id);
+            // The filter the landing widened comes back with the task gone.
+            narrowAfterUndo(container, focus);
           } catch (_) {
             if (messenger.mounted) {
               unawaited(showFeedback(messenger, strings.undoError));

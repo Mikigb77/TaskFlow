@@ -26,10 +26,15 @@ class HomeScreen extends ConsumerStatefulWidget {
     this.initialFilter = 0,
     this.isRoot = true,
     this.listId,
+    this.landing = const {},
   });
   final int initialFilter;
   final bool isRoot;
   final String? listId;
+
+  /// Tasks just saved that this page, opened for them, lights once they
+  /// show: a project made by voice with its new tasks.
+  final Set<int> landing;
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
@@ -49,7 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _nested = GlobalKey<NestedScrollViewState>();
   // Tasks just saved from capture opened here: waiting to appear, then shown
   // and highlighted.
-  Set<int> _landingIds = {};
+  late Set<int> _landingIds = widget.landing;
   Set<int> _landedIds = {};
   bool _highlight = false;
   Timer? _highlightTimer;
@@ -86,10 +91,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required String query,
     required String? label,
     bool everyone = false,
+    ProjectScope? global,
   }) {
     final scope = everyone && widget.listId != null
         ? ProjectScope(projectId: widget.listId, team: true)
-        : _scope(ref.read(projectScopeProvider));
+        : _scope(global ?? ref.read(projectScopeProvider));
     final person = everyone ? null : _personShown;
     final projects = ref.read(taskListsProvider).valueOrNull ?? [];
     final accountId = ref.read(authProvider).account?.id;
@@ -131,35 +137,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// Capture, or the form, opened here saved [focus]'s tasks. If the search
   /// or a filter would hide them, clear it, so they are on screen every
-  /// time: on a project page, `Para mí` and a person too, when need be.
+  /// time: on a project page, `Para mí` and a person too, when need be;
+  /// elsewhere the app-wide `Para mí`, then the project filter.
   void _land(CalendarFocus focus) {
     final all = ref.read(taskProvider).valueOrNull ?? [];
     bool lists(List<Task> tasks) =>
         tasks.any((task) => focus.taskIds.contains(task.id));
+    final global = ref.read(projectScopeProvider);
+    final wider = widget.listId != null
+        ? global
+        : scopeShowing(
+            all.where((task) => focus.taskIds.contains(task.id)),
+            global,
+            ref.read(authProvider).account?.id,
+            ref.read(taskListsProvider).valueOrNull ?? [],
+          );
+    var scope = global;
     setState(() {
       if (!lists(
         _visible(all, filter: _filter, query: _query, label: _label),
       )) {
-        for (final everyone in [false, if (widget.listId != null) true]) {
+        for (final (clear, everyone, widen) in [
+          (true, false, false),
+          if (widget.listId != null) (true, true, false),
+          if (!identical(wider, global)) ...[
+            (false, false, true),
+            (true, false, true),
+          ],
+        ]) {
           if (!lists(
             _visible(
               all,
-              filter: widget.isRoot ? 0 : _filter,
-              query: '',
-              label: null,
+              filter: clear && widget.isRoot ? 0 : _filter,
+              query: clear ? '' : _query,
+              label: clear ? null : _label,
               everyone: everyone,
+              global: widen ? wider : global,
             ),
           )) {
             continue;
           }
-          _search.clear();
-          _query = '';
-          _label = null;
-          if (widget.isRoot) _filter = 0;
+          if (clear) {
+            _search.clear();
+            _query = '';
+            _label = null;
+            if (widget.isRoot) _filter = 0;
+          }
           if (everyone) {
             _team = true;
             _person = null;
           }
+          if (widen) scope = wider;
           break;
         }
       }
@@ -168,6 +196,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _highlight = false;
       _highlightTimer?.cancel();
     });
+    if (!identical(scope, global)) {
+      ref.read(projectScopeProvider.notifier).state = scope;
+      ref.read(scopeWideningProvider.notifier).state = ScopeWidening(
+        focus,
+        global,
+        scope,
+      );
+    }
   }
 
   /// Brings the first new row into view, clear of the save message, then
@@ -320,19 +356,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         (list == null ? !lists.isLoading && lists.hasValue : !list.canEdit);
     return Scaffold(
       key: _page,
-      appBar: CustomAppBar(title: title, isRoot: widget.isRoot),
+      appBar: CustomAppBar(
+        title: title,
+        isRoot: widget.isRoot,
+        actions: [if (!widget.isRoot) completed],
+      ),
       body: NestedScrollView(
         key: _nested,
         headerSliverBuilder: (context, innerScrolled) => [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 10, 24, 20),
+              padding: const EdgeInsets.only(top: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Full width: a people row that scrolls runs to the
+                  // screen's edges.
                   widget.listId == null
-                      ? const ProjectScopeControl()
+                      ? const ProjectScopeControl(
+                          padding: EdgeInsets.symmetric(horizontal: 24),
+                        )
                       : ProjectScopeControl(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                           fixedProjectId: widget.listId,
                           team: _team,
                           onTeamChanged: (team) => setState(() => _team = team),
@@ -342,143 +387,149 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             _person = person;
                           }),
                         ),
-                  const SizedBox(height: 12),
-                  // The app bar names a project or the Inbox: no headline
-                  // repeats it.
-                  if (widget.isRoot)
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          context.l10n.yourTasks,
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.pushNamed(context, '/lists'),
-                              child: Text(context.l10n.lists),
-                            ),
-                            completed,
-                          ],
-                        ),
-                      ],
-                    )
-                  else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: list?.inactive == true
-                              ? Text(
-                                  context.l10n.archivedList,
-                                  style: TextStyle(
-                                    color: colors.onSurfaceVariant,
+                        const SizedBox(height: 12),
+                        // The app bar names a project or the Inbox: no headline
+                        // repeats it.
+                        if (widget.isRoot)
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                context.l10n.yourTasks,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineLarge,
+                              ),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pushNamed(context, '/lists'),
+                                    child: Text(context.l10n.lists),
                                   ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                        completed,
-                      ],
-                    ),
-                  const SizedBox(height: 16),
-                  // The owner can share a project of their own from here.
-                  if (list != null &&
-                      (list.shared ||
-                          (list.groupId == null && list.role == 'owner')))
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton.icon(
-                        icon: Icon(
-                          list.shared
-                              ? Icons.group_outlined
-                              : Icons.person_add_outlined,
-                        ),
-                        label: Text(
-                          list.shared
-                              ? context.l10n.projectMembersCount(
-                                  list.people.length,
-                                )
-                              : context.l10n.shareProject,
-                        ),
-                        onPressed: () async {
-                          final gone = await Navigator.push(
-                            context,
-                            MaterialPageRoute<bool>(
-                              builder: (_) => list.groupId == null
-                                  ? ListSharingScreen(listId: list.id)
-                                  : GroupScreen(groupId: list.groupId!),
+                                  completed,
+                                ],
+                              ),
+                            ],
+                          ),
+                        // Elsewhere ✓ is in the app bar.
+                        if (widget.isRoot || list?.inactive == true) ...[
+                          if (!widget.isRoot)
+                            Text(
+                              context.l10n.archivedList,
+                              style: TextStyle(color: colors.onSurfaceVariant),
                             ),
-                          );
-                          // Deleted or left: this page has nothing to show.
-                          if (gone == true && context.mounted) {
-                            Navigator.pop(context);
-                          }
-                        },
-                      ),
-                    ),
-                  if (widget.listId != null)
-                    TextButton.icon(
-                      icon: const Icon(Icons.description_outlined),
-                      label: Text(context.l10n.notes),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              NotesScreen(listId: widget.listId, isRoot: false),
+                          const SizedBox(height: 16),
+                        ],
+                        // The owner can share a project of their own from here.
+                        if (list != null &&
+                            (list.shared ||
+                                (list.groupId == null && list.role == 'owner')))
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                              icon: Icon(
+                                list.shared
+                                    ? Icons.group_outlined
+                                    : Icons.person_add_outlined,
+                              ),
+                              label: Text(
+                                list.shared
+                                    ? context.l10n.projectMembersCount(
+                                        list.people.length,
+                                      )
+                                    : context.l10n.shareProject,
+                              ),
+                              onPressed: () async {
+                                final gone = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute<bool>(
+                                    builder: (_) => list.groupId == null
+                                        ? ListSharingScreen(listId: list.id)
+                                        : GroupScreen(groupId: list.groupId!),
+                                  ),
+                                );
+                                // Deleted or left: this page has nothing to show.
+                                if (gone == true && context.mounted) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                            ),
+                          ),
+                        if (widget.listId != null)
+                          TextButton.icon(
+                            icon: const Icon(Icons.description_outlined),
+                            label: Text(context.l10n.notes),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => NotesScreen(
+                                  listId: widget.listId,
+                                  isRoot: false,
+                                ),
+                              ),
+                            ),
+                          ),
+                        TextField(
+                          controller: _search,
+                          onChanged: (value) =>
+                              setState(() => _query = value.trim()),
+                          decoration: InputDecoration(
+                            hintText: context.l10n.findTask,
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            isDense: true,
+                          ),
                         ),
-                      ),
-                    ),
-                  TextField(
-                    controller: _search,
-                    onChanged: (value) => setState(() => _query = value.trim()),
-                    decoration: InputDecoration(
-                      hintText: context.l10n.findTask,
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      isDense: true,
+                        const SizedBox(height: 12),
+                        if (widget.isRoot)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              for (final entry in [
+                                (0, context.l10n.allTasks),
+                                (3, context.l10n.inbox),
+                                (1, context.l10n.today),
+                                (2, context.l10n.highPriority),
+                              ])
+                                ChoiceChip(
+                                  label: Text(entry.$2),
+                                  selected: _filter == entry.$1,
+                                  onSelected: (_) =>
+                                      setState(() => _filter = entry.$1),
+                                ),
+                            ],
+                          ),
+                        if (labels.isNotEmpty)
+                          DropdownButton<String>(
+                            hint: Text(context.l10n.filterLabel),
+                            value: labels.contains(_label) ? _label : null,
+                            isExpanded: true,
+                            items: [
+                              DropdownMenuItem(
+                                value: '',
+                                child: Text(context.l10n.allLabels),
+                              ),
+                              for (final label in labels)
+                                DropdownMenuItem(
+                                  value: label,
+                                  child: Text('#$label'),
+                                ),
+                            ],
+                            onChanged: (value) => setState(
+                              () => _label = value == '' ? null : value,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  if (widget.isRoot)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (final entry in [
-                          (0, context.l10n.allTasks),
-                          (3, context.l10n.inbox),
-                          (1, context.l10n.today),
-                          (2, context.l10n.highPriority),
-                        ])
-                          ChoiceChip(
-                            label: Text(entry.$2),
-                            selected: _filter == entry.$1,
-                            onSelected: (_) =>
-                                setState(() => _filter = entry.$1),
-                          ),
-                      ],
-                    ),
-                  if (labels.isNotEmpty)
-                    DropdownButton<String>(
-                      hint: Text(context.l10n.filterLabel),
-                      value: labels.contains(_label) ? _label : null,
-                      isExpanded: true,
-                      items: [
-                        DropdownMenuItem(
-                          value: '',
-                          child: Text(context.l10n.allLabels),
-                        ),
-                        for (final label in labels)
-                          DropdownMenuItem(
-                            value: label,
-                            child: Text('#$label'),
-                          ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _label = value == '' ? null : value),
-                    ),
                 ],
               ),
             ),

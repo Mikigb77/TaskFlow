@@ -199,7 +199,8 @@ class CaptureSession {
   final String? projectId;
 
   /// Where the first words came from: `speech` (the recognizer or recorded
-  /// audio) or `typed` (the keyboard or a share). Null until words arrive.
+  /// audio), `typed` (the keyboard) or `shared` (a share, sent to the server
+  /// as typed). Null until words arrive.
   final String? source;
 
   /// The later day capture was opened for (Calendar's selected day, the

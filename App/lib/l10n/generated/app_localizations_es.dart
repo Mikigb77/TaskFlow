@@ -588,9 +588,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get keepChanges => 'Guardar cambios';
 
   @override
-  String get saveChanges => 'Guardar cambios';
-
-  @override
   String get taskTitle => 'Título de la tarea';
 
   @override
@@ -1223,6 +1220,11 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String taskAddedOn(String date) {
     return 'Añadida al $date';
+  }
+
+  @override
+  String taskAddedDue(String date) {
+    return 'Añadida · vence el $date';
   }
 
   @override
@@ -2699,7 +2701,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get captureTimeLeft => 'Quedan 10 segundos';
 
   @override
-  String get captureKeepQuestion => '¿Quieres conservarlo para más tarde?';
+  String get captureKeepQuestion =>
+      '¿Conservar lo que has dicho para más tarde?';
+
+  @override
+  String get captureKeepTextQuestion => '¿Conservar el texto para más tarde?';
 
   @override
   String get captureRecordingFirst =>
@@ -2849,7 +2855,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get captureNothingToReview => 'No queda nada por revisar';
 
   @override
-  String get captureRemovedDraftsHelp => 'No se añadirá nada.';
+  String get captureRemovedDraftsHelp => 'No se hará ningún cambio.';
 
   @override
   String get captureFinish => 'Terminar';
@@ -3784,7 +3790,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Demasiados intentos. Inténtalo más tarde.';
 
   @override
-  String deleteAccountThrottledWait(int minutes) {
+  String tooManyTriesWait(int minutes) {
     String _temp0 = intl.Intl.pluralLogic(
       minutes,
       locale: localeName,
@@ -3854,7 +3860,40 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get commandApply => 'Aplicar';
+  String get commandAddAndChange => 'Añadir y cambiar';
+
+  @override
+  String get commandAddAndDelete => 'Añadir y eliminar';
+
+  @override
+  String get commandChangeAndDelete => 'Cambiar y eliminar';
+
+  @override
+  String get commandAddChangeAndDelete => 'Añadir, cambiar y eliminar';
+
+  @override
+  String commandDontDelete(String title) {
+    return 'No eliminar $title';
+  }
+
+  @override
+  String commandDontChange(String title) {
+    return 'No cambiar $title';
+  }
+
+  @override
+  String commandDontCreate(String name) {
+    return 'No crear $name';
+  }
+
+  @override
+  String get commandWontDelete => 'No se eliminará';
+
+  @override
+  String get commandWontChange => 'No se cambiará';
+
+  @override
+  String get commandWontCreate => 'No se creará';
 
   @override
   String commandFindWords(String words) {

@@ -19,6 +19,14 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Sign-in refused the email and password: a 401 from `auth/login/`,
+/// whatever its wording. The app's own marker, so the answer is read by
+/// where it came from rather than by the server's English.
+class WrongCredentials extends ApiException {
+  WrongCredentials(ApiException error)
+    : super(error.status, error.message, error.body, error.retryAfter);
+}
+
 /// The account's email address isn't confirmed yet: the server has emailed a
 /// 6-digit code to [email], and signs in only once it is typed. Thrown by
 /// [ApiClient.signIn] for a new account, and for a right password whose
@@ -233,6 +241,11 @@ class ApiClient {
       // server has already emailed a fresh code.
       if (error.status == 403 && error.body?['code'] == 'email_unverified') {
         throw EmailVerificationRequired(_emailIn(error.body) ?? address);
+      }
+      // Signing in, the server's 401 (it has a body, unlike the app's own
+      // "account changed") can only mean the email or the password is wrong.
+      if (!register && error.status == 401 && error.body != null) {
+        throw WrongCredentials(error);
       }
       rethrow;
     }

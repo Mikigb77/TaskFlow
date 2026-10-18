@@ -1,0 +1,773 @@
+{
+ "runId": "2026-10-18-commands",
+ "mode": "changes",
+ "created": "2026-10-18",
+ "conventions": [
+  "Paths are relative to the repo root. Line numbers come from the four reviews (.claude/ux-review/runs/2026-10-18-commands/review-A.md to review-D.md) at commit 985f060, with no uncommitted changes in App/lib. Packages run one at a time, in order, and many share files (App/lib/screens/voice_task_screen.dart, App/lib/widgets/capture_command_cards.dart, App/lib/widgets/capture_review_editor.dart, App/lib/widgets/task_editor.dart, App/lib/screens/home_screen.dart, App/lib/screens/verify_email_screen.dart, App/lib/screens/login_screen.dart and the three ARB files): after an earlier package, search for the code a line number points at, and build on what it left.",
+  "Copy is exact, shown as EN / ES / CA. Keep the catalogs' marks: “…” and ’ in English; «…» in Spanish and Catalan; … as one character (U+2026); ICU plurals as written. Every new or changed string goes in app_en.arb, app_es.arb and app_ca.arb (App/docs/LOCALIZATION.md), with an accurate @key description in app_en.arb and typed placeholders; a key a package removes goes from all three. Run flutter gen-l10n; never edit lib/l10n/generated/. The Catalan is the reviewers', checked by the organizer; where the organizer wrote it, the brief says so.",
+  "Owner decisions that bind every package (.claude/ux-review/DECISIONS.md, 2026-10-18 and 2026-10-18 later): the voice-commands plan's seven recommendations (nothing is created, changed or deleted before the confirming tap; changes and deletions show before → after and offer «Deshacer»; search includes completed tasks and never answers in sentences; free typing creates tasks only); accounts without Pro create tasks with the form and keep 10 dictations a month; the phone's parser stays only as a dictation's fallback («Guardar tal cual»); new password accounts confirm their email with a 6-digit code.",
+  "The speed bar holds for plain capture: a plain one-task dictation stays Añadir tarea → speak → Listo → one confirming tap and looks and saves exactly as today (App/test/voice_command_cards_test.dart:1007 must keep passing). The form and the sign-up are judged by the owner's father: a first-time, non-technical user, in Spanish, often at large text.",
+  "Out of scope: Backend/ (no package changes it; server halves are noted for the main session); the owner questions D1–D11 in plan.md; and the three questions already with the owner: deleting one repetition of a repeating task by voice, a default day in the form, and the Android launcher shortcut's wording. A brief part marked 'waits on D#' is left out on purpose. No new settings, screens, tabs or concepts.",
+  "Tests: the implementer keeps the whole suite passing and updates only the tests its change rightly breaks (each brief names those it knows); ux-tester writes the acceptance tests and reads copy through the generated AppLocalizations. Harnesses: App/test/voice_command_cards_test.dart (`_App.open`, `showResult`, `speak`, `type`; fixtures `command(json)`, `draft(...)`, `serverTask(...)`, projects `physics`, `maths`, `team`; `es`, `ca`; `weekday(date)`), App/test/new_task_form_test.dart (`openForm`, `_App.open`), App/test/project_people_filter_test.dart, App/test/email_verification_test.dart, App/test/auth_gate_test.dart, App/test/capture_free_dictations_test.dart, App/test/capture_landing_test.dart, App/test/project_assignment_test.dart, App/test/delete_account_test.dart.",
+  "Sizes: 2× means TextScaler.linear(2.0); 320 dp means a 320×640 view at devicePixelRatio 1 unless another size is given; 'with the keyboard' means a 300 dp bottom view inset (tester.view.viewInsets). Where a check counts lines, truncation or positions, load Manrope (assets/fonts/Manrope.ttf) as App/test/calendar_feedback_test.dart:55-57 does. Time-dependent checks move calendarClockProvider (App/lib/providers/calendar_focus_provider.dart:36).",
+  "Renders: the form previews come from flutter test --no-pub --dart-define=WRITE_FORM_PREVIEWS=true test/new_task_form_test.dart (build/new-task-form-*.png, capture-fill-by-hand-es, project-people-filter-es, task-created-by-es); the calendar, review and sign-in previews are in CLAUDE.md. Re-run the preview of any screen a package changes.",
+  "No agent touches a phone or an emulator, runs the backend, or calls the AI. Device checks are for the owner or the main session; real-model checks need staging.",
+  "Package numbering continues after P126 (run 2026-10-15-deletion)."
+ ],
+ "packages": [
+  {
+   "id": "P127",
+   "title": "A task that sounds like a command still becomes a task",
+   "area": "A",
+   "size": "M",
+   "severity": 3,
+   "findings": ["UX-901", "UX-904"],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/services/capture_processor.dart",
+    "App/lib/services/capture_store.dart",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/capture_free_dictations_test.dart"
+   ],
+   "brief": [
+    "Context: every dictation, and every typed capture with Pro, now asks the assistant for commands (App/lib/services/capture_processor.dart:229-232). Everyday task titles start with command verbs: «Cambiar la cita del dentista», «Cambia el aceite del coche el sábado», «Busca piso en Valencia», «Buscar a los niños a las 5», «Borrar las fotos del móvil». When one comes back as a change, a deletion or a search that finds nothing, the result offers only «Cerrar» (and «Volver a decirlo» while dictations are left): the thought isn't captured, and a free account has spent a dictation. Shared text, which is someone else's words full of imperatives, is sent the same way with Pro. This package makes such a result end in a task, and stops asking for commands on shares.",
+    "UX-901 (S3), part 1, the way out. In `CaptureResult` (voice_task_screen.dart:2130-3449) a result is read-only when `readOnly` (:3229-3230). When it is read-only and every card shown is either a change or a deletion that found nothing (`CommandView.notFound`, capture_command_cards.dart:57-60; this includes a target whose only matches are in projects the person can't edit) or a search with no results (`view.found.isEmpty`), show the existing «Guardar tal cual» (`captureSaveAsWritten`: “Save as written” / «Guardar tal cual» / «Desa-ho tal com està») as the filled button, full width, above «Cerrar» (`_exits(close: true)`, :3415). «Volver a decirlo» stays where it shows today. A search that found tasks, and a change that found its task (for example «Ya está así.»), keep today's footer with no filled button.",
+    "UX-901 part 1, what the tap does: exactly what «Guardar tal cual» does after a slow answer (U7, `_saveAsWritten`, :1319-1351). The phone's parser builds the task from the result's words: use the result's `transcript`, falling back to the capture's `text`, because a dictation transcribed online may have no `text`. None of the commands is applied, and the saved capture holds none. The task saves at once (`saveAtOnce`) and lands on Calendar lit, with «Añadida al …» and Deshacer, like any save. Pass this to `CaptureResult` as a callback from the sheet's state, beside `onSayAgain` (:2131-2145); don't write a second parser path, and make sure `CaptureProcessor.asWritten` (capture_processor.dart:56-73) can't fail on an empty `text` here. It sends nothing to the assistant, so a free account spends no second dictation; it is allowed without Pro because it is a dictation's fallback (DECISIONS.md, 2026-10-18 later).",
+    "UX-901 part 2, completed matches say so. On change and deletion cards (UpdateCommandCard :682-921, DeleteCommandCard :923-992), when the task, or the repetition shown, is completed, add the existing «Completada» (`commandCompleted`: “Completed” / «Completada» / «Completada») as a quiet `_Note` right under the card's first line. On pick-list rows (`_Choice`, :623-645) append it to the day line with « · », as found rows do (:543). Use the same completed rule as `_FoundRow` (:532-533).",
+    "UX-904 (S2), shares are tasks. `CaptureStore.acceptEntry` (capture_store.dart:111-146) stores shared text with `source: 'shared'` instead of 'typed'. In `CaptureProcessor._process` (capture_processor.dart:218-233), a shared capture sends `'source': 'typed'` (the server knows only speech and typed) and no `commands`; dictations and words the person typed keep `'commands': true` (decision 7 of the voice-commands plan: typed commands with Pro). Every test of `source == 'speech'` or `!= 'speech'` in voice_task_screen.dart (:535, :667, :1230, :1441, :1473, :1756, :1772, :3239) already treats 'shared' as typed; keep it so. A shared capture keeps 'shared' when its words are edited (:738).",
+    "Don't touch: the cards' layout and wording beyond the «Completada» line (P128 and later packages change them); the label «Guardar tal cual» (renaming it waits on D3, UX-919); «Volver a decirlo»; free-dictation counting; Backend/."
+   ],
+   "acceptance": [
+    "ES, 1× on 390×844: a dictation answered with one `update` whose target matches no task (transcript «Cambia el aceite del coche el sábado») shows «No encuentro ninguna tarea con «…»» with the command's words, a filled «Guardar tal cual», and «Cerrar» under it.",
+    "ES: tapping that «Guardar tal cual» sends no second request to ai/drafts/, saves a task titled «Cambia el aceite del coche» dated next Saturday, closes the sheet, and Calendar shows that Saturday with the row lit and «Añadida al {weekdayDate}» with Deshacer.",
+    "ES: a dictation answered with one `find` that finds nothing («Busca piso en Valencia») shows «Guardar tal cual» above «Cerrar»; a `find` that finds two tasks shows no filled button, only «Cerrar».",
+    "ES: a result whose `update` found its task but has nothing to change («Ya está así.») shows no «Guardar tal cual».",
+    "ES: a deletion card whose matched task is completed shows «Completada» under «Se eliminará: …»; a change card on a completed task shows «Completada» under its title; in a pick list of two matches, the completed one's second line ends with « · Completada».",
+    "Unit: a capture accepted through `acceptEntry` is stored with source 'shared'; processing it sends source 'typed' and no `commands` key; a typed capture with Pro sends `commands: true`; a spoken one sends `commands: true`.",
+    "ES, free account with 3 dictations left: «Guardar tal cual» on a found-nothing result makes no request to ai/drafts/, and «Te quedan 3 dictados gratis este mes» is unchanged before the sheet closes.",
+    "The plain one-task dictation test (App/test/voice_command_cards_test.dart:1007) passes unchanged."
+   ],
+   "deviceChecks": [
+    "Real model on staging, in ES and CA: say «Cambiar la cita del dentista el lunes», «Cambia el aceite del coche el sábado», «Busca piso en Valencia», «Buscar a los niños a las 5» and «Borrar las fotos del móvil» as plain dictations, and count how many come back as commands. If two or more do, tell the owner: review A asks to raise UX-901 to severity 4.",
+    "Phone with Pro: share «Busca el informe de ventas» to TaskFlow; the result is a task, not a search."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P128",
+   "title": "Command cards say what each tap does",
+   "area": "A",
+   "size": "M",
+   "severity": 3,
+   "findings": ["UX-903", "UX-905"],
+   "files": [
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/capture_result_exits_test.dart",
+    "App/test/localization_catalog_test.dart"
+   ],
+   "brief": [
+    "Context: on a deletion card the ✕ means “don't delete”, but TalkBack reads «Quitar Ir al dentista», the deletion's own name; after it the message says «Quitada» and the empty state «No se añadirá nada.», so the task looks deleted and survives. Cancelar asks «¿Quieres conservarlo para más tarde?», where «lo» reads as the task, with a red «Descartar» that is in fact the choice that keeps it. The confirming button says «Aplicar», or keeps «Añadir 1 tarea» when the same tap also changes and deletes. Name the outcome everywhere. Task cards don't change: their ✕ keeps «Quitar {title}» (`removeCaptureItem`, capture_review_editor.dart:537, :561) and their message «Quitada».",
+    "UX-903 (S3), the ✕ on command cards: its tooltip, which is also its TalkBack label, replaces `removeCaptureItem` at capture_command_cards.dart:407 and :433 (new project), :719 and :784 (change), :959 and :984 (deletion). New keys, given the title or name each line already passes: `commandDontDelete` “Don’t delete {title}” / «No eliminar {title}» / «No suprimeixis {title}»; `commandDontChange` “Don’t change {title}” / «No cambiar {title}» / «No canviïs {title}»; `commandDontCreate` “Don’t create {name}” / «No crear {name}» / «No creïs {name}».",
+    "UX-903, the message after ✕ (`_removeCommand`, voice_task_screen.dart:2623-2633), by the card's kind, replacing `reviewRemoved` there only; Deshacer stays: `commandWontDelete` “Won’t be deleted” / «No se eliminará» / «No es suprimirà»; `commandWontChange` “Won’t be changed” / «No se cambiará» / «No es canviarà»; `commandWontCreate` “Won’t be created” / «No se creará» / «No es crearà». `_remove` (task cards, :2571-2586) keeps «Quitada».",
+    "UX-903, `captureRemovedDraftsHelp` (the empty state once every card is removed, :3360-3364): “Nothing will change.” / «No se hará ningún cambio.» / «No es farà cap canvi.». It is true for removed tasks too.",
+    "UX-903, the keep question (`_askToKeep`, :251-272, used while listening, while typing and on a result). Settled with the 2026-10-14 fix (UX-605, UX-612) that made one question cover typed words: name the words, spoken or written. Spoken words (listening; a result whose capture is speech or has audio, `spoken` at :3239): `captureKeepQuestion` becomes “Keep what you said for later?” / «¿Conservar lo que has dicho para más tarde?» / «Vols conservar el que has dit per a més tard?». Typed or shared words (typing in the sheet; any other result): new `captureKeepTextQuestion` “Keep the text for later?” / «¿Conservar el texto para más tarde?» / «Vols conservar el text per a més tard?» (the organizer's copy, from the «Ver lo que dije» / «Texto original» split). The buttons stay Descartar / Conservar. Whether Cancel should ask at all on a result with no task to add waits on D1 (UX-917): don't change when the question shows.",
+    "UX-905 (S2), the confirming button (label at :3250-3267). Sort what the tap does into three kinds: add (ready tasks, `ready > 0`), change (`changes > 0`), delete (`deletes > 0`). New projects are named only when they are all the tap does. Add only: today's add labels (`captureAddTasks` / `captureAddToCalendar` / `captureAddTask`), with or without their new project. Change only: exactly one change whose only field is the planned day or time (the `onlyMoved` rule in `_apply`, :2882-2890) reads the existing `reschedule` “Reschedule” / «Cambiar fecha» / «Canvia la data»; any other change, or several, read the existing `saveChangesSentence` “Save changes” / «Guardar cambios» / «Desa els canvis». Delete only, even when a new project is created too: «Eliminar» (`delete`) with today's red style and delete icon (:3383-3398), so `deleteOnly` also holds when projects are created (settled by the organizer: the label names only the deletion, so it keeps the warning colour). Projects only: `commandCreateProjects`, as today.",
+    "UX-905, mixes, new keys: `commandAddAndChange` “Add and change” / «Añadir y cambiar» / «Afegeix i canvia»; `commandAddAndDelete` “Add and delete” / «Añadir y eliminar» / «Afegeix i suprimeix»; `commandChangeAndDelete` “Change and delete” / «Cambiar y eliminar» / «Canvia i suprimeix»; `commandAddChangeAndDelete` “Add, change and delete” / «Añadir, cambiar y eliminar» / «Afegeix, canvia i suprimeix». «Terminar», «Revisa los datos de arriba» and «Guardando…» stay as they are. Remove `commandApply` from the three catalogs. `saveChanges` (English “Save Changes”, title case; review A's cross-slice note) is used nowhere in lib/: delete it from the three catalogs too.",
+    "Existing tests that change for the right reason: App/test/voice_command_cards_test.dart:513 and :529 (one change of day only now reads «Cambiar fecha», `reschedule`, instead of `commandApply`), :943 (a task, a change and a deletion now read «Añadir, cambiar y eliminar») and :1255 (the 2× case, in ES and CA, reads `commandAddChangeAndDelete` instead of `captureAddTasks(1)` and `(2)`), and any other test that reads `commandApply`, `reviewRemoved` after a command's ✕, `captureRemovedDraftsHelp` or `captureKeepQuestion`.",
+    "Don't touch: task cards' ✕ and messages; when the keep question shows (waits on D1); the buttons' order; the label «Guardar tal cual» (waits on D3)."
+   ],
+   "acceptance": [
+    "ES, semantics: the deletion card's ✕ has the tooltip and label «No eliminar Dentista»; a change card's «No cambiar Ir al médico»; the new-project card's «No crear Física»; a task card's ✕ still reads «Quitar Comprar pan».",
+    "ES: after ✕ on the deletion card, «No se eliminará» shows with Deshacer, and after the result is confirmed or closed the task «Dentista» still exists; after ✕ on a change card, «No se cambiará»; on the project card, «No se creará».",
+    "ES: with every card removed, the result shows «No queda nada por revisar» and «No se hará ningún cambio.», and the button reads «Terminar».",
+    "ES: Cancelar on a spoken result holding a deletion card asks «¿Conservar lo que has dicho para más tarde?» with Descartar and Conservar; Cancelar while listening with words asks the same; Cancelar while typing with Pro, and on a typed result, asks «¿Conservar el texto para más tarde?».",
+    "ES, the confirming button: one change of day only reads «Cambiar fecha»; one change of title reads «Guardar cambios»; two changes read «Guardar cambios»; a task and a change read «Añadir y cambiar»; a task and a deletion «Añadir y eliminar»; a change and a deletion «Cambiar y eliminar»; a task, a change and a deletion «Añadir, cambiar y eliminar»; a deletion alone reads «Eliminar» on the error colour; a new project alone «Crear proyecto»; a task into a new project «Añadir tarea» or «Añadir al calendario», as today.",
+    "CA at 2× on 320×640 with Manrope: «Afegeix, canvia i suprimeix» takes at most 2 lines inside the button, and nothing overflows.",
+    "Catalogs: `commandApply` and `saveChanges` exist in none of the three ARB files; every new key exists in all three."
+   ],
+   "deviceChecks": [
+    "Phone with TalkBack, in Spanish: on a deletion card «Se eliminará: …» is read, then the ✕ reads «No eliminar …»; after it, «No se eliminará» is announced."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P129",
+   "title": "Deadline-only tasks show and land on their due day; a project made by voice opens",
+   "area": "A",
+   "size": "L",
+   "severity": 3,
+   "findings": ["UX-902", "UX-906"],
+   "files": [
+    "App/lib/widgets/capture_review_editor.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/screens/home_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/capture_landing_test.dart"
+   ],
+   "brief": [
+    "Context: the plan's own example, «Crea un proyecto de matemáticas y añade terminar la presentación para el 12», returns a task with only a deadline. The project card makes the result compact, so the task's card shows only «Sin fecha» (`_dateLine(main: false)`, capture_review_editor.dart:774, through `taskDayLine`); after the tap the message says «Proyecto creado · Añadida sin fecha» and Calendar lights the Sin fecha row, though Calendar also lists the task on the 12th (`Task.calendarOccurrencesOn`). The same happens to any deadline task in a dictation of several, including the owner's 2026-10-15 example (“…by Thursday at 5”). And a project made by voice is never shown: «Proyecto creado» closes onto Calendar, while making one by hand opens its page (UX-327, `createProject`, task_lists_screen.dart:416-428).",
+    "UX-902 (S3), what shows. Where a line shows only a task's day, and the task has no day but a deadline, show `taskDeadlineLabel` (task_planning_control.dart:7-13: “Due Thu, 12 Nov” / «Vence jue, 12 nov» / «Termini: dj., 12 de nov.») with `Icons.flag_outlined` instead of «Sin fecha» with the calendar icon, in: the collapsed card's date line (`_dateLine`, capture_review_editor.dart:372-401, via :774; TalkBack reads the same text, and it still opens the date sheet); pick-list rows (`_Choice`, capture_command_cards.dart:636-641); and found rows (`_FoundRow`, :535-539), which today show the deadline's date bare, as if it were the day. The opened card (`main: true`, :598) keeps «Sin fecha» with its deadline row under it. Don't change `taskDayLine` itself (task_schedule_label.dart:8-13): Calendar, Tareas and the form use it.",
+    "UX-902, where it lands. In `_save` (voice_task_screen.dart:2433-2483) and `_apply` (:2867-2936), a task with no day but a deadline lands on its deadline's day: count `Task.day(deadline)` among `days`, and count the task as undated (`undated:`) only when it has neither a day nor a deadline. Calendar already lists such a task on that day, so its row lights there and the Sin fecha row doesn't.",
+    "UX-902, the message. For one saved task with no day but a deadline, new key `taskAddedDue` replaces `taskSavedInbox` (in `_save`'s `added`, :2444-2448, and in `_apply`'s parts, :2895-2900): “Added · due {date}” / «Añadida · vence el {date}» / «Afegida · venç el {date}», with `{date}` = `context.weekdayDate(deadline)`. Several tasks keep `captureTasksAdded` and `captureAlsoOn` / `captureAlsoOnDays`, with deadline days counted as the tasks' days.",
+    "UX-906 (S2). In `_apply`, when the sheet closes (nothing left pending), the tap created exactly one project (`applied.projects.length == 1`), every task it added went into that project (or it added none), and it changed no task (`applied.updates.isEmpty`; deletions don't matter, since they land nowhere): open that project's page, `HomeScreen(isRoot: false, listId: id)`, as `createProject` does, and light its new tasks there as a project page lights a landing (`_land` / `_landingIds`, home_screen.dart:132-171, :495-501). The page doesn't exist before the push, so give HomeScreen a way to start with that landing (for example an optional set of task ids it lands on first build); no visible control. The message (`parts`, :2892-2914) shows there, with Deshacer. Every other result lands on Calendar as now.",
+    "UX-906, Deshacer. It already takes the project and its tasks back and reopens the result (:2943-3034). With the project's page open, close that page first (the project is gone), then reopen the result over the screen underneath, as today.",
+    "How the two fit: the plan's example (one new project, one deadline-only task in it) opens the Matemáticas page with the row lit and «Proyecto creado · Añadida · vence el jue, 12 nov». A deadline-only task that doesn't go into a single new project lands on Calendar on the deadline's day.",
+    "Don't touch: the opened card's date line; the form; `taskDayLine`; U5's landing for tasks with a day; the find card's other lines (P137 changes its rows' icon and heading). No new controls."
+   ],
+   "acceptance": [
+    "ES, 1×: a result with a `project` command «Matemáticas» and a draft «Terminar la presentación» into it with only a deadline 5 days ahead shows, on the collapsed task card, «Vence {weekdayDate}» with the flag icon and no «Sin fecha» line; opened, the card shows «Sin fecha» as its main line and the deadline row under it.",
+    "ES: a pick-list row and a found row for a task with only a deadline show «Vence {weekdayDate}», not the bare date.",
+    "ES: a plain dictation of one task with only a deadline 3 days ahead: after «Añadir tarea», Calendar selects that day, the task's row is lit, the Sin fecha row is not lit, and the message reads «Añadida · vence el {weekdayDate}» with Deshacer.",
+    "ES: a dictation of two tasks, one for tomorrow and one with only a deadline 3 days ahead: Calendar lands on tomorrow with that row lit, and the message names the other day («2 tareas añadidas · También el {weekdayDate}»).",
+    "ES: «Nuevo proyecto: Física» alone: after «Crear proyecto», the Física project page is on top (app bar «Física») and «Proyecto creado» shows with Deshacer; after Deshacer, no project Física exists, its page has closed, and the result shows again.",
+    "ES: «Nuevo proyecto: Física» with «Estudiar el tema 2» into it: after the tap, the Física page shows «Estudiar el tema 2» lit.",
+    "ES: the plan's example (project «Matemáticas» and the deadline-only «Terminar la presentación» into it): the Matemáticas page opens with the row lit and «Proyecto creado · Añadida · vence el {weekdayDate}».",
+    "ES: a result that creates a project and also changes a task lands on Calendar on the changed task's day, as today."
+   ],
+   "deviceChecks": [
+    "Phone, real model, in Spanish: «Crea un proyecto de matemáticas y añade terminar la presentación para el 12» opens the Matemáticas page with the task lit and the due day in the message."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P130",
+   "title": "A task for someone else lands in view on Calendar and Tareas",
+   "area": "B",
+   "size": "M",
+   "severity": 3,
+   "findings": ["UX-1001"],
+   "files": [
+    "App/lib/screens/calendar_screen.dart",
+    "App/lib/screens/home_screen.dart",
+    "App/test/project_assignment_test.dart",
+    "App/test/capture_landing_test.dart",
+    "App/test/new_task_form_test.dart"
+   ],
+   "brief": [
+    "Context: once an account has a shared project, Calendar's and Tareas' filter defaults to «Para mí» (`ProjectScope.team = false`, App/lib/providers/project_scope_provider.dart:7). A task made for Ana (the form: Más detalles › Familia › Ana; or a dictation «Ana tiene que…») isn't «for me» (App/lib/models/task.dart:59-63; `taskInProjectScope`, project_scope_provider.dart:18-32). On save, Calendar selects the day and shows the message, but the row is filtered out: nothing lights and nothing scrolls. The Tareas root behaves the same. Project pages already clear «Para mí» and the person for a landing (home_screen.dart:132-171); Calendar's `_land` (calendar_screen.dart:119-134) and the Tareas root's don't. The severity scale's own blocker example is a saved task the person can't see, so they add it twice.",
+    "UX-1001 (S3), Calendar: in `_land`, when the app-wide scope (`projectScopeProvider`) hides any landed task, widen it before selecting the day: first to «Todas» (`team: true`, keeping the project), and if the project filter still hides it, to all projects (`projectId: null`, shown as the existing `projectsAll`: “All projects” / «Todos los proyectos» / «Tots els projectes»). Then select the day and light the row as now. A landing the scope already shows changes nothing.",
+    "UX-1001, the Tareas root: in `HomeScreen._land` (:132-171), when `widget.listId == null` and the page's own search, label and chip aren't what hides the task, widen the app-wide scope the same way (Todas, then all projects). Project pages keep their own rule.",
+    "This covers capture results, the form and voice assignments alike, because they all land through `CalendarFocus`. No copy change and no new control.",
+    "Don't touch: which project a new task goes to when Calendar is filtered (an older owner question, UX-302); the person filter on project pages; the scope's default."
+   ],
+   "acceptance": [
+    "ES, 1×: an account (id 1) in a shared project «Familia» with Ana (id 2) as editor, Calendar on its default «Para mí». A free account opens Nueva tarea, types «Llamar al médico», taps Mañana, chooses Familia and the person «Ana» under Más detalles, and taps «Añadir al calendario». Calendar shows Mañana selected, «Todas» selected, the row «Llamar al médico» lit, and «Añadida al {weekdayDate}» with Deshacer.",
+    "ES: the same saved from the Tareas root (default «Para mí»): afterwards «Todas» is selected and the row is lit.",
+    "ES, Pro: a capture result assigned to Ana and saved from Calendar under «Para mí»: «Todas» is selected and the row is lit.",
+    "ES: Calendar's project filter on «Casa», and a task for the account itself saved into «Familia»: afterwards the project filter shows «Todos los proyectos» and the row is lit.",
+    "ES: a task for the account itself saved under «Para mí» leaves «Para mí» selected."
+   ],
+   "deviceChecks": [
+    "Phone, Pro, a project shared with a second account: on Calendar say «Ana tiene que llamar al médico mañana» and save; Mañana shows the row lit, with «Todas» selected."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P131",
+   "title": "A shared project's people filter: every chip in view, one order, named for TalkBack",
+   "area": "C",
+   "size": "M",
+   "severity": 3,
+   "findings": ["UX-1101", "UX-1108", "UX-1110"],
+   "files": [
+    "App/lib/widgets/project_scope_control.dart",
+    "App/lib/screens/home_screen.dart",
+    "App/test/project_people_filter_test.dart",
+    "App/test/project_scope_control_test.dart",
+    "App/test/home_screen_test.dart"
+   ],
+   "brief": [
+    "Context: on a shared project's page with two or more other editors, `_PeopleFilter` (project_scope_control.dart:217-275) shows «Todas · Para mí · Ana · Paul…» in one row that scrolls sideways and is clipped by the page's 24 dp padding (home_screen.dart:329). When a gap falls at the clip, the row looks complete: at 2× on 393 dp, or at 1.3× with «Ana García», Paul is entirely off-screen, and at 2× on 320 dp only Todas and Para mí show. Real names are often email prefixes, the widest labels (UX-1102). Elsewhere (Calendar, Tareas, a shared project nobody else edits) the pair reads «Para mí · Todas» (:199-210), the other way round. And TalkBack hears «Ana, botón».",
+    "UX-1101 (S3), part 1: wrap the chips (a `Wrap`, spacing 8, runSpacing 4, as the pair at :87-91 does). Keep a sideways row only when the chips would need a third row; then run it to the screen's edges (the page's 24 dp becomes padding inside the scroll view), so the next chip is visibly cut at the screen edge.",
+    "UX-1101 part 2: on every non-root page (project pages and Sin fecha share this header), move ✓ (`completed`, Tareas completadas, home_screen.dart:310-314) into the app bar (`CustomAppBar(actions: …)`), and drop the row it sat in alone (:370-386). An archived project keeps its «Proyecto archivado» line (`archivedList`) as plain text where it was. The root Tareas page keeps ✓ beside «Proyectos». That frees about 60 dp, so a second row of chips doesn't push the first task down.",
+    "UX-1108 (S2): one order everywhere, the approved plan's: «Todas · Para mí · Paul…». Swap the pair at :199-210 so Calendar, Tareas and a shared project with no other editor read Todas (`forTeam`) first, then Para mí (`forMe`). What each chip does, the selection and the default stay the same.",
+    "UX-1110 (S1): each person chip's semantics label is `commandFindPerson(name)` (today ES «Tareas de Ana», EN “Ana’s tasks”, CA «Tasques assignades a Ana»; P137 later makes ES «Tareas para Ana» and EN “Tasks for Ana”), with its selected state; the people row's «Todas» chip is labelled `allTasks` (“All tasks” / «Todas las tareas» / «Totes les tasques»). The visible text doesn't change.",
+    "UX-1101, the first task stays where it is (review C's check): before you change anything, measure the top of the first task row on a shared project page with two tasks and «Ana» and «Paul» as other editors, in ES with Manrope, at 2× on 320×640 and at 1.3× on 393×851. Write both numbers in a comment in App/test/project_people_filter_test.dart and in your notes. After the change, the first task row's top must be no lower at either size: the freed ✓ row (about 60 dp) pays for a second chip row (about 50–60 dp). If it still ends up lower, say by how much in your notes; don't shrink the chips below Material's 48 dp touch target to make it fit.",
+    "Don't touch: the filter's rules (`projectPeopleToFilter`, `_visible`), who gets a chip, the landing that clears a person. No copy change."
+   ],
+   "acceptance": [
+    "Manrope, ES and CA: a shared project with «Ana García» and «Paul» as other editors at 1.3× on 393×851, and with «Ana» and «Paul» at 2× on 320×640: every person chip is hit-testable and lies wholly inside the screen, with no drag.",
+    "ES, Manrope, a shared project page with two tasks and «Ana» and «Paul» as other editors, at 2× on 320×640 and at 1.3× on 393×851: the first task row's top is no lower than the value measured before the change, which P131's implementer recorded in App/test/project_people_filter_test.dart.",
+    "ES, 2× on 320×640, 8 other editors: the people row scrolls sideways, and the last chip it shows crosses the screen's right edge (its right side beyond x = 320).",
+    "ES: on a project page, Tareas completadas is an app-bar action (tooltip «Tareas completadas») that opens Tareas completadas, and no header row holds only that button; an archived project still shows «Proyecto archivado» as text; on the root Tareas page the button is still beside «Proyectos».",
+    "ES and CA: on Calendar, on the Tareas root, on a shared project whose others are all viewers, and on one with two other editors, the first ChoiceChip reads Todas (CA Totes) and the second Para mí (CA Per a mi).",
+    "ES, semantics: Ana's chip has the label `commandFindPerson('Ana')` and reports selected once tapped; the people row's Todas chip has the label «Todas las tareas»."
+   ],
+   "deviceChecks": [
+    "Phone, Spanish, the largest font, 360–393 dp: on a shared project with two other editors both names show without swiping, and the first task is in view."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P132",
+   "title": "Sign-in errors name the problem: a wrong password, and how long to wait",
+   "area": "D",
+   "size": "M",
+   "severity": 3,
+   "findings": ["UX-402", "UX-1208"],
+   "files": [
+    "App/lib/services/api_client.dart",
+    "App/lib/l10n/request_locale.dart",
+    "App/lib/screens/login_screen.dart",
+    "App/lib/screens/verify_email_screen.dart",
+    "App/lib/screens/delete_account_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/auth_gate_test.dart",
+    "App/test/email_verification_test.dart",
+    "App/test/delete_account_test.dart"
+   ],
+   "brief": [
+    "Context, UX-402 (reopened): the real server answers a wrong password, or an address with no account, with 401 and the detail «Email or password is incorrect.» (Backend/core/auth_views.py:173). `requestProblem` (request_locale.dart:80-82) recognises only simplejwt's wording, so the 401 falls to `session` (:95) and sign-in says «Vuelve a iniciar sesión para continuar. Tus tareas locales se conservan.», without «Crear una cuenta con este correo» (UX-402) or «¿Has olvidado tu contraseña?» (UX-488). The app's tests pass only because they fake simplejwt's text (auth_gate_test.dart:277, :600, :727). Context, UX-1208: every 429 on the auth screens says «Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.» (`rateLimit`), though the server sends the wait (Retry-After 900 for sign-in's 15-minute lock, auth_views.py:166-167; read into `ApiException.retryAfter`, api_client.dart:536-546).",
+    "UX-402 (S3): classify by status and endpoint, not by English text. In `ApiClient.signIn` (api_client.dart:210-243), a 401 from `auth/login/` (not register) means wrong credentials, whatever its wording: rethrow it as an `ApiException` that carries a marker of the app's own, keeping status, message and retryAfter, and make `requestProblem` (request_locale.dart:78-97) read that marker first, before its text rules and its generic 401 → `session` rule (:95). Use a field, or a body key, that no other rule reads: a body `email` key already means `email` (:79), and a 400 with a body `code` key means `recoveryCode` (:90). Keep the simplejwt matches for older servers. The copy stays (`requestError` credentials: «No encontramos esa cuenta o la contraseña no es correcta.»), and `unknownAccount` (login_screen.dart:320-325) then offers «Crear una cuenta con este correo», or after «Iniciar sesión con este correo» the recovery button (UX-488).",
+    "UX-1208 (S1), the wait: in whole minutes rounded up, at least 1, from `retryAfter` or else DRF's English ending, as the delete page's `_waitMinutesFor` does (delete_account_screen.dart:178-191). Move that helper beside `requestProblem` in request_locale.dart, and rename the key `deleteAccountThrottledWait` to a shared `tooManyTriesWait`, its text unchanged: “{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}” / «{minutes, plural, =1{Demasiados intentos. Espera un minuto y vuelve a intentarlo.} other{Demasiados intentos. Espera {minutes} minutos y vuelve a intentarlo.}}» / «{minutes, plural, =1{Massa intents. Espera un minut i torna-ho a provar.} other{Massa intents. Espera {minutes} minuts i torna-ho a provar.}}». The delete page uses the moved helper and the renamed key, unchanged for the person.",
+    "UX-1208, where: in `requestProblemText` called with `onSignIn: true` (the auth screens: verify_email_screen.dart:119 and login_screen.dart's `problem`), a `rateLimit` answer whose wait is known shows `tooManyTriesWait(minutes)`; without a known wait `rateLimit` stays. That covers the confirm screen, «Crea tu cuenta» and sign-in. Other screens keep today's line.",
+    "Tests: those that fake simplejwt's wording keep passing; ux-tester adds the server's real answer. Update the tests that read `deleteAccountThrottledWait` (App/test/delete_account_test.dart) to the new key.",
+    "Don't touch: the server; sign-in's password rules; other 401s (a session that ended elsewhere still reads `session`)."
+   ],
+   "acceptance": [
+    "ES, sign-in mode: a login answered 401 with the detail «Email or password is incorrect.» shows «No encontramos esa cuenta o la contraseña no es correcta.» and the button «Crear una cuenta con este correo», with the email kept; no «Vuelve a iniciar sesión…» line shows.",
+    "ES: UX-488's sequence (create → «Ya existe una cuenta…» → «Iniciar sesión con este correo» → the same 401) shows «¿Has olvidado tu contraseña?» (`recover-with-email`).",
+    "An authenticated request elsewhere answered 401 still maps to `session`.",
+    "ES: on the confirm screen, Confirmar answered 429 with Retry-After 42 shows «Demasiados intentos. Espera un minuto y vuelve a intentarlo.»; sign-in answered 429 with Retry-After 900 shows «Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.»; «Crea tu cuenta» answered 429 with Retry-After 60 shows «Demasiados intentos. Espera un minuto y vuelve a intentarlo.»; a 429 with no Retry-After and no wait in its text keeps «Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.».",
+    "ES: the delete page's lock still reads «Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.», and its tests pass with the renamed key.",
+    "Catalogs: `deleteAccountThrottledWait` exists in none; `tooManyTriesWait` exists in all three with the text above."
+   ],
+   "deviceChecks": [
+    "Phone, on staging: sign in with a wrong password; the credentials line and «Crear una cuenta con este correo» show. This also unblocks UX-484's and UX-488's phone checks.",
+    "Phone, on staging: five wrong passwords, then a sixth try; the line says «Espera 15 minutos»."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P133",
+   "title": "Confirm your email: the answer in view, the keyboard steady, an honest «expired»",
+   "area": "D",
+   "size": "L",
+   "severity": 3,
+   "findings": ["UX-1201", "UX-1203", "UX-1204"],
+   "files": [
+    "App/lib/screens/verify_email_screen.dart",
+    "App/lib/providers/auth_provider.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/email_verification_test.dart"
+   ],
+   "brief": [
+    "Context, App/lib/screens/verify_email_screen.dart: on the 6th digit the field turns read-only (:312), which closes Android's keyboard; on a refusal it comes back and covers the message, and nothing scrolls the answer into view (sign-in does, `_reveal`, login_screen.dart:128-158). The field is autofocused (:308), so on arrival the keyboard also hides «Reenviar código» and «Usar otro correo», the way out for someone who still has to fetch the code. The server answers `code_expired` both for a spent code and for an address already confirmed (Backend/core/auth_views.py:118-122), for example after the right code's answer was lost, and resend then sends nothing. Confirmar and the keyboard's ✓ resend refused digits, spending tries (5 lock the code). «Pide uno nuevo» names an action the screen calls «Reenviar código», and on `code_expired` the countdown is cancelled (:196-199), inviting a resend the server drops within the minute.",
+    "UX-1201 (S3), part 1, keep the keyboard steady while confirming: don't make the code field read-only (:312); ignore edits while `_confirming` instead (for example an input formatter that keeps the old value). Do the same for the password field (:362). Correct the comment at :309-311.",
+    "UX-1201 part 2, bring every answer into view: after an error, «El código tiene 6 cifras» or «Te hemos enviado un código nuevo», scroll so the field and the line under it sit above the keyboard, as sign-in's `_reveal` does (`Scrollable.ensureVisible`, keepVisibleAtEnd), with no animation when animations are off (`MediaQuery.disableAnimationsOf`).",
+    "UX-1201 part 3, open without the keyboard: `autofocus: false` (:308). The help already says «Escríbelo aquí» right above the field, and one tap on «Código» brings the keyboard and Gboard's chip with a copied code. Sign-up happens once, so the speed bar doesn't apply. Update App/test/email_verification_test.dart:361, which expects the autofocus.",
+    "Keep, for this and later packages, the time of this screen's last code (`_sentAt`): when the screen opens (the server sent one just before) and after each successful Reenviar. Read the time through `calendarClockProvider` (App/lib/providers/calendar_focus_provider.dart:36), which tests replace.",
+    "UX-1203 (S3): on `code_expired`, before showing anything, sign in with the screen's address and password, the same sign-in the login screen runs (it throws `EmailVerificationRequired` on 403 `email_unverified`, api_client.dart:231-236). Signed in: the app opens, as after the right code. `EmailVerificationRequired`: the code really is spent; go on to the expired lines below (that sign-in has just emailed a fresh code, if the server's one-a-minute limit allowed it). Any other answer: its own line under the field (`requestProblemText(l, error, onSignIn: true)`, which names a wait since P132). The screen stays in its confirming state meanwhile.",
+    "UX-1204 (S2), part 1, don't resend refused digits: remember the last refused code; Confirmar, ✓ or six digits typed again that equal it send nothing and show that refusal's line again. Changing a digit clears the line, as today.",
+    "UX-1204 part 2, `verifyEmailCodeInvalid` says what to do: “That code isn’t right. Check the newest email we sent.” / «Ese código no es correcto. Mira el último correo que te hemos enviado.» / «Aquest codi no és correcte. Mira l’últim correu que t’hem enviat.».",
+    "UX-1204 part 3, expired or locked, after UX-1203's check; never cancel the countdown on `code_expired` (remove :196-199). At least 60 s since `_sentAt`: that sign-in sent a new code, so empty and focus the field, set `_sentAt` to now and restart the countdown, as after Reenviar, and show new `verifyEmailCodeSpentNew` “That code no longer works. We’ve sent you a new one.” / «Ese código ya no sirve. Te hemos enviado uno nuevo.» / «Aquest codi ja no serveix. T’hem enviat un codi nou.». Within the 60 s: keep the countdown running, and show new `verifyEmailCodeSpentWait` “That code no longer works. Tap “Resend code” when the countdown ends.” / «Ese código ya no sirve. Toca «Reenviar código» cuando acabe la cuenta atrás.» / «Aquest codi ja no serveix. Toca «Torna a enviar el codi» quan acabi el compte enrere.» (settled by the organizer: review D's «Pide otro…» would repeat the two-names problem it reports, so the line names the button, `verifyEmailResend`; the Catalan is the organizer's). Remove `verifyEmailCodeExpired` from the three catalogs.",
+    "Whether «Te hemos enviado…» can be untrue past the server's hourly cap waits on D9 (UX-1206): don't build anything for it. Don't touch: six digits confirming by themselves, pasted codes, `signup_replaced`'s return to «Crea tu cuenta» (P134 changes it only when the screen asks for the password itself), the screen's order."
+   ],
+   "acceptance": [
+    "ES and CA, Manrope, 360×740 with the keyboard, at 1.3× and 2×: after `code_invalid`, after `code_expired` (both variants), after an offline answer and after Reenviar, the bottom of the line under the code field is at or above y = 440.",
+    "ES: `tester.testTextInput.isVisible` stays true from the 6th digit until the answer arrives.",
+    "ES, 1.3× on 360×740: on arrival nothing has focus, no keyboard shows, and «Reenviar código en 60 segundos» and «Usar otro correo» are on screen.",
+    "ES: after `code_invalid`, tapping Confirmar and the keyboard's done action make no second verify request (the fake API counts them), and «Ese código no es correcto. Mira el último correo que te hemos enviado.» stays; changing one digit clears it, and six new digits send one request.",
+    "ES: verify answers `code_expired` and the sign-in answers a session: the app opens on Calendar, and no expired line ever shows.",
+    "ES: verify answers `code_expired` 61 s after the screen opened and the sign-in answers 403 `email_unverified`: «Ese código ya no sirve. Te hemos enviado uno nuevo.», the field empty and focused, and «Reenviar código en 60 segundos».",
+    "ES: the same 20 s after the screen opened: «Ese código ya no sirve. Toca «Reenviar código» cuando acabe la cuenta atrás.», and the button reads «Reenviar código en 40 segundos» and stays off.",
+    "ES, EN and CA at 2× on 320×640: each new line fits with no overflow.",
+    "Catalogs: `verifyEmailCodeExpired` exists in none; the two new keys exist in all three."
+   ],
+   "deviceChecks": [
+    "Phone, Spanish at 1.3× and 2×: type a wrong code; the keyboard doesn't drop, and «Ese código no es correcto…» shows above it.",
+    "Phone, on staging: confirm on a poor connection so the right code's answer is lost; Confirmar again opens the app instead of «ya no sirve»."
+   ],
+   "dependsOn": ["P132"]
+  },
+  {
+   "id": "P134",
+   "title": "Confirm your email survives the trip to the inbox",
+   "area": "D",
+   "size": "M",
+   "severity": 3,
+   "findings": ["UX-1202"],
+   "files": [
+    "App/lib/screens/verify_email_screen.dart",
+    "App/lib/screens/login_screen.dart",
+    "App/lib/main.dart",
+    "App/lib/services/pending_verification.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/email_verification_test.dart"
+   ],
+   "brief": [
+    "Context: the password lives only in memory (verify_email_screen.dart:30-38), the screen is a plain pushed route (login_screen.dart:184-207), and a cold start without a session opens a blank sign-in (main.dart:427-431). If Android kills TaskFlow while the person reads the email (a low-memory phone, or «Cerrar todo» in recent apps), they come back to «Inicia sesión», must retype the 12-character password they invented a minute ago, and signing in or creating the account again emails a new code that replaces the one they just read.",
+    "UX-1202 (S3): remember the pending address, never the password. Keep it from the moment «Confirma tu correo» opens until the address is confirmed, «Usar otro correo» is tapped, or 30 minutes pass (the code's life). Store only the address and when it was saved, in the kind of storage a pending invitation uses (App/lib/services/invitation_links.dart: FlutterSecureStorage, injectable for tests), behind a provider tests can replace. The file name above is a suggestion.",
+    "On a cold start with no session and a pending address younger than 30 minutes, open «Confirma tu correo» for it straight away, over sign-in, without a password: its own password field already exists for this case (`widget.password == null`, verify_email_screen.dart:354-383; tested at App/test/email_verification_test.dart:727). Send nothing on the way (no sign-in, no resend), so the code in the inbox still works. Not when sign-in is the session-expiry screen (`signInAgain`). An older entry is dropped.",
+    "In that case (the screen asks for the password itself), a `signup_replaced` answer most likely means a mistyped password, since verify checks the password first (Backend/docs/EMAIL_VERIFICATION.md:39): stay on the screen and show new `verifyEmailWrongPassword` under the password field: “That isn’t this account’s password.” / «Esa contraseña no es la de esta cuenta.» / «Aquesta contrasenya no és la d’aquest compte.». The same line shows there when P133's sign-in check answers wrong credentials. After sign-up or sign-in (password passed in), `signup_replaced` keeps today's return to «Crea tu cuenta».",
+    "Back keeps the pending address (the person may come back for it); «Usar otro correo» and a confirmed address clear it.",
+    "Don't touch: the server; what the screen asks when it opens from sign-up or sign-in. The password is never written anywhere."
+   ],
+   "acceptance": [
+    "ES: open the confirm screen after a sign-up, then rebuild the app as a cold start with the same storage and no session: «Confirma tu correo» opens for that address with the password field, and no request was sent.",
+    "ES: the same after the clock moves 31 minutes, after «Usar otro correo», or after the address was confirmed: the cold start opens plain sign-in.",
+    "ES: on the cold-start screen, a verify answered `signup_replaced` shows «Esa contraseña no es la de esta cuenta.» under the password field, and the screen stays.",
+    "The storage never holds the password, only the address and a time.",
+    "ES: after a normal sign-up, `signup_replaced` still returns to «Crea tu cuenta» with «Alguien ha vuelto a crear una cuenta con este correo. Créala de nuevo para continuar.»."
+   ],
+   "deviceChecks": [
+    "Phone, Developer options › «No mantener actividades» on: create an account, open Gmail, come back to TaskFlow; «Confirma tu correo» is there, and the emailed code works with the password."
+   ],
+   "dependsOn": ["P133"]
+  },
+  {
+   "id": "P135",
+   "title": "Command-card questions: in the question box, the right question, few chips",
+   "area": "A",
+   "size": "L",
+   "severity": 2,
+   "findings": ["UX-908", "UX-909", "UX-915"],
+   "files": [
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/widgets/capture_review_editor.dart",
+    "App/lib/widgets/task_list_picker.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/models/capture_command.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_command_cards_test.dart"
+   ],
+   "brief": [
+    "Context: «…al proyecto de química», when no such project exists, asks the yes/no «¿Crear el proyecto «Química»?» and answers with «Crear «Química»», one chip per editable project (10 projects give 12 chips) and «Sin proyecto»; nothing says the project chips mean “put it there instead” (`ProjectChoices`, capture_command_cards.dart:161-232, used by capture_review_editor.dart:293-330 and by the two-matches card, :400-425). «Crea el proyecto Química» beside «Física y Química» arrives matched to the existing project (`existing_list_id`, the server's lenient match, Backend/docs/VOICE_COMMANDS.md:246), and the card only states «Ya tienes «Física y Química»» (:387-399): the person asked to create, and the app decided otherwise. The change card's «¿Qué día?» is a grey footnote (`_Note`, :797), the time it understood stays hidden until a day is picked (command_plan.dart:207-211), and «Elegir día» never shows the day picked.",
+    "UX-908 (S2), the question: on a task's card whose project said doesn't exist (`_projectChoice`, capture_review_editor.dart:293-330), ask where it goes, new `commandWhichProject`: “Which project should it go in?” / «¿En qué proyecto la pongo?» / «A quin projecte la poso?». The «Nuevo proyecto» card with two matches keeps «¿Crear el proyecto «…»?» as its first line, because there the person asked to create one.",
+    "UX-908, the chips, in both places: «Crear «Química»» first (`commandCreateNamed`); then at most 3 projects like the name (the `like` test in `_likeFirst`, :146-155: only those, in that order); then new `commandOtherProject` “Another project…” / «Otro proyecto…» / «Un altre projecte…», shown only when the person has editable projects not already shown, which opens the project sheet the task's project chip opens (TaskListPicker's sheet, task_list_picker.dart:44-91: make it callable from here rather than building a second sheet), where a pick answers the question as a chip would (`onPick`); then «Sin proyecto» (`noList`) on the task's card only. At most 6 chips.",
+    "UX-909 (S2): a `project` command whose existing project's name differs from the name said, ignoring case and accents (`foldForSearch`), is shown as a question, like `ambiguous_project`: the card reads «¿Crear el proyecto «Química»?» (`commandCreateProjectQuestion`) with ✕ and the chips of the step above, the existing project first after «Crear …», and it blocks the confirming tap until a chip is tapped. «Crear «Química»» sets `choice: createChoice`, which must then count as a project to create (adjust `existing` and `pending`, capture_command.dart:300-310, which today treat any `existingListId` as existing), and the dictation's tasks that the server filed in the existing project go to the new one instead. The existing project's chip sets `choice` to its id, and the tasks stay there (as `_changeCommand` does for two matches, voice_task_screen.dart:2262-2294). Equal names, ignoring case and accents, keep «Ya tienes «Matemáticas»».",
+    "UX-915 (S1), the box: both questions sit in the result's question box (capture_review_editor.dart:166-176: surfaceContainerHigh, 16 dp corners, 14 dp padding): the task card's project question above, and the change card's day question (capture_command_cards.dart:796-837). Extract the box into one widget both files use; don't copy it.",
+    "UX-915, the time: `commandWhichDay` takes `{hour}` (the hour as shown, for the article, as `notificationAt` and App/lib/services/reminder_copy.dart:109 do) and `{time}` (`context.clockTime` of the time the change says): “{hour, plural, other{Which day, at {time}?}}” / «{hour, plural, one{¿Qué día, a la {time}?} other{¿Qué día, a las {time}?}}» / «{hour, plural, one{Quin dia, a la {time}?} other{Quin dia, a les {time}?}}». The day question shows only when a time was said for a task with no day (`needsDay`) or a day was already picked for it, so a time is always known.",
+    "UX-915, the chip: «Elegir día» (:815-833) shows the day picked, as the form's chip does (task_editor.dart:976-984): when `command.day` is neither today nor tomorrow, its label is `context.weekdayDate(day)` and it is selected.",
+    "Don't touch: Backend/ (the lenient match stays the server's); the «Nuevo proyecto: X» card when nothing similar exists; the project sheet's own rows (P141 changes them); the ✕'s wording (P128)."
+   ],
+   "acceptance": [
+    "ES, 10 editable projects (among them «Química orgánica», «Física y Química» and «Casa»): a task card whose project «química» doesn't exist shows «¿En qué proyecto la pongo?» inside the question box and at most 6 chips, in this order: «Crear «Química»», the similar projects (at most 3), «Otro proyecto…», «Sin proyecto».",
+    "ES: tapping «Otro proyecto…» opens the project sheet; tapping «Casa» there puts the task in Casa (its chip reads Casa) and the question disappears.",
+    "ES: with one editable project, already shown as a similar chip, no «Otro proyecto…» shows.",
+    "ES: a `project` command «Química» whose existing_list_id is «Física y Química» asks «¿Crear el proyecto «Química»?» with «Crear «Química»» and «Física y Química», and the confirming button waits; after «Crear «Química»» and the tap, a project «Química» exists and the dictation's task is in it; after «Física y Química» instead, no project is created and the task is in Física y Química.",
+    "ES: a `project` command «matematicas» whose existing project is «Matemáticas» still shows «Ya tienes «Matemáticas»».",
+    "ES: «Pon el médico a las 5» on a task with no day shows «¿Qué día, a las 17:00?» inside the question box; at 1:00 it reads «¿Qué día, a la 1:00?»; CA reads «Quin dia, a les 17:00?». After «Elegir día» and a day 4 days ahead, the chip reads that day's weekdayDate and is selected."
+   ],
+   "deviceChecks": [
+    "Phone, real model, Spanish: «…al proyecto de química» with no such project shows «¿En qué proyecto la pongo?» and at most 6 chips."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P136",
+   "title": "Every change and deletion can be finished by tapping",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": ["UX-914"],
+   "files": [
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/services/task_matcher.dart",
+    "App/lib/services/command_plan.dart",
+    "App/lib/models/capture_command.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_command_cards_test.dart"
+   ],
+   "brief": [
+    "Context, three dead ends on change and deletion cards: (1) only 5 matches can be picked (`_Choice.shown`, capture_command_cards.dart:613), and «Y 4 más» is plain text (:646); «Llamar…» tasks easily pass five. (2) A task in a project the person can only view is skipped (`TaskMatcher.targets`, task_matcher.dart:189), so the card says «No encuentro ninguna tarea con «informe»», which is untrue. (3) «Asigna el informe a Paul» with two Pauls shows «Hay varias personas que se llaman Paul.» (`AssigneeProblem.ambiguous`, command_plan.dart:244-249; card :772-775) and nothing to tap.",
+    "UX-914 (S2), part 1: the pick list's «Y {count} más» becomes a TextButton with new plural `commandShowMore`: “{count, plural, =1{Show 1 more} other{Show {count} more}}” / «{count, plural, =1{Ver 1 más} other{Ver {count} más}}» / «{count, plural, =1{Mostra’n 1 més} other{Mostra’n {count} més}}». It lists the rest in the card, each tappable like the first five. The search card's «Y N más» after 20 results (:494, `commandMore`) stays.",
+    "UX-914 part 2: when no editable task matches but tasks in view-only projects would (the same match without the edit filter), the card's line is new `commandViewOnly`, with the first such task's title: “{title}” is in a project you can only view. / ««{title}» es de un proyecto que solo puedes ver.» / ««{title}» és d’un projecte que només pots veure.». English wraps the title in “…”, as the other lines do. Like «No encuentro…» it has no ✕ and nothing to apply (P127's «Guardar tal cual» counts it as found nothing).",
+    "UX-914 part 3: under «Hay varias personas que se llaman {name}.», one chip per person in the task's project who can edit and whose name starts with the name said (ignoring case and accents, `foldForSearch`), one tap each. The tap resolves the change's assignee to that person, so the before → after line shows them and the change is ready. Keep the choice with the command (it is stored with the capture), as `taskId` is.",
+    "Don't touch: the order of matches, the deletion card's look, «Elegir otra», the plan's other fields, Backend/."
+   ],
+   "acceptance": [
+    "ES: an `update` whose words match 8 tasks shows 5 rows and «Ver 3 más»; tapping it shows all 8; tapping the 7th makes it the chosen task, and the card shows its before → after.",
+    "ES: an `update` whose only matching task «Informe» is in a project the account can only view shows ««Informe» es de un proyecto que solo puedes ver.» and no «No encuentro…».",
+    "ES: an `update` assigning «Paul» in a project whose editors include «Paul García» and «Paul Martí» shows «Hay varias personas que se llaman Paul.» and two chips; tapping «Paul Martí» enables the confirming button and the assignee line ends «→ Paul Martí»; after the tap the task is assigned to Paul Martí.",
+    "ES: a search card with 25 results still shows «Y 5 más» as plain text."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P137",
+   "title": "Search cards say what they searched; found rows open, not tick; copy slips",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": ["UX-907", "UX-913", "UX-916"],
+   "files": [
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/localization_catalog_test.dart"
+   ],
+   "brief": [
+    "Context: «¿Qué tengo mañana?» shows the heading «Tareas» and never says «Mañana»: the heading (FindCommandCard, capture_command_cards.dart:463-471) names the words, the project or the person, never the period or the status, and with both a project and a person it drops the person (review C's cross-slice note). Each found row starts with the empty circle or tick of the completion checkbox (:564-572; task_tile.dart:91-97), yet a tap opens the task. And a few copy slips.",
+    "UX-907 (S2), one quieter line under the heading (the `_Note` style), only when the search has a period (`command.from` and `command.to`) or a status (`command.status` 'open' or 'completed'), parts joined with « · ». One day (from equals to): `context.dayLabel(from)` («Mañana», «Hoy», «vie, 23 oct»). A longer period with both ends: new `commandFindPeriod` with `context.weekdayDate` for both ends: “{from} to {to}” / «Del {from} al {to}» / «Del {from} al {to}»; with only one end known, no period part. Status: new `commandFindOpen` “To do” / «Pendientes» / «Per fer»; new `commandFindDone` “Completed” / «Completadas» / «Completades» (they match `agendaCounts`). An empty result keeps «No hay ninguna tarea»; the line above says for when.",
+    "UX-907, the heading with a project and a person (from review C's note; organizer's copy, in the pattern of `commandFindProject` and `commandFindMine`): new `commandFindProjectPerson` “Tasks in “{project}” for {name}” / «Tareas de «{project}» para {name}» / «Tasques de «{project}» assignades a {name}»; with the account itself, new `commandFindProjectMine` “Your tasks in “{project}”” / «Tus tareas de «{project}»» / «Les teves tasques de «{project}»». Words still come first when there are words.",
+    "UX-913 (S2): remove the circle and the tick from found rows (:564-572), and add a trailing `Icons.chevron_right_rounded` (size 20, as the result's rows that open something, capture_review_editor.dart:282-284). The strikethrough and «Completada» keep marking done ones; the whole row still opens the task's details.",
+    "UX-916 (S1), copy slips. `commandFindPerson` (the heading, and P131's chip label): “Tasks for {name}” / «Tareas para {name}»; Catalan stays «Tasques assignades a {name}». Tasks now show «Creada por», so «Tareas de Ana» also reads as created by Ana. `commandExistingProjectTasks` takes the number of the dictation's tasks going there (ProjectCommandCard's `hasTasks`, :375-376, and its caller voice_task_screen.dart:3177-3182): “{count, plural, =1{The task goes there.} other{The tasks go there.}}” / «{count, plural, =1{La tarea va ahí.} other{Las tareas van ahí.}}» / «{count, plural, =1{La tasca hi va.} other{Les tasques hi van.}}». English only: `commandWhichToChange` “Which one do you want to change?” and `commandWhichToDelete` “Which one do you want to delete?”, as Spanish and Catalan ask. The change card's priority line (:845-851) uses `Icons.flag_outlined`, the app's priority icon (task_editor.dart:831, task_detail_screen.dart:327).",
+    "Two of UX-916's items are done elsewhere, not here: the English notice body by UX-1009 (P140) and the new-project chip by UX-1104 (P141).",
+    "Don't touch: the search's order (newest first; ordering a period by day waits on D4, UX-920); the found rows' details line beyond P129's deadline label; «Abrir «X»» (P142 passes the person)."
+   ],
+   "acceptance": [
+    "ES: a `find` from tomorrow to tomorrow, with no words and no project, is headed «Tareas» with the line «Mañana» under it; with status completed the line reads «Mañana · Completadas».",
+    "ES: a `find` from next Monday to next Sunday with status open shows «Del {weekdayDate Monday} al {weekdayDate Sunday} · Pendientes».",
+    "ES: a `find` with no period and status any shows no line under the heading.",
+    "ES: a `find` for project «Matemáticas» and person Paul is headed «Tareas de «Matemáticas» para Paul»; with the account's own id, «Tus tareas de «Matemáticas»»; with words, the words' heading as today.",
+    "ES: found rows have no leading circle or tick and end with a chevron; tapping one opens TaskDetailScreen; a completed one is struck through and its details end with «Completada».",
+    "Catalogs: `commandFindPerson('Ana')` reads ES «Tareas para Ana», EN “Tasks for Ana”, CA «Tasques assignades a Ana»; `commandExistingProjectTasks(1)` ES «La tarea va ahí.» and `(2)` «Las tareas van ahí.»; EN `commandWhichToChange` “Which one do you want to change?” and `commandWhichToDelete` “Which one do you want to delete?”.",
+    "ES: an existing-project card with one task going there reads «La tarea va ahí.».",
+    "A change card that raises a task's priority shows `Icons.flag_outlined` on its priority line."
+   ],
+   "deviceChecks": [],
+   "dependsOn": ["P129", "P135"]
+  },
+  {
+   "id": "P138",
+   "title": "Free accounts' way into the form: «Escribir», shares straight in, why there's no mic, nothing lost",
+   "area": "A",
+   "size": "L",
+   "severity": 2,
+   "findings": ["UX-911", "UX-910", "UX-1005", "UX-1011"],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/widgets/task_form_entry.dart",
+    "App/lib/screens/edit_task_screen.dart",
+    "App/lib/widgets/task_editor.dart",
+    "App/lib/services/capture_store.dart",
+    "App/lib/main.dart",
+    "App/lib/screens/captures_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/capture_free_dictations_test.dart",
+    "App/test/new_task_form_test.dart",
+    "App/test/capture_sheet_test.dart",
+    "App/test/capture_recovery_test.dart"
+   ],
+   "brief": [
+    "Context: for an account without Pro (`typesInFormProvider`), typed words become a task only through the form (DECISIONS.md, 2026-10-18 later). Today: (a) the sheet's keyboard became «✏ Rellenar a mano», naming a form nobody has seen (voice_task_screen.dart:2054-2062), and «Listo» reads it on typed words (:1765-1772, :1820); (b) a free account's shared text opens the sheet with the words and «Rellenar a mano» as its only way on (main.dart:188-203): one screen too many; (c) at 0 left the home-screen widget («Toca para dictar una tarea») and the «Dictar una tarea» shortcut open the form, and after the month's notice nothing says why there's no mic (`askedToSpeak` is dropped, :76-87); (d) «Rellenar a mano» discards the capture before the form opens (:1488-1490), and the form keeps everything only in memory (edit_task_screen.dart:80-117, task_editor.dart:144-176), so if Android closes the app during the photo picker (task_editor.dart:479-535) or a call, the words are gone; (e) entries from outside the app open without `showCalendar` (main.dart:195-202), so a task saved while the app was on Tareas, Notas or Ajustes lands on Calendar out of sight (main_shell.dart:44-50).",
+    "UX-911 (S2), part 1: the free account's keyboard button reads the existing `captureTypeInstead`: “Type instead” / «Escribir» / «Escriu», with `Icons.keyboard_outlined`, still a labelled TextButton.icon that opens the form (`_fillByHand`). On typed words the filled button reads `done` («Listo») and still opens the form (`_done`, :1455-1463). Delete `captureFillByHand` from the three catalogs, and update the comments that name it (:59-62, :1465-1478, :2034-2037).",
+    "UX-911 part 2: for an account without Pro, shared text (main.dart:188-203) and a typed or shared capture with no result, reopened from «Sin guardar» (captures_screen.dart:83, through `showCaptureSheet`), open straight in the form (`openTaskForm` with that capture) instead of the sheet. The words become the title and notes as `NewTaskScreen._start` already splits them (`leadingTitle`, edit_task_screen.dart:90-110). Route it in `showCaptureSheet` (:76-87), so every way in follows one rule. With Pro nothing changes.",
+    "UX-1005 (S2, review B), the form keeps the words until it saves, in the capture store (`captureStoreProvider`), by the sheet's rule since UX-102: «Escribir» hands its capture to the form instead of discarding it (:1479-1511); the new-task form writes its title and notes into that capture as they change (the capture's text is the title, then a line break and the notes when there are any, so `leadingTitle` reads them back), or into a new typed capture created at the first character typed, never before; it discards the capture when the task is saved (the button, or Back with a title, D12) and when it closes with an empty title. If Android closes the app, the words wait under «Sin guardar», and opening them opens the form again (part 2). Only the title and notes are kept, not the day, steps or files. No new copy. Don't read dates out of the words (that waits on D2, UX-918).",
+    "UX-910 (S2): `showCaptureSheet`'s form branch passes `askedToSpeak` to `openTaskForm`, and `NewTaskArguments` carries it. When the form opened from the widget or the voice shortcut without a mic, it shows above the title the line the sheet showed for these entries (:1855-1879): `freeVoiceUsedUpText` («Sin dictados gratis hasta el {date}.» / “No free dictations until {date}.” / «Fins al dia {date} no tens dictats gratuïts.»), or `captureSpeakingIsPro` when the server sent no count, with key `free-voice-used-up` on the line, and «Ver Pro» (`voiceProAction`, which opens /subscription). Every time, also after the month's notice. «Nueva tarea» and the text shortcut open the form without it. No new strings. The shortcut's own wording is an open owner question; don't touch it.",
+    "UX-1011 (S2, from review B's U5 notes): the entries' `showCaptureSheet` call in main.dart (:195-202) passes `showCalendar: true`, as the pending list (captures_screen.dart:83) and the timeline already do, so a task saved from the widget, a shortcut or a share lands on Calendar in view whichever tab was showing. `showCaptureSheet` already hands `showCalendar` to the form.",
+    "Don't touch: Pro's sheet, typing and shares; free-dictation counting; the used-up notice (P140 changes its words); the form's layout (P139, P140); Backend/."
+   ],
+   "acceptance": [
+    "ES and CA at 2× on 320×640, free account with dictations left, in the mic sheet: the keyboard button reads «Escribir» (CA «Escriu») with the keyboard icon, whole and inside the screen; tapping it opens «Nueva tarea» with the words heard as the title.",
+    "Catalogs: `captureFillByHand` exists in none.",
+    "ES, free account: shared «Pedir cita en el dentista» opens «Nueva tarea» with that title and no capture sheet; the capture store holds the share's capture until «Añadir tarea», and none after it.",
+    "ES, free account: a typed capture «Comprar pan» under «Sin guardar», tapped, opens the form titled «Comprar pan».",
+    "ES, Pro: shared text still opens the capture sheet with the words.",
+    "ES, free account at 0 left, the month's notice already seen: a `voice` entry (the widget) opens the form with the `free-voice-used-up` line «Sin dictados gratis hasta el …» and «Ver Pro» above the title; «Nueva tarea» opens it without that line.",
+    "ES: in the form opened by «Nueva tarea», the capture store holds nothing before typing, one capture with the text «Llamar a» after typing it, none after «Añadir tarea», and none after emptying the title and pressing Back.",
+    "ES: «Escribir» in the mic sheet, then typing in the form: exactly one capture exists (the sheet's) until the save.",
+    "ES: with the app on the Tareas tab, a widget entry (Pro) saved from the sheet switches to the Calendario tab with the day selected and the row lit; the same for the form at 0 left."
+   ],
+   "deviceChecks": [
+    "Phone, Developer options › «No mantener actividades» on: Nueva tarea, type a title, then Más detalles › Añadir adjunto › Elegir una foto; back in TaskFlow, the words are under «Sin guardar» and open in the form.",
+    "Phone, free account at 0 left: tap the home-screen widget twice in one month; both times the form says «Sin dictados gratis hasta el …»."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P139",
+   "title": "The new-task form at large text: keyboard down for choices, a title that wraps, one way to add a time",
+   "area": "B",
+   "size": "M",
+   "severity": 2,
+   "findings": ["UX-1002", "UX-1003", "UX-1004"],
+   "files": [
+    "App/lib/widgets/task_editor.dart",
+    "App/lib/widgets/schedule_editor.dart",
+    "App/test/new_task_form_test.dart",
+    "App/test/schedule_editor_test.dart"
+   ],
+   "brief": [
+    "Context: Nueva tarea opens on the title with the keyboard up (task_editor.dart:606). At 2× on 320×640 with the keyboard, only the title and the top half of Hoy and Mañana show (renders new-task-form-2x-es and -2x-ca); tapping a chip leaves the keyboard up, and when the date sheet or the time picker closes, Flutter gives the focus back to the title, so the keyboard rises over the time just set. The title is one line, so about 12 letters show at 2× (:601-631). «Añadir hora» opens Android's clock dial (:224-242), where 17 sits on an inner ring 28 dp inside 5; «Elegir día» opens the full «Fecha y hora» sheet (schedule_editor.dart:201-204), with a second «Añadir hora», and needs «Listo» after a date is tapped (:284-301, :412-416).",
+    "UX-1002 (S2): when Hoy, Mañana, Elegir día, «Añadir hora» or the time chip is tapped (`_dayAndTime`, :943-1010), first take the focus off the title (`FocusScope.of(context).unfocus()`, as `_save` :333 and Más detalles :700 do). The keyboard goes down and the rest of the form shows; no sheet or picker brings it back; tapping the title does.",
+    "UX-1003 (S2): the title field (:601-631) sets `minLines: 1, maxLines: 3, keyboardType: TextInputType.text` and keeps its `textInputAction` (done for tasks), so it wraps to three lines and the keyboard's action key still closes the keyboard instead of adding a line. Three, not unlimited, so Hoy and Mañana stay reachable. The edit form shares the field; that's intended.",
+    "UX-1004 (S2), the day sheet from the form: a day-only mode of `editSchedule` (schedule_editor.dart:16-37), beside `applyDays`, used only by the new-task form's «Elegir día» (`_pickDate(applyDays: true)`, task_editor.dart:186-197, :976-984). It is titled `pickDay` (“Pick a day” / «Elegir día» / «Tria un dia»), has no time switch, no hour fields and no «Listo» (`schedule-has-time`, `schedule-hour`, `schedule-minute`, `schedule-done`; «Cancelar» may stay), and a date tapped in its calendar applies and closes the sheet, as Hoy, Mañana and Sin fecha do. A time already chosen in the form is kept on the new day, as `_setDay` does. The capture result's sheet and the edit form's keep the full sheet.",
+    "UX-1004, the time: the form's «Añadir hora» and its time chip open `showTimePicker(..., initialEntryMode: TimePickerEntryMode.input)`, so the hour and minutes go in on the number keys, like the rest of the app.",
+    "No copy change. Don't touch: the form's order, its button, D12's Back, the chips' labels."
+   ],
+   "acceptance": [
+    "ES, Manrope, 2× on 320×640 with the keyboard: type a title and tap Mañana; nothing has the primary focus, and «Añadir hora» and «Más detalles» are hit-testable without scrolling.",
+    "ES: then tap «Añadir hora» and confirm 17:00; the title still isn't focused, and the «17:00» chip is hit-testable.",
+    "ES, 2× on 320 dp: a 40-character title shows whole on at most 3 lines with no horizontal scroll, and the keyboard's done action adds no line break.",
+    "ES, 1× on 390 dp: a 20-character title stays on one line.",
+    "ES: from the form, «Elegir día» opens a sheet titled «Elegir día» with no `schedule-has-time` and no `schedule-done`; tapping a date 9 days ahead closes it, and the third chip shows that date's weekdayDate; a time set before is kept.",
+    "«Añadir hora» opens the time picker in TimePickerEntryMode.input.",
+    "The capture result's date sheet still has «Añadir hora» and «Listo»."
+   ],
+   "deviceChecks": [
+    "Phone, the largest font on a 360 dp phone: title › Mañana › Añadir hora › 17:00; the keyboard stays down and «17:00» stays in view.",
+    "Phone, UX_REVIEW §7 with the father on a free account: “Add: call the doctor on Friday at 5 in the afternoon”; he sets 17:00, not 05:00."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P140",
+   "title": "The form's details and the notice: no stale help, filled details stay, «Creada por ti», «a mano»",
+   "area": "B",
+   "size": "M",
+   "severity": 2,
+   "findings": ["UX-1006", "UX-1007", "UX-1008", "UX-1009"],
+   "files": [
+    "App/lib/widgets/task_editor.dart",
+    "App/lib/screens/task_detail_screen.dart",
+    "App/lib/widgets/task_form_entry.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/new_task_form_test.dart",
+    "App/test/task_detail_test.dart",
+    "App/test/localization_catalog_test.dart"
+   ],
+   "brief": [
+    "Context: a new task's «Añadir adjunto» sheet starts with 31 words about older local files and a «Subir» button that don't exist yet (task_editor.dart:496-503); «Menos detalles» hides notes, files and a project already filled in (:717-768), while steps stay; in a shared project «Creada por Miguel» names you one line under a chip that calls you «Yo» (task_detail_screen.dart:146-150, :232-240); the used-up notice calls the form «el formulario», a name shown nowhere else (`freeVoiceNoticeBody`, task_form_entry.dart:96-103).",
+    "UX-1006 (S2): for a new task (`_creating`), the attach sheet shows no paragraph, only «Elegir una foto» and «Adjuntar un archivo»; `fileLimit` still explains a file that's too big when it happens. Editing keeps `fileUploadHelp` / `fileLocalHelp`. Update the test that asserts the paragraph (App/test/new_task_form_test.dart:780-810).",
+    "UX-1007 (S1): with «Menos detalles», a new task keeps showing what holds something: the notes field when it has text, the files when there are any, the project row when one is chosen, as it already does for steps. Empty rows stay hidden, and nothing shows twice (notes and project already shown up front, `_notesUpFront` and `_projectUpFront`, stay where they are).",
+    "UX-1008 (S1): when `task.createdBy` is the signed-in account, the line reads new `createdByYou`: “Created by you” / «Creada por ti» / «Creada per tu», keeping the key `task-created-by`. Others keep `createdBy(name)`.",
+    "UX-1009 (S1; also review A's UX-916 note on the English), `freeVoiceNoticeBody`, keeping the plurals. EN: “You can keep creating tasks by hand, with no limit. {limit, plural, =1{On {date} you’ll get 1 more dictation.} other{On {date} you’ll get {limit} more dictations.}}”. ES: «Puedes seguir creando tareas a mano, sin límite. {limit, plural, =1{El {date} tendrás 1 dictado más.} other{El {date} tendrás {limit} dictados más.}}». CA: «Pots continuar creant tasques a mà, sense límit. {limit, plural, =1{El dia {date} tindràs 1 dictat més.} other{El dia {date} tindràs {limit} dictats més.}}» (only «amb el formulari» changes; the date stays mid-sentence, UX-503).",
+    "Don't touch: what Back says on a new task (waits on D6, UX-1010); the notice's title and buttons; Más detalles' order."
+   ],
+   "acceptance": [
+    "ES: New task › Más detalles › «Añadir adjunto» shows neither `fileUploadHelp` nor `fileLocalHelp`; an existing task's sheet still shows its paragraph.",
+    "ES: in a new task, type notes, add a file and choose a project under Más detalles, then tap «Menos detalles»: the notes text, the file's row and the project row are on screen; «Recordatorio» and «Repetir», at their defaults, are not.",
+    "ES: task details in a shared project, created by the signed-in account, read «Creada por ti»; created by Ana, «Creada por Ana». EN “Created by you”, CA «Creada per tu».",
+    "Catalogs: `freeVoiceNoticeBody` contains none of «formulario», “form” and «formulari»; in all three languages the date comes before the number; the Catalan contains «El dia {date}».",
+    "ES at 2× on 320×640: the notice's body reads «Puedes seguir creando tareas a mano, sin límite. El {date} tendrás 10 dictados más.» and nothing overflows."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P141",
+   "title": "A project the dictation creates: its name first, one way to fix it, the next step; the person chip's ▾",
+   "area": "C",
+   "size": "L",
+   "severity": 2,
+   "findings": ["UX-1104", "UX-1105", "UX-1106", "UX-1103"],
+   "files": [
+    "App/lib/widgets/task_list_picker.dart",
+    "App/lib/widgets/task_assignment_picker.dart",
+    "App/lib/widgets/capture_review_editor.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/project_ui_test.dart"
+   ],
+   "brief": [
+    "Context: a task going to a project the confirming tap creates shows the chip «Nuevo proyecto: {name}», name last, cut at large text («Nuevo proyec…» at 2×; task_list_picker.dart:129-139, the 230 dp cap :167-176); after «Crear «Química»» it's the only place the name shows. Its sheet lists «Nuevo proyecto: Quico» (selected), «Sin proyecto» and the plain «Nuevo proyecto» (:86-91, shown when the account can edit no project), which creates a project at once from a dialog, kept even if the result is cancelled; tapping the dictated row only closes the sheet, so a misheard name can only be fixed by saying everything again. Naming a person for a brand-new project shows «Paul no está en «Matemáticas»» (capture_review_editor.dart:460-474) and no next step. The person chip «Ana» has no ▾, unlike the project chip beside it (task_assignment_picker.dart:89-96 against task_list_picker.dart:169-176).",
+    "UX-1104 (S2; also review A's UX-916 chip note): the chip (not the sheet row, not `asRow`) of a project to create reads new `commandNewProjectChip`: “{name} (new)” / «{name} (nuevo)» / «{name} (nou)», name first, with the new-folder icon it already has. `commandNewProject` («Nuevo proyecto: {name}») stays for the sheet row, the row form and the project card, which wrap. Settled: review A asked for just «Física» beside the project card; one label everywhere is simpler and still reads as one project.",
+    "UX-1105 (S2): for a project the dictation creates (`newProject != null && task.listId == null`, :460-474), the line is new `commandMemberNotInNew`: “{name} isn’t in “{project}” yet. Afterwards, share the project with {name}.” / «{name} aún no está en «{project}». Luego, comparte el proyecto con {name}.» / «{name} encara no és a «{project}». Després, comparteix el projecte amb {name}.» («Compartir» is the project page's button, `shareProject`; since P129 such a save opens that page). `commandMemberNotIn` stays for existing projects (change cards, capture_command_cards.dart:762-771).",
+    "UX-1106 (S2), part 1: in the project sheet, hide the plain «Nuevo proyecto» row (`newList`, :86-91) while a dictated project is shown (`newName != null && listId == null`).",
+    "UX-1106 part 2: tapping the dictated row (:58-64) opens its name to correct: a dialog titled `newList` (“New project” / «Nuevo proyecto» / «Projecte nou») with the `listName` field (“Name” / «Nombre» / «Nom») prefilled and selected, «Cancelar», and a button with new `commandUseName`: “Use this name” / «Usar este nombre» / «Fes servir aquest nom», off while the name is empty, with the project-name dialog's limit (`editTaskList`, 80 characters). The new name replaces the old one on the project card (the `project` command's name) and on every task of the result that goes there (`newProject`), linked by the folded name as `_removeCommand` does (voice_task_screen.dart:2590-2620), and is written with the capture. Nothing is created before the confirming tap. Pass it up as a callback through TaskAssignmentPicker and CaptureReviewEditor to the result's state.",
+    "UX-1103 (S2): whenever the person chip can be changed (`onChanged != null && editable`, task_assignment_picker.dart:89-96), add the same ▾ after its label (`Icons.arrow_drop_down_rounded`, size 18), in a row with the label flexible and ellipsized under the same 230 dp cap, as task_list_picker.dart:163-178 does. The label stays the name. No ▾ in a view-only project.",
+    "Don't touch: who a task is for under a person's chip (waits on D7, UX-1111); names shown as email prefixes (D8, UX-1102); the «Otro proyecto…» question (P135)."
+   ],
+   "acceptance": [
+    "Manrope, 2× on 320×640, in ES, CA and EN: the chip of a task going to a new project «Matemáticas» starts with «Matemáticas» and shows at least its first 8 characters; the sheet's row still reads `commandNewProject('Matemáticas')`.",
+    "ES: «Crea el proyecto Matemáticas» with a task whose member hint is Paul (no members yet) shows «Paul aún no está en «Matemáticas». Luego, comparte el proyecto con Paul.»; an `update` naming a non-member in an existing shared project «Equipo» still shows «Paul no está en «Equipo»».",
+    "ES, an account with no projects and «Quico» dictated as a new project with one task: the task's project sheet has exactly one row starting «Nuevo proyecto»; tapping it, typing «Kiko» and «Usar este nombre» makes the project card read «Nuevo proyecto: Kiko» and the chip «Kiko (nuevo)»; after the confirming tap only a project «Kiko» exists, holding the task.",
+    "ES: on a capture card in a shared project with Ana assigned, the person chip shows ▾, and a tap opens «¿Quién es responsable?»; in a view-only project it shows no ▾; at 2× on 320 dp the ▾ lies wholly inside the chip and the screen."
+   ],
+   "deviceChecks": [
+    "Phone, real model, at 1.3× and 2×: «Crea un proyecto de matemáticas y añade terminar la presentación para el 12»; the task's chip shows the project's name first."
+   ],
+   "dependsOn": ["P135"]
+  },
+  {
+   "id": "P142",
+   "title": "A person's view: «Abrir» keeps the person; an empty view says why",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": ["UX-1107", "UX-1109"],
+   "files": [
+    "App/lib/screens/home_screen.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/project_people_filter_test.dart",
+    "App/test/voice_command_cards_test.dart"
+   ],
+   "brief": [
+    "Context: «Enséñame las tareas de Paul en Matemáticas» lists Paul's tasks, but «Abrir «Matemáticas»» (capture_command_cards.dart:495-513) opens the page on Todas, because HomeScreen (home_screen.dart:23-35) can't start on a person; «Mis tareas de Matemáticas» also opens on Todas. Tapping someone with no open tasks shows «No hay tareas que coincidan» / «Prueba otra palabra o filtro.» (:502-515), though nothing was searched.",
+    "UX-1107 (S2): HomeScreen gets an optional starting person, and «Abrir» passes the search's `command.personId`. On open, a person who has a chip there (`projectPeopleToFilter`) is selected; the account itself selects «Para mí» (`_team = false`); anyone else (a viewer, someone who left) opens on «Todas». No copy change.",
+    "UX-1109 (S1): when the person chip is the only filter on (no search, no label, `_personShown != null`) and the list is empty, the empty state reads new `personNothingOpen`: “{name} has nothing open here” / «{name} no tiene tareas pendientes aquí» / «{name} no té tasques pendents aquí», and new `personNothingOpenHelp`: “Tap All to see every task.” / «Toca Todas para ver todas las tareas.» / «Toca Totes per veure totes les tasques.». With a search or a label on, `noMatches` / `differentFilter` stay; «Para mí» with nothing keeps `noMatches` (UX-629).",
+    "Update the test “someone with nothing assigned” in App/test/project_people_filter_test.dart, which asserts today's text.",
+    "Don't touch: the filter's rules; P131's chip row."
+   ],
+   "acceptance": [
+    "ES: a `find` for project Matemáticas and person Paul (an editor there), then «Abrir «Matemáticas»»: the page has Paul's chip selected and lists only his open tasks; with the account's own id, «Para mí» is selected; with a viewer's id, «Todas».",
+    "ES: on a shared project's page, tapping Marta, who has no open tasks, shows «Marta no tiene tareas pendientes aquí» and «Toca Todas para ver todas las tareas.»; with «pan» typed in the search, «No hay tareas que coincidan» and «Prueba otra palabra o filtro.».",
+    "CA: the same empty state reads «Marta no té tasques pendents aquí» and «Toca Totes per veure totes les tasques.»."
+   ],
+   "deviceChecks": [],
+   "dependsOn": ["P131"]
+  },
+  {
+   "id": "P143",
+   "title": "Confirm your email: help when the email doesn't come, a named screen, a readable countdown, unbroken headings",
+   "area": "D",
+   "size": "M",
+   "severity": 2,
+   "findings": ["UX-1205", "UX-1207", "UX-1209", "UX-1210"],
+   "files": [
+    "App/lib/screens/verify_email_screen.dart",
+    "App/lib/screens/login_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/email_verification_test.dart",
+    "App/test/auth_gate_test.dart"
+   ],
+   "brief": [
+    "Context: the only clue to a mistyped address is the address, grey, inside a sentence (verify_email_screen.dart:291-300); «Te hemos enviado un código nuevo» repeats the same promise after each Reenviar (:333-348); «Usar otro correo» lands on «Crea tu cuenta» with nothing focused (login_screen.dart:184-207). TalkBack hears nothing as the screen opens: the heading has `header` but no `namesRoute` (:280-289) and there is no app bar; Confirmar's spinner has no label (:397-404). At linear 2× the 30 sp heading breaks «Confirm/a» mid-word (:283-288; sign-in's headings too, login_screen.dart:387-396). The countdown is 2.2:1 on white (38% onSurface), counts ticks so it stops while Android freezes the app (:88-95), and touches «Usar otro correo» with no gap (:418-442).",
+    "UX-1205 (S2), part 1: the address stands out, bold and in `onSurface`, inside the same sentence: split the translated `verifyEmailHelp(email)` at the address into spans. The copy doesn't change.",
+    "UX-1205 part 2: `verifyEmailResent` gives the hint at the moment someone shows they didn't get the email: “We’ve sent you a new code. If you can’t see it, check Spam or Promotions.” / «Te hemos enviado un código nuevo. Si no lo ves, mira en Spam o en Promociones.» / «T’hem enviat un codi nou. Si no el veus, mira a Correu brossa o a Promocions.» (Gmail's Catalan folder names; review D asks for a native read).",
+    "UX-1205 part 3: «Usar otro correo» lands on «Crea tu cuenta» with the email field focused and the cursor at the end of the address.",
+    "UX-1207 (S2): name the screen with `namesRoute: true` on the heading's Semantics, so TalkBack says «Confirma tu correo» as it opens; do the same on sign-in's heading (login_screen.dart:387-396), which has the same gap. Label Confirmar's spinner with new `verifyEmailConfirming`: “Confirming” / «Confirmando» / «S’està confirmant», as UX-513 did for Account's spinners.",
+    "UX-1209 (S1): the auth headings scale by at most 1.2× (`textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2)`): the confirm screen's and sign-in's three (sign-in, create, recover). 36 sp is still above body text at 2× (28) and close to Android 14's own curve, and every heading word then fits in 224 dp.",
+    "UX-1210 (S1): while waiting, «Reenviar código en N segundos» uses `onSurfaceVariant` (the TextButton's `disabledForegroundColor`; 5.3:1 light, about 8:1 dark). Compute the wait from when the code was sent (P133's `_sentAt`: 60 minus the seconds since), not by counting ticks, so it is right when the app comes back. Put 8 dp between «Reenviar código» and «Usar otro correo».",
+    "Don't touch: the screen's order, the six-digit auto-confirm, the other lines' copy; an «Abrir el correo» button (D10, not now); what Reenviar says past the server's limits (D9)."
+   ],
+   "acceptance": [
+    "ES, EN and CA: the address inside `verifyEmailHelp` is its own span, bold, in onSurface; the rest of the sentence is unchanged.",
+    "ES, EN and CA at 2× on 320×640 with the keyboard: after Reenviar, the new `verifyEmailResent` line shows whole, above the keyboard.",
+    "ES: after «Usar otro correo», «Crea tu cuenta» shows with the email field focused and the cursor collapsed at the end of the address.",
+    "Semantics: the confirm screen's heading node has namesRoute and header; sign-in's heading has namesRoute too; while confirming, the spinner's label is «Confirmando».",
+    "At linear 2× on 320×640, in ES, EN and CA, «Confirma tu correo» and sign-in's three headings break lines only at spaces.",
+    "ES, light and dark: the waiting label's colour is onSurfaceVariant.",
+    "ES: with the clock moved 120 s ahead and one tick, the button reads «Reenviar código» and can be tapped.",
+    "ES: the vertical gap between the Reenviar and Usar otro correo buttons is at least 8 dp."
+   ],
+   "deviceChecks": [
+    "Phone with TalkBack: opening «Confirma tu correo» says «Confirma tu correo».",
+    "Phone: go to Gmail for 2 minutes and come back; «Reenviar código» is ready.",
+    "Phone, a fresh Gmail account: note where the code lands (Principal, Notificaciones or Spam); a native read of the Catalan «Correu brossa» and «Promocions»."
+   ],
+   "dependsOn": ["P133"]
+  },
+  {
+   "id": "P144",
+   "title": "Chip borders that can be seen",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": ["UX-1012"],
+   "files": [
+    "App/lib/theme/app_theme.dart",
+    "App/test/appearance_test.dart"
+   ],
+   "brief": [
+    "Context (review B's cross-slice note for area D): chips' borders use `outlineVariant` (app_theme.dart:152-153): 1.20:1 against the background, 1.28:1 on white. The form's Hoy, Mañana and Elegir día chips are now a free account's main controls, and the people filter, the project and the person are chips too. UX-412 moved text fields to `outline` (3.79:1 light, 4.85:1 dark) for the same reason.",
+    "UX-1012 (S2): `chipTheme.side` uses `scheme.outline`, in light and dark. Nothing else in the theme changes.",
+    "Don't touch: chip shapes, selected colours, text fields, buttons."
+   ],
+   "acceptance": [
+    "Light and dark: an unselected ChoiceChip's and an ActionChip's border colour is the theme's colorScheme.outline, and its contrast against colorScheme.surface is at least 3:1."
+   ],
+   "deviceChecks": [
+    "Phone, light and dark: the form's Hoy, Mañana and Elegir día chips have a border you can see."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [
+  {
+   "id": "D1",
+   "question": "Cancel on a result with nothing to add: should Cancelar just close, meaning “don't do it”?",
+   "findings": ["UX-917"],
+   "recommendation": "Yes. When a result only changes, deletes or creates projects, Cancelar, Back and the dimmed area close at once and discard it. Today they ask keep-or-discard, as U2 does for spoken words, and «Conservar» leaves a pending deletion in «Sin guardar». The words can be said again, at the cost of a free dictation on a free account. Results with a task to add keep asking. P128 rewords the question meanwhile."
+  },
+  {
+   "id": "D2",
+   "question": "Date words in the form's title: should the phone's parser fill in the day and time?",
+   "findings": ["UX-918"],
+   "recommendation": "For words dictated before «Escribir», yes: they are a dictation, and «Guardar tal cual» already reads them on the phone; today «Médico el viernes a las 5» becomes a title with no day, and Back saves it that way (D12). For titles typed in the form, no: your 2026-10-18 decision keeps a free account's typing literal, and the first-run line teaches the day chips. Review B's case («Médico el viernes» typed, saved to Sin fecha) belongs with your open question about a default day in the form."
+  },
+  {
+   "id": "D3",
+   "question": "Rename «Guardar tal cual» to «Guardar como tarea» / “Save as a task” / «Desa-ho com a tasca»?",
+   "findings": ["UX-919"],
+   "recommendation": "Yes. A dictation can now be a command. After 8 s «Guardar tal cual» is the filled button, so «Borra la tarea del dentista» is easily saved as a new task, and P127 shows it on command results that find nothing. The new name says what the tap makes. It changes D3 and U7's wording, so it's yours."
+  },
+  {
+   "id": "D4",
+   "question": "Should a search by period («¿qué tengo esta semana?») list by day instead of newest first?",
+   "findings": ["UX-920"],
+   "recommendation": "Yes, for a search with a period: by day and time, soonest first, which is how the question is meant. Other searches stay newest first, as the approved plan's item 5 says. P137 already shows the period under the heading."
+  },
+  {
+   "id": "D5",
+   "question": "At 0 free dictations, should the creation button keep «Añadir tarea» (with the + icon) instead of becoming «Nueva tarea»?",
+   "findings": ["UX-921"],
+   "recommendation": "Keep «Nueva tarea». You asked for the button to change once the dictations run out, and it shares its name with the form's page (review B keeps it). Review A would keep «Añadir tarea», because renaming the one main button each month costs recognition; if you agree with A, `tasksEmptyForm` and `inboxEmptyForm` change too."
+  },
+  {
+   "id": "D6",
+   "question": "Back on a new task in the form: show the button's message instead of «Cambios guardados»?",
+   "findings": ["UX-1010"],
+   "recommendation": "Yes. Keep D12's saving, but for a new task Back says what the button says («Añadida al lun, 19 oct» or «Añadida sin fecha», with Deshacer). A newcomer who presses Back to get out hears about changes he didn't make, and isn't told the day. It changes D12's wording, so it's yours."
+  },
+  {
+   "id": "D7",
+   "question": "When a task is added on a shared project's page while a person's chip is on, should it be that person's task by default?",
+   "findings": ["UX-1111"],
+   "recommendation": "Yes, as a picked day already is (D9) and as the page already sets the project. Today it goes to «Todos», and the page switches back to Todas to show it. The person shows on the form and the card, and changes with one tap."
+  },
+  {
+   "id": "D8",
+   "question": "How should people get a real name instead of the first part of their email?",
+   "findings": ["UX-1102", "UX-1112"],
+   "recommendation": "Google accounts (the first sign-in option): take the name from Google at sign-in, falling back to the email; that is a server change for the main session (Backend/core/google_auth.py:77 stores none), not a product question. Password accounts: ask once when they first share or join a shared project, prefilled from the email and skippable, rather than one more field at sign-up. Until then, chips, «Creada por» and the person picker read «ana.garcia84», «paulsmith»."
+  },
+  {
+   "id": "D9",
+   "question": "Should «Reenviar código» admit when no code was sent?",
+   "findings": ["UX-1206"],
+   "recommendation": "Yes. When this address's own limit blocks a code (5 codes an hour, 8 emails a day), the server answers 429 with Retry-After, and the app says «Has pedido muchos códigos. Espera {n} minutos para pedir otro.» and keeps Reenviar off. It tells someone pressing resend that an unconfirmed sign-up exists for that address, which is worth little: they typed it. Server first (main session), then the app half in a later run."
+  },
+  {
+   "id": "D10",
+   "question": "Add an «Abrir el correo» button to «Confirma tu correo»?",
+   "findings": ["UX-1211"],
+   "recommendation": "Not now. It adds a control, and the code is in the email's subject, so the phone's notification already shows it. Watch for it in the §7 test with an email sign-up rather than Google."
+  },
+  {
+   "id": "D11",
+   "question": "Does asking for commands on every dictation slow down plain capture?",
+   "findings": ["UX-912"],
+   "recommendation": "Measure before deciding (main session, staging, same phone and network): 10 or more one-task dictations with the commands flag and 10 or more without it, reading extraction_ms p50 and p95 in Diagnóstico de captura. If the flag adds 300 ms or more at p50, the cause is the longer prompt on the server: decide it with UX-616 (a shorter commands section, a faster model, or the paid fallback). Speed is the selling point, so it's worth the half hour."
+  }
+ ],
+ "skipped": []
+}

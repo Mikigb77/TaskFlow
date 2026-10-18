@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -176,20 +175,6 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     return _Problem.failed;
   }
 
-  /// The wait a refusal names, in whole minutes rounded up: from its
-  /// `Retry-After` header, or else the English detail's ending, "Expected
-  /// available in N seconds."
-  static int? _waitMinutesFor(Object error) {
-    if (error is! ApiException || error.status != 429) return null;
-    final match = RegExp(
-      r'Expected available in (\d+) seconds?',
-    ).firstMatch(error.message);
-    final seconds =
-        error.retryAfter?.inSeconds ?? int.tryParse(match?.group(1) ?? '');
-    if (seconds == null) return null;
-    return max(1, (seconds + 59) ~/ 60);
-  }
-
   Future<void> _delete() async {
     final preview = _preview;
     final account = ref.read(authProvider).account;
@@ -236,7 +221,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       setState(() {
         _deleting = false;
         _problem = problem;
-        _waitMinutes = _waitMinutesFor(error);
+        _waitMinutes = waitMinutesFor(error);
         // That Google confirmation can't be used again.
         if (problem == _Problem.otherGoogleAccount ||
             problem == _Problem.confirmAgain) {
@@ -377,7 +362,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       _Problem.throttled =>
         _waitMinutes == null
             ? strings.deleteAccountThrottled
-            : strings.deleteAccountThrottledWait(_waitMinutes!),
+            : strings.tooManyTriesWait(_waitMinutes!),
       _Problem.confirmAgain => strings.deleteAccountConfirmAgain,
       _Problem.failed => strings.deleteAccountFailed,
       _ => null,

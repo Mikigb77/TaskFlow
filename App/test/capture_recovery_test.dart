@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/capture_clarification.dart';
 import 'package:agenda/models/task.dart';
@@ -594,8 +595,104 @@ void main() {
         text: 'Comprar leche',
         capturedAt: DateTime.utc(2026, 10, 13, 9),
       ))!;
-      expect(shared.source, 'typed');
+      expect(shared.source, 'shared');
       expect(await sent(shared), 'typed');
+    },
+  );
+
+  test('UX-904: shared text is stored as shared and sent as typed without '
+      'commands; typed words and dictations ask for commands', () async {
+    final api = _CaptureApi();
+    addTearDown(api.close);
+    Future<Map<String, dynamic>> sent(CaptureSession session) async {
+      await CaptureProcessor(store, api).process(session);
+      return api.requests.last;
+    }
+
+    final shared = (await store.acceptEntry(
+      '7d1c2e9a-3b4f-4a6e-9c1d-2f3e4a5b6c7d',
+      'local',
+      'UTC',
+      text: 'Busca el informe de ventas',
+      capturedAt: DateTime.utc(2026, 10, 18, 9),
+    ))!;
+    expect(shared.source, 'shared');
+    expect((await store.read(shared.id, 'local'))!.source, 'shared');
+    final sharedRequest = await sent(shared);
+    expect(sharedRequest['source'], 'typed');
+    expect(sharedRequest.containsKey('commands'), isFalse);
+    expect(sharedRequest['text'], 'Busca el informe de ventas');
+
+    final typed = await store.create(
+      'local',
+      'UTC',
+      text: 'Busca el informe',
+      source: 'typed',
+    );
+    final typedRequest = await sent(typed);
+    expect(typedRequest['source'], 'typed');
+    expect(typedRequest['commands'], isTrue);
+
+    final spoken = await store.create(
+      'local',
+      'UTC',
+      text: 'Cambia el aceite del coche el sábado',
+      source: 'speech',
+    );
+    final spokenRequest = await sent(spoken);
+    expect(spokenRequest['source'], 'speech');
+    expect(spokenRequest['commands'], isTrue);
+
+    final audio = await store.create(
+      'local',
+      'UTC',
+      audio: true,
+      source: 'speech',
+    );
+    await File(audio.audioPath!).writeAsBytes(_wav());
+    final audioRequest = await sent(audio);
+    expect(audioRequest['source'], 'speech');
+    expect(audioRequest['commands'], isTrue);
+  });
+
+  test(
+    'UX-901: Guardar tal cual on a result whose commands found nothing reads '
+    'its transcript when it has no text, and keeps no command',
+    () async {
+      final api = _CaptureApi();
+      addTearDown(api.close);
+      final created = await store.create(
+        'local',
+        'Europe/Madrid',
+        audio: true,
+        source: 'speech',
+        now: DateTime.utc(2026, 10, 14, 9),
+      );
+      // Transcribed online: words in the transcript only, and a command.
+      final result = created.copyWith(
+        status: 'ready',
+        transcript: 'Comprar pan mañana',
+        commands: [
+          CaptureCommand.fromServer({
+            'kind': 'delete',
+            'target': {
+              'words': ['pan'],
+            },
+            'issues': [],
+          })!,
+        ],
+      );
+      await store.update(result);
+      expect(result.text, isEmpty);
+      final written = await CaptureProcessor(
+        store,
+        api,
+      ).asWritten(result, text: result.transcript);
+      expect(api.requests, isEmpty, reason: 'nothing goes to the assistant');
+      expect(written.commands, isEmpty);
+      expect(written.drafts.single.task.title, 'Comprar pan');
+      expect(written.drafts.single.task.dueDate, DateTime(2026, 10, 15));
+      expect((await store.read(written.id, 'local'))!.commands, isEmpty);
     },
   );
 

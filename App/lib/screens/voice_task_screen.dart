@@ -18,12 +18,14 @@ import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/capture_entries.dart';
+import 'package:agenda/services/command_plan.dart';
 import 'package:agenda/services/command_runner.dart';
 import 'package:agenda/services/text_search.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -246,30 +248,47 @@ class _SheetFrameState extends State<_SheetFrame> {
 }
 
 /// Leaving the sheet with something said, written or understood: the one
-/// question, while listening, typing and on a result. True keeps it pending,
-/// false discards it, null (dismissed) stays.
-Future<bool?> _askToKeep(BuildContext context) => showDialog<bool>(
-  context: context,
-  builder: (context) => AlertDialog(
-    // At large text on a small screen, the question scrolls instead of
-    // overflowing.
-    scrollable: true,
-    title: Text(context.l10n.captureKeepQuestion),
-    actions: [
-      TextButton(
-        style: TextButton.styleFrom(
-          foregroundColor: Theme.of(context).colorScheme.error,
+/// question, while listening, typing and on a result. It names the words:
+/// [spoken] ones, or a text typed or shared. True keeps it pending, false
+/// discards it, null (dismissed) stays.
+Future<bool?> _askToKeep(BuildContext context, {required bool spoken}) =>
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        // At large text on a small screen, the question scrolls instead of
+        // overflowing.
+        scrollable: true,
+        title: Text(
+          spoken
+              ? context.l10n.captureKeepQuestion
+              : context.l10n.captureKeepTextQuestion,
         ),
-        onPressed: () => Navigator.pop(context, false),
-        child: Text(context.l10n.discard),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.discard),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.keep),
+          ),
+        ],
       ),
-      FilledButton(
-        onPressed: () => Navigator.pop(context, true),
-        child: Text(context.l10n.keep),
-      ),
-    ],
-  ),
-);
+    );
+
+/// A change that only moves its task to another day or time: its button
+/// reads `Cambiar fecha` and its message names the day.
+bool _onlyMoved(UpdatePlan? plan) =>
+    plan != null &&
+    plan.schedule != null &&
+    plan.title == null &&
+    plan.deadline == null &&
+    plan.priority == null &&
+    plan.notes == null &&
+    plan.assignee == null;
 
 /// The capture sheet's content. Open it with [showCaptureSheet]. A recorder
 /// is created only with the mic; without it every way in types.
@@ -1350,6 +1369,24 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
   }
 
+  /// `Guardar tal cual` on a result whose commands found nothing: its words
+  /// become a task, understood on the phone and saved at once. No command is
+  /// applied, and nothing goes to the assistant, so no dictation is used.
+  Future<void> _saveResultAsWritten(CaptureSession result) async {
+    final words = result.transcript.trim().isNotEmpty
+        ? result.transcript
+        : result.text;
+    final written = await CaptureProcessor(
+      _store,
+      ref.read(apiClientProvider),
+    ).asWritten(result, text: words, now: ref.read(calendarClockProvider)());
+    if (!mounted) return;
+    _session = written;
+    _saveAtOnce = written.id;
+    ref.invalidate(pendingCapturesProvider);
+    _review(written);
+  }
+
   /// The result replaces the words in this same sheet.
   void _review(CaptureSession session) {
     _movedToReview = true;
@@ -1543,7 +1580,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _finishRecording(submit: false, interrupted: true, quiet: true),
       );
     }
-    final keep = await _askToKeep(context);
+    // Words said, even when shown to type after, or words typed.
+    final keep = await _askToKeep(
+      context,
+      spoken:
+          !_typing ||
+          _session?.source == 'speech' ||
+          _session?.audioPath != null,
+    );
     _asking = false;
     if (!mounted || keep == null) return;
     if (keep) {
@@ -1695,11 +1739,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final result = _result;
     if (result != null) {
       _holdScrim(false);
+      final saveAtOnce = _saveAtOnce == result.id;
       return CaptureResult(
-        key: ValueKey(result.id),
+        // Saved as written from its own result: a new result, built afresh.
+        key: ValueKey((result.id, saveAtOnce)),
         session: result,
         onSayAgain: _sayAgain,
-        saveAtOnce: _saveAtOnce == result.id,
+        onSaveAsWritten: _saveResultAsWritten,
+        saveAtOnce: saveAtOnce,
       );
     }
     final l10n = context.l10n;
@@ -2132,6 +2179,7 @@ class CaptureResult extends ConsumerStatefulWidget {
     super.key,
     required this.session,
     this.onSayAgain,
+    this.onSaveAsWritten,
     this.saveAtOnce = false,
   });
   final CaptureSession session;
@@ -2143,6 +2191,10 @@ class CaptureResult extends ConsumerStatefulWidget {
   /// Spoken captures: listen again. It gets the result as it is now, with
   /// its edits written, so Cancel can bring it back.
   final ValueChanged<CaptureSession>? onSayAgain;
+
+  /// `Guardar tal cual`, when every command found nothing: the words become
+  /// a task instead.
+  final Future<void> Function(CaptureSession)? onSaveAsWritten;
   @override
   ConsumerState<CaptureResult> createState() => _CaptureResultState();
 }
@@ -2431,21 +2483,26 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       EdgeInsets? margin() =>
           messenger == sheetMessages ? _aboveActions() : null;
       final tasks = ready.where((item) => !item.task.isNote).toList();
-      // The tasks' days, earliest first: Calendar lands on the first.
+      // The tasks' days, earliest first: Calendar lands on the first. A task
+      // with only a deadline lands on its deadline's day, where Calendar
+      // lists it.
       final days =
           tasks
-              .map((item) => item.task.dueDate)
+              .map((item) => item.task.dueDate ?? item.task.deadline)
               .whereType<DateTime>()
               .map(Task.day)
               .toSet()
               .toList()
             ..sort();
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
+      final due = ready.length == 1 ? ready.single.task.deadline : null;
       final added = ready.length > 1
           ? strings.captureTasksAdded(ready.length)
-          : day == null
-          ? strings.taskSavedInbox
-          : strings.taskAddedOn(context.weekdayDate(day));
+          : day != null
+          ? strings.taskAddedOn(context.weekdayDate(day))
+          : due != null
+          ? strings.taskAddedDue(context.weekdayDate(due))
+          : strings.taskSavedInbox;
       // Tasks on days other than the one Calendar lands on are out of sight:
       // name them.
       final otherDays = days.skip(1).toList();
@@ -2458,6 +2515,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           : otherDays.length > 1
           ? '$added · ${strings.captureAlsoOnDays(otherDays.length)}'
           : added;
+      // The landing Deshacer takes back, if any.
+      CalendarFocus? focus;
       if (remaining == 0) {
         // From the pending list, back to Calendar, where the tasks land.
         if (origin?.showCalendar == true) {
@@ -2473,13 +2532,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             if (undoIds[item.id] != null) undoIds[item.id]!,
         };
         if (ids.isNotEmpty) {
-          container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+          focus = CalendarFocus(
             days.firstOrNull,
             ids,
             page: origin?.page,
             showCalendar: origin?.showCalendar ?? false,
-            undated: tasks.any((item) => item.task.dueDate == null),
+            undated: tasks.any(
+              (item) => item.task.dueDate == null && item.task.deadline == null,
+            ),
           );
+          container.read(calendarFocusProvider.notifier).state = focus;
         }
       }
       final feedback = showFeedback(
@@ -2510,6 +2572,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               return;
             }
             await container.read(taskProvider.notifier).showLocal();
+            // The filter the landing widened comes back with the tasks gone.
+            narrowAfterUndo(container, focus);
             container.invalidate(pendingCapturesProvider);
             if (mounted) {
               setState(() {
@@ -2620,10 +2684,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     }
 
     put(back: false);
+    final l = context.l10n;
     unawaited(
       showFeedback(
         ScaffoldMessenger.of(context),
-        context.l10n.reviewRemoved,
+        switch (command.kind) {
+          CommandKind.delete => l.commandWontDelete,
+          CommandKind.update => l.commandWontChange,
+          // A search has no ✕.
+          CommandKind.project || CommandKind.find => l.commandWontCreate,
+        },
         margin: _aboveActions(),
         actionLabel: context.l10n.undo,
         onAction: () {
@@ -2869,41 +2939,37 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         for (final update in applied.updates)
           if (update.landed case final task?) task,
       ];
-      // Calendar lands on the earliest day among those added and changed.
-      final days =
-          [
-              for (final item in tasks) ?item.task.dueDate,
-              for (final task in landed) ?task.displayDate,
-            ].map(Task.day).toSet().toList()
-            ..sort();
+      // Calendar lands on the earliest day among those added and changed; a
+      // task with only a deadline, on its deadline's day.
+      final days = [
+        for (final item in tasks) ?(item.task.dueDate ?? item.task.deadline),
+        for (final task in landed) ?task.displayDate,
+      ].map(Task.day).toSet().toList()..sort();
       final updates = actionable
           .where((view) => view.kind == CommandKind.update)
           .toList();
       final moved = updates.length == 1 ? updates.single.plan! : null;
-      final onlyMoved =
-          moved != null &&
-          moved.schedule != null &&
-          moved.title == null &&
-          moved.deadline == null &&
-          moved.priority == null &&
-          moved.notes == null &&
-          moved.assignee == null;
+      // Only moved to another day or time: the message names the day.
+      final moving = _onlyMoved(moved) ? moved!.schedule : null;
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
+      final due = ready.length == 1 ? ready.single.task.deadline : null;
       final parts = [
         if (applied.projects.isNotEmpty)
           strings.commandProjectsCreated(applied.projects.length),
         if (ready.isNotEmpty)
           ready.length > 1
               ? strings.captureTasksAdded(ready.length)
-              : day == null
-              ? strings.taskSavedInbox
-              : strings.taskAddedOn(context.weekdayDate(day)),
+              : day != null
+              ? strings.taskAddedOn(context.weekdayDate(day))
+              : due != null
+              ? strings.taskAddedDue(context.weekdayDate(due))
+              : strings.taskSavedInbox,
         if (applied.updates.isNotEmpty)
-          onlyMoved
-              ? moved.schedule!.date == null
+          moving != null
+              ? moving.date == null
                     ? strings.movedInbox
                     : strings.movedOccurrenceDate(
-                        context.weekdayDate(moved.schedule!.date!),
+                        context.weekdayDate(moving.date!),
                       )
               : strings.commandTasksChanged(applied.updates.length),
         if (applied.deleted.isNotEmpty)
@@ -2912,6 +2978,18 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       final message = remaining > 0
           ? '${parts.join(' · ')} · ${strings.captureKeptForReview(remaining)}'
           : parts.join(' · ');
+      // One new project, with only its own new tasks and no changes: its
+      // page opens, as making one by hand does, with the tasks lit.
+      final project = applied.projects.length == 1 && applied.updates.isEmpty
+          ? applied.projects.single
+          : null;
+      final opensProject =
+          project != null &&
+          written.drafts
+              .where((draft) => readyIds.contains(draft.id))
+              .every((draft) => draft.task.listId == project);
+      MaterialPageRoute<void>? projectPage;
+      CalendarFocus? focus;
       if (remaining == 0) {
         if (origin?.showCalendar == true) {
           navigator.popUntil((route) => route.isFirst);
@@ -2923,16 +3001,26 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             if (undoIds[item.id] != null) undoIds[item.id]!,
           for (final update in applied.updates) ?update.before.id,
         };
-        if (ids.isNotEmpty) {
-          container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+        if (opensProject) {
+          projectPage = MaterialPageRoute<void>(
+            builder: (_) =>
+                HomeScreen(isRoot: false, listId: project, landing: ids),
+          );
+          unawaited(navigator.push(projectPage));
+        } else if (ids.isNotEmpty) {
+          focus = CalendarFocus(
             days.firstOrNull,
             ids,
             page: origin?.page,
             showCalendar: origin?.showCalendar ?? false,
             undated:
-                tasks.any((item) => item.task.dueDate == null) ||
+                tasks.any(
+                  (item) =>
+                      item.task.dueDate == null && item.task.deadline == null,
+                ) ||
                 landed.any((task) => task.displayDate == null),
           );
+          container.read(calendarFocusProvider.notifier).state = focus;
         }
       }
       final feedback = showFeedback(
@@ -2976,9 +3064,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             if (applied.projects.isNotEmpty) {
               container.invalidate(taskListsProvider);
             }
+            // The project is gone, so its page closes, with anything opened
+            // from it; the result reopens over the screen underneath.
+            final page = projectPage;
+            if (projectsBack && page != null && page.isActive) {
+              navigator.popUntil((route) => route == page);
+              navigator.pop();
+            }
             await container.read(taskProvider.notifier).showLocal();
             container.invalidate(pendingCapturesProvider);
             final whole = changesBack && projectsBack;
+            if (whole && restored != null) narrowAfterUndo(container, focus);
             if (restored == null || !whole) {
               if (messenger.mounted) {
                 unawaited(
@@ -3072,6 +3168,26 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     if (mounted) widget.onSayAgain?.call(_session);
   }
 
+  /// `Guardar tal cual`: the words, not the commands, are what to keep.
+  Future<void> _saveAsWritten() async {
+    final save = widget.onSaveAsWritten;
+    if (_saving || save == null) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await _writes;
+      _finished = true;
+      await save(_session);
+    } catch (_) {
+      _finished = false;
+      if (mounted) setState(() => _error = CaptureProblem.saveFailed);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   /// Cancel, Back, a tap above the sheet and a swipe down: ask once whether
   /// to keep it, as while listening. With every card removed, it finishes as
   /// `Terminar` does. While saving, nothing happens.
@@ -3083,7 +3199,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       return;
     }
     _asking = true;
-    final keep = await _askToKeep(context);
+    final keep = await _askToKeep(
+      context,
+      spoken: _session.source == 'speech' || _session.audioPath != null,
+    );
     _asking = false;
     if (!mounted || keep == null || _saving) return;
     if (keep) {
@@ -3228,8 +3347,22 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     // Only things to read (a search, a task not found): nothing to tap.
     final readOnly =
         commands && cards > 0 && ready == 0 && actionable.isEmpty && !blocked;
-    final deleteOnly =
-        commands && ready == 0 && changes == 0 && projects == 0 && deletes > 0;
+    // New projects are named only when they are all the tap does: with a
+    // deletion alone, the button names it and keeps the warning colour.
+    final deleteOnly = commands && ready == 0 && changes == 0 && deletes > 0;
+    // Every command found nothing («Cambia el aceite…» was a task): the
+    // words can still become one.
+    final asWritten =
+        readOnly &&
+        widget.onSaveAsWritten != null &&
+        cards == views.length &&
+        views.every(
+          (view) =>
+              view.notFound ||
+              (view.kind == CommandKind.find && view.found.isEmpty),
+        ) &&
+        (_session.transcript.trim().isNotEmpty ||
+            _session.text.trim().isNotEmpty);
     final l = context.l10n;
     final theme = Theme.of(context);
     final note =
@@ -3254,17 +3387,34 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               ? l.captureFinish
               : ready == 0 && actionable.isEmpty
               ? l.captureCheckDetails
+              : ready > 0 && changes > 0 && deletes > 0
+              ? l.commandAddChangeAndDelete
+              : ready > 0 && changes > 0
+              ? l.commandAddAndChange
+              : ready > 0 && deletes > 0
+              ? l.commandAddAndDelete
               : ready > 0
               ? ready > 1 || pending.length > 1
                     ? l.captureAddTasks(ready)
                     : pending.single.task.dueDate != null
                     ? l.captureAddToCalendar
                     : l.captureAddTask
-              : changes == 0 && deletes == 0
-              ? l.commandCreateProjects(projects)
+              : changes > 0 && deletes > 0
+              ? l.commandChangeAndDelete
+              : changes > 0
+              ? changes == 1 &&
+                        _onlyMoved(
+                          actionable
+                              .firstWhere(
+                                (view) => view.kind == CommandKind.update,
+                              )
+                              .plan,
+                        )
+                    ? l.reschedule
+                    : l.saveChangesSentence
               : deleteOnly
               ? l.delete
-              : l.commandApply
+              : l.commandCreateProjects(projects)
         : pending.isEmpty
         ? l.captureFinish
         : ready == 0
@@ -3398,6 +3548,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                                   : Icons.done_all_rounded,
                             ),
                       label: Text(label),
+                    )
+                  else if (asWritten)
+                    FilledButton(
+                      key: const ValueKey('result-save-as-written'),
+                      onPressed: _saving
+                          ? null
+                          : () => unawaited(_saveAsWritten()),
+                      child: Text(l.captureSaveAsWritten),
                     ),
                   if (!typing) ...[
                     if (freeLeft != null && freeLeft <= 3) ...[
@@ -3411,7 +3569,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                         ),
                       ),
                     ],
-                    SizedBox(height: readOnly ? 0 : 12),
+                    SizedBox(height: readOnly && !asWritten ? 0 : 12),
                     _exits(context, canSayAgain: sayAgain, close: readOnly),
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,

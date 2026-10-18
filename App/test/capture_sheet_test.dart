@@ -2097,7 +2097,7 @@ class _Captures extends CaptureStore {
       timezone: timezone,
       text: text,
       capturedAt: capturedAt.toUtc(),
-      source: 'typed',
+      source: 'shared',
     );
   }
 

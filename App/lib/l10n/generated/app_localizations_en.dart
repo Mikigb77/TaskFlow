@@ -582,9 +582,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keepChanges => 'Keep changes';
 
   @override
-  String get saveChanges => 'Save Changes';
-
-  @override
   String get taskTitle => 'Task title';
 
   @override
@@ -1193,6 +1190,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String taskAddedOn(String date) {
     return 'Added to $date';
+  }
+
+  @override
+  String taskAddedDue(String date) {
+    return 'Added · due $date';
   }
 
   @override
@@ -2624,7 +2626,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureTimeLeft => '10 seconds left';
 
   @override
-  String get captureKeepQuestion => 'Keep it for later?';
+  String get captureKeepQuestion => 'Keep what you said for later?';
+
+  @override
+  String get captureKeepTextQuestion => 'Keep the text for later?';
 
   @override
   String get captureRecordingFirst =>
@@ -2771,7 +2776,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureNothingToReview => 'Nothing left to review';
 
   @override
-  String get captureRemovedDraftsHelp => 'Nothing will be added.';
+  String get captureRemovedDraftsHelp => 'Nothing will change.';
 
   @override
   String get captureFinish => 'Done';
@@ -3692,7 +3697,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteAccountThrottled => 'Too many tries. Try again later.';
 
   @override
-  String deleteAccountThrottledWait(int minutes) {
+  String tooManyTriesWait(int minutes) {
     String _temp0 = intl.Intl.pluralLogic(
       minutes,
       locale: localeName,
@@ -3761,7 +3766,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get commandApply => 'Apply';
+  String get commandAddAndChange => 'Add and change';
+
+  @override
+  String get commandAddAndDelete => 'Add and delete';
+
+  @override
+  String get commandChangeAndDelete => 'Change and delete';
+
+  @override
+  String get commandAddChangeAndDelete => 'Add, change and delete';
+
+  @override
+  String commandDontDelete(String title) {
+    return 'Don’t delete $title';
+  }
+
+  @override
+  String commandDontChange(String title) {
+    return 'Don’t change $title';
+  }
+
+  @override
+  String commandDontCreate(String name) {
+    return 'Don’t create $name';
+  }
+
+  @override
+  String get commandWontDelete => 'Won’t be deleted';
+
+  @override
+  String get commandWontChange => 'Won’t be changed';
+
+  @override
+  String get commandWontCreate => 'Won’t be created';
 
   @override
   String commandFindWords(String words) {
