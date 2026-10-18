@@ -35,6 +35,26 @@ The agents can't see the conversation. Before running `/ux`, record lasting owne
 - Android and iOS strings, launcher shortcuts, the home-screen widget, and permission text;
 - native behaviour the user feels directly, such as when speech listening starts and stops.
 
+## UX web loop
+
+This section is for the main session. It's the same loop for the marketing website (`../TaskFlowWeb`), run with **`/ux-web`**.
+
+Run `/ux-web` once, before you report the work as done:
+- after website work;
+- whenever an app feature changes what the site should say, such as a new feature, a limit, a price, or what happens to people's data. `/ux-web` then also checks the site's claims against the app.
+
+Before starting website work, run `bash .claude/ux-web/ux-web.sh base`, so your changes can be told apart from another session's uncommitted work in TaskFlowWeb.
+
+- `/ux-web site` reviews the whole site and stops for the owner's approval. `/ux-web fix` then carries out the approved plan.
+- `/ux-web <pages>` reviews only the pages named.
+
+Owner policy (2026-10-18):
+- fix everything the reviewer finds, except product decisions;
+- stop for approval only on whole-site runs;
+- commit each verified round on `dev` in each repo: the site's files in TaskFlowWeb, the loop's records here. Never push, and never deploy.
+
+Record lasting owner decisions about the site in `.claude/ux-web/DECISIONS.md`. How the loop works, and which commands run in WSL and which on Windows: `.claude/ux-web/README.md`. Issues and their status: `.claude/ux-web/ISSUES.md`.
+
 ## Layout
 
 **`App/`** — the Flutter app (Dart package `agenda`; app label TaskFlow). Run Flutter commands from here.
