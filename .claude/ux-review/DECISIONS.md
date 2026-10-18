@@ -2,6 +2,56 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-18 (night) — The owner is away: the main session decides, records and moves on
+**The owner, before leaving:** "whatever question you have for me, whatever decisions, even if it concerns the product, just for now, record what decision you made, what was your recommendation, and you move forward with your recommendation… you are on your own… prioritize completing everything to the best degree possible." Earlier the same evening: "if you have to do something, don't ask me for permission, just go ahead and do it."
+
+How the loop runs until he's back:
+- Organizers still keep decisions apart from fixes. The main session answers each decision here, using the recommendation unless it says otherwise, and the loop then builds it like any fix.
+- Whole-app and whole-site runs don't stop for approval.
+- Everything decided below is reversible. He reviews it all afterwards; the summary is `.claude/AWAY-2026-10-18.md`.
+- These rules don't change: no push, no deploy, never `main`, never his phone or his own emulators (the separate `TaskFlow_Review` test emulator is the main session's), never `Backend/.env`.
+
+**Run 2026-10-18-commands, D1–D11 (details in its `plan.md`):**
+- **D1 — Cancelar on a result with nothing to add:** it just closes ("don't do it"). Results with a task to add keep asking whether to keep or discard.
+- **D2 — date words carried into the form:** dictated words carried into the form by «Escribir» have their day and time read, as «Guardar como tarea» does. Titles typed into the form are left as typed.
+- **D3 — rename «Guardar tal cual»:** «Guardar como tarea» / "Save as a task" / «Desa-ho com a tasca».
+- **D4 — a search with a period** («¿qué tengo esta semana?»): listed by day and time, soonest first. Other searches stay newest first.
+- **D5 — the button at 0 dictations:** stays «Nueva tarea».
+- **D6 — Back on a new task:** shows the add message («Añadida al lun, 19 oct» or «Añadida sin fecha», with Deshacer), not «Cambios guardados».
+- **D7 — a task added under a person's chip:** it's that person's by default, shown on the form and the card, and one tap changes it.
+- **D8 — real names:**
+  - the Google half is done on the server (41c00f3);
+  - password accounts are asked for a first name once, when they first share a project or join one. The field is prefilled from the email and can be skipped. There's no field at sign-up;
+  - the server gets a way to set the name (`PATCH /api/auth/me/` with `first_name`).
+- **D9 — «Reenviar código» when nothing was sent:**
+  - past the limit, the server answers 429 with Retry-After;
+  - the app says «Has pedido muchos códigos. Espera {n} minutos para pedir otro.» and keeps Reenviar off.
+
+  The server goes first.
+- **D10 — «Abrir el correo»:** not now.
+- **D11 — does the commands flag slow every dictation?** Staging can't be used without a deploy, so the main session measures it locally with the real model, then decides together with UX-616.
+
+**Other open items, decided:**
+- **Cleaning up completed tasks** (the owner floated 1 month on free, 3 months on Pro): **none for now**, so nothing is ever deleted on its own.
+  - Why: it deletes people's history irreversibly, voice search now finds completed tasks (decided earlier today), the privacy page he approved promises the opposite, and a free plan shouldn't lose data.
+  - Nothing is built, so it's easy to revisit. If it's ever wanted, the app must say so before it happens.
+- **UX-815:** an account with Google linked can confirm the deletion with Google on the delete page.
+- **UX-813:** later, with the confirmation email he deferred.
+- **UX-814 and UX-812:** not now.
+- **Deleting the RevenueCat customer:** yes, best effort after the deletion commits, when the server has the RevenueCat secret key. A failure is logged and never blocks the deletion.
+- **Free dictations after deleting and re-creating an account:** accepted for now. No hash of the email is kept, which keeps the privacy page simple.
+- **UX-615 (a result that saves itself):** no. The confirming tap stays until the test with his father.
+- **UX-616 (the assistant's wait on the server):** on staging and production, `AI_ROUTE=auto` with `AI_FREE_ATTEMPT_SECONDS=10`, so a slow free call falls back to the paid model sooner.
+  - Settings only; it applies at the next deploy, which stays his call.
+  - Local Docker has no Vertex configuration, so nothing changes locally.
+- **Finding the tasks that hold files:** yes, the smallest version. When storage is full, the message and the Account storage row link to «Ver tareas con archivos», a list of tasks with files, largest first.
+  - Why: today the message asks people to remove files from other tasks, with no way to find them, which is a dead end.
+- **U13 (two tabs), and UX-331, UX-421 and U10 which follow from it:** still waiting for his test with his father; only he can run it.
+- **The package name `com.example.agenda`:** the new ID will be `tech.garbar.taskflow`, from garbar.tech. The code doesn't change yet, because Google sign-in, RevenueCat and Play must register it first. `App/docs/PACKAGE_ID.md` lists the steps.
+- **From the website review** (WD7 and WD11 in `.claude/ux-web/runs/2026-10-18-site/plan.md`):
+  - the app no longer says it's available on iOS (`app_en.arb` "available in the Android and iOS app");
+  - the app links to the website's Privacy and Terms, at sign-up and in Ajustes, in the app's language.
+
 ## 2026-10-18 (later) — A form for free accounts, and voice commands for projects and tasks
 - **The owner approved all seven recommendations** in `.claude/ux-review/voice-commands-plan.md`:
   1. «Proyecto» in the app, with «grupo», «proyecto» and «lista» understood in dictations;
@@ -178,6 +228,7 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - archived groups drop out of the daily view, capture and reminders.
 
 ## Open — not decided; anything that depends on these is a decision, not a fix
+- **2026-10-18 (night):** most items below were decided by the main session while the owner was away; see that entry at the top. Still open: U13 and what follows from it.
 - **Account deletion (2026-10-15).** The design is `Backend/docs/ACCOUNT_DELETION.md`; the review is run `2026-10-15-deletion`. Each item below gives the organizer's recommendation:
   - **Cleaning up completed tasks.** The owner described completed tasks being removed after 1 month (free) or 3 months (Pro). That job doesn't exist, and the privacy page says completed tasks are not deleted after 30 or 90 days. Choose one, and the website must match:
     - for everyone;

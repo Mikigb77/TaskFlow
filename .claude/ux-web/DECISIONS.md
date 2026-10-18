@@ -4,6 +4,60 @@ Every agent in the UX web loop reads this before reviewing or planning. Only the
 
 The app's decisions are in `.claude/ux-review/DECISIONS.md`. They bind the site too: the site may only say what the app does, and anything open there is open here.
 
+## 2026-10-18 (night) — The owner is away: the main session decides, records and moves on
+**The owner, before leaving:** "whatever question you have for me, whatever decisions, even if it concerns the product, just for now, record what decision you made, what was your recommendation, and you move forward with your recommendation… you are on your own… prioritize completing everything to the best degree possible."
+
+What that means for the loop:
+- The main session answers each decision here, and the loop builds it.
+- Whole-site runs don't stop for approval.
+- Everything is reversible. He reviews it afterwards; the summary is `.claude/AWAY-2026-10-18.md`.
+- Unchanged: never push, never deploy, never commit or revert the other session's work in TaskFlowWeb. Edits to its files stay uncommitted for him.
+
+The owner also asked that the reviewers get every tool they need before they judge ("we cannot compromise the quality"). Then they recheck their areas:
+- the live demo in every state, with the API stubbed;
+- 200% text, zoom and 320 px renders;
+- a measured audit: axe, target sizes, contrast, a screen-reader snapshot, the keyboard path, lab speed;
+- WebKit renders if possible.
+
+**Run 2026-10-18-site, WD1–WD13 (details in its `plan.md`), decided as recommended unless noted:**
+- **WD1 — the sample walkthrough (`#demo`):** removed. One static example takes its place in the live demo's intro: the spoken "Tomorrow, call the dentist and buy bread." and its two task cards. It shows without JavaScript, and whenever the live demo can't run.
+- **WD2 — free and Pro on the site:** yes, without a price and without "100 MB":
+  - 10 dictations a month without Pro;
+  - tasks by hand with no limit;
+  - TaskFlow Pro, monthly, for unlimited dictation and file space.
+
+  It goes in the FAQ, in one line in the closing card and in one line after the demo, in three languages.
+- **WD3 — editing the legal documents:** yes. The privacy policy gains:
+  - the email codes;
+  - the first name from Google;
+  - speech recognised on the phone;
+  - phone calendars staying on the phone;
+  - «Creada por».
+
+  The jargon, the Catalan «Eliminar» and "Versión 2026-10-16" are fixed, and `company.version` moves to the edit date. These are the other session's untracked files, so the changes stay uncommitted for his sign-off.
+- **WD4 — the hero image and the link preview:** the Calendar with the hero card's example done: "Call the dentist" and "Buy bread" on tomorrow, with the one «Añadir tarea» button. One image per language and theme (6 PNGs, 780 × 1688), rendered by the main session from the app.
+- **WD5 — the language of the bare `/`:** chosen from the browser's language on `/` only, never from the IP, falling back to English.
+  - A choice made in the language switch is remembered in the browser and always wins.
+  - Privacy §8 says so (with WD3).
+- **WD6 — "A little focus. A little flow.":** dropped from the footer.
+- **WD7 — Android only:** the site says "for Android phones". The Apple mentions go from the legal pages (with WD3), and the app's own "Android and iOS" line goes through /ux.
+- **WD8 — the live demo against the free app:** kept as it is; its tries are labelled as the demo's. Once UX-616's route is deployed, the demo gets the same one.
+- **WD9 — "tell me when it launches":** not yet. Use Play pre-registration once the package ID is final.
+  - The research (second pass) found a Spanish "Pre-register" badge but no Catalan one, so /ca/ would use a text link.
+- **WD10 — a family-sharing section:** not now; the FAQ answer is rewritten instead.
+- **WD11 — Privacy and Terms inside the app:** yes, at sign-up and in Ajustes, through /ux. It's recorded in `.claude/ux-review/DECISIONS.md`.
+- **WD12 — backup retention, and paid or free Gemini:** only the owner knows these.
+  - The site states nothing new about backup windows or model training; today's cautious wording stays ("no prometemos retención cero").
+  - Ask him when he's back.
+- **WD13 — publishing:** the site goes out together with, or after, the app and backend it describes. Play Console gets `/delete-account/`. Nothing is deployed now.
+
+**Also decided:**
+- **Analytics:** none before launch.
+  - At launch, the first choice is server-log or first-party audience measurement within the AEPD's 2024 conditions (the guide's PV-6 and FN-9): no consent banner, own audience only, anonymous, cookies at most 13 months.
+  - Whether a given tool qualifies is a legal check for him.
+- **The Android trademark line** ("Android is a trademark of Google LLC." and ™ on first use): added wherever the site names Android.
+  - Approval by Google's Android brand team is his action, at launch.
+
 ## 2026-10-18 — What the website is for, and how the UX web loop runs
 The owner asked for a review-and-fix loop for the website, as thorough as the app's. His goals, paraphrased:
 - **The website is the entry point.** Many people will only know TaskFlow through it, so their experience must be flawless.
@@ -26,5 +80,5 @@ How the loop runs, the same policy as the app's:
 - The decisions in the 2026-10-18 entry above.
 
 ## Open — not decided; anything that depends on these is a decision, not a fix
-- Nothing recorded for the site yet. The first whole-site run's `plan.md` lists the questions it raises.
+- WD1–WD13 of the first whole-site run were decided by the main session on 2026-10-18 (night); see the top. Still for the owner: WD12's two facts, the legal checks, and the Android brand approval at launch.
 - The app's open items bind the site too: see the Open section of `.claude/ux-review/DECISIONS.md`. Account deletion and the clean-up of completed tasks are listed there, and the privacy and delete-account pages must match whatever is chosen.
