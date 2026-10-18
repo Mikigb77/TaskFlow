@@ -1300,6 +1300,12 @@ abstract class AppLocalizations {
   /// **'Try it: tap Add a task and type “Tomorrow, call the dentist.”'**
   String get calendarTryTyping;
 
+  /// calendarTryTyping while the button reads Write a task: an account without Pro whose free dictations are used up this month.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it: tap Write a task and type “Tomorrow, call the dentist.”'**
+  String get calendarTryTypingWrite;
+
   /// No description provided for @planTask.
   ///
   /// In en, this message translates to:
@@ -1419,6 +1425,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tasks without a date wait here until you choose one.\nStart with Add a task.'**
   String get inboxEmpty;
+
+  /// tasksEmpty while the button reads Write a task: an account without Pro whose free dictations are used up this month.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Write a task to add one. A date is optional.'**
+  String get tasksEmptyWrite;
+
+  /// inboxEmpty while the button reads Write a task: an account without Pro whose free dictations are used up this month.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks without a date wait here until you choose one.\nStart with Write a task.'**
+  String get inboxEmptyWrite;
 
   /// No description provided for @savedOnDevice.
   ///
@@ -2589,6 +2607,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password updated. Sign in with your new password.'**
   String get passwordResetComplete;
+
+  /// Heading of the screen that asks for the 6-digit code the server emailed: after creating an account, or after signing in to one whose address isn't confirmed yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your email'**
+  String get verifyEmailHeading;
+
+  /// Under that heading. {email} is the address the code went to.
+  ///
+  /// In en, this message translates to:
+  /// **'We’ve sent a 6-digit code to {email}. Type it here.'**
+  String verifyEmailHelp(String email);
+
+  /// Label of the field for the emailed code. It confirms by itself once 6 digits are typed or pasted.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get verifyEmailCode;
+
+  /// Under the code field when Confirm is tapped with fewer than 6 digits typed.
+  ///
+  /// In en, this message translates to:
+  /// **'The code has 6 digits'**
+  String get verifyEmailCodeLength;
+
+  /// Sends the typed code. When it is right, the person is signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get verifyEmailConfirm;
+
+  /// Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code'**
+  String get verifyEmailResend;
+
+  /// The resend button while it waits, counting down each second from 60.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds, plural, =1{Resend code in 1 second} other{Resend code in {seconds} seconds}}'**
+  String verifyEmailResendIn(int seconds);
+
+  /// Under the code field after a new code was emailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We’ve sent you a new code'**
+  String get verifyEmailResent;
+
+  /// Under the code field when the server says the code is wrong. The person can type it again.
+  ///
+  /// In en, this message translates to:
+  /// **'That code isn’t right'**
+  String get verifyEmailCodeInvalid;
+
+  /// Under the code field when the code is too old, or was tried too many times. Resend code can be tapped at once.
+  ///
+  /// In en, this message translates to:
+  /// **'That code has expired. Ask for a new one.'**
+  String get verifyEmailCodeExpired;
+
+  /// Goes back to creating an account, with the email kept so it can be corrected.
+  ///
+  /// In en, this message translates to:
+  /// **'Use another email'**
+  String get verifyEmailOtherAddress;
+
+  /// Under Create account, back from the confirm screen, when the address was registered again with another password before it was confirmed. The email is kept and the password field is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone has created an account with this email again. Create it again to continue.'**
+  String get verifyEmailReplaced;
 
   /// No description provided for @newList.
   ///
@@ -5355,6 +5445,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Free dictations: {left} of {limit} left this month. More on {date}.'**
   String freeVoiceStatus(int left, int limit, String date);
+
+  /// Replaces Add a task, with a pencil icon, for an account without Pro once this month's free dictations are used up. It opens the capture sheet for typing: understood on the phone, with no limit.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a task'**
+  String get writeTask;
+
+  /// Title of a sheet shown at most once a month: the first time an account without Pro taps Write a task with this month's free dictations used up. {limit} is the account's monthly free dictations (10).
+  ///
+  /// In en, this message translates to:
+  /// **'{limit, plural, =1{You’ve used your free dictation for this month} other{You’ve used your {limit} free dictations for this month}}'**
+  String freeVoiceNoticeTitle(int limit);
+
+  /// Under that title. {limit} is how many free dictations come back, and {date} the local short date they do.
+  ///
+  /// In en, this message translates to:
+  /// **'You can keep creating tasks by typing them, with no limit. {limit, plural, =1{You’ll get 1 more dictation on {date}.} other{You’ll get {limit} more dictations on {date}.}}'**
+  String freeVoiceNoticeBody(int limit, String date);
+
+  /// That sheet's main button: opens the capture sheet for typing. Its other button is voiceProAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a task'**
+  String get freeVoiceNoticeWrite;
 
   /// Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes.
   ///

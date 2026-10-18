@@ -69,6 +69,16 @@ final freeVoiceLeftProvider = Provider<int?>((ref) {
   return free?.leftAt(ref.watch(calendarClockProvider)());
 });
 
+/// An account without Pro has used this month's free dictations: Añadir
+/// tarea becomes Escribir tarea, which types. False while billing is still
+/// finding out whether the account has Pro, and when the server sent no
+/// count: then the button stays as it was.
+final freeVoiceUsedUpProvider = Provider<bool>(
+  (ref) =>
+      !ref.watch(billingLoadingProvider) &&
+      ref.watch(freeVoiceLeftProvider) == 0,
+);
+
 /// When free dictations come back: the saved date, else the next calendar
 /// month (UTC), as the server counts them.
 final freeVoiceResetsProvider = Provider<DateTime>((ref) {

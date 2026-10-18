@@ -7,6 +7,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -477,6 +478,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ? context.l10n.readOnlyListEmpty
                         : widget.listId != null
                         ? context.l10n.listEmpty
+                        // They name the button, which can read Escribir
+                        // tarea.
+                        : ref.watch(freeVoiceUsedUpProvider)
+                        ? widget.isRoot
+                              ? context.l10n.tasksEmptyWrite
+                              : context.l10n.inboxEmptyWrite
                         : widget.isRoot
                         ? context.l10n.tasksEmpty
                         : context.l10n.inboxEmpty,

@@ -157,11 +157,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Failures are kept in [AuthState.error], except
+  /// [EmailVerificationRequired], which is thrown: it isn't a problem to
+  /// show, and the caller opens the screen that asks for the code.
   Future<void> signIn(
     String email,
     String password, {
     bool register = false,
     String timezone = 'UTC',
+    String? language,
   }) async {
     state = AuthState(
       account: state.account,
@@ -169,9 +173,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       expired: state.expired,
     );
     try {
-      await api.signIn(email, password, register: register, timezone: timezone);
+      await api.signIn(
+        email,
+        password,
+        register: register,
+        timezone: timezone,
+        language: language,
+      );
       if (mounted) state = AuthState(account: api.account);
       _remind(_owner);
+    } on EmailVerificationRequired {
+      if (mounted) {
+        state = AuthState(account: state.account, expired: state.expired);
+      }
+      rethrow;
     } catch (error) {
       if (mounted) {
         state = AuthState(
@@ -181,6 +196,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
     }
+  }
+
+  /// Confirms [email] with its 6-digit [code] and the [password] just typed
+  /// for it, which signs in as [signIn] does. Failures are thrown, not kept:
+  /// the confirm screen shows them under its field.
+  Future<void> verifyEmail(String email, String code, String password) async {
+    state = AuthState(
+      account: state.account,
+      loading: true,
+      expired: state.expired,
+    );
+    try {
+      await api.verifyEmail(email, code, password);
+    } catch (_) {
+      if (mounted) {
+        state = AuthState(account: state.account, expired: state.expired);
+      }
+      rethrow;
+    }
+    if (mounted) state = AuthState(account: api.account);
+    _remind(_owner);
   }
 
   Future<void> signOut() async {

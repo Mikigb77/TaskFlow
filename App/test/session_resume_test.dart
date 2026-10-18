@@ -461,6 +461,7 @@ class _SessionApi extends OfflineApiClient {
     String password, {
     bool register = false,
     String timezone = 'UTC',
+    String? language,
   }) async {
     signIns++;
     _account = _user(nextAccount);

@@ -6,6 +6,8 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/screens/verify_email_screen.dart';
+import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/development_login.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -41,6 +43,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   // account: wrong credentials mean a forgotten password, not a new account.
   bool _accountExists = false;
   String? _message;
+  // [_message] says the account must be created again, back from the
+  // confirm screen: TalkBack reads it as it appears.
+  bool _replaced = false;
   Object? _error;
   final _emailField = GlobalKey();
   final _passwordField = GlobalKey();
@@ -78,6 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _hasRecoveryCode = false;
       _code.clear();
       _message = null;
+      _replaced = false;
       _error = null;
       _form = GlobalKey<FormState>();
     });
@@ -91,6 +97,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
       _message = null;
+      _replaced = false;
     });
     try {
       await action();
@@ -150,8 +157,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
+  /// Signs in, or creates the account, with the app's language for its
+  /// emails. Returns the address that must be confirmed first, if any.
+  Future<String?> _signIn(
+    String email,
+    String password, {
+    bool register = false,
+  }) async {
+    final language = Localizations.localeOf(context).languageCode;
+    await ref.read(regionalProvider.notifier).ready;
+    final zone = await CaptureTimezone.resolve(ref.read(regionalProvider));
+    if (!mounted) return null;
+    try {
+      await ref
+          .read(authProvider.notifier)
+          .signIn(
+            email,
+            password,
+            register: register,
+            timezone: zone.identifier,
+            language: language,
+          );
+    } on EmailVerificationRequired catch (pending) {
+      return pending.email;
+    }
+    return null;
+  }
+
+  /// The address waits for the code the server just emailed: ask for it,
+  /// sending the [password] just typed along with it. Coming back lands on
+  /// creating the account, with the email kept. When it must be created
+  /// again, the password is cleared and sign-up says why.
+  Future<void> _confirmEmail(String email, String password) async {
+    final back = await Navigator.of(context).push<VerifyEmailReturn>(
+      MaterialPageRoute(
+        builder: (_) => VerifyEmailScreen(email: email, password: password),
+      ),
+    );
+    if (back == null || !mounted) return;
+    _mode(register: true);
+    if (back == VerifyEmailReturn.replaced) {
+      _password.clear();
+      setState(() {
+        _message = context.l10n.verifyEmailReplaced;
+        _replaced = true;
+      });
+      _reveal();
+    }
+  }
+
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
+    final password = _password.text;
+    String? unconfirmed;
     await _run(() async {
       final api = ref.read(apiClientProvider);
       await api.setServer(_server.text);
@@ -180,35 +238,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
         return;
       }
-      await ref.read(regionalProvider.notifier).ready;
-      final zone = await CaptureTimezone.resolve(ref.read(regionalProvider));
-      if (!mounted) return;
-      await ref
-          .read(authProvider.notifier)
-          .signIn(
-            _email.text,
-            _password.text,
-            register: _register,
-            timezone: zone.identifier,
-          );
+      unconfirmed = await _signIn(_email.text, password, register: _register);
     });
+    if (unconfirmed != null && mounted) {
+      await _confirmEmail(unconfirmed!, password);
+    }
   }
 
   Future<void> _testSignIn() async {
     if (!DevelopmentLogin.enabled) return;
+    String? unconfirmed;
     await _run(() async {
       await ref.read(apiClientProvider).setServer(_server.text);
-      await ref.read(regionalProvider.notifier).ready;
-      final zone = await CaptureTimezone.resolve(ref.read(regionalProvider));
-      if (!mounted) return;
-      await ref
-          .read(authProvider.notifier)
-          .signIn(
-            DevelopmentLogin.email,
-            DevelopmentLogin.password,
-            timezone: zone.identifier,
-          );
+      unconfirmed = await _signIn(
+        DevelopmentLogin.email,
+        DevelopmentLogin.password,
+      );
     });
+    if (unconfirmed != null && mounted) {
+      await _confirmEmail(unconfirmed!, DevelopmentLogin.password);
+    }
   }
 
   Future<void> _googleSignIn() => _run(() async {
@@ -329,18 +378,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 16),
                     ],
                     DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.surface,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: colors.outlineVariant),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colors.shadow.withValues(alpha: .025),
-                            blurRadius: 32,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
-                      ),
+                      decoration: authCardDecoration(colors),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Column(
@@ -637,10 +675,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    MessageBanner(
-                                      problem ?? _message!,
-                                      isError: error != null,
-                                    ),
+                                    // Its own node: only the line is read.
+                                    if (_replaced && error == null)
+                                      Semantics(
+                                        container: true,
+                                        liveRegion: true,
+                                        child: MessageBanner(
+                                          _message!,
+                                          key: const ValueKey(
+                                            'signup-replaced',
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      MessageBanner(
+                                        problem ?? _message!,
+                                        isError: error != null,
+                                      ),
                                     if (unknownAccount && _accountExists) ...[
                                       const SizedBox(height: 12),
                                       OutlinedButton(
@@ -761,6 +812,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
+
+/// The card around sign-in's form, and the confirm screen's.
+BoxDecoration authCardDecoration(ColorScheme colors) => BoxDecoration(
+  color: colors.surface,
+  borderRadius: BorderRadius.circular(28),
+  border: Border.all(color: colors.outlineVariant),
+  boxShadow: [
+    BoxShadow(
+      color: colors.shadow.withValues(alpha: .025),
+      blurRadius: 32,
+      offset: const Offset(0, 12),
+    ),
+  ],
+);
 
 class AuthBrand extends StatelessWidget {
   const AuthBrand({super.key});

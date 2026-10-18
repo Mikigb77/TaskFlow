@@ -5,6 +5,8 @@
 // when the words are saved as written or dropped while understood.
 // P90 (UX-498): used up — the words are kept, typing takes over, and the
 // sheet says when more come.
+// 2026-10-18 (DECISIONS.md): at 0 left the button reads Escribir tarea, and
+// its first tap of the month says so once.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -17,12 +19,14 @@ import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/providers/free_voice_notice_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/captures_screen.dart';
+import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_entries.dart';
@@ -34,6 +38,7 @@ import 'package:agenda/services/revenuecat_service.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/widgets/task_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +47,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:uuid/uuid.dart';
 
 import 'support/billing_fixtures.dart';
@@ -394,23 +400,25 @@ void main() {
 
   for (final language in ['es', 'en', 'ca']) {
     testWidgets(
-      'UX-498: at 0 left, Añadir tarea opens typing with the used-up line naming the reset date and Ver Pro, and no recorder ($language)',
+      'UX-498: at 0 left, Escribir tarea opens typing with the used-up line naming the reset date and Ver Pro, and no recorder ($language)',
       (tester) async {
         final l = strings(language);
         final resets = nextReset();
+        // This month's notice already seen: the tap goes straight to typing.
         final app = await _FreeApp.open(
           tester,
           language: language,
           freeVoice: freeVoice(0, resets: resets),
+          noticeSeen: true,
         );
         expect(
           find.descendant(
-            of: find.widgetWithText(FilledButton, l.addTask),
-            matching: find.byIcon(Icons.add_rounded),
+            of: find.widgetWithText(FilledButton, l.writeTask),
+            matching: find.byIcon(Icons.edit_outlined),
           ),
           findsOneWidget,
         );
-        await tester.tap(find.text(l.addTask).hitTestable());
+        await tester.tap(find.text(l.writeTask).hitTestable());
         await tester.pumpAndSettle();
         expect(words(), findsOneWidget, reason: 'it opens typing');
         expect(app.recorders, 0);
@@ -1356,9 +1364,10 @@ void main() {
             language: language,
             freeVoice: freeVoice(0, resets: resets),
             size: size,
+            noticeSeen: true,
           );
           final l = strings(language);
-          await tester.tap(find.text(l.addTask).hitTestable());
+          await tester.tap(find.text(l.writeTask).hitTestable());
           await tester.pumpAndSettle();
           // The keyboard comes up for the focused field.
           tester.view.viewInsets = const FakeViewPadding(bottom: 300);
@@ -1408,18 +1417,647 @@ void main() {
       );
     }
   });
+
+  // ---- 2026-10-18: Escribir tarea once the free dictations are used up ----
+
+  Finder notice() => find.byKey(const ValueKey('free-voice-notice'));
+  Finder inActions(Finder finder) =>
+      find.descendant(of: find.byType(TaskActions), matching: finder);
+  Finder inNotice(Finder finder) =>
+      find.descendant(of: notice(), matching: finder);
+
+  /// The button reads [label], with [icon] and no other.
+  void expectButton(String label, IconData icon) {
+    final button = inActions(find.widgetWithText(FilledButton, label));
+    expect(button, findsOneWidget);
+    expect(
+      find.descendant(of: button, matching: find.byIcon(icon)),
+      findsOneWidget,
+    );
+    for (final other in [
+      Icons.mic_none_rounded,
+      Icons.add_rounded,
+      Icons.edit_outlined,
+    ]) {
+      if (other == icon) continue;
+      expect(inActions(find.byIcon(other)), findsNothing, reason: '$other');
+    }
+  }
+
+  test(
+    '2026-10-18: the button reads Escribir tarea / Write a task / Escriu una tasca; the notice names the limit and the date, with its date mid-sentence in Catalan',
+    () {
+      expect(es.writeTask, 'Escribir tarea');
+      expect(en.writeTask, 'Write a task');
+      expect(ca.writeTask, 'Escriu una tasca');
+      expect(
+        es.freeVoiceNoticeTitle(10),
+        'Has usado tus 10 dictados gratis de este mes',
+      );
+      expect(
+        es.freeVoiceNoticeBody(10, '1 nov'),
+        'Puedes seguir creando tareas escribiéndolas, sin límite. Tendrás 10 dictados más el 1 nov.',
+      );
+      expect(es.freeVoiceNoticeWrite, 'Escribir una tarea');
+      expect(es.voiceProAction, 'Ver Pro');
+      expect(
+        en.freeVoiceNoticeTitle(10),
+        'You’ve used your 10 free dictations for this month',
+      );
+      expect(
+        en.freeVoiceNoticeBody(10, 'Nov 1'),
+        'You can keep creating tasks by typing them, with no limit. You’ll get 10 more dictations on Nov 1.',
+      );
+      expect(en.freeVoiceNoticeWrite, 'Write a task');
+      expect(
+        ca.freeVoiceNoticeTitle(10),
+        'Has fet servir els 10 dictats gratuïts d’aquest mes',
+      );
+      // The date keeps its own full stop: «1 de nov.».
+      expect(
+        ca.freeVoiceNoticeBody(10, '1 de nov.'),
+        'Pots continuar creant tasques escrivint-les, sense límit. El dia 1 de nov. tindràs 10 dictats més.',
+      );
+      expect(ca.freeVoiceNoticeWrite, 'Escriu una tasca');
+      // The limit comes from the account, in the singular too.
+      expect(
+        es.freeVoiceNoticeTitle(1),
+        'Has usado tu dictado gratis de este mes',
+      );
+      expect(
+        es.freeVoiceNoticeBody(1, 'D'),
+        endsWith('Tendrás 1 dictado más el D.'),
+      );
+      for (final l in [en, es, ca]) {
+        expect(l.freeVoiceNoticeTitle(7), contains('7'), reason: l.localeName);
+        expect(l.freeVoiceNoticeBody(7, 'D'), contains('7'));
+        expect(l.freeVoiceNoticeBody(7, 'D'), contains('D'));
+      }
+    },
+  );
+
+  test(
+    '2026-10-18: with the real short dates for 1 November and 1 May, the notice never doubles a full stop',
+    () async {
+      for (final l in [en, es, ca]) {
+        await initializeDateFormatting(l.localeName);
+        for (final day in [
+          DateTime(2026, 11, 1, 12),
+          DateTime(2027, 5, 1, 12),
+        ]) {
+          final date = DateFormat.MMMd(l.localeName).format(day);
+          final body = l.freeVoiceNoticeBody(10, date);
+          expect(body, contains(date), reason: body);
+          expect(body, isNot(contains('..')), reason: body);
+        }
+      }
+    },
+  );
+
+  test(
+    '2026-10-18: the lines that name the button name Escribir tarea when it reads so, and are otherwise unchanged',
+    () {
+      for (final l in [en, es, ca]) {
+        String swap(String text) => text.replaceFirst(l.addTask, l.writeTask);
+        expect(l.calendarTryTypingWrite, swap(l.calendarTryTyping));
+        expect(l.tasksEmptyWrite, swap(l.tasksEmpty));
+        expect(l.inboxEmptyWrite, swap(l.inboxEmpty));
+        for (final text in [
+          l.calendarTryTypingWrite,
+          l.tasksEmptyWrite,
+          l.inboxEmptyWrite,
+        ]) {
+          expect(text, contains(l.writeTask), reason: text);
+          expect(text, isNot(contains(l.addTask)), reason: text);
+        }
+      }
+    },
+  );
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      '2026-10-18: a free account with no dictations left this month sees Escribir tarea with a pencil instead of Añadir tarea ($language)',
+      (tester) async {
+        final l = strings(language);
+        final app = await _FreeApp.open(
+          tester,
+          language: language,
+          freeVoice: freeVoice(0),
+        );
+        expect(app.container.read(freeVoiceUsedUpProvider), isTrue);
+        expectButton(l.writeTask, Icons.edit_outlined);
+        expect(find.text(l.addTask), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final (state, pro, free, loading, icon) in [
+    (
+      'Pro, even with a saved 0',
+      true,
+      freeVoice(0),
+      false,
+      Icons.mic_none_rounded,
+    ),
+    (
+      'Free with dictations left',
+      false,
+      freeVoice(5),
+      false,
+      Icons.mic_none_rounded,
+    ),
+    (
+      'Free at 0 while billing doesn’t know yet whether it has Pro',
+      false,
+      freeVoice(0),
+      true,
+      Icons.add_rounded,
+    ),
+    (
+      'Free on an older server that sends no count',
+      false,
+      null,
+      false,
+      Icons.add_rounded,
+    ),
+  ]) {
+    testWidgets(
+      '2026-10-18: $state keeps Añadir tarea with today’s icon, and its tap opens the sheet with no notice',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          pro: pro,
+          freeVoice: free,
+          billingLoading: loading,
+        );
+        expect(app.container.read(freeVoiceUsedUpProvider), isFalse);
+        expectButton(es.addTask, icon);
+        expect(find.text(es.writeTask), findsNothing);
+        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        expect(notice(), findsNothing);
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(app.notices.writes, 0);
+        expect(app.notices.months, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  group('2026-10-18: freeVoiceUsedUp', () {
+    final resets = DateTime.utc(2026, 11);
+    final before = DateTime.utc(2026, 10, 20);
+    ProviderContainer container({
+      bool pro = false,
+      bool loading = false,
+      Map<String, dynamic>? free,
+      DateTime? now,
+      SubscriptionController? subscription,
+    }) {
+      final api = OfflineApiClient();
+      final c = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          authProvider.overrideWith(
+            (ref) => _AccountAuth(api, {
+              'id': 1,
+              'email': 'a@example.invalid',
+              'timezone': 'UTC',
+              if (subscription != null) 'complimentary_pro': true,
+              if (free != null) 'free_voice': free,
+            }),
+          ),
+          if (subscription != null)
+            subscriptionProvider.overrideWith((_) => subscription)
+          else ...[
+            hasProProvider.overrideWithValue(pro),
+            billingLoadingProvider.overrideWithValue(loading),
+          ],
+          calendarClockProvider.overrideWithValue(() => now ?? before),
+        ],
+      );
+      addTearDown(c.dispose);
+      addTearDown(api.close);
+      return c;
+    }
+
+    test('only an account without Pro, at 0, once billing has answered; '
+        'from the reset on, the saved 0 is a new month', () {
+      bool usedUp(ProviderContainer c) => c.read(freeVoiceUsedUpProvider);
+      expect(usedUp(container(free: freeVoice(0, resets: resets))), isTrue);
+      expect(usedUp(container(free: freeVoice(1, resets: resets))), isFalse);
+      expect(usedUp(container()), isFalse, reason: 'an older server');
+      expect(
+        usedUp(container(free: freeVoice(0, resets: resets), loading: true)),
+        isFalse,
+        reason: 'not known yet',
+      );
+      expect(
+        usedUp(container(free: freeVoice(0, resets: resets), pro: true)),
+        isFalse,
+      );
+      expect(
+        usedUp(
+          container(
+            free: freeVoice(0, resets: resets),
+            now: resets,
+          ),
+        ),
+        isFalse,
+      );
+    });
+
+    test('a complimentary account at 0 has not used anything up', () async {
+      final controller = SubscriptionController(
+        FakeRevenueCat(),
+        const BillingConfiguration(apiKey: 'test_fixture', supported: true),
+      );
+      await controller.setIdentity(
+        'owner',
+        () async => 'owner-id',
+        complimentary: true,
+      );
+      final c = container(
+        free: freeVoice(0, resets: resets),
+        subscription: controller,
+      );
+      expect(c.read(hasProProvider), isTrue);
+      expect(c.read(freeVoiceUsedUpProvider), isFalse);
+    });
+  });
+
+  testWidgets(
+    '2026-10-18: the first tap of the month at 0 left shows the notice, with the account’s limit and the local reset date; Escribir una tarea opens typing, focused, with the used-up line and no recorder; the next tap types at once',
+    (tester) async {
+      final resets = nextReset();
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0, resets: resets),
+      );
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsOneWidget);
+      expect(words(), findsNothing, reason: 'the notice comes first');
+      expect(inNotice(find.text(es.freeVoiceNoticeTitle(10))), findsOneWidget);
+      expect(
+        inNotice(
+          find.text(es.freeVoiceNoticeBody(10, resetDay(tester, resets))),
+        ),
+        findsOneWidget,
+      );
+      // Seen from now on, for this account and this month.
+      expect(app.notices.months, {app.owner: resets});
+
+      await tester.tap(
+        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeWrite)),
+      );
+      await tester.pumpAndSettle();
+      expect(notice(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(wordsFocused(tester), isTrue);
+      // The sheet's own used-up line stays, as it was.
+      expect(find.byKey(const ValueKey('free-voice-used-up')), findsOneWidget);
+      expect(app.recorders, 0);
+      expect(app.speech.starts, 0);
+
+      // Closed with nothing typed: the next tap types at once.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(words(), findsNothing);
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(wordsFocused(tester), isTrue);
+      expect(app.notices.writes, 1);
+      expect(app.recorders, 0);
+      expect(app.speech.starts, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: at 0 left no recorder is ever created and the mic is never readied: not on Calendar, not behind the notice, not in the sheet, not on the next tap',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
+      await frames(tester);
+      expect(app.speech.warms, 0, reason: 'speech is readied only for the mic');
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsOneWidget);
+      expect(app.recorders, 0);
+      await tester.tap(
+        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeWrite)),
+      );
+      await tester.pumpAndSettle();
+      expect(words(), findsOneWidget);
+      expect(app.recorders, 0);
+      // Closed with nothing typed, and opened again.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(words(), findsOneWidget);
+      // Typed and understood on the phone: still none.
+      await tester.enterText(words(), 'Comprar pan');
+      await tester.pumpAndSettle();
+      await tester.tap(button(es.done));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(app.api.drafts, isEmpty, reason: 'understood on the phone');
+      expect(app.recorders, 0);
+      expect(app.speech.starts, 0);
+      expect(app.speech.warms, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: closing the notice opens nothing; it doesn’t come back, and the next tap types at once',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(notice(), findsNothing);
+      expect(words(), findsNothing);
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(app.notices.writes, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: Ver Pro on the notice opens the Pro screen, as the sheet’s Ver Pro does; back on Calendar, Escribir tarea types at once',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        inNotice(find.widgetWithText(TextButton, es.voiceProAction)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(SubscriptionScreen), findsOneWidget);
+      expect(notice(), findsNothing);
+      expect(words(), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(SubscriptionScreen), findsNothing);
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(app.recorders, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: seen last month, the notice shows again the first time this month runs out too; seen this month (another run of the app), it doesn’t',
+    (tester) async {
+      final resets = nextReset();
+      final lastMonth = DateTime.utc(resets.year, resets.month - 1);
+      final notices = _Notices()
+        ..months['http://free.test/users/1'] = lastMonth;
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0, resets: resets),
+        notices: notices,
+      );
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsOneWidget);
+      expect(notices.months[app.owner], resets);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      // The app starts again on this phone: still seen this month.
+      await tester.pumpWidget(const SizedBox());
+      await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0, resets: resets),
+        notices: notices,
+      );
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsNothing);
+      expect(words(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: another account on the same phone, out of dictations too, gets its own notice once',
+    (tester) async {
+      final resets = nextReset();
+      final notices = _Notices()..months['http://free.test/users/1'] = resets;
+      final app = await _FreeApp.open(
+        tester,
+        accountId: 2,
+        freeVoice: freeVoice(0, resets: resets),
+        notices: notices,
+      );
+      expect(app.owner, 'http://free.test/users/2');
+      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(notice(), findsOneWidget);
+      expect(notices.months, {
+        'http://free.test/users/1': resets,
+        'http://free.test/users/2': resets,
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'ca', 'en']) {
+    testWidgets(
+      '2026-10-18: at 2× text on 320 dp ($language), Escribir tarea and its notice read in full with no overflow; both notice buttons can be reached, and TalkBack reads the title as a heading as it opens',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = strings(language);
+        final resets = nextReset();
+        await _FreeApp.open(
+          tester,
+          language: language,
+          freeVoice: freeVoice(0, resets: resets),
+          size: const Size(320, 640),
+        );
+        final label = inActions(find.text(l.writeTask));
+        expect(label, findsOneWidget);
+        final rect = tester.getRect(label);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        expect(
+          tester
+              .renderObject<RenderParagraph>(
+                find.descendant(of: label, matching: find.byType(RichText)),
+              )
+              .didExceedMaxLines,
+          isFalse,
+        );
+        await tester.tap(label.hitTestable());
+        await tester.pumpAndSettle();
+        expect(notice(), findsOneWidget);
+        final title = inNotice(find.text(l.freeVoiceNoticeTitle(10)));
+        final body = inNotice(
+          find.text(l.freeVoiceNoticeBody(10, resetDay(tester, resets))),
+        );
+        final write = inNotice(
+          find.widgetWithText(FilledButton, l.freeVoiceNoticeWrite),
+        );
+        final pro = inNotice(find.widgetWithText(TextButton, l.voiceProAction));
+        for (final finder in [title, body, write, pro]) {
+          expect(finder, findsOneWidget);
+          await tester.ensureVisible(finder);
+          await tester.pumpAndSettle();
+          expect(finder.hitTestable(), findsOneWidget, reason: '$finder');
+          final box = tester.getRect(finder);
+          expect(box.left, greaterThanOrEqualTo(0), reason: '$finder');
+          expect(box.right, lessThanOrEqualTo(320.5), reason: '$finder');
+        }
+        final heading = tester
+            .getSemantics(title)
+            .getSemanticsData()
+            .flagsCollection;
+        expect(heading.isHeader, isTrue);
+        expect(heading.isLiveRegion, isTrue);
+        // The heading and the line under it are read one by one.
+        expect(tester.getSemantics(title).label, l.freeVoiceNoticeTitle(10));
+        expect(
+          tester.getSemantics(body).label,
+          l.freeVoiceNoticeBody(10, resetDay(tester, resets)),
+        );
+        expect(
+          tester.getSemantics(body).getSemanticsData().flagsCollection.isHeader,
+          isFalse,
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  }
+
+  testWidgets(
+    '2026-10-18: at 0 left, the first-run line on Calendar and the empty Tareas list name Escribir tarea, the button they point to',
+    (tester) async {
+      await _FreeApp.open(tester, freeVoice: freeVoice(0));
+      expect(find.text(es.calendarTryTypingWrite), findsOneWidget);
+      expect(find.text(es.calendarTryTyping), findsNothing);
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed('/home');
+      await tester.pumpAndSettle();
+      expect(find.text(es.tasksEmptyWrite), findsOneWidget);
+      expect(find.text(es.tasksEmpty), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: with dictations left, the first-run line still says Añadir tarea and to say it',
+    (tester) async {
+      await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      expect(find.text(es.calendarTrySaying), findsOneWidget);
+      expect(find.text(es.calendarTryTypingWrite), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  group('2026-10-18: the notice’s memory on the phone', () {
+    const ana = 'http://free.test/users/1';
+    const luis = 'http://free.test/users/2';
+    final november = DateTime.utc(2026, 11);
+    final december = DateTime.utc(2026, 12);
+
+    test(
+      'real SQLite: once per account and per month, still seen after '
+      'the app restarts, and kept per account so deleting it erases it',
+      () async {
+        sqfliteFfiInit();
+        final sql = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
+        addTearDown(sql.close);
+        await TaskDatabase.createReminderTables(sql);
+        final store = FreeVoiceNoticeStore(TaskDatabase.forTesting(sql));
+        final first = FreeVoiceNotice(store, ana);
+        addTearDown(first.dispose);
+        expect(await first.claim(november), isTrue);
+        expect(await first.claim(november), isFalse, reason: 'once');
+        expect(await store.seen(ana), november);
+
+        // Another run of the app reads it back.
+        final again = FreeVoiceNotice(store, ana);
+        addTearDown(again.dispose);
+        expect(await again.claim(november), isFalse);
+        // Another account on this phone has its own.
+        final other = FreeVoiceNotice(store, luis);
+        addTearDown(other.dispose);
+        expect(await other.claim(november), isTrue);
+        // Next month, out again: once more.
+        expect(await again.claim(december), isTrue);
+        expect(await again.claim(december), isFalse);
+        final later = FreeVoiceNotice(store, ana);
+        addTearDown(later.dispose);
+        expect(await later.claim(december), isFalse);
+        expect(
+          (await sql.query('app_preferences')).map((row) => row['scope']),
+          unorderedEquals(['freeVoiceNotice:$ana', 'freeVoiceNotice:$luis']),
+        );
+      },
+    );
+
+    test('a phone that can’t read or write it shows it once in this run '
+        'all the same', () async {
+      final notice = FreeVoiceNotice(_BrokenNotices(), ana);
+      addTearDown(notice.dispose);
+      expect(await notice.claim(november), isTrue);
+      expect(await notice.claim(november), isFalse);
+    });
+  });
 }
 
-Map<String, dynamic> _session(Map<String, dynamic>? free) => {
+/// A phone whose database can't be read or written.
+class _BrokenNotices extends FreeVoiceNoticeStore {
+  _BrokenNotices() : super(TaskDatabase());
+  @override
+  Future<DateTime?> seen(String owner) async =>
+      throw StateError('No database.');
+  @override
+  Future<void> markSeen(String owner, DateTime resetsAt) async =>
+      throw StateError('No database.');
+}
+
+Map<String, dynamic> _session(Map<String, dynamic>? free, {int id = 1}) => {
   'access': 'fixture-access',
   'refresh': 'fixture-refresh',
   'user': {
-    'id': 1,
-    'email': 'free@example.invalid',
+    'id': id,
+    'email': 'free$id@example.invalid',
     'timezone': 'Europe/Madrid',
     if (free != null) 'free_voice': free,
   },
 };
+
+/// The phone's memory of the used-up notice, without sqflite: the month
+/// each account has seen it for.
+class _Notices extends FreeVoiceNoticeStore {
+  _Notices() : super(TaskDatabase());
+  final months = <String, DateTime>{};
+  int writes = 0;
+  @override
+  Future<DateTime?> seen(String owner) async => months[owner];
+  @override
+  Future<void> markSeen(String owner, DateTime resetsAt) async {
+    writes++;
+    months[owner] = resetsAt;
+  }
+}
 
 Map<String, dynamic> _found(String title) => {
   'title': title,
@@ -1459,14 +2097,28 @@ class _AccountAuth extends AuthNotifier {
 /// The app in Spanish (or [language]) on Calendar, signed in to an account
 /// whose session — with its free dictations — is saved on the phone.
 class _FreeApp {
-  _FreeApp(this.container, this.api, this.store, this.tasks, this.speech);
+  _FreeApp(
+    this.container,
+    this.api,
+    this.store,
+    this.tasks,
+    this.speech,
+    this.notices,
+  );
   final ProviderContainer container;
   final _Api api;
   final _Captures store;
   final _Tasks tasks;
   final _Speech speech;
+  final _Notices notices;
   int recorders = 0;
 
+  /// The signed-in account's key on this phone.
+  String get owner => container.read(captureOwnerProvider);
+
+  /// [notices] is the phone's memory of the used-up notice, kept across
+  /// runs when a test passes the same one; [noticeSeen] starts with it
+  /// seen for [freeVoice]'s month.
   static Future<_FreeApp> open(
     WidgetTester tester, {
     bool pro = false,
@@ -1474,17 +2126,26 @@ class _FreeApp {
     String language = 'es',
     Size size = const Size(390, 844),
     bool billingLoading = false,
+    int accountId = 1,
+    _Notices? notices,
+    bool noticeSeen = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     FlutterSecureStorage.setMockInitialValues({
-      'taskflow.session': jsonEncode(_session(freeVoice)),
+      'taskflow.session': jsonEncode(_session(freeVoice, id: accountId)),
     });
     final api = _Api();
     final store = _Captures();
     final tasks = _Tasks();
     final speech = _Speech();
+    final seen = notices ?? _Notices();
+    if (noticeSeen && freeVoice != null) {
+      seen.months['${api.baseUrl}/users/$accountId'] = DateTime.parse(
+        '${freeVoice['resets_at']}',
+      );
+    }
     final entries = CaptureEntries(
       channel: const MethodChannel('test/free-dictation-entries'),
     );
@@ -1522,9 +2183,10 @@ class _FreeApp {
           return SilentRecorder();
         }),
         captureEntriesProvider.overrideWithValue(entries),
+        freeVoiceNoticeStoreProvider.overrideWithValue(seen),
       ],
     );
-    app = _FreeApp(container, api, store, tasks, speech);
+    app = _FreeApp(container, api, store, tasks, speech, seen);
     store.tasks = tasks;
     final messenger = tester.binding.defaultBinaryMessenger;
     const channel = MethodChannel('test/free-dictation-entries');
@@ -1714,7 +2376,14 @@ class _Captures extends CaptureStore {
 class _Speech extends NativeSpeech {
   final _events = StreamController<SpeechEvent>.broadcast(sync: true);
   int starts = 0;
+  int warms = 0;
   int? _run;
+  @override
+  void warm(String language) {
+    warms++;
+    super.warm(language);
+  }
+
   @override
   Future<SpeechCapability> capability({String? language}) async =>
       const SpeechCapability(

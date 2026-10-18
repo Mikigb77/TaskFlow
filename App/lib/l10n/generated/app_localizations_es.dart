@@ -743,6 +743,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Prueba: toca Añadir tarea y escribe «Mañana, llamar al dentista».';
 
   @override
+  String get calendarTryTypingWrite =>
+      'Prueba: toca Escribir tarea y escribe «Mañana, llamar al dentista».';
+
+  @override
   String get planTask => 'Planificar una tarea';
 
   @override
@@ -807,6 +811,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get inboxEmpty =>
       'Las tareas sin fecha esperan aquí hasta que elijas una.\nEmpieza con Añadir tarea.';
+
+  @override
+  String get tasksEmptyWrite =>
+      'Toca Escribir tarea para añadir una. La fecha es opcional.';
+
+  @override
+  String get inboxEmptyWrite =>
+      'Las tareas sin fecha esperan aquí hasta que elijas una.\nEmpieza con Escribir tarea.';
 
   @override
   String get savedOnDevice => 'Tus tareas guardadas siguen en tu dispositivo.';
@@ -1518,6 +1530,54 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get passwordResetComplete =>
       'Contraseña actualizada. Inicia sesión con tu nueva contraseña.';
+
+  @override
+  String get verifyEmailHeading => 'Confirma tu correo';
+
+  @override
+  String verifyEmailHelp(String email) {
+    return 'Te hemos enviado un código de 6 cifras a $email. Escríbelo aquí.';
+  }
+
+  @override
+  String get verifyEmailCode => 'Código';
+
+  @override
+  String get verifyEmailCodeLength => 'El código tiene 6 cifras';
+
+  @override
+  String get verifyEmailConfirm => 'Confirmar';
+
+  @override
+  String get verifyEmailResend => 'Reenviar código';
+
+  @override
+  String verifyEmailResendIn(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: 'Reenviar código en $seconds segundos',
+      one: 'Reenviar código en 1 segundo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get verifyEmailResent => 'Te hemos enviado un código nuevo';
+
+  @override
+  String get verifyEmailCodeInvalid => 'Ese código no es correcto';
+
+  @override
+  String get verifyEmailCodeExpired =>
+      'Ese código ha caducado. Pide uno nuevo.';
+
+  @override
+  String get verifyEmailOtherAddress => 'Usar otro correo';
+
+  @override
+  String get verifyEmailReplaced =>
+      'Alguien ha vuelto a crear una cuenta con este correo. Créala de nuevo para continuar.';
 
   @override
   String get newList => 'Nuevo proyecto';
@@ -3494,6 +3554,34 @@ class AppLocalizationsEs extends AppLocalizations {
     );
     return 'Dictados gratis: $_temp0 de $limit este mes. Más el $date.';
   }
+
+  @override
+  String get writeTask => 'Escribir tarea';
+
+  @override
+  String freeVoiceNoticeTitle(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: 'Has usado tus $limit dictados gratis de este mes',
+      one: 'Has usado tu dictado gratis de este mes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeVoiceNoticeBody(int limit, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: 'Tendrás $limit dictados más el $date.',
+      one: 'Tendrás 1 dictado más el $date.',
+    );
+    return 'Puedes seguir creando tareas escribiéndolas, sin límite. $_temp0';
+  }
+
+  @override
+  String get freeVoiceNoticeWrite => 'Escribir una tarea';
 
   @override
   String storageUsage(int used, int limit) {

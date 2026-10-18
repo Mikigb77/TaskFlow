@@ -204,6 +204,7 @@ void main() {
           'calendars:$gone',
           'groups:$gone',
           'sharing:$gone',
+          'freeVoiceNotice:$gone',
           'reminders:$other',
           'regional',
         ]) {

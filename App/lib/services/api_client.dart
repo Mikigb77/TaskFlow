@@ -19,6 +19,17 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// The account's email address isn't confirmed yet: the server has emailed a
+/// 6-digit code to [email], and signs in only once it is typed. Thrown by
+/// [ApiClient.signIn] for a new account, and for a right password whose
+/// address waits for its code.
+class EmailVerificationRequired implements Exception {
+  const EmailVerificationRequired(this.email);
+  final String email;
+  @override
+  String toString() => 'Confirm your email address to continue.';
+}
+
 /// The free dictations of an account without Pro, this calendar month (UTC).
 class FreeVoice {
   const FreeVoice({
@@ -192,21 +203,76 @@ class ApiClient {
     await _storage.write(key: 'taskflow.server', value: baseUrl);
   }
 
+  /// Signs in, or with [register] creates the account. A new account sends
+  /// [language] (`es`, `ca` or `en`), the language of the emails it gets.
+  /// Throws [EmailVerificationRequired] when the address waits for its
+  /// code; a server that doesn't ask for one signs straight in.
   Future<void> signIn(
     String email,
     String password, {
     bool register = false,
     String timezone = 'UTC',
+    String? language,
   }) async {
+    final address = email.trim();
+    final dynamic result;
+    try {
+      result = await request(
+        'POST',
+        'auth/${register ? 'register' : 'login'}/',
+        authenticated: false,
+        data: {
+          'email': address,
+          'password': password,
+          'timezone': timezone,
+          if (register && language != null) 'language': language,
+        },
+      );
+    } on ApiException catch (error) {
+      // The password is right, but the address isn't confirmed yet. The
+      // server has already emailed a fresh code.
+      if (error.status == 403 && error.body?['code'] == 'email_unverified') {
+        throw EmailVerificationRequired(_emailIn(error.body) ?? address);
+      }
+      rethrow;
+    }
+    // Created, with a code on its way instead of a session.
+    if (result is Map && result['verification_required'] == true) {
+      throw EmailVerificationRequired(_emailIn(result) ?? address);
+    }
+    await _persist(Map<String, dynamic>.from(result as Map), ++_generation);
+  }
+
+  static String? _emailIn(Map? body) {
+    final email = body?['email'];
+    return email is String && email.trim().isNotEmpty ? email.trim() : null;
+  }
+
+  /// Confirms [email] with the 6-digit [code] it received and the
+  /// [password] just typed for it, and signs in with the session the server
+  /// answers, as [signIn] does. The password is only sent, never kept. A
+  /// wrong code is a 400 `code_invalid`; an expired one, or one tried too
+  /// often, a 400 `code_expired`; a 400 `signup_replaced` means the address
+  /// was registered again, with another password, before it was confirmed.
+  Future<void> verifyEmail(String email, String code, String password) async {
     final result = await request(
       'POST',
-      'auth/${register ? 'register' : 'login'}/',
+      'auth/verify-email/',
       authenticated: false,
-      data: {'email': email.trim(), 'password': password, 'timezone': timezone},
+      data: {'email': email, 'code': code, 'password': password},
     );
-    final session = Map<String, dynamic>.from(result as Map);
-    await _persist(session, ++_generation);
+    await _persist(Map<String, dynamic>.from(result as Map), ++_generation);
   }
+
+  /// Emails [email] a new code, in [language]. The server answers the same
+  /// whether or not the address waits for one.
+  Future<void> resendVerificationCode(String email, {String? language}) =>
+      request(
+        'POST',
+        'auth/verify-email/resend/',
+        authenticated: false,
+        data: {'email': email, 'language': ?language},
+      );
 
   Future<Account> refreshAccount() async {
     final generation = _generation;

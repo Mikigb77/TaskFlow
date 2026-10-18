@@ -705,6 +705,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                       ? context.l10n.calendarEmpty
                       : ref.watch(voiceAvailableProvider)
                       ? context.l10n.calendarTrySaying
+                      : ref.watch(freeVoiceUsedUpProvider)
+                      ? context.l10n.calendarTryTypingWrite
                       : context.l10n.calendarTryTyping,
                 ),
               )

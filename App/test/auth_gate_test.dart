@@ -1039,6 +1039,7 @@ class _LoginApi extends OfflineApiClient {
     String password, {
     bool register = false,
     String timezone = 'UTC',
+    String? language,
   }) async {
     signIns.add((email, register));
     // Creating the account here stops short of signing in.
