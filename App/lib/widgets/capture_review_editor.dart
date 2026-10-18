@@ -165,103 +165,86 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         for (final question in questions)
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 12),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      question.question.isEmpty
-                          ? l.captureWhatTime
-                          : question.question,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        // A question that offers times is answered by picking
-                        // one of them or saying there is no time.
-                        if (timed &&
-                            day != null &&
-                            question.times.isNotEmpty) ...[
-                          for (final clock in question.times)
-                            ActionChip(
-                              label: Text(
-                                TimeOfDay(
-                                  hour: int.parse(clock.split(':')[0]),
-                                  minute: int.parse(clock.split(':')[1]),
-                                ).format(context),
-                              ),
-                              onPressed: !widget.enabled
-                                  ? null
-                                  : () {
-                                      final date = DateTime(
-                                        day.year,
-                                        day.month,
-                                        day.day,
-                                        int.parse(clock.split(':')[0]),
-                                        int.parse(clock.split(':')[1]),
-                                      );
-                                      _resolve(
-                                        question,
-                                        value: field == 'deadline'
-                                            ? task.copyWith(
-                                                deadline: date,
-                                                deadlineHasTime: true,
-                                              )
-                                            : task.copyWith(
-                                                dueDate: date,
-                                                hasTime: true,
-                                              ),
-                                      );
-                                    },
-                            ),
-                          ActionChip(
-                            label: Text(l.reviewNoTime),
-                            onPressed: !widget.enabled
-                                ? null
-                                : () => _resolve(
-                                    question,
-                                    value: field == 'deadline'
-                                        ? task.copyWith(
-                                            deadline: Task.day(day),
-                                            deadlineHasTime: false,
-                                          )
-                                        : task.copyWith(
-                                            dueDate: Task.day(day),
-                                            hasTime: false,
-                                          ),
-                                  ),
-                          ),
-                        ] else ...[
-                          if (timed)
-                            TextButton(
-                              onPressed: !widget.enabled
-                                  ? null
-                                  : () => _schedule(
-                                      question: question,
-                                      deadline: field == 'deadline',
+            child: QuestionBox(
+              question: question.question.isEmpty
+                  ? l.captureWhatTime
+                  : question.question,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  // A question that offers times is answered by picking
+                  // one of them or saying there is no time.
+                  if (timed && day != null && question.times.isNotEmpty) ...[
+                    for (final clock in question.times)
+                      ActionChip(
+                        label: Text(
+                          TimeOfDay(
+                            hour: int.parse(clock.split(':')[0]),
+                            minute: int.parse(clock.split(':')[1]),
+                          ).format(context),
+                        ),
+                        onPressed: !widget.enabled
+                            ? null
+                            : () {
+                                final date = DateTime(
+                                  day.year,
+                                  day.month,
+                                  day.day,
+                                  int.parse(clock.split(':')[0]),
+                                  int.parse(clock.split(':')[1]),
+                                );
+                                _resolve(
+                                  question,
+                                  value: field == 'deadline'
+                                      ? task.copyWith(
+                                          deadline: date,
+                                          deadlineHasTime: true,
+                                        )
+                                      : task.copyWith(
+                                          dueDate: date,
+                                          hasTime: true,
+                                        ),
+                                );
+                              },
+                      ),
+                    ActionChip(
+                      label: Text(l.reviewNoTime),
+                      onPressed: !widget.enabled
+                          ? null
+                          : () => _resolve(
+                              question,
+                              value: field == 'deadline'
+                                  ? task.copyWith(
+                                      deadline: Task.day(day),
+                                      deadlineHasTime: false,
+                                    )
+                                  : task.copyWith(
+                                      dueDate: Task.day(day),
+                                      hasTime: false,
                                     ),
-                              child: Text(l.reviewEditDetail),
                             ),
-                          TextButton.icon(
-                            onPressed: !widget.enabled
-                                ? null
-                                : () => _resolve(question),
-                            icon: const Icon(Icons.check_rounded, size: 18),
-                            label: Text(l.reviewConfirmDetail),
-                          ),
-                        ],
-                      ],
+                    ),
+                  ] else ...[
+                    if (timed)
+                      TextButton(
+                        onPressed: !widget.enabled
+                            ? null
+                            : () => _schedule(
+                                question: question,
+                                deadline: field == 'deadline',
+                              ),
+                        child: Text(l.reviewEditDetail),
+                      ),
+                    TextButton.icon(
+                      onPressed: !widget.enabled
+                          ? null
+                          : () => _resolve(question),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: Text(l.reviewConfirmDetail),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
@@ -287,9 +270,10 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     onTap: widget.enabled ? onTap : null,
   );
 
-  /// A project said that doesn't exist: create it, or take an existing one
-  /// or none instead, one tap each. Never created without that tap. A person
-  /// named for a shared project chosen is then checked as before.
+  /// A project said that doesn't exist: where the task goes. Create it, or
+  /// take an existing one or none instead, one tap each. Never created
+  /// without that tap. A person named for a shared project chosen is then
+  /// checked as before.
   Widget _projectChoice(String said) => Consumer(
     builder: (context, ref, _) {
       final name = spokenProjectName(said);
@@ -297,31 +281,34 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
           widget.draft.assignmentHints['member']?.trim().isNotEmpty == true;
       return Padding(
         padding: const EdgeInsets.only(top: 4, bottom: 8),
-        child: ProjectChoices(
-          name: name,
-          enabled: widget.enabled,
-          projects: editableProjects(
-            ref.watch(taskListsProvider).valueOrNull ?? const [],
-          ),
-          onCreate: () => widget.onChanged(
-            widget.draft.copyWith(
-              newProject: name,
-              clearProjectSuggestion: true,
-              assignmentReviewed: true,
+        child: QuestionBox(
+          question: context.l10n.commandWhichProject,
+          child: ProjectChoices(
+            name: name,
+            enabled: widget.enabled,
+            projects: editableProjects(
+              ref.watch(taskListsProvider).valueOrNull ?? const [],
             ),
-          ),
-          onPick: (project) => widget.onChanged(
-            widget.draft.copyWith(
-              task: taskWithProject(task, project),
-              clearProjectSuggestion: true,
-              assignmentReviewed: !(project.shared && member),
+            onCreate: () => widget.onChanged(
+              widget.draft.copyWith(
+                newProject: name,
+                clearProjectSuggestion: true,
+                assignmentReviewed: true,
+              ),
             ),
-          ),
-          onNone: () => widget.onChanged(
-            widget.draft.copyWith(
-              task: taskWithProject(task, null),
-              clearProjectSuggestion: true,
-              assignmentReviewed: true,
+            onPick: (project) => widget.onChanged(
+              widget.draft.copyWith(
+                task: taskWithProject(task, project),
+                clearProjectSuggestion: true,
+                assignmentReviewed: !(project.shared && member),
+              ),
+            ),
+            onNone: () => widget.onChanged(
+              widget.draft.copyWith(
+                task: taskWithProject(task, null),
+                clearProjectSuggestion: true,
+                assignmentReviewed: true,
+              ),
             ),
           ),
         ),

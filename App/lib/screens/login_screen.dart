@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +12,22 @@ import 'package:agenda/screens/verify_email_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/development_login.dart';
+import 'package:agenda/services/pending_verification.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/google_login_button.dart';
 import 'package:agenda/widgets/language_selector.dart';
 
 /// The form field a server answer belongs on.
 enum _Field { email, password }
+
+/// A page that opens with no slide, as if the app had opened on it; closing
+/// it plays the theme's usual Back transition.
+class _ShownAtOnce<T> extends MaterialPageRoute<T> {
+  _ShownAtOnce({required super.builder});
+
+  @override
+  Duration get transitionDuration => Duration.zero;
+}
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key, this.signInAgain = false});
@@ -57,7 +69,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _server = TextEditingController(text: ref.read(apiClientProvider).baseUrl);
     if (widget.signInAgain) {
       _email.text = ref.read(authProvider).account?.email ?? '';
+    } else {
+      unawaited(_resumeConfirming());
     }
+  }
+
+  /// Android closed the app while the person read the email: the address
+  /// still waits for that code, so its screen opens again, asking for the
+  /// password. Nothing is sent, so the code in the inbox still works, and
+  /// «Reenviar código» waits only what is left of that code's minute.
+  Future<void> _resumeConfirming() async {
+    final pending = await ref.read(pendingVerificationProvider).resume();
+    if (pending == null || !mounted || _busy) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    _email.text = pending.email;
+    await _confirmEmail(pending.email, resumedFrom: pending.sentAt);
   }
 
   @override
@@ -185,14 +211,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   /// The address waits for the code the server just emailed: ask for it,
-  /// sending the [password] just typed along with it. Coming back lands on
-  /// creating the account, with the email kept. When it must be created
-  /// again, the password is cleared and sign-up says why.
-  Future<void> _confirmEmail(String email, String password) async {
+  /// sending the [password] just typed along with it; without one, the
+  /// screen asks for it. Coming back lands on creating the account, with the
+  /// email kept. When it must be created again, the password is cleared and
+  /// sign-up says why. Reopened after a restart, with [resumedFrom] the time
+  /// its code went, the screen shows at once, with no slide in.
+  Future<void> _confirmEmail(
+    String email, {
+    String? password,
+    DateTime? resumedFrom,
+  }) async {
+    // Kept across a restart while its code works; never the password.
+    if (password != null) {
+      unawaited(ref.read(pendingVerificationProvider).remember(email));
+    }
+    Widget screen(BuildContext _) =>
+        VerifyEmailScreen(email: email, password: password, sentAt: resumedFrom);
     final back = await Navigator.of(context).push<VerifyEmailReturn>(
-      MaterialPageRoute(
-        builder: (_) => VerifyEmailScreen(email: email, password: password),
-      ),
+      resumedFrom == null
+          ? MaterialPageRoute(builder: screen)
+          : _ShownAtOnce(builder: screen),
     );
     if (back == null || !mounted) return;
     _mode(register: true);
@@ -241,7 +279,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       unconfirmed = await _signIn(_email.text, password, register: _register);
     });
     if (unconfirmed != null && mounted) {
-      await _confirmEmail(unconfirmed!, password);
+      await _confirmEmail(unconfirmed!, password: password);
     }
   }
 
@@ -256,7 +294,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
     });
     if (unconfirmed != null && mounted) {
-      await _confirmEmail(unconfirmed!, DevelopmentLogin.password);
+      await _confirmEmail(
+        unconfirmed!,
+        password: DevelopmentLogin.password,
+      );
     }
   }
 

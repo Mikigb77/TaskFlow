@@ -9,7 +9,7 @@
 // says so once.
 // 2026-10-18 later: free accounts create tasks with the form. At 0 left the
 // button reads Nueva tarea and opens it; with dictations left, the sheet's
-// keyboard reads Rellenar a mano and opens it; typed words never reach the
+// keyboard reads Escribir and opens it; typed words never reach the
 // phone's parser.
 import 'dart:async';
 import 'dart:convert';
@@ -29,6 +29,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
 import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
@@ -44,6 +45,7 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_editor.dart';
+import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -228,7 +230,7 @@ void main() {
       .hasFocus;
 
   testWidgets(
-    '2026-10-18: a free account with dictations left opens Añadir tarea on the mic; the keyboard reads Rellenar a mano, and it opens the form, with nothing sent, no dictation used and nothing kept',
+    '2026-10-18: a free account with dictations left opens Añadir tarea on the mic; the keyboard reads Escribir, and it opens the form, with nothing sent, no dictation used and nothing kept',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
       await tester.tap(find.text(es.addTask).hitTestable());
@@ -238,10 +240,10 @@ void main() {
       final byHand = find.byKey(const ValueKey('capture-fill-by-hand'));
       expect(byHand, findsOneWidget);
       expect(
-        find.descendant(of: byHand, matching: find.text(es.captureFillByHand)),
+        find.descendant(of: byHand, matching: find.text(es.captureTypeInstead)),
         findsOneWidget,
       );
-      expect(es.captureFillByHand, 'Rellenar a mano');
+      expect(es.captureTypeInstead, 'Escribir');
       await tester.tap(byHand);
       await tester.pumpAndSettle();
       expect(
@@ -277,7 +279,7 @@ void main() {
 
   for (final language in ['es', 'ca']) {
     testWidgets(
-      '2026-10-18 (later): at 2× text on 320 dp ($language), the listening sheet shows Listo, Cancelar and Rellenar a mano in full, in view, with no overflow',
+      '2026-10-18 (later): at 2× text on 320 dp ($language), the listening sheet shows Listo, Cancelar and Escribir in full, in view, with no overflow',
       (tester) async {
         tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -309,7 +311,7 @@ void main() {
         }
         final label = find.descendant(
           of: byHand,
-          matching: find.text(l.captureFillByHand),
+          matching: find.text(l.captureTypeInstead),
         );
         expect(label, findsOneWidget);
         expect(
@@ -326,16 +328,16 @@ void main() {
   }
 
   test(
-    '2026-10-18 (later): the sheet’s way to the form reads Fill in by hand / Rellenar a mano / Emplena-la a mà',
+    'UX-911: the sheet’s way to the form reads Type instead / Escribir / Escriu',
     () {
-      expect(en.captureFillByHand, 'Fill in by hand');
-      expect(es.captureFillByHand, 'Rellenar a mano');
-      expect(ca.captureFillByHand, 'Emplena-la a mà');
+      expect(en.captureTypeInstead, 'Type instead');
+      expect(es.captureTypeInstead, 'Escribir');
+      expect(ca.captureTypeInstead, 'Escriu');
     },
   );
 
   testWidgets(
-    '2026-10-18: words already heard go with Rellenar a mano: they are the form’s title, unsent, and the capture is dropped',
+    'UX-1005: words already heard go with Escribir: they are the form’s title, unsent, and their capture waits until the task is saved',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
       await tester.tap(find.text(es.addTask).hitTestable());
@@ -350,6 +352,14 @@ void main() {
       expect(formTitle(tester), 'Llamar al dentista');
       expect(app.api.drafts, isEmpty, reason: 'no dictation used');
       expect(
+        app.store.sessions.values.where((s) => !s.terminal),
+        hasLength(1),
+        reason: 'the form keeps the capture',
+      );
+      await tester.tap(find.byKey(const ValueKey('task-save')));
+      await tester.pumpAndSettle();
+      expect(app.tasks.titles(), ['Llamar al dentista']);
+      expect(
         app.store.sessions.values.every((s) => s.status == 'discarded'),
         isTrue,
       );
@@ -358,7 +368,7 @@ void main() {
   );
 
   testWidgets(
-    '2026-10-18: a free account’s typed or shared words never reach the phone’s parser: shared text opens the sheet with its words and Rellenar a mano, which takes them to the form',
+    'UX-911: a free account’s typed or shared words never reach the phone’s parser: shared text opens straight in the form, and its capture waits until the task is saved',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
       final owner = app.container.read(captureOwnerProvider);
@@ -379,14 +389,14 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(words(), findsOneWidget);
-      expect(button(es.done), findsNothing);
-      await tester.tap(button(es.captureFillByHand));
-      await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
       expect(form(), findsOneWidget);
       expect(formTitle(tester), 'Comprar pilas el viernes');
       expect(app.api.drafts, isEmpty);
+      expect(app.store.sessions['shared']!.terminal, isFalse);
+      await tester.tap(find.byKey(const ValueKey('task-save')));
+      await tester.pumpAndSettle();
+      expect(app.tasks.titles(), ['Comprar pilas el viernes']);
       expect(app.store.sessions['shared']!.status, 'discarded');
       expect(find.byType(CaptureResult), findsNothing, reason: 'no parser');
       expect(tester.takeException(), isNull);
@@ -2271,6 +2281,314 @@ void main() {
       expect(await notice.claim(november), isFalse);
     });
   });
+
+  // ---- Run 2026-10-18-commands, round 2 (P138: UX-911, UX-910, UX-1005,
+  // UX-1011): a free account's way into the form ----
+
+  var entryCount = 0;
+  Map<String, Object> entry(String kind, {String text = ''}) => {
+    'id':
+        '00000000-0000-4000-9000-${(++entryCount).toString().padLeft(12, '0')}',
+    'kind': kind,
+    'text': text,
+    'capturedAt': DateTime.now().millisecondsSinceEpoch,
+  };
+
+  /// The captures still waiting under «Sin guardar».
+  List<CaptureSession> waiting(_FreeApp app) => [
+    for (final session in app.store.sessions.values)
+      if (!session.terminal) session,
+  ];
+
+  Finder title() => find.byKey(const ValueKey('task-title'));
+  Finder usedUp() => find.byKey(const ValueKey('free-voice-used-up'));
+
+  Future<void> tapSave(WidgetTester tester) async {
+    final save = find.byKey(const ValueKey('task-save'));
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openTasksTab(WidgetTester tester) async {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text(es.tasks),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-911: at 2× on 320×640 ($language), with dictations left, the mic sheet’s keyboard button reads «${strings(language).captureTypeInstead}» with the keyboard icon, whole and on screen; it opens «Nueva tarea» with the words heard as the title',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = strings(language);
+        final app = await _FreeApp.open(
+          tester,
+          language: language,
+          freeVoice: freeVoice(5),
+          size: const Size(320, 640),
+        );
+        await tester.tap(find.text(l.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        app.speech.send('ready');
+        app.speech.send('segment', text: 'Llamar al dentista');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(l.captureTypeInstead, language == 'es' ? 'Escribir' : 'Escriu');
+        final type = find.ancestor(
+          of: find.text(l.captureTypeInstead),
+          matching: find.byWidgetPredicate((widget) => widget is TextButton),
+        );
+        expect(type, findsOneWidget);
+        expect(
+          find.descendant(
+            of: type,
+            matching: find.byIcon(Icons.keyboard_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(type.hitTestable(), findsOneWidget);
+        final rect = tester.getRect(type);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(640.5));
+        expect(
+          tester
+              .renderObject<RenderParagraph>(
+                find.descendant(
+                  of: find.text(l.captureTypeInstead),
+                  matching: find.byType(RichText),
+                  matchRoot: true,
+                ),
+              )
+              .didExceedMaxLines,
+          isFalse,
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+        await tester.tap(type);
+        await tester.pumpAndSettle();
+        expect(form(), findsOneWidget);
+        expect(find.text(l.newTask), findsWidgets);
+        expect(formTitle(tester), 'Llamar al dentista');
+        expect(app.api.drafts, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-911: a typed capture «Comprar pan» under «Sin guardar», tapped, opens the form titled «Comprar pan»',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      app.store.sessions['typed'] = CaptureSession(
+        id: 'typed',
+        ownerKey: app.owner,
+        timezone: 'Europe/Madrid',
+        capturedAt: DateTime.now().toUtc(),
+        text: 'Comprar pan',
+        source: 'typed',
+      );
+      app.container.invalidate(pendingCapturesProvider);
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed('/captures');
+      await tester.pumpAndSettle();
+      expect(find.byType(CapturesScreen), findsOneWidget);
+      final row = find.descendant(
+        of: find.byType(CapturesScreen),
+        matching: find.textContaining('Comprar pan'),
+      );
+      expect(row, findsOneWidget);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(VoiceTaskScreen), findsNothing);
+      expect(form(), findsOneWidget);
+      expect(formTitle(tester), 'Comprar pan');
+      expect(app.api.drafts, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-910: at 0 left with this month’s notice already seen, the widget’s entry opens the form with «Sin dictados gratis hasta el …» and «Ver Pro» above the title, every time; «Nueva tarea» opens it without them',
+    (tester) async {
+      final resets = nextReset();
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0, resets: resets),
+        noticeSeen: true,
+      );
+      for (var time = 1; time <= 2; time++) {
+        await app.deliver(tester, entry('voice'));
+        expect(notice(), findsNothing, reason: 'seen this month');
+        expect(form(), findsOneWidget, reason: 'entry $time');
+        expect(usedUp(), findsOneWidget, reason: 'entry $time');
+        final line = es.freeVoiceUsedUp(resetDay(tester, resets));
+        expect(line, startsWith('Sin dictados gratis hasta el '));
+        expect(tester.widget<Text>(usedUp()).data, line);
+        final pro = find.widgetWithText(TextButton, es.voiceProAction);
+        expect(pro, findsOneWidget);
+        expect(es.voiceProAction, 'Ver Pro');
+        final top = tester.getRect(title()).top;
+        expect(tester.getRect(usedUp()).bottom, lessThanOrEqualTo(top));
+        expect(tester.getRect(pro).bottom, lessThanOrEqualTo(top));
+        expect(app.recorders, 0);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(form(), findsNothing);
+      }
+      await tester.tap(find.text(es.newTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(form(), findsOneWidget);
+      expect(usedUp(), findsNothing);
+      expect(find.text(es.voiceProAction), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1005: the form opened by «Nueva tarea» keeps nothing before typing, one capture «Llamar a» after typing it, none after «Añadir tarea», and none after emptying the title and pressing Back',
+    (tester) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0),
+        noticeSeen: true,
+      );
+      await tester.tap(find.text(es.newTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(form(), findsOneWidget);
+      expect(waiting(app), isEmpty, reason: 'nothing before typing');
+      await tester.enterText(title(), 'Llamar a');
+      await tester.pumpAndSettle();
+      expect(waiting(app), hasLength(1));
+      expect(waiting(app).single.text, 'Llamar a');
+      await tapSave(tester);
+      expect(form(), findsNothing);
+      expect(app.tasks.titles(), ['Llamar a']);
+      expect(waiting(app), isEmpty, reason: 'saved');
+
+      await tester.tap(find.text(es.newTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.enterText(title(), 'Llamar a');
+      await tester.pumpAndSettle();
+      expect(waiting(app), hasLength(1));
+      await tester.enterText(title(), '');
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(form(), findsNothing);
+      expect(app.tasks.titles(), ['Llamar a'], reason: 'nothing more saved');
+      expect(waiting(app), isEmpty, reason: 'closed with no title');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1005: the form keeps its title and notes in the capture: the title, a line break, then the notes, which open again from «Sin guardar»',
+    (tester) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0),
+        noticeSeen: true,
+      );
+      await tester.tap(find.text(es.newTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.enterText(title(), 'Llamar a Ana');
+      await tester.pumpAndSettle();
+      final more = find.byKey(const ValueKey('task-more-details'));
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      final notes = find.byKey(const ValueKey('task-notes'));
+      await tester.ensureVisible(notes);
+      await tester.enterText(notes, 'Por el viaje');
+      await tester.pumpAndSettle();
+      expect(waiting(app), hasLength(1));
+      expect(waiting(app).single.text, 'Llamar a Ana\nPor el viaje');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1005: «Escribir» in the mic sheet hands its capture to the form: typing there keeps exactly that one capture until the save',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Llamar a');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.byKey(const ValueKey('capture-fill-by-hand')));
+      await tester.pumpAndSettle();
+      expect(form(), findsOneWidget);
+      expect(formTitle(tester), 'Llamar a');
+      expect(app.store.sessions, hasLength(1), reason: 'the sheet’s');
+      final sheets = app.store.sessions.keys.single;
+      expect(waiting(app).single.id, sheets);
+      await tester.enterText(title(), 'Llamar a Ana');
+      await tester.pumpAndSettle();
+      expect(
+        app.store.sessions,
+        hasLength(1),
+        reason: 'still only the sheet’s',
+      );
+      expect(waiting(app).single.id, sheets);
+      expect(waiting(app).single.text, 'Llamar a Ana');
+      await tapSave(tester);
+      expect(app.tasks.titles(), ['Llamar a Ana']);
+      expect(app.store.sessions, hasLength(1));
+      expect(waiting(app), isEmpty);
+      expect(app.api.drafts, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1011: at 0 left, with the app on Tareas, a task saved in the form the widget’s entry opened switches to Calendario, with its day selected and its row lit',
+    (tester) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0),
+        noticeSeen: true,
+      );
+      await openTasksTab(tester);
+      expect(find.byType(CalendarScreen).hitTestable(), findsNothing);
+      await app.deliver(tester, entry('voice'));
+      expect(form(), findsOneWidget);
+      await tester.enterText(title(), 'Regar las plantas');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('new-task-tomorrow')));
+      await tester.pumpAndSettle();
+      await tapSave(tester);
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      expect(form(), findsNothing);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+      expect(
+        find.text(DateFormat.MMMMEEEEd('es').format(tomorrow)),
+        findsOneWidget,
+      );
+      final row = find.widgetWithText(TaskTile, 'Regar las plantas');
+      expect(row.hitTestable(), findsOneWidget);
+      expect(
+        tester.widget<TaskTile>(row).color,
+        Theme.of(
+          tester.element(find.byType(NavigationBar)),
+        ).colorScheme.primaryContainer,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// A phone whose database can't be read or written.
@@ -2364,6 +2682,22 @@ class _FreeApp {
   final _Notices notices;
   int recorders = 0;
 
+  /// Android's queue of entries from outside the app: the widget, the
+  /// shortcuts and share.
+  final queue = <Map<String, Object>>[];
+
+  /// Android hands over [entry], from the widget, a shortcut or a share.
+  Future<void> deliver(WidgetTester tester, Map<String, Object> entry) async {
+    queue.add(entry);
+    const channel = MethodChannel('test/free-dictation-entries');
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      channel.name,
+      channel.codec.encodeMethodCall(const MethodCall('changed')),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+  }
+
   /// The signed-in account's key on this phone.
   String get owner => container.read(captureOwnerProvider);
 
@@ -2442,7 +2776,11 @@ class _FreeApp {
     final messenger = tester.binding.defaultBinaryMessenger;
     const channel = MethodChannel('test/free-dictation-entries');
     messenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'pending') return [];
+      if (call.method == 'pending') return [...app.queue];
+      if (call.method == 'acknowledge') {
+        final id = (call.arguments as Map)['id'];
+        app.queue.removeWhere((entry) => entry['id'] == id);
+      }
       return null;
     });
     addTearDown(() {

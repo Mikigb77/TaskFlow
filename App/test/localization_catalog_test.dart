@@ -636,4 +636,169 @@ void main() {
       'Espera 15 minuts i torna-ho a provar.',
     );
   });
+
+  // ---- Run 2026-10-18-commands, round 2 (P133–P138) ----
+
+  test('UX-1204 and UX-911: verifyEmailCodeExpired and captureFillByHand are '
+      'gone from all three catalogs', () {
+    for (final code in ['en', 'es', 'ca']) {
+      final arb = catalog(code);
+      for (final gone in ['verifyEmailCodeExpired', 'captureFillByHand']) {
+        expect(arb.containsKey(gone), isFalse, reason: '$gone in $code');
+        expect(arb.containsKey('@$gone'), isFalse, reason: '@$gone in $code');
+      }
+    }
+  });
+
+  test('UX-1201–UX-1204, UX-1202, UX-908, UX-914, UX-907: every new key is in '
+      'all three catalogs, described in English, with the plan’s copy', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    final added = [
+      'verifyEmailCodeSpentNew',
+      'verifyEmailCodeSpentWait',
+      'verifyEmailWrongPassword',
+      'commandWhichProject',
+      'commandOtherProject',
+      'commandShowMore',
+      'commandViewOnly',
+      'commandFindPeriod',
+      'commandFindOpen',
+      'commandFindDone',
+      'commandFindProjectPerson',
+      'commandFindProjectMine',
+    ];
+    for (final code in ['en', 'es', 'ca']) {
+      final arb = catalog(code);
+      for (final key in added) {
+        expect(arb.containsKey(key), isTrue, reason: '$key in $code');
+      }
+    }
+    final english = catalog('en');
+    for (final key in added) {
+      final description =
+          (english['@$key'] as Map<String, dynamic>?)?['description'];
+      expect(description, isA<String>(), reason: '@$key');
+      expect((description as String).trim(), isNotEmpty, reason: '@$key');
+    }
+    String all(String Function(AppLocalizations l) text) =>
+        [en, es, ca].map(text).join(' / ');
+    expect(
+      all((l) => l.verifyEmailCodeInvalid),
+      'That code isn’t right. Check the newest email we sent. / Ese código '
+      'no es correcto. Mira el último correo que te hemos enviado. / Aquest '
+      'codi no és correcte. Mira l’últim correu que t’hem enviat.',
+    );
+    expect(
+      all((l) => l.verifyEmailCodeSpentNew),
+      'That code no longer works. We’ve sent you a new one. / Ese código ya '
+      'no sirve. Te hemos enviado uno nuevo. / Aquest codi ja no serveix. '
+      'T’hem enviat un codi nou.',
+    );
+    expect(
+      all((l) => l.verifyEmailCodeSpentWait),
+      'That code no longer works. Tap “Resend code” when the countdown ends. '
+      '/ Ese código ya no sirve. Toca «Reenviar código» cuando acabe la '
+      'cuenta atrás. / Aquest codi ja no serveix. Toca «Torna a enviar el '
+      'codi» quan acabi el compte enrere.',
+    );
+    // The wait line names the button as it reads.
+    for (final l in [en, es, ca]) {
+      expect(l.verifyEmailCodeSpentWait, contains(l.verifyEmailResend));
+    }
+    expect(
+      all((l) => l.verifyEmailWrongPassword),
+      'That isn’t this account’s password. Don’t remember it? Tap “Use '
+      'another email” and create the account again. / Esa contraseña no es '
+      'la de esta cuenta. ¿No la recuerdas? Toca «Usar otro correo» y crea '
+      'la cuenta de nuevo. / Aquesta contrasenya no és la d’aquest compte. '
+      'No la recordes? Toca «Utilitza un altre correu» i torna a crear el '
+      'compte.',
+    );
+    expect(
+      all((l) => l.commandWhichProject),
+      'Which project should it go in? / ¿En qué proyecto la pongo? / A quin '
+      'projecte la poso?',
+    );
+    expect(
+      all((l) => l.commandOtherProject),
+      'Another project… / Otro proyecto… / Un altre projecte…',
+    );
+    expect(
+      all((l) => l.commandShowMore(1)),
+      'Show 1 more / Ver 1 más / Mostra’n 1 més',
+    );
+    expect(
+      all((l) => l.commandShowMore(3)),
+      'Show 3 more / Ver 3 más / Mostra’n 3 més',
+    );
+    expect(
+      all((l) => l.commandViewOnly('Informe')),
+      '“Informe” is in a project you can only view. / «Informe» es de un '
+      'proyecto que solo puedes ver. / «Informe» és d’un projecte que només '
+      'pots veure.',
+    );
+    expect(
+      all((l) => l.commandWhichDay(17, '17:00')),
+      'Which day, at 17:00? / ¿Qué día, a las 17:00? / Quin dia, a les 17:00?',
+    );
+    expect(
+      all((l) => l.commandWhichDay(1, '1:00')),
+      'Which day, at 1:00? / ¿Qué día, a la 1:00? / Quin dia, a la 1:00?',
+    );
+    expect(
+      all((l) => l.commandFindPeriod('lun, 19 oct', 'dom, 25 oct')),
+      'lun, 19 oct to dom, 25 oct / Del lun, 19 oct al dom, 25 oct / Del '
+      'lun, 19 oct al dom, 25 oct',
+    );
+    expect(all((l) => l.commandFindOpen), 'To do / Pendientes / Per fer');
+    expect(
+      all((l) => l.commandFindDone),
+      'Completed / Completadas / Completades',
+    );
+    expect(
+      all((l) => l.commandFindProjectPerson('Matemáticas', 'Paul')),
+      'Tasks in “Matemáticas” for Paul / Tareas de «Matemáticas» para Paul / '
+      'Tasques de «Matemáticas» assignades a Paul',
+    );
+    expect(
+      all((l) => l.commandFindProjectMine('Matemáticas')),
+      'Your tasks in “Matemáticas” / Tus tareas de «Matemáticas» / Les teves '
+      'tasques de «Matemáticas»',
+    );
+  });
+
+  test('UX-916: the copy slips read as the plan wrote them', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(es.commandFindPerson('Ana'), 'Tareas para Ana');
+    expect(en.commandFindPerson('Ana'), 'Tasks for Ana');
+    expect(ca.commandFindPerson('Ana'), 'Tasques assignades a Ana');
+    expect(es.commandExistingProjectTasks(1), 'La tarea va ahí.');
+    expect(es.commandExistingProjectTasks(2), 'Las tareas van ahí.');
+    expect(en.commandExistingProjectTasks(1), 'The task goes there.');
+    expect(en.commandExistingProjectTasks(2), 'The tasks go there.');
+    expect(ca.commandExistingProjectTasks(1), 'La tasca hi va.');
+    expect(ca.commandExistingProjectTasks(2), 'Les tasques hi van.');
+    expect(en.commandWhichToChange, 'Which one do you want to change?');
+    expect(en.commandWhichToDelete, 'Which one do you want to delete?');
+  });
+
+  test('UX-911: the free account’s keyboard button reads Type instead / '
+      'Escribir / Escriu', () {
+    expect(
+      lookupAppLocalizations(const Locale('en')).captureTypeInstead,
+      'Type instead',
+    );
+    expect(
+      lookupAppLocalizations(const Locale('es')).captureTypeInstead,
+      'Escribir',
+    );
+    expect(
+      lookupAppLocalizations(const Locale('ca')).captureTypeInstead,
+      'Escriu',
+    );
+  });
 }

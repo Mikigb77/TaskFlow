@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -98,6 +99,8 @@ void main() {
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await icons.load();
   });
+  // Signed out, the app waits for the stored address waiting for its code.
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   testWidgets('restoration exposes neither login nor tasks until it finishes', (
     tester,

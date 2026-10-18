@@ -1,6 +1,7 @@
 import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/services/text_search.dart';
 
 /// A planned day, with or without a time; no [date] means none.
 typedef Schedule = ({DateTime? date, bool hasTime});
@@ -14,7 +15,7 @@ enum AssigneeProblem {
   /// Only a task in a shared project has an assignee.
   needsShared,
 
-  /// Two or more people have that name.
+  /// Two or more people have that name: the card asks which.
   ambiguous,
 }
 
@@ -34,6 +35,7 @@ class UpdatePlan {
     this.assignee,
     this.problem,
     this.problemName,
+    this.namesakes = const [],
     this.needsDay = false,
     this.seriesOnly = false,
   });
@@ -62,6 +64,11 @@ class UpdatePlan {
   final AssigneeProblem? problem;
   final String? problemName;
 
+  /// Two or more people have the name said: those of the task's project who
+  /// can edit and whose name starts with it, one chip each. They stay once
+  /// one is tapped, to tap another.
+  final List<ProjectMember> namesakes;
+
   /// A time for a task with no day: a day has to be chosen first.
   final bool needsDay;
 
@@ -81,6 +88,10 @@ class UpdatePlan {
 
   /// The confirming tap can apply it.
   bool get ready => !isEmpty && !needsDay;
+
+  /// It waits for one of [namesakes] to be tapped.
+  bool get asksMember =>
+      namesakes.isNotEmpty && problem == AssigneeProblem.ambiguous;
 
   /// Every change but the planned day and time, on the stored task.
   Task fields() {
@@ -179,7 +190,8 @@ Schedule _at(DateTime day, ({int hour, int minute})? clock) => clock == null
 
 /// What [changes] would do to [task], shown as [shown] (a repeating task's
 /// repetition). [project] is the task's project, [accountId] the person's
-/// own, and [day] the day chosen for a new time on a task with no day.
+/// own, [day] the day chosen for a new time on a task with no day, and
+/// [member] the person tapped when several have the name said.
 UpdatePlan planUpdate({
   required Task task,
   required Task shown,
@@ -188,6 +200,7 @@ UpdatePlan planUpdate({
   TaskListInfo? project,
   int? accountId,
   DateTime? day,
+  int? member,
 }) {
   final title = changes.title;
 
@@ -238,15 +251,32 @@ UpdatePlan planUpdate({
   ({String assignment, int? id, String? name})? assignee;
   AssigneeProblem? problem;
   String? problemName;
+  var namesakes = const <ProjectMember>[];
   if (changes.assigns) {
     final shared = project?.shared == true;
-    if (changes.hasUnresolved) {
+    if (changes.hasUnresolved && issues.contains('ambiguous_member')) {
+      final said = foldForSearch(changes.assigneeName ?? '').trim();
+      namesakes = shared && said.isNotEmpty
+          ? project!.people
+                .where(
+                  (p) => p.canEdit && foldForSearch(p.name).startsWith(said),
+                )
+                .toList()
+          : const [];
+    }
+    // The one tapped among them, while they are still the task's project's.
+    final chosen = namesakes.where((p) => p.id == member).firstOrNull;
+    if (changes.hasUnresolved && chosen == null) {
       problem = issues.contains('ambiguous_member')
           ? AssigneeProblem.ambiguous
           : shared
           ? AssigneeProblem.notInProject
           : AssigneeProblem.needsShared;
       problemName = changes.assigneeName;
+    } else if (chosen != null) {
+      if (task.assignment != 'member' || task.assigneeId != chosen.id) {
+        assignee = (assignment: 'member', id: chosen.id, name: chosen.name);
+      }
     } else if (changes.assignsNobody) {
       // Nobody in particular: everyone in the project.
       if (shared && task.assignment != 'group') {
@@ -285,6 +315,7 @@ UpdatePlan planUpdate({
     assignee: assignee,
     problem: problem,
     problemName: problemName,
+    namesakes: namesakes,
     needsDay: needsDay,
     seriesOnly: seriesOnly,
   );

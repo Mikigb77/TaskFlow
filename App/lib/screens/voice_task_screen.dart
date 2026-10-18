@@ -60,8 +60,10 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 ///
 /// An account without Pro makes tasks from typed words only in the task
 /// form (DECISIONS.md, 2026-10-18 later): a new task capture that would
-/// only type opens the form instead, and the sheet's keyboard reads
-/// `Rellenar a mano`.
+/// only type opens the form instead, and so do typed or shared words with
+/// no result yet (shared text, a capture resumed from `Sin guardar`), as
+/// the form's title and notes. The sheet's keyboard, `Escribir`, opens the
+/// form too.
 Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
@@ -73,28 +75,45 @@ Future<void> showCaptureSheet(
   DateTime? day,
   bool typing = false,
   bool askedToSpeak = false,
-}) {
+}) async {
   final container = ProviderScope.containerOf(context, listen: false);
-  if (kind == 'task' &&
-      captureId == null &&
-      container.read(typesInFormProvider) &&
-      (typing || !container.read(voiceAvailableProvider))) {
-    return openTaskForm(
-      context,
-      projectId: projectId,
-      day: day,
-      page: page,
-      showCalendar: showCalendar,
-    );
+  if (container.read(typesInFormProvider)) {
+    if (captureId == null) {
+      if (kind == 'task' &&
+          (typing || !container.read(voiceAvailableProvider))) {
+        return openTaskForm(
+          context,
+          projectId: projectId,
+          day: day,
+          page: page,
+          showCalendar: showCalendar,
+          askedToSpeak: askedToSpeak,
+        );
+      }
+    } else {
+      final typed = await _typedWords(container, captureId);
+      if (!context.mounted) return;
+      if (typed != null) {
+        return openTaskForm(
+          context,
+          projectId: typed.projectId,
+          day: typed.day,
+          page: page,
+          showCalendar: showCalendar,
+          words: typed.text,
+          captureId: typed.id,
+        );
+      }
+    }
   }
+  if (!context.mounted) return;
   final navigator = Navigator.of(context);
+  final above = navigator.context;
+  if (!above.mounted) return;
   final localizations = MaterialLocalizations.of(context);
-  return navigator.push(
+  return navigator.push<void>(
     _CaptureSheetRoute(
-      capturedThemes: InheritedTheme.capture(
-        from: context,
-        to: navigator.context,
-      ),
+      capturedThemes: InheritedTheme.capture(from: context, to: above),
       barrierLabel: localizations.scrimLabel,
       barrierOnTapHint: localizations.scrimOnTapHint(
         localizations.bottomSheetLabel,
@@ -117,6 +136,31 @@ Future<void> showCaptureSheet(
       ),
     ),
   );
+}
+
+/// A task capture of typed or shared words with no result yet: for an
+/// account without Pro, the form takes it. A dictation stays in the sheet.
+Future<CaptureSession?> _typedWords(
+  ProviderContainer container,
+  String captureId,
+) async {
+  try {
+    final session = await container
+        .read(captureStoreProvider)
+        .read(captureId, container.read(captureOwnerProvider));
+    return session != null &&
+            !session.terminal &&
+            session.kind == 'task' &&
+            !session.hasResult &&
+            session.audioPath == null &&
+            session.source != 'speech' &&
+            session.text.trim().isNotEmpty
+        ? session
+        : null;
+  } catch (_) {
+    // The sheet reads it again, and says what went wrong.
+    return null;
+  }
 }
 
 /// Where the sheet was opened from, so a save can land there.
@@ -452,6 +496,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   String? _audioId;
   bool _movedToReview = false;
   bool _discarded = false;
+  // `Escribir` without Pro handed the capture to the task form.
+  bool _toForm = false;
   // The result, shown in this sheet once the words are understood.
   CaptureSession? _result;
   // `Volver a decirlo` starts a new capture for the same project.
@@ -785,9 +831,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (!_acceptSpeech || event.run != _nativeRun) return;
     final text = event.text?.trim() ?? '';
     // `listening`: the app's own microphone already keeps the words.
-    if (event.kind == 'ready' ||
-        event.kind == 'listening' ||
-        text.isNotEmpty) {
+    if (event.kind == 'ready' || event.kind == 'listening' || text.isNotEmpty) {
       _listening();
     }
     if (event.kind == 'error' && !_recognizerReady) {
@@ -1510,21 +1554,29 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _session?.source != 'speech' &&
       ref.read(typesInFormProvider);
 
-  /// `Rellenar a mano`, for an account without Pro: the task form instead of
+  /// `Escribir`, for an account without Pro: the task form instead of
   /// typing here. Listening stops; words heard or typed so far go to the
-  /// form as its title, so this sheet keeps nothing.
+  /// form as its title, with their capture, which the form keeps until the
+  /// task is saved.
   Future<void> _fillByHand() async {
     if (_asking) return;
     _asking = true;
     var words = '';
+    String? captureId;
     try {
       await _starting;
       await _finishRecording(submit: false, quiet: true);
       await _writes;
       words = _words.text.trim();
       final session = _session;
-      if (session != null) await _store.discard(session.id, _owner);
-      _discarded = true;
+      if (session != null) {
+        if (CaptureStore.isEmpty(session.copyWith(text: words))) {
+          await _store.discard(session.id, _owner);
+        } else {
+          captureId = session.id;
+        }
+      }
+      _toForm = true;
     } catch (_) {
       /* The capture stays pending; the words go to the form all the same. */
     } finally {
@@ -1543,6 +1595,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         page: origin?.page,
         showCalendar: origin?.showCalendar ?? false,
         words: words,
+        captureId: captureId,
       ),
     );
   }
@@ -1704,6 +1757,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       final session = _session;
       if (!_movedToReview &&
           !_discarded &&
+          !_toForm &&
           session != null &&
           !session.terminal) {
         if (session.text.trim().isEmpty &&
@@ -1809,14 +1863,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // The assistant is slow, or failed: the words can be saved as written.
     final saveAsWritten =
         _hasWords && _session != null && ((processing && _slow) || failed);
-    // Without Pro, typed words make a task only in the form: the keyboard
-    // becomes `Rellenar a mano`, and so does `Listo` on typed words.
+    // Without Pro, typed words make a task only in the form: the keyboard,
+    // `Escribir`, opens it, and so does `Listo` on typed words.
     final byHand = _kind == 'task' && ref.watch(typesInFormProvider);
-    final typedForForm =
-        byHand &&
-        _typing &&
-        _session?.audioPath == null &&
-        _session?.source != 'speech';
     final primary = <Widget>[
       if (waiting)
         FilledButton(
@@ -1864,7 +1913,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ),
         FilledButton(
           onPressed: _busy || !_hasInput ? null : _done,
-          child: Text(typedForForm ? l10n.captureFillByHand : l10n.done),
+          child: Text(l10n.done),
         ),
       ],
     ];
@@ -2080,8 +2129,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   /// `Cancelar`, the filled action (with `Seguir` beside it when paused) and
   /// the keyboard. They share a row when it fits, and stack at large text or
-  /// when [stack] asks. With [byHand] the keyboard is `Rellenar a mano`,
-  /// named in full: the filled action takes the whole width above it.
+  /// when [stack] asks. With [byHand] the keyboard is `Escribir`, named in
+  /// full, and opens the form: the filled action takes the whole width above
+  /// it.
   Widget _controls(
     BuildContext context,
     List<Widget> primary, {
@@ -2104,8 +2154,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         ? TextButton.icon(
             key: const ValueKey('capture-fill-by-hand'),
             onPressed: onType,
-            icon: const Icon(Icons.edit_outlined),
-            label: Text(l10n.captureFillByHand),
+            icon: const Icon(Icons.keyboard_outlined),
+            label: Text(l10n.captureTypeInstead),
           )
         : IconButton(
             tooltip: l10n.captureTypeInstead,
@@ -2148,7 +2198,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               side(primary),
             if (cancel != null || type != null) ...[
               const SizedBox(height: 4),
-              // `Rellenar a mano` goes under `Cancelar` when both don't fit.
+              // `Escribir` goes under `Cancelar` when both don't fit.
               if (byHand)
                 Wrap(
                   alignment: WrapAlignment.spaceBetween,
@@ -2288,7 +2338,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   }
 
   static bool _sameProject(String a, String b) =>
-      foldForSearch(spokenProjectName(a)) == foldForSearch(spokenProjectName(b));
+      foldForSearch(spokenProjectName(a)) ==
+      foldForSearch(spokenProjectName(b));
 
   /// [draft] given the project choice made on [chosen]'s card.
   CaptureDraft _sameChoice(CaptureDraft draft, CaptureDraft chosen) {
@@ -2302,8 +2353,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final project = (ref.read(taskListsProvider).valueOrNull ?? const [])
         .where((p) => p.id == chosen.task.listId)
         .firstOrNull;
-    final member =
-        draft.assignmentHints['member']?.trim().isNotEmpty == true;
+    final member = draft.assignmentHints['member']?.trim().isNotEmpty == true;
     return draft.copyWith(
       task: taskWithProject(draft.task, project),
       clearProjectSuggestion: true,
@@ -2313,16 +2363,24 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
 
   Future<void> _changeCommand(CaptureCommand command) async {
     final before = _commands.where((c) => c.id == command.id).firstOrNull;
-    // An existing project taken instead of a new one: its tasks go there.
-    final picked =
+    final chose =
         command.kind == CommandKind.project &&
-            command.existing &&
-            command.choice != null &&
-            before?.choice != command.choice
+        command.choice != null &&
+        before?.choice != command.choice;
+    // An existing project taken instead of a new one: its tasks go there.
+    final picked = chose && command.existing
         ? (ref.read(taskListsProvider).valueOrNull ?? const [])
               .where((p) => p.id == command.choice)
               .firstOrNull
         : null;
+    // The project said created instead of the one the server matched: the
+    // tasks it filed there go to the new one.
+    final matched = command.existingListId;
+    final created = chose && !command.existing && matched != null;
+    bool inMatched(CaptureDraft draft) =>
+        matched != null &&
+        draft.newProject == null &&
+        draft.task.listId == matched;
     setState(() {
       _commands = [
         for (final item in _commands) item.id == command.id ? command : item,
@@ -2331,11 +2389,24 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         _items = [
           for (final draft in _items)
             draft.pending &&
-                    draft.newProject != null &&
-                    _sameProject(draft.newProject!, command.name)
+                    ((draft.newProject != null &&
+                            _sameProject(draft.newProject!, command.name)) ||
+                        (inMatched(draft) && picked.id != matched))
                 ? draft.copyWith(
                     task: taskWithProject(draft.task, picked),
                     clearNewProject: true,
+                  )
+                : draft,
+        ];
+      }
+      if (created) {
+        _items = [
+          for (final draft in _items)
+            draft.pending && inMatched(draft)
+                ? draft.copyWith(
+                    task: taskWithProject(draft.task, null),
+                    newProject: command.name,
+                    assignmentReviewed: true,
                   )
                 : draft,
         ];
@@ -2345,20 +2416,39 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     await _write();
   }
 
-  /// The new projects whose card still asks which one is meant: two
-  /// projects match. Their tasks wait for that choice.
-  static Set<String> _undecided(List<CommandView> views) => {
-    for (final view in views)
-      if (view.kind == CommandKind.project && view.blocking)
-        foldForSearch(spokenProjectName(view.command.name)),
-  };
+  /// The projects whose card still asks which one is meant: two projects
+  /// match, or one matched under another name. [names] holds the new
+  /// projects' folded names, [lists] the ids of the matched projects the
+  /// server filed tasks in. Their tasks wait for that choice.
+  static ({Set<String> names, Set<String> lists}) _undecided(
+    List<CommandView> views,
+  ) {
+    final asking = [
+      for (final view in views)
+        if (view.kind == CommandKind.project && view.blocking) view.command,
+    ];
+    return (
+      names: {
+        for (final command in asking)
+          foldForSearch(spokenProjectName(command.name)),
+      },
+      lists: {
+        for (final command in asking)
+          if (command.existingListId case final id?) id,
+      },
+    );
+  }
 
-  static bool _draftReady(CaptureDraft draft, Set<String> undecided) =>
+  static bool _draftReady(
+    CaptureDraft draft,
+    ({Set<String> names, Set<String> lists}) undecided,
+  ) =>
       draft.ready &&
-      (draft.newProject == null ||
-          !undecided.contains(
-            foldForSearch(spokenProjectName(draft.newProject!)),
-          ));
+      (draft.newProject == null
+          ? !undecided.lists.contains(draft.task.listId)
+          : !undecided.names.contains(
+              foldForSearch(spokenProjectName(draft.newProject!)),
+            ));
 
   /// Every card as it is now, kept with the capture.
   Future<void> _write() async {
@@ -2805,9 +2895,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       String folded(String name) => foldForSearch(spokenProjectName(name));
       final ids = <String, String>{
         for (final view in views)
-          if (view.kind == CommandKind.project && view.command.existing)
-            folded(view.command.name):
-                view.command.existingListId ?? view.command.choice!,
+          if (view.command.existingId case final id?)
+            folded(view.command.name): id,
       };
       final names = <String, String>{
         for (final view in actionable)
@@ -2889,17 +2978,15 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       if (!committed) {
         // Nothing half done: what was done is taken back.
         await runner.undoChanges(applied);
-        await runner.takeBackProjects(
-          applied,
-          api: api,
-          accountId: accountId,
-        );
+        await runner.takeBackProjects(applied, api: api, accountId: accountId);
         try {
           await _store.update(before.copyWith(status: 'ready'));
         } catch (_) {
           /* The capture keeps what it had. */
         }
-        if (applied.projects.isNotEmpty) container.invalidate(taskListsProvider);
+        if (applied.projects.isNotEmpty) {
+          container.invalidate(taskListsProvider);
+        }
       }
       if (mounted) {
         setState(() {
@@ -3280,29 +3367,32 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     }
   }
 
-  /// A command's card. A project's says whether tasks go there.
+  /// A command's card. A project's says how many tasks go there.
   Widget _commandCard(CommandView view, List<CaptureDraft> pending) {
     final command = view.command;
     void changed(CaptureCommand next) => unawaited(_changeCommand(next));
     void remove() => _removeCommand(command);
-    final existing = command.existing
-        ? command.existingListId ?? command.choice
-        : null;
+    final existing = command.existingId;
     return switch (view.kind) {
       CommandKind.project => ProjectCommandCard(
         key: ValueKey(command.id),
         view: view,
         enabled: !_saving,
-        hasTasks: pending.any(
-          (draft) =>
-              (draft.newProject != null &&
-                  _sameProject(draft.newProject!, command.name)) ||
-              (existing != null && draft.task.listId == existing),
-        ),
+        taskCount: pending
+            .where(
+              (draft) =>
+                  (draft.newProject != null &&
+                      _sameProject(draft.newProject!, command.name)) ||
+                  (existing != null && draft.task.listId == existing),
+            )
+            .length,
         onChanged: changed,
         onRemove: remove,
       ),
-      CommandKind.find => FindCommandCard(key: ValueKey(command.id), view: view),
+      CommandKind.find => FindCommandCard(
+        key: ValueKey(command.id),
+        view: view,
+      ),
       CommandKind.update => UpdateCommandCard(
         key: ValueKey(command.id),
         view: view,
@@ -3443,8 +3533,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final adding =
         compact &&
         views.every(
-          (view) =>
-              view.kind == CommandKind.project && !view.command.existing,
+          (view) => view.kind == CommandKind.project && !view.command.existing,
         );
     Widget card(Widget child) => Padding(
       padding: EdgeInsets.only(bottom: compact ? 12 : 0),

@@ -17,6 +17,81 @@ Color taskListColor(String color) => switch (color) {
 /// Sheet result for the "New project" row; project ids are UUIDs.
 const _newProject = '+new';
 
+/// A pick in the project sheet: a project, or none.
+typedef TaskListChoice = ({TaskListInfo? project});
+
+/// The project sheet the project chip opens, for a task in [listId], or
+/// going to [newName], a project a dictation's confirming tap creates. With
+/// [none], it offers no project too. Null when it is closed without a pick.
+/// «Sin proyecto» shows as chosen only when [selectedNone] is true and
+/// there is no [listId] or [newName]; false while a card still asks.
+Future<TaskListChoice?> chooseTaskList(
+  BuildContext context,
+  WidgetRef ref, {
+  String? listId,
+  String? newName,
+  bool none = true,
+  bool selectedNone = true,
+}) async {
+  final lists = ref.read(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
+  final choices = lists
+      .where((list) => list.canEdit && (!list.inactive || list.id == listId))
+      .toList();
+  final chosen = await showModalBottomSheet<String>(
+    context: context,
+    builder: (context) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          ListTile(title: Text(context.l10n.list)),
+          // Keeping it closes the sheet as it is.
+          if (newName != null && listId == null)
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: Text(context.l10n.commandNewProject(newName)),
+              selected: true,
+              onTap: () => Navigator.pop(context),
+            ),
+          if (none)
+            ListTile(
+              leading: const Icon(Icons.folder_off_outlined),
+              title: Text(context.l10n.noList),
+              selected: selectedNone && listId == null && newName == null,
+              onTap: () => Navigator.pop(context, ''),
+            ),
+          for (final list in choices)
+            ListTile(
+              leading: Icon(
+                Icons.folder_outlined,
+                color: taskListColor(list.color),
+              ),
+              title: Text(list.name),
+              subtitle: list.shared
+                  ? Text(list.groupName ?? context.l10n.sharedProject)
+                  : list.inactive
+                  ? Text(context.l10n.archived)
+                  : null,
+              selected: listId == list.id,
+              onTap: () => Navigator.pop(context, list.id),
+            ),
+          if (choices.isEmpty)
+            ListTile(
+              leading: const Icon(Icons.add_rounded),
+              title: Text(context.l10n.newList),
+              onTap: () => Navigator.pop(context, _newProject),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (chosen == null || !context.mounted) return null;
+  if (chosen == _newProject) {
+    final project = await editTaskList(context, ref);
+    return project == null ? null : (project: project);
+  }
+  return (project: lists.where((list) => list.id == chosen).firstOrNull);
+}
+
 class TaskListPicker extends ConsumerWidget {
   const TaskListPicker({
     super.key,
@@ -41,63 +116,16 @@ class TaskListPicker extends ConsumerWidget {
   Future<void> _choose(
     BuildContext context,
     WidgetRef ref,
-    List<TaskListInfo> lists,
     TaskListInfo? selected,
   ) async {
-    final choices = lists
-        .where((list) => list.canEdit && (!list.inactive || list.id == listId))
-        .toList();
-    final chosen = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ListTile(title: Text(context.l10n.list)),
-            // Keeping it closes the sheet as it is.
-            if (newName != null && listId == null)
-              ListTile(
-                leading: const Icon(Icons.create_new_folder_outlined),
-                title: Text(context.l10n.commandNewProject(newName!)),
-                selected: true,
-                onTap: () => Navigator.pop(context),
-              ),
-            ListTile(
-              leading: const Icon(Icons.folder_off_outlined),
-              title: Text(context.l10n.noList),
-              selected: listId == null && newName == null,
-              onTap: () => Navigator.pop(context, ''),
-            ),
-            for (final list in choices)
-              ListTile(
-                leading: Icon(
-                  Icons.folder_outlined,
-                  color: taskListColor(list.color),
-                ),
-                title: Text(list.name),
-                subtitle: list.shared
-                    ? Text(list.groupName ?? context.l10n.sharedProject)
-                    : list.inactive
-                    ? Text(context.l10n.archived)
-                    : null,
-                selected: listId == list.id,
-                onTap: () => Navigator.pop(context, list.id),
-              ),
-            if (choices.isEmpty)
-              ListTile(
-                leading: const Icon(Icons.add_rounded),
-                title: Text(context.l10n.newList),
-                onTap: () => Navigator.pop(context, _newProject),
-              ),
-          ],
-        ),
-      ),
+    final choice = await chooseTaskList(
+      context,
+      ref,
+      listId: listId,
+      newName: newName,
     );
-    if (chosen == null || !context.mounted) return;
-    final project = chosen == _newProject
-        ? await editTaskList(context, ref)
-        : lists.where((list) => list.id == chosen).firstOrNull;
-    if (chosen == _newProject && project == null) return;
+    if (choice == null || !context.mounted) return;
+    final project = choice.project;
     if (lockShared && project?.shared == true && selected?.shared != true) {
       if (!context.mounted) return;
       final share = await showDialog<bool>(
@@ -144,7 +172,7 @@ class TaskListPicker extends ConsumerWidget {
           )
         : onChanged == null
         ? null
-        : () => _choose(context, ref, lists, selected);
+        : () => _choose(context, ref, selected);
     final avatar = Icon(
       creating ? Icons.create_new_folder_outlined : Icons.folder_outlined,
       size: 18,

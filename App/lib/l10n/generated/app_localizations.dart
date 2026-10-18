@@ -2656,17 +2656,23 @@ abstract class AppLocalizations {
   /// **'We’ve sent you a new code'**
   String get verifyEmailResent;
 
-  /// Under the code field when the server says the code is wrong. The person can type it again.
+  /// Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line.
   ///
   /// In en, this message translates to:
-  /// **'That code isn’t right'**
+  /// **'That code isn’t right. Check the newest email we sent.'**
   String get verifyEmailCodeInvalid;
 
-  /// Under the code field when the code is too old, or was tried too many times. Resend code can be tapped at once.
+  /// Under the code field when the code is too old, or was tried too many times, and a minute or more has passed since the last code: a new code has just been emailed. The field is emptied and Resend code counts down again.
   ///
   /// In en, this message translates to:
-  /// **'That code has expired. Ask for a new one.'**
-  String get verifyEmailCodeExpired;
+  /// **'That code no longer works. We’ve sent you a new one.'**
+  String get verifyEmailCodeSpentNew;
+
+  /// Under the code field when the code is too old, or was tried too many times, less than a minute after the last code was sent: no new code could be sent yet. Names the button verifyEmailResend, which is still counting down.
+  ///
+  /// In en, this message translates to:
+  /// **'That code no longer works. Tap “Resend code” when the countdown ends.'**
+  String get verifyEmailCodeSpentWait;
 
   /// Goes back to creating an account, with the email kept so it can be corrected.
   ///
@@ -2679,6 +2685,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Someone has created an account with this email again. Create it again to continue.'**
   String get verifyEmailReplaced;
+
+  /// Under the password field of the confirm screen, when it reopened after the app was closed and asks for the password itself: the password typed on this screen isn’t the account’s. Names “Use another email” (verifyEmailOtherAddress), the way out for a forgotten password; the quoted label must match it.
+  ///
+  /// In en, this message translates to:
+  /// **'That isn’t this account’s password. Don’t remember it? Tap “Use another email” and create the account again.'**
+  String get verifyEmailWrongPassword;
 
   /// No description provided for @newList.
   ///
@@ -5458,12 +5470,6 @@ abstract class AppLocalizations {
   /// **'New task'**
   String get newTask;
 
-  /// In the capture sheet, for an account without Pro, in place of the keyboard button: closes the sheet and opens the task form. Words already heard become the form's title. Typed words make tasks only with Pro.
-  ///
-  /// In en, this message translates to:
-  /// **'Fill in by hand'**
-  String get captureFillByHand;
-
   /// In the task form for a new task, the third day chip after Today and Tomorrow: opens the date sheet. Short, so the three fit on one row.
   ///
   /// In en, this message translates to:
@@ -5764,23 +5770,35 @@ abstract class AppLocalizations {
   /// **'You already have “{name}”'**
   String commandExistingProject(String name);
 
-  /// Under commandExistingProject, when tasks in the same dictation name that project.
+  /// Under commandExistingProject, when tasks in the same dictation name that project. {count} is how many of the dictation's tasks go there.
   ///
   /// In en, this message translates to:
-  /// **'The tasks go there.'**
-  String get commandExistingProjectTasks;
+  /// **'{count, plural, =1{The task goes there.} other{The tasks go there.}}'**
+  String commandExistingProjectTasks(int count);
 
-  /// A dictation's result, for a project that was named but doesn't exist, or that matches several projects. Chips follow: create it, or pick an existing project. {name} is the name as said.
+  /// A dictation's result, for a project the person asked to create that matches several projects, or one with a different name. Chips follow: create it, or pick an existing project. {name} is the name as said.
   ///
   /// In en, this message translates to:
   /// **'Create the project “{name}”?'**
   String commandCreateProjectQuestion(String name);
 
-  /// Chip under commandCreateProjectQuestion: creates that project on the confirming tap. {name} is the name as said.
+  /// First chip under commandCreateProjectQuestion and commandWhichProject: creates that project on the confirming tap. {name} is the name as said.
   ///
   /// In en, this message translates to:
   /// **'Create “{name}”'**
   String commandCreateNamed(String name);
+
+  /// A dictation's task named a project that doesn't exist. Chips follow: commandCreateNamed, up to three projects with a similar name, commandOtherProject and No project.
+  ///
+  /// In en, this message translates to:
+  /// **'Which project should it go in?'**
+  String get commandWhichProject;
+
+  /// Chip after the similar projects under commandWhichProject or commandCreateProjectQuestion: opens the list of the person's projects, where a pick answers the question. Shown only when they have other projects.
+  ///
+  /// In en, this message translates to:
+  /// **'Another project…'**
+  String get commandOtherProject;
 
   /// The confirming button of a dictation's result that only creates projects.
   ///
@@ -5863,7 +5881,7 @@ abstract class AppLocalizations {
   /// Heading of a dictation's search results for the tasks assigned to someone. {name} is that person.
   ///
   /// In en, this message translates to:
-  /// **'{name}’s tasks'**
+  /// **'Tasks for {name}'**
   String commandFindPerson(String name);
 
   /// Heading of a dictation's search results for the person's own tasks.
@@ -5871,6 +5889,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your tasks'**
   String get commandFindMine;
+
+  /// Heading of a dictation's search results for a project's tasks assigned to someone. {project} is the project; {name} is that person.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks in “{project}” for {name}'**
+  String commandFindProjectPerson(String project, String name);
+
+  /// Heading of a dictation's search results for the person's own tasks in a project. {project} is the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Your tasks in “{project}”'**
+  String commandFindProjectMine(String project);
+
+  /// Under the heading of a dictation's search results: the period searched, longer than one day. {from} and {to} are its first and last days, weekday first (“Mon, Oct 19”).
+  ///
+  /// In en, this message translates to:
+  /// **'{from} to {to}'**
+  String commandFindPeriod(String from, String to);
+
+  /// Under the heading of a dictation's search results, when it searched only tasks not yet done. Matches agendaCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'To do'**
+  String get commandFindOpen;
+
+  /// Under the heading of a dictation's search results, when it searched only completed tasks. Matches agendaCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get commandFindDone;
 
   /// On a completed task in a dictation's search results.
   ///
@@ -5890,11 +5938,17 @@ abstract class AppLocalizations {
   /// **'There are no tasks'**
   String get commandFindNoneAtAll;
 
-  /// Under a dictation's search results or choice list, when more tasks match than are shown.
+  /// Under a dictation's search results, when more tasks match than are shown.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{And 1 more} other{And {count} more}}'**
   String commandMore(int count);
+
+  /// Button under a dictation's list of tasks to choose from, when more tasks match than are shown: shows the rest in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Show 1 more} other{Show {count} more}}'**
+  String commandShowMore(int count);
 
   /// Under a dictation's search results in a project: opens that project's page. {name} is the project.
   ///
@@ -5926,16 +5980,22 @@ abstract class AppLocalizations {
   /// **'Can’t find that task'**
   String get commandTaskNotFoundPlain;
 
+  /// A dictation asked to change or delete a task, and the only tasks that match are in projects the person can only view, so it can't be changed. {title} is the first such task's title.
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” is in a project you can only view.'**
+  String commandViewOnly(String title);
+
   /// A dictation asked to change a task and several match: a short list to tap one follows.
   ///
   /// In en, this message translates to:
-  /// **'Which one should change?'**
+  /// **'Which one do you want to change?'**
   String get commandWhichToChange;
 
   /// A dictation asked to delete a task and several match: a short list to tap one follows.
   ///
   /// In en, this message translates to:
-  /// **'Which one should be deleted?'**
+  /// **'Which one do you want to delete?'**
   String get commandWhichToDelete;
 
   /// A dictation's result, in a destructive style: the task the confirming tap deletes. {title} is the task's title.
@@ -5962,11 +6022,11 @@ abstract class AppLocalizations {
   /// **'It’s already like that.'**
   String get commandNothingToChange;
 
-  /// A dictation set a time on a task with no day: Today, Tomorrow and Pick a day follow.
+  /// A dictation set a time on a task with no day: Today, Tomorrow and Pick a day follow. {time} is the time said, as the app shows times; {hour} is its hour as shown, for the article (Spanish and Catalan say a la 1:00).
   ///
   /// In en, this message translates to:
-  /// **'Which day?'**
-  String get commandWhichDay;
+  /// **'{hour, plural, other{Which day, at {time}?}}'**
+  String commandWhichDay(int hour, String time);
 
   /// A dictation named someone for a task, who can't be its assignee because they aren't in its shared project (or the project is new and has nobody yet). The task is left as it is. {name} is the name as said; {project} the project.
   ///
@@ -5980,7 +6040,7 @@ abstract class AppLocalizations {
   /// **'Only tasks in shared projects can be assigned.'**
   String get commandAssignNeedsShared;
 
-  /// A dictation named someone for a task, and two or more people match: the assignee stays as it is. {name} is the name as said.
+  /// A dictation named someone for a task, and two or more people match: under it, one chip per person with that name, to tap the one meant. {name} is the name as said.
   ///
   /// In en, this message translates to:
   /// **'More than one person is called {name}.'**

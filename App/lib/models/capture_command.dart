@@ -237,6 +237,7 @@ class CaptureCommand {
     this.removed = false,
     this.done = false,
     this.taskId,
+    this.memberId,
     this.series = false,
     this.choice,
     this.day,
@@ -281,6 +282,9 @@ class CaptureCommand {
   /// The task chosen when several matched.
   final int? taskId;
 
+  /// The person tapped when several have the name said for the assignee.
+  final int? memberId;
+
   /// A repeating task's new day or time is for the whole series, not only
   /// this repetition.
   final bool series;
@@ -296,10 +300,14 @@ class CaptureCommand {
 
   bool get ambiguous => issues.contains('ambiguous_project');
 
-  /// A project that is already there: nothing to create.
+  /// A project that is already there: nothing to create. A tap on its card
+  /// decides it: `new` creates it even when the server matched one.
   bool get existing =>
       kind == CommandKind.project &&
-      (existingListId != null || (choice != null && choice != createChoice));
+      (choice == null ? existingListId != null : choice != createChoice);
+
+  /// The project that is already there: the one tapped, or the one matched.
+  String? get existingId => existing ? choice ?? existingListId : null;
 
   /// Still waiting for the confirming tap. A search, and a project that is
   /// already there, never wait.
@@ -307,7 +315,7 @@ class CaptureCommand {
       !removed &&
       !done &&
       kind != CommandKind.find &&
-      !(kind == CommandKind.project && existingListId != null);
+      !(kind == CommandKind.project && existing);
 
   /// The card shows in the result.
   bool get shown => !removed && !done;
@@ -376,6 +384,7 @@ class CaptureCommand {
     bool? done,
     int? taskId,
     bool clearTaskId = false,
+    int? memberId,
     bool? series,
     String? choice,
     bool clearChoice = false,
@@ -400,6 +409,7 @@ class CaptureCommand {
     removed: removed ?? this.removed,
     done: done ?? this.done,
     taskId: clearTaskId ? null : taskId ?? this.taskId,
+    memberId: memberId ?? this.memberId,
     series: series ?? this.series,
     choice: clearChoice ? null : choice ?? this.choice,
     day: clearDay ? null : day ?? this.day,
@@ -424,6 +434,7 @@ class CaptureCommand {
     'removed': removed,
     'done': done,
     'taskId': taskId,
+    'memberId': memberId,
     'series': series,
     'choice': choice,
     'day': day == null ? null : _dayKey(day!),
@@ -456,6 +467,7 @@ class CaptureCommand {
       removed: json['removed'] == true,
       done: json['done'] == true,
       taskId: _int(json['taskId']),
+      memberId: _int(json['memberId']),
       series: json['series'] == true,
       choice: json['choice'] as String?,
       day: _day(json['day']),

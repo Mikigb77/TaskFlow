@@ -3,12 +3,14 @@
 // a stand-in server; the screens are the app's own.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show File;
 import 'dart:ui' show Tristate;
 
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -74,8 +76,15 @@ class _Server {
       _json(200, _session('${body['email']}'));
   http.Response Function(Map<String, dynamic> body) resend = (_) => _json(204);
 
+  /// Google sign-in; this server has none unless a test gives it one.
+  http.Response Function(Map<String, dynamic> body) google = (_) =>
+      _json(404, {'detail': 'Not found.'});
+
   /// Holds the code's answer back until completed.
   Completer<void>? holdVerify;
+
+  /// Holds the sign-in's answer back until completed.
+  Completer<void>? holdLogin;
 
   /// No connection at all.
   bool offline = false;
@@ -91,6 +100,8 @@ class _Server {
       case 'auth/register/':
         return register(body);
       case 'auth/login/':
+        final gate = holdLogin;
+        if (gate != null) await gate.future;
         return login(body);
       case 'auth/verify-email/':
         final gate = holdVerify;
@@ -98,6 +109,8 @@ class _Server {
         return verify(body);
       case 'auth/verify-email/resend/':
         return resend(body);
+      case 'auth/google/':
+        return google(body);
     }
     return _json(404, {'detail': 'Not found.'});
   });
@@ -109,11 +122,25 @@ class _Server {
   ];
 }
 
+/// A clock the test moves by hand, read through calendarClockProvider.
+class _Clock {
+  DateTime now = DateTime(2026, 10, 18, 10);
+  DateTime call() => now;
+}
+
 class _Google extends GoogleSignInService {
   @override
   bool get supported => true;
   @override
   bool get configured => true;
+}
+
+/// Google, where the person picks their account and Google answers a token.
+class _GoogleAccount extends _Google {
+  @override
+  Future<String?> authenticate() async => 'fixture-google-token';
+  @override
+  Future<void> signOut() async {}
 }
 
 /// The app signed out, in Spanish (or [language]), against its own
@@ -130,6 +157,10 @@ class _App {
     String language = 'es',
     Size size = const Size(390, 844),
     bool announces = false,
+    Map<String, String> storage = const {},
+    DateTime Function()? clock,
+    GoogleSignInService? google,
+    bool settle = true,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -137,7 +168,7 @@ class _App {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         FakeAccessibilityFeatures(supportsAnnounce: announces);
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
-    FlutterSecureStorage.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues(Map.of(storage));
     final server = _Server();
     final api = ApiClient(
       transport: server.transport,
@@ -152,7 +183,7 @@ class _App {
         authProvider.overrideWith(
           (ref) => AuthNotifier(api, activateReminders: (_) async {}),
         ),
-        googleSignInServiceProvider.overrideWithValue(_Google()),
+        googleSignInServiceProvider.overrideWithValue(google ?? _Google()),
         billingConfigurationProvider.overrideWithValue(
           const BillingConfiguration(apiKey: '', supported: false),
         ),
@@ -167,6 +198,7 @@ class _App {
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
         taskProvider.overrideWith((ref) => DesignTaskNotifier()),
         themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+        if (clock != null) calendarClockProvider.overrideWithValue(clock),
       ],
     );
     addTearDown(container.dispose);
@@ -174,12 +206,15 @@ class _App {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const MyApp()),
     );
+    // The test steps through the first frames itself.
+    if (!settle) return _App(container, api, server);
     // Nothing is saved yet: the (mocked) secure storage says so.
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(LoginScreen), findsOneWidget);
+    // Under «Confirma tu correo» when an address still waits for its code.
+    expect(find.byType(LoginScreen, skipOffstage: false), findsOneWidget);
     return _App(container, api, server);
   }
 }
@@ -301,10 +336,9 @@ void main() {
     expect(es.verifyEmailResendIn(42), 'Reenviar código en 42 segundos');
     expect(es.verifyEmailResendIn(1), 'Reenviar código en 1 segundo');
     expect(es.verifyEmailResent, 'Te hemos enviado un código nuevo');
-    expect(es.verifyEmailCodeInvalid, 'Ese código no es correcto');
     expect(
-      es.verifyEmailCodeExpired,
-      'Ese código ha caducado. Pide uno nuevo.',
+      es.verifyEmailCodeInvalid,
+      'Ese código no es correcto. Mira el último correo que te hemos enviado.',
     );
     expect(es.verifyEmailOtherAddress, 'Usar otro correo');
     expect(es.verifyEmailCodeLength, 'El código tiene 6 cifras');
@@ -342,7 +376,7 @@ void main() {
   });
 
   testWidgets(
-    'a sign-up answered verification_required opens Confirma tu correo for the server’s address, with the code field focused; nothing is signed in or saved yet',
+    'a sign-up answered verification_required opens Confirma tu correo for the server’s address, with no keyboard until the field is tapped; nothing is signed in or saved yet',
     (tester) async {
       final app = await _App.open(tester);
       await createAccount(tester, es);
@@ -359,7 +393,7 @@ void main() {
         'timezone': 'Europe/Madrid',
         'language': 'es',
       });
-      expect(focused(tester, code), isTrue);
+      expect(focused(tester, code), isFalse);
       final field = tester.widget<TextField>(code);
       expect(field.keyboardType, TextInputType.number);
       expect(field.autofillHints, [AutofillHints.oneTimeCode]);
@@ -511,7 +545,7 @@ void main() {
   );
 
   testWidgets(
-    'code_invalid says «Ese código no es correcto» under the field, read out as it appears, and keeps the digits; a changed code clears it and confirms again',
+    'code_invalid says «Ese código no es correcto…» under the field, read out as it appears, and keeps the digits; a changed code clears it and confirms again',
     (tester) async {
       final app = await _App.open(tester);
       await createAccount(tester, es);
@@ -519,7 +553,10 @@ void main() {
           _json(400, {'code': 'code_invalid', 'detail': 'Invalid code.'});
       await tester.enterText(code, '111111');
       await tester.pumpAndSettle();
-      expect(errorUnder(tester, code), 'Ese código no es correcto');
+      expect(
+        errorUnder(tester, code),
+        'Ese código no es correcto. Mira el último correo que te hemos enviado.',
+      );
       expect(find.text('Invalid code.'), findsNothing);
       expect(typed(tester, code), '111111');
       expect(screen(), findsOneWidget);
@@ -543,7 +580,7 @@ void main() {
   );
 
   testWidgets(
-    'code_expired says «Ese código ha caducado. Pide uno nuevo.» and Reenviar código can be tapped at once; the new code clears it, empties the field and says «Te hemos enviado un código nuevo»',
+    'code_expired within the minute, with the address still unconfirmed, says to tap Reenviar código when the countdown ends, which keeps running; the new code clears it, empties the field and says «Te hemos enviado un código nuevo»',
     (tester) async {
       final app = await _App.open(tester);
       await createAccount(tester, es);
@@ -552,11 +589,14 @@ void main() {
       app.server.verify = (_) => _json(400, {'code': 'code_expired'});
       await tester.enterText(code, '222222');
       await tester.pumpAndSettle();
-      expect(
-        errorUnder(tester, code),
-        'Ese código ha caducado. Pide uno nuevo.',
-      );
-      expect(resendEnabled(tester), isTrue, reason: 'offered at once');
+      expect(app.server.bodies('auth/login/').single, {
+        'email': 'ana@example.invalid',
+        'password': typedPassword,
+        'timezone': 'UTC',
+      });
+      expect(errorUnder(tester, code), es.verifyEmailCodeSpentWait);
+      expect(resendEnabled(tester), isFalse, reason: 'the countdown goes on');
+      await tester.pump(const Duration(seconds: 61));
       expect(resendLabel(tester), 'Reenviar código');
       await tapVisible(tester, resend);
       expect(app.server.bodies('auth/verify-email/resend/').single, {
@@ -914,8 +954,9 @@ void main() {
         app.server.verify = (_) => _json(400, {'code': 'code_expired'});
         await tester.enterText(code, '999998');
         await tester.pumpAndSettle();
-        await expectReadable(find.text(l.verifyEmailCodeExpired));
+        await expectReadable(find.text(l.verifyEmailCodeSpentWait));
         await expectReadable(resend);
+        await tester.pump(const Duration(seconds: 61));
         await tapVisible(tester, resend);
         await expectReadable(find.text(l.verifyEmailResent));
         expect(tester.takeException(), isNull, reason: 'no overflow');
@@ -1293,4 +1334,911 @@ void main() {
       reason: 'other screens keep today’s line',
     );
   });
+
+  // ---- Run 2026-10-18-commands, round 2 (P133: UX-1201, UX-1203, UX-1204;
+  // P134: UX-1202): the answer in view, the keyboard steady, an honest
+  // «ya no sirve», and the screen survives the trip to the inbox ----
+
+  /// [seconds] pass, on the clock the screen reads and for its countdown.
+  Future<void> later(WidgetTester tester, _Clock clock, int seconds) async {
+    clock.now = clock.now.add(Duration(seconds: seconds));
+    await tester.pump(Duration(seconds: seconds));
+  }
+
+  /// The confirm screen's list, scrolled back to its top.
+  void scrollToTop(WidgetTester tester) => tester
+      .state<ScrollableState>(
+        find.descendant(of: screen(), matching: find.byType(Scrollable)).first,
+      )
+      .position
+      .jumpTo(0);
+
+  /// [text] shows whole inside a [size] screen, with no line cut off.
+  Future<void> expectFits(WidgetTester tester, String text, Size size) async {
+    final finder = find.text(text);
+    expect(finder, findsOneWidget, reason: text);
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    final rect = tester.getRect(finder);
+    expect(rect.left, greaterThanOrEqualTo(0), reason: text);
+    expect(rect.right, lessThanOrEqualTo(size.width + 0.5), reason: text);
+    expect(rect.top, greaterThanOrEqualTo(0), reason: text);
+    expect(rect.bottom, lessThanOrEqualTo(size.height + 0.5), reason: text);
+    for (final paragraph in tester.renderObjectList<RenderParagraph>(
+      find.descendant(
+        of: finder,
+        matching: find.byType(RichText),
+        matchRoot: true,
+      ),
+    )) {
+      expect(paragraph.didExceedMaxLines, isFalse, reason: text);
+    }
+  }
+
+  /// Opens «Confirma tu correo» for [address] as a cold start does: without
+  /// the password, which the screen then asks for.
+  Future<void> openWithoutPassword(
+    WidgetTester tester, {
+    String address = 'ana@example.invalid',
+  }) async {
+    unawaited(
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => VerifyEmailScreen(email: address),
+            ),
+          ),
+    );
+    await tester.pumpAndSettle();
+    expect(askedPassword, findsOneWidget);
+  }
+
+  /// The phone's storage now, without the session: what TaskFlow finds when
+  /// Android has closed it and it starts again.
+  Future<Map<String, String>> storedWithoutSession(WidgetTester tester) async {
+    final saved = await tester.runAsync(
+      () => const FlutterSecureStorage().readAll(),
+    );
+    return Map.of(saved!)
+      ..removeWhere((_, value) => value.contains('fixture-access'));
+  }
+
+  /// TaskFlow starts again from nothing, with [storage] on the phone.
+  Future<_App> coldStart(
+    WidgetTester tester,
+    Map<String, String> storage, {
+    _Clock? clock,
+  }) async {
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    return _App.open(tester, storage: storage, clock: clock?.call);
+  }
+
+  testWidgets(
+    'UX-1201: the keyboard stays up from the 6th digit until the answer arrives, and after it; what is typed while it confirms is ignored',
+    (tester) async {
+      final app = await _App.open(tester);
+      await createAccount(tester, es);
+      await tester.showKeyboard(code);
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+      app.server.holdVerify = Completer<void>();
+      app.server.verify = (_) => _json(400, {'code': 'code_invalid'});
+      await tester.enterText(code, '123456');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(app.server.bodies('auth/verify-email/'), hasLength(1));
+      expect(tester.testTextInput.isVisible, isTrue, reason: '6th digit');
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.testTextInput.isVisible, isTrue, reason: 'confirming');
+      await tester.enterText(code, '999999');
+      await tester.pump();
+      expect(typed(tester, code), '123456', reason: 'ignored while confirming');
+      expect(tester.testTextInput.isVisible, isTrue);
+      app.server.holdVerify!.complete();
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isTrue, reason: 'answered');
+      expect(errorUnder(tester, code), es.verifyEmailCodeInvalid);
+      expect(focused(tester, code), isTrue);
+      expect(app.server.bodies('auth/verify-email/'), hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1201: at 1.3× on 360×740 the screen opens with nothing focused and no keyboard, and «Reenviar código en 60 segundos» and «Usar otro correo» are on screen',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _App.open(tester, size: const Size(360, 740));
+      await createAccount(tester, es);
+      expect(screen(), findsOneWidget);
+      expect(focused(tester, code), isFalse);
+      expect(
+        FocusManager.instance.primaryFocus?.context?.widget,
+        isNot(isA<EditableText>()),
+      );
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(es.verifyEmailResendIn(60), 'Reenviar código en 60 segundos');
+      for (final label in [
+        es.verifyEmailResendIn(60),
+        es.verifyEmailOtherAddress,
+      ]) {
+        final line = find.text(label);
+        expect(line, findsOneWidget, reason: label);
+        final rect = tester.getRect(line);
+        expect(rect.top, greaterThanOrEqualTo(0), reason: label);
+        expect(rect.bottom, lessThanOrEqualTo(740), reason: label);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'ca']) {
+    for (final scale in [1.3, 2.0]) {
+      testWidgets(
+        'UX-1201: with the keyboard up ($language, $scale×, 360×740), each answer under the code field (refused, no connection, spent within the minute, spent after it, a new code sent) ends above the keyboard',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final l = strings(language);
+          final clock = _Clock();
+          final app = await _App.open(
+            tester,
+            language: language,
+            size: const Size(360, 740),
+            clock: clock.call,
+          );
+          await createAccount(tester, l);
+          // The keyboard takes the bottom 300 dp.
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          await tester.showKeyboard(code);
+          await tester.pumpAndSettle();
+
+          void expectAboveKeyboard(String line) {
+            final shown = find.text(line);
+            expect(shown, findsOneWidget, reason: line);
+            final rect = tester.getRect(shown);
+            expect(rect.top, greaterThanOrEqualTo(0), reason: line);
+            expect(rect.bottom, lessThanOrEqualTo(440), reason: line);
+          }
+
+          Future<void> answer(String digits, String line) async {
+            scrollToTop(tester);
+            await tester.pump();
+            await tester.enterText(code, digits);
+            await tester.pumpAndSettle();
+            expectAboveKeyboard(line);
+          }
+
+          app.server.verify = (_) => _json(400, {'code': 'code_invalid'});
+          await answer('111111', l.verifyEmailCodeInvalid);
+          app.server.offline = true;
+          await answer('222222', l.requestError('network'));
+          app.server.offline = false;
+          app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+          await answer('333333', l.verifyEmailCodeSpentWait);
+          await later(tester, clock, 61);
+          await answer('444444', l.verifyEmailCodeSpentNew);
+
+          await later(tester, clock, 61);
+          expect(resendEnabled(tester), isTrue);
+          await tapVisible(tester, resend);
+          expect(app.server.bodies('auth/verify-email/resend/'), hasLength(1));
+          expectAboveKeyboard(l.verifyEmailResent);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'UX-1204: refused digits are not sent again: Confirmar, the keyboard’s done action and the same six digits typed again keep «Ese código no es correcto. Mira el último correo que te hemos enviado.»; one changed digit clears it and six new digits send one request',
+    (tester) async {
+      final app = await _App.open(tester);
+      await createAccount(tester, es);
+      app.server.verify = (_) => _json(400, {'code': 'code_invalid'});
+      int sent() => app.server.bodies('auth/verify-email/').length;
+      const refused =
+          'Ese código no es correcto. Mira el último correo que te hemos enviado.';
+      expect(es.verifyEmailCodeInvalid, refused);
+      await tester.enterText(code, '111111');
+      await tester.pumpAndSettle();
+      expect(sent(), 1);
+      expect(errorUnder(tester, code), refused);
+
+      await tapVisible(tester, confirm);
+      expect(sent(), 1, reason: 'Confirmar');
+      expect(errorUnder(tester, code), refused);
+
+      await tester.showKeyboard(code);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(sent(), 1, reason: 'the keyboard’s done action');
+      expect(errorUnder(tester, code), refused);
+
+      await tester.enterText(code, '11111');
+      await tester.pump();
+      expect(errorUnder(tester, code), isNull, reason: 'a digit changed');
+      await tester.enterText(code, '111111');
+      await tester.pumpAndSettle();
+      expect(sent(), 1, reason: 'the same six digits typed again');
+      expect(errorUnder(tester, code), refused);
+
+      await tester.enterText(code, '11111');
+      await tester.pump();
+      expect(errorUnder(tester, code), isNull);
+      await tester.enterText(code, '111112');
+      await tester.pumpAndSettle();
+      expect(sent(), 2);
+      expect(
+        app.server.bodies('auth/verify-email/').map((body) => body['code']),
+        ['111111', '111112'],
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1203: verify answered code_expired and the sign-in answered a session opens the app on Calendar, and no «ya no sirve» line ever shows',
+    (tester) async {
+      final app = await _App.open(tester);
+      await createAccount(tester, es);
+      app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+      app.server.login = (body) => _json(200, _session('${body['email']}'));
+      app.server.holdLogin = Completer<void>();
+      bool saysSpent() =>
+          says(tester, es.verifyEmailCodeSpentNew) ||
+          says(tester, es.verifyEmailCodeSpentWait);
+      await tester.enterText(code, '222222');
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(app.server.paths.last, 'auth/login/');
+      final login = app.server.bodies('auth/login/').single;
+      expect(login['email'], 'ana@example.invalid');
+      expect(login['password'], typedPassword);
+      expect(saysSpent(), isFalse, reason: 'while signing in');
+      expect(screen(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: confirm,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+        reason: 'still confirming',
+      );
+      app.server.holdLogin!.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(CalendarScreen), findsOneWidget);
+      expect(screen(), findsNothing);
+      expect(saysSpent(), isFalse);
+      expect(
+        app.container.read(authProvider).account!.email,
+        'ana@example.invalid',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1204: code_expired 61 s after the screen opened, the address still unconfirmed, says «Ese código ya no sirve. Te hemos enviado uno nuevo.», empties and focuses the field, and the countdown starts again at 60',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      await later(tester, clock, 61);
+      expect(resendEnabled(tester), isTrue);
+      app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+      await tester.enterText(code, '222222');
+      await tester.pumpAndSettle();
+      expect(app.server.paths, contains('auth/login/'));
+      expect(
+        es.verifyEmailCodeSpentNew,
+        'Ese código ya no sirve. Te hemos enviado uno nuevo.',
+      );
+      expect(errorUnder(tester, code), es.verifyEmailCodeSpentNew);
+      expect(typed(tester, code), isEmpty);
+      expect(focused(tester, code), isTrue);
+      expect(resendLabel(tester), 'Reenviar código en 60 segundos');
+      expect(resendEnabled(tester), isFalse);
+      expect(screen(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1204: code_expired 20 s after the screen opened says «Ese código ya no sirve. Toca «Reenviar código» cuando acabe la cuenta atrás.», and the button reads «Reenviar código en 40 segundos» and stays off',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      await later(tester, clock, 20);
+      app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+      await tester.enterText(code, '222222');
+      await tester.pumpAndSettle();
+      expect(app.server.paths, contains('auth/login/'));
+      expect(
+        es.verifyEmailCodeSpentWait,
+        'Ese código ya no sirve. Toca «Reenviar código» cuando acabe la cuenta atrás.',
+      );
+      expect(errorUnder(tester, code), es.verifyEmailCodeSpentWait);
+      expect(resendLabel(tester), 'Reenviar código en 40 segundos');
+      expect(resendEnabled(tester), isFalse);
+      await tester.tap(resend, warnIfMissed: false);
+      await tester.pump();
+      expect(app.server.paths, isNot(contains('auth/verify-email/resend/')));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-1204 + UX-1202: at 2× on 320×640 ($language), «Ese código no es correcto…», both «ya no sirve» lines and «Esa contraseña no es la de esta cuenta.» fit with no overflow',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        const size = Size(320, 640);
+        final l = strings(language);
+        final clock = _Clock();
+        final app = await _App.open(
+          tester,
+          language: language,
+          size: size,
+          clock: clock.call,
+        );
+        await openWithoutPassword(tester);
+        await tester.enterText(askedPassword, typedPassword);
+        app.server.verify = (_) => _json(400, {'code': 'signup_replaced'});
+        await tester.enterText(code, '101010');
+        await tester.pumpAndSettle();
+        await expectFits(tester, l.verifyEmailWrongPassword, size);
+        await tester.enterText(askedPassword, '$typedPassword!');
+        app.server.verify = (_) => _json(400, {'code': 'code_invalid'});
+        await tester.enterText(code, '111111');
+        await tester.pumpAndSettle();
+        await expectFits(tester, l.verifyEmailCodeInvalid, size);
+        app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+        await tester.enterText(code, '222222');
+        await tester.pumpAndSettle();
+        await expectFits(tester, l.verifyEmailCodeSpentWait, size);
+        await later(tester, clock, 61);
+        await tester.enterText(code, '333333');
+        await tester.pumpAndSettle();
+        await expectFits(tester, l.verifyEmailCodeSpentNew, size);
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1202: Android closes TaskFlow after the sign-up; started again with no session, it opens «Confirma tu correo» for that address with the password field, sending nothing, and the emailed code then signs in',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es);
+      expect(screen(), findsOneWidget);
+      final storage = await storedWithoutSession(tester);
+      final again = await coldStart(tester, storage);
+      expect(screen(), findsOneWidget);
+      expect(find.text(es.verifyEmailHeading), findsOneWidget);
+      expect(
+        find.text(es.verifyEmailHelp('ana@example.invalid')),
+        findsOneWidget,
+      );
+      expect(askedPassword, findsOneWidget);
+      expect(again.server.requests, isEmpty, reason: 'nothing sent');
+
+      await tester.enterText(askedPassword, typedPassword);
+      await tester.enterText(code, '123456');
+      await tester.pumpAndSettle();
+      expect(again.server.bodies('auth/verify-email/').single, {
+        'email': 'ana@example.invalid',
+        'code': '123456',
+        'password': typedPassword,
+      });
+      expect(find.byType(CalendarScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1202: Back from «Confirma tu correo» keeps the address waiting: started again, the app opens that screen',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(screen(), findsNothing);
+      final again = await coldStart(tester, await storedWithoutSession(tester));
+      expect(screen(), findsOneWidget);
+      expect(askedPassword, findsOneWidget);
+      expect(again.server.requests, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final ending in ['31 minutes later', 'Usar otro correo', 'confirmed']) {
+    testWidgets(
+      'UX-1202: after the sign-up, then $ending, a cold start with no session opens plain sign-in',
+      (tester) async {
+        final clock = _Clock();
+        final app = await _App.open(tester, clock: clock.call);
+        await createAccount(tester, es);
+        expect(screen(), findsOneWidget);
+        switch (ending) {
+          case 'Usar otro correo':
+            await tapVisible(tester, otherAddress);
+            expect(screen(), findsNothing);
+          case 'confirmed':
+            await tester.enterText(code, '123456');
+            await tester.pumpAndSettle();
+            expect(find.byType(CalendarScreen), findsOneWidget);
+            expect(app.container.read(authProvider).account, isNotNull);
+          default:
+            clock.now = clock.now.add(const Duration(minutes: 31));
+        }
+        final storage = await storedWithoutSession(tester);
+        final again = await coldStart(tester, storage, clock: clock);
+        expect(screen(), findsNothing);
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(again.server.requests, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1202: the phone’s storage never holds the password, only the address and a time',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      await later(tester, clock, 61);
+      await tapVisible(tester, resend);
+      expect(app.server.bodies('auth/verify-email/resend/'), hasLength(1));
+      final saved = (await tester.runAsync(
+        () => const FlutterSecureStorage().readAll(),
+      ))!;
+      for (final value in saved.values) {
+        expect(value, isNot(contains(typedPassword)));
+      }
+      final pending = [
+        for (final value in saved.values)
+          if (value.contains('ana@example.invalid')) value,
+      ];
+      expect(pending, hasLength(1));
+      final entry = jsonDecode(pending.single) as Map<String, dynamic>;
+      expect(entry, hasLength(2));
+      expect(entry.values, contains('ana@example.invalid'));
+      final other = entry.values.firstWhere(
+        (value) => value != 'ana@example.invalid',
+      );
+      expect(DateTime.tryParse('$other'), isNotNull, reason: 'a time: $other');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1202: on the cold-start screen, verify answered signup_replaced says «Esa contraseña no es la de esta cuenta.» under the password field, and the screen stays',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es);
+      final again = await coldStart(tester, await storedWithoutSession(tester));
+      expect(screen(), findsOneWidget);
+      again.server.verify = (_) =>
+          _json(400, {'code': 'signup_replaced', 'detail': 'Replaced.'});
+      await tester.enterText(askedPassword, 'otra-clave-mal-escrita');
+      await tester.enterText(code, '444444');
+      await tester.pumpAndSettle();
+      expect(again.server.bodies('auth/verify-email/'), hasLength(1));
+      expect(
+        es.verifyEmailWrongPassword,
+        'Esa contraseña no es la de esta cuenta. ¿No la recuerdas? Toca '
+        '«Usar otro correo» y crea la cuenta de nuevo.',
+      );
+      expect(errorUnder(tester, askedPassword), es.verifyEmailWrongPassword);
+      expect(errorUnder(tester, code), isNull);
+      expect(screen(), findsOneWidget);
+      expect(find.text(es.registerHeading), findsNothing);
+      expect(find.text(es.verifyEmailReplaced), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1202: on the cold-start screen, a spent code whose sign-in check answers wrong credentials says «Esa contraseña no es la de esta cuenta.» under the password field',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es);
+      final again = await coldStart(tester, await storedWithoutSession(tester));
+      again.server.verify = (_) => _json(400, {'code': 'code_expired'});
+      again.server.login = wrongPassword;
+      await tester.enterText(askedPassword, 'otra-clave-mal-escrita');
+      await tester.enterText(code, '444444');
+      await tester.pumpAndSettle();
+      expect(again.server.paths, contains('auth/login/'));
+      expect(errorUnder(tester, askedPassword), es.verifyEmailWrongPassword);
+      expect(says(tester, es.verifyEmailCodeSpentWait), isFalse);
+      expect(says(tester, es.verifyEmailCodeSpentNew), isFalse);
+      expect(screen(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1203: verify answered code_expired and the sign-in check answered something else (too many tries) shows that answer under the code field, and the screen stays',
+    (tester) async {
+      final app = await _App.open(tester);
+      await createAccount(tester, es);
+      app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+      app.server.login = (_) => throttled(retryAfter: 120);
+      await tester.enterText(code, '222222');
+      await tester.pumpAndSettle();
+      expect(app.server.paths, contains('auth/login/'));
+      expect(errorUnder(tester, code), es.tooManyTriesWait(2));
+      expect(says(tester, es.verifyEmailCodeSpentWait), isFalse);
+      expect(says(tester, es.verifyEmailCodeSpentNew), isFalse);
+      expect(screen(), findsOneWidget);
+      expect(find.byType(CalendarScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, round 2 (b2) · P149 (UX-1215 to UX-1218):
+  // «Confirma tu correo» reopened after a restart ----
+
+  /// The sign-up's address waits; [after] passes; TaskFlow starts again with
+  /// no session, on the same storage.
+  Future<({_App app, _Clock clock, Map<String, String> storage})>
+  reopenedAfter(
+    WidgetTester tester,
+    Duration after, {
+    String language = 'es',
+    Size size = const Size(390, 844),
+  }) async {
+    final clock = _Clock();
+    await _App.open(tester, clock: clock.call, language: language, size: size);
+    await createAccount(tester, strings(language));
+    expect(screen(), findsOneWidget);
+    final storage = await storedWithoutSession(tester);
+    clock.now = clock.now.add(after);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    final app = await _App.open(
+      tester,
+      storage: storage,
+      clock: clock.call,
+      language: language,
+      size: size,
+    );
+    expect(screen(), findsOneWidget);
+    return (app: app, clock: clock, storage: storage);
+  }
+
+  testWidgets(
+    'UX-1215: reopened a minute after the sign-up, signup_replaced says from the first refusal «Esa contraseña no es la de esta cuenta. ¿No la recuerdas? Toca «Usar otro correo» y crea la cuenta de nuevo.» under the password field; the screen stays, and «Usar otro correo» lands on «Crea tu cuenta» with the address',
+    (tester) async {
+      final again = await reopenedAfter(tester, const Duration(minutes: 1));
+      final app = again.app;
+      app.server.verify = (_) =>
+          _json(400, {'code': 'signup_replaced', 'detail': 'Replaced.'});
+      await tester.enterText(askedPassword, 'no-la-recuerdo');
+      await tester.enterText(code, '444444');
+      await tester.pumpAndSettle();
+      expect(app.server.bodies('auth/verify-email/'), hasLength(1));
+      expect(
+        es.verifyEmailWrongPassword,
+        'Esa contraseña no es la de esta cuenta. ¿No la recuerdas? Toca '
+        '«Usar otro correo» y crea la cuenta de nuevo.',
+      );
+      expect(errorUnder(tester, askedPassword), es.verifyEmailWrongPassword);
+      expect(screen(), findsOneWidget);
+      // The way out it names is the button on this screen.
+      expect(
+        find.descendant(
+          of: otherAddress,
+          matching: find.text(es.verifyEmailOtherAddress),
+        ),
+        findsOneWidget,
+      );
+      await tapVisible(tester, otherAddress);
+      expect(screen(), findsNothing);
+      expect(find.text(es.registerHeading), findsOneWidget);
+      expect(
+        find.descendant(of: submit, matching: find.text(es.createAccount)),
+        findsOneWidget,
+      );
+      expect(formText(tester, email), 'ana@example.invalid');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-1215: the wrong-password line names «Use another email» in English and Catalan too, with each catalog’s own label',
+    () {
+      expect(
+        en.verifyEmailWrongPassword,
+        'That isn’t this account’s password. Don’t remember it? Tap '
+        '“Use another email” and create the account again.',
+      );
+      expect(
+        ca.verifyEmailWrongPassword,
+        'Aquesta contrasenya no és la d’aquest compte. No la recordes? Toca '
+        '«Utilitza un altre correu» i torna a crear el compte.',
+      );
+      expect(
+        en.verifyEmailWrongPassword,
+        contains('“${en.verifyEmailOtherAddress}”'),
+      );
+      expect(
+        es.verifyEmailWrongPassword,
+        contains('«${es.verifyEmailOtherAddress}»'),
+      );
+      expect(
+        ca.verifyEmailWrongPassword,
+        contains('«${ca.verifyEmailOtherAddress}»'),
+      );
+    },
+  );
+
+  testWidgets(
+    'UX-1215: at 2× on 320×640 in Catalan, reopened after a restart, the whole wrong-password line shows under the password field, not cut or ellipsized',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      const size = Size(320, 640);
+      final again = await reopenedAfter(
+        tester,
+        const Duration(minutes: 1),
+        language: 'ca',
+        size: size,
+      );
+      again.app.server.verify = (_) => _json(400, {'code': 'signup_replaced'});
+      await tester.enterText(askedPassword, 'no-la-recordo');
+      await tester.enterText(code, '444444');
+      await tester.pumpAndSettle();
+      expect(errorUnder(tester, askedPassword), ca.verifyEmailWrongPassword);
+      await expectFits(tester, ca.verifyEmailWrongPassword, size);
+      // Under the password field.
+      final line = tester.getRect(find.text(ca.verifyEmailWrongPassword));
+      final field = tester.getRect(
+        find.descendant(of: askedPassword, matching: find.byType(EditableText)),
+      );
+      expect(line.top, greaterThanOrEqualTo(field.bottom - 0.5));
+      expect(tester.takeException(), isNull, reason: 'no overflow');
+    },
+  );
+
+  testWidgets(
+    'UX-1216: reopened 5 minutes after the sign-up, «Reenviar código» is on at once; the saved time isn’t rewritten; a code_expired whose sign-in check sends a new code says «Te hemos enviado uno nuevo» and empties the code field',
+    (tester) async {
+      final again = await reopenedAfter(tester, const Duration(minutes: 5));
+      final app = again.app;
+      expect(resendLabel(tester), es.verifyEmailResend);
+      expect(waitLeft(tester, es), isNull);
+      expect(resendEnabled(tester), isTrue);
+      expect(app.server.requests, isEmpty, reason: 'nothing sent');
+      // Reopening doesn't count as a new code.
+      expect(await storedWithoutSession(tester), again.storage);
+      app.server.verify = (_) => _json(400, {'code': 'code_expired'});
+      await tester.enterText(askedPassword, typedPassword);
+      await tester.enterText(code, '222222');
+      await tester.pumpAndSettle();
+      expect(app.server.paths, ['auth/verify-email/', 'auth/login/']);
+      expect(errorUnder(tester, code), es.verifyEmailCodeSpentNew);
+      expect(says(tester, es.verifyEmailCodeSpentWait), isFalse);
+      expect(typed(tester, code), isEmpty);
+      expect(screen(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1216: reopened 20 seconds after the sign-up, the button reads «Reenviar código en 40 segundos» and is off; 40 seconds later it is on',
+    (tester) async {
+      final again = await reopenedAfter(tester, const Duration(seconds: 20));
+      expect(es.verifyEmailResendIn(40), 'Reenviar código en 40 segundos');
+      expect(resendLabel(tester), es.verifyEmailResendIn(40));
+      expect(resendEnabled(tester), isFalse);
+      await later(tester, again.clock, 40);
+      await tester.pumpAndSettle();
+      expect(resendLabel(tester), es.verifyEmailResend);
+      expect(resendEnabled(tester), isTrue);
+      expect(again.app.server.requests, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1217: a cold start with a waiting address goes from SessionLoadingScreen straight to «Confirma tu correo», over sign-in, at most one frame of sign-in between, with no transition, sending nothing',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es);
+      final storage = await storedWithoutSession(tester);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      final again = await _App.open(tester, storage: storage, settle: false);
+      // What each frame shows, from the first.
+      final frames = <String>[];
+      String shown() {
+        if (find.byType(SessionLoadingScreen).evaluate().isNotEmpty) {
+          return 'loading';
+        }
+        if (screen().evaluate().isNotEmpty) {
+          final route = ModalRoute.of(tester.element(screen()))!;
+          final at = tester.getTopLeft(screen());
+          return route.animation!.value == 1 && at == Offset.zero
+              ? 'confirm'
+              : 'confirm-moving';
+        }
+        if (find.byType(LoginScreen).evaluate().isNotEmpty) return 'sign-in';
+        // Before the app's localizations load, nothing is drawn yet.
+        if (find.byType(Scaffold).evaluate().isEmpty) return 'blank';
+        return 'other';
+      }
+
+      frames.add(shown());
+      for (var i = 0; i < 60 && !frames.contains('confirm'); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 1)),
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+        frames.add(shown());
+      }
+      expect(frames, contains('confirm'), reason: '$frames');
+      // Nothing, or SessionLoadingScreen, until the stored address is read.
+      final start = frames.indexWhere(
+        (frame) => frame != 'blank' && frame != 'loading',
+      );
+      expect(
+        frames.take(start),
+        everyElement(isIn(['blank', 'loading'])),
+        reason: '$frames',
+      );
+      final after = frames.sublist(start);
+      final first = after.indexOf('confirm');
+      expect(
+        after.take(first).where((frame) => frame == 'sign-in').length,
+        lessThanOrEqualTo(1),
+        reason: 'at most one frame of sign-in: $frames',
+      );
+      expect(
+        after.take(first),
+        everyElement(isIn(['sign-in'])),
+        reason: 'no sliding or zooming in: $frames',
+      );
+      await tester.pumpAndSettle();
+      final route = ModalRoute.of(tester.element(screen()))!;
+      expect(route, isA<TransitionRoute<dynamic>>());
+      expect(
+        (route as TransitionRoute<dynamic>).transitionDuration,
+        Duration.zero,
+      );
+      // Over sign-in, which Back returns to.
+      expect(find.byType(LoginScreen, skipOffstage: false), findsOneWidget);
+      expect(again.server.requests, isEmpty, reason: 'nothing sent');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final via in ['password', 'Google']) {
+    testWidgets(
+      'UX-1218: an address waiting for its code, then a sign-in as another account ($via), then sign-out: no address waits, sign-in stays on «Inicia sesión», and a cold start opens plain sign-in',
+      (tester) async {
+        final app = await _App.open(tester, google: _GoogleAccount());
+        await createAccount(tester, es);
+        expect(screen(), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(screen(), findsNothing);
+        app.server.login = (body) => _json(200, _session('${body['email']}'));
+        app.server.google = (_) => _json(200, _session('bea@example.invalid'));
+        if (via == 'password') {
+          await tapVisible(tester, find.text(es.alreadyHaveAccount));
+          await signIn(tester, address: 'bea@example.invalid');
+        } else {
+          await tapVisible(tester, find.byKey(const ValueKey('google-sign-in')));
+        }
+        expect(
+          app.container.read(authProvider).account?.email,
+          'bea@example.invalid',
+        );
+        expect(find.byType(CalendarScreen), findsOneWidget);
+        unawaited(app.container.read(authProvider.notifier).signOut());
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pumpAndSettle();
+        final saved = (await tester.runAsync(
+          () => const FlutterSecureStorage().readAll(),
+        ))!;
+        expect(
+          saved.values.where((value) => value.contains('ana@example.invalid')),
+          isEmpty,
+          reason: 'no address waits',
+        );
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(screen(), findsNothing);
+        final again = await coldStart(
+          tester,
+          await storedWithoutSession(tester),
+        );
+        expect(screen(), findsNothing);
+        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(again.server.requests, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // ---- Run 2026-10-18-commands, round 3 (b2) · P151 (UX-1220): Back from
+  // the reopened «Confirma tu correo» plays the usual transition ----
+
+  /// How long Back takes from a plain page pushed on [navigator], as every
+  /// other screen of the app is pushed.
+  Future<Duration> plainBack(WidgetTester tester, NavigatorState navigator) async {
+    final plain = MaterialPageRoute<void>(
+      builder: (_) => const Scaffold(body: Text('plain-page')),
+    );
+    unawaited(navigator.push(plain));
+    await tester.pumpAndSettle();
+    final duration = plain.reverseTransitionDuration;
+    navigator.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('plain-page'), findsNothing);
+    return duration;
+  }
+
+  testWidgets(
+    'UX-1220: reopened after a restart, «Confirma tu correo» opens with no transition and closes with the same Back duration as a plain page on the same navigator',
+    (tester) async {
+      await reopenedAfter(tester, const Duration(seconds: 5));
+      final route =
+          ModalRoute.of(tester.element(screen()))! as TransitionRoute<dynamic>;
+      expect(route.transitionDuration, Duration.zero);
+      final usual = await plainBack(tester, route.navigator!);
+      expect(usual, greaterThan(Duration.zero));
+      expect(route.reverseTransitionDuration, usual);
+      // The page class keeps no Back duration of its own.
+      final source = File('lib/screens/login_screen.dart').readAsStringSync();
+      expect(source, isNot(contains('reverseTransitionDuration')));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1220: Back from the reopened «Confirma tu correo» returns to «Inicia sesión», and the page stays on screen while the usual Back transition runs',
+    (tester) async {
+      final again = await reopenedAfter(tester, const Duration(seconds: 5));
+      final route =
+          ModalRoute.of(tester.element(screen()))! as TransitionRoute<dynamic>;
+      final usual = await plainBack(tester, route.navigator!);
+      expect(screen(), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      // Step through the Back transition one frame at a time.
+      const frame = Duration(milliseconds: 10);
+      var mounted = Duration.zero;
+      while (screen().evaluate().isNotEmpty && mounted < usual * 3) {
+        await tester.pump(frame);
+        mounted += frame;
+      }
+      expect(screen(), findsNothing);
+      expect(
+        mounted,
+        greaterThanOrEqualTo(usual - frame),
+        reason: 'closing ran for $mounted; a plain page closes in $usual',
+      );
+      expect(mounted, lessThanOrEqualTo(usual + frame * 2));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      expect(again.app.server.requests, isEmpty, reason: 'nothing sent');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

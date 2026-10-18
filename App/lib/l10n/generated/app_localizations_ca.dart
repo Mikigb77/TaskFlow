@@ -1565,11 +1565,16 @@ class AppLocalizationsCa extends AppLocalizations {
   String get verifyEmailResent => 'T’hem enviat un codi nou';
 
   @override
-  String get verifyEmailCodeInvalid => 'Aquest codi no és correcte';
+  String get verifyEmailCodeInvalid =>
+      'Aquest codi no és correcte. Mira l’últim correu que t’hem enviat.';
 
   @override
-  String get verifyEmailCodeExpired =>
-      'Aquest codi ha caducat. Demana’n un de nou.';
+  String get verifyEmailCodeSpentNew =>
+      'Aquest codi ja no serveix. T’hem enviat un codi nou.';
+
+  @override
+  String get verifyEmailCodeSpentWait =>
+      'Aquest codi ja no serveix. Toca «Torna a enviar el codi» quan acabi el compte enrere.';
 
   @override
   String get verifyEmailOtherAddress => 'Utilitza un altre correu';
@@ -1577,6 +1582,10 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get verifyEmailReplaced =>
       'Algú ha tornat a crear un compte amb aquest correu. Torna a crear-lo per continuar.';
+
+  @override
+  String get verifyEmailWrongPassword =>
+      'Aquesta contrasenya no és la d’aquest compte. No la recordes? Toca «Utilitza un altre correu» i torna a crear el compte.';
 
   @override
   String get newList => 'Projecte nou';
@@ -3559,9 +3568,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get newTask => 'Tasca nova';
 
   @override
-  String get captureFillByHand => 'Emplena-la a mà';
-
-  @override
   String get pickDay => 'Tria un dia';
 
   @override
@@ -3829,7 +3835,15 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get commandExistingProjectTasks => 'Les tasques hi van.';
+  String commandExistingProjectTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Les tasques hi van.',
+      one: 'La tasca hi va.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String commandCreateProjectQuestion(String name) {
@@ -3840,6 +3854,12 @@ class AppLocalizationsCa extends AppLocalizations {
   String commandCreateNamed(String name) {
     return 'Crea «$name»';
   }
+
+  @override
+  String get commandWhichProject => 'A quin projecte la poso?';
+
+  @override
+  String get commandOtherProject => 'Un altre projecte…';
 
   @override
   String commandCreateProjects(int count) {
@@ -3907,6 +3927,27 @@ class AppLocalizationsCa extends AppLocalizations {
   String get commandFindMine => 'Les teves tasques';
 
   @override
+  String commandFindProjectPerson(String project, String name) {
+    return 'Tasques de «$project» assignades a $name';
+  }
+
+  @override
+  String commandFindProjectMine(String project) {
+    return 'Les teves tasques de «$project»';
+  }
+
+  @override
+  String commandFindPeriod(String from, String to) {
+    return 'Del $from al $to';
+  }
+
+  @override
+  String get commandFindOpen => 'Per fer';
+
+  @override
+  String get commandFindDone => 'Completades';
+
+  @override
   String get commandCompleted => 'Completada';
 
   @override
@@ -3924,6 +3965,17 @@ class AppLocalizationsCa extends AppLocalizations {
       locale: localeName,
       other: 'I $count més',
       one: 'I 1 més',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandShowMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mostra’n $count més',
+      one: 'Mostra’n 1 més',
     );
     return '$_temp0';
   }
@@ -3952,6 +4004,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get commandTaskNotFoundPlain => 'No trobo aquesta tasca';
 
   @override
+  String commandViewOnly(String title) {
+    return '«$title» és d’un projecte que només pots veure.';
+  }
+
+  @override
   String get commandWhichToChange => 'Quina vols canviar?';
 
   @override
@@ -3974,7 +4031,15 @@ class AppLocalizationsCa extends AppLocalizations {
   String get commandNothingToChange => 'Ja és així.';
 
   @override
-  String get commandWhichDay => 'Quin dia?';
+  String commandWhichDay(int hour, String time) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hour,
+      locale: localeName,
+      other: 'Quin dia, a les $time?',
+      one: 'Quin dia, a la $time?',
+    );
+    return '$_temp0';
+  }
 
   @override
   String commandMemberNotIn(String name, String project) {

@@ -9,10 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Opens the task form for a new task: how an account without Pro creates
-/// tasks once there is no mic, or from the capture sheet's `Rellenar a
-/// mano`. The first time in a month that its free dictations are used up,
-/// a notice says why first, once; it offers the form and Pro. [words] are
-/// words already heard, for the title. The form's route is pushed, not
+/// tasks once there is no mic, or from the capture sheet's `Escribir`. The
+/// first time in a month that its free dictations are used up, a notice
+/// says why first, once; it offers the form and Pro. [words] are words
+/// already heard, typed or shared, for the title and notes; [captureId] is
+/// the capture that keeps them until the task is saved. [askedToSpeak]
+/// marks the ways in that ask to speak (the widget, the voice shortcut):
+/// without the mic, the form says why. The form's route is pushed, not
 /// awaited.
 Future<void> openTaskForm(
   BuildContext context, {
@@ -21,6 +24,8 @@ Future<void> openTaskForm(
   Object? page,
   bool showCalendar = false,
   String words = '',
+  String? captureId,
+  bool askedToSpeak = false,
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final free = container.read(authProvider).account?.freeVoice;
@@ -57,6 +62,8 @@ Future<void> openTaskForm(
         page: page,
         showCalendar: showCalendar,
         words: words,
+        captureId: captureId,
+        askedToSpeak: askedToSpeak,
       ),
     ),
   );

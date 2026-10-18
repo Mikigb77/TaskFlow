@@ -200,7 +200,7 @@ void main() {
           find.text(es.commandExistingProject('Matemáticas')),
           findsOneWidget,
         );
-        expect(find.text(es.commandExistingProjectTasks), findsOneWidget);
+        expect(find.text(es.commandExistingProjectTasks(1)), findsOneWidget);
         // Not a list of things to add: nothing new is made for the project.
         expect(find.text(es.captureThingsToAdd(2)), findsNothing);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -233,7 +233,10 @@ void main() {
         );
         expect(saveButton(tester).onPressed, isNull);
         expect(find.text(es.captureCheckDetails), findsOneWidget);
-        await tester.tap(find.byKey(const ValueKey('project-choice-maths')));
+        // Neither is like «Mates»: both are in the project sheet.
+        await tester.tap(find.byKey(const ValueKey('project-choice-other')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Matemáticas').last);
         await tester.pumpAndSettle();
         expect(
           find.text(es.commandExistingProject('Matemáticas')),
@@ -269,12 +272,10 @@ void main() {
             ),
           ],
         );
-        expect(
-          find.text(es.commandCreateProjectQuestion('Química')),
-          findsNWidgets(2),
-        );
+        expect(find.text(es.commandWhichProject), findsNWidgets(2));
         expect(find.text(es.commandCreateNamed('Química')), findsNWidgets(2));
-        expect(find.text('Física'), findsNWidgets(2));
+        // Física isn't like «Química»: it is in the project sheet.
+        expect(find.text(es.commandOtherProject), findsNWidgets(2));
         expect(find.text(es.noList), findsNWidgets(2));
         // Nothing is added until it is chosen.
         expect(saveButton(tester).onPressed, isNull);
@@ -283,10 +284,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         // One choice for both.
-        expect(
-          find.text(es.commandCreateProjectQuestion('Química')),
-          findsNothing,
-        );
+        expect(find.text(es.commandWhichProject), findsNothing);
         expect(find.text(es.commandNewProject('Química')), findsNWidgets(2));
         expect(app.lists.created, isEmpty);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -313,7 +311,9 @@ void main() {
             ),
           ],
         );
-        await tester.tap(find.byKey(const ValueKey('project-choice-physics')));
+        await tester.tap(find.byKey(const ValueKey('project-choice-other')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Física').last);
         await tester.pumpAndSettle();
         expect(find.text('Física'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -737,7 +737,7 @@ void main() {
             }),
           ],
         );
-        expect(find.text(es.commandWhichDay), findsOneWidget);
+        expect(find.text(es.commandWhichDay(18, '18:00')), findsOneWidget);
         expect(saveButton(tester).onPressed, isNull);
         await tester.tap(find.widgetWithText(ChoiceChip, es.tomorrow));
         await tester.pumpAndSettle();
@@ -1114,7 +1114,7 @@ void main() {
     );
 
     testWidgets(
-      'without Pro, typed words never reach the assistant: «Rellenar a mano» '
+      'without Pro, typed words never reach the assistant: «Escribir» '
       'opens the form, and a dictation still asks for commands',
       (tester) async {
         final app = await _App.open(tester, pro: false, freeLeft: 5);
@@ -1233,7 +1233,7 @@ void main() {
           );
           expect(tester.takeException(), isNull);
           expect(
-            find.text(l.commandCreateProjectQuestion('Geografía e historia')),
+            find.text(l.commandWhichProject),
             findsWidgets,
           );
           // Every card can be scrolled to, and the button stays in view.
@@ -1324,6 +1324,8 @@ void main() {
   // Run 2026-10-18-commands, round 1 (P127–P130): last, because its final
   // group loads Manrope for the tests after it.
   _commandsRound1();
+  _commandsRound2();
+  _commandsRound2b();
 }
 
 /// The phone's recognizer, shared by the tests: it listens until stopped,
@@ -3219,6 +3221,1183 @@ void _commandsRound1() {
         expect(inside.right, lessThanOrEqualTo(outside.right + 0.5));
         expect(inside.top, greaterThanOrEqualTo(outside.top - 0.5));
         expect(inside.bottom, lessThanOrEqualTo(outside.bottom + 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+}
+
+// ---- Run 2026-10-18-commands, round 2 ----------------------------------
+//
+// P135 (UX-908, UX-909, UX-915): command-card questions sit in the question
+// box, ask the right question and offer few chips. P136 (UX-914): every
+// change and deletion can be finished by tapping. P137 (UX-907, UX-913,
+// UX-916): search cards say what they searched, found rows open, copy.
+
+TaskListInfo _project(
+  String id,
+  String name, {
+  String role = 'owner',
+  bool shared = false,
+  List<ProjectMember> people = const [],
+}) => TaskListInfo(
+  id: id,
+  name: name,
+  version: 2,
+  role: role,
+  shared: shared,
+  people: people,
+);
+
+/// The question box holding [question].
+Finder _boxOf(String question) =>
+    find.ancestor(of: find.text(question), matching: find.byType(QuestionBox));
+
+/// The labels of the chips under a question, in the order they read.
+List<String> _chipLabels(WidgetTester tester, Finder box) => [
+  for (final text in tester.widgetList<Text>(
+    find.descendant(
+      of: find.descendant(of: box, matching: find.byType(ActionChip)),
+      matching: find.byType(Text),
+    ),
+  ))
+    text.data!,
+];
+
+/// The question box is the result's tinted box: surfaceContainerHigh, 16 dp
+/// corners, 14 dp padding.
+void _expectQuestionBox(WidgetTester tester, Finder box) {
+  expect(box, findsOneWidget);
+  final decoration =
+      tester
+              .widget<DecoratedBox>(
+                find
+                    .descendant(of: box, matching: find.byType(DecoratedBox))
+                    .first,
+              )
+              .decoration
+          as BoxDecoration;
+  expect(
+    decoration.color,
+    Theme.of(tester.element(box)).colorScheme.surfaceContainerHigh,
+  );
+  expect(decoration.borderRadius, BorderRadius.circular(16));
+  expect(
+    tester
+        .widget<Padding>(
+          find.descendant(of: box, matching: find.byType(Padding)).first,
+        )
+        .padding,
+    const EdgeInsets.all(14),
+  );
+}
+
+/// The card [text] is on: a command's frame in the result.
+Finder _cardOf(Finder text) =>
+    find.ancestor(of: text, matching: find.byType(Material)).first;
+
+void _commandsRound2() {
+  group('UX-908: a task’s missing project asks where it goes', () {
+    final draftQuimica = draft(
+      'Repasar el tema 3',
+      suggestion: 'química',
+      issues: ['project_not_available'],
+      hints: {'project': 'química'},
+    );
+
+    testWidgets(
+      'UX-908: with 10 editable projects, «química» asks «¿En qué proyecto la pongo?» inside the question box, with at most 6 chips: «Crear «Química»», up to 3 similar projects in their order, «Otro proyecto…», «Sin proyecto»',
+      (tester) async {
+        final projects = [
+          _project('organica', 'Química orgánica'),
+          _project('casa', 'Casa'),
+          _project('fyq', 'Física y Química'),
+          _project('bio', 'Bioquímica'),
+          _project('q2', 'Química II'),
+          _project('trabajo', 'Trabajo'),
+          _project('gym', 'Gimnasio'),
+          _project('viajes', 'Viajes'),
+          _project('lectura', 'Lectura'),
+          _project('musica', 'Música'),
+        ];
+        expect(projects, hasLength(10));
+        final app = await _App.open(tester, projects: projects);
+        await app.showResult(tester, drafts: [draftQuimica]);
+        expect(es.commandWhichProject, '¿En qué proyecto la pongo?');
+        expect(es.commandOtherProject, 'Otro proyecto…');
+        final box = _boxOf(es.commandWhichProject);
+        _expectQuestionBox(tester, box);
+        final labels = _chipLabels(tester, box);
+        expect(labels.length, lessThanOrEqualTo(6), reason: '$labels');
+        expect(labels.first, es.commandCreateNamed('Química'));
+        expect(es.commandCreateNamed('Química'), 'Crear «Química»');
+        expect(labels.sublist(labels.length - 2), [
+          es.commandOtherProject,
+          es.noList,
+        ]);
+        final similar = labels.sublist(1, labels.length - 2);
+        const like = [
+          'Química orgánica',
+          'Física y Química',
+          'Bioquímica',
+          'Química II',
+        ];
+        expect(similar, hasLength(3), reason: 'four are like it: three show');
+        for (final name in similar) {
+          expect(like, contains(name), reason: '$name isn’t like «Química»');
+        }
+        expect(similar, [
+          ...like.where(similar.contains),
+        ], reason: 'in their order');
+        expect(labels, isNot(contains('Casa')));
+        expect(saveButton(tester).onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-908: «Otro proyecto…» opens the project sheet; «Casa» there puts the task in Casa, its chip reads Casa, and the question goes',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [
+            _project('organica', 'Química orgánica'),
+            _project('casa', 'Casa'),
+            _project('fyq', 'Física y Química'),
+          ],
+        );
+        await app.showResult(tester, drafts: [draftQuimica]);
+        expect(find.text('Casa'), findsNothing, reason: 'not like «Química»');
+        await tester.tap(find.text(es.commandOtherProject));
+        await tester.pumpAndSettle();
+        expect(find.text('Casa'), findsOneWidget, reason: 'in the sheet');
+        await tester.tap(find.text('Casa'));
+        await tester.pumpAndSettle();
+        expect(find.text(es.commandWhichProject), findsNothing);
+        expect(find.text(es.commandOtherProject), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.text('Casa'),
+          ),
+          findsOneWidget,
+          reason: 'the task’s project chip',
+        );
+        expect(saveButton(tester).onPressed, isNotNull);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.lists.created, isEmpty);
+        expect(app.tasks.named('Repasar el tema 3')!.listId, 'casa');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-908: with one editable project, already a similar chip, there is no «Otro proyecto…» (a view-only project doesn’t count)',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [
+            _project('fyq', 'Física y Química'),
+            _project('ajena', 'Química de Ana', role: 'viewer', shared: true),
+          ],
+        );
+        await app.showResult(tester, drafts: [draftQuimica]);
+        final box = _boxOf(es.commandWhichProject);
+        expect(_chipLabels(tester, box), [
+          es.commandCreateNamed('Química'),
+          'Física y Química',
+          es.noList,
+        ]);
+        expect(find.text(es.commandOtherProject), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-909: «Crea el proyecto Química» matched to another name asks', () {
+    final fyq = _project('fyq', 'Física y Química');
+    final quimica = command({
+      'kind': 'project',
+      'name': 'Química',
+      'existing_list_id': 'fyq',
+    });
+
+    Future<_App> open(WidgetTester tester) async {
+      final app = await _App.open(
+        tester,
+        projects: [fyq, _project('casa', 'Casa')],
+      );
+      await app.showResult(
+        tester,
+        drafts: [draft('Repasar el tema 3', listId: 'fyq')],
+        commands: [quimica],
+      );
+      return app;
+    }
+
+    testWidgets(
+      'UX-909: a project «Química» the server matched to «Física y Química» asks «¿Crear el proyecto «Química»?» with «Crear «Química»» and then «Física y Química», and the confirming button waits for a chip',
+      (tester) async {
+        await open(tester);
+        final question = find.text(es.commandCreateProjectQuestion('Química'));
+        expect(question, findsOneWidget);
+        expect(
+          es.commandCreateProjectQuestion('Química'),
+          '¿Crear el proyecto «Química»?',
+        );
+        expect(
+          find.text(es.commandExistingProject('Física y Química')),
+          findsNothing,
+        );
+        final labels = _chipLabels(tester, _cardOf(question));
+        expect(labels.take(2), [
+          es.commandCreateNamed('Química'),
+          'Física y Química',
+        ]);
+        expect(find.byTooltip(es.commandDontCreate('Química')), findsOneWidget);
+        expect(saveButton(tester).onPressed, isNull, reason: 'it waits');
+        await tester.tap(find.text(es.commandCreateNamed('Química')));
+        await tester.pumpAndSettle();
+        expect(saveButton(tester).onPressed, isNotNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-909: after «Crear «Química»» and the confirming tap, a project «Química» exists and the dictation’s task is in it',
+      (tester) async {
+        final app = await open(tester);
+        await tester.tap(find.text(es.commandCreateNamed('Química')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.lists.created, ['Química']);
+        final created = app.lists.projects.firstWhere(
+          (project) => project.name == 'Química',
+        );
+        expect(app.tasks.named('Repasar el tema 3')!.listId, created.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-909: «Física y Química» instead creates nothing, and the task stays in Física y Química',
+      (tester) async {
+        final app = await open(tester);
+        final card = _cardOf(
+          find.text(es.commandCreateProjectQuestion('Química')),
+        );
+        await tester.tap(
+          find.descendant(
+            of: find.descendant(of: card, matching: find.byType(ActionChip)),
+            matching: find.text('Física y Química'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(saveButton(tester).onPressed, isNotNull);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.lists.created, isEmpty);
+        expect(app.tasks.named('Repasar el tema 3')!.listId, 'fyq');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-909: «matematicas» matched to «Matemáticas» (the same name, ignoring case and accents) still shows «Ya tienes «Matemáticas»» and doesn’t wait',
+      (tester) async {
+        final app = await _App.open(tester, projects: [maths]);
+        await app.showResult(
+          tester,
+          drafts: [draft('Repasar fracciones', listId: 'maths')],
+          commands: [
+            command({
+              'kind': 'project',
+              'name': 'matematicas',
+              'existing_list_id': 'maths',
+            }),
+          ],
+        );
+        expect(
+          find.text(es.commandExistingProject('Matemáticas')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(es.commandCreateProjectQuestion('matematicas')),
+          findsNothing,
+        );
+        expect(
+          find.textContaining(
+            es.commandCreateProjectQuestion('').split('«').first,
+          ),
+          findsNothing,
+        );
+        expect(saveButton(tester).onPressed, isNotNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-915: the change card’s day question', () {
+    Future<_App> open(
+      WidgetTester tester,
+      String time, {
+      String language = 'es',
+    }) async {
+      final app = await _App.open(
+        tester,
+        language: language,
+        tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+      );
+      await app.showResult(
+        tester,
+        commands: [
+          command({
+            'kind': 'update',
+            'target': {
+              'words': ['médico'],
+            },
+            'changes': {'time': time},
+          }),
+        ],
+      );
+      return app;
+    }
+
+    testWidgets(
+      'UX-915: «Pon el médico a las 5» on a task with no day asks «¿Qué día, a las 17:00?» inside the question box',
+      (tester) async {
+        await open(tester, '17:00');
+        const question = '¿Qué día, a las 17:00?';
+        expect(es.commandWhichDay(17, '17:00'), question);
+        _expectQuestionBox(tester, _boxOf(question));
+        expect(saveButton(tester).onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-915: at 1:00 it takes the singular article, «¿Qué día, a la 1:00?», with the time as the app writes times',
+      (tester) async {
+        expect(es.commandWhichDay(1, '1:00'), '¿Qué día, a la 1:00?');
+        await open(tester, '01:00');
+        // The time as the app shows times: 01:00 on this 24-hour phone.
+        final time = appContext().clockTime(DateTime(2000, 1, 1, 1));
+        final question = es.commandWhichDay(1, time);
+        expect(question, '¿Qué día, a la $time?');
+        expect(find.text(question), findsOneWidget);
+        _expectQuestionBox(tester, _boxOf(question));
+        expect(find.textContaining('a las'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-915: in Catalan it reads «Quin dia, a les 17:00?»', (
+      tester,
+    ) async {
+      await open(tester, '17:00', language: 'ca');
+      expect(ca.commandWhichDay(17, '17:00'), 'Quin dia, a les 17:00?');
+      expect(ca.commandWhichDay(1, '1:00'), 'Quin dia, a la 1:00?');
+      _expectQuestionBox(tester, _boxOf('Quin dia, a les 17:00?'));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'UX-915: after «Elegir día» and a day 4 days ahead, the chip reads that day’s weekdayDate and is selected',
+      (tester) async {
+        final app = await open(tester, '17:00');
+        final picked = day(4);
+        final pick = find.byKey(const ValueKey('command-pick-day'));
+        expect(
+          find.descendant(of: pick, matching: find.text(es.pickDay)),
+          findsOneWidget,
+        );
+        expect(tester.widget<ChoiceChip>(pick).selected, isFalse);
+        await tester.tap(pick);
+        await tester.pumpAndSettle();
+        final calendar = find.byType(CalendarDatePicker);
+        expect(calendar, findsOneWidget);
+        if (picked.month != day(0).month) {
+          await tester.tap(
+            find.descendant(
+              of: calendar,
+              matching: find.byIcon(Icons.chevron_right),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(
+          find.descendant(of: calendar, matching: find.text('${picked.day}')),
+        );
+        await tester.pumpAndSettle();
+        final done = find.byKey(const ValueKey('schedule-done'));
+        if (done.evaluate().isNotEmpty) {
+          await tester.ensureVisible(done);
+          await tester.pumpAndSettle();
+          await tester.tap(done);
+          await tester.pumpAndSettle();
+        }
+        expect(
+          find.descendant(of: pick, matching: find.text(weekday(picked))),
+          findsOneWidget,
+        );
+        expect(tester.widget<ChoiceChip>(pick).selected, isTrue);
+        expect(
+          find.text('${es.noDate} → ${weekday(picked)} · 17:00'),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.tasks.byId(1)!.dueDate, day(4, 17));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-914: every change and deletion can be finished by tapping', () {
+    testWidgets(
+      'UX-914: an update whose words match 8 tasks shows 5 and «Ver 3 más»; tapping it shows all 8; the 7th tapped is the one changed, with its before → after',
+      (tester) async {
+        const names = [
+          'Ana',
+          'Bea',
+          'Carla',
+          'Dani',
+          'Eva',
+          'Fran',
+          'Gema',
+          'Hugo',
+        ];
+        final app = await _App.open(
+          tester,
+          tasks: [
+            for (var i = 0; i < names.length; i++)
+              Task(
+                id: i + 1,
+                title: 'Llamar a ${names[i]}',
+                priority: 1,
+                dueDate: day(i + 2, 9),
+              ),
+          ],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['llamar'],
+              },
+              'changes': {'time': '18:00'},
+            }),
+          ],
+        );
+        List<String> shown() => [
+          for (final name in names)
+            if (find.text('Llamar a $name').evaluate().isNotEmpty)
+              'Llamar a $name',
+        ];
+        expect(shown(), hasLength(5));
+        expect(es.commandShowMore(3), 'Ver 3 más');
+        final more = find.widgetWithText(TextButton, es.commandShowMore(3));
+        expect(more, findsOneWidget);
+        await tester.ensureVisible(more);
+        await tester.pumpAndSettle();
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        expect(shown(), hasLength(8));
+        expect(find.text(es.commandShowMore(3)), findsNothing);
+        final ordered = shown()
+          ..sort(
+            (a, b) => tester
+                .getTopLeft(find.text(a))
+                .dy
+                .compareTo(tester.getTopLeft(find.text(b)).dy),
+          );
+        final seventh = ordered[6];
+        final task = app.tasks.named(seventh)!;
+        await tester.ensureVisible(find.text(seventh));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(seventh));
+        await tester.pumpAndSettle();
+        expect(find.text(es.commandWhichToChange), findsNothing);
+        expect(find.text(seventh), findsOneWidget);
+        final due = task.dueDate!;
+        expect(
+          find.text('${weekday(due)} · 09:00 → ${weekday(due)} · 18:00'),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.tasks.byId(task.id!)!.dueDate!.hour, 18);
+        for (final other in names.map((name) => 'Llamar a $name')) {
+          if (other == seventh) continue;
+          expect(app.tasks.named(other)!.dueDate!.hour, 9, reason: other);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-914: an update whose only matching task «Informe» is in a project the account can only view says ««Informe» es de un proyecto que solo puedes ver.», not «No encuentro…», with nothing to apply',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [
+            _project('ajeno', 'Equipo de Ana', role: 'viewer', shared: true),
+          ],
+          tasks: [Task(id: 1, title: 'Informe', priority: 1, listId: 'ajeno')],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['informe'],
+              },
+              'changes': {'priority': 3},
+            }),
+          ],
+        );
+        expect(
+          es.commandViewOnly('Informe'),
+          '«Informe» es de un proyecto que solo puedes ver.',
+        );
+        expect(find.text(es.commandViewOnly('Informe')), findsOneWidget);
+        expect(find.text(es.commandTaskNotFound('informe')), findsNothing);
+        expect(find.byTooltip(es.commandDontChange('informe')), findsNothing);
+        expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
+        expect(app.tasks.byId(1)!.priority, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-914: «Asigna el informe a Paul» with two editors called Paul shows «Hay varias personas que se llaman Paul.» and one chip each; «Paul Martí» makes it ready, «→ Paul Martí», and the task is assigned to him',
+      (tester) async {
+        final team2 = _project(
+          'team2',
+          'Equipo',
+          shared: true,
+          people: const [
+            ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+            ProjectMember(id: 3, name: 'Paul García', role: 'editor'),
+            ProjectMember(id: 4, name: 'Paul Martí', role: 'editor'),
+            ProjectMember(id: 5, name: 'Paula Ruiz', role: 'viewer'),
+            ProjectMember(id: 6, name: 'Pablo', role: 'editor'),
+          ],
+        );
+        final app = await _App.open(
+          tester,
+          projects: [team2],
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Informe',
+              priority: 1,
+              listId: 'team2',
+              assignment: 'group',
+            ),
+          ],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['informe'],
+              },
+              'changes': {'assignee_name': 'Paul'},
+              'issues': ['ambiguous_member'],
+            }),
+          ],
+        );
+        expect(
+          es.commandAmbiguousMember('Paul'),
+          'Hay varias personas que se llaman Paul.',
+        );
+        expect(find.text(es.commandAmbiguousMember('Paul')), findsOneWidget);
+        final chips = find.descendant(
+          of: find.byType(CaptureResult),
+          matching: find.byType(ChoiceChip),
+        );
+        final names = [
+          for (final chip in tester.widgetList<ChoiceChip>(chips))
+            (chip.label as Text).data,
+        ];
+        expect(names, ['Paul García', 'Paul Martí']);
+        expect(saveButton(tester).onPressed, isNull, reason: 'it waits');
+        await tester.tap(find.widgetWithText(ChoiceChip, 'Paul Martí'));
+        await tester.pumpAndSettle();
+        expect(saveButton(tester).onPressed, isNotNull);
+        expect(find.text('${es.assignedToGroup} → Paul Martí'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        final report = app.tasks.byId(1)!;
+        expect(report.assignment, 'member');
+        expect(report.assigneeId, 4);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-914: a search card with 25 results still shows «Y 5 más» as plain text',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            for (var i = 1; i <= 25; i++)
+              Task(id: i, title: 'Nota $i', priority: 1),
+          ],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'find',
+              'words': ['nota'],
+            }),
+          ],
+        );
+        expect(es.commandMore(5), 'Y 5 más');
+        final more = find.text(es.commandMore(5), skipOffstage: false);
+        await tester.scrollUntilVisible(
+          more,
+          300,
+          scrollable: find
+              .descendant(
+                of: find.byType(CaptureResult),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(more, findsOneWidget);
+        for (final tappable in [TextButton, InkWell, ActionChip]) {
+          expect(
+            find.ancestor(of: more, matching: find.byType(tappable)),
+            findsNothing,
+            reason: '$tappable',
+          );
+        }
+        expect(
+          find.text(es.commandShowMore(5), skipOffstage: false),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-907: a search card says for when and what it searched', () {
+    Finder inCard(Finder finder) =>
+        find.descendant(of: find.byType(FindCommandCard), matching: finder);
+
+    Future<void> search(
+      WidgetTester tester,
+      Map<String, dynamic> json, {
+      List<Task> tasks = const [],
+      List<TaskListInfo> projects = const [],
+    }) async {
+      final app = await _App.open(tester, tasks: tasks, projects: projects);
+      await app.showResult(
+        tester,
+        commands: [
+          command({'kind': 'find', 'words': [], ...json}),
+        ],
+      );
+    }
+
+    /// The card's lines, top to bottom.
+    List<String> lines(WidgetTester tester) {
+      final texts = inCard(find.byType(Text));
+      final found = [
+        for (final element in texts.evaluate())
+          (
+            text: (element.widget as Text).data ?? '',
+            top: tester
+                .getTopLeft(find.byElementPredicate((e) => e == element))
+                .dy,
+          ),
+      ]..sort((a, b) => a.top.compareTo(b.top));
+      return [for (final line in found) line.text];
+    }
+
+    testWidgets(
+      'UX-907: tomorrow to tomorrow, no words, no project: headed «Tareas» with «Mañana» under it; with status completed, «Mañana · Completadas»',
+      (tester) async {
+        await search(tester, {'from': key(day(1)), 'to': key(day(1))});
+        expect(lines(tester).take(2), [es.tasks, es.tomorrow]);
+        expect(es.tomorrow, 'Mañana');
+        await tester.pumpWidget(const SizedBox());
+        await search(tester, {
+          'from': key(day(1)),
+          'to': key(day(1)),
+          'status': 'completed',
+        });
+        expect(es.commandFindDone, 'Completadas');
+        expect(lines(tester).take(2), [es.tasks, 'Mañana · Completadas']);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-907: next Monday to next Sunday with status open reads «Del {lunes} al {domingo} · Pendientes»',
+      (tester) async {
+        var monday = day(1);
+        while (monday.weekday != DateTime.monday) {
+          monday = DateTime(monday.year, monday.month, monday.day + 1);
+        }
+        final sunday = DateTime(monday.year, monday.month, monday.day + 6);
+        await search(tester, {
+          'from': key(monday),
+          'to': key(sunday),
+          'status': 'open',
+        });
+        final expected =
+            'Del ${weekday(monday)} al ${weekday(sunday)} · Pendientes';
+        expect(
+          '${es.commandFindPeriod(weekday(monday), weekday(sunday))} · ${es.commandFindOpen}',
+          expected,
+        );
+        expect(lines(tester).take(2), [es.tasks, expected]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-907: a search with no period and status any has no line under its heading',
+      (tester) async {
+        await search(
+          tester,
+          {
+            'words': ['pan'],
+          },
+          tasks: [Task(id: 1, title: 'Comprar pan', priority: 1)],
+        );
+        expect(lines(tester).take(2), [
+          es.commandFindWords('pan'),
+          'Comprar pan',
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    final mathsTeam = _project(
+      'maths',
+      'Matemáticas',
+      shared: true,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 3, name: 'Paul', role: 'editor'),
+      ],
+    );
+
+    testWidgets(
+      'UX-907: a project and a person: «Tareas de «Matemáticas» para Paul»; the account itself: «Tus tareas de «Matemáticas»»; words still come first',
+      (tester) async {
+        await search(
+          tester,
+          {'list_id': 'maths', 'person_id': 3},
+          projects: [mathsTeam],
+        );
+        expect(
+          es.commandFindProjectPerson('Matemáticas', 'Paul'),
+          'Tareas de «Matemáticas» para Paul',
+        );
+        expect(lines(tester).first, 'Tareas de «Matemáticas» para Paul');
+
+        await tester.pumpWidget(const SizedBox());
+        await search(
+          tester,
+          {'list_id': 'maths', 'person_id': 1},
+          projects: [mathsTeam],
+        );
+        expect(
+          es.commandFindProjectMine('Matemáticas'),
+          'Tus tareas de «Matemáticas»',
+        );
+        expect(lines(tester).first, 'Tus tareas de «Matemáticas»');
+
+        await tester.pumpWidget(const SizedBox());
+        await search(
+          tester,
+          {
+            'words': ['examen'],
+            'list_id': 'maths',
+            'person_id': 3,
+          },
+          projects: [mathsTeam],
+        );
+        expect(lines(tester).first, es.commandFindWords('examen'));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-913: found rows open the task; they don’t look like ticks', () {
+    testWidgets(
+      'UX-913: found rows have no circle or tick in front and end with a chevron; a tap opens the task; a completed one is struck through and its details end with «Completada»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            Task(
+              id: 3,
+              title: 'Hacer la introducción',
+              priority: 1,
+              isCompleted: true,
+            ),
+            Task(
+              id: 4,
+              title: 'Introducción al tema 3',
+              priority: 1,
+              dueDate: day(5),
+              hasTime: false,
+            ),
+          ],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'find',
+              'words': ['introducción'],
+            }),
+          ],
+        );
+        for (final title in [
+          'Hacer la introducción',
+          'Introducción al tema 3',
+        ]) {
+          final row = find
+              .ancestor(of: find.text(title), matching: find.byType(InkWell))
+              .first;
+          for (final icon in [
+            Icons.check_circle_rounded,
+            Icons.radio_button_unchecked_rounded,
+            Icons.check_circle_outline,
+            Icons.circle_outlined,
+            Icons.check_box_outlined,
+            Icons.check_box_outline_blank,
+          ]) {
+            expect(
+              find.descendant(of: row, matching: find.byIcon(icon)),
+              findsNothing,
+              reason: '$title: $icon',
+            );
+          }
+          expect(
+            find.descendant(of: row, matching: find.byType(Checkbox)),
+            findsNothing,
+          );
+          final chevron = find.descendant(
+            of: row,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          );
+          expect(chevron, findsOneWidget, reason: title);
+          expect(tester.widget<Icon>(chevron).size, 20);
+          final rowBox = tester.getRect(row);
+          final chevronBox = tester.getRect(chevron);
+          final titleBox = tester.getRect(find.text(title));
+          expect(chevronBox.left, greaterThan(titleBox.left));
+          expect(
+            rowBox.right - chevronBox.right,
+            lessThan(24),
+            reason: 'at the end',
+          );
+        }
+        final done = tester.widget<Text>(find.text('Hacer la introducción'));
+        expect(done.style?.decoration, TextDecoration.lineThrough);
+        final details = find.descendant(
+          of: find
+              .ancestor(
+                of: find.text('Hacer la introducción'),
+                matching: find.byType(InkWell),
+              )
+              .first,
+          matching: find.byType(Text),
+        );
+        expect(
+          tester.widgetList<Text>(details).last.data,
+          endsWith(es.commandCompleted),
+        );
+        expect(es.commandCompleted, 'Completada');
+        await tester.tap(find.text('Introducción al tema 3'));
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskDetailScreen), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-916: copy slips', () {
+    testWidgets(
+      'UX-916: an existing-project card with one task going there reads «La tarea va ahí.»; with two, «Las tareas van ahí.»',
+      (tester) async {
+        expect(es.commandExistingProjectTasks(1), 'La tarea va ahí.');
+        expect(es.commandExistingProjectTasks(2), 'Las tareas van ahí.');
+        var app = await _App.open(tester, projects: [maths]);
+        await app.showResult(
+          tester,
+          drafts: [draft('Repasar fracciones', listId: 'maths')],
+          commands: [
+            command({
+              'kind': 'project',
+              'name': 'Matemáticas',
+              'existing_list_id': 'maths',
+            }),
+          ],
+        );
+        expect(find.text('La tarea va ahí.'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+        app = await _App.open(tester, projects: [maths]);
+        await app.showResult(
+          tester,
+          drafts: [
+            draft('Repasar fracciones', listId: 'maths'),
+            draft('Repasar decimales', listId: 'maths'),
+          ],
+          commands: [
+            command({
+              'kind': 'project',
+              'name': 'Matemáticas',
+              'existing_list_id': 'maths',
+            }),
+          ],
+        );
+        expect(find.text('Las tareas van ahí.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-916: a change that raises a task’s priority shows the app’s priority flag on its line',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [Task(id: 2, title: 'Presupuesto', priority: 2)],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['presupuesto'],
+              },
+              'changes': {'priority': 3},
+            }),
+          ],
+        );
+        final line = find.text('${es.medium} → ${es.high}');
+        expect(line, findsOneWidget);
+        final row = find.ancestor(of: line, matching: find.byType(Row)).first;
+        expect(
+          find.descendant(of: row, matching: find.byIcon(Icons.flag_outlined)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+}
+
+// ---- Run 2026-10-18-commands, round 2 (b2) ----------------------------
+//
+// P148 (UX-909, UX-1219): a task the server filed in the matched project of
+// a «¿Crear el proyecto …?» card waits for a chip, as the two-matches card's
+// tasks do; «Otro proyecto…» opens the sheet with nothing chosen.
+
+void _commandsRound2b() {
+  group('P148 · UX-909: the matched project’s task waits for the question', () {
+    final fyq = _project('fyq', 'Física y Química');
+    final quimica = command({
+      'kind': 'project',
+      'name': 'Química',
+      'existing_list_id': 'fyq',
+    });
+
+    Future<_App> open(
+      WidgetTester tester, {
+      List<CaptureDraft> more = const [],
+    }) async {
+      final app = await _App.open(
+        tester,
+        projects: [fyq, _project('casa', 'Casa')],
+      );
+      await app.showResult(
+        tester,
+        drafts: [draft('Repasar el tema 3', listId: 'fyq'), ...more],
+        commands: [quimica],
+      );
+      return app;
+    }
+
+    String label(WidgetTester tester) => tester
+        .widget<Text>(
+          find.descendant(
+            of: find.byKey(const ValueKey('save-drafts')),
+            matching: find.byType(Text),
+          ),
+        )
+        .data!;
+
+    Finder chipIn(Finder card, String text) => find.descendant(
+      of: find.descendant(of: card, matching: find.byType(ActionChip)),
+      matching: find.text(text),
+    );
+
+    testWidgets(
+      'UX-909: with only the task filed in «Física y Química», the confirming button reads «Revisa los detalles» and is off; a tap on it saves nothing; «Crear «Química»» turns it on',
+      (tester) async {
+        final app = await open(tester);
+        expect(
+          find.text(es.commandCreateProjectQuestion('Química')),
+          findsOneWidget,
+        );
+        expect(label(tester), es.captureCheckDetails);
+        expect(saveButton(tester).onPressed, isNull);
+        await tester.tap(
+          find.byKey(const ValueKey('save-drafts')),
+          warnIfMissed: false,
+        );
+        await tester.pumpAndSettle();
+        expect(app.tasks.named('Repasar el tema 3'), isNull, reason: 'held');
+        expect(app.lists.created, isEmpty);
+        await tester.tap(find.text(es.commandCreateNamed('Química')));
+        await tester.pumpAndSettle();
+        expect(saveButton(tester).onPressed, isNotNull);
+        expect(label(tester), isNot(es.captureCheckDetails));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-909: «Física y Química» on the card turns the button on; the tap creates no project and files «Repasar el tema 3» in Física y Química',
+      (tester) async {
+        final app = await open(tester);
+        expect(saveButton(tester).onPressed, isNull);
+        final card = _cardOf(
+          find.text(es.commandCreateProjectQuestion('Química')),
+        );
+        await tester.tap(chipIn(card, 'Física y Química'));
+        await tester.pumpAndSettle();
+        expect(saveButton(tester).onPressed, isNotNull);
+        expect(label(tester), isNot(es.captureCheckDetails));
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.lists.created, isEmpty);
+        expect(app.tasks.named('Repasar el tema 3')!.listId, 'fyq');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-909: with «Comprar pan» (no project) too, the button is on and adds one task; the tap saves only «Comprar pan», and the «¿Crear el proyecto «Química»?» card still shows with its chips',
+      (tester) async {
+        final app = await open(tester, more: [draft('Comprar pan')]);
+        expect(saveButton(tester).onPressed, isNotNull);
+        // The plan says «Añadir tarea». With two tasks on screen the app
+        // names the count, «Añadir 1 tarea»; either says one task is added.
+        expect(label(tester), anyOf(es.captureAddTask, es.captureAddTasks(1)));
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.tasks.named('Comprar pan'), isNotNull);
+        expect(app.tasks.named('Repasar el tema 3'), isNull);
+        expect(app.lists.created, isEmpty);
+        final question = find.text(es.commandCreateProjectQuestion('Química'));
+        expect(question, findsOneWidget);
+        final card = _cardOf(question);
+        expect(chipIn(card, es.commandCreateNamed('Química')), findsOneWidget);
+        expect(chipIn(card, 'Física y Química'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-909: «matematicas» whose project is «Matemáticas» shows «Ya tienes «Matemáticas»», and the first tap saves its task in Matemáticas',
+      (tester) async {
+        final app = await _App.open(tester, projects: [maths]);
+        await app.showResult(
+          tester,
+          drafts: [draft('Repasar fracciones', listId: 'maths')],
+          commands: [
+            command({
+              'kind': 'project',
+              'name': 'matematicas',
+              'existing_list_id': 'maths',
+            }),
+          ],
+        );
+        expect(
+          find.text(es.commandExistingProject('Matemáticas')),
+          findsOneWidget,
+        );
+        expect(saveButton(tester).onPressed, isNotNull);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.tasks.named('Repasar fracciones')!.listId, 'maths');
+        expect(app.lists.created, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('P148 · UX-1219: «Otro proyecto…» opens the sheet with nothing chosen', () {
+    testWidgets(
+      'UX-1219: a task whose project «química» doesn’t exist: «Otro proyecto…» shows the sheet with no row selected, «Sin proyecto» included; «Sin proyecto» there puts the task in no project and the question goes',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [
+            _project('organica', 'Química orgánica'),
+            _project('casa', 'Casa'),
+            _project('fyq', 'Física y Química'),
+          ],
+        );
+        await app.showResult(
+          tester,
+          drafts: [
+            draft(
+              'Repasar el tema 3',
+              suggestion: 'química',
+              issues: ['project_not_available'],
+              hints: {'project': 'química'},
+            ),
+          ],
+        );
+        expect(find.text(es.commandWhichProject), findsOneWidget);
+        await tester.tap(find.text(es.commandOtherProject));
+        await tester.pumpAndSettle();
+        // The project sheet, over the capture sheet.
+        final sheets = find.byType(BottomSheet).evaluate().length;
+        expect(sheets, 2);
+        final sheet = find.byType(BottomSheet).last;
+        final none = find.descendant(
+          of: sheet,
+          matching: find.widgetWithText(ListTile, es.noList),
+        );
+        expect(none, findsOneWidget);
+        expect(tester.widget<ListTile>(none).selected, isFalse);
+        final selected = [
+          for (final tile in tester.widgetList<ListTile>(
+            find.descendant(of: sheet, matching: find.byType(ListTile)),
+          ))
+            if (tile.selected) (tile.title as Text?)?.data,
+        ];
+        expect(selected, isEmpty, reason: 'nothing is chosen yet: $selected');
+        await tester.tap(none);
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsOneWidget, reason: 'closed');
+        expect(find.text(es.commandWhichProject), findsNothing);
+        expect(saveButton(tester).onPressed, isNotNull);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(app.lists.created, isEmpty);
+        expect(app.tasks.named('Repasar el tema 3')!.listId, isNull);
         expect(tester.takeException(), isNull);
       },
     );

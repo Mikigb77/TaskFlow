@@ -584,7 +584,7 @@ void main() {
   // ---- P39 · UX-106 and UX-114: every way in, with or without Pro ----
 
   testWidgets(
-    'UX-106 / 2026-10-18 (later): without Pro and with no dictation to use, the widget and the text shortcut open the form; shared text opens the sheet with its words and Rellenar a mano, never the phone’s parser; no Actualizar estado anywhere',
+    'UX-106 / 2026-10-18 (later): without Pro and with no dictation to use, the widget and the text shortcut open the form; shared text opens straight in the form with its words, never the phone’s parser; no Actualizar estado anywhere',
     (tester) async {
       final app = await _App.open(
         tester,
@@ -609,19 +609,12 @@ void main() {
       app.entries.queue.add(_entry('share', text: 'Comprar pilas el viernes'));
       app.entries.changed();
       await tester.pumpAndSettle();
-      expect(find.byType(VoiceTaskScreen), findsOneWidget);
-      expect(
-        tester.widget<TextField>(words()).controller!.text,
-        'Comprar pilas el viernes',
-      );
+      expect(find.byType(VoiceTaskScreen), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(TaskEditor), findsOneWidget);
       expect(find.text(es.captureSpeakingIsPro), findsNothing);
       expect(find.text('Actualizar estado'), findsNothing);
       expect(app.speech.starts, 0);
-      await tester.tap(
-        inSheet(find.widgetWithText(FilledButton, es.captureFillByHand)),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
       expect(titleText(tester), 'Comprar pilas el viernes');
       expect(app.api.requests, 0);
       expect(tester.takeException(), isNull);
@@ -1811,6 +1804,128 @@ void main() {
       final calendar = tester.element(find.byType(CalendarScreen));
       expect(dateLine(tester), calendar.weekdayDate(later));
       expect(app.store.sessions.values.last.day, later);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, round 2 (P138: UX-911, UX-910, UX-1005,
+  // UX-1011): entries from outside the app, for free accounts and Pro ----
+
+  /// The captures still waiting under «Sin guardar».
+  List<CaptureSession> waiting(_App app) => [
+    for (final session in app.store.sessions.values)
+      if (!session.terminal) session,
+  ];
+
+  testWidgets(
+    'UX-911: a free account’s shared «Pedir cita en el dentista» opens «Nueva tarea» with that title and no capture sheet; the share’s capture waits until «Añadir tarea», and none after it',
+    (tester) async {
+      final share = _entry('share', text: 'Pedir cita en el dentista');
+      final app = await _App.open(
+        tester,
+        pro: false,
+        freeLeft: 5,
+        entries: [share],
+      );
+      expect(find.byType(VoiceTaskScreen), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(TaskEditor), findsOneWidget);
+      expect(find.text(es.newTask), findsWidgets);
+      expect(titleText(tester), 'Pedir cita en el dentista');
+      expect(app.api.requests, 0);
+      expect(waiting(app), hasLength(1));
+      expect(waiting(app).single.id, share['id']);
+      expect(waiting(app).single.text, 'Pedir cita en el dentista');
+      final save = find.byKey(const ValueKey('task-save'));
+      expect(
+        find.descendant(of: save, matching: find.text(es.addTask)),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+      expect(app.tasks.titles(), ['Pedir cita en el dentista']);
+      expect(waiting(app), isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-910: with no free count from the server, the widget’s entry opens the form with «Dictar una tarea es parte de TaskFlow Pro…» and «Ver Pro» above the title; the text shortcut opens it without them',
+    (tester) async {
+      final app = await _App.open(
+        tester,
+        pro: false,
+        entries: [_entry('voice')],
+      );
+      expect(find.byType(TaskEditor), findsOneWidget);
+      final line = find.text(es.captureSpeakingIsPro);
+      expect(line, findsOneWidget);
+      final pro = find.widgetWithText(TextButton, es.voiceProAction);
+      expect(pro, findsOneWidget);
+      final title = find.byKey(const ValueKey('task-title'));
+      expect(
+        tester.getRect(line).bottom,
+        lessThanOrEqualTo(tester.getRect(title).top),
+      );
+      expect(
+        tester.getRect(pro).bottom,
+        lessThanOrEqualTo(tester.getRect(title).top),
+      );
+      expect(app.speech.starts, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+
+      app.entries.queue.add(_entry('text'));
+      app.entries.changed();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsOneWidget);
+      expect(find.text(es.captureSpeakingIsPro), findsNothing);
+      expect(find.text(es.voiceProAction), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1011: with Pro and the app on Tareas, a task said from the widget’s entry and saved from the sheet switches to Calendario, with its day selected and its row lit',
+    (tester) async {
+      final app = await _App.open(tester, pro: true);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(es.tasks),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen).hitTestable(), findsWidgets);
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      app.api.found = [
+        dated(
+          'Llamar al médico',
+          DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 17),
+        ),
+      ];
+      app.entries.queue.add(_entry('voice'));
+      app.entries.changed();
+      await tester.pumpAndSettle();
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      expect(app.speech.starts, 1);
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Llamar al médico mañana a las 5');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      await saveResult(tester);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+      expect(find.text(selectedHeader(tomorrow)), findsOneWidget);
+      final row = find.widgetWithText(TaskTile, 'Llamar al médico');
+      expect(row.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(row).color, litColor(tester));
       expect(tester.takeException(), isNull);
     },
   );

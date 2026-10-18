@@ -38,6 +38,7 @@ import 'package:agenda/screens/device_calendars_screen.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/services/pending_verification.dart';
 import 'package:agenda/screens/invitation_review_screen.dart';
 
 Future<void> main() async {
@@ -90,6 +91,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ref.read(invitationLinkProvider);
+    // Read with the session restore, so a waiting address opens at once.
+    ref.read(pendingVerificationLoadProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => _openInvitation());
     TaskReminders.openRequest.addListener(_openReminder);
     // Scheduling also emits changes; reload only in response to action callbacks.
@@ -200,6 +203,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             startListening: voice,
             askedToSpeak: voice,
             typing: !voice,
+            // Saved tasks land on Calendar, in view, whichever tab shows.
+            showCalendar: true,
           ),
         );
       }
@@ -363,6 +368,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         return;
       }
       if (_signInAgain != null && !next.loading) _closeSignInAgain();
+      // Signed in, nobody waits for a code.
+      final account = next.loading ? null : next.account;
+      if (account != null && previous?.account?.id != account.id) {
+        unawaited(ref.read(pendingVerificationProvider).forget());
+      }
       if (!next.loading && next.account != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
         WidgetsBinding.instance.addPostFrameCallback((_) => _openEntries());
@@ -376,7 +386,17 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     });
     final auth = ref.watch(authProvider);
     final signedIn = auth.account != null;
-    final session = auth.restoring
+    // Signed out, sign-in waits for the stored address, which may open
+    // «Confirma tu correo» instead.
+    final restoring =
+        auth.restoring ||
+        (!signedIn &&
+            ref.watch(
+              pendingVerificationLoadProvider.select(
+                (load) => !load.hasValue && !load.hasError,
+              ),
+            ));
+    final session = restoring
         ? 'restoring'
         : signedIn
         ? '${ref.read(apiClientProvider).baseUrl}/users/${auth.account!.id}'
@@ -426,7 +446,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       initialRoute: '/',
       routes: !signedIn
           ? {
-              '/': (_) => auth.restoring
+              '/': (_) => restoring
                   ? const SessionLoadingScreen()
                   : const LoginScreen(),
             }
@@ -456,7 +476,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         if (!signedIn) {
           return MaterialPageRoute<void>(
             settings: settings,
-            builder: (_) => auth.restoring
+            builder: (_) => restoring
                 ? const SessionLoadingScreen()
                 : const LoginScreen(),
           );

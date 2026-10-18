@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -8,8 +9,10 @@ import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/screens/login_screen.dart';
 import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/pending_verification.dart';
 
 /// Why the confirm screen sends the person back to creating the account.
 enum VerifyEmailReturn {
@@ -21,21 +24,41 @@ enum VerifyEmailReturn {
   replaced,
 }
 
+/// A code the server no longer takes, too old or tried too often, once
+/// signing in has shown that the address still waits for one.
+enum _Spent {
+  /// A minute or more after the last code: that sign-in emailed a new one.
+  sentNew,
+
+  /// Within the minute: no new code could go yet.
+  wait,
+}
+
 /// Asks for the 6-digit code the server emailed to [email]: after creating
 /// an account, or after signing in to one whose address isn't confirmed
 /// yet. The right code signs in, so the app opens where any sign-in does.
 /// Pops with a [VerifyEmailReturn] when it sends the person back to
 /// creating the account.
 class VerifyEmailScreen extends ConsumerStatefulWidget {
-  const VerifyEmailScreen({super.key, required this.email, this.password});
+  const VerifyEmailScreen({
+    super.key,
+    required this.email,
+    this.password,
+    this.sentAt,
+  });
 
   /// Where the code went, as the server wrote it.
   final String email;
 
   /// The password just typed to create the account, or to sign in to it,
   /// sent with the code. Only in memory: it goes when this screen closes.
-  /// Without it, the screen asks for it.
+  /// Without it, as when the app reopens on this screen after Android closed
+  /// it, the screen asks for it.
   final String? password;
+
+  /// When the code went, if before this screen opened, as when the app
+  /// reopens on it: «Reenviar código» waits only what is left of its minute.
+  final DateTime? sentAt;
 
   /// Digits in a code.
   static const codeLength = 6;
@@ -53,26 +76,54 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   // Typed here only when the screen opened without the password.
   final _password = TextEditingController();
   final _passwordField = FocusNode();
+  // What [_reveal] brings into view: each field with the line under it.
+  final _codeBox = GlobalKey();
+  final _passwordBox = GlobalKey();
   bool _confirming = false;
   bool _resending = false;
-  // Seconds until «Reenviar código» can be tapped. The server sent a code
-  // just before this screen opened.
+  // When this screen's last code was sent: just before it opened, or at
+  // [VerifyEmailScreen.sentAt], then at each new one.
+  late DateTime _sentAt;
+  // Seconds until «Reenviar código» can be tapped.
   int _wait = 0;
   Timer? _timer;
   // The last answer: from the server or the connection.
   Object? _error;
+  // The last code was spent, as signing in confirmed.
+  _Spent? _spent;
+  // The last digits refused, and what was said: sent again, they would only
+  // use up a try.
+  ({String code, Object? error, _Spent? spent})? _refused;
   // Confirmar with fewer than 6 digits.
   bool _short = false;
   // Confirmar with no password to send.
   bool _noPassword = false;
+  // The password typed here isn't the account's.
+  bool _wrongPassword = false;
   // A new code went out, and nothing was confirmed or sent since.
   bool _resent = false;
 
   @override
   void initState() {
     super.initState();
-    _countDown();
+    // The server sent a code just before this screen opened, or at [sentAt].
+    _sentAt = widget.sentAt ?? _now();
+    _countDown(
+      math.max(
+        0,
+        VerifyEmailScreen.resendWait - _now().difference(_sentAt).inSeconds,
+      ),
+    );
   }
+
+  DateTime _now() => ref.read(calendarClockProvider)();
+
+  /// While it confirms, what is typed is ignored. Neither field turns
+  /// read-only: that would close Android's keyboard, which on an answer
+  /// would come back over it.
+  late final _steady = TextInputFormatter.withFunction(
+    (old, typed) => _confirming ? old : typed,
+  );
 
   @override
   void dispose() {
@@ -84,10 +135,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     super.dispose();
   }
 
-  /// «Reenviar código» waits, counting down each second.
-  void _countDown() {
+  /// «Reenviar código» waits [seconds], counting down each second.
+  void _countDown([int seconds = VerifyEmailScreen.resendWait]) {
     _timer?.cancel();
-    _wait = VerifyEmailScreen.resendWait;
+    _wait = seconds;
+    if (seconds <= 0) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() => _wait--);
       if (_wait <= 0) timer.cancel();
@@ -112,9 +164,16 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   String? _problem(AppLocalizations l) {
     final error = _error;
     if (_short) return l.verifyEmailCodeLength;
+    switch (_spent) {
+      case _Spent.sentNew:
+        return l.verifyEmailCodeSpentNew;
+      case _Spent.wait:
+        return l.verifyEmailCodeSpentWait;
+      case null:
+        break;
+    }
     if (error == null) return null;
     return switch (_refusal(error)) {
-      'code_expired' => l.verifyEmailCodeExpired,
       'code_invalid' => l.verifyEmailCodeInvalid,
       _ => requestProblemText(l, error, onSignIn: true),
     };
@@ -134,11 +193,41 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     );
   }
 
+  /// Brings the field and the line under it into view, above the keyboard,
+  /// as sign-in does with its answers.
+  void _reveal([GlobalKey? box]) {
+    final key = box ?? _codeBox;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 250);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      for (final policy in [
+        ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      ]) {
+        final target = key.currentContext;
+        if (target == null || !target.mounted) return;
+        await Scrollable.ensureVisible(
+          target,
+          duration: duration,
+          alignmentPolicy: policy,
+        );
+      }
+    });
+  }
+
+  /// Shows [message] under its field: read out, and in view.
+  void _show(String message, [GlobalKey? box]) {
+    _announce(message);
+    _reveal(box);
+  }
+
   void _changed(String code) {
-    if (_error != null || _short) {
+    if (_error != null || _short || _spent != null) {
       setState(() {
         _error = null;
         _short = false;
+        _spent = null;
       });
     }
     // Six digits, typed or pasted, confirm by themselves.
@@ -154,9 +243,22 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       setState(() {
         _short = true;
         _error = null;
+        _spent = null;
         _resent = false;
       });
-      _announce(l.verifyEmailCodeLength);
+      _show(l.verifyEmailCodeLength);
+      return;
+    }
+    // Refused already: said again, and nothing is sent.
+    final refused = _refused;
+    if (refused != null && refused.code == code) {
+      setState(() {
+        _short = false;
+        _error = refused.error;
+        _spent = refused.spent;
+        _resent = false;
+      });
+      _show(_problem(l)!);
       return;
     }
     if (password.isEmpty) {
@@ -164,9 +266,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         _noPassword = true;
         _short = false;
         _error = null;
+        _spent = null;
         _resent = false;
       });
-      _announce(l.enterPassword);
+      _show(l.enterPassword, _passwordBox);
       _passwordField.requestFocus();
       return;
     }
@@ -174,7 +277,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       _confirming = true;
       _error = null;
       _short = false;
+      _spent = null;
       _resent = false;
+      _wrongPassword = false;
     });
     try {
       // Signed in: the app opens where any sign-in does, and this screen
@@ -184,22 +289,104 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           .verifyEmail(widget.email, code, password);
     } catch (error) {
       if (!mounted) return;
-      if (_refusal(error) == 'signup_replaced') {
-        // Sign-up says why, with the email kept.
-        Navigator.pop(context, VerifyEmailReturn.replaced);
-        return;
+      switch (_refusal(error)) {
+        case 'signup_replaced':
+          // The password is checked before the code: typed here, it is most
+          // likely mistyped.
+          if (widget.password == null) {
+            _showWrongPassword(l);
+            return;
+          }
+          // Sign-up says why, with the email kept.
+          unawaited(ref.read(pendingVerificationProvider).forget());
+          Navigator.pop(context, VerifyEmailReturn.replaced);
+          return;
+        case 'code_expired':
+          await _signInInstead(l, code, password);
+          return;
+        case 'code_invalid':
+          _refused = (code: code, error: error, spent: null);
       }
       setState(() {
         _confirming = false;
         _error = error;
-        // Only a new code can be confirmed now: offered at once.
-        if (_refusal(error) == 'code_expired') {
-          _timer?.cancel();
-          _wait = 0;
-        }
       });
-      _announce(_problem(l)!);
+      _show(_problem(l)!);
     }
+  }
+
+  /// The server says `code_expired` for a spent code, and also for an
+  /// address already confirmed: by this very code, if its answer was lost,
+  /// or by Google. Signing in tells them apart; for a spent code it emails a
+  /// new one, at most one a minute. The screen stays confirming meanwhile.
+  Future<void> _signInInstead(
+    AppLocalizations l,
+    String code,
+    String password,
+  ) async {
+    final auth = ref.read(authProvider.notifier);
+    try {
+      // Signed in: the app opens, as after the right code.
+      await auth.signIn(widget.email, password);
+    } on EmailVerificationRequired {
+      if (mounted) _codeSpent(l, code);
+      return;
+    }
+    if (!mounted) return;
+    final error = ref.read(authProvider).error;
+    if (error == null) return;
+    // This screen's answer, not one for sign-in behind it.
+    auth.clearError();
+    if (widget.password == null && requestProblem(error) == 'credentials') {
+      _showWrongPassword(l);
+      return;
+    }
+    setState(() {
+      _confirming = false;
+      _error = error;
+    });
+    _show(_problem(l)!);
+  }
+
+  /// The password typed here isn't the account's: said under it, which takes
+  /// the keyboard to correct it.
+  void _showWrongPassword(AppLocalizations l) {
+    setState(() {
+      _confirming = false;
+      _error = null;
+      _wrongPassword = true;
+    });
+    _show(l.verifyEmailWrongPassword, _passwordBox);
+    _passwordField.requestFocus();
+  }
+
+  /// The code really is spent. A minute or more after the last code, the
+  /// sign-in that checked it emailed a new one: the field is emptied for it
+  /// and the countdown starts again. Within the minute, it keeps running.
+  void _codeSpent(AppLocalizations l, String code) {
+    final now = _now();
+    final elapsed = now.difference(_sentAt).inSeconds;
+    final sentNew = elapsed >= VerifyEmailScreen.resendWait;
+    if (sentNew) {
+      _sentAt = now;
+      _code.clear();
+      unawaited(ref.read(pendingVerificationProvider).remember(widget.email));
+    }
+    setState(() {
+      _confirming = false;
+      _error = null;
+      _spent = sentNew ? _Spent.sentNew : _Spent.wait;
+      _refused = sentNew ? null : (code: code, error: null, spent: _spent);
+      // A new code waits a minute again; otherwise the wait goes on, never
+      // longer than the clock says.
+      _countDown(
+        sentNew
+            ? VerifyEmailScreen.resendWait
+            : math.min(_wait, VerifyEmailScreen.resendWait - elapsed),
+      );
+    });
+    if (sentNew) _field.requestFocus();
+    _show(_problem(l)!);
   }
 
   Future<void> _resend() async {
@@ -210,6 +397,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       _resending = true;
       _error = null;
       _short = false;
+      _spent = null;
       _resent = false;
     });
     try {
@@ -219,12 +407,15 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       if (!mounted) return;
       // The code that was typed no longer works.
       _code.clear();
+      _sentAt = _now();
+      unawaited(ref.read(pendingVerificationProvider).remember(widget.email));
       setState(() {
         _resending = false;
         _resent = true;
+        _refused = null;
         _countDown();
       });
-      _announce(l.verifyEmailResent);
+      _show(l.verifyEmailResent);
       _field.requestFocus();
     } catch (error) {
       if (!mounted) return;
@@ -234,7 +425,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         // Too many requests: the next one waits too.
         if (error is ApiException && error.status == 429) _countDown();
       });
-      _announce(_problem(l)!);
+      _show(_problem(l)!);
     }
   }
 
@@ -300,16 +491,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                             ),
                             const SizedBox(height: 24),
                             Semantics(
+                              key: _codeBox,
                               container: true,
                               child: TextField(
                                 key: const ValueKey('verify-email-code'),
                                 controller: _code,
                                 focusNode: _field,
-                                autofocus: true,
-                                // Read-only, not disabled, while it
-                                // confirms: the keyboard stays up to fix
-                                // a wrong digit.
-                                readOnly: _confirming,
                                 keyboardType: TextInputType.number,
                                 textInputAction: TextInputAction.done,
                                 autofillHints: const [
@@ -318,6 +505,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                                 autocorrect: false,
                                 enableSuggestions: false,
                                 inputFormatters: [
+                                  _steady,
                                   FilteringTextInputFormatter.digitsOnly,
                                   LengthLimitingTextInputFormatter(
                                     VerifyEmailScreen.codeLength,
@@ -354,20 +542,24 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                             if (widget.password == null) ...[
                               const SizedBox(height: 16),
                               Semantics(
+                                key: _passwordBox,
                                 container: true,
                                 child: TextField(
                                   key: const ValueKey('verify-email-password'),
                                   controller: _password,
                                   focusNode: _passwordField,
-                                  readOnly: _confirming,
+                                  inputFormatters: [_steady],
                                   obscureText: true,
                                   enableSuggestions: false,
                                   autocorrect: false,
                                   autofillHints: const [AutofillHints.password],
                                   textInputAction: TextInputAction.done,
                                   onChanged: (_) {
-                                    if (_noPassword) {
-                                      setState(() => _noPassword = false);
+                                    if (_noPassword || _wrongPassword) {
+                                      setState(() {
+                                        _noPassword = false;
+                                        _wrongPassword = false;
+                                      });
                                     }
                                   },
                                   onSubmitted: (_) => unawaited(_confirm()),
@@ -375,8 +567,13 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                                     labelText: l.password,
                                     errorText: _noPassword
                                         ? l.enterPassword
+                                        : _wrongPassword
+                                        ? l.verifyEmailWrongPassword
                                         : null,
-                                    errorMaxLines: 4,
+                                    // The wrong-password line names the way
+                                    // out: over 8 lines in English and
+                                    // Catalan at 2× on 320 dp.
+                                    errorMaxLines: 12,
                                   ),
                                 ),
                               ),
@@ -431,10 +628,17 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                               key: const ValueKey('verify-email-other-address'),
                               onPressed: _confirming
                                   ? null
-                                  : () => Navigator.pop(
-                                      context,
-                                      VerifyEmailReturn.otherAddress,
-                                    ),
+                                  : () {
+                                      unawaited(
+                                        ref
+                                            .read(pendingVerificationProvider)
+                                            .forget(),
+                                      );
+                                      Navigator.pop(
+                                        context,
+                                        VerifyEmailReturn.otherAddress,
+                                      );
+                                    },
                               child: Text(
                                 l.verifyEmailOtherAddress,
                                 textAlign: TextAlign.center,

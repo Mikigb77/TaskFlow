@@ -218,3 +218,38 @@ Round 1 (P127–P132) passed its round check, no test failed, and every finding 
 ### Phone checks added
 - P145: at the largest font, the chosen chip shows ✓ and both names show without swiping.
 - P147: on Calendar under «Para mí», say «Ana tiene que llamar al médico mañana», save, then tap Deshacer: «Para mí» comes back.
+
+## Round 2 (b2)
+
+Round 1 of b2 (P133–P138) failed its round check on one test: UX-909's confirming button doesn't wait for a chip. Every other finding in it was fixed. Round 2 retries UX-909 and fixes the five regressions in two packages. Nothing is escalated: UX-909 has failed once. There's no new owner question.
+
+### P148 · S2 · A · S · The «Crear el proyecto» question holds its tasks until a chip is tapped; the sheet picks nothing for it
+- **UX-909 (S2), second attempt:** P135's question and both answers work. But the server files the dictation's task in «Física y Química» already, so `_draftReady` counted it as ready, and one tap saved it there with the question unanswered. Now `_undecided` also collects the matched project's id of every card that still asks, and a task filed there waits, as with the two-matches card. With only that task, the button reads «Revisa los detalles» until a chip is tapped.
+- **UX-1219 (S1), regression R1A-1 from P135:** «Otro proyecto…» opens the project sheet with «Sin proyecto» highlighted. A new `selectedNone: false` from the question's chips means no row is highlighted while it asks.
+- **Settled here:** the reviewer's first option. Disabling the whole button while any project card asks would also hold back unrelated tasks.
+
+### P149 · S2 · D · M · Confirm your email, reopened after a restart: a way out of a forgotten password, the real countdown, no flash, no stale address
+- **UX-1215 (S2), regression R1D-1 from P134:** the wrong-password line names the way out: «Esa contraseña no es la de esta cuenta. ¿No la recuerdas? Toca «Usar otro correo» y crea la cuenta de nuevo.» (EN and CA in the brief).
+- **UX-1216 (S1), regression R1D-2 from P134:** the reopened screen counts from when the code went. `resume()` returns the saved time, and «Reenviar código» waits only what's left of the minute.
+- **UX-1217 (S1), regression R1D-3 from P134:** the pending address is read while the session restores, and the screen opens with no slide, so «Inicia sesión» doesn't flash first. The flash is inferred from the code.
+- **UX-1218 (S1), regression R1D-4 from P134:** any successful sign-in forgets the pending address, whatever the account.
+- **Settled here:** review D left it to the organizer whether the longer line shows after two refusals or from the first. It shows from the first: no counter, and its question form fits a typo too.
+
+### Phone checks added
+- P148: with the real model, «Crea el proyecto Química y apunta repasar el tema 3 en él» beside «Física y Química» waits for a chip.
+- P149: with «No mantener actividades», come back from Gmail: «Confirma tu correo» shows without «Inicia sesión» sliding away first, and «Reenviar código» is on if more than a minute has passed.
+
+## Round 3 (b2)
+
+Round 2 (P148, P149) passed its round check with no failing test, and both reviewers wrote all six findings `fixed`. The workflow didn't read their statuses (written as headings, not table rows), so round 3 re-confirms them without code changes, and fixes the one new regression. Nothing is escalated, and there's no new owner question.
+
+### P150 · S2 · A · S · Re-confirm the «Crear el proyecto» question fixes (no code change)
+- **UX-909 (S2):** re-confirm only. The round-2 reviewer found it fixed (verify-b2-r2-A): a task filed in the matched project waits for a chip. Not a new attempt.
+- **UX-1219 (S1):** re-confirm only. Found fixed in round 2: «Otro proyecto…» opens the sheet with no row highlighted.
+
+### P151 · S2 · D · S · Back from the reopened «Confirma tu correo» plays the usual transition; re-confirm P149
+- **UX-1220 (S1), regression R2D-1 from P149:** Back from the reopened screen was 150 ms quicker than every other Back. Delete the 300 ms `reverseTransitionDuration` override, so the theme's own duration applies.
+- **UX-1215 to UX-1218:** re-confirm only. The round-2 reviewer found all four fixed (verify-b2-r2-D).
+
+### Phone checks added
+- P151: after a restart, Back from «Confirma tu correo» closes with the same animation as Back from any other screen.

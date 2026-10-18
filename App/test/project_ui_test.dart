@@ -581,4 +581,41 @@ void main() {
       'Comença amb Casa, Feina o Compres. Pots moure les tasques quan vulguis.',
     );
   });
+
+  // ---- Run 2026-10-18-commands, round 2 (b2) · P148 (UX-1219) ----
+
+  testWidgets(
+    'UX-1219: the project chip of a task with no project still opens the sheet with «Sin proyecto» selected (es)',
+    (tester) async {
+      final l = lookupAppLocalizations(const Locale('es'));
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(api),
+            authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+            taskListsProvider.overrideWith(
+              (ref) async => [TaskListInfo(id: 'home', name: 'Casa')],
+            ),
+          ],
+          child: localized(
+            Scaffold(body: TaskListPicker(listId: null, onChanged: (_) {})),
+            language: 'es',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, l.noList));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(sheet, findsOneWidget);
+      ListTile row(String name) => tester.widget<ListTile>(
+        find.descendant(of: sheet, matching: find.widgetWithText(ListTile, name)),
+      );
+      expect(row(l.noList).selected, isTrue);
+      expect(row('Casa').selected, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

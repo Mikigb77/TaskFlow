@@ -30,8 +30,14 @@ class CommandView {
     this.target,
     this.stored,
     this.plan,
+    this.viewOnly,
+    this.asks = false,
   });
   final CaptureCommand command;
+
+  /// `project`: two projects match the name said, or the one that matches
+  /// has another name. The card asks whether to create it.
+  final bool asks;
 
   /// `find`: the results, newest first.
   final List<Task> found;
@@ -49,7 +55,14 @@ class CommandView {
   /// `update`: what would change.
   final UpdatePlan? plan;
 
+  /// `update` and `delete`, when nothing the person can edit matches: the
+  /// first task that would, in a project they can only view.
+  final Task? viewOnly;
+
   CommandKind get kind => command.kind;
+
+  /// `project`: it asks, and nothing was tapped yet.
+  bool get asking => asks && command.choice == null;
 
   /// Several tasks match and none was tapped yet.
   bool get choosing => target == null && matches.length > 1;
@@ -64,8 +77,7 @@ class CommandView {
   bool get actionable => switch (kind) {
     CommandKind.project =>
       !command.existing &&
-          (!command.ambiguous ||
-              command.choice == CaptureCommand.createChoice),
+          (!asks || command.choice == CaptureCommand.createChoice),
     CommandKind.update => plan?.ready == true,
     CommandKind.delete => stored != null,
     CommandKind.find => false,
@@ -73,8 +85,9 @@ class CommandView {
 
   /// It waits for a tap on its card before the confirming tap can do it.
   bool get blocking => switch (kind) {
-    CommandKind.project => command.ambiguous && command.choice == null,
-    CommandKind.update => choosing || plan?.needsDay == true,
+    CommandKind.project => asking,
+    CommandKind.update =>
+      choosing || plan?.needsDay == true || plan?.asksMember == true,
     CommandKind.delete => choosing,
     CommandKind.find => false,
   };
@@ -92,7 +105,18 @@ CommandView resolveCommand(
 }) {
   switch (command.kind) {
     case CommandKind.project:
-      return CommandView(command);
+      // A project matched under another name («Física y Química» for
+      // «Química»): the person may have meant a new one.
+      final matched = projects
+          .where((p) => p.id == command.existingListId)
+          .firstOrNull;
+      return CommandView(
+        command,
+        asks:
+            command.ambiguous ||
+            (matched != null &&
+                _fold(matched.name) != _fold(spokenProjectName(command.name))),
+      );
     case CommandKind.find:
       return CommandView(
         command,
@@ -105,12 +129,21 @@ CommandView resolveCommand(
       );
     case CommandKind.update:
     case CommandKind.delete:
+      bool canEdit(String? id) =>
+          id == null || projects.any((p) => p.id == id && p.canEdit);
       final matches = TaskMatcher.targets(
         tasks,
         command.target,
-        canEdit: (id) =>
-            id == null || projects.any((p) => p.id == id && p.canEdit),
+        canEdit: canEdit,
       );
+      // None to edit: the same search among all, for the line saying why.
+      final viewOnly = matches.isNotEmpty
+          ? null
+          : TaskMatcher.targets(
+              tasks,
+              command.target,
+              canEdit: (_) => true,
+            ).where((task) => !canEdit(task.listId)).firstOrNull;
       final chosen = command.taskId == null
           ? null
           : matches.where((task) => task.id == command.taskId).firstOrNull;
@@ -124,11 +157,10 @@ CommandView resolveCommand(
               shown: target!,
               changes: command.changes,
               issues: command.issues,
-              project: projects
-                  .where((p) => p.id == stored.listId)
-                  .firstOrNull,
+              project: projects.where((p) => p.id == stored.listId).firstOrNull,
               accountId: accountId,
               day: command.day,
+              member: command.memberId,
             )
           : null;
       return CommandView(
@@ -137,14 +169,16 @@ CommandView resolveCommand(
         target: stored == null ? null : target,
         stored: stored,
         plan: plan,
+        viewOnly: viewOnly,
       );
   }
 }
 
 String _fold(String text) => foldForSearch(text).trim();
 
-/// The projects most like [name] first: those it starts, or that start it.
-List<TaskListInfo> _likeFirst(String name, List<TaskListInfo> projects) {
+/// The projects like [name], in their order: those it starts, that start
+/// it, or that contain it.
+List<TaskListInfo> _similar(String name, List<TaskListInfo> projects) {
   final said = _fold(name);
   bool like(TaskListInfo project) {
     final own = _fold(project.name);
@@ -152,81 +186,131 @@ List<TaskListInfo> _likeFirst(String name, List<TaskListInfo> projects) {
         (own.startsWith(said) || said.startsWith(own) || own.contains(said));
   }
 
-  return [...projects.where(like), ...projects.where((p) => !like(p))];
+  return projects.where(like).toList();
 }
 
 /// The projects a task can go to: those the person can edit, not archived.
 List<TaskListInfo> editableProjects(List<TaskListInfo> projects) =>
     projects.where((p) => p.canEdit && !p.inactive).toList();
 
-/// One tap each: create the project said, take an existing one instead, or,
-/// with [onNone], none. [question] asks it first.
-class ProjectChoices extends StatelessWidget {
+/// A question of a dictation's result, in its tinted box, with the chips
+/// that answer it.
+class QuestionBox extends StatelessWidget {
+  const QuestionBox({super.key, required this.question, required this.child});
+  final String question;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(question, style: theme.textTheme.bodyMedium),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One tap each: create the project said, take one like it ([first], the
+/// one matched, before them), another from the project sheet, or, with
+/// [onNone], none.
+class ProjectChoices extends ConsumerWidget {
   const ProjectChoices({
     super.key,
     required this.name,
     required this.projects,
     required this.onCreate,
     required this.onPick,
+    this.first,
     this.onNone,
     this.enabled = true,
-    this.question = true,
   });
   final String name;
+
+  /// Those the person can edit.
   final List<TaskListInfo> projects;
+  final TaskListInfo? first;
   final VoidCallback onCreate;
   final ValueChanged<TaskListInfo> onPick;
   final VoidCallback? onNone;
   final bool enabled;
-  final bool question;
+
+  /// Projects shown as chips; the rest are in the sheet.
+  static const similar = 3;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     Widget label(String text) => ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 230),
       child: Text(text, overflow: TextOverflow.ellipsis),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final shown = [
+      ?first,
+      ..._similar(name, projects).where((p) => p.id != first?.id),
+    ].take(similar).toList();
+    final more = projects.any((p) => !shown.any((s) => s.id == p.id));
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
       children: [
-        if (question) ...[
-          Text(
-            l.commandCreateProjectQuestion(name),
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-        ],
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            ActionChip(
-              key: const ValueKey('project-choice-create'),
-              avatar: const Icon(Icons.create_new_folder_outlined, size: 18),
-              label: label(l.commandCreateNamed(name)),
-              onPressed: enabled ? onCreate : null,
-            ),
-            for (final project in _likeFirst(name, projects))
-              ActionChip(
-                key: ValueKey('project-choice-${project.id}'),
-                avatar: Icon(
-                  Icons.folder_outlined,
-                  size: 18,
-                  color: taskListColor(project.color),
-                ),
-                label: label(project.name),
-                onPressed: enabled ? () => onPick(project) : null,
-              ),
-            if (onNone != null)
-              ActionChip(
-                key: const ValueKey('project-choice-none'),
-                avatar: const Icon(Icons.folder_off_outlined, size: 18),
-                label: label(l.noList),
-                onPressed: enabled ? onNone : null,
-              ),
-          ],
+        ActionChip(
+          key: const ValueKey('project-choice-create'),
+          avatar: const Icon(Icons.create_new_folder_outlined, size: 18),
+          label: label(l.commandCreateNamed(name)),
+          onPressed: enabled ? onCreate : null,
         ),
+        for (final project in shown)
+          ActionChip(
+            key: ValueKey('project-choice-${project.id}'),
+            avatar: Icon(
+              Icons.folder_outlined,
+              size: 18,
+              color: taskListColor(project.color),
+            ),
+            label: label(project.name),
+            onPressed: enabled ? () => onPick(project) : null,
+          ),
+        if (more)
+          ActionChip(
+            key: const ValueKey('project-choice-other'),
+            avatar: const Icon(Icons.folder_open_outlined, size: 18),
+            label: label(l.commandOtherProject),
+            onPressed: !enabled
+                ? null
+                : () async {
+                    final choice = await chooseTaskList(
+                      context,
+                      ref,
+                      none: onNone != null,
+                      selectedNone: false,
+                    );
+                    if (choice == null) return;
+                    if (choice.project case final project?) {
+                      onPick(project);
+                    } else {
+                      onNone?.call();
+                    }
+                  },
+          ),
+        if (onNone != null)
+          ActionChip(
+            key: const ValueKey('project-choice-none'),
+            avatar: const Icon(Icons.folder_off_outlined, size: 18),
+            label: label(l.noList),
+            onPressed: enabled ? onNone : null,
+          ),
       ],
     );
   }
@@ -366,15 +450,15 @@ class ProjectCommandCard extends ConsumerWidget {
   const ProjectCommandCard({
     super.key,
     required this.view,
-    required this.hasTasks,
+    required this.taskCount,
     required this.onChanged,
     required this.onRemove,
     this.enabled = true,
   });
   final CommandView view;
 
-  /// Tasks of the same dictation go to this project.
-  final bool hasTasks;
+  /// How many tasks of the same dictation go to this project.
+  final int taskCount;
   final ValueChanged<CaptureCommand> onChanged;
   final VoidCallback onRemove;
   final bool enabled;
@@ -385,8 +469,8 @@ class ProjectCommandCard extends ConsumerWidget {
     final command = view.command;
     final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
     final name = view.projectName;
-    if (command.existing) {
-      final id = command.existingListId ?? command.choice;
+    if (command.existing && !view.asking) {
+      final id = command.existingId;
       final project = projects.where((p) => p.id == id).firstOrNull;
       return _Frame(
         children: [
@@ -394,11 +478,11 @@ class ProjectCommandCard extends ConsumerWidget {
             icon: Icons.folder_outlined,
             text: l.commandExistingProject(project?.name ?? name),
           ),
-          if (hasTasks) _Note(l.commandExistingProjectTasks),
+          if (taskCount > 0) _Note(l.commandExistingProjectTasks(taskCount)),
         ],
       );
     }
-    if (command.ambiguous && command.choice == null) {
+    if (view.asking) {
       return _Frame(
         children: [
           _Header(
@@ -412,8 +496,10 @@ class ProjectCommandCard extends ConsumerWidget {
             padding: const EdgeInsets.only(left: 34, right: 8, bottom: 4),
             child: ProjectChoices(
               name: name,
-              question: false,
-              projects: _likeFirst(name, editableProjects(projects)),
+              projects: editableProjects(projects),
+              first: editableProjects(
+                projects,
+              ).where((p) => p.id == command.existingListId).firstOrNull,
               enabled: enabled,
               onCreate: () => onChanged(
                 command.copyWith(choice: CaptureCommand.createChoice),
@@ -461,20 +547,28 @@ class FindCommandCard extends ConsumerWidget {
               .expand((p) => p.people)
               .where((p) => p.id == command.personId)
               .firstOrNull;
+    final mine = command.personId != null && command.personId == accountId;
     final heading = command.words.isNotEmpty
         ? l.commandFindWords(_words(command.words))
+        : project != null && mine
+        ? l.commandFindProjectMine(project.name)
+        : project != null && person != null
+        ? l.commandFindProjectPerson(project.name, person.name)
         : project != null
         ? l.commandFindProject(project.name)
-        : command.personId != null && command.personId == accountId
+        : mine
         ? l.commandFindMine
         : person != null
         ? l.commandFindPerson(person.name)
         : l.tasks;
-    final unresolved = command.projectName != null || command.personName != null;
+    final unresolved =
+        command.projectName != null || command.personName != null;
     final found = view.found;
+    final scope = _findScope(context, command);
     return _Frame(
       children: [
         _Header(icon: Icons.search_rounded, text: heading),
+        if (scope != null) _Note(scope),
         if (command.projectName != null)
           _Note(
             l.commandProjectNotFound(command.projectName!),
@@ -515,6 +609,26 @@ class FindCommandCard extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// The period and the status a search used, under its heading: «Mañana»,
+/// «Del lun, 19 oct al dom, 25 oct · Pendientes». Null when it used neither.
+String? _findScope(BuildContext context, CaptureCommand command) {
+  final l = context.l10n;
+  final from = command.from;
+  final to = command.to;
+  final parts = [
+    if (from != null && to != null)
+      DateUtils.isSameDay(from, to)
+          ? context.dayLabel(from)
+          : l.commandFindPeriod(
+              context.weekdayDate(from),
+              context.weekdayDate(to),
+            ),
+    if (command.status == 'open') l.commandFindOpen,
+    if (command.status == 'completed') l.commandFindDone,
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
 }
 
 /// A task found: its title, then its day, project and assignee. A tap opens
@@ -558,20 +672,9 @@ class _FoundRow extends ConsumerWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(34, 8, 4, 8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ExcludeSemantics(
-              child: Icon(
-                completed
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 22,
-                color: completed ? colors.onSurfaceVariant : colors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,6 +696,14 @@ class _FoundRow extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 4),
+            ExcludeSemantics(
+              child: Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
@@ -607,8 +718,9 @@ bool _completed(Task task) => task.occurrenceDate != null
     : (task.isRecurring ? task.nextOpenOccurrence() : task)?.isCompleted ??
           true;
 
-/// Several tasks match: a short list to tap the one meant.
-class _Choice extends StatelessWidget {
+/// Several tasks match: a short list to tap the one meant, and the rest
+/// after «Ver N más».
+class _Choice extends StatefulWidget {
   const _Choice({
     required this.view,
     required this.onChanged,
@@ -621,14 +733,25 @@ class _Choice extends StatelessWidget {
   static const shown = 5;
 
   @override
+  State<_Choice> createState() => _ChoiceState();
+}
+
+class _ChoiceState extends State<_Choice> {
+  bool _all = false;
+
+  @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     final theme = Theme.of(context);
+    final view = widget.view;
+    final enabled = widget.enabled;
+    final onChanged = widget.onChanged;
     final matches = view.matches;
+    final more = _all ? 0 : matches.length - _Choice.shown;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final task in matches.take(shown))
+        for (final task in more > 0 ? matches.take(_Choice.shown) : matches)
           InkWell(
             key: ValueKey('choose-${view.command.id}-${task.id}'),
             borderRadius: BorderRadius.circular(12),
@@ -656,7 +779,18 @@ class _Choice extends StatelessWidget {
               ),
             ),
           ),
-        if (matches.length > shown) _Note(l.commandMore(matches.length - shown)),
+        if (more > 0)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: TextButton(
+                key: ValueKey('choose-more-${view.command.id}'),
+                onPressed: enabled ? () => setState(() => _all = true) : null,
+                child: Text(l.commandShowMore(more)),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -681,15 +815,34 @@ Widget _another(
   ),
 );
 
-/// Why the task wasn't found: a project that doesn't exist, or the words.
-String _notFound(BuildContext context, CommandTarget target) {
+/// Why the task wasn't found: a project that doesn't exist, a task in a
+/// project the person can only view, or the words.
+String _notFound(BuildContext context, CommandView view) {
   final l = context.l10n;
+  final target = view.command.target;
+  if (view.viewOnly case final task?) return l.commandViewOnly(task.title);
   if (target.projectName != null) {
     return l.commandProjectNotFound(target.projectName!);
   }
   return target.words.isEmpty
       ? l.commandTaskNotFoundPlain
       : l.commandTaskNotFound(_words(target.words));
+}
+
+/// «¿Qué día, a las 17:00?»: [time] as the app shows times, with the
+/// article its hour as shown takes (`a la 1:00`).
+String _whichDay(BuildContext context, ({int hour, int minute}) time) {
+  final clock = TimeOfDay(hour: time.hour, minute: time.minute);
+  final format = MaterialLocalizations.of(context).timeOfDayFormat(
+    alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+  );
+  final hour = hourFormat(of: format) == HourFormat.h
+      ? clock.hourOfPeriod
+      : clock.hour;
+  return context.l10n.commandWhichDay(
+    hour,
+    context.clockTime(DateTime(2000, 1, 1, time.hour, time.minute)),
+  );
 }
 
 /// `update`: the task with each change as before → after, or the short list
@@ -715,10 +868,7 @@ class UpdateCommandCard extends ConsumerWidget {
     if (view.notFound) {
       return _Frame(
         children: [
-          _Header(
-            icon: Icons.edit_outlined,
-            text: _notFound(context, command.target),
-          ),
+          _Header(icon: Icons.edit_outlined, text: _notFound(context, view)),
         ],
       );
     }
@@ -770,7 +920,12 @@ class UpdateCommandCard extends ConsumerWidget {
     );
     final today = DateUtils.dateOnly(DateTime.now());
     final tomorrow = DateTime(today.year, today.month, today.day + 1);
-    final asksDay = plan.needsDay || command.day != null;
+    // A time said for a task with no day: the day it goes on, asked with
+    // the time, so the time understood shows before a day is picked.
+    final said = command.changes.time;
+    final asksDay = said != null && (plan.needsDay || command.day != null);
+    final picked = command.day == null ? null : Task.day(command.day!);
+    final otherDay = picked != null && picked != today && picked != tomorrow;
     final problem = switch (plan.problem) {
       AssigneeProblem.notInProject => l.commandMemberNotIn(
         plan.problemName ?? '',
@@ -783,9 +938,11 @@ class UpdateCommandCard extends ConsumerWidget {
             '',
       ),
       AssigneeProblem.needsShared => l.commandAssignNeedsShared,
-      AssigneeProblem.ambiguous => l.commandAmbiguousMember(
-        plan.problemName ?? '',
-      ),
+      // With people to tap, the question box below says it.
+      AssigneeProblem.ambiguous =>
+        plan.namesakes.isNotEmpty
+            ? null
+            : l.commandAmbiguousMember(plan.problemName ?? ''),
       null => null,
     };
     return _Frame(
@@ -807,48 +964,55 @@ class UpdateCommandCard extends ConsumerWidget {
             scheduleText(context, current),
             scheduleText(context, schedule),
           ),
-        if (asksDay) ...[
-          _Note(l.commandWhichDay),
+        // The box spans the card, for the chips' room at large text.
+        if (asksDay)
           Padding(
-            padding: const EdgeInsets.only(left: 34, right: 8, bottom: 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final (label, day) in [
-                  (l.today, today),
-                  (l.tomorrow, tomorrow),
-                ])
+            padding: const EdgeInsets.only(right: 10, top: 4, bottom: 8),
+            child: QuestionBox(
+              question: _whichDay(context, said),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final (label, day) in [
+                    (l.today, today),
+                    (l.tomorrow, tomorrow),
+                  ])
+                    ChoiceChip(
+                      label: Text(label),
+                      selected: command.day == day,
+                      onSelected: enabled
+                          ? (_) => onChanged(command.copyWith(day: day))
+                          : null,
+                    ),
+                  // The day picked shows here, as in the form.
                   ChoiceChip(
-                    label: Text(label),
-                    selected: command.day == day,
-                    onSelected: enabled
-                        ? (_) => onChanged(command.copyWith(day: day))
-                        : null,
+                    key: const ValueKey('command-pick-day'),
+                    avatar: const Icon(Icons.calendar_today_outlined, size: 18),
+                    label: Text(
+                      otherDay ? context.weekdayDate(picked) : l.pickDay,
+                    ),
+                    selected: otherDay,
+                    onSelected: !enabled
+                        ? null
+                        : (_) async {
+                            final result = await editSchedule(
+                              context,
+                              date: command.day ?? today,
+                              hasTime: false,
+                              title: l.pickDay,
+                              applyDays: true,
+                            );
+                            final date = result?.date;
+                            if (date != null) {
+                              onChanged(command.copyWith(day: Task.day(date)));
+                            }
+                          },
                   ),
-                ActionChip(
-                  avatar: const Icon(Icons.calendar_today_outlined, size: 18),
-                  label: Text(l.pickDay),
-                  onPressed: !enabled
-                      ? null
-                      : () async {
-                          final result = await editSchedule(
-                            context,
-                            date: command.day ?? today,
-                            hasTime: false,
-                            title: l.pickDay,
-                            applyDays: true,
-                          );
-                          final date = result?.date;
-                          if (date != null) {
-                            onChanged(command.copyWith(day: Task.day(date)));
-                          }
-                        },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ],
         if (plan.deadline case final changed?)
           line(
             Icons.flag_outlined,
@@ -858,7 +1022,7 @@ class UpdateCommandCard extends ConsumerWidget {
           ),
         if (plan.priority case final priority?)
           line(
-            Icons.low_priority_rounded,
+            Icons.flag_outlined,
             l.priority,
             context.priorityName(task.priority),
             context.priorityName(priority),
@@ -881,6 +1045,34 @@ class UpdateCommandCard extends ConsumerWidget {
             ),
           ),
         if (problem != null) _Note(problem, icon: Icons.info_outline),
+        // Two or more people have the name said: one chip each, and they
+        // stay once one is tapped, to tap another.
+        if (plan.namesakes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(right: 10, top: 4, bottom: 8),
+            child: QuestionBox(
+              question: l.commandAmbiguousMember(
+                command.changes.assigneeName ?? '',
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final person in plan.namesakes)
+                    ChoiceChip(
+                      key: ValueKey('command-member-${person.id}'),
+                      label: Text(person.name),
+                      selected:
+                          !plan.asksMember && command.memberId == person.id,
+                      onSelected: enabled
+                          ? (_) =>
+                                onChanged(command.copyWith(memberId: person.id))
+                          : null,
+                    ),
+                ],
+              ),
+            ),
+          ),
         // A repeating task's day or time: this repetition, or all of them,
         // as `Cambiar fecha` asks.
         if (plan.repeating && plan.schedule != null && !plan.seriesOnly)
@@ -893,9 +1085,7 @@ class UpdateCommandCard extends ConsumerWidget {
                 for (final series in [false, true])
                   ChoiceChip(
                     key: ValueKey('command-series-$series'),
-                    label: Text(
-                      series ? l.wholeSeries : l.thisOccurrence,
-                    ),
+                    label: Text(series ? l.wholeSeries : l.thisOccurrence),
                     selected: command.series == series,
                     onSelected: enabled
                         ? (_) => onChanged(command.copyWith(series: series))
@@ -904,9 +1094,9 @@ class UpdateCommandCard extends ConsumerWidget {
               ],
             ),
           ),
-        // Nothing to change: already as asked (unless the line above says
+        // Nothing to change: already as asked (unless a line above says
         // why not), or nothing asked, and then it opens to edit.
-        if (plan.isEmpty && !plan.needsDay && problem == null)
+        if (plan.isEmpty && !plan.needsDay && plan.problem == null)
           plan.asked
               ? _Note(l.commandNothingToChange)
               : Align(
@@ -958,7 +1148,7 @@ class DeleteCommandCard extends StatelessWidget {
         children: [
           _Header(
             icon: Icons.delete_outline_rounded,
-            text: _notFound(context, command.target),
+            text: _notFound(context, view),
           ),
         ],
       );

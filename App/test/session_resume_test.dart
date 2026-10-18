@@ -22,6 +22,7 @@ import 'package:agenda/widgets/task_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
 
@@ -32,6 +33,8 @@ void main() {
   const timeoutChannel = MethodChannel('taskflow/accessibility');
   const timezoneChannel = MethodChannel('flutter_timezone');
   setUp(() {
+    // Signed out, the app waits for the stored address waiting for its code.
+    FlutterSecureStorage.setMockInitialValues({});
     platform.setMockMethodCallHandler(timeoutChannel, (_) async => null);
     platform.setMockMethodCallHandler(
       timezoneChannel,

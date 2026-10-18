@@ -870,7 +870,7 @@ void main() {
   // ---- Pro, and billing not known yet: unchanged ----
 
   testWidgets(
-    'Pro: Añadir tarea still opens the capture sheet on the mic, with the keyboard for typing to the assistant and no Rellenar a mano',
+    'Pro: Añadir tarea still opens the capture sheet on the mic, with the keyboard for typing to the assistant and no way to the form',
     (tester) async {
       final app = await _App.open(tester, pro: true);
       expect(find.text(es.newTask), findsNothing);
@@ -886,7 +886,7 @@ void main() {
       expect(find.byType(VoiceTaskScreen), findsOneWidget);
       expect(find.byType(TaskEditor), findsNothing);
       expect(find.byTooltip(es.captureTypeInstead), findsOneWidget);
-      expect(find.text(es.captureFillByHand), findsNothing);
+      expect(find.byKey(const ValueKey('capture-fill-by-hand')), findsNothing);
       expect(app.speech.starts, 0, reason: 'this phone has no recognizer');
       expect(tester.takeException(), isNull);
     },
@@ -1309,7 +1309,7 @@ void main() {
   // would then use.
 
   testWidgets(
-    'previews of the form, its details, 2× text in ES and CA, the sheet’s Rellenar a mano, the people filter and Creada por (written to build/ on request)',
+    'previews of the form, its details, 2× text in ES and CA, the sheet’s Escribir, the people filter and Creada por (written to build/ on request)',
     (tester) async {
       if (!const bool.fromEnvironment('WRITE_FORM_PREVIEWS')) return;
       await tester.runAsync(() async {
@@ -1382,7 +1382,7 @@ void main() {
         tester.platformDispatcher.clearTextScaleFactorTestValue();
       }
 
-      // The sheet with dictations left: Rellenar a mano.
+      // The sheet with dictations left: Escribir opens the form.
       await tester.pumpWidget(const SizedBox());
       await _App.open(tester, freeLeft: 5, listening: true, preview: preview);
       await tester.tap(find.text(es.addTask).hitTestable());

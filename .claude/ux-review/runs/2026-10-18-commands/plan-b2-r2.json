@@ -1,0 +1,91 @@
+{
+ "runId": "2026-10-18-commands",
+ "mode": "changes",
+ "round": "b2-r2",
+ "packages": [
+  {
+   "id": "P148",
+   "title": "The «Crear el proyecto» question holds its tasks until a chip is tapped; the sheet picks nothing for it",
+   "area": "A",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-909",
+    "UX-1219"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/widgets/task_list_picker.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/test/voice_command_cards_test.dart"
+   ],
+   "brief": [
+    "Round 2 of run 2026-10-18-commands (b2). Both findings are left over from P135, which is otherwise verified (UX-908, UX-915 fixed). Line numbers are from the current working tree; search for the code if they have moved.",
+    "UX-909 (S2), what round 1 did: P135 made a `project` command whose `existingListId` names a project with a different name (ignoring case and accents) into a question: «¿Crear el proyecto «Química»?», with «Crear «Química»», then «Física y Química», then the other chips (App/lib/widgets/capture_command_cards.dart:108-119). Its view is `blocking` until a chip is tapped. Both answers work (App/lib/models/capture_command.dart:303-318; `_changeCommand`, App/lib/screens/voice_task_screen.dart:2366-2415).",
+    "UX-909, why it failed review A and ux-tester: the server files the dictation's task in the matched project already (Backend/docs/VOICE_COMMANDS.md:69: the task carries `list_id` 'fyq' and no `newProject`). `_undecided` (voice_task_screen.dart:2423-2427) collects only the folded names of blocking project views, and `_draftReady` (:2429-2434) holds back only drafts whose `newProject` matches one of those names. So the task counts as ready, `onSave` (:3501-3513) is `_save`, and one tap on «Añadir tarea» files it in Física y Química with the question still unanswered. The question is then left under «Sin guardar». The `blocked` value (:3407-3409) is computed but doesn't disable anything. The failing test is App/test/voice_command_cards_test.dart:3439.",
+    "UX-909, the fix (the reviewer's first option, which works like the two-matches case): the drafts filed in the matched project of a project card that still asks are undecided too. In `_undecided`, also collect `view.command.existingListId` of every view with `view.kind == CommandKind.project && view.blocking` and a non-null `existingListId`. Keep the list ids apart from the folded names: return a record such as `({Set<String> names, Set<String> lists})`, or add a second helper next to it. Don't mix ids and names in one set. `_draftReady` also returns false for a draft with `newProject == null` whose `task.listId` is in that set of ids. Update both callers, `_save` (about :2835-2836) and `build` (about :3402-3403), so the save and the button agree.",
+    "UX-909, the result: with only that task, `ready` is 0 and nothing is actionable. The button then reads «Revisa los detalles» (`captureCheckDetails`) and is disabled until a chip is tapped. After «Crear «Química»», `_changeCommand` moves the task to `newProject: Química`. After «Física y Química», the choice equals the matched id and the task stays. Either way the view stops blocking, so the task is ready. ✕ on the card removes the view, and the task stays where the server filed it, as P135 left it. Don't use the second option (disable `onSave` while any project view blocks): it would also hold back unrelated tasks, unlike the two-matches card.",
+    "UX-1219 (S1, regression R1A-1 from P135): «Otro proyecto…» on a task's card (`ProjectChoices`, capture_command_cards.dart:288-305) calls `chooseTaskList(context, ref, none: onNone != null)` with no `listId` and no `newName`. So the sheet marks «Sin proyecto» as chosen (`selected: listId == null && newName == null`, App/lib/widgets/task_list_picker.dart:56). That reads as \"this task is already in no project\" while the question is still open. Fix: add a named parameter `selectedNone` (bool, default true) to `chooseTaskList`, with a line in its doc comment: «Sin proyecto» shows as chosen only when this is true and there's no `listId` or `newName`. The «Sin proyecto» row's `selected` becomes `selectedNone && listId == null && newName == null`. Pass `selectedNone: false` from `ProjectChoices`. No row in the sheet is then highlighted. Tapping «Sin proyecto» there still answers the question with no project, as today.",
+    "Don't touch: the chips, their order and their copy (UX-908 is verified); the «Ya tienes «…»» card for equal names; the two-matches card; the project sheet's rows and their order (P141 changes them later); `TaskListPicker`'s own call (task_list_picker.dart:118), whose sheet still marks «Sin proyecto» for a task with no project; the plain one-task capture (voice_command_cards_test.dart:1007 must keep passing); Backend/. No copy change, so the ARB files stay untouched."
+   ],
+   "acceptance": [
+    "ES: a result with one draft «Repasar el tema 3» (listId 'fyq', no newProject) and a `project` command «Química» whose existing_list_id is 'fyq' («Física y Química»): the confirming button is disabled and reads «Revisa los detalles». After «Crear «Química»» it is enabled (App/test/voice_command_cards_test.dart:3439 passes).",
+    "ES: the same result, after «Física y Química» instead, the button is enabled. After the tap, no project is created and «Repasar el tema 3» is in Física y Química.",
+    "ES: the same result plus a second draft «Comprar pan» with no project: the button is enabled and reads «Añadir tarea». After the tap, only «Comprar pan» is saved. «Repasar el tema 3» isn't saved, and the «¿Crear el proyecto «Química»?» card still shows with its chips.",
+    "ES: a `project` command «matematicas» whose existing project is «Matemáticas» still shows «Ya tienes «Matemáticas»», and its task saves with the first tap.",
+    "ES: on a task card whose project «química» doesn't exist, tap «Otro proyecto…»: in the sheet, no row is selected (the «Sin proyecto» ListTile has selected false). Tapping «Sin proyecto» puts the task in no project, and «¿En qué proyecto la pongo?» disappears.",
+    "ES: the project chip of a task with no project (TaskListPicker) still opens the sheet with «Sin proyecto» selected."
+   ],
+   "deviceChecks": [
+    "Phone, Pro, real model on staging, Spanish, with a project «Física y Química»: «Crea el proyecto Química y apunta repasar el tema 3 en él». The button reads «Revisa los detalles» until «Crear «Química»» or «Física y Química» is tapped."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P149",
+   "title": "Confirm your email, reopened after a restart: a way out of a forgotten password, the real countdown, no flash, no stale address",
+   "area": "D",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-1215",
+    "UX-1216",
+    "UX-1217",
+    "UX-1218"
+   ],
+   "files": [
+    "App/lib/screens/verify_email_screen.dart",
+    "App/lib/screens/login_screen.dart",
+    "App/lib/services/pending_verification.dart",
+    "App/lib/main.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/email_verification_test.dart"
+   ],
+   "brief": [
+    "Round 2 of run 2026-10-18-commands (b2). P133 and P134 are verified (UX-1201 to UX-1204 fixed). P134 made a cold start with no session, and a pending address younger than 30 minutes, reopen «Confirma tu correo» without a password. App/lib/services/pending_verification.dart stores `{email, saved}`. `LoginScreen._resumeConfirming` (App/lib/screens/login_screen.dart:63-77) calls `resume()` after sign-in's first frame and pushes the screen through `_confirmEmail` (:203-225) with `password: null`. The screen then asks for the password itself, and `signup_replaced` or the sign-in check's `credentials` answer shows `verifyEmailWrongPassword` under that field (`_showWrongPassword`, App/lib/screens/verify_email_screen.dart:340-350). Review D found four problems on that path. Line numbers are from the current working tree; search if they have moved.",
+    "UX-1215 (S2, R1D-1), a forgotten password has no way forward: the line says only «Esa contraseña no es la de esta cuenta.». Back goes to plain sign-in, where the password is still unknown. «Usar otro correo» re-creates the account with the address kept, but nothing says so. Fix: change the text of the existing key `verifyEmailWrongPassword`, keeping the key, so the line names the way out. EN: “That isn’t this account’s password. Don’t remember it? Tap “Use another email” and create the account again.” ES: «Esa contraseña no es la de esta cuenta. ¿No la recuerdas? Toca «Usar otro correo» y crea la cuenta de nuevo.» CA: «Aquesta contrasenya no és la d’aquest compte. No la recordes? Toca «Utilitza un altre correu» i torna a crear el compte.» Settled here: the line shows in full from the first refusal, which the reviewer left to the organizer. That needs no refusal counter, and the question form doesn't blame someone who only mistyped. Update the @verifyEmailWrongPassword description in app_en.arb: it shows under the password field when the password typed on this screen isn't the account's, and names «Use another email» (verifyEmailOtherAddress) as the way out. The quoted labels must match `verifyEmailOtherAddress` in each catalog: “Use another email” / «Usar otro correo» / «Utilitza un altre correu». The password field's errorMaxLines is 8 (P134); keep it, and make sure the Catalan line isn't cut at 2× on 320 dp.",
+    "UX-1216 (S1, R1D-2), the resumed screen times the code from when it reopened: `initState` sets `_sentAt = _now()` and runs a 60 s `_countDown()` on every open (verify_email_screen.dart:98-103), and `resume()` drops the saved time. So «Reenviar código» stays off for 60 s, minutes after the code went out. A code spent within that minute then gets the «wait» line (`_Spent.wait`), although the sign-in check has just emailed a new code. Reenviar then replaces that new code, and two emails arrive. Fix: `resume()` returns the saved time with the address, for example a record `({String email, DateTime sentAt})` (`_read` parses `saved` already). `_confirmEmail` passes it on, and `VerifyEmailScreen` gets an optional `final DateTime? sentAt;`, with a doc comment: when the code went, if before this screen opened. In `initState`: `_sentAt = widget.sentAt ?? _now();` and `_countDown(math.max(0, VerifyEmailScreen.resendWait - _now().difference(_sentAt).inSeconds))`. `_countDown` already returns at once for 0 or less. `_codeSpent`'s existing elapsed test then gives `_Spent.sentNew` when the code is 60 s old or more. Reopening must not call `remember()`. The saved time stays the time of the last code, so the 30-minute life is still counted from it.",
+    "UX-1217 (S1, R1D-3), sign-in flashes before the resumed screen slides in: `_resumeConfirming` awaits secure storage after LoginScreen's first frame, then pushes a `MaterialPageRoute` with its slide. Fix, both halves: (1) Start the storage read when the app starts, in parallel with the session restore, and keep SessionLoadingScreen up until it has finished. Add to `PendingVerification` a `load()` that starts the read once and memoises its Future. main.dart calls it where the app's state starts, and while signed out, the '/' route and `onGenerateRoute` (main.dart:439-441 and :469-471) show SessionLoadingScreen while `auth.restoring` or that read is still running. For example, add a FutureProvider over `load()` that main.dart watches. `resume()` keeps its once-per-process rule: its first call returns the memoised result, later calls return null. `remember()` and `forget()` drop the memoised Future, so a later read sees storage as it is. (2) The resumed route opens without a transition: give `_confirmEmail` a flag for the resumed case, and push a route whose `transitionDuration` is `Duration.zero`. Closing it may keep the usual reverse transition. Opening from sign-up or sign-in keeps the MaterialPageRoute slide. At most one frame of sign-in may then show, with no slide. The flash is inferred from the code: say in your notes that it needs a phone.",
+    "UX-1218 (S1, R1D-4), an old pending address reopens after signing out of another account: main.dart:369-375 calls `confirmed(account.email)`, which clears the entry only when the signed-in address matches it. Fix: on any account signing in (the same `previous?.account?.id != account.id` test, which includes a restored session), call `forget()`, whatever the address: someone signed in no longer waits for a code. Then remove `confirmed()` from PendingVerification if nothing else uses it, and update its comment in main.dart: «Signed in, nobody waits for a code.»",
+    "Don't touch: what the screen asks and sends when it opens from sign-up or sign-in; the 30-minute life; the copy of every other line; `signup_replaced` after sign-up, which still returns to «Crea tu cuenta»; the session-expiry sign-in (`signInAgain`), which never resumes; Backend/. The password is never written anywhere. Run flutter gen-l10n after the ARB edits. Tests this change rightly breaks: any expectation of the short `verifyEmailWrongPassword` text, and of a 60 s countdown on a resumed screen. Update those, and say which in your notes. P134's note for the tester still holds: rebuild a ProviderContainer on the same mock storage for a cold start."
+   ],
+   "acceptance": [
+    "ES, cold start on the same storage with a pending address saved 1 minute earlier, no session: «Confirma tu correo» opens. A verify answered `signup_replaced` shows, under the password field, «Esa contraseña no es la de esta cuenta. ¿No la recuerdas? Toca «Usar otro correo» y crea la cuenta de nuevo.», from the first refusal, and the screen stays. Tapping «Usar otro correo» then lands on «Crea tu cuenta» with the address in the email field.",
+    "EN and CA: verifyEmailWrongPassword reads “That isn’t this account’s password. Don’t remember it? Tap “Use another email” and create the account again.” and «Aquesta contrasenya no és la d’aquest compte. No la recordes? Toca «Utilitza un altre correu» i torna a crear el compte.». At 2× on 320×640, in CA, the whole line shows under the password field, not cut or ellipsized.",
+    "ES, cold start 5 minutes after the pending address was saved: «Reenviar código» is enabled at once, with no «Reenviar código en … segundos». A Confirmar answered `code_expired`, then 403 EmailVerificationRequired from the sign-in check, shows the «we sent you a new code» line (`_Spent.sentNew`) and empties the code field.",
+    "ES, cold start 20 seconds after the pending address was saved: the button reads «Reenviar código en 40 segundos».",
+    "ES, cold start with a pending address and no session: the first route the navigator shows after SessionLoadingScreen is «Confirma tu correo», over sign-in. Its route's transitionDuration is zero, and no request was sent.",
+    "ES: a pending address for A, then a successful sign-in as B (password or Google), then sign-out: the storage holds no pending entry, and the next LoginScreen stays on «Inicia sesión».",
+    "P134's acceptance still passes: after 31 minutes, after «Usar otro correo», or after the address is confirmed, a cold start opens plain sign-in. The storage never holds the password."
+   ],
+   "deviceChecks": [
+    "Phone, Developer options › «No mantener actividades» on: create an account, open Gmail, come back to TaskFlow. «Confirma tu correo» shows without «Inicia sesión» sliding away first, and «Reenviar código» is on if more than a minute has passed."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

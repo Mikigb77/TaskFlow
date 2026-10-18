@@ -27,6 +27,12 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/reminder_ask_sheet.dart';
+import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/models/capture_session.dart';
+import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/services/capture_store.dart';
 
 /// Edits a saved task or note, or fills in a new task: a [task] with no id
 /// is new. That is how an account without Pro creates tasks (DECISIONS.md,
@@ -34,16 +40,28 @@ import 'package:agenda/widgets/reminder_ask_sheet.dart';
 /// and the rest under `Más detalles`. A new task is saved on the phone first
 /// and lands as a capture's does: on [page], the task page the form was
 /// opened from, or else on Calendar, which [showCalendar] brings forward.
+///
+/// Until a new task is saved, its title and notes wait in the capture store,
+/// as a capture's words do, so they survive Android closing the app: in
+/// [captureId], the capture its words came from, or in a new one from the
+/// first character typed.
 class TaskEditor extends ConsumerStatefulWidget {
   const TaskEditor({
     super.key,
     required this.task,
     this.page,
     this.showCalendar = false,
+    this.captureId,
+    this.askedToSpeak = false,
   });
   final Task task;
   final Object? page;
   final bool showCalendar;
+  final String? captureId;
+
+  /// A new task opened by a way in that asks to speak (the widget, the voice
+  /// shortcut): without the mic, the form says why above the title.
+  final bool askedToSpeak;
   @override
   ConsumerState<TaskEditor> createState() => _TaskEditorState();
 }
@@ -142,6 +160,99 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   late final bool _notesUpFront =
       _creating && (widget.task.notes?.trim().isNotEmpty ?? false);
 
+  // A new task's words, kept in the capture store until it is saved.
+  late final CaptureStore _captures;
+  late final String _owner;
+  late final ProviderContainer _container;
+  CaptureSession? _capture;
+  String? _captureId;
+  String _kept = '';
+  bool _letGo = false;
+  Future<void> _keeping = Future.value();
+
+  /// The capture's text: the title, then a line break and the notes when
+  /// there are any, so a resumed capture opens with both again.
+  String get _words {
+    final title = _title.text.trim();
+    final notes = _notes.text.trim();
+    return notes.isEmpty ? title : '$title\n$notes';
+  }
+
+  void _keepWords() {
+    final text = _words;
+    if (_letGo || text == _kept) return;
+    _kept = text;
+    _keeping = _keeping.then((_) => _writeWords(text));
+  }
+
+  Future<void> _writeWords(String text) async {
+    try {
+      final id = _captureId;
+      if (id == null) {
+        // Created at the first character typed, never before.
+        if (text.trim().isEmpty) return;
+        _capture = await _captures.create(
+          _owner,
+          _zone(),
+          text: text,
+          source: 'typed',
+        );
+        _captureId = _capture!.id;
+        _container.invalidate(pendingCapturesProvider);
+        return;
+      }
+      final session = _capture ??= await _captures.read(id, _owner);
+      if (session == null || session.terminal) {
+        // Gone meanwhile: the next words start a new one.
+        _capture = null;
+        _captureId = null;
+        return _writeWords(text);
+      }
+      final next = session.copyWith(text: text);
+      if (CaptureStore.isEmpty(next)) {
+        // Every word gone: nothing is kept.
+        await _captures.discard(id, _owner);
+        _capture = null;
+        _captureId = null;
+        _container.invalidate(pendingCapturesProvider);
+        return;
+      }
+      await _captures.update(next);
+      _capture = next;
+    } catch (_) {
+      // The words stay in the form; the next change writes them again.
+      _kept = '';
+    }
+  }
+
+  /// The zone a new capture is stored in: the one chosen in Ajustes, or
+  /// the account's. Its words are typed, so it matters only if the
+  /// assistant reads them later.
+  String _zone() {
+    final chosen = _container.read(regionalProvider).captureTimezone;
+    if (CaptureTimezone.valid(chosen)) return chosen!;
+    final account = _container.read(authProvider).account?.timezone;
+    return CaptureTimezone.valid(account) ? account! : 'UTC';
+  }
+
+  /// The task is saved, or the form closes with no title: its words no
+  /// longer wait under `Sin guardar`.
+  void _letGoOfWords() {
+    if (!_creating || _letGo) return;
+    _letGo = true;
+    _keeping = _keeping.then((_) async {
+      final id = _captureId;
+      if (id == null) return;
+      _captureId = null;
+      try {
+        await _captures.discard(id, _owner);
+      } catch (_) {
+        // It waits under `Sin guardar`, where it can be dropped.
+      }
+      _container.invalidate(pendingCapturesProvider);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -174,6 +285,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _attachments = [...task.filePaths, ...task.imagePaths];
     _checklist = [...task.checklist];
     _unchanged = _edited().toMap();
+    if (_creating) {
+      _captures = ref.read(captureStoreProvider);
+      _owner = ref.read(captureOwnerProvider);
+      _container = ProviderScope.containerOf(context, listen: false);
+      _captureId = widget.captureId;
+      _kept = _words;
+      _title.addListener(_keepWords);
+      _notes.addListener(_keepWords);
+    }
   }
 
   @override
@@ -320,6 +440,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   Future<void> _back() async {
     if (_saving) return;
     if (_creating && _title.text.trim().isEmpty) {
+      _letGoOfWords();
       Navigator.pop(context);
       return;
     }
@@ -428,6 +549,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           ? strings.taskSavedInbox
           : strings.taskAddedOn(context.weekdayDate(day));
       final id = await notifier.addTask(task);
+      _letGoOfWords();
       // Shown from the phone at once, even while a sync is under way.
       await notifier.showLocal();
       if (!mounted) return;
@@ -602,6 +724,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         _project(),
                         const SizedBox(height: 16),
                       ],
+                      if (_creating &&
+                          widget.askedToSpeak &&
+                          !ref.watch(voiceAvailableProvider))
+                        ..._noMic(),
                       TextFormField(
                         key: const ValueKey('task-title'),
                         controller: _title,
@@ -929,6 +1055,37 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             _assigneeName = value.assigneeName;
           }),
   );
+
+  /// Opened to speak without the mic: when free dictations come back, or,
+  /// with no count from the server, that speaking comes with Pro; and where
+  /// Pro is. As the capture sheet said it.
+  List<Widget> _noMic() {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final usedUp = ref.watch(freeVoiceUsedUpProvider);
+    return [
+      Semantics(
+        liveRegion: usedUp,
+        child: Text(
+          usedUp
+              ? freeVoiceUsedUpText(l, ref.watch(freeVoiceResetsProvider))
+              : l.captureSpeakingIsPro,
+          key: usedUp ? const ValueKey('free-voice-used-up') : null,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton(
+          onPressed: () => Navigator.pushNamed(context, '/subscription'),
+          child: Text(l.voiceProAction),
+        ),
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
 
   Widget _notesField() => TextFormField(
     key: const ValueKey('task-notes'),

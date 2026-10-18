@@ -1534,11 +1534,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get verifyEmailResent => 'We’ve sent you a new code';
 
   @override
-  String get verifyEmailCodeInvalid => 'That code isn’t right';
+  String get verifyEmailCodeInvalid =>
+      'That code isn’t right. Check the newest email we sent.';
 
   @override
-  String get verifyEmailCodeExpired =>
-      'That code has expired. Ask for a new one.';
+  String get verifyEmailCodeSpentNew =>
+      'That code no longer works. We’ve sent you a new one.';
+
+  @override
+  String get verifyEmailCodeSpentWait =>
+      'That code no longer works. Tap “Resend code” when the countdown ends.';
 
   @override
   String get verifyEmailOtherAddress => 'Use another email';
@@ -1546,6 +1551,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get verifyEmailReplaced =>
       'Someone has created an account with this email again. Create it again to continue.';
+
+  @override
+  String get verifyEmailWrongPassword =>
+      'That isn’t this account’s password. Don’t remember it? Tap “Use another email” and create the account again.';
 
   @override
   String get newList => 'New project';
@@ -3476,9 +3485,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newTask => 'New task';
 
   @override
-  String get captureFillByHand => 'Fill in by hand';
-
-  @override
   String get pickDay => 'Pick a day';
 
   @override
@@ -3742,7 +3748,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get commandExistingProjectTasks => 'The tasks go there.';
+  String commandExistingProjectTasks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The tasks go there.',
+      one: 'The task goes there.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String commandCreateProjectQuestion(String name) {
@@ -3753,6 +3767,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String commandCreateNamed(String name) {
     return 'Create “$name”';
   }
+
+  @override
+  String get commandWhichProject => 'Which project should it go in?';
+
+  @override
+  String get commandOtherProject => 'Another project…';
 
   @override
   String commandCreateProjects(int count) {
@@ -3813,11 +3833,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String commandFindPerson(String name) {
-    return '$name’s tasks';
+    return 'Tasks for $name';
   }
 
   @override
   String get commandFindMine => 'Your tasks';
+
+  @override
+  String commandFindProjectPerson(String project, String name) {
+    return 'Tasks in “$project” for $name';
+  }
+
+  @override
+  String commandFindProjectMine(String project) {
+    return 'Your tasks in “$project”';
+  }
+
+  @override
+  String commandFindPeriod(String from, String to) {
+    return '$from to $to';
+  }
+
+  @override
+  String get commandFindOpen => 'To do';
+
+  @override
+  String get commandFindDone => 'Completed';
 
   @override
   String get commandCompleted => 'Completed';
@@ -3837,6 +3878,17 @@ class AppLocalizationsEn extends AppLocalizations {
       locale: localeName,
       other: 'And $count more',
       one: 'And 1 more',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandShowMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Show $count more',
+      one: 'Show 1 more',
     );
     return '$_temp0';
   }
@@ -3865,10 +3917,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandTaskNotFoundPlain => 'Can’t find that task';
 
   @override
-  String get commandWhichToChange => 'Which one should change?';
+  String commandViewOnly(String title) {
+    return '“$title” is in a project you can only view.';
+  }
 
   @override
-  String get commandWhichToDelete => 'Which one should be deleted?';
+  String get commandWhichToChange => 'Which one do you want to change?';
+
+  @override
+  String get commandWhichToDelete => 'Which one do you want to delete?';
 
   @override
   String commandWillDelete(String title) {
@@ -3887,7 +3944,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commandNothingToChange => 'It’s already like that.';
 
   @override
-  String get commandWhichDay => 'Which day?';
+  String commandWhichDay(int hour, String time) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hour,
+      locale: localeName,
+      other: 'Which day, at $time?',
+    );
+    return '$_temp0';
+  }
 
   @override
   String commandMemberNotIn(String name, String project) {

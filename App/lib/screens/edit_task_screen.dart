@@ -55,6 +55,8 @@ class NewTaskArguments {
     this.page,
     this.showCalendar = false,
     this.words = '',
+    this.captureId,
+    this.askedToSpeak = false,
   });
 
   /// The day shown where the form was opened (Calendar's selected day, the
@@ -70,9 +72,17 @@ class NewTaskArguments {
   /// Bring the Calendar tab forward once it is saved.
   final bool showCalendar;
 
-  /// Words already heard in the capture sheet: the title, and the notes for
+  /// Words already heard, typed or shared: the title, and the notes for
   /// whatever follows its first sentence.
   final String words;
+
+  /// The capture that holds [words]. The form keeps its title and notes
+  /// there until the task is saved.
+  final String? captureId;
+
+  /// Opened by a way in that asks to speak (the widget, the voice
+  /// shortcut): without the mic, the form says why.
+  final bool askedToSpeak;
 }
 
 /// The task form in create mode, for accounts without Pro: free text makes
@@ -114,5 +124,7 @@ class _NewTaskScreenState extends ConsumerState<NewTaskScreen> {
     task: _task,
     page: widget.arguments.page,
     showCalendar: widget.arguments.showCalendar,
+    captureId: widget.arguments.captureId,
+    askedToSpeak: widget.arguments.askedToSpeak,
   );
 }
