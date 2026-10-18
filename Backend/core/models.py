@@ -175,6 +175,10 @@ class ProjectPreference(models.Model):
 class Task(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tasks")
+    # Who created it, shown as «Creada por». The owner can change (account deletion hands
+    # a kept task to the project's owner); the creator never does, and becomes null when
+    # that account is deleted.
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_tasks")
     assignment = models.CharField(max_length=10, default="personal", choices=[(v, v) for v in ("personal", "member", "group", "unassigned")])
     assignee = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_tasks")
     title = models.CharField(max_length=160)
@@ -216,6 +220,12 @@ class Task(models.Model):
             models.CheckConstraint(condition=models.Q(duration_minutes__isnull=True) | models.Q(duration_minutes__gte=1, duration_minutes__lte=1440), name="valid_task_duration"),
             models.CheckConstraint(condition=models.Q(reminder_anchor="planned") | (models.Q(reminder_anchor="deadline") & (models.Q(deadline_at__isnull=False) | models.Q(deadline_date__isnull=False))), name="valid_reminder_anchor"),
         ]
+
+    def save(self, *args, **kwargs):
+        # Every way of creating a task records its creator: whoever creates one owns it.
+        if self._state.adding and self.created_by_id is None:
+            self.created_by_id = self.owner_id
+        super().save(*args, **kwargs)
 
 
 class TaskEvent(models.Model):

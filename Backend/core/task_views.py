@@ -16,7 +16,7 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
     lookup_value_regex = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
     def get_queryset(self):
-        query = visible_tasks(self.request.user)
+        query = visible_tasks(self.request.user).select_related("created_by", "assignee")
         if self.action == "list" and self.request.query_params.get("include_deleted") != "true":
             query = query.filter(is_deleted=False)
         return query
@@ -42,9 +42,12 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
                 raise ValidationError({"version": "New tasks must start at version 0."})
             check_list_transfer(task, destination)
             is_new = task is None
+            # Typed, dictated and imported tasks all arrive here; the creator never changes after.
+            creator = {"created_by": request.user} if is_new else {}
             try:
                 with transaction.atomic():
-                    task = serializer.save(id=pk, owner=task.owner if task else request.user, version=(task.version + 1 if task else 1))
+                    task = serializer.save(id=pk, owner=task.owner if task else request.user, version=(task.version + 1 if task else 1),
+                                           **creator)
             except IntegrityError:
                 # Concurrent first uploads cannot overwrite another owner's UUID.
                 current = visible_tasks(request.user).filter(pk=pk).first()

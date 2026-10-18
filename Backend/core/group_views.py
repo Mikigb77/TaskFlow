@@ -17,6 +17,7 @@ from .collaboration import clear_assignments
 from .list_access import visible_groups, require_group, group_role, group_people, visible_tasks, display_name
 from .models import TaskGroup, GroupMembership, GroupInvitation, TaskList, User, TaskNotification
 from .email_delivery import queue_invitation, deliver_email
+from .invitation_email import invitation_language
 
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -43,6 +44,8 @@ class GroupSerializer(serializers.ModelSerializer):
 class GroupInviteSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
     role = serializers.ChoiceField(choices=["admin", "editor", "viewer"], default="editor")
+    # As for projects (list_views.InviteSerializer): "es", "ca" or "en", else Accept-Language.
+    language = serializers.CharField(max_length=35, required=False, allow_blank=True, allow_null=True)
 
     def validate_email(self, value):
         return value.strip().casefold()
@@ -131,6 +134,7 @@ class TaskGroupViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
         serializer = GroupInviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        language = invitation_language(data.pop("language", None), request.META.get("HTTP_ACCEPT_LANGUAGE"))
         with transaction.atomic():
             group, projects = self._locked(pk, manage=True)
             if data["role"] == "admin" and group.owner_id != request.user.pk:
@@ -143,7 +147,8 @@ class TaskGroupViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
                 code_digest=salted_hmac("group-invite", code, algorithm="sha256").hexdigest(),
                 expires_at=timezone.now() + timedelta(days=7))
             bump_group(group, projects)
-            delivery = queue_invitation(invitation, code, kind="group", sender=display_name(request.user))
+            delivery = queue_invitation(invitation, code, kind="group", sender=display_name(request.user),
+                                        language=language)
         email_status = deliver_email(delivery.pk)
         return Response({**invitation_data(invitation), "code": code, "email_status": email_status}, status=201)
 

@@ -190,11 +190,18 @@ class TaskSerializer(serializers.ModelSerializer):
     assignment = serializers.ChoiceField(choices=["personal", "member", "group", "unassigned"], required=False)
     assignee_id = serializers.IntegerField(min_value=1, allow_null=True, required=False)
     assignee_name = serializers.SerializerMethodField()
-    created_by = serializers.IntegerField(source="owner_id", read_only=True)
+    # Who created the task. Null once that account is deleted: the task's owner then
+    # becomes the project's owner, who isn't its creator.
+    created_by = serializers.IntegerField(source="created_by_id", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
 
     def get_assignee_name(self, task):
         from .list_access import display_name
         return display_name(task.assignee) if task.assignee_id else None
+
+    def get_created_by_name(self, task):
+        from .list_access import display_name
+        return display_name(task.created_by) if task.created_by_id else None
 
     def validate_assignment_context(self, attrs, kind):
         from .list_access import project_people
@@ -251,7 +258,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -311,6 +318,9 @@ class DraftRequestSerializer(serializers.Serializer):
     # The speech language chosen in the app (BCP-47, e.g. "ca-ES"), a hint for transcription.
     language = serializers.RegexField(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$", max_length=35,
                                       required=False, allow_null=True)
+    # An app with voice commands sends true, and gets "commands" next to "tasks"
+    # (docs/VOICE_COMMANDS.md). Without it the answer is the one older apps know.
+    commands = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
         if bool(attrs.get("text")) == bool(attrs.get("audio")):

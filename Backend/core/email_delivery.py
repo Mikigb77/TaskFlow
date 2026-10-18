@@ -13,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.html import escape
 
+from .invitation_email import invitation_html, invitation_message
 from .models import EmailDelivery
 from rest_framework.exceptions import Throttled
 
@@ -49,6 +50,10 @@ def schedule_retry(row):
 
 
 def email_html(body):
+    # An invitation gets its designed layout, rebuilt from its own text (invitation_email).
+    designed = invitation_html(body)
+    if designed is not None:
+        return designed
     # Only application-generated HTTPS links become anchors. Escape all names/content.
     paragraphs = []
     for paragraph in body.split("\n\n"):
@@ -76,25 +81,16 @@ def reserve_email(recipient):
             raise Throttled(detail="Email sending is temporarily limited. Try again later.", wait=3600)
 
 
-def queue_invitation(invitation, code, *, kind, sender):
+def queue_invitation(invitation, code, *, kind, sender, language=None):
+    """Queue the invitation email, in "en", "es" or "ca" (English by default)."""
     reserve_email(invitation.email)
     name = invitation.group.name if kind == "group" else invitation.task_list.name
     link = settings.INVITATION_BASE_URL + "#" + urlencode({
         "kind": kind, "id": str(invitation.pk), "code": code,
         "environment": settings.DEPLOYMENT_ENVIRONMENT})
-    body = (
-        f"{sender} invited you to join {name} in TaskFlow.\n\n"
-        f"Review your invitation:\n{link}\n\n"
-        f"Already using TaskFlow? Sign in with {invitation.email}, open Groups "
-        f"{'and invitations' if kind == 'group' else 'or shared lists'}, and accept with this code:\n{code}\n\n"
-        "New to TaskFlow? The app is coming soon to the app stores. "
-        "If you are a staging tester, use the private build supplied by the owner "
-        "and create an account with this email address.\n\n"
-        "This invitation expires in 7 days. Joining requires your confirmation. "
-        "If you were not expecting it, you can ignore this email."
-    )
-    return EmailDelivery.objects.create(recipient=invitation.email,
-        subject="You're invited to a group in TaskFlow" if kind == "group" else "You're invited to a shared list in TaskFlow",
+    subject, body = invitation_message(kind=kind, sender=sender, name=name, link=link, email=invitation.email,
+                                       code=code, language=language)
+    return EmailDelivery.objects.create(recipient=invitation.email, subject=subject,
         body=body, expires_at=invitation.expires_at,
         **{f"{kind}_invitation": invitation})
 

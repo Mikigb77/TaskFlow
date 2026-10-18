@@ -23,11 +23,11 @@ Everything runs in one transaction on the server. Stored files are removed only 
 | Shared projects the person owns, with no group | Handed to an heir: the earliest editor, otherwise the earliest member. The heir's membership row goes, because owners aren't members. The version is bumped. |
 | Projects the person owns inside a group someone else owns | Handed to that group's owner. |
 | Groups the person owns | Handed to an heir: the earliest admin, then editor, then viewer, by membership order. If there's no one else, the group and its projects are deleted like personal ones. |
-| Tasks the person created in projects owned by others, or in projects being handed over | Kept for the group, and `owner` becomes the project's (new) owner. The app never shows a task's creator, so nothing is misattributed on screen. Attachments the person added to those tasks stay too, with `owner` moved to the project's owner, which is where storage is charged. |
+| Tasks the person created in projects owned by others, or in projects being handed over | Kept for the group, and `owner` becomes the project's (new) owner. `created_by` (shown as «Creada por») becomes null in the same update, so the project's owner never appears as the creator; the version is bumped once. Any other task that still names the person as its creator loses it too. Attachments the person added to those tasks stay too, with `owner` moved to the project's owner, which is where storage is charged. |
 | Tasks assigned to the person | Kept, and unassigned (`assignee` is set to null; the existing `SET_NULL`). |
 | Activity events by the person | Kept for the group with `actor` null. Any name or email of the person in `details` is scrubbed. |
 | Pending invitations to the person's email | Deleted, together with their `EmailDelivery` rows. |
-| Invitations the person sent | They stay valid for the project or group (`invited_by` is set to null). |
+| Invitations the person sent | They stay valid for the project or group (`invited_by` is set to null). An unsent invitation email that names them is signed «Someone», «Alguien» or «Algú» instead, in its language. |
 | Queued or old emails to the person's address (`EmailDelivery`) | Deleted. |
 | RevenueCat customer, and store purchase records | Not touched in this step; to do later with the owner (see below). The store keeps its own legally required records. |
 
@@ -68,4 +68,4 @@ If the request fails, nothing changes on the phone. Deleting needs a connection;
 ## Implementation
 - Module: `core/account_deletion.py` (`deletion_preview`, `delete_account` and the view).
 - Endpoint: `GET` and `POST /api/auth/delete-account/`.
-- Tests: `core/test_account_deletion.py`.
+- Tests: `core/test_account_deletion.py`; the creator of kept tasks in `core/test_task_creator.py`.

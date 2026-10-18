@@ -19,6 +19,9 @@ from rest_framework import serializers
 class InviteSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
     role = serializers.ChoiceField(choices=["editor", "viewer"])
+    # The email's language: "es", "ca" or "en" (a tag such as "ca-ES" works too). Without
+    # one, or with another language, the request's Accept-Language decides, then English.
+    language = serializers.CharField(max_length=35, required=False, allow_blank=True, allow_null=True)
 
     def validate_email(self, value):
         return value.strip().casefold()
@@ -145,6 +148,8 @@ class TaskListViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets
         serializer = InviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        from .invitation_email import invitation_language
+        language = invitation_language(data.pop("language", None), request.META.get("HTTP_ACCEPT_LANGUAGE"))
         with transaction.atomic():
             item = self._locked(pk, owner=True)
             self._legacy(item)
@@ -170,7 +175,7 @@ class TaskListViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets
                     task.save()
                     record_event(task, request.user, "shared")
             from .email_delivery import queue_invitation
-            delivery = queue_invitation(invitation, code, kind="list", sender=request.user.email)
+            delivery = queue_invitation(invitation, code, kind="list", sender=request.user.email, language=language)
         from .email_delivery import deliver_email
         email_status = deliver_email(delivery.pk)
         return Response({**invitation_data(invitation), 'code': code, 'email_status': email_status}, status=201)

@@ -91,7 +91,10 @@ class DraftView(APIView):
         serializer = DraftRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        data["collaboration_context"] = capture_context(request.user, data.get("project_id"))
+        # Voice commands are a batch feature; a single draft ignores the flag.
+        data["commands"] = self.batch and data.get("commands", False)
+        data["collaboration_context"] = capture_context(request.user, data.get("project_id"), commands=data["commands"])
+        # A dictation counts once below, whatever it holds: tasks, notes or commands.
         pro = has_pro(request.user)
         dictation = None
         if not pro:

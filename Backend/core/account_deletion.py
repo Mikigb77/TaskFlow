@@ -22,6 +22,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from .billing import has_pro
 from .collaboration import clear_assignments
 from .google_auth import verify_google_identity
+from .invitation_email import unsigned_invitation
 from .list_access import display_name
 from .models import (Attachment, EmailDelivery, GoogleIdentity, GroupInvitation, GroupMembership,
                      ListInvitation, ListMembership, Task, TaskEvent, TaskGroup, TaskList, User)
@@ -151,14 +152,15 @@ def _lock(user):
 def _move_kept_contributions(user, plan, now):
     """Tasks and notes the person created in projects that stay go to the project's
     (new) owner, and so do the files they added to tasks that stay: storage is
-    charged to the project's owner."""
+    charged to the project's owner. The tasks keep no creator: the project's owner
+    must never appear to have created them."""
     by_owner = {}
     project_ids = set(plan.kept_tasks.values_list("task_list_id", flat=True))
     for project_id, owner_id in TaskList.objects.filter(pk__in=project_ids).values_list("pk", "owner_id"):
         by_owner.setdefault(owner_id, []).append(project_id)
     for owner_id, ids in by_owner.items():
         Task.objects.filter(owner=user, task_list_id__in=ids).update(
-            owner_id=owner_id, version=F("version") + 1, updated_at=now)
+            owner_id=owner_id, created_by=None, version=F("version") + 1, updated_at=now)
     files = {}
     for row in Attachment.objects.filter(owner=user).exclude(task__in=plan.deleted_tasks).select_related("task__task_list"):
         task = row.task
@@ -168,16 +170,15 @@ def _move_kept_contributions(user, plan, now):
 
 
 def _unsign_invitation_emails(user, plan):
-    """An unsent invitation email starts with its sender's email or name. The
-    invitation stays valid, so the email can still go, without naming the person."""
-    marker = " invited you to join "
+    """An unsent invitation email starts with its sender's email or name, in English,
+    Spanish or Catalan. The invitation stays valid, so the email can still go, signed
+    «Someone» in its language. Its HTML is made from this text when it's sent."""
     pending = EmailDelivery.objects.filter(state="pending").filter(
         Q(group_invitation__invited_by=user) | Q(list_invitation__task_list_id__in=list(plan.new_owners)))
     for row in pending:
-        for sender in (user.email, display_name(user)):
-            if row.body.startswith(sender + marker):
-                EmailDelivery.objects.filter(pk=row.pk).update(body="Someone" + row.body[len(sender):])
-                break
+        body = unsigned_invitation(row.body, (user.email, display_name(user)))
+        if body is not None:
+            EmailDelivery.objects.filter(pk=row.pk).update(body=body)
 
 
 def _scrubbed(value, person_id, pattern):
@@ -266,6 +267,9 @@ def delete_account(user, expected_plan=None):
         clear_assignments(sorted(set(assigned.values_list("task_list_id", flat=True))), user.pk, None)
 
         plan.deleted_tasks.delete()
+        # Any other task that still names the person as its creator stays without one, and
+        # syncs. (Task.created_by is SET_NULL too, but that wouldn't bump the version.)
+        Task.objects.filter(created_by=user).update(created_by=None, version=F("version") + 1, updated_at=now)
         TaskList.objects.filter(pk__in=list(plan.deleted_projects)).delete()
         TaskGroup.objects.filter(pk__in=list(plan.deleted_groups)).delete()
 
