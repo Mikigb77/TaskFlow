@@ -70,13 +70,29 @@ final freeVoiceLeftProvider = Provider<int?>((ref) {
 });
 
 /// An account without Pro has used this month's free dictations: Añadir
-/// tarea becomes Escribir tarea, which types. False while billing is still
-/// finding out whether the account has Pro, and when the server sent no
-/// count: then the button stays as it was.
+/// tarea becomes Nueva tarea, which opens the form, and its first tap that
+/// month says why. False while billing is still finding out whether the
+/// account has Pro, and when the server sent no count.
 final freeVoiceUsedUpProvider = Provider<bool>(
   (ref) =>
       !ref.watch(billingLoadingProvider) &&
       ref.watch(freeVoiceLeftProvider) == 0,
+);
+
+/// An account without Pro, once billing has answered: words it types never
+/// become tasks on the phone. It creates tasks with the form, and the
+/// capture sheet's keyboard opens the form (DECISIONS.md, 2026-10-18
+/// later). Dictations, and `Guardar tal cual` after one, stay. False while
+/// billing is still finding out: then the sheet types as before.
+final typesInFormProvider = Provider<bool>(
+  (ref) => !ref.watch(billingLoadingProvider) && !ref.watch(hasProProvider),
+);
+
+/// Añadir tarea opens the form at once, as Nueva tarea: an account without
+/// Pro and without the mic (no free dictation left this month, or a server
+/// that sends no count).
+final opensFormProvider = Provider<bool>(
+  (ref) => ref.watch(typesInFormProvider) && !ref.watch(voiceAvailableProvider),
 );
 
 /// When free dictations come back: the saved date, else the next calendar

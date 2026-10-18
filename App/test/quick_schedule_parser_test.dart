@@ -513,4 +513,174 @@ void main() {
           date: DateTime(2026, 9, 23, 17), title: 'Llamar al médico');
     });
   });
+
+  // ---- 2026-10-18 (voice-commands plan, item 2): a day of the month alone
+  // is this month's until it has passed, then next month's ----
+
+  group('a day of the month alone', () {
+    // Sunday 18 October 2026, 10:00.
+    final sunday = DateTime(2026, 10, 18, 10);
+
+    /// [words] said or typed on [at]: the day they name, and the title left.
+    void expectDay(
+      String words,
+      DateTime at, {
+      required DateTime day,
+      required String title,
+      bool deadline = false,
+    }) {
+      final found = QuickScheduleParser.parse(words, at);
+      expect(found, isNotNull, reason: words);
+      expect(found!.date, day, reason: words);
+      expect(found.hasTime, isFalse, reason: words);
+      expect(found.ambiguousTime, isFalse, reason: words);
+      expect(found.isDeadline, deadline, reason: words);
+      expect(found.title, title, reason: words);
+      // The phone's result, as Guardar tal cual saves it.
+      final task = localDrafts(words, at).single.task;
+      expect(task.title, title, reason: words);
+      expect(deadline ? task.deadline : task.dueDate, day, reason: words);
+      expect(deadline ? task.dueDate : task.deadline, isNull, reason: words);
+    }
+
+    /// [words] on [at] name no date: they stay the title, as typed.
+    void expectNoDay(String words, DateTime at) {
+      expect(QuickScheduleParser.parse(words, at), isNull, reason: words);
+      final task = localDrafts(words, at).single.task;
+      expect(task.dueDate, isNull, reason: words);
+      expect(task.deadline, isNull, reason: words);
+      expect(task.title.toLowerCase(), words.toLowerCase(), reason: words);
+    }
+
+    test(
+        'on Sunday 18 Oct, «el 12» has passed: it is 12 Nov; «el 20» is 20 Oct; «el 18» is today',
+        () {
+      expectDay('Entregar el informe el 12', sunday,
+          day: DateTime(2026, 11, 12), title: 'Entregar el informe');
+      expectDay('Entregar el informe el 20', sunday,
+          day: DateTime(2026, 10, 20), title: 'Entregar el informe');
+      expectDay('Llamar al médico el 18', sunday,
+          day: DateTime(2026, 10, 18), title: 'Llamar al médico');
+    });
+
+    test(
+        '«para el 12», «el día 12», «el dia 12», «per al 12», “the 12th” and “on the 1st” all name the day, and leave the title',
+        () {
+      final cases = {
+        'Comprar el regalo para el 12': ('Comprar el regalo', 11, 12),
+        'Pagar la luz el día 12': ('Pagar la luz', 11, 12),
+        'Pagar la luz el dia 25': ('Pagar la luz', 10, 25),
+        'Trucar al metge el dia 12': ('Trucar al metge', 11, 12),
+        'Pagar la llum per al 25': ('Pagar la llum', 10, 25),
+        'Reservar taula per al dia 30': ('Reservar taula', 10, 30),
+        'Dentist the 12th': ('Dentist', 11, 12),
+        'Pay rent on the 1st': ('Pay rent', 11, 1),
+        'Call Ana on the 30th': ('Call Ana', 10, 30),
+        'Book a table for the 22nd': ('Book a table', 10, 22),
+      };
+      for (final MapEntry(key: words, value: (title, month, day))
+          in cases.entries) {
+        expectDay(words, sunday,
+            day: DateTime(2026, month, day), title: title);
+      }
+    });
+
+    test('“by the 12th” and «antes del 20» are deadlines', () {
+      expectDay('Submit the report by the 12th', sunday,
+          day: DateTime(2026, 11, 12),
+          title: 'Submit the report',
+          deadline: true);
+      expectDay('Entregar el trabajo antes del 20', sunday,
+          day: DateTime(2026, 10, 20),
+          title: 'Entregar el trabajo',
+          deadline: true);
+      expectDay('Entregar el trabajo antes del día 5', sunday,
+          day: DateTime(2026, 11, 5),
+          title: 'Entregar el trabajo',
+          deadline: true);
+    });
+
+    test(
+        'a time goes with it: «el 20 a las 17:00» is 20 Oct 17:00; «el 20 a las 5» asks 05:00 or 17:00 on 20 Oct',
+        () {
+      final timed = QuickScheduleParser.parse('Médico el 20 a las 17:00', sunday)!;
+      expect(timed.date, DateTime(2026, 10, 20, 17));
+      expect(timed.hasTime, isTrue);
+      expect(timed.title, 'Médico');
+      final five = localDrafts('Médico el 20 a las 5', sunday).single;
+      expect(five.task.dueDate, DateTime(2026, 10, 20));
+      expect(five.task.hasTime, isFalse);
+      expect(five.task.title, 'Médico');
+      expect(five.clarifications.single.times, ['05:00', '17:00']);
+    });
+
+    test(
+        'at a month’s end: on Saturday 31 Oct «el 31» is today, «el 30» is 30 Nov and «el 1» is 1 Nov',
+        () {
+      final last = DateTime(2026, 10, 31, 9);
+      expectDay('Pagar el alquiler el 31', last,
+          day: DateTime(2026, 10, 31), title: 'Pagar el alquiler');
+      expectDay('Pagar el alquiler el 30', last,
+          day: DateTime(2026, 11, 30), title: 'Pagar el alquiler');
+      expectDay('Pagar el alquiler el 1', last,
+          day: DateTime(2026, 11, 1), title: 'Pagar el alquiler');
+    });
+
+    test(
+        'a day the month doesn’t have is never guessed: «el 31» on 30 Nov, «el 30» on 31 Jan, «el 29» on 31 Jan 2027',
+        () {
+      expectNoDay('Pagar el 31', DateTime(2026, 11, 30, 9));
+      expectNoDay('Pagar el 30', DateTime(2027, 1, 31, 9));
+      expectNoDay('Pagar el 29', DateTime(2027, 1, 31, 9));
+      // A day February has: 28 Feb, and 29 Feb in a leap year.
+      expectDay('Pagar el 28', DateTime(2027, 1, 31, 9),
+          day: DateTime(2027, 2, 28), title: 'Pagar');
+      expectDay('Pagar el 29', DateTime(2028, 1, 31, 9),
+          day: DateTime(2028, 2, 29), title: 'Pagar');
+    });
+
+    test(
+        'in December, a day that has passed is next January’s: on 20 Dec «el 12» is 12 Jan 2027 and «el 25» is 25 Dec; on 31 Dec “the 1st” is 1 Jan 2027',
+        () {
+      final december = DateTime(2026, 12, 20, 18);
+      expectDay('Renovar el seguro el 12', december,
+          day: DateTime(2027, 1, 12), title: 'Renovar el seguro');
+      expectDay('Cena familiar el 25', december,
+          day: DateTime(2026, 12, 25), title: 'Cena familiar');
+      final newYearsEve = DateTime(2026, 12, 31, 23);
+      expectDay('Call grandma on the 1st', newYearsEve,
+          day: DateTime(2027, 1, 1), title: 'Call grandma');
+      expectDay('Brindar el 31', newYearsEve,
+          day: DateTime(2026, 12, 31), title: 'Brindar');
+      expectDay('Pagar la cuota el 15', newYearsEve,
+          day: DateTime(2027, 1, 15), title: 'Pagar la cuota');
+    });
+
+    test(
+        'a day with its month, a range, a number that isn’t a day, or two days stay as typed',
+        () {
+      for (final words in [
+        'Cita el 12 de noviembre',
+        'Reunió el 12 de novembre',
+        'Reunió el 12 d’octubre',
+        'Cita el 12 mayo',
+        'Party on the 12th of May',
+        'Clean the 1st floor',
+        'Tomar el antibiótico hasta el 12',
+        'Vacaciones desde el 3',
+        'Turno entre el 12 y el 15',
+        'Viatge fins el 12',
+        'Off from the 12th',
+        'Pagar el 12/11',
+        'Subir el 10 por ciento',
+        'Subir el 10%',
+        'Llamar el 32',
+        'Llamar el 0',
+        'Reunión el 12 y el 14',
+        'Reunión el viernes, el 12',
+      ]) {
+        expectNoDay(words, sunday);
+      }
+    });
+  });
 }

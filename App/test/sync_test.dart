@@ -31,6 +31,7 @@ void main() {
         ..remove('assigneeId')
         ..remove('assigneeName')
         ..remove('createdBy')
+        ..remove('createdByName')
         ..remove('kind')
         ..remove('hasTime')
         ..remove('recurrence')

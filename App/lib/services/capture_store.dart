@@ -305,10 +305,12 @@ class CaptureStore {
               before.ownerKey,
             )).toMap()
             ..remove('id')
-            ..remove('createdBy');
+            ..remove('createdBy')
+            ..remove('createdByName');
       final actual = Task.fromMap(tasks.single).toMap()
         ..remove('id')
-        ..remove('createdBy');
+        ..remove('createdBy')
+        ..remove('createdByName');
       if (!const DeepCollectionEquality().equals(expected, actual)) return null;
       await TaskDatabase.validateList(
         tx,

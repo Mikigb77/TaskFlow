@@ -5,9 +5,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/text_search.dart';
+import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
+
+/// The people a shared project's page can filter by, besides the account
+/// itself (that is `Para mí`): the others who can be given tasks. None
+/// unless the project is shared with 2 or more people.
+List<ProjectMember> projectPeopleToFilter(TaskListInfo? project, int? me) =>
+    project == null || !project.shared || project.people.length < 2
+    ? const []
+    : project.people.where((p) => p.id != me && p.canEdit).toList();
 
 class ProjectScopeControl extends ConsumerWidget {
   const ProjectScopeControl({
@@ -16,6 +25,8 @@ class ProjectScopeControl extends ConsumerWidget {
     this.padding = EdgeInsets.zero,
     this.team,
     this.onTeamChanged,
+    this.person,
+    this.onPeopleChanged,
   });
   final String? fixedProjectId;
 
@@ -23,6 +34,14 @@ class ProjectScopeControl extends ConsumerWidget {
   /// Without it, the chips change the app-wide scope.
   final bool? team;
   final ValueChanged<bool>? onTeamChanged;
+
+  /// A shared project page's person: their tasks only. With
+  /// [onPeopleChanged], a project shared with 2 or more people shows one row
+  /// of chips, `Todas · Para mí · Ana · Paul…`, in place of `Para mí` and
+  /// `Todas`. It gets the page's `Todas`/`Para mí` choice ([team]) and the
+  /// person (null for none).
+  final int? person;
+  final void Function(bool team, int? person)? onPeopleChanged;
 
   /// Applied only when the control draws something, so an empty one takes
   /// no room.
@@ -42,6 +61,23 @@ class ProjectScopeControl extends ConsumerWidget {
     final selected = projects.where((p) => p.id == selectedId).firstOrNull;
     final shared =
         selected?.shared ?? projects.any((p) => p.shared && !p.inactive);
+    final people = fixedProjectId == null || onPeopleChanged == null
+        ? const <ProjectMember>[]
+        : projectPeopleToFilter(
+            selected,
+            ref.watch(authProvider.select((s) => s.account?.id)),
+          );
+    if (people.isNotEmpty) {
+      return Padding(
+        padding: padding,
+        child: _PeopleFilter(
+          people: people,
+          team: team,
+          person: people.any((p) => p.id == person) ? person : null,
+          onChanged: onPeopleChanged!,
+        ),
+      );
+    }
     // A scope chip means nothing until there is a project to scope to.
     final showScope =
         fixedProjectId == null && (projects.isNotEmpty || selectedId != null);
@@ -171,6 +207,66 @@ class ProjectScopeControl extends ConsumerWidget {
               selected: team,
               onSelected: (_) => setTeam(true),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One row of chips on a shared project's page: everyone's tasks, the
+/// account's own, then each other person's. It scrolls sideways when the
+/// names don't fit, so it never pushes the tasks down.
+class _PeopleFilter extends StatelessWidget {
+  const _PeopleFilter({
+    required this.people,
+    required this.team,
+    required this.person,
+    required this.onChanged,
+  });
+  final List<ProjectMember> people;
+  final bool team;
+  final int? person;
+  final void Function(bool team, int? person) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [
+      ChoiceChip(
+        key: const ValueKey('people-all'),
+        label: Text(context.l10n.forTeam),
+        selected: team && person == null,
+        onSelected: (_) => onChanged(true, null),
+      ),
+      ChoiceChip(
+        key: const ValueKey('people-me'),
+        label: Text(context.l10n.forMe),
+        selected: !team && person == null,
+        onSelected: (_) => onChanged(false, null),
+      ),
+      for (final member in people)
+        ChoiceChip(
+          key: ValueKey('people-${member.id}'),
+          label: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: Text(
+              member.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          selected: person == member.id,
+          onSelected: (_) => onChanged(true, member.id),
+        ),
+    ];
+    return SingleChildScrollView(
+      key: const ValueKey('people-filter'),
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < chips.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            chips[i],
           ],
         ],
       ),

@@ -743,8 +743,8 @@ class AppLocalizationsCa extends AppLocalizations {
       'Prova-ho: toca Afegeix una tasca i escriu «Demà, trucar al dentista».';
 
   @override
-  String get calendarTryTypingWrite =>
-      'Prova-ho: toca Escriu una tasca i escriu «Demà, trucar al dentista».';
+  String get calendarTryForm =>
+      'Prova-ho: toca Tasca nova, escriu «Trucar al dentista» i toca Demà.';
 
   @override
   String get planTask => 'Planifica una tasca';
@@ -813,12 +813,12 @@ class AppLocalizationsCa extends AppLocalizations {
       'Les tasques sense data esperen aquí fins que en triïs una.\nComença amb Afegeix una tasca.';
 
   @override
-  String get tasksEmptyWrite =>
-      'Toca Escriu una tasca per afegir-ne una. La data és opcional.';
+  String get tasksEmptyForm =>
+      'Toca Tasca nova per afegir-ne una. La data és opcional.';
 
   @override
-  String get inboxEmptyWrite =>
-      'Les tasques sense data esperen aquí fins que en triïs una.\nComença amb Escriu una tasca.';
+  String get inboxEmptyForm =>
+      'Les tasques sense data esperen aquí fins que en triïs una.\nComença amb Tasca nova.';
 
   @override
   String get savedOnDevice => 'Les tasques desades continuen al dispositiu.';
@@ -3549,7 +3549,21 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get writeTask => 'Escriu una tasca';
+  String get newTask => 'Tasca nova';
+
+  @override
+  String get captureFillByHand => 'Emplena-la a mà';
+
+  @override
+  String get pickDay => 'Tria un dia';
+
+  @override
+  String get removeTime => 'Treu l’hora';
+
+  @override
+  String createdBy(String name) {
+    return 'Creada per $name';
+  }
 
   @override
   String freeVoiceNoticeTitle(int limit) {
@@ -3570,11 +3584,11 @@ class AppLocalizationsCa extends AppLocalizations {
       other: 'El dia $date tindràs $limit dictats més.',
       one: 'El dia $date tindràs 1 dictat més.',
     );
-    return 'Pots continuar creant tasques escrivint-les, sense límit. $_temp0';
+    return 'Pots continuar creant tasques amb el formulari, sense límit. $_temp0';
   }
 
   @override
-  String get freeVoiceNoticeWrite => 'Escriu una tasca';
+  String get freeVoiceNoticeCreate => 'Crea una tasca';
 
   @override
   String storageUsage(int used, int limit) {

@@ -5,8 +5,12 @@
 // when the words are saved as written or dropped while understood.
 // P90 (UX-498): used up — the words are kept, typing takes over, and the
 // sheet says when more come.
-// 2026-10-18 (DECISIONS.md): at 0 left the button reads Escribir tarea, and
-// its first tap of the month says so once.
+// 2026-10-18 (DECISIONS.md): at 0 left the button's first tap of the month
+// says so once.
+// 2026-10-18 later: free accounts create tasks with the form. At 0 left the
+// button reads Nueva tarea and opens it; with dictations left, the sheet's
+// keyboard reads Rellenar a mano and opens it; typed words never reach the
+// phone's parser.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -39,6 +43,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/widgets/task_editor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -180,56 +185,233 @@ void main() {
     },
   );
 
-  for (final pro in [false, true]) {
+  testWidgets(
+    'UX-497: with Pro, typed words go to the assistant as today, through the keyboard',
+    (tester) async {
+      final app = await _FreeApp.open(tester, pro: true);
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(app.speech.starts, 1, reason: 'it opens on the mic');
+      expect(find.byKey(const ValueKey('capture-fill-by-hand')), findsNothing);
+      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.pumpAndSettle();
+      await tester.enterText(words(), 'Comprar pan');
+      await tester.pumpAndSettle();
+      await tester.tap(button(es.done));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(app.api.drafts, hasLength(1));
+      expect(app.api.drafts.single['source'], 'typed');
+      expect(
+        app.store.sessions.values.single.drafts.single.task.title,
+        'Comprar pan',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- 2026-10-18 (later): free accounts fill in the form ----
+
+  Finder form() => find.byType(TaskEditor);
+  String formTitle(WidgetTester tester) => tester
+      .widget<TextFormField>(find.byKey(const ValueKey('task-title')))
+      .controller!
+      .text;
+  bool formTitleFocused(WidgetTester tester) => tester
+      .widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const ValueKey('task-title')),
+          matching: find.byType(EditableText),
+        ),
+      )
+      .focusNode
+      .hasFocus;
+
+  testWidgets(
+    '2026-10-18: a free account with dictations left opens Añadir tarea on the mic; the keyboard reads Rellenar a mano, and it opens the form, with nothing sent, no dictation used and nothing kept',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      expect(app.speech.starts, 1, reason: 'mic first, as today');
+      expect(find.byTooltip(es.captureTypeInstead), findsNothing);
+      final byHand = find.byKey(const ValueKey('capture-fill-by-hand'));
+      expect(byHand, findsOneWidget);
+      expect(
+        find.descendant(of: byHand, matching: find.text(es.captureFillByHand)),
+        findsOneWidget,
+      );
+      expect(es.captureFillByHand, 'Rellenar a mano');
+      await tester.tap(byHand);
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(BottomSheet),
+        findsNothing,
+        reason: 'the sheet closed',
+      );
+      expect(form(), findsOneWidget);
+      expect(formTitle(tester), isEmpty);
+      expect(formTitleFocused(tester), isTrue);
+      expect(app.api.drafts, isEmpty);
+      expect(app.container.read(freeVoiceLeftProvider), 5);
+      expect(
+        await app.container.read(pendingCapturesProvider.future),
+        isEmpty,
+        reason: 'nothing waits in Sin guardar',
+      );
+      // The form saves the task with no assistant and no parser.
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Comprar pan mañana',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('task-save')));
+      await tester.pumpAndSettle();
+      expect(form(), findsNothing);
+      expect(app.tasks.titles(), ['Comprar pan mañana']);
+      expect(app.tasks.state.requireValue.single.dueDate, isNull);
+      expect(app.api.drafts, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'ca']) {
     testWidgets(
-      'UX-497: ${pro ? 'with Pro, typed words go to the assistant as today' : 'a free account’s typed words are understood on the phone with no request and use no dictation'}',
+      '2026-10-18 (later): at 2× text on 320 dp ($language), the listening sheet shows Listo, Cancelar and Rellenar a mano in full, in view, with no overflow',
       (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = strings(language);
         final app = await _FreeApp.open(
           tester,
-          pro: pro,
-          freeVoice: pro ? null : freeVoice(5),
+          language: language,
+          freeVoice: freeVoice(5),
+          size: const Size(320, 640),
         );
-        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.tap(find.text(l.addTask).hitTestable());
         await tester.pumpAndSettle();
-        expect(app.speech.starts, 1, reason: 'both open on the mic');
-        await tester.tap(find.byTooltip(es.captureTypeInstead));
-        await tester.pumpAndSettle();
-        await tester.enterText(words(), 'Comprar pan');
-        await tester.pumpAndSettle();
-        await tester.tap(button(es.done));
-        await tester.pumpAndSettle();
-        expect(find.byType(CaptureResult), findsOneWidget);
-        expect(app.api.drafts, hasLength(pro ? 1 : 0));
-        expect(
-          app.store.sessions.values.single.drafts.single.task.title,
-          'Comprar pan',
-        );
-        if (!pro) {
-          expect(app.container.read(freeVoiceLeftProvider), 5);
-          expect(find.byKey(const ValueKey('free-voice-left')), findsNothing);
+        expect(app.speech.starts, 1);
+        app.speech.send('ready');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        final byHand = find.byKey(const ValueKey('capture-fill-by-hand'));
+        for (final finder in [
+          byHand,
+          inSheet(find.widgetWithText(TextButton, l.cancel)),
+          button(l.done),
+        ]) {
+          expect(finder, findsOneWidget, reason: '$finder');
+          expect(finder.hitTestable(), findsOneWidget, reason: '$finder');
+          final rect = tester.getRect(finder);
+          expect(rect.left, greaterThanOrEqualTo(0), reason: '$finder');
+          expect(rect.right, lessThanOrEqualTo(320.5), reason: '$finder');
+          expect(rect.bottom, lessThanOrEqualTo(640.5), reason: '$finder');
         }
-        expect(tester.takeException(), isNull);
+        final label = find.descendant(
+          of: byHand,
+          matching: find.text(l.captureFillByHand),
+        );
+        expect(label, findsOneWidget);
+        expect(
+          tester
+              .renderObject<RenderParagraph>(
+                find.descendant(of: label, matching: find.byType(RichText)),
+              )
+              .didExceedMaxLines,
+          isFalse,
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
       },
     );
   }
 
+  test(
+    '2026-10-18 (later): the sheet’s way to the form reads Fill in by hand / Rellenar a mano / Emplena-la a mà',
+    () {
+      expect(en.captureFillByHand, 'Fill in by hand');
+      expect(es.captureFillByHand, 'Rellenar a mano');
+      expect(ca.captureFillByHand, 'Emplena-la a mà');
+    },
+  );
+
   testWidgets(
-    'UX-497: with no free_voice block (an older server), a free account’s Añadir tarea opens typing with the + icon and no recorder',
+    '2026-10-18: words already heard go with Rellenar a mano: they are the form’s title, unsent, and the capture is dropped',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'llamar al dentista');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.byKey(const ValueKey('capture-fill-by-hand')));
+      await tester.pumpAndSettle();
+      expect(form(), findsOneWidget);
+      expect(formTitle(tester), 'Llamar al dentista');
+      expect(app.api.drafts, isEmpty, reason: 'no dictation used');
+      expect(
+        app.store.sessions.values.every((s) => s.status == 'discarded'),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18: a free account’s typed or shared words never reach the phone’s parser: shared text opens the sheet with its words and Rellenar a mano, which takes them to the form',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      final owner = app.container.read(captureOwnerProvider);
+      app.store.sessions['shared'] = CaptureSession(
+        id: 'shared',
+        ownerKey: owner,
+        timezone: 'Europe/Madrid',
+        capturedAt: DateTime.now().toUtc(),
+        text: 'Comprar pilas el viernes',
+        source: 'typed',
+      );
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(Scaffold).first),
+          captureId: 'shared',
+          startListening: false,
+          typing: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(words(), findsOneWidget);
+      expect(button(es.done), findsNothing);
+      await tester.tap(button(es.captureFillByHand));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(form(), findsOneWidget);
+      expect(formTitle(tester), 'Comprar pilas el viernes');
+      expect(app.api.drafts, isEmpty);
+      expect(app.store.sessions['shared']!.status, 'discarded');
+      expect(find.byType(CaptureResult), findsNothing, reason: 'no parser');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-497 / 2026-10-18: with no free_voice block (an older server), a free account’s button reads Nueva tarea with the + icon and opens the form, with no recorder and no notice',
     (tester) async {
       final app = await _FreeApp.open(tester);
       expect(
         find.descendant(
-          of: find.widgetWithText(FilledButton, es.addTask),
+          of: find.widgetWithText(FilledButton, es.newTask),
           matching: find.byIcon(Icons.add_rounded),
         ),
         findsOneWidget,
       );
-      await tester.tap(find.text(es.addTask).hitTestable());
+      expect(find.text(es.addTask), findsNothing);
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
-      expect(words(), findsOneWidget);
+      expect(form(), findsOneWidget);
+      expect(find.byType(VoiceTaskScreen), findsNothing);
+      expect(find.byKey(const ValueKey('free-voice-notice')), findsNothing);
       expect(app.speech.starts, 0);
       expect(app.recorders, 0);
-      expect(find.byKey(const ValueKey('free-voice-used-up')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -400,11 +582,11 @@ void main() {
 
   for (final language in ['es', 'en', 'ca']) {
     testWidgets(
-      'UX-498: at 0 left, Escribir tarea opens typing with the used-up line naming the reset date and Ver Pro, and no recorder ($language)',
+      'UX-498 / 2026-10-18: at 0 left, Nueva tarea opens the form, with no recorder and no request, and the task is saved ($language)',
       (tester) async {
         final l = strings(language);
         final resets = nextReset();
-        // This month's notice already seen: the tap goes straight to typing.
+        // This month's notice already seen: the tap goes straight to the form.
         final app = await _FreeApp.open(
           tester,
           language: language,
@@ -413,33 +595,26 @@ void main() {
         );
         expect(
           find.descendant(
-            of: find.widgetWithText(FilledButton, l.writeTask),
-            matching: find.byIcon(Icons.edit_outlined),
+            of: find.widgetWithText(FilledButton, l.newTask),
+            matching: find.byIcon(Icons.add_rounded),
           ),
           findsOneWidget,
         );
-        await tester.tap(find.text(l.writeTask).hitTestable());
+        await tester.tap(find.text(l.newTask).hitTestable());
         await tester.pumpAndSettle();
-        expect(words(), findsOneWidget, reason: 'it opens typing');
+        expect(form(), findsOneWidget, reason: 'it opens the form');
+        expect(find.byType(VoiceTaskScreen), findsNothing);
+        expect(formTitleFocused(tester), isTrue);
         expect(app.recorders, 0);
         expect(app.speech.starts, 0);
-        final line = find.byKey(const ValueKey('free-voice-used-up'));
-        expect(line, findsOneWidget);
-        expect(
-          tester.widget<Text>(line).data,
-          l.freeVoiceUsedUp(resetDay(tester, resets)),
+        await tester.enterText(
+          find.byKey(const ValueKey('task-title')),
+          'Comprar pan',
         );
-        expect(find.text(l.captureSpeakingIsPro), findsNothing);
-        expect(
-          inSheet(find.widgetWithText(TextButton, l.voiceProAction)),
-          findsOneWidget,
-        );
-        // Typing still works, understood on the phone.
-        await tester.enterText(words(), 'Comprar pan');
         await tester.pumpAndSettle();
-        await tester.tap(button(l.done));
+        await tester.tap(find.byKey(const ValueKey('task-save')));
         await tester.pumpAndSettle();
-        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(app.tasks.titles(), ['Comprar pan']);
         expect(app.api.drafts, isEmpty);
         expect(tester.takeException(), isNull);
       },
@@ -1359,15 +1534,17 @@ void main() {
           if (!DateTime.utc(year, 11, 1, 12).isAfter(now)) year++;
           final resets = DateTime.utc(year, 11, 1, 12);
           const size = Size(320, 740);
+          // While billing hasn't answered yet, the sheet types as before the
+          // form (2026-10-18 later), with the used-up line.
           final app = await _FreeApp.open(
             tester,
             language: language,
             freeVoice: freeVoice(0, resets: resets),
             size: size,
-            noticeSeen: true,
+            billingLoading: true,
           );
           final l = strings(language);
-          await tester.tap(find.text(l.writeTask).hitTestable());
+          await tester.tap(find.text(l.addTask).hitTestable());
           await tester.pumpAndSettle();
           // The keyboard comes up for the focused field.
           tester.view.viewInsets = const FakeViewPadding(bottom: 300);
@@ -1418,7 +1595,8 @@ void main() {
     }
   });
 
-  // ---- 2026-10-18: Escribir tarea once the free dictations are used up ----
+  // ---- 2026-10-18: once the free dictations are used up, the button opens
+  // the form (2026-10-18 later: Nueva tarea, replacing Escribir tarea) ----
 
   Finder notice() => find.byKey(const ValueKey('free-voice-notice'));
   Finder inActions(Finder finder) =>
@@ -1445,20 +1623,20 @@ void main() {
   }
 
   test(
-    '2026-10-18: the button reads Escribir tarea / Write a task / Escriu una tasca; the notice names the limit and the date, with its date mid-sentence in Catalan',
+    '2026-10-18 (later): the button reads Nueva tarea / New task / Tasca nova; the notice speaks of the form, names the limit and the date (mid-sentence in Catalan) and offers Crear una tarea',
     () {
-      expect(es.writeTask, 'Escribir tarea');
-      expect(en.writeTask, 'Write a task');
-      expect(ca.writeTask, 'Escriu una tasca');
+      expect(es.newTask, 'Nueva tarea');
+      expect(en.newTask, 'New task');
+      expect(ca.newTask, 'Tasca nova');
       expect(
         es.freeVoiceNoticeTitle(10),
         'Has usado tus 10 dictados gratis de este mes',
       );
       expect(
         es.freeVoiceNoticeBody(10, '1 nov'),
-        'Puedes seguir creando tareas escribiéndolas, sin límite. Tendrás 10 dictados más el 1 nov.',
+        'Puedes seguir creando tareas con el formulario, sin límite. Tendrás 10 dictados más el 1 nov.',
       );
-      expect(es.freeVoiceNoticeWrite, 'Escribir una tarea');
+      expect(es.freeVoiceNoticeCreate, 'Crear una tarea');
       expect(es.voiceProAction, 'Ver Pro');
       expect(
         en.freeVoiceNoticeTitle(10),
@@ -1466,9 +1644,9 @@ void main() {
       );
       expect(
         en.freeVoiceNoticeBody(10, 'Nov 1'),
-        'You can keep creating tasks by typing them, with no limit. You’ll get 10 more dictations on Nov 1.',
+        'You can keep creating tasks with the form, with no limit. You’ll get 10 more dictations on Nov 1.',
       );
-      expect(en.freeVoiceNoticeWrite, 'Write a task');
+      expect(en.freeVoiceNoticeCreate, 'Create a task');
       expect(
         ca.freeVoiceNoticeTitle(10),
         'Has fet servir els 10 dictats gratuïts d’aquest mes',
@@ -1476,9 +1654,9 @@ void main() {
       // The date keeps its own full stop: «1 de nov.».
       expect(
         ca.freeVoiceNoticeBody(10, '1 de nov.'),
-        'Pots continuar creant tasques escrivint-les, sense límit. El dia 1 de nov. tindràs 10 dictats més.',
+        'Pots continuar creant tasques amb el formulari, sense límit. El dia 1 de nov. tindràs 10 dictats més.',
       );
-      expect(ca.freeVoiceNoticeWrite, 'Escriu una tasca');
+      expect(ca.freeVoiceNoticeCreate, 'Crea una tasca');
       // The limit comes from the account, in the singular too.
       expect(
         es.freeVoiceNoticeTitle(1),
@@ -1515,28 +1693,40 @@ void main() {
   );
 
   test(
-    '2026-10-18: the lines that name the button name Escribir tarea when it reads so, and are otherwise unchanged',
+    '2026-10-18 (later): the lines that name the button name Nueva tarea when it reads so; the first-run line says to tap Mañana, as the form reads no dates from words',
     () {
       for (final l in [en, es, ca]) {
-        String swap(String text) => text.replaceFirst(l.addTask, l.writeTask);
-        expect(l.calendarTryTypingWrite, swap(l.calendarTryTyping));
-        expect(l.tasksEmptyWrite, swap(l.tasksEmpty));
-        expect(l.inboxEmptyWrite, swap(l.inboxEmpty));
+        String swap(String text) => text.replaceFirst(l.addTask, l.newTask);
+        expect(l.tasksEmptyForm, swap(l.tasksEmpty));
+        expect(l.inboxEmptyForm, swap(l.inboxEmpty));
         for (final text in [
-          l.calendarTryTypingWrite,
-          l.tasksEmptyWrite,
-          l.inboxEmptyWrite,
+          l.calendarTryForm,
+          l.tasksEmptyForm,
+          l.inboxEmptyForm,
         ]) {
-          expect(text, contains(l.writeTask), reason: text);
+          expect(text, contains(l.newTask), reason: text);
           expect(text, isNot(contains(l.addTask)), reason: text);
         }
+        expect(l.calendarTryForm, contains(l.tomorrow));
       }
+      expect(
+        es.calendarTryForm,
+        'Prueba: toca Nueva tarea, escribe «Llamar al dentista» y toca Mañana.',
+      );
+      expect(
+        ca.calendarTryForm,
+        'Prova-ho: toca Tasca nova, escriu «Trucar al dentista» i toca Demà.',
+      );
+      expect(
+        en.calendarTryForm,
+        'Try it: tap New task, type “Call the dentist” and tap Tomorrow.',
+      );
     },
   );
 
   for (final language in ['es', 'en', 'ca']) {
     testWidgets(
-      '2026-10-18: a free account with no dictations left this month sees Escribir tarea with a pencil instead of Añadir tarea ($language)',
+      '2026-10-18 (later): a free account with no dictations left this month sees Nueva tarea with + instead of Añadir tarea ($language)',
       (tester) async {
         final l = strings(language);
         final app = await _FreeApp.open(
@@ -1545,7 +1735,8 @@ void main() {
           freeVoice: freeVoice(0),
         );
         expect(app.container.read(freeVoiceUsedUpProvider), isTrue);
-        expectButton(l.writeTask, Icons.edit_outlined);
+        expect(app.container.read(opensFormProvider), isTrue);
+        expectButton(l.newTask, Icons.add_rounded);
         expect(find.text(l.addTask), findsNothing);
         expect(tester.takeException(), isNull);
       },
@@ -1574,13 +1765,6 @@ void main() {
       true,
       Icons.add_rounded,
     ),
-    (
-      'Free on an older server that sends no count',
-      false,
-      null,
-      false,
-      Icons.add_rounded,
-    ),
   ]) {
     testWidgets(
       '2026-10-18: $state keeps Añadir tarea with today’s icon, and its tap opens the sheet with no notice',
@@ -1592,12 +1776,14 @@ void main() {
           billingLoading: loading,
         );
         expect(app.container.read(freeVoiceUsedUpProvider), isFalse);
+        expect(app.container.read(opensFormProvider), isFalse);
         expectButton(es.addTask, icon);
-        expect(find.text(es.writeTask), findsNothing);
+        expect(find.text(es.newTask), findsNothing);
         await tester.tap(find.text(es.addTask).hitTestable());
         await tester.pumpAndSettle();
         expect(notice(), findsNothing);
         expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(form(), findsNothing);
         expect(app.notices.writes, 0);
         expect(app.notices.months, isEmpty);
         expect(tester.takeException(), isNull);
@@ -1684,21 +1870,55 @@ void main() {
       );
       expect(c.read(hasProProvider), isTrue);
       expect(c.read(freeVoiceUsedUpProvider), isFalse);
+      // Its typed words still go to the assistant, as with Pro.
+      expect(c.read(typesInFormProvider), isFalse);
+      expect(c.read(opensFormProvider), isFalse);
+    });
+
+    test('2026-10-18 (later): without Pro, once billing has answered, typed '
+        'words go to the form; the button opens it at once when there is no '
+        'mic; Pro and billing not known yet keep today’s behaviour', () {
+      bool types(ProviderContainer c) => c.read(typesInFormProvider);
+      bool opens(ProviderContainer c) => c.read(opensFormProvider);
+      final left = container(free: freeVoice(3, resets: resets));
+      expect(types(left), isTrue);
+      expect(opens(left), isFalse, reason: 'the mic first');
+      final none = container(free: freeVoice(0, resets: resets));
+      expect(types(none), isTrue);
+      expect(opens(none), isTrue);
+      final older = container();
+      expect(types(older), isTrue, reason: 'an older server');
+      expect(opens(older), isTrue);
+      final loading = container(
+        free: freeVoice(0, resets: resets),
+        loading: true,
+      );
+      expect(types(loading), isFalse, reason: 'not known yet');
+      expect(opens(loading), isFalse);
+      final pro = container(free: freeVoice(0, resets: resets), pro: true);
+      expect(types(pro), isFalse);
+      expect(opens(pro), isFalse);
+      // From the reset on, the mic is back: Añadir tarea again.
+      final renewed = container(
+        free: freeVoice(0, resets: resets),
+        now: resets,
+      );
+      expect(opens(renewed), isFalse);
     });
   });
 
   testWidgets(
-    '2026-10-18: the first tap of the month at 0 left shows the notice, with the account’s limit and the local reset date; Escribir una tarea opens typing, focused, with the used-up line and no recorder; the next tap types at once',
+    '2026-10-18 (later): the first tap of the month at 0 left shows the notice, with the account’s limit and the local reset date; Crear una tarea opens the form, its title focused, with no recorder; the next tap opens the form at once',
     (tester) async {
       final resets = nextReset();
       final app = await _FreeApp.open(
         tester,
         freeVoice: freeVoice(0, resets: resets),
       );
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsOneWidget);
-      expect(words(), findsNothing, reason: 'the notice comes first');
+      expect(form(), findsNothing, reason: 'the notice comes first');
       expect(inNotice(find.text(es.freeVoiceNoticeTitle(10))), findsOneWidget);
       expect(
         inNotice(
@@ -1710,26 +1930,25 @@ void main() {
       expect(app.notices.months, {app.owner: resets});
 
       await tester.tap(
-        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeWrite)),
+        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeCreate)),
       );
       await tester.pumpAndSettle();
       expect(notice(), findsNothing);
-      expect(words(), findsOneWidget);
-      expect(wordsFocused(tester), isTrue);
-      // The sheet's own used-up line stays, as it was.
-      expect(find.byKey(const ValueKey('free-voice-used-up')), findsOneWidget);
+      expect(form(), findsOneWidget);
+      expect(formTitleFocused(tester), isTrue);
+      expect(find.byType(VoiceTaskScreen), findsNothing);
       expect(app.recorders, 0);
       expect(app.speech.starts, 0);
 
-      // Closed with nothing typed: the next tap types at once.
+      // Closed with nothing typed: the next tap opens the form at once.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(words(), findsNothing);
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      expect(form(), findsNothing);
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsNothing);
-      expect(words(), findsOneWidget);
-      expect(wordsFocused(tester), isTrue);
+      expect(form(), findsOneWidget);
+      expect(formTitleFocused(tester), isTrue);
       expect(app.notices.writes, 1);
       expect(app.recorders, 0);
       expect(app.speech.starts, 0);
@@ -1738,35 +1957,38 @@ void main() {
   );
 
   testWidgets(
-    '2026-10-18: at 0 left no recorder is ever created and the mic is never readied: not on Calendar, not behind the notice, not in the sheet, not on the next tap',
+    '2026-10-18: at 0 left no recorder is ever created and the mic is never readied: not on Calendar, not behind the notice, not in the form, not on the next tap',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
       await frames(tester);
       expect(app.speech.warms, 0, reason: 'speech is readied only for the mic');
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsOneWidget);
       expect(app.recorders, 0);
       await tester.tap(
-        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeWrite)),
+        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeCreate)),
       );
       await tester.pumpAndSettle();
-      expect(words(), findsOneWidget);
+      expect(form(), findsOneWidget);
       expect(app.recorders, 0);
       // Closed with nothing typed, and opened again.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      expect(form(), findsNothing);
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
-      expect(words(), findsOneWidget);
-      // Typed and understood on the phone: still none.
-      await tester.enterText(words(), 'Comprar pan');
+      expect(form(), findsOneWidget);
+      // A task saved from the form: still none, and nothing asked.
+      await tester.enterText(
+        find.byKey(const ValueKey('task-title')),
+        'Comprar pan',
+      );
       await tester.pumpAndSettle();
-      await tester.tap(button(es.done));
+      await tester.tap(find.byKey(const ValueKey('task-save')));
       await tester.pumpAndSettle();
-      expect(find.byType(CaptureResult), findsOneWidget);
-      expect(app.api.drafts, isEmpty, reason: 'understood on the phone');
+      expect(app.tasks.titles(), ['Comprar pan']);
+      expect(app.api.drafts, isEmpty);
       expect(app.recorders, 0);
       expect(app.speech.starts, 0);
       expect(app.speech.warms, 0);
@@ -1775,30 +1997,30 @@ void main() {
   );
 
   testWidgets(
-    '2026-10-18: closing the notice opens nothing; it doesn’t come back, and the next tap types at once',
+    '2026-10-18: closing the notice opens nothing; it doesn’t come back, and the next tap opens the form at once',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(notice(), findsNothing);
-      expect(words(), findsNothing);
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      expect(form(), findsNothing);
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsNothing);
-      expect(words(), findsOneWidget);
+      expect(form(), findsOneWidget);
       expect(app.notices.writes, 1);
       expect(tester.takeException(), isNull);
     },
   );
 
   testWidgets(
-    '2026-10-18: Ver Pro on the notice opens the Pro screen, as the sheet’s Ver Pro does; back on Calendar, Escribir tarea types at once',
+    '2026-10-18: Ver Pro on the notice opens the Pro screen, as the sheet’s Ver Pro does; back on Calendar, Nueva tarea opens the form at once',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       await tester.tap(
         inNotice(find.widgetWithText(TextButton, es.voiceProAction)),
@@ -1806,14 +2028,37 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SubscriptionScreen), findsOneWidget);
       expect(notice(), findsNothing);
-      expect(words(), findsNothing);
+      expect(form(), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(SubscriptionScreen), findsNothing);
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsNothing);
-      expect(words(), findsOneWidget);
+      expect(form(), findsOneWidget);
+      expect(app.recorders, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    '2026-10-18 (later): at 0 left, the widget’s Dictar una tarea opens the form too, after the same notice once a month',
+    (tester) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(0));
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(Scaffold).first),
+          askedToSpeak: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(notice(), findsOneWidget);
+      await tester.tap(
+        inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeCreate)),
+      );
+      await tester.pumpAndSettle();
+      expect(form(), findsOneWidget);
+      expect(find.byType(VoiceTaskScreen), findsNothing);
       expect(app.recorders, 0);
       expect(tester.takeException(), isNull);
     },
@@ -1831,7 +2076,7 @@ void main() {
         freeVoice: freeVoice(0, resets: resets),
         notices: notices,
       );
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsOneWidget);
       expect(notices.months[app.owner], resets);
@@ -1845,10 +2090,10 @@ void main() {
         freeVoice: freeVoice(0, resets: resets),
         notices: notices,
       );
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsNothing);
-      expect(words(), findsOneWidget);
+      expect(form(), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1865,7 +2110,7 @@ void main() {
         notices: notices,
       );
       expect(app.owner, 'http://free.test/users/2');
-      await tester.tap(find.text(es.writeTask).hitTestable());
+      await tester.tap(find.text(es.newTask).hitTestable());
       await tester.pumpAndSettle();
       expect(notice(), findsOneWidget);
       expect(notices.months, {
@@ -1878,7 +2123,7 @@ void main() {
 
   for (final language in ['es', 'ca', 'en']) {
     testWidgets(
-      '2026-10-18: at 2× text on 320 dp ($language), Escribir tarea and its notice read in full with no overflow; both notice buttons can be reached, and TalkBack reads the title as a heading as it opens',
+      '2026-10-18: at 2× text on 320 dp ($language), Nueva tarea and its notice read in full with no overflow; both notice buttons can be reached, and TalkBack reads the title as a heading as it opens',
       (tester) async {
         tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -1890,7 +2135,7 @@ void main() {
           freeVoice: freeVoice(0, resets: resets),
           size: const Size(320, 640),
         );
-        final label = inActions(find.text(l.writeTask));
+        final label = inActions(find.text(l.newTask));
         expect(label, findsOneWidget);
         final rect = tester.getRect(label);
         expect(rect.left, greaterThanOrEqualTo(0));
@@ -1911,7 +2156,7 @@ void main() {
           find.text(l.freeVoiceNoticeBody(10, resetDay(tester, resets))),
         );
         final write = inNotice(
-          find.widgetWithText(FilledButton, l.freeVoiceNoticeWrite),
+          find.widgetWithText(FilledButton, l.freeVoiceNoticeCreate),
         );
         final pro = inNotice(find.widgetWithText(TextButton, l.voiceProAction));
         for (final finder in [title, body, write, pro]) {
@@ -1945,17 +2190,23 @@ void main() {
   }
 
   testWidgets(
-    '2026-10-18: at 0 left, the first-run line on Calendar and the empty Tareas list name Escribir tarea, the button they point to',
+    '2026-10-18 (later): at 0 left, the first-run line on Calendar and the empty Tareas and Sin fecha lists name Nueva tarea, the button they point to',
     (tester) async {
       await _FreeApp.open(tester, freeVoice: freeVoice(0));
-      expect(find.text(es.calendarTryTypingWrite), findsOneWidget);
+      expect(find.text(es.calendarTryForm), findsOneWidget);
       expect(find.text(es.calendarTryTyping), findsNothing);
       tester
           .state<NavigatorState>(find.byType(Navigator).first)
           .pushNamed('/home');
       await tester.pumpAndSettle();
-      expect(find.text(es.tasksEmptyWrite), findsOneWidget);
+      expect(find.text(es.tasksEmptyForm), findsOneWidget);
       expect(find.text(es.tasksEmpty), findsNothing);
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed('/inbox');
+      await tester.pumpAndSettle();
+      expect(find.text(es.inboxEmptyForm), findsOneWidget);
+      expect(find.text(es.inboxEmpty), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1965,7 +2216,7 @@ void main() {
     (tester) async {
       await _FreeApp.open(tester, freeVoice: freeVoice(5));
       expect(find.text(es.calendarTrySaying), findsOneWidget);
-      expect(find.text(es.calendarTryTypingWrite), findsNothing);
+      expect(find.text(es.calendarTryForm), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

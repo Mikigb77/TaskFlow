@@ -1300,11 +1300,11 @@ abstract class AppLocalizations {
   /// **'Try it: tap Add a task and type “Tomorrow, call the dentist.”'**
   String get calendarTryTyping;
 
-  /// calendarTryTyping while the button reads Write a task: an account without Pro whose free dictations are used up this month.
+  /// Calendar's empty state while the account has no tasks or notes yet and the button reads New task: it opens the task form (an account without Pro and no free dictation left). The form doesn't read dates from the words: Tomorrow is the chip under the title.
   ///
   /// In en, this message translates to:
-  /// **'Try it: tap Write a task and type “Tomorrow, call the dentist.”'**
-  String get calendarTryTypingWrite;
+  /// **'Try it: tap New task, type “Call the dentist” and tap Tomorrow.'**
+  String get calendarTryForm;
 
   /// No description provided for @planTask.
   ///
@@ -1426,17 +1426,17 @@ abstract class AppLocalizations {
   /// **'Tasks without a date wait here until you choose one.\nStart with Add a task.'**
   String get inboxEmpty;
 
-  /// tasksEmpty while the button reads Write a task: an account without Pro whose free dictations are used up this month.
+  /// tasksEmpty while the button reads New task (newTask).
   ///
   /// In en, this message translates to:
-  /// **'Tap Write a task to add one. A date is optional.'**
-  String get tasksEmptyWrite;
+  /// **'Tap New task to add one. A date is optional.'**
+  String get tasksEmptyForm;
 
-  /// inboxEmpty while the button reads Write a task: an account without Pro whose free dictations are used up this month.
+  /// inboxEmpty while the button reads New task (newTask).
   ///
   /// In en, this message translates to:
-  /// **'Tasks without a date wait here until you choose one.\nStart with Write a task.'**
-  String get inboxEmptyWrite;
+  /// **'Tasks without a date wait here until you choose one.\nStart with New task.'**
+  String get inboxEmptyForm;
 
   /// No description provided for @savedOnDevice.
   ///
@@ -5446,13 +5446,37 @@ abstract class AppLocalizations {
   /// **'Free dictations: {left} of {limit} left this month. More on {date}.'**
   String freeVoiceStatus(int left, int limit, String date);
 
-  /// Replaces Add a task, with a pencil icon, for an account without Pro once this month's free dictations are used up. It opens the capture sheet for typing: understood on the phone, with no limit.
+  /// Replaces Add a task, with a + icon, for an account without Pro once the mic isn't available (this month's free dictations are used up, or the server sends no count). It opens the task form, with no limit. Also the form's title while it creates a task.
   ///
   /// In en, this message translates to:
-  /// **'Write a task'**
-  String get writeTask;
+  /// **'New task'**
+  String get newTask;
 
-  /// Title of a sheet shown at most once a month: the first time an account without Pro taps Write a task with this month's free dictations used up. {limit} is the account's monthly free dictations (10).
+  /// In the capture sheet, for an account without Pro, in place of the keyboard button: closes the sheet and opens the task form. Words already heard become the form's title. Typed words make tasks only with Pro.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in by hand'**
+  String get captureFillByHand;
+
+  /// In the task form for a new task, the third day chip after Today and Tomorrow: opens the date sheet. Short, so the three fit on one row.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a day'**
+  String get pickDay;
+
+  /// Tooltip of the small ✕ on a new task's time chip in the task form: the task keeps its day, with no time.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove time'**
+  String get removeTime;
+
+  /// On a task's or note's details page in a shared project, under the project and who it's for. {name} is the display name of the account that created it; hidden when that account has left or been deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Created by {name}'**
+  String createdBy(String name);
+
+  /// Title of a sheet shown at most once a month: the first time an account without Pro taps New task with this month's free dictations used up. {limit} is the account's monthly free dictations (10).
   ///
   /// In en, this message translates to:
   /// **'{limit, plural, =1{You’ve used your free dictation for this month} other{You’ve used your {limit} free dictations for this month}}'**
@@ -5461,14 +5485,14 @@ abstract class AppLocalizations {
   /// Under that title. {limit} is how many free dictations come back, and {date} the local short date they do.
   ///
   /// In en, this message translates to:
-  /// **'You can keep creating tasks by typing them, with no limit. {limit, plural, =1{You’ll get 1 more dictation on {date}.} other{You’ll get {limit} more dictations on {date}.}}'**
+  /// **'You can keep creating tasks with the form, with no limit. {limit, plural, =1{You’ll get 1 more dictation on {date}.} other{You’ll get {limit} more dictations on {date}.}}'**
   String freeVoiceNoticeBody(int limit, String date);
 
-  /// That sheet's main button: opens the capture sheet for typing. Its other button is voiceProAction.
+  /// That sheet's main button: opens the task form. Its other button is voiceProAction.
   ///
   /// In en, this message translates to:
-  /// **'Write a task'**
-  String get freeVoiceNoticeWrite;
+  /// **'Create a task'**
+  String get freeVoiceNoticeCreate;
 
   /// Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes.
   ///

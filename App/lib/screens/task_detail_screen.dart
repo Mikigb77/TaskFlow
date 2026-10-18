@@ -139,8 +139,15 @@ class TaskDetailScreen extends ConsumerWidget {
               );
             }
             final canEdit = ref.watch(listCanEditProvider(task.listId));
-            final hasProjects =
-                ref.watch(taskListsProvider).valueOrNull?.isNotEmpty == true;
+            final projects = ref.watch(taskListsProvider).valueOrNull;
+            final hasProjects = projects?.isNotEmpty == true;
+            // Who created it, in a shared project only. No name: the
+            // account has left the project or been deleted.
+            final creator = task.createdByName?.trim() ?? '';
+            final project = projects?.firstWhereOrNull(
+              (p) => p.id == task.listId,
+            );
+            final showCreator = creator.isNotEmpty && project?.shared == true;
             final hasBody = task.notes?.trim().isNotEmpty == true;
             void edit() =>
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
@@ -220,6 +227,15 @@ class TaskDetailScreen extends ConsumerWidget {
                                   }
                                 }
                               },
+                      ),
+                    ),
+                  if (showCreator)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        context.l10n.createdBy(creator),
+                        key: const ValueKey('task-created-by'),
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   if (task.assignment != 'personal')

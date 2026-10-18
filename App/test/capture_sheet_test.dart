@@ -8,6 +8,8 @@
 // Round 2: P67 (UX-103, UX-467–UX-470) messages that name what's on screen,
 // slow spoken, the typing hint, the failed pair stacked; P68 (UX-465) the
 // phone's time question; P69 (UX-466) saving from the day timeline.
+// 2026-10-18 later: without Pro, tasks are typed only in the form; the
+// sheet types, read on the phone, only while billing hasn't answered.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -40,6 +42,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -125,8 +128,11 @@ void main() {
   // ---- P38 · U8: one creation button ----
 
   for (final pro in [true, false]) {
+    // Without Pro (and here no free dictations), the one button reads
+    // Nueva tarea and opens the form (2026-10-18 later).
+    final label = pro ? es.addTask : es.newTask;
     testWidgets(
-      'U8: ${pro ? 'with' : 'without'} Pro, Calendar, Tareas, a project page and the day timeline each show one Añadir tarea (${pro ? 'mic' : 'add'} icon) and no Nueva tarea, Escribir una tarea or +',
+      'U8: ${pro ? 'with' : 'without'} Pro, Calendar, Tareas, a project page and the day timeline each show one $label (${pro ? 'mic' : 'add'} icon) and no Escribir una tarea or +',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -134,11 +140,7 @@ void main() {
           projects: [TaskListInfo(id: 'casa', name: 'Casa')],
         );
         void expectOneButton(String where) {
-          expect(
-            find.text(es.addTask).hitTestable(),
-            findsOneWidget,
-            reason: where,
-          );
+          expect(find.text(label).hitTestable(), findsOneWidget, reason: where);
           expect(
             find.descendant(
               of: find.byType(TaskActions).hitTestable(),
@@ -149,7 +151,11 @@ void main() {
             findsOneWidget,
             reason: where,
           );
-          for (final old in ['Nueva tarea', 'Escribir una tarea']) {
+          for (final old in [
+            pro ? es.newTask : es.addTask,
+            'Escribir una tarea',
+            'Escribir tarea',
+          ]) {
             expect(find.text(old), findsNothing, reason: '$where: $old');
           }
           expect(find.byType(FloatingActionButton), findsNothing);
@@ -187,17 +193,28 @@ void main() {
         await tester.pumpAndSettle();
         expectOneButton('Casa');
         // It adds to the project the page shows.
-        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.tap(find.text(label).hitTestable());
         await tester.pumpAndSettle();
-        expect(
-          tester
-              .widget<VoiceTaskScreen>(find.byType(VoiceTaskScreen))
-              .projectId,
-          'casa',
-        );
-        await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
-        await tester.pumpAndSettle();
-        expect(find.byType(BottomSheet), findsNothing);
+        if (pro) {
+          expect(
+            tester
+                .widget<VoiceTaskScreen>(find.byType(VoiceTaskScreen))
+                .projectId,
+            'casa',
+          );
+          await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+          await tester.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsNothing);
+        } else {
+          expect(
+            tester.widget<TaskEditor>(find.byType(TaskEditor)).task.listId,
+            'casa',
+          );
+          // An empty form: Back just closes it.
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.byType(TaskEditor), findsNothing);
+        }
 
         unawaited(
           Navigator.of(
@@ -269,7 +286,7 @@ void main() {
   );
 
   test(
-    'U8: the typed form no longer creates: no CreateTaskScreen, /createTask or useSchedule in App/lib',
+    'U8: the old create screen stays gone: no CreateTaskScreen, /createTask or useSchedule in App/lib (accounts without Pro create in the task form, /newTask, since 2026-10-18 later)',
     () {
       expect(File('lib/screens/create_task_screen.dart').existsSync(), isFalse);
       final hits = <String>[];
@@ -288,13 +305,33 @@ void main() {
   );
 
   // ---- P38 · UX-204: typing without Pro, understood on the phone ----
+  // Since 2026-10-18 (later) an account without Pro types tasks only in the
+  // form. The sheet still types, read on the phone, while billing hasn't
+  // said yet whether the account has Pro: these tests open it so.
+
+  /// Without Pro, before billing has answered, with no free dictation left:
+  /// Añadir tarea opens the sheet typing, read on the phone.
+  Future<_App> openTyping(
+    WidgetTester tester, {
+    DateTime? clock,
+    String language = 'es',
+    ClockFormat clockFormat = ClockFormat.twentyFour,
+  }) => _App.open(
+    tester,
+    pro: false,
+    billingLoading: true,
+    freeLeft: 0,
+    clock: clock,
+    language: language,
+    clockFormat: clockFormat,
+  );
 
   testWidgets(
-    'U8 / UX-204: without Pro, Añadir tarea opens typing; Dentista viernes 10:00 → Listo shows Dentista on vie, … · 10:00 with Según lo que has escrito · Dejar como está and no network call; Dejar como está restores the words and no date',
+    'U8 / UX-204: without Pro, while billing hasn’t answered, Añadir tarea opens typing; Dentista viernes 10:00 → Listo shows Dentista on vie, … · 10:00 with Según lo que has escrito · Dejar como está and no network call; Dejar como está restores the words and no date',
     (tester) async {
       final start = monday();
       final friday = plus(start, 4);
-      final app = await _App.open(tester, pro: false, clock: start);
+      final app = await openTyping(tester, clock: start);
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
       // Typing, with the keyboard up, and no microphone.
@@ -345,9 +382,8 @@ void main() {
       (tester) async {
         final l = language == 'es' ? es : en;
         final start = monday();
-        final app = await _App.open(
+        final app = await openTyping(
           tester,
-          pro: false,
           clock: start,
           language: language,
           clockFormat: clock,
@@ -413,11 +449,13 @@ void main() {
 
   for (final pro in [true, false]) {
     testWidgets(
-      'UX-112: ${pro ? 'said to the assistant' : 'typed without Pro'}, a task with no date gets the Thursday selected on Calendar, without a time, and the capture keeps the day; with today selected it has no date',
+      'UX-112: ${pro ? 'said to the assistant' : 'typed without Pro, before billing has answered'}, a task with no date gets the Thursday selected on Calendar, without a time, and the capture keeps the day; with today selected it has no date',
       (tester) async {
         final start = monday();
         final thursday = plus(start, 3);
-        final app = await _App.open(tester, pro: pro, clock: start);
+        final app = pro
+            ? await _App.open(tester, pro: true, clock: start)
+            : await openTyping(tester, clock: start);
         app.api.found = [_found('Comprar pan')];
 
         Future<void> capture() async {
@@ -546,29 +584,26 @@ void main() {
   // ---- P39 · UX-106 and UX-114: every way in, with or without Pro ----
 
   testWidgets(
-    'UX-106: without Pro, the widget opens typing with Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí. and Ver Pro; shared text opens typing with its words and no Pro line; no Actualizar estado anywhere',
+    'UX-106 / 2026-10-18 (later): without Pro and with no dictation to use, the widget and the text shortcut open the form; shared text opens the sheet with its words and Rellenar a mano, never the phone’s parser; no Actualizar estado anywhere',
     (tester) async {
       final app = await _App.open(
         tester,
         pro: false,
         entries: [_entry('voice')],
       );
-      expect(find.byType(VoiceTaskScreen), findsOneWidget);
-      expect(words(), findsOneWidget);
+      expect(find.byType(TaskEditor), findsOneWidget);
+      expect(find.byType(VoiceTaskScreen), findsNothing);
       expect(app.speech.starts, 0);
-      expect(
-        es.captureSpeakingIsPro,
-        'Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.',
-      );
-      expect(inSheet(find.text(es.captureSpeakingIsPro)), findsOneWidget);
-      expect(
-        inSheet(find.widgetWithText(TextButton, es.voiceProAction)),
-        findsOneWidget,
-      );
-      expect(es.voiceProAction, 'Ver Pro');
       expect(find.text('Actualizar estado'), findsNothing);
-      expect(find.byKey(const ValueKey('free-voice-used-up')), findsNothing);
-      await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+
+      app.entries.queue.add(_entry('text'));
+      app.entries.changed();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsOneWidget);
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
       app.entries.queue.add(_entry('share', text: 'Comprar pilas el viernes'));
@@ -580,10 +615,27 @@ void main() {
         'Comprar pilas el viernes',
       );
       expect(find.text(es.captureSpeakingIsPro), findsNothing);
-      expect(find.text(es.voiceProAction), findsNothing);
       expect(find.text('Actualizar estado'), findsNothing);
       expect(app.speech.starts, 0);
+      await tester.tap(
+        inSheet(find.widgetWithText(FilledButton, es.captureFillByHand)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(titleText(tester), 'Comprar pilas el viernes');
+      expect(app.api.requests, 0);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-106: the Pro line reads Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.',
+    () {
+      expect(
+        es.captureSpeakingIsPro,
+        'Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.',
+      );
+      expect(es.voiceProAction, 'Ver Pro');
     },
   );
 
@@ -1246,10 +1298,10 @@ void main() {
 
   for (final language in ['es', 'en']) {
     testWidgets(
-      'UX-468: without Pro, the empty typing field reads ${language == 'es' ? 'Médico el viernes a las 17:00' : 'Doctor Friday at 5 p.m.'} ($language)',
+      'UX-468: without Pro, before billing has answered, the empty typing field reads ${language == 'es' ? 'Médico el viernes a las 17:00' : 'Doctor Friday at 5 p.m.'} ($language)',
       (tester) async {
         final l = language == 'es' ? es : en;
-        await _App.open(tester, pro: false, language: language);
+        await openTyping(tester, language: language);
         await tester.tap(find.text(l.addTask).hitTestable());
         await tester.pumpAndSettle();
         final hint = tester.widget<TextField>(words()).decoration!.hintText;
@@ -1357,15 +1409,10 @@ void main() {
 
   for (final language in ['es', 'en']) {
     testWidgets(
-      'UX-465: without Pro, typing an ambiguous hour shows ${language == 'es' ? '¿A qué hora?' : 'What time?'} above the morning and evening chips ($language)',
+      'UX-465: without Pro, before billing has answered, typing an ambiguous hour shows ${language == 'es' ? '¿A qué hora?' : 'What time?'} above the morning and evening chips ($language)',
       (tester) async {
         final l = language == 'es' ? es : en;
-        await _App.open(
-          tester,
-          pro: false,
-          clock: monday(),
-          language: language,
-        );
+        await openTyping(tester, clock: monday(), language: language);
         await tester.tap(find.text(l.addTask).hitTestable());
         await tester.pumpAndSettle();
         await tester.enterText(
@@ -1440,10 +1487,10 @@ void main() {
   ).colorScheme.primaryContainer;
 
   testWidgets(
-    'UX-466: without Pro, from today’s timeline, comprar pan saved returns to Calendar with the Sin fecha row highlighted, and the timeline is gone',
+    'UX-466: without Pro, before billing has answered, from today’s timeline, comprar pan saved returns to Calendar with the Sin fecha row highlighted, and the timeline is gone',
     (tester) async {
       final start = monday();
-      final app = await _App.open(tester, pro: false, clock: start);
+      final app = await openTyping(tester, clock: start);
       await openTimeline(tester, start);
       await typeAndSave(tester, 'comprar pan');
       expect(app.tasks.titles(), ['Comprar pan']);
@@ -1475,7 +1522,7 @@ void main() {
     (tester) async {
       final start = monday();
       final thursday = plus(start, 3);
-      final app = await _App.open(tester, pro: false, clock: start);
+      final app = await openTyping(tester, clock: start);
       await openTimeline(tester, thursday);
       await typeAndSave(tester, 'comprar pan');
       expect(Task.day(app.tasks.state.requireValue.single.dueDate!), thursday);
@@ -1509,7 +1556,7 @@ void main() {
       final start = monday();
       final thursday = plus(start, 3);
       final friday = plus(start, 4);
-      final app = await _App.open(tester, pro: false, clock: start);
+      final app = await openTyping(tester, clock: start);
       await openTimeline(tester, thursday);
       await typeAndSave(tester, 'comprar pan el viernes');
       expect(Task.day(app.tasks.state.requireValue.single.dueDate!), friday);
@@ -1531,9 +1578,9 @@ void main() {
   // ---- 2026-10-14-speed · P104 (UX-604): parts of the day on the phone ----
 
   testWidgets(
-    'UX-604: without Pro, typed “Llamar a mamá mañana por la mañana” shows the date line Mañana and the title Llamar a mamá por la mañana',
+    'UX-604: without Pro, before billing has answered, typed “Llamar a mamá mañana por la mañana” shows the date line Mañana and the title Llamar a mamá por la mañana',
     (tester) async {
-      final app = await _App.open(tester, pro: false);
+      final app = await openTyping(tester);
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'Llamar a mamá mañana por la mañana');
@@ -1671,11 +1718,13 @@ void main() {
 
   for (final pro in [true, false]) {
     testWidgets(
-      'UX-602: ${pro ? 'with the assistant' : 'typed without Pro'}, from Calendar on today, a result for Friday lands on Friday; the next result with no date reads Sin fecha; after tapping Friday, it reads Friday’s date (D9)',
+      'UX-602: ${pro ? 'with the assistant' : 'typed without Pro, before billing has answered'}, from Calendar on today, a result for Friday lands on Friday; the next result with no date reads Sin fecha; after tapping Friday, it reads Friday’s date (D9)',
       (tester) async {
         final start = monday();
         final friday = plus(start, 4);
-        final app = await _App.open(tester, pro: pro, clock: start);
+        final app = pro
+            ? await _App.open(tester, pro: true, clock: start)
+            : await openTyping(tester, clock: start);
         expect(find.text(es.todayAgenda), findsOneWidget);
 
         app.api.found = [
@@ -1805,10 +1854,13 @@ class _App {
   final _Speech speech;
   final _Entries entries;
 
+  /// [freeLeft] gives the account this month's free dictations left, as the
+  /// server counts them; without it the server sends no count.
   static Future<_App> open(
     WidgetTester tester, {
     required bool pro,
     bool billingLoading = false,
+    int? freeLeft,
     DateTime? clock,
     String language = 'es',
     ClockFormat clockFormat = ClockFormat.twentyFour,
@@ -1832,7 +1884,11 @@ class _App {
         ),
         hasProProvider.overrideWithValue(pro),
         billingLoadingProvider.overrideWithValue(billingLoading),
-        authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+        authProvider.overrideWith(
+          (ref) => freeLeft == null
+              ? SignedInFixtureAuth(api)
+              : _CountedAuth(api, freeLeft),
+        ),
         attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
         regionalStoreProvider.overrideWithValue(
           MemoryRegionalStore(
@@ -1882,6 +1938,28 @@ class _App {
       await wait();
     }
     return _App(container, store, api, tasks, speech, outside);
+  }
+}
+
+/// The fixture's account, with [left] free dictations this month.
+class _CountedAuth extends AuthNotifier {
+  _CountedAuth(super.api, this.left);
+  final int left;
+  @override
+  Future<void> restore() async {
+    final now = DateTime.now().toUtc();
+    state = AuthState(
+      account: Account.fromJson({
+        'id': 1,
+        'email': 'design@example.invalid',
+        'timezone': 'Europe/Madrid',
+        'free_voice': {
+          'limit': 10,
+          'left': left,
+          'resets_at': DateTime.utc(now.year, now.month + 1).toIso8601String(),
+        },
+      }),
+    );
   }
 }
 

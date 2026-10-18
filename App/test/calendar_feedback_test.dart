@@ -12,7 +12,9 @@ import 'package:agenda/providers/first_task_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/main_shell.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -28,7 +30,6 @@ import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/screens/day_timeline_screen.dart';
-import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/local_capture.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
@@ -1459,15 +1460,34 @@ void main() {
     }
   }
 
+  /// Without Pro, the task form (2026-10-18 later): `Nueva tarea`, the
+  /// title, and the day chip under it when [day] names one.
+  Future<void> fillForm(
+    WidgetTester tester,
+    String title, {
+    String? day,
+  }) async {
+    final l = tester.element(find.byType(MainShell)).l10n;
+    await tester.tap(find.text(l.newTask).hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditor), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('task-title')), title);
+    await tester.pumpAndSettle();
+    if (day != null) {
+      await tester.tap(find.byKey(ValueKey(day)));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byKey(const ValueKey('task-save')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditor), findsNothing);
+  }
+
   testWidgets(
-    'UX-205: a Friday task typed in the sheet from Calendario selects Friday, shows and highlights its row, says Añadida al vie, … with Deshacer, and Undo removes it',
+    'UX-205: a task for Mañana filled in from Calendario selects Mañana, shows and highlights its row, says Añadida al <weekday>, … with Deshacer, and Undo removes it',
     (tester) async {
       platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
       final now = DateTime.now();
-      var friday = DateTime(now.year, now.month, now.day + 1);
-      while (friday.weekday != DateTime.friday) {
-        friday = DateTime(friday.year, friday.month, friday.day + 1);
-      }
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
       final container = await openCalendar(tester, [
         Task(
           id: 1,
@@ -1479,25 +1499,22 @@ void main() {
       final calendar = tester.element(find.byType(CalendarScreen));
       final l = calendar.l10n;
       expect(find.text(l.todayAgenda), findsOneWidget);
-      await typeCapture(
+      await fillForm(
         tester,
-        l.addTask,
-        'Llevar el coche al taller el próximo viernes',
+        'Llevar el coche al taller',
+        day: 'new-task-tomorrow',
       );
-      expect(find.text('Llevar el coche al taller'), findsOneWidget);
-      expect(find.text(l.fromYourWords), findsOneWidget);
-      await saveCapture(tester);
 
-      // Friday is selected.
+      // Mañana is selected.
       expect(
-        find.text(DateFormat.MMMMEEEEd('es').format(friday)),
+        find.text(DateFormat.MMMMEEEEd('es').format(tomorrow)),
         findsOneWidget,
       );
       expect(find.text(l.todayAgenda), findsNothing);
       // Its row is in view, clear of the message, and lit up.
       final row = find.widgetWithText(TaskTile, 'Llevar el coche al taller');
       expect(row.hitTestable(), findsOneWidget);
-      final message = l.taskAddedOn(calendar.weekdayDate(friday));
+      final message = l.taskAddedOn(calendar.weekdayDate(tomorrow));
       expect(find.text(message), findsOneWidget);
       expect(
         tester.getRect(row).bottom,
@@ -1507,7 +1524,7 @@ void main() {
       final colors = Theme.of(calendar).colorScheme;
       expect(tester.widget<TaskTile>(row).color, colors.primaryContainer);
       // The message leads with the weekday, never Hoy or Mañana.
-      expect(message, contains(DateFormat.E('es').format(friday)));
+      expect(message, contains(DateFormat.E('es').format(tomorrow)));
       expect(message, isNot(l.taskAddedOn(l.tomorrow)));
       expect(message, isNot(l.taskAddedOn(l.today)));
       expect(find.text(l.undo), findsOneWidget);
@@ -1531,7 +1548,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-205: an undated task typed in the sheet from Calendario says it went to the inbox and offers Deshacer',
+    'UX-205: an undated task filled in from Calendario says it went to the inbox and offers Deshacer',
     (tester) async {
       platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
       final container = await openCalendar(
@@ -1540,8 +1557,7 @@ void main() {
         captures: MemoryCaptures(),
       );
       final l = tester.element(find.byType(CalendarScreen)).l10n;
-      await typeCapture(tester, l.addTask, 'Algún día');
-      await saveCapture(tester);
+      await fillForm(tester, 'Algún día');
       expect(find.text(l.taskSavedInbox), findsOneWidget);
       expect(find.text(l.todayAgenda), findsOneWidget);
       await tester.tap(find.text(l.undo));
@@ -1614,7 +1630,7 @@ void main() {
   });
 
   testWidgets(
-    'UX-203: Añadir tarea, from Calendar and from the day timeline, never gives a past day',
+    'UX-203: Nueva tarea, from Calendar and from the day timeline, never gives a past day',
     (tester) async {
       final today = DateTime(2030, 3, 14, 11);
       final captures = MemoryCaptures();
@@ -1633,22 +1649,26 @@ void main() {
         findsOneWidget,
       );
       Future<void> expectNoDay() async {
-        await typeCapture(tester, l.addTask, 'Comprar pan');
-        expect(find.byType(CaptureResult), findsOneWidget);
-        expect(captures.current!.drafts.single.task.dueDate, isNull);
-        expect(
-          find.descendant(
-            of: find.byType(CaptureResult),
-            matching: find.text(l.noDate),
-          ),
-          findsOneWidget,
-        );
-        await tester.tap(find.widgetWithText(TextButton, l.cancel));
+        await tester.tap(find.text(l.newTask).hitTestable());
         await tester.pumpAndSettle();
-        // Cancelar asks first; kept for later, as before the question.
-        await tester.tap(find.widgetWithText(FilledButton, l.keep));
+        expect(find.byType(TaskEditor), findsOneWidget);
+        // No day chosen: neither Hoy, Mañana nor another date.
+        for (final key in [
+          'new-task-today',
+          'new-task-tomorrow',
+          'new-task-pick-day',
+        ]) {
+          expect(
+            tester.widget<ChoiceChip>(find.byKey(ValueKey(key))).selected,
+            isFalse,
+            reason: key,
+          );
+        }
+        expect(find.text(l.pickDay), findsOneWidget);
+        // Empty: Back just closes it.
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(find.byType(CaptureResult), findsNothing);
+        expect(find.byType(TaskEditor), findsNothing);
       }
 
       await expectNoDay();
@@ -2410,10 +2430,15 @@ void main() {
   );
 
   testWidgets(
-    'U12: a new account without Pro shows Prueba: toca Añadir tarea y escribe «…»',
+    'U12 / 2026-10-18 (later): a new account without Pro shows Prueba: toca Nueva tarea, escribe «…» y toca Mañana, the button on screen',
     (tester) async {
       await openCalendar(tester, const [], captures: MemoryCaptures());
       final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        l.calendarTryForm,
+        'Prueba: toca Nueva tarea, escribe «Llamar al dentista» y toca Mañana.',
+      );
+      // While billing doesn't know yet, typing is still read on the phone.
       expect(
         l.calendarTryTyping,
         'Prueba: toca Añadir tarea y escribe «Mañana, llamar al dentista».',
@@ -2421,10 +2446,12 @@ void main() {
       expect(
         find.descendant(
           of: emptyState(),
-          matching: find.text(l.calendarTryTyping),
+          matching: find.text(l.calendarTryForm),
         ),
         findsOneWidget,
       );
+      expect(find.text(l.newTask), findsWidgets);
+      expect(find.text(l.calendarTryTyping), findsNothing);
       expect(find.text(l.calendarTrySaying), findsNothing);
       expect(find.text(l.calendarEmpty), findsNothing);
       expect(tester.takeException(), isNull);
@@ -2539,7 +2566,7 @@ void main() {
           );
           final l = tester.element(find.byType(CalendarScreen)).l10n;
           final message = find.text(
-            pro ? l.calendarTrySaying : l.calendarTryTyping,
+            pro ? l.calendarTrySaying : l.calendarTryForm,
           );
           // Scroll the page, not the week strip: a drag on the strip changes
           // the calendar's format.
@@ -2881,9 +2908,8 @@ void main() {
         expect(
           find.descendant(
             of: emptyState(),
-            matching: find.text(
-              pro ? l.calendarTrySaying : l.calendarTryTyping,
-            ),
+            // Without Pro, Nueva tarea opens the form (2026-10-18 later).
+            matching: find.text(pro ? l.calendarTrySaying : l.calendarTryForm),
           ),
           findsOneWidget,
         );

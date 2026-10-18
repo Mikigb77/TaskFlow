@@ -481,6 +481,18 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             builder: (_) => EditTaskScreen(taskId: settings.arguments as int),
           );
         }
+        // The task form for a new task: how an account without Pro creates
+        // tasks. Open it with openTaskForm.
+        if (settings.name == '/newTask') {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => NewTaskScreen(
+              arguments:
+                  settings.arguments as NewTaskArguments? ??
+                  const NewTaskArguments(),
+            ),
+          );
+        }
         return null;
       },
     );

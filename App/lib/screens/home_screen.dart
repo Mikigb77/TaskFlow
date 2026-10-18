@@ -42,6 +42,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // A project page shows all of its tasks until `Para mí` is chosen here;
   // the choice stays on this page.
   bool _team = true;
+  // A shared project page can show one person's tasks instead: those
+  // assigned to them.
+  int? _person;
   final _page = GlobalKey();
   final _nested = GlobalKey<NestedScrollViewState>();
   // Tasks just saved from capture opened here: waiting to appear, then shown
@@ -62,14 +65,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
+  /// The person whose tasks this project page shows, while they can still
+  /// be chosen: someone who left takes their filter with them.
+  int? get _personShown {
+    final project = (ref.read(taskListsProvider).valueOrNull ?? [])
+        .where((p) => p.id == widget.listId)
+        .firstOrNull;
+    final people = projectPeopleToFilter(
+      project,
+      ref.read(authProvider).account?.id,
+    );
+    return people.any((p) => p.id == _person) ? _person : null;
+  }
+
   /// The open tasks this page lists with the given search and filters.
+  /// [everyone] leaves out a project page's `Para mí` and person.
   List<Task> _visible(
     List<Task> all, {
     required int filter,
     required String query,
     required String? label,
+    bool everyone = false,
   }) {
-    final scope = _scope(ref.read(projectScopeProvider));
+    final scope = everyone && widget.listId != null
+        ? ProjectScope(projectId: widget.listId, team: true)
+        : _scope(ref.read(projectScopeProvider));
+    final person = everyone ? null : _personShown;
     final projects = ref.read(taskListsProvider).valueOrNull ?? [];
     final accountId = ref.read(authProvider).account?.id;
     final now = DateTime.now();
@@ -85,6 +106,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           (task) =>
               !task.isCompleted &&
               taskInProjectScope(task, scope, accountId, projects) &&
+              (person == null ||
+                  (task.assignment == 'member' && task.assigneeId == person)) &&
               (label == null || task.labels.contains(label)) &&
               (filter == 0 ||
                   (filter == 3 && task.dueDate == null) ||
@@ -106,28 +129,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ? global
       : ProjectScope(projectId: widget.listId, team: _team);
 
-  /// Capture opened here saved [focus]'s tasks. If the search or a filter
-  /// would hide them, clear it, so they are on screen every time.
+  /// Capture, or the form, opened here saved [focus]'s tasks. If the search
+  /// or a filter would hide them, clear it, so they are on screen every
+  /// time: on a project page, `Para mí` and a person too, when need be.
   void _land(CalendarFocus focus) {
     final all = ref.read(taskProvider).valueOrNull ?? [];
     bool lists(List<Task> tasks) =>
         tasks.any((task) => focus.taskIds.contains(task.id));
     setState(() {
       if (!lists(
-            _visible(all, filter: _filter, query: _query, label: _label),
-          ) &&
-          lists(
+        _visible(all, filter: _filter, query: _query, label: _label),
+      )) {
+        for (final everyone in [false, if (widget.listId != null) true]) {
+          if (!lists(
             _visible(
               all,
               filter: widget.isRoot ? 0 : _filter,
               query: '',
               label: null,
+              everyone: everyone,
             ),
           )) {
-        _search.clear();
-        _query = '';
-        _label = null;
-        if (widget.isRoot) _filter = 0;
+            continue;
+          }
+          _search.clear();
+          _query = '';
+          _label = null;
+          if (widget.isRoot) _filter = 0;
+          if (everyone) {
+            _team = true;
+            _person = null;
+          }
+          break;
+        }
       }
       _landingIds = focus.taskIds;
       _landedIds = {};
@@ -302,6 +336,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           fixedProjectId: widget.listId,
                           team: _team,
                           onTeamChanged: (team) => setState(() => _team = team),
+                          person: _person,
+                          onPeopleChanged: (team, person) => setState(() {
+                            _team = team;
+                            _person = person;
+                          }),
                         ),
                   const SizedBox(height: 12),
                   // The app bar names a project or the Inbox: no headline
@@ -465,7 +504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _query.isNotEmpty ||
                   _label != null ||
                   (widget.isRoot && _filter != 0) ||
-                  (widget.listId != null && !_team);
+                  (widget.listId != null && (!_team || _personShown != null));
               return ListView(
                 children: [
                   EmptyState(
@@ -478,12 +517,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ? context.l10n.readOnlyListEmpty
                         : widget.listId != null
                         ? context.l10n.listEmpty
-                        // They name the button, which can read Escribir
+                        // They name the button, which can read Nueva
                         // tarea.
-                        : ref.watch(freeVoiceUsedUpProvider)
+                        : ref.watch(opensFormProvider)
                         ? widget.isRoot
-                              ? context.l10n.tasksEmptyWrite
-                              : context.l10n.inboxEmptyWrite
+                              ? context.l10n.tasksEmptyForm
+                              : context.l10n.inboxEmptyForm
                         : widget.isRoot
                         ? context.l10n.tasksEmpty
                         : context.l10n.inboxEmpty,

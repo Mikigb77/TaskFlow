@@ -30,7 +30,7 @@ import 'package:agenda/screens/groups_screen.dart';
 
 void main() {
   testWidgets(
-      'create rename archive and restore a list; capture directly into it with labels',
+      'create rename archive and restore a list; add a task directly into it with labels',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -39,7 +39,7 @@ void main() {
     final store = _Lists();
     final captures = MemoryCaptures();
     final container = ProviderContainer(overrides: [
-      // Typed in the capture sheet without Pro, and saved in memory.
+      // Without Pro, tasks are added with the form (2026-10-18 later).
       hasProProvider.overrideWithValue(false),
       billingLoadingProvider.overrideWithValue(false),
       captureStoreProvider.overrideWithValue(captures),
@@ -79,8 +79,15 @@ void main() {
     await tester.tap(find.text('Weekend'));
     await tester.pumpAndSettle();
     // Added from the project's page, it goes to the project.
-    await typeCapture(tester, 'Add a task', 'Buy coffee');
-    await saveCapture(tester);
+    await tester.tap(find.text('New task').hitTestable());
+    await tester.pumpAndSettle();
+    expect(
+        tester.widget<TaskEditor>(find.byType(TaskEditor)).task.listId, id);
+    await tester.enterText(
+        find.byKey(const ValueKey('task-title')), 'Buy coffee');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('task-save')));
+    await tester.pumpAndSettle();
     final added = container
         .read(taskProvider)
         .requireValue

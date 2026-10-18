@@ -540,6 +540,152 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- 2026-10-18 (later): «Creada por» on a shared task ----
+
+  final familia = TaskListInfo(
+    id: 'familia',
+    name: 'Familia',
+    version: 1,
+    shared: true,
+    role: 'owner',
+    ownerId: 1,
+    people: const [
+      ProjectMember(id: 1, name: 'Miki', role: 'owner'),
+      ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+    ],
+  );
+
+  /// A task in [listId] as the server sends it, with its creator's name.
+  Task fromServer({String? listId = 'familia', Object? name = 'Ana'}) =>
+      Task.fromApi({
+        ...Task(
+          title: 'Comprar pan',
+          priority: 1,
+          dueDate: friday,
+          listId: listId,
+          assignment: listId == 'familia' ? 'group' : 'personal',
+        ).toApi(),
+        'created_by': 2,
+        'created_by_name': name,
+      }).copyWith(id: 1);
+
+  Finder createdBy() => find.byKey(const ValueKey('task-created-by'));
+
+  testWidgets(
+    '«Creada por Ana» on a task in a shared project, from the server’s created_by_name, under the project and who it’s for',
+    (tester) async {
+      await _App.open(tester, [fromServer()], projects: [familia]);
+      await _App.detail(tester, 1);
+      expect(es.createdBy('Ana'), 'Creada por Ana');
+      expect(createdBy(), findsOneWidget);
+      expect(tester.widget<Text>(createdBy()).data, 'Creada por Ana');
+      final picker = find.byType(TaskAssignmentPicker);
+      expect(picker, findsOneWidget);
+      expect(
+        find.descendant(of: picker, matching: find.text(es.assignedToGroup)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(createdBy()).top,
+        greaterThanOrEqualTo(tester.getRect(picker).bottom - 0.5),
+        reason: 'right under who it’s for',
+      );
+      expect(
+        tester.getRect(createdBy()).top,
+        lessThan(tester.getRect(find.text(es.plannedFor)).top),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (what, task, projects) in [
+    (
+      'the server sends no name (the account left or was deleted)',
+      () => fromServer(name: null),
+      () => [familia],
+    ),
+    (
+      'the project is personal',
+      () => fromServer(listId: 'casa'),
+      () => [TaskListInfo(id: 'casa', name: 'Casa', version: 1)],
+    ),
+    (
+      'the task has no project',
+      () => fromServer(listId: null),
+      () => [familia],
+    ),
+  ]) {
+    testWidgets('no «Creada por» when $what', (tester) async {
+      await _App.open(tester, [task()], projects: projects());
+      await _App.detail(tester, 1);
+      expect(createdBy(), findsNothing);
+      expect(find.textContaining('Creada por'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('editing a shared task keeps «Creada por Ana»', (tester) async {
+    final app = await _App.open(tester, [fromServer()], projects: [familia]);
+    await openEditor(tester);
+    await tester.enterText(title(), 'Comprar pan y leche');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(es.saveChangesSentence));
+    await tester.pumpAndSettle();
+    expect(app.tasks().single.title, 'Comprar pan y leche');
+    expect(app.tasks().single.createdByName, 'Ana');
+    await _App.detail(tester, 1);
+    expect(createdBy(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('«Creada por» reads Created by / Creada por / Creada per', () {
+    expect(
+      lookupAppLocalizations(const Locale('en')).createdBy('Ana'),
+      'Created by Ana',
+    );
+    expect(es.createdBy('Ana'), 'Creada por Ana');
+    expect(
+      lookupAppLocalizations(const Locale('ca')).createdBy('Ana'),
+      'Creada per Ana',
+    );
+  });
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'at 2× text on 320 dp ($language), «Creada por» with a long name reads in full with no overflow',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _App.open(
+          tester,
+          [fromServer(name: 'Maria Antònia Ferrer i Puigdollers')],
+          projects: [familia],
+          language: language,
+          size: const Size(320, 640),
+        );
+        await _App.detail(tester, 1);
+        // At 2× text it sits below the first screenful: scrolled to.
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('task-created-by'), skipOffstage: false),
+        );
+        await tester.pumpAndSettle();
+        final line = createdBy();
+        expect(line, findsOneWidget);
+        expect(line.hitTestable(), findsOneWidget);
+        final rect = tester.getRect(line);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        expect(
+          tester.widget<Text>(line).data,
+          lookupAppLocalizations(
+            Locale(language),
+          ).createdBy('Maria Antònia Ferrer i Puigdollers'),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 /// The app in Spanish, signed in, on Calendar, with the real task list over
@@ -555,14 +701,16 @@ class _App {
     WidgetTester tester,
     List<Task> tasks, {
     List<TaskListInfo> projects = const [],
+    String language = 'es',
+    Size size = const Size(390, 844),
   }) async {
-    tester.view.physicalSize = const Size(390, 844);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final repository = _Repository(tasks);
     final container = designContainer(
       regionalStore: MemoryRegionalStore(
-        const RegionalPreferences(language: 'es'),
+        RegionalPreferences(language: language),
       ),
       projects: projects,
       tasks: () => TaskNotifier(repository),

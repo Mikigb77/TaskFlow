@@ -26,6 +26,7 @@ import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
 import 'package:agenda/widgets/reminder_ask_sheet.dart';
+import 'package:agenda/widgets/task_form_entry.dart';
 
 // Each capture screen owns and releases its recorder. A factory also lets the
 // interruption contract be exercised without recording from a test machine.
@@ -45,10 +46,15 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 /// typed without a date goes there.
 ///
 /// The mic comes with Pro, or while free dictations are left; otherwise the
-/// sheet types. Typed words go to the assistant only with Pro; without it
-/// they are understood on the phone. [typing] opens with the keyboard up
-/// (the text shortcut, shared text); [askedToSpeak] marks the ways in that
-/// ask to speak (the widget, the voice shortcut), which say why without it.
+/// sheet types. Typed words go to the assistant only with Pro. [typing]
+/// opens with the keyboard up (the text shortcut, shared text);
+/// [askedToSpeak] marks the ways in that ask to speak (the widget, the voice
+/// shortcut), which say why without it.
+///
+/// An account without Pro makes tasks from typed words only in the task
+/// form (DECISIONS.md, 2026-10-18 later): a new task capture that would
+/// only type opens the form instead, and the sheet's keyboard reads
+/// `Rellenar a mano`.
 Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
@@ -61,6 +67,19 @@ Future<void> showCaptureSheet(
   bool typing = false,
   bool askedToSpeak = false,
 }) {
+  final container = ProviderScope.containerOf(context, listen: false);
+  if (kind == 'task' &&
+      captureId == null &&
+      container.read(typesInFormProvider) &&
+      (typing || !container.read(voiceAvailableProvider))) {
+    return openTaskForm(
+      context,
+      projectId: projectId,
+      day: day,
+      page: page,
+      showCalendar: showCalendar,
+    );
+  }
   final navigator = Navigator.of(context);
   final localizations = MaterialLocalizations.of(context);
   return navigator.push(
@@ -1186,6 +1205,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       if (_session == null && _words.text.trim().isEmpty) {
         throw StateError('Say or type what you need to do first.');
       }
+      // Typed by an account without Pro: the form, never the parser.
+      if (_typedForForm) {
+        _attempts++;
+        unawaited(_fillByHand());
+        return;
+      }
       await _ensureSession(text: _words.text);
       attempt = _session;
       if (wentBack()) {
@@ -1420,13 +1445,64 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool _recordingWaits() =>
       _freeVoice().waitsForMore && _previousResult == null;
 
-  /// `Listo`: stop listening and continue with the words.
+  /// `Listo`: stop listening and continue with the words. Typed by an
+  /// account without Pro, they go to the form.
   void _done() {
     if (_recording) {
       unawaited(_finishRecording());
+    } else if (_typedForForm) {
+      unawaited(_fillByHand());
     } else {
       unawaited(_process());
     }
+  }
+
+  /// Words typed (or shared) for a task by an account without Pro: they
+  /// become a task only through the form, never the phone's parser. A
+  /// dictation still goes to the assistant, and `Guardar tal cual` after it
+  /// stays.
+  bool get _typedForForm =>
+      _kind == 'task' &&
+      _hasWords &&
+      _session?.audioPath == null &&
+      _session?.source != 'speech' &&
+      ref.read(typesInFormProvider);
+
+  /// `Rellenar a mano`, for an account without Pro: the task form instead of
+  /// typing here. Listening stops; words heard or typed so far go to the
+  /// form as its title, so this sheet keeps nothing.
+  Future<void> _fillByHand() async {
+    if (_asking) return;
+    _asking = true;
+    var words = '';
+    try {
+      await _starting;
+      await _finishRecording(submit: false, quiet: true);
+      await _writes;
+      words = _words.text.trim();
+      final session = _session;
+      if (session != null) await _store.discard(session.id, _owner);
+      _discarded = true;
+    } catch (_) {
+      /* The capture stays pending; the words go to the form all the same. */
+    } finally {
+      _asking = false;
+    }
+    if (!mounted) return;
+    ref.invalidate(pendingCapturesProvider);
+    final navigator = Navigator.of(context);
+    final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
+    navigator.pop();
+    unawaited(
+      openTaskForm(
+        navigator.context,
+        projectId: _projectId ?? widget.projectId,
+        day: widget.day,
+        page: origin?.page,
+        showCalendar: origin?.showCalendar ?? false,
+        words: words,
+      ),
+    );
   }
 
   /// `Escribir`: stop listening, keep the words and edit them.
@@ -1681,6 +1757,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // The assistant is slow, or failed: the words can be saved as written.
     final saveAsWritten =
         _hasWords && _session != null && ((processing && _slow) || failed);
+    // Without Pro, typed words make a task only in the form: the keyboard
+    // becomes `Rellenar a mano`, and so does `Listo` on typed words.
+    final byHand = _kind == 'task' && ref.watch(typesInFormProvider);
+    final typedForForm =
+        byHand &&
+        _typing &&
+        _session?.audioPath == null &&
+        _session?.source != 'speech';
     final primary = <Widget>[
       if (waiting)
         FilledButton(
@@ -1728,7 +1812,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ),
         FilledButton(
           onPressed: _busy || !_hasInput ? null : _done,
-          child: Text(l10n.done),
+          child: Text(typedForForm ? l10n.captureFillByHand : l10n.done),
         ),
       ],
     ];
@@ -1897,7 +1981,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                 stack: failed && saveAsWritten,
                 showCancel: !recordingWaits,
                 showType: !_typing && !recorded,
-                onType: working ? null : () => unawaited(_typeInstead()),
+                byHand: byHand,
+                onType: working
+                    ? null
+                    : byHand
+                    ? () => unawaited(_fillByHand())
+                    : () => unawaited(_typeInstead()),
               ),
             ],
           ),
@@ -1939,13 +2028,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   /// `Cancelar`, the filled action (with `Seguir` beside it when paused) and
   /// the keyboard. They share a row when it fits, and stack at large text or
-  /// when [stack] asks.
+  /// when [stack] asks. With [byHand] the keyboard is `Rellenar a mano`,
+  /// named in full: the filled action takes the whole width above it.
   Widget _controls(
     BuildContext context,
     List<Widget> primary, {
     bool stack = false,
     bool showCancel = true,
     required bool showType,
+    bool byHand = false,
     VoidCallback? onType,
   }) {
     final l10n = context.l10n;
@@ -1955,13 +2046,20 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             child: Text(l10n.cancel),
           )
         : null;
-    final type = showType
-        ? IconButton(
+    final type = !showType
+        ? null
+        : byHand
+        ? TextButton.icon(
+            key: const ValueKey('capture-fill-by-hand'),
+            onPressed: onType,
+            icon: const Icon(Icons.edit_outlined),
+            label: Text(l10n.captureFillByHand),
+          )
+        : IconButton(
             tooltip: l10n.captureTypeInstead,
             onPressed: onType,
             icon: const Icon(Icons.keyboard_outlined),
-          )
-        : null;
+          );
     final large = MediaQuery.textScalerOf(context).scale(14) > 18;
     Widget side(List<Widget> buttons) => Row(
       children: [
@@ -1975,6 +2073,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       builder: (context, constraints) {
         if (!large &&
             !stack &&
+            !(byHand && type != null) &&
             constraints.maxWidth >= (primary.length > 1 ? 440 : 280)) {
           return Row(
             children: [
@@ -1997,13 +2096,21 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               side(primary),
             if (cancel != null || type != null) ...[
               const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (cancel != null) Flexible(child: cancel),
-                  ?type,
-                ],
-              ),
+              // `Rellenar a mano` goes under `Cancelar` when both don't fit.
+              if (byHand)
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [?cancel, ?type],
+                )
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (cancel != null) Flexible(child: cancel),
+                    ?type,
+                  ],
+                ),
             ],
           ],
         );

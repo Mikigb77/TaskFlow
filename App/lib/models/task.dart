@@ -52,6 +52,10 @@ class Task {
   final int? assigneeId;
   final String? assigneeName;
   final int? createdBy;
+
+  /// The name of the account that created the task, as the server sends it;
+  /// null for an account that has left the project or been deleted.
+  final String? createdByName;
   bool isForAccount(int? id, {bool managesProject = false}) =>
       assignment == 'personal' ||
       assignment == 'group' ||
@@ -95,6 +99,7 @@ class Task {
     this.assigneeId,
     this.assigneeName,
     this.createdBy,
+    this.createdByName,
     List<String>? labels,
   }) : _hasTime = dueDate != null && hasTime,
        deadlineHasTime = deadline != null && deadlineHasTime,
@@ -532,6 +537,7 @@ class Task {
     Object? assigneeId = _unchanged,
     Object? assigneeName = _unchanged,
     Object? createdBy = _unchanged,
+    Object? createdByName = _unchanged,
     List<String>? labels,
   }) => Task(
     id: id ?? this.id,
@@ -588,6 +594,9 @@ class Task {
     createdBy: identical(createdBy, _unchanged)
         ? this.createdBy
         : createdBy as int?,
+    createdByName: identical(createdByName, _unchanged)
+        ? this.createdByName
+        : createdByName as String?,
     labels: labels ?? this.labels,
     imagePaths: imagePaths ?? this.imagePaths,
   );
@@ -628,6 +637,7 @@ class Task {
     'assigneeId': assigneeId,
     'assigneeName': assigneeName,
     'createdBy': createdBy,
+    'createdByName': createdByName,
     'labels': jsonEncode(labels),
     'checklist': jsonEncode(checklist.map((item) => item.toJson()).toList()),
     'filePaths': filePaths.isEmpty ? null : filePaths.join('|'),
@@ -673,6 +683,7 @@ class Task {
     assigneeId: map['assigneeId'],
     assigneeName: map['assigneeName'],
     createdBy: map['createdBy'],
+    createdByName: map['createdByName'],
     labels: List<String>.from(jsonDecode(map['labels'] ?? '[]')),
     checklist: (jsonDecode(map['checklist'] ?? '[]') as List)
         .map((item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)))
@@ -755,6 +766,10 @@ class Task {
     assigneeId: data['assignee_id'],
     assigneeName: data['assignee_name'],
     createdBy: data['created_by'],
+    // Null, or missing on an older server: the name isn't shown.
+    createdByName: data['created_by_name'] is String
+        ? data['created_by_name']
+        : null,
     labels: List<String>.from(data['labels'] ?? []),
     checklist: (data['checklist'] as List? ?? [])
         .map((item) => ChecklistItem.fromJson(Map<String, dynamic>.from(item)))

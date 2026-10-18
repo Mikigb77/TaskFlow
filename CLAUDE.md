@@ -65,6 +65,7 @@ Rendered screen previews, no device needed. The calendar and review previews wri
 flutter test --no-pub --dart-define=WRITE_CALENDAR_PREVIEWS=true test/calendar_feedback_test.dart
 flutter test --no-pub --dart-define=WRITE_REVIEW_PREVIEWS=true test/review_tasks_test.dart
 flutter test --no-pub --dart-define=WRITE_AUTH_PREVIEWS=true test/auth_gate_test.dart
+flutter test --no-pub --dart-define=WRITE_FORM_PREVIEWS=true test/new_task_form_test.dart
 ```
 
 Backend (from `Backend/`, with Docker Desktop running; API on http://localhost:8088):

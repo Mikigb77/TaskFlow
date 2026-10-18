@@ -86,11 +86,54 @@ class QuickScheduleParser {
       caseSensitive: false);
   static final _bareHour =
       RegExp(r'\b(?:at|a las|a les)\s+(\d{1,2})\b', caseSensitive: false);
+  static const _months =
+      'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|'
+      'octubre|noviembre|diciembre|gener|febrer|març|maig|juny|juliol|agost|'
+      'setembre|octubre|novembre|desembre|january|february|march|april|may|'
+      'june|july|august|september|october|november|december';
+  // A day of the month on its own: `el 12`, `el día 12`, `el dia 12`, `para
+  // el 12`, `per al 12`, `antes del 12`, `the 12th`, `on the 1st`. Never
+  // when a month or more numbers follow (`el 12 de mayo`, `the 1st of May`,
+  // `el 12/11`), or when an English ordinal names something else (`the 1st
+  // floor`).
+  static final _dayOfMonth = RegExp(
+      r'(?<![\p{L}\p{N}_])'
+      r'(?:'
+      r'(?:para\s+)?el\s+(?:d[ií]a\s+)?(\d{1,2})'
+      r'|per\s+al\s+(?:dia\s+)?(\d{1,2})'
+      r'|(?<=(?<![\p{L}\p{N}_])antes\s+del\s+)(?:d[ií]a\s+)?(\d{1,2})'
+      r'|(?:(?:on|for)\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)'
+      r'(?!\s+(?!(?:at|in|and|morning|afternoon|evening|night|tonight)(?![\p{L}\p{N}_]))\p{L})'
+      r')'
+      r'(?![\p{L}\p{N}_])(?![.,:/\-]\d)'
+      r"(?!\s*(?:%|(?:de|del|of|por\s+ciento|per\s+cent|veces|vegades)(?![\p{L}\p{N}_])|d['’]))"
+      '(?!\\s+(?:$_months)(?![\\p{L}\\p{N}_]))',
+      caseSensitive: false,
+      unicode: true);
+  // Words that make a day of the month the edge of a range (`hasta el 12`,
+  // `entre el 12 y el 15`, `from the 12th`): the words stay as typed.
+  static final _rangeBefore = RegExp(
+      r'(?<![\p{L}\p{N}_])(?:hasta|desde|entre|fins|until|till|from|since|after|between)\s+$',
+      caseSensitive: false,
+      unicode: true);
+
+  /// The day of the month [day] means on [today]: this month's while it
+  /// hasn't passed (today included), else next month's. Null for a day the
+  /// month it lands in doesn't have (the 31st in November, the 30th of
+  /// February): no date is guessed for it.
+  static DateTime? _dayInMonth(int day, DateTime today) {
+    if (day < 1 || day > 31) return null;
+    final month = today.month + (day < today.day ? 1 : 0);
+    // DateTime rolls a day a month doesn't have into the month after.
+    final date = DateTime(today.year, month, day);
+    return date.day == day && date.month == (month - 1) % 12 + 1 ? date : null;
+  }
 
   /// The one date (and time) [input] names, relative to [reference]. A time
   /// with no date words goes on [day], or on [reference]'s day; on the next
-  /// day when that time has already passed. The title can be empty when the
-  /// words are only a date.
+  /// day when that time has already passed. A day of the month alone (`el
+  /// 12`, `the 12th`) is this month's until it has passed, then next
+  /// month's. The title can be empty when the words are only a date.
   static ScheduleSuggestion? parse(
     String input,
     DateTime reference, {
@@ -104,8 +147,14 @@ class QuickScheduleParser {
       return null;
     }
     final dates = _date.allMatches(input).toList();
-    if (dates.length > 1) return null;
-    final match = dates.singleOrNull;
+    final days = _dayOfMonth.allMatches(input).toList();
+    if (days.any(
+        (day) => _rangeBefore.hasMatch(input.substring(0, day.start)))) {
+      return null;
+    }
+    if (dates.length + days.length > 1) return null;
+    final dayOfMonth = days.singleOrNull;
+    final match = dates.singleOrNull ?? dayOfMonth;
     final deadlineMarker = match == null
         ? null
         : RegExp(
@@ -119,6 +168,14 @@ class QuickScheduleParser {
     DateTime date;
     if (match == null) {
       date = Task.day(day ?? today);
+    } else if (dayOfMonth != null) {
+      final number = [1, 2, 3, 4]
+          .map(dayOfMonth.group)
+          .whereType<String>()
+          .first;
+      final found = _dayInMonth(int.parse(number), today);
+      if (found == null) return null;
+      date = found;
     } else if (RegExp(_dayAfterTomorrow).hasMatch(phrase)) {
       date = DateTime(today.year, today.month, today.day + 2);
     } else if (_today.contains(word)) {

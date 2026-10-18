@@ -736,8 +736,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Try it: tap Add a task and type “Tomorrow, call the dentist.”';
 
   @override
-  String get calendarTryTypingWrite =>
-      'Try it: tap Write a task and type “Tomorrow, call the dentist.”';
+  String get calendarTryForm =>
+      'Try it: tap New task, type “Call the dentist” and tap Tomorrow.';
 
   @override
   String get planTask => 'Plan a task';
@@ -804,12 +804,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tasks without a date wait here until you choose one.\nStart with Add a task.';
 
   @override
-  String get tasksEmptyWrite =>
-      'Tap Write a task to add one. A date is optional.';
+  String get tasksEmptyForm => 'Tap New task to add one. A date is optional.';
 
   @override
-  String get inboxEmptyWrite =>
-      'Tasks without a date wait here until you choose one.\nStart with Write a task.';
+  String get inboxEmptyForm =>
+      'Tasks without a date wait here until you choose one.\nStart with New task.';
 
   @override
   String get savedOnDevice => 'Your saved tasks are still on your device.';
@@ -3469,7 +3468,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get writeTask => 'Write a task';
+  String get newTask => 'New task';
+
+  @override
+  String get captureFillByHand => 'Fill in by hand';
+
+  @override
+  String get pickDay => 'Pick a day';
+
+  @override
+  String get removeTime => 'Remove time';
+
+  @override
+  String createdBy(String name) {
+    return 'Created by $name';
+  }
 
   @override
   String freeVoiceNoticeTitle(int limit) {
@@ -3490,11 +3503,11 @@ class AppLocalizationsEn extends AppLocalizations {
       other: 'You’ll get $limit more dictations on $date.',
       one: 'You’ll get 1 more dictation on $date.',
     );
-    return 'You can keep creating tasks by typing them, with no limit. $_temp0';
+    return 'You can keep creating tasks with the form, with no limit. $_temp0';
   }
 
   @override
-  String get freeVoiceNoticeWrite => 'Write a task';
+  String get freeVoiceNoticeCreate => 'Create a task';
 
   @override
   String storageUsage(int used, int limit) {

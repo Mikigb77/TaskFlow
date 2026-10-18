@@ -40,7 +40,7 @@ final freeVoiceNoticeStoreProvider = Provider(
 );
 
 /// The month whose used-up notice the signed-in account has seen. Read from
-/// the phone as soon as Escribir tarea shows, so its tap never waits.
+/// the phone as soon as Nueva tarea shows, so its tap never waits.
 final freeVoiceNoticeProvider =
     StateNotifierProvider<FreeVoiceNotice, AsyncValue<DateTime?>>(
       (ref) => FreeVoiceNotice(

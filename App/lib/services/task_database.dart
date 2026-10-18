@@ -7,7 +7,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/services/android_database_factory.dart';
 
 class TaskDatabase {
-  static const schemaVersion = 17;
+  static const schemaVersion = 18;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -60,7 +60,7 @@ class TaskDatabase {
           checklist TEXT NOT NULL DEFAULT '[]',
           listId TEXT, labels TEXT NOT NULL DEFAULT '[]',
           assignment TEXT NOT NULL DEFAULT 'personal', assigneeId INTEGER,
-          assigneeName TEXT, createdBy INTEGER,
+          assigneeName TEXT, createdBy INTEGER, createdByName TEXT,
           repeatInterval INTEGER NOT NULL DEFAULT 1,
           repeatWeekdays TEXT NOT NULL DEFAULT '[]', exceptions TEXT NOT NULL DEFAULT '[]',
           owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
@@ -227,6 +227,10 @@ class TaskDatabase {
           'ALTER TABLE task_lists ADD COLUMN group_archived INTEGER NOT NULL DEFAULT 0',
         );
       }
+    }
+    if (oldVersion < 18 && newVersion >= 18) {
+      // Who created a shared task, by name; filled in by the next sync.
+      await db.execute('ALTER TABLE tasks ADD COLUMN createdByName TEXT');
     }
   }
 
@@ -615,7 +619,8 @@ class TaskDatabase {
   }) async {
     await (await database).rawUpdate(
       '''UPDATE tasks SET listId = NULL, assignment = 'personal', assigneeId = NULL,
-        assigneeName = NULL, createdBy = NULL, revision = revision + 1
+        assigneeName = NULL, createdBy = NULL, createdByName = NULL,
+        revision = revision + 1
       WHERE owner_key = ? AND id = ? AND remote_version = 0 AND sync_pending = 1
       ${revision == null ? '' : 'AND revision = ?'}
       ${assignmentChanged ? '' : "AND listId IN (SELECT id FROM task_lists WHERE owner_key = ? AND role = 'viewer')"}''',
@@ -723,6 +728,7 @@ class TaskDatabase {
             'assigneeId': null,
             'assigneeName': null,
             'createdBy': null,
+            'createdByName': null,
           });
         }
         final title = '${local['title']} (offline copy)';

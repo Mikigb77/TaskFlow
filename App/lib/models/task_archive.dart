@@ -334,6 +334,7 @@ class TaskArchive {
                 assigneeId: null,
                 assigneeName: null,
                 createdBy: null,
+                createdByName: null,
               )
               .toApi(),
           'attachments':

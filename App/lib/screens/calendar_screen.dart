@@ -705,8 +705,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                       ? context.l10n.calendarEmpty
                       : ref.watch(voiceAvailableProvider)
                       ? context.l10n.calendarTrySaying
-                      : ref.watch(freeVoiceUsedUpProvider)
-                      ? context.l10n.calendarTryTypingWrite
+                      // Nueva tarea opens the form, which reads no dates
+                      // from words.
+                      : ref.watch(opensFormProvider)
+                      ? context.l10n.calendarTryForm
                       : context.l10n.calendarTryTyping,
                 ),
               )

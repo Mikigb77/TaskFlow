@@ -146,6 +146,7 @@ class ArchiveStore {
           assigneeId: null,
           assigneeName: null,
           createdBy: null,
+          createdByName: null,
           listId: row.task!.listId == null ? null : mappings[row.task!.listId],
         );
         final values = task.toMap()..remove('id');

@@ -141,7 +141,8 @@ void main() {
               ..remove('assignment')
               ..remove('assigneeId')
               ..remove('assigneeName')
-              ..remove('createdBy');
+              ..remove('createdBy')
+              ..remove('createdByName');
         await old.insert('tasks', {
           ...row,
           'owner_key': owner,
@@ -287,6 +288,7 @@ void main() {
           assignment: 'member',
           assigneeId: 2,
           createdBy: 1,
+          createdByName: 'Miki',
         ),
         ownerKey: owner,
       );
@@ -312,6 +314,113 @@ void main() {
       expect(copy.assigneeId, isNull);
       expect(copy.assigneeName, isNull);
       expect(copy.createdBy, isNull);
+      expect(copy.createdByName, isNull, reason: 'a personal copy');
+    },
+  );
+
+  // ---- 2026-10-18 (later): «Creada por» ----
+
+  test(
+    'schema 17 upgrades add createdByName and keep every task; the next sync fills it from created_by_name, and a null clears it',
+    () async {
+      final old = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
+      addTearDown(old.close);
+      await old.execute(
+        'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)',
+      );
+      await TaskDatabase.upgrade(old, 3, 17);
+      await old.insert('task_lists', {
+        'id': projectId,
+        'owner_key': owner,
+        'name': 'Physics',
+        'shared': 1,
+      });
+      final row =
+          Task(
+              title: 'Exercise 3',
+              priority: 1,
+              listId: projectId,
+              assignment: 'group',
+              createdBy: 2,
+            ).toMap()
+            ..remove('id')
+            ..remove('createdByName');
+      await old.insert('tasks', {
+        ...row,
+        'owner_key': owner,
+        'sync_id': 'exercise',
+        'remote_version': 1,
+        'sync_pending': 0,
+      });
+      await TaskDatabase.upgrade(old, 17, TaskDatabase.schemaVersion);
+      final columns = (await old.rawQuery(
+        'PRAGMA table_info(tasks)',
+      )).map((row) => row['name']).toSet();
+      expect(columns, contains('createdByName'));
+      final upgraded = TaskDatabase.forTesting(old);
+      final before = (await upgraded.getTasks(ownerKey: owner)).single;
+      expect(before.title, 'Exercise 3');
+      expect(before.createdBy, 2);
+      expect(before.createdByName, isNull);
+
+      Map<String, dynamic> remote(Object? name) => {
+        ...Task(
+          title: 'Exercise 3',
+          priority: 1,
+          listId: projectId,
+          assignment: 'group',
+        ).toApi(),
+        'id': 'exercise',
+        'version': 1,
+        'is_deleted': false,
+        'created_by': 2,
+        'created_by_name': name,
+      };
+      await upgraded.mergeRemote(owner, remote('Ana'));
+      expect(
+        (await upgraded.getTasks(ownerKey: owner)).single.createdByName,
+        'Ana',
+      );
+      // The account left or was deleted: the name goes.
+      await upgraded.mergeRemote(owner, remote(null));
+      expect(
+        (await upgraded.getTasks(ownerKey: owner)).single.createdByName,
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'createdByName survives storage, is never sent to the server, and an older server that sends none leaves it null',
+    () async {
+      await database.insertTask(
+        Task(
+          title: 'Exercise 4',
+          priority: 1,
+          listId: projectId,
+          createdBy: 2,
+          createdByName: 'Ana',
+        ),
+        ownerKey: owner,
+      );
+      final restored = (await database.getTasks(ownerKey: owner)).single;
+      expect(restored.createdByName, 'Ana');
+      expect(restored.copyWith(title: 'Exercise 5').createdByName, 'Ana');
+      expect(restored.copyWith(createdByName: null).createdByName, isNull);
+      expect(restored.toApi(), isNot(contains('created_by_name')));
+      final api = restored.toApi();
+      expect(Task.fromApi(api).createdByName, isNull);
+      expect(
+        Task.fromApi({...api, 'created_by_name': 'Paul'}).createdByName,
+        'Paul',
+      );
+      expect(
+        Task.fromApi({...api, 'created_by_name': null}).createdByName,
+        isNull,
+      );
     },
   );
 

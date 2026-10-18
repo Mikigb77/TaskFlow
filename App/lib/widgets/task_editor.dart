@@ -18,6 +18,7 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/widgets/repeat_rule_control.dart';
 import 'package:agenda/models/occurrence_exception.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -26,10 +27,22 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/reminder_ask_sheet.dart';
 
-/// Edits a saved task or note. New ones come from the capture sheet.
+/// Edits a saved task or note, or fills in a new task: a [task] with no id
+/// is new. That is how an account without Pro creates tasks (DECISIONS.md,
+/// 2026-10-18 later): the title first, then the day and an optional time,
+/// and the rest under `Más detalles`. A new task is saved on the phone first
+/// and lands as a capture's does: on [page], the task page the form was
+/// opened from, or else on Calendar, which [showCalendar] brings forward.
 class TaskEditor extends ConsumerStatefulWidget {
-  const TaskEditor({super.key, required this.task});
+  const TaskEditor({
+    super.key,
+    required this.task,
+    this.page,
+    this.showCalendar = false,
+  });
   final Task task;
+  final Object? page;
+  final bool showCalendar;
   @override
   ConsumerState<TaskEditor> createState() => _TaskEditorState();
 }
@@ -116,6 +129,18 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     });
   }
 
+  /// A new task, not saved yet: the form for accounts without Pro.
+  bool get _creating => widget.task.id == null;
+
+  /// A new task opened inside a project shows its project by the day, so it
+  /// is clear where the task goes; otherwise the project waits in `Más
+  /// detalles`. Decided once, so the row never jumps.
+  late final bool _projectUpFront = _creating && widget.task.listId != null;
+
+  /// Words carried into a new task beyond its title show at once.
+  late final bool _notesUpFront =
+      _creating && (widget.task.notes?.trim().isNotEmpty ?? false);
+
   @override
   void initState() {
     super.initState();
@@ -127,7 +152,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _notes = TextEditingController(text: task.notes ?? '');
     _labels = TextEditingController(text: task.labels.join(', '));
     _listId = task.listId;
-    _assignment = task.assignment;
+    // A new task follows its project: everyone in a shared one, until a
+    // person is chosen.
+    _assignment = _creating ? null : task.assignment;
     _assigneeId = task.assigneeId;
     _assigneeName = task.assigneeName;
     _hasTime = task.hasTime;
@@ -156,25 +183,62 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
+  /// The date sheet. For a new task, [applyDays] makes its Hoy, Mañana and
+  /// Sin fecha apply at once, as on a capture's result.
+  Future<void> _pickDate({bool applyDays = false}) async {
     final result = await editSchedule(
       context,
       date: _dueDate,
       hasTime: _hasTime,
+      applyDays: applyDays,
     );
     if (result == null || !mounted) return;
-    setState(() {
-      _dueDate = result.date;
-      _hasTime = result.hasTime;
-      if (_dueDate == null) {
-        _recurrence = 'none';
-        _repeatInterval = 1;
-        _repeatWeekdays = [];
-        _repeatUntil = null;
-      } else if (_repeatUntil?.isBefore(Task.day(_dueDate!)) ?? false) {
-        _repeatUntil = null;
-      }
-    });
+    _schedule(result.date, result.hasTime);
+  }
+
+  void _schedule(DateTime? date, bool hasTime) => setState(() {
+    _dueDate = date;
+    _hasTime = hasTime && date != null;
+    if (_dueDate == null) {
+      _recurrence = 'none';
+      _repeatInterval = 1;
+      _repeatWeekdays = [];
+      _repeatUntil = null;
+    } else if (_repeatUntil?.isBefore(Task.day(_dueDate!)) ?? false) {
+      _repeatUntil = null;
+    }
+  });
+
+  /// A new task's day chip: [day], keeping a time already chosen; null
+  /// takes the date away.
+  void _setDay(DateTime? day) {
+    final time = _hasTime ? _dueDate : null;
+    _schedule(
+      day == null || time == null
+          ? day
+          : DateTime(day.year, day.month, day.day, time.hour, time.minute),
+      time != null,
+    );
+  }
+
+  /// A new task's time, on its day: the phone's own time picker, as for a
+  /// reminder's time. It starts on the next full hour.
+  Future<void> _pickTime() async {
+    final day = _dueDate;
+    if (day == null) return;
+    final next = (TimeOfDay.now().hour + 1) % 24;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _hasTime
+          ? TimeOfDay.fromDateTime(day)
+          : TimeOfDay(hour: next, minute: 0),
+    );
+    if (picked == null || !mounted || _dueDate == null) return;
+    final on = _dueDate!;
+    _schedule(
+      DateTime(on.year, on.month, on.day, picked.hour, picked.minute),
+      true,
+    );
   }
 
   bool _isImage(String file) => [
@@ -239,6 +303,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       assigneeId: _responsibility.assigneeId,
       assigneeName: _responsibility.assigneeName,
       createdBy: before.createdBy,
+      createdByName: before.createdByName,
       labels: _labels.text
           .split(',')
           .where((label) => label.trim().isNotEmpty)
@@ -249,13 +314,18 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   }
 
   /// Back and Save behave the same: an unchanged form just closes, and
-  /// changes are saved, with Undo.
+  /// changes are saved, with Undo (D12). A new task with no title just
+  /// closes; with one, Back saves it too.
   Future<void> _back() async {
     if (_saving) return;
-    await _save();
+    if (_creating && _title.text.trim().isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+    await _save(back: true);
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool back = false}) async {
     if (_saving || !_form.currentState!.validate()) return;
     // Leaving the step field keeps a step typed without Enter; focus
     // changes land in a microtask, so wait for that one first.
@@ -264,6 +334,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     await Future<void>.microtask(() {});
     _saving = false;
     if (!mounted) return;
+    if (_creating) {
+      await _add(back: back);
+      return;
+    }
     if (const DeepCollectionEquality().equals(_edited().toMap(), _unchanged)) {
       Navigator.pop(context);
       return;
@@ -310,6 +384,75 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           }
           try {
             await notifier.updateTask(before);
+          } catch (_) {
+            if (messenger.mounted) {
+              unawaited(showFeedback(messenger, strings.undoError));
+            }
+          }
+        },
+      );
+      unawaited(feedback);
+      askAboutRemindersAfterSave(context, [task], feedback: feedback);
+    } catch (_) {
+      if (mounted) {
+        unawaited(
+          showFeedback(
+            ScaffoldMessenger.of(context),
+            context.l10n.taskSaveError,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Saves a new task on the phone (it syncs behind, so it works offline),
+  /// then lands as a capture does: Calendar, or the page the form came
+  /// from, shows it lit, with Deshacer. The message says the day it went
+  /// to; after Back, that the changes were saved (D12).
+  Future<void> _add({required bool back}) async {
+    setState(() => _saving = true);
+    final task = _edited();
+    try {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final notifier = ref.read(taskProvider.notifier);
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final strings = context.l10n;
+      final day = task.dueDate == null ? null : Task.day(task.dueDate!);
+      final message = back
+          ? strings.changesSaved
+          : day == null
+          ? strings.taskSavedInbox
+          : strings.taskAddedOn(context.weekdayDate(day));
+      final id = await notifier.addTask(task);
+      // Shown from the phone at once, even while a sync is under way.
+      await notifier.showLocal();
+      if (!mounted) return;
+      if (widget.showCalendar) {
+        navigator.popUntil((route) => route.isFirst);
+      } else {
+        navigator.pop();
+      }
+      container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+        day,
+        {id},
+        page: widget.page,
+        showCalendar: widget.showCalendar,
+        undated: day == null,
+      );
+      final feedback = showFeedback(
+        messenger,
+        message,
+        actionLabel: strings.undo,
+        onAction: () async {
+          if (!messenger.mounted ||
+              !identical(container.read(taskProvider.notifier), notifier)) {
+            return;
+          }
+          try {
+            await notifier.deleteTask(id);
           } catch (_) {
             if (messenger.mounted) {
               unawaited(showFeedback(messenger, strings.undoError));
@@ -416,7 +559,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       },
       child: Scaffold(
         appBar: CustomAppBar(
-          title: _isNote ? context.l10n.editNote : context.l10n.editTask,
+          title: _creating
+              ? context.l10n.newTask
+              : _isNote
+              ? context.l10n.editNote
+              : context.l10n.editTask,
         ),
         body: SafeArea(
           top: false,
@@ -441,32 +588,28 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      // Projects show once there is one to choose.
-                      if (_listId != null ||
-                          (ref.watch(taskListsProvider).valueOrNull ?? const [])
-                              .isNotEmpty) ...[
-                        TaskAssignmentPicker(
-                          compact: true,
-                          task: _responsibility,
-                          lockShared: true,
-                          onChanged: _saving
-                              ? null
-                              : (value) => setState(() {
-                                  _listId = value.listId;
-                                  _assignment = value.assignment;
-                                  _assigneeId = value.assigneeId;
-                                  _assigneeName = value.assigneeName;
-                                }),
-                        ),
+                      // Projects show once there is one to choose. A new
+                      // task starts with its title instead.
+                      if (!_creating &&
+                          (_listId != null ||
+                              (ref.watch(taskListsProvider).valueOrNull ??
+                                      const [])
+                                  .isNotEmpty)) ...[
+                        _project(),
                         const SizedBox(height: 16),
                       ],
                       TextFormField(
                         key: const ValueKey('task-title'),
                         controller: _title,
+                        // A new task opens with the keyboard up. Its Done key
+                        // only closes the keyboard: the day comes next.
+                        autofocus: _creating,
                         textInputAction: _isNote
                             ? TextInputAction.next
                             : TextInputAction.done,
-                        onFieldSubmitted: _isNote ? null : (_) => _save(),
+                        onFieldSubmitted: _isNote || _creating
+                            ? null
+                            : (_) => _save(),
                         onChanged: (_) => setState(() {}),
                         maxLength: 160,
                         textCapitalization: TextCapitalization.sentences,
@@ -503,20 +646,22 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      if (!_isNote) ...[
-                        TextFormField(
-                          key: const ValueKey('task-notes'),
-                          controller: _notes,
-                          maxLength: 8000,
-                          minLines: 2,
-                          maxLines: null,
-                          textCapitalization: TextCapitalization.sentences,
-                          decoration: InputDecoration(
-                            labelText: context.l10n.notes,
-                            hintText: context.l10n.notesHint,
-                            counterText: '',
-                          ),
-                        ),
+                      // A new task: its day and time come right after the
+                      // title, then words carried over and its project.
+                      if (_creating) ...[
+                        _dayAndTime(),
+                        const SizedBox(height: 12),
+                        if (_notesUpFront) ...[
+                          _notesField(),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_projectUpFront) ...[
+                          _project(),
+                          const SizedBox(height: 8),
+                        ],
+                      ],
+                      if (!_isNote && !_creating) ...[
+                        _notesField(),
                         const SizedBox(height: 12),
                         ListTile(
                           key: const ValueKey('task-date'),
@@ -599,43 +744,34 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 setState(() => _checklist = items),
                           ),
                       ],
+                      // A new task's details: notes and files first, as the
+                      // owner listed them, then reminder, repeat, steps and
+                      // the project. The rest waits for editing.
+                      if (_detailsExpanded && _creating) ...[
+                        if (!_notesUpFront) ...[
+                          _notesField(),
+                          const SizedBox(height: 16),
+                        ],
+                        ..._files(colors),
+                        const SizedBox(height: 8),
+                        _reminder(),
+                        _repeat(),
+                        const SizedBox(height: 8),
+                        _stepsEditor(),
+                        if (!_projectUpFront &&
+                            (ref.watch(taskListsProvider).valueOrNull ??
+                                    const [])
+                                .isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          _project(),
+                        ],
+                      ],
                       // Most used first: reminder, repeat and steps; then
                       // duration, deadline, priority, labels and files.
-                      if (_detailsExpanded) ...[
+                      if (_detailsExpanded && !_creating) ...[
                         if (!_isNote) ...[
-                          ReminderControl(
-                            hasDate: _planningTask.reminderDate != null,
-                            hasTime: _planningTask.reminderHasTime,
-                            minutes: _reminderMinutes,
-                            time: _reminderTime,
-                            onMinutes: (value) =>
-                                setState(() => _reminderMinutes = value),
-                            onTime: (value) =>
-                                setState(() => _reminderTime = value),
-                          ),
-                          ListTile(
-                            key: const ValueKey('task-repeat'),
-                            contentPadding: EdgeInsets.zero,
-                            enabled: _dueDate != null,
-                            leading: const Icon(Icons.repeat_rounded),
-                            title: Text(context.l10n.repeat),
-                            subtitle: Text(
-                              _dueDate == null
-                                  ? context.l10n.repeatNeedsDate
-                                  : [
-                                      _recurrence == 'none'
-                                          ? context.repeatName(_recurrence)
-                                          : context.repeatLabel(_repeatTask),
-                                      if (_recurrence != 'none' &&
-                                          _repeatUntil != null)
-                                        context.l10n.untilDate(
-                                          context.shortDate(_repeatUntil!),
-                                        ),
-                                    ].join(' · '),
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: _editRepeat,
-                          ),
+                          _reminder(),
+                          _repeat(),
                           if (_dueDate != null && _exceptions.isNotEmpty)
                             ExpansionTile(
                               tilePadding: EdgeInsets.zero,
@@ -669,13 +805,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             ),
                           const SizedBox(height: 8),
                         ],
-                        ChecklistEditor(
-                          key: _steps,
-                          items: _checklist,
-                          recurring: !_isNote && _recurrence != 'none',
-                          onChanged: (items) =>
-                              setState(() => _checklist = items),
-                        ),
+                        _stepsEditor(),
                         if (!_isNote) ...[
                           const SizedBox(height: 16),
                           TaskPlanningControl(
@@ -733,64 +863,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           },
                         ),
                         const SizedBox(height: 24),
-                        if (_attachments.isNotEmpty) ...[
-                          SectionLabel(context.l10n.attachments),
-                          for (var i = 0; i < _attachments.length; i++)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: AppSurface(
-                                padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-                                child: Row(
-                                  children: [
-                                    if (_isImage(_attachments[i]))
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(
-                                          File(_attachments[i]),
-                                          width: 40,
-                                          height: 40,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                                Icons.broken_image_outlined,
-                                              ),
-                                        ),
-                                      )
-                                    else
-                                      Icon(
-                                        Icons.insert_drive_file_outlined,
-                                        color: colors.primary,
-                                      ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        path.basename(_attachments[i]),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: context.l10n.removeFileNamed(
-                                        path.basename(_attachments[i]),
-                                      ),
-                                      onPressed: () => setState(
-                                        () => _attachments.removeAt(i),
-                                      ),
-                                      icon: const Icon(
-                                        Icons.close_rounded,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                        TextButton.icon(
-                          onPressed: _pickingFile || _saving ? null : _attach,
-                          icon: const Icon(Icons.attach_file_rounded, size: 20),
-                          label: Text(context.l10n.addAttachment),
-                        ),
+                        ..._files(colors),
                       ],
                     ],
                   ),
@@ -799,23 +872,35 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             ),
           ),
         ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-            child: ElevatedButton.icon(
-              onPressed: _saving || _pickingFile ? null : _save,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.check_rounded, size: 20),
-              label: Text(
-                _saving
-                    ? context.l10n.saving
-                    : context.l10n.saveChangesSentence,
+        // A new task's button stays above the keyboard: title, day, add.
+        bottomNavigationBar: Padding(
+          padding: EdgeInsets.only(
+            bottom: _creating ? MediaQuery.viewInsetsOf(context).bottom : 0,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+              child: ElevatedButton.icon(
+                key: const ValueKey('task-save'),
+                onPressed: _saving || _pickingFile ? null : _save,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_rounded, size: 20),
+                label: Text(
+                  _saving
+                      ? context.l10n.saving
+                      // As on a capture's result: where the task goes.
+                      : !_creating
+                      ? context.l10n.saveChangesSentence
+                      : _dueDate != null
+                      ? context.l10n.captureAddToCalendar
+                      : context.l10n.captureAddTask,
+                ),
               ),
             ),
           ),
@@ -823,4 +908,194 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       ),
     );
   }
+
+  /// The project, and who in a shared one the task is for: a row, as the
+  /// edit form has always shown it.
+  Widget _project() => TaskAssignmentPicker(
+    compact: true,
+    task: _responsibility,
+    // A new task may go to any project; a saved shared one stays put.
+    lockShared: !_creating,
+    onChanged: _saving
+        ? null
+        : (value) => setState(() {
+            _listId = value.listId;
+            _assignment = value.assignment;
+            _assigneeId = value.assigneeId;
+            _assigneeName = value.assigneeName;
+          }),
+  );
+
+  Widget _notesField() => TextFormField(
+    key: const ValueKey('task-notes'),
+    controller: _notes,
+    maxLength: 8000,
+    minLines: 2,
+    maxLines: null,
+    textCapitalization: TextCapitalization.sentences,
+    decoration: InputDecoration(
+      labelText: context.l10n.notes,
+      hintText: context.l10n.notesHint,
+      counterText: '',
+    ),
+  );
+
+  /// A new task's day, with Hoy and Mañana one tap away, and its optional
+  /// time once it has a day. Tapping the chosen day again takes it away.
+  Widget _dayAndTime() {
+    final l = context.l10n;
+    final now = ref.watch(calendarClockProvider)();
+    final today = Task.day(now);
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final day = _dueDate == null ? null : Task.day(_dueDate!);
+    final other = day != null && day != today && day != tomorrow;
+    const icon = 18.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            ChoiceChip(
+              key: const ValueKey('new-task-today'),
+              label: Text(l.today),
+              selected: day == today,
+              onSelected: _saving
+                  ? null
+                  : (selected) => _setDay(selected ? today : null),
+            ),
+            ChoiceChip(
+              key: const ValueKey('new-task-tomorrow'),
+              label: Text(l.tomorrow),
+              selected: day == tomorrow,
+              onSelected: _saving
+                  ? null
+                  : (selected) => _setDay(selected ? tomorrow : null),
+            ),
+            ChoiceChip(
+              key: const ValueKey('new-task-pick-day'),
+              avatar: const Icon(Icons.calendar_today_outlined, size: icon),
+              label: Text(other ? context.weekdayDate(day) : l.pickDay),
+              selected: other,
+              onSelected: _saving
+                  ? null
+                  : (_) => unawaited(_pickDate(applyDays: true)),
+            ),
+          ],
+        ),
+        if (_dueDate != null) ...[
+          const SizedBox(height: 8),
+          if (_hasTime)
+            InputChip(
+              key: const ValueKey('new-task-time'),
+              avatar: const Icon(Icons.schedule_rounded, size: icon),
+              label: Text(context.clockTime(_dueDate!)),
+              onPressed: _saving ? null : () => unawaited(_pickTime()),
+              onDeleted: _saving
+                  ? null
+                  : () => _schedule(Task.day(_dueDate!), false),
+              deleteButtonTooltipMessage: l.removeTime,
+            )
+          else
+            ActionChip(
+              key: const ValueKey('new-task-time'),
+              avatar: const Icon(Icons.schedule_rounded, size: icon),
+              label: Text(l.addTime),
+              onPressed: _saving ? null : () => unawaited(_pickTime()),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _reminder() => ReminderControl(
+    hasDate: _planningTask.reminderDate != null,
+    hasTime: _planningTask.reminderHasTime,
+    minutes: _reminderMinutes,
+    time: _reminderTime,
+    onMinutes: (value) => setState(() => _reminderMinutes = value),
+    onTime: (value) => setState(() => _reminderTime = value),
+  );
+
+  Widget _repeat() => ListTile(
+    key: const ValueKey('task-repeat'),
+    contentPadding: EdgeInsets.zero,
+    enabled: _dueDate != null,
+    leading: const Icon(Icons.repeat_rounded),
+    title: Text(context.l10n.repeat),
+    subtitle: Text(
+      _dueDate == null
+          ? context.l10n.repeatNeedsDate
+          : [
+              _recurrence == 'none'
+                  ? context.repeatName(_recurrence)
+                  : context.repeatLabel(_repeatTask),
+              if (_recurrence != 'none' && _repeatUntil != null)
+                context.l10n.untilDate(context.shortDate(_repeatUntil!)),
+            ].join(' · '),
+    ),
+    trailing: const Icon(Icons.chevron_right_rounded),
+    onTap: _editRepeat,
+  );
+
+  Widget _stepsEditor() => ChecklistEditor(
+    key: _steps,
+    items: _checklist,
+    recurring: !_isNote && _recurrence != 'none',
+    onChanged: (items) => setState(() => _checklist = items),
+  );
+
+  /// The files, and the button that adds one. A new task's file is kept on
+  /// the phone with the task, and goes up once the task reaches the server.
+  List<Widget> _files(ColorScheme colors) => [
+    if (_attachments.isNotEmpty) ...[
+      SectionLabel(context.l10n.attachments),
+      for (var i = 0; i < _attachments.length; i++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: AppSurface(
+            padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+            child: Row(
+              children: [
+                if (_isImage(_attachments[i]))
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      File(_attachments[i]),
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image_outlined),
+                    ),
+                  )
+                else
+                  Icon(Icons.insert_drive_file_outlined, color: colors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    path.basename(_attachments[i]),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  tooltip: context.l10n.removeFileNamed(
+                    path.basename(_attachments[i]),
+                  ),
+                  onPressed: () => setState(() => _attachments.removeAt(i)),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+    TextButton.icon(
+      onPressed: _pickingFile || _saving ? null : _attach,
+      icon: const Icon(Icons.attach_file_rounded, size: 20),
+      label: Text(context.l10n.addAttachment),
+    ),
+  ];
 }

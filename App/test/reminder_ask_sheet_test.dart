@@ -12,6 +12,7 @@ import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/feedback_timeout.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -105,16 +106,33 @@ void main() {
 
   Finder question(AppLocalizations l) => find.text(l.reminderAskQuestion);
 
-  /// Types [title] and today's word in the capture sheet from Calendar's
-  /// `Añadir tarea`, and adds it: a task dated today.
-  Future<void> typeDatedTask(WidgetTester tester, String title) async {
+  /// Without Pro, the task form from Calendar's `Nueva tarea` (2026-10-18
+  /// later): [title], on Hoy when [today], then added.
+  Future<void> fillForm(
+    WidgetTester tester,
+    String title, {
+    bool today = false,
+  }) async {
     final l = strings(tester);
-    final today = {'es': 'hoy', 'ca': 'avui'}[l.localeName] ?? 'today';
-    await typeCapture(tester, l.addTask, '$title $today');
-    // The result not yet added is never covered by the question.
+    await tester.tap(find.text(l.newTask).hitTestable());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('task-title')), title);
+    await tester.pumpAndSettle();
+    if (today) {
+      await tester.tap(find.byKey(const ValueKey('new-task-today')));
+      await tester.pumpAndSettle();
+    }
+    // The task not yet added is never covered by the question.
     expect(question(l), findsNothing);
-    await saveCapture(tester);
+    await tester.tap(find.byKey(const ValueKey('task-save')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditor), findsNothing);
   }
+
+  /// Fills in [title] for Hoy in the form from Calendar, and adds it: a
+  /// task dated today.
+  Future<void> typeDatedTask(WidgetTester tester, String title) =>
+      fillForm(tester, title, today: true);
 
   /// The question waits for the save message to close (UX-439).
   Future<void> letSaveMessageClose(WidgetTester tester) async {
@@ -125,11 +143,9 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   }
 
-  /// Types a task with no date: with today selected, it gets none.
-  Future<void> typeUndatedTask(WidgetTester tester, String title) async {
-    await typeCapture(tester, strings(tester).addTask, title);
-    await saveCapture(tester);
-  }
+  /// Fills in a task with no date: with no day chosen, it gets none.
+  Future<void> typeUndatedTask(WidgetTester tester, String title) =>
+      fillForm(tester, title);
 
   testWidgets(
     'UX-401: the first typed task with a date shows the sheet once, after the save message; Ahora no leaves reminders off',
@@ -230,10 +246,10 @@ void main() {
       final access = FakeReminderAccess();
       await openApp(tester, store, access);
       final l = strings(tester);
-      // A brand-new account without Pro is told to type.
-      expect(find.text(l.calendarTryTyping), findsOneWidget);
+      // A brand-new account without Pro is told to use Nueva tarea.
+      expect(find.text(l.calendarTryForm), findsOneWidget);
       await typeDatedTask(tester, 'Comprar pan');
-      expect(find.text(l.calendarTryTyping), findsNothing);
+      expect(find.text(l.calendarTryForm), findsNothing);
       await letSaveMessageClose(tester);
       expect(
         find.descendant(of: sheet(), matching: question(l)),
@@ -243,6 +259,7 @@ void main() {
       await tester.pumpAndSettle();
       // Only one question: the instruction never comes back either.
       expect(question(l), findsNothing);
+      expect(find.text(l.calendarTryForm), findsNothing);
       expect(find.text(l.calendarTryTyping), findsNothing);
       expect(find.text(l.calendarTrySaying), findsNothing);
       expect(tester.takeException(), isNull);
@@ -502,12 +519,8 @@ void main() {
           container.read(taskProvider).requireValue.map((t) => t.title),
           isNot(contains('Comprar pan')),
         );
-        // Deshacer reopens the capture on its result; leave it for later.
-        expect(find.byType(CaptureResult), findsOneWidget);
-        await tester.tap(find.widgetWithText(TextButton, l.cancel));
-        await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(FilledButton, l.keep));
-        await tester.pumpAndSettle();
+        // A new task's Deshacer only takes it away.
+        expect(find.byType(TaskEditor), findsNothing);
         expect(find.byType(VoiceTaskScreen), findsNothing);
         await tester.pump(FeedbackTimeout.defaultDuration * 2);
         await tester.pumpAndSettle();
@@ -523,7 +536,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-439: opening Añadir tarea before the message closes never covers it with the sheet; the next dated save asks',
+      'UX-439: opening Nueva tarea before the message closes never covers the form with the sheet; the next dated save asks',
       (tester) async {
         final store = MemoryReminderStore();
         final access = FakeReminderAccess();
@@ -531,24 +544,25 @@ void main() {
         final l = strings(tester);
         await typeDatedTask(tester, 'Comprar pan');
         expect(find.byType(SnackBar), findsOneWidget);
-        await tester.tap(find.text(l.addTask).hitTestable());
+        await tester.tap(find.text(l.newTask).hitTestable());
         await tester.pumpAndSettle();
-        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(find.byType(TaskEditor), findsOneWidget);
         await tester.pump(FeedbackTimeout.defaultDuration * 2);
         await tester.pumpAndSettle();
-        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(find.byType(TaskEditor), findsOneWidget);
         expect(sheet(), findsNothing);
         expect(question(l), findsNothing);
         expect(store.value.asked, isFalse);
 
         await tester.enterText(
-          find.byKey(const ValueKey('capture-words')),
-          'Llamar a mamá hoy',
+          find.byKey(const ValueKey('task-title')),
+          'Llamar a mamá',
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(FilledButton, l.done));
+        await tester.tap(find.byKey(const ValueKey('new-task-today')));
         await tester.pumpAndSettle();
-        await saveCapture(tester);
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
         await letSaveMessageClose(tester);
         expect(question(l), findsOneWidget);
         expect(tester.takeException(), isNull);

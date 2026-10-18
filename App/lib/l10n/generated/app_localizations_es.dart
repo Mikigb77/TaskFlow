@@ -743,8 +743,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'Prueba: toca Añadir tarea y escribe «Mañana, llamar al dentista».';
 
   @override
-  String get calendarTryTypingWrite =>
-      'Prueba: toca Escribir tarea y escribe «Mañana, llamar al dentista».';
+  String get calendarTryForm =>
+      'Prueba: toca Nueva tarea, escribe «Llamar al dentista» y toca Mañana.';
 
   @override
   String get planTask => 'Planificar una tarea';
@@ -813,12 +813,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Las tareas sin fecha esperan aquí hasta que elijas una.\nEmpieza con Añadir tarea.';
 
   @override
-  String get tasksEmptyWrite =>
-      'Toca Escribir tarea para añadir una. La fecha es opcional.';
+  String get tasksEmptyForm =>
+      'Toca Nueva tarea para añadir una. La fecha es opcional.';
 
   @override
-  String get inboxEmptyWrite =>
-      'Las tareas sin fecha esperan aquí hasta que elijas una.\nEmpieza con Escribir tarea.';
+  String get inboxEmptyForm =>
+      'Las tareas sin fecha esperan aquí hasta que elijas una.\nEmpieza con Nueva tarea.';
 
   @override
   String get savedOnDevice => 'Tus tareas guardadas siguen en tu dispositivo.';
@@ -3556,7 +3556,21 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get writeTask => 'Escribir tarea';
+  String get newTask => 'Nueva tarea';
+
+  @override
+  String get captureFillByHand => 'Rellenar a mano';
+
+  @override
+  String get pickDay => 'Elegir día';
+
+  @override
+  String get removeTime => 'Quitar hora';
+
+  @override
+  String createdBy(String name) {
+    return 'Creada por $name';
+  }
 
   @override
   String freeVoiceNoticeTitle(int limit) {
@@ -3577,11 +3591,11 @@ class AppLocalizationsEs extends AppLocalizations {
       other: 'Tendrás $limit dictados más el $date.',
       one: 'Tendrás 1 dictado más el $date.',
     );
-    return 'Puedes seguir creando tareas escribiéndolas, sin límite. $_temp0';
+    return 'Puedes seguir creando tareas con el formulario, sin límite. $_temp0';
   }
 
   @override
-  String get freeVoiceNoticeWrite => 'Escribir una tarea';
+  String get freeVoiceNoticeCreate => 'Crear una tarea';
 
   @override
   String storageUsage(int used, int limit) {
