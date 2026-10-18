@@ -24,6 +24,7 @@ class TaskListPicker extends ConsumerWidget {
     this.onChanged,
     this.asRow = false,
     this.lockShared = false,
+    this.newName,
   });
   final String? listId;
   final ValueChanged<TaskListInfo?>? onChanged;
@@ -32,6 +33,10 @@ class TaskListPicker extends ConsumerWidget {
   /// and a shared task stays in its project.
   final bool lockShared;
   final bool asRow;
+
+  /// A project a dictation's confirming tap creates for this task: shown by
+  /// name, and chosen in the sheet, until another is picked.
+  final String? newName;
 
   Future<void> _choose(
     BuildContext context,
@@ -49,10 +54,18 @@ class TaskListPicker extends ConsumerWidget {
           shrinkWrap: true,
           children: [
             ListTile(title: Text(context.l10n.list)),
+            // Keeping it closes the sheet as it is.
+            if (newName != null && listId == null)
+              ListTile(
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: Text(context.l10n.commandNewProject(newName!)),
+                selected: true,
+                onTap: () => Navigator.pop(context),
+              ),
             ListTile(
               leading: const Icon(Icons.folder_off_outlined),
               title: Text(context.l10n.noList),
-              selected: listId == null,
+              selected: listId == null && newName == null,
               onTap: () => Navigator.pop(context, ''),
             ),
             for (final list in choices)
@@ -116,9 +129,14 @@ class TaskListPicker extends ConsumerWidget {
     final lists = ref.watch(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
     final selected = lists.where((list) => list.id == listId).firstOrNull;
     final locked = lockShared && selected?.shared == true;
+    final creating = newName != null && listId == null;
     final name =
         selected?.name ??
-        (listId == null ? context.l10n.noList : context.l10n.listUnavailable);
+        (creating
+            ? context.l10n.commandNewProject(newName!)
+            : listId == null
+            ? context.l10n.noList
+            : context.l10n.listUnavailable);
     final VoidCallback? onPressed = locked
         ? () => showFeedback(
             ScaffoldMessenger.of(context),
@@ -128,7 +146,7 @@ class TaskListPicker extends ConsumerWidget {
         ? null
         : () => _choose(context, ref, lists, selected);
     final avatar = Icon(
-      Icons.folder_outlined,
+      creating ? Icons.create_new_folder_outlined : Icons.folder_outlined,
       size: 18,
       color: selected == null ? null : taskListColor(selected.color),
     );

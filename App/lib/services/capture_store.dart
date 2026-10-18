@@ -98,12 +98,12 @@ class CaptureStore {
     }
   }
 
-  /// A capture with no words, no audio and no drafts holds nothing to keep.
+  /// A capture with no words, no audio and no result holds nothing to keep.
   static bool isEmpty(CaptureSession session) =>
       session.text.trim().isEmpty &&
       session.transcript.trim().isEmpty &&
       session.audioPath == null &&
-      session.drafts.isEmpty;
+      !session.hasResult;
 
   /// Shared text only: it brings words. Android acknowledges a share only
   /// after this idempotent write. A lost acknowledgement cannot duplicate a
@@ -193,6 +193,9 @@ class CaptureStore {
 
   /// Saved draft IDs remain in the journal even if a task is later deleted.
   /// Repeating Save after a lost response cannot insert the tasks again.
+  /// A capture is finished once no draft and no command waits: commands are
+  /// marked done before this, and a result of only commands saves an empty
+  /// set.
   Future<CaptureSession> saveReady(
     String id,
     String ownerKey,
@@ -232,7 +235,10 @@ class CaptureStore {
         await TaskDatabase.stageAttachments(tx, ownerKey, syncId, task);
         updated.add(draft.copyWith(task: task, savedTaskId: taskId));
       }
-      final completed = updated.isNotEmpty && updated.every((d) => !d.pending);
+      final completed =
+          (updated.isNotEmpty || session.commands.isNotEmpty) &&
+          updated.every((d) => !d.pending) &&
+          session.commands.every((c) => !c.pending);
       final next = session.copyWith(
         drafts: updated,
         status: completed ? 'saved' : 'ready',
@@ -274,6 +280,8 @@ class CaptureStore {
 
   /// Undo only this save, atomically, without deleting a task changed since it
   /// was created. Cloud deletions remain queued for the ordinary sync protocol.
+  /// A result with commands comes back with them waiting again, even when
+  /// it saved no task; undoing what they did is the caller's.
   Future<CaptureSession?> undoSave(
     CaptureSession before,
     Map<String, int> savedIds,
@@ -283,7 +291,9 @@ class CaptureStore {
       where: 'id = ? AND owner_key = ?',
       whereArgs: [before.id, before.ownerKey],
     );
-    if (rows.isEmpty || savedIds.isEmpty) return null;
+    if (rows.isEmpty || (savedIds.isEmpty && before.commands.isEmpty)) {
+      return null;
+    }
     final current = _decode(rows.single);
     for (final entry in savedIds.entries) {
       if (!current.drafts.any(
@@ -354,6 +364,7 @@ class CaptureStore {
           else
             draft,
       ],
+      commands: before.commands,
     );
     await tx.update(
       'captures',

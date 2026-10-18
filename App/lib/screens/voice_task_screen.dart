@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -23,9 +24,13 @@ import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/capture_entries.dart';
+import 'package:agenda/services/command_runner.dart';
+import 'package:agenda/services/text_search.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/capture_command_cards.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
 import 'package:agenda/widgets/reminder_ask_sheet.dart';
+import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_form_entry.dart';
 
 // Each capture screen owns and releases its recorder. A factory also lets the
@@ -515,7 +520,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         unawaited(
           CaptureDiagnostics(_store.database).record(CaptureEvent.resumed),
         );
-        if (_session!.drafts.isNotEmpty && mounted) {
+        if (_session!.hasResult && mounted) {
           _review(_session!);
           return;
         }
@@ -604,7 +609,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _autoStarted ||
         _session?.audioPath != null ||
         _words.text.trim().isNotEmpty ||
-        _session?.drafts.isNotEmpty == true) {
+        _session?.hasResult == true) {
       return;
     }
     _autoStarted = true;
@@ -1659,7 +1664,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           !session.terminal) {
         if (session.text.trim().isEmpty &&
             session.audioPath == null &&
-            session.drafts.isEmpty) {
+            !session.hasResult) {
           // Nothing was said: closing keeps nothing.
           await _store.discard(session.id, _owner);
           _container?.invalidate(pendingCapturesProvider);
@@ -2145,6 +2150,8 @@ class CaptureResult extends ConsumerStatefulWidget {
 class _CaptureResultState extends ConsumerState<CaptureResult> {
   late CaptureSession _session = widget.session;
   late List<CaptureDraft> _items = _session.drafts;
+  // Create a project, find, change or delete a task: each its own card.
+  late List<CaptureCommand> _commands = _session.commands;
   late final CaptureStore _store;
   Future<void> _writes = Future.value();
   bool _saving = false;
@@ -2174,7 +2181,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
 
   @override
   void dispose() {
-    if (!_finished && _items.any((d) => d.pending)) {
+    if (!_finished &&
+        (_items.any((d) => d.pending) || _commands.any((c) => c.pending))) {
       unawaited(
         CaptureDiagnostics(
           _store.database,
@@ -2203,11 +2211,110 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   }
 
   Future<void> _change(CaptureDraft draft) async {
+    final said = _items
+        .where((d) => d.id == draft.id)
+        .firstOrNull
+        ?.projectSuggestion;
+    // A choice for a project said serves every task that said it.
+    final chosen = said != null && draft.projectSuggestion == null;
     setState(() {
-      _items = _items.map((d) => d.id == draft.id ? draft : d).toList();
+      _items = _items
+          .map(
+            (d) => d.id == draft.id
+                ? draft
+                : chosen &&
+                      d.pending &&
+                      d.projectSuggestion != null &&
+                      _sameProject(d.projectSuggestion!, said)
+                ? _sameChoice(d, draft)
+                : d,
+          )
+          .toList();
       _error = null;
     });
-    final snapshot = _session.copyWith(drafts: _items, status: 'ready');
+    await _write();
+  }
+
+  static bool _sameProject(String a, String b) =>
+      foldForSearch(spokenProjectName(a)) == foldForSearch(spokenProjectName(b));
+
+  /// [draft] given the project choice made on [chosen]'s card.
+  CaptureDraft _sameChoice(CaptureDraft draft, CaptureDraft chosen) {
+    if (chosen.newProject != null) {
+      return draft.copyWith(
+        newProject: chosen.newProject,
+        clearProjectSuggestion: true,
+        assignmentReviewed: true,
+      );
+    }
+    final project = (ref.read(taskListsProvider).valueOrNull ?? const [])
+        .where((p) => p.id == chosen.task.listId)
+        .firstOrNull;
+    final member =
+        draft.assignmentHints['member']?.trim().isNotEmpty == true;
+    return draft.copyWith(
+      task: taskWithProject(draft.task, project),
+      clearProjectSuggestion: true,
+      assignmentReviewed: !(project?.shared == true && member),
+    );
+  }
+
+  Future<void> _changeCommand(CaptureCommand command) async {
+    final before = _commands.where((c) => c.id == command.id).firstOrNull;
+    // An existing project taken instead of a new one: its tasks go there.
+    final picked =
+        command.kind == CommandKind.project &&
+            command.existing &&
+            command.choice != null &&
+            before?.choice != command.choice
+        ? (ref.read(taskListsProvider).valueOrNull ?? const [])
+              .where((p) => p.id == command.choice)
+              .firstOrNull
+        : null;
+    setState(() {
+      _commands = [
+        for (final item in _commands) item.id == command.id ? command : item,
+      ];
+      if (picked != null) {
+        _items = [
+          for (final draft in _items)
+            draft.pending &&
+                    draft.newProject != null &&
+                    _sameProject(draft.newProject!, command.name)
+                ? draft.copyWith(
+                    task: taskWithProject(draft.task, picked),
+                    clearNewProject: true,
+                  )
+                : draft,
+        ];
+      }
+      _error = null;
+    });
+    await _write();
+  }
+
+  /// The new projects whose card still asks which one is meant: two
+  /// projects match. Their tasks wait for that choice.
+  static Set<String> _undecided(List<CommandView> views) => {
+    for (final view in views)
+      if (view.kind == CommandKind.project && view.blocking)
+        foldForSearch(spokenProjectName(view.command.name)),
+  };
+
+  static bool _draftReady(CaptureDraft draft, Set<String> undecided) =>
+      draft.ready &&
+      (draft.newProject == null ||
+          !undecided.contains(
+            foldForSearch(spokenProjectName(draft.newProject!)),
+          ));
+
+  /// Every card as it is now, kept with the capture.
+  Future<void> _write() async {
+    final snapshot = _session.copyWith(
+      drafts: _items,
+      commands: _commands,
+      status: 'ready',
+    );
     _session = snapshot;
     _writes = _writes
         .catchError((Object _) {})
@@ -2225,7 +2332,41 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     }
   }
 
+  /// The result holds commands, or a task that goes into a project the tap
+  /// creates: it is applied with [_apply]. Every other result saves as it
+  /// always has.
+  bool get _usesCommands =>
+      _commands.isNotEmpty ||
+      _items.any((d) => d.pending && d.newProject != null);
+
+  /// The cards of the commands still shown, worked out against the tasks
+  /// and projects on the phone. [watch] only from [build].
+  List<CommandView> _views({bool watch = false}) {
+    if (_commands.isEmpty) return const [];
+    final tasks = watch ? ref.watch(taskProvider) : ref.read(taskProvider);
+    final projects = watch
+        ? ref.watch(taskListsProvider)
+        : ref.read(taskListsProvider);
+    final auth = watch ? ref.watch(authProvider) : ref.read(authProvider);
+    return [
+      for (final command in _commands)
+        if (command.shown)
+          resolveCommand(
+            command,
+            tasks: tasks.valueOrNull ?? const [],
+            projects: projects.valueOrNull ?? const [],
+            accountId: auth.account?.id,
+          ),
+    ];
+  }
+
+  /// Something here still waits for the confirming tap, or for a choice.
+  bool _worthKeeping() =>
+      _items.any((d) => d.pending) ||
+      _views().any((view) => view.actionable || view.blocking);
+
   Future<void> _save() async {
+    if (_usesCommands) return _apply();
     if (_saving) return;
     // Leaving the step field keeps a step typed without Enter; focus
     // changes land in a microtask, so wait for that one first.
@@ -2374,6 +2515,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               setState(() {
                 _session = restored;
                 _items = restored.drafts;
+                _commands = restored.commands;
                 _finished = false;
               });
               if (messenger.mounted) {
@@ -2443,6 +2585,480 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     );
   }
 
+  /// ✕ on a command's card: nothing happens for it. A new project taken out
+  /// takes its tasks with it out of the project: they go without one.
+  void _removeCommand(CaptureCommand command) {
+    final name = command.kind == CommandKind.project
+        ? foldForSearch(spokenProjectName(command.name))
+        : null;
+    final moved = <String, String>{
+      for (final draft in _items)
+        if (name != null &&
+            draft.pending &&
+            draft.newProject != null &&
+            foldForSearch(spokenProjectName(draft.newProject!)) == name)
+          draft.id: draft.newProject!,
+    };
+    void put({required bool back}) {
+      setState(() {
+        _commands = [
+          for (final item in _commands)
+            item.id == command.id ? item.copyWith(removed: !back) : item,
+        ];
+        _items = [
+          for (final draft in _items)
+            if (moved[draft.id] case final project?)
+              back
+                  ? draft.copyWith(newProject: project)
+                  : draft.copyWith(clearNewProject: true)
+            else
+              draft,
+        ];
+        _error = null;
+      });
+      unawaited(_write());
+    }
+
+    put(back: false);
+    unawaited(
+      showFeedback(
+        ScaffoldMessenger.of(context),
+        context.l10n.reviewRemoved,
+        margin: _aboveActions(),
+        actionLabel: context.l10n.undo,
+        onAction: () {
+          if (mounted && !_saving) put(back: true);
+        },
+      ),
+    );
+  }
+
+  /// D11: a whole repeating series is deleted only after asking, with
+  /// `Conservar tarea` as the filled button. True deletes it, false keeps
+  /// it, null (dismissed) does nothing yet.
+  Future<bool?> _askToDeleteSeries(Task task) => showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      scrollable: true,
+      content: Text(context.l10n.deleteSeriesHelp(task.title)),
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(context.l10n.delete),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(context.l10n.keepTask),
+        ),
+      ],
+    ),
+  );
+
+  /// The confirming tap of a result with commands: the projects first, then
+  /// the tasks in them, the changes and the deletions, all in one go. One
+  /// `Deshacer` takes all of it back; what can't be done is taken back at
+  /// once, and the result stays.
+  Future<void> _apply() async {
+    if (_saving) return;
+    // As in _save: a step typed without Enter is kept first.
+    _saving = true;
+    FocusScope.of(context).unfocus();
+    await Future<void>.microtask(() {});
+    _saving = false;
+    if (!mounted) return;
+    for (final view in _views()) {
+      if (view.kind != CommandKind.delete ||
+          !view.actionable ||
+          view.stored?.isRecurring != true) {
+        continue;
+      }
+      final delete = await _askToDeleteSeries(view.stored!);
+      if (!mounted || delete == null) return;
+      if (!delete) {
+        // `Conservar tarea`: the task stays, and the rest goes ahead.
+        setState(() {
+          _commands = [
+            for (final item in _commands)
+              item.id == view.command.id ? item.copyWith(removed: true) : item,
+          ];
+        });
+        unawaited(_write());
+      }
+    }
+    final views = _views();
+    final undecided = _undecided(views);
+    final ready = _items.where((d) => _draftReady(d, undecided)).toList();
+    final actionable = views.where((view) => view.actionable).toList();
+    if (ready.isEmpty && actionable.isEmpty) {
+      if (!_worthKeeping()) await _finishEmpty();
+      return;
+    }
+    final saveWatch = Stopwatch()..start();
+    unawaited(
+      CaptureDiagnostics(_store.database).record(
+        CaptureEvent.reviewTime,
+        elapsedMs: _reviewWatch.elapsedMilliseconds,
+      ),
+    );
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final notifier = ref.read(taskProvider.notifier);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final navigator = Navigator.of(context);
+    final strings = context.l10n;
+    final sheetMessages = ScaffoldMessenger.of(context);
+    final appMessages = ScaffoldMessenger.of(navigator.context);
+    final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
+    final projects = ref.read(taskListsProvider).valueOrNull ?? const [];
+    final api = ref.read(apiClientProvider);
+    final accountId = ref.read(authProvider).account?.id;
+    final runner = CommandRunner(
+      notifier,
+      ref.read(taskListStoreProvider),
+      current: () => container.read(taskProvider).valueOrNull ?? const [],
+    );
+    final applied = AppliedCommands();
+    final before = _session.copyWith(drafts: _items, commands: _commands);
+    final readyIds = {for (final draft in ready) draft.id};
+    final undoIds = <String, int>{};
+    late CaptureSession written;
+    var committed = false;
+    try {
+      await _writes;
+      // The projects: those the cards create, and those ready tasks go to.
+      // One with the same name already there is used, never a second one.
+      String folded(String name) => foldForSearch(spokenProjectName(name));
+      final ids = <String, String>{
+        for (final view in views)
+          if (view.kind == CommandKind.project && view.command.existing)
+            folded(view.command.name):
+                view.command.existingListId ?? view.command.choice!,
+      };
+      final names = <String, String>{
+        for (final view in actionable)
+          if (view.kind == CommandKind.project)
+            folded(view.command.name): view.projectName,
+        for (final draft in ready)
+          if (draft.newProject case final name?)
+            folded(name): spokenProjectName(name),
+      };
+      for (final MapEntry(key: key, value: name) in names.entries) {
+        if (ids.containsKey(key)) continue;
+        final same = editableProjects(
+          projects,
+        ).where((p) => foldForSearch(p.name.trim()) == key).firstOrNull;
+        ids[key] = same?.id ?? (await runner.createProject(name, applied)).id;
+      }
+      // The tasks into their projects: new ones are personal.
+      final items = [
+        for (final draft in _items)
+          if (readyIds.contains(draft.id) &&
+              draft.newProject != null &&
+              ids[folded(draft.newProject!)] != null)
+            draft.copyWith(
+              task: draft.task.copyWith(
+                listId: ids[folded(draft.newProject!)],
+                assignment: 'personal',
+                assigneeId: null,
+                assigneeName: null,
+              ),
+            )
+          else
+            draft,
+      ];
+      for (final view in actionable) {
+        if (view.kind == CommandKind.update) {
+          await runner.update(
+            view.plan!,
+            series: view.command.series,
+            applied: applied,
+          );
+        } else if (view.kind == CommandKind.delete) {
+          await runner.delete(view.stored!, applied);
+        }
+      }
+      // Done with: what was applied, and changes or deletions with nothing
+      // to do (not found, or already as asked). Choices still wait.
+      final handled = {
+        for (final view in views)
+          if (view.actionable ||
+              (!view.blocking &&
+                  (view.kind == CommandKind.update ||
+                      view.kind == CommandKind.delete)))
+            view.command.id,
+      };
+      written = _session.copyWith(
+        drafts: items,
+        commands: [
+          for (final item in _commands)
+            handled.contains(item.id) ? item.copyWith(done: true) : item,
+        ],
+        status: 'ready',
+      );
+      await _store.update(written);
+      final result = await _store.saveReady(
+        _session.id,
+        _session.ownerKey,
+        readyIds,
+      );
+      committed = true;
+      _session = result;
+      _items = result.drafts;
+      _commands = result.commands;
+      for (final draft in result.drafts) {
+        if (readyIds.contains(draft.id) && draft.savedTaskId != null) {
+          undoIds[draft.id] = draft.savedTaskId!;
+        }
+      }
+    } catch (_) {
+      if (!committed) {
+        // Nothing half done: what was done is taken back.
+        await runner.undoChanges(applied);
+        await runner.takeBackProjects(
+          applied,
+          api: api,
+          accountId: accountId,
+        );
+        try {
+          await _store.update(before.copyWith(status: 'ready'));
+        } catch (_) {
+          /* The capture keeps what it had. */
+        }
+        if (applied.projects.isNotEmpty) container.invalidate(taskListsProvider);
+      }
+      if (mounted) {
+        setState(() {
+          _error = CaptureProblem.saveFailed;
+          _saving = false;
+          if (!committed) {
+            _session = before;
+            _items = before.drafts;
+            _commands = before.commands;
+          }
+        });
+      }
+      return;
+    }
+    try {
+      unawaited(
+        CaptureDiagnostics(_store.database).record(
+          CaptureEvent.saved,
+          elapsedMs: saveWatch.elapsedMilliseconds,
+          count: ready.length + actionable.length,
+        ),
+      );
+      _reviewWatch.reset();
+      if (applied.projects.isNotEmpty) container.invalidate(taskListsProvider);
+      await notifier.showLocal();
+      if (!mounted) return;
+      ref.invalidate(pendingCapturesProvider);
+      final remaining =
+          _items.where((d) => d.pending).length +
+          _commands.where((c) => c.pending).length;
+      _finished = remaining == 0;
+      final messenger = remaining == 0 ? appMessages : sheetMessages;
+      EdgeInsets? margin() =>
+          messenger == sheetMessages ? _aboveActions() : null;
+      final tasks = ready.where((item) => !item.task.isNote).toList();
+      final landed = [
+        for (final update in applied.updates)
+          if (update.landed case final task?) task,
+      ];
+      // Calendar lands on the earliest day among those added and changed.
+      final days =
+          [
+              for (final item in tasks) ?item.task.dueDate,
+              for (final task in landed) ?task.displayDate,
+            ].map(Task.day).toSet().toList()
+            ..sort();
+      final updates = actionable
+          .where((view) => view.kind == CommandKind.update)
+          .toList();
+      final moved = updates.length == 1 ? updates.single.plan! : null;
+      final onlyMoved =
+          moved != null &&
+          moved.schedule != null &&
+          moved.title == null &&
+          moved.deadline == null &&
+          moved.priority == null &&
+          moved.notes == null &&
+          moved.assignee == null;
+      final day = ready.length == 1 ? ready.single.task.dueDate : null;
+      final parts = [
+        if (applied.projects.isNotEmpty)
+          strings.commandProjectsCreated(applied.projects.length),
+        if (ready.isNotEmpty)
+          ready.length > 1
+              ? strings.captureTasksAdded(ready.length)
+              : day == null
+              ? strings.taskSavedInbox
+              : strings.taskAddedOn(context.weekdayDate(day)),
+        if (applied.updates.isNotEmpty)
+          onlyMoved
+              ? moved.schedule!.date == null
+                    ? strings.movedInbox
+                    : strings.movedOccurrenceDate(
+                        context.weekdayDate(moved.schedule!.date!),
+                      )
+              : strings.commandTasksChanged(applied.updates.length),
+        if (applied.deleted.isNotEmpty)
+          strings.commandTasksDeleted(applied.deleted.length),
+      ];
+      final message = remaining > 0
+          ? '${parts.join(' · ')} · ${strings.captureKeptForReview(remaining)}'
+          : parts.join(' · ');
+      if (remaining == 0) {
+        if (origin?.showCalendar == true) {
+          navigator.popUntil((route) => route.isFirst);
+        } else {
+          Navigator.pop(context);
+        }
+        final ids = {
+          for (final item in tasks)
+            if (undoIds[item.id] != null) undoIds[item.id]!,
+          for (final update in applied.updates) ?update.before.id,
+        };
+        if (ids.isNotEmpty) {
+          container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+            days.firstOrNull,
+            ids,
+            page: origin?.page,
+            showCalendar: origin?.showCalendar ?? false,
+            undated:
+                tasks.any((item) => item.task.dueDate == null) ||
+                landed.any((task) => task.displayDate == null),
+          );
+        }
+      }
+      final feedback = showFeedback(
+        messenger,
+        message,
+        margin: margin(),
+        actionLabel: strings.undo,
+        onAction: () async {
+          if (mounted && _saving) return;
+          if (mounted) setState(() => _saving = true);
+          try {
+            if (container.read(captureOwnerProvider) != before.ownerKey) {
+              return;
+            }
+            await _writes;
+            final changesBack = await runner.undoChanges(applied);
+            // The tasks come out of the new projects before those go; the
+            // result comes back as it was before the tap.
+            final back = await _store.undoSave(
+              written.copyWith(commands: before.commands),
+              undoIds,
+            );
+            CaptureSession? restored;
+            if (back != null) {
+              restored = back.copyWith(
+                drafts: [
+                  for (final draft in back.drafts)
+                    undoIds.containsKey(draft.id)
+                        ? before.drafts.firstWhere((d) => d.id == draft.id)
+                        : draft,
+                ],
+                commands: before.commands,
+              );
+              await _store.update(restored);
+            }
+            final projectsBack = await runner.takeBackProjects(
+              applied,
+              api: api,
+              accountId: accountId,
+            );
+            if (applied.projects.isNotEmpty) {
+              container.invalidate(taskListsProvider);
+            }
+            await container.read(taskProvider.notifier).showLocal();
+            container.invalidate(pendingCapturesProvider);
+            final whole = changesBack && projectsBack;
+            if (restored == null || !whole) {
+              if (messenger.mounted) {
+                unawaited(
+                  showFeedback(
+                    messenger,
+                    restored == null
+                        ? strings.reviewUndoChanged
+                        : strings.undoError,
+                    margin: margin(),
+                  ),
+                );
+              }
+              if (restored == null) return;
+            }
+            if (mounted) {
+              setState(() {
+                _session = restored!;
+                _items = restored.drafts;
+                _commands = restored.commands;
+                _finished = false;
+              });
+              if (whole && messenger.mounted) {
+                unawaited(
+                  showFeedback(
+                    messenger,
+                    strings.reviewUndoSaved,
+                    margin: margin(),
+                  ),
+                );
+              }
+            } else if (navigator.mounted &&
+                container.read(captureOwnerProvider) == before.ownerKey) {
+              // The sheet opens again on the restored result, as after a
+              // save's Undo.
+              unawaited(
+                showCaptureSheet(
+                  navigator.context,
+                  captureId: restored.id,
+                  startListening: false,
+                  page: origin?.page,
+                ),
+              );
+            }
+          } catch (_) {
+            if (messenger.mounted) {
+              unawaited(
+                showFeedback(messenger, strings.undoError, margin: margin()),
+              );
+            }
+          } finally {
+            if (mounted) setState(() => _saving = false);
+          }
+        },
+      );
+      unawaited(feedback);
+      // A deletion is sent once `Deshacer` is no longer offered.
+      if (applied.deleted.isNotEmpty) {
+        unawaited(
+          feedback.then((controller) async {
+            final reason = await controller?.closed;
+            if (reason != SnackBarClosedReason.action && notifier.mounted) {
+              unawaited(notifier.loadTasks());
+            }
+          }),
+        );
+      }
+      if (remaining == 0 && ready.isNotEmpty) {
+        askAboutRemindersAfterSave(
+          context,
+          ready.map((d) => d.task),
+          feedback: feedback,
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = CaptureProblem.saveFailed);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   /// `Volver a decirlo`: the edits are written first, so the result can come
   /// back as it was.
   Future<void> _sayAgain() async {
@@ -2461,7 +3077,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   /// `Terminar` does. While saving, nothing happens.
   Future<void> _leave() async {
     if (_saving || _asking || !mounted) return;
-    if (!_items.any((d) => d.pending)) {
+    // Nothing waits (a search, a task not found): it only closes.
+    if (!_worthKeeping()) {
       await _finishEmpty();
       return;
     }
@@ -2497,12 +3114,18 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
 
   /// `Cancelar` asks as Back does. `Volver a decirlo` (spoken words, while
   /// dictations are available) sits at the other end. They share a row, and
-  /// stack at large text.
-  Widget _exits(BuildContext context, {required bool canSayAgain}) {
+  /// stack at large text. With nothing to confirm (a search), [close]
+  /// makes it `Cerrar`.
+  Widget _exits(
+    BuildContext context, {
+    required bool canSayAgain,
+    bool close = false,
+  }) {
     final l = context.l10n;
     final cancel = TextButton(
+      key: close ? const ValueKey('capture-result-close') : null,
       onPressed: _saving ? null : () => unawaited(Navigator.maybePop(context)),
-      child: Text(l.cancel),
+      child: Text(close ? l.captureClose : l.cancel),
     );
     if (!canSayAgain) {
       return Align(alignment: AlignmentDirectional.centerStart, child: cancel);
@@ -2538,11 +3161,75 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     }
   }
 
+  /// A command's card. A project's says whether tasks go there.
+  Widget _commandCard(CommandView view, List<CaptureDraft> pending) {
+    final command = view.command;
+    void changed(CaptureCommand next) => unawaited(_changeCommand(next));
+    void remove() => _removeCommand(command);
+    final existing = command.existing
+        ? command.existingListId ?? command.choice
+        : null;
+    return switch (view.kind) {
+      CommandKind.project => ProjectCommandCard(
+        key: ValueKey(command.id),
+        view: view,
+        enabled: !_saving,
+        hasTasks: pending.any(
+          (draft) =>
+              (draft.newProject != null &&
+                  _sameProject(draft.newProject!, command.name)) ||
+              (existing != null && draft.task.listId == existing),
+        ),
+        onChanged: changed,
+        onRemove: remove,
+      ),
+      CommandKind.find => FindCommandCard(key: ValueKey(command.id), view: view),
+      CommandKind.update => UpdateCommandCard(
+        key: ValueKey(command.id),
+        view: view,
+        enabled: !_saving,
+        onChanged: changed,
+        onRemove: remove,
+      ),
+      CommandKind.delete => DeleteCommandCard(
+        key: ValueKey(command.id),
+        view: view,
+        enabled: !_saving,
+        onChanged: changed,
+        onRemove: remove,
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final pending = _items.where((d) => d.pending).toList();
-    final ready = pending.where((d) => d.ready).length;
-    final compact = pending.length > 1;
+    // Commands: one card each, the new projects before the tasks, and the
+    // searches, changes and deletions after them, in the order said.
+    final commands = _usesCommands;
+    final views = commands ? _views(watch: true) : const <CommandView>[];
+    final undecided = _undecided(views);
+    final ready = pending.where((d) => _draftReady(d, undecided)).length;
+    final cards = pending.length + views.length;
+    final compact = commands ? cards > 1 : pending.length > 1;
+    final actionable = views.where((view) => view.actionable).toList();
+    final blocked =
+        pending.any((d) => !_draftReady(d, undecided)) ||
+        views.any((view) => view.blocking);
+    final changes = actionable
+        .where((view) => view.kind == CommandKind.update)
+        .length;
+    final deletes = actionable
+        .where((view) => view.kind == CommandKind.delete)
+        .length;
+    final projects = actionable
+        .where((view) => view.kind == CommandKind.project)
+        .length;
+    // Only things to read (a search, a task not found): nothing to tap.
+    final readOnly =
+        commands && cards > 0 && ready == 0 && actionable.isEmpty && !blocked;
+    final deleteOnly =
+        commands && ready == 0 && changes == 0 && projects == 0 && deletes > 0;
     final l = context.l10n;
     final theme = Theme.of(context);
     final note =
@@ -2562,6 +3249,22 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final freeLeft = spoken ? ref.watch(freeVoiceLeftProvider) : null;
     final label = _saving
         ? l.saving
+        : commands
+        ? cards == 0
+              ? l.captureFinish
+              : ready == 0 && actionable.isEmpty
+              ? l.captureCheckDetails
+              : ready > 0
+              ? ready > 1 || pending.length > 1
+                    ? l.captureAddTasks(ready)
+                    : pending.single.task.dueDate != null
+                    ? l.captureAddToCalendar
+                    : l.captureAddTask
+              : changes == 0 && deletes == 0
+              ? l.commandCreateProjects(projects)
+              : deleteOnly
+              ? l.delete
+              : l.commandApply
         : pending.isEmpty
         ? l.captureFinish
         : ready == 0
@@ -2573,6 +3276,30 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         : pending.single.task.dueDate != null
         ? l.captureAddToCalendar
         : l.captureAddTask;
+    final onSave = _saving
+        ? null
+        : commands
+        ? cards == 0
+              ? _finishEmpty
+              : ready == 0 && actionable.isEmpty
+              ? null
+              : _save
+        : pending.isEmpty
+        ? _finishEmpty
+        : ready == 0
+        ? null
+        : _save;
+    // A heading only when everything here is something to add.
+    final adding =
+        compact &&
+        views.every(
+          (view) =>
+              view.kind == CommandKind.project && !view.command.existing,
+        );
+    Widget card(Widget child) => Padding(
+      padding: EdgeInsets.only(bottom: compact ? 12 : 0),
+      child: child,
+    );
     // A save closes the sheet itself; every other way out asks first.
     return PopScope(
       canPop: false,
@@ -2585,11 +3312,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (compact)
+            if (adding)
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                 child: Text(
-                  l.captureThingsToAdd(pending.length),
+                  l.captureThingsToAdd(cards),
                   style: theme.textTheme.titleMedium,
                 ),
               ),
@@ -2607,10 +3334,12 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    for (final view in views)
+                      if (view.kind == CommandKind.project)
+                        card(_commandCard(view, pending)),
                     for (final item in pending)
-                      Padding(
-                        padding: EdgeInsets.only(bottom: compact ? 12 : 0),
-                        child: CaptureReviewEditor(
+                      card(
+                        CaptureReviewEditor(
                           key: ValueKey(item.id),
                           draft: item,
                           compact: compact,
@@ -2625,7 +3354,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                           onRemove: () => _remove(item),
                         ),
                       ),
-                    if (pending.isEmpty)
+                    for (final view in views)
+                      if (view.kind != CommandKind.project)
+                        card(_commandCard(view, pending)),
+                    if (cards == 0)
                       EmptyState(
                         title: l.captureNothingToReview,
                         message: l.captureRemovedDraftsHelp,
@@ -2641,25 +3373,32 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  FilledButton.icon(
-                    key: const ValueKey('save-drafts'),
-                    // With every draft removed, the button finishes instead.
-                    onPressed: _saving
-                        ? null
-                        : pending.isEmpty
-                        ? _finishEmpty
-                        : ready == 0
-                        ? null
-                        : _save,
-                    icon: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.done_all_rounded),
-                    label: Text(label),
-                  ),
+                  // A search needs no tap: it only shows its list.
+                  if (!readOnly)
+                    FilledButton.icon(
+                      key: const ValueKey('save-drafts'),
+                      // With every card removed, the button finishes
+                      // instead.
+                      onPressed: onSave,
+                      style: deleteOnly
+                          ? FilledButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error,
+                              foregroundColor: theme.colorScheme.onError,
+                            )
+                          : null,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              deleteOnly
+                                  ? Icons.delete_outline_rounded
+                                  : Icons.done_all_rounded,
+                            ),
+                      label: Text(label),
+                    ),
                   if (!typing) ...[
                     if (freeLeft != null && freeLeft <= 3) ...[
                       const SizedBox(height: 8),
@@ -2672,8 +3411,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    _exits(context, canSayAgain: sayAgain),
+                    SizedBox(height: readOnly ? 0 : 12),
+                    _exits(context, canSayAgain: sayAgain, close: readOnly),
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       leading: Icon(

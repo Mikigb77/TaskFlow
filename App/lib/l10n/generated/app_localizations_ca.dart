@@ -3810,4 +3810,189 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get accountDeleted => 'S’ha suprimit el compte.';
+
+  @override
+  String commandNewProject(String name) {
+    return 'Projecte nou: $name';
+  }
+
+  @override
+  String commandExistingProject(String name) {
+    return 'Ja tens «$name»';
+  }
+
+  @override
+  String get commandExistingProjectTasks => 'Les tasques hi van.';
+
+  @override
+  String commandCreateProjectQuestion(String name) {
+    return 'Vols crear el projecte «$name»?';
+  }
+
+  @override
+  String commandCreateNamed(String name) {
+    return 'Crea «$name»';
+  }
+
+  @override
+  String commandCreateProjects(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Crea $count projectes',
+      one: 'Crea el projecte',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get commandApply => 'Aplica';
+
+  @override
+  String commandFindWords(String words) {
+    return 'Tasques amb «$words»';
+  }
+
+  @override
+  String commandFindProject(String name) {
+    return 'Tasques de «$name»';
+  }
+
+  @override
+  String commandFindPerson(String name) {
+    return 'Tasques assignades a $name';
+  }
+
+  @override
+  String get commandFindMine => 'Les teves tasques';
+
+  @override
+  String get commandCompleted => 'Completada';
+
+  @override
+  String commandFindNone(String words) {
+    return 'No hi ha cap tasca amb «$words»';
+  }
+
+  @override
+  String get commandFindNoneAtAll => 'No hi ha cap tasca';
+
+  @override
+  String commandMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'I $count més',
+      one: 'I 1 més',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandOpenProject(String name) {
+    return 'Obre «$name»';
+  }
+
+  @override
+  String commandProjectNotFound(String name) {
+    return 'No trobo el projecte «$name»';
+  }
+
+  @override
+  String commandPersonNotFound(String name) {
+    return 'No trobo $name';
+  }
+
+  @override
+  String commandTaskNotFound(String words) {
+    return 'No trobo cap tasca amb «$words»';
+  }
+
+  @override
+  String get commandTaskNotFoundPlain => 'No trobo aquesta tasca';
+
+  @override
+  String get commandWhichToChange => 'Quina vols canviar?';
+
+  @override
+  String get commandWhichToDelete => 'Quina vols suprimir?';
+
+  @override
+  String commandWillDelete(String title) {
+    return 'Se suprimirà: $title';
+  }
+
+  @override
+  String commandWillDeleteOn(String title, String date) {
+    return 'Se suprimirà: $title ($date)';
+  }
+
+  @override
+  String get commandChooseAnother => 'Tria’n una altra';
+
+  @override
+  String get commandNothingToChange => 'Ja és així.';
+
+  @override
+  String get commandWhichDay => 'Quin dia?';
+
+  @override
+  String commandMemberNotIn(String name, String project) {
+    return '$name no és a «$project»';
+  }
+
+  @override
+  String get commandAssignNeedsShared =>
+      'Només es poden assignar tasques de projectes compartits.';
+
+  @override
+  String commandAmbiguousMember(String name) {
+    return 'Hi ha diverses persones que es diuen $name.';
+  }
+
+  @override
+  String commandTasksChanged(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques canviades',
+      one: 'Tasca canviada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandTasksDeleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques suprimides',
+      one: 'Tasca suprimida',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandProjectsCreated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count projectes creats',
+      one: 'Projecte creat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandChangeSemantics(String label, String before, String after) {
+    return '$label: de $before a $after';
+  }
+
+  @override
+  String commandNotesAdd(String text) {
+    return 'S’afegeix a les notes: $text';
+  }
+
+  @override
+  String get commandAssignee => 'Responsable';
 }

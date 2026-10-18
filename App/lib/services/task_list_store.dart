@@ -88,6 +88,52 @@ class TaskListStore {
     });
   }
 
+  /// Takes back a project created moments ago (a dictation's `Deshacer`),
+  /// once its tasks are undone: it goes from this phone, and from the server
+  /// when it has reached it. False when it holds tasks again, or the server
+  /// couldn't be told: then it stays, as it is.
+  Future<bool> takeBack(String id, {ApiClient? api, int? accountId}) async {
+    final db = await database.database;
+    final rows = await db.query(
+      'task_lists',
+      where: 'id = ? AND owner_key = ?',
+      whereArgs: [id, owner],
+    );
+    if (rows.isEmpty) return true;
+    final live = await db.query(
+      'tasks',
+      columns: ['id'],
+      where: 'owner_key = ? AND listId = ? AND is_deleted = 0',
+      whereArgs: [owner, id],
+    );
+    if (live.isNotEmpty) return false;
+    final version = rows.single['remote_version'] as int;
+    if (version > 0) {
+      if (api == null || accountId == null) return false;
+      await api.request(
+        'DELETE',
+        'lists/$id/',
+        data: {'version': version},
+        accountId: accountId,
+      );
+    }
+    await db.transaction((tx) async {
+      // The undone tasks go with it: the server, if it had them, deleted
+      // them with the project.
+      await tx.delete(
+        'tasks',
+        where: 'owner_key = ? AND listId = ? AND is_deleted = 1',
+        whereArgs: [owner, id],
+      );
+      await tx.delete(
+        'task_lists',
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [id, owner],
+      );
+    });
+    return true;
+  }
+
   Future<void> update(TaskListInfo list) async {
     _validate(list);
     await (await database.database).transaction((tx) async {

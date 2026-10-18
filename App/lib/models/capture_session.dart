@@ -1,3 +1,4 @@
+import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:uuid/uuid.dart';
@@ -20,6 +21,14 @@ class CaptureDraft {
   /// it would be without that date, for `Keep as typed`.
   final Task? asTyped;
 
+  /// The project the task goes to once the confirming tap creates it, by
+  /// name: a `project` command of the same dictation, or `Crear «X»`.
+  final String? newProject;
+
+  /// The project as said, which doesn't exist: the card offers to create it
+  /// or to pick another, and the task waits for that tap.
+  final String? projectSuggestion;
+
   const CaptureDraft({
     required this.id,
     required this.task,
@@ -33,7 +42,22 @@ class CaptureDraft {
     this.clarifications = const [],
     this.resolvedQuestions = const [],
     this.asTyped,
+    this.newProject,
+    this.projectSuggestion,
   });
+
+  /// A project made in the same dictation has nobody to assign yet, so a
+  /// person named for it leaves nothing to decide: the card only says so.
+  /// A project that doesn't exist always waits for a choice.
+  static bool _reviewed(TaskDraft draft) {
+    if (draft.projectSuggestion != null) return false;
+    if (draft.newProject != null) {
+      return draft.assignmentIssues.every(
+        (issue) => issue == 'member_not_available',
+      );
+    }
+    return draft.assignmentIssues.isEmpty;
+  }
 
   factory CaptureDraft.fromAI(TaskDraft draft) => CaptureDraft(
     id: const Uuid().v4(),
@@ -64,8 +88,10 @@ class CaptureDraft {
     clarifications: draft.clarifications,
     assignmentIssues: draft.assignmentIssues,
     assignmentHints: draft.assignmentHints,
-    assignmentReviewed: draft.assignmentIssues.isEmpty,
+    assignmentReviewed: _reviewed(draft),
     confirmed: draft.questions.isEmpty && draft.clarifications.isEmpty,
+    newProject: draft.newProject,
+    projectSuggestion: draft.projectSuggestion,
   );
 
   bool get pending => savedTaskId == null && !removed;
@@ -91,6 +117,9 @@ class CaptureDraft {
     List<String>? resolvedQuestions,
     bool clearSavedTaskId = false,
     bool clearAsTyped = false,
+    String? newProject,
+    bool clearNewProject = false,
+    bool clearProjectSuggestion = false,
   }) => CaptureDraft(
     id: id,
     task: task ?? this.task,
@@ -104,6 +133,8 @@ class CaptureDraft {
     resolvedQuestions: resolvedQuestions ?? this.resolvedQuestions,
     removed: removed ?? this.removed,
     asTyped: clearAsTyped ? null : asTyped,
+    newProject: clearNewProject ? null : newProject ?? this.newProject,
+    projectSuggestion: clearProjectSuggestion ? null : projectSuggestion,
   );
 
   Map<String, dynamic> toJson() => {
@@ -119,6 +150,8 @@ class CaptureDraft {
     'savedTaskId': savedTaskId,
     'removed': removed,
     if (asTyped != null) 'asTyped': asTyped!.toMap(),
+    if (newProject != null) 'newProject': newProject,
+    if (projectSuggestion != null) 'projectSuggestion': projectSuggestion,
   };
 
   factory CaptureDraft.fromJson(Map<String, dynamic> json) => CaptureDraft(
@@ -138,6 +171,8 @@ class CaptureDraft {
     asTyped: json['asTyped'] == null
         ? null
         : Task.fromMap(Map<String, dynamic>.from(json['asTyped'])),
+    newProject: json['newProject'] as String?,
+    projectSuggestion: json['projectSuggestion'] as String?,
   );
 }
 
@@ -157,6 +192,10 @@ class CaptureSession {
   final String status;
   final String? error;
   final List<CaptureDraft> drafts;
+
+  /// The dictation's commands (create a project, find, change or delete a
+  /// task), in the order they were said, with their cards' choices.
+  final List<CaptureCommand> commands;
   final String? projectId;
 
   /// Where the first words came from: `speech` (the recognizer or recorded
@@ -185,6 +224,7 @@ class CaptureSession {
     this.status = 'editing',
     this.error,
     this.drafts = const [],
+    this.commands = const [],
     this.source,
     this.day,
     this.language,
@@ -193,6 +233,10 @@ class CaptureSession {
   bool get terminal => status == 'saved' || status == 'discarded';
   List<CaptureDraft> get remaining => drafts.where((d) => d.pending).toList();
   List<CaptureDraft> get ready => drafts.where((d) => d.ready).toList();
+
+  /// The words were understood: tasks, notes or commands to show. A result
+  /// that is only commands has no drafts.
+  bool get hasResult => drafts.isNotEmpty || commands.isNotEmpty;
 
   CaptureSession copyWith({
     String? text,
@@ -203,6 +247,7 @@ class CaptureSession {
     String? error,
     String? kind,
     List<CaptureDraft>? drafts,
+    List<CaptureCommand>? commands,
     String? source,
     String? language,
   }) => CaptureSession(
@@ -219,6 +264,7 @@ class CaptureSession {
     status: status ?? this.status,
     error: error,
     drafts: drafts ?? this.drafts,
+    commands: commands ?? this.commands,
     source: source ?? this.source,
     day: day,
     language: language ?? this.language,
@@ -238,6 +284,8 @@ class CaptureSession {
     'status': status,
     'error': error,
     'drafts': drafts.map((d) => d.toJson()).toList(),
+    if (commands.isNotEmpty)
+      'commands': commands.map((c) => c.toJson()).toList(),
     'source': source,
     'day': day == null ? null : Task.dateKey(day!),
     if (language != null) 'language': language,
@@ -259,6 +307,11 @@ class CaptureSession {
     drafts: (json['drafts'] as List? ?? [])
         .map((d) => CaptureDraft.fromJson(Map<String, dynamic>.from(d)))
         .toList(),
+    commands: [
+      for (final item in json['commands'] as List? ?? [])
+        if (item is Map)
+          ?CaptureCommand.fromJson(Map<String, dynamic>.from(item)),
+    ],
     source: json['source'],
     day: json['day'] == null ? null : DateTime.parse(json['day']),
     language: json['language'],

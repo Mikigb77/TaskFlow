@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/models/task.dart';
@@ -164,7 +165,7 @@ class CaptureProcessor {
     if (existing == null || existing.terminal) {
       throw StateError('Capture is no longer available.');
     }
-    if (existing.drafts.isNotEmpty) return existing;
+    if (existing.hasResult) return existing;
     final diagnostics = CaptureDiagnostics(store.database);
     final watch = Stopwatch()..start();
     if (existing.status == 'failed') {
@@ -225,6 +226,10 @@ class CaptureProcessor {
                 ? 'speech'
                 : existing.source ?? 'typed',
             if (existing.language != null) 'language': existing.language,
+            // Create a project, find, change or delete a task, besides tasks
+            // (Backend/docs/VOICE_COMMANDS.md). A multipart form sends it as
+            // `true` too.
+            'commands': true,
           },
         );
       } finally {
@@ -234,6 +239,14 @@ class CaptureProcessor {
       // Even when saved as written meanwhile: an answered dictation counts.
       _rememberFreeVoice(response['free_voice'], existing);
       final transcript = response['transcript'] as String;
+      // An older server sends no commands: the answer is today's. Kinds this
+      // app doesn't know are left out. Notes take no commands.
+      final commands = existing.kind == 'note' || response['commands'] is! List
+          ? const <CaptureCommand>[]
+          : [
+              for (final item in response['commands'] as List)
+                ?CaptureCommand.fromServer(item),
+            ];
       final drafts = (response['tasks'] as List).map((item) {
         final draft = CaptureDraft.fromAI(
           TaskDraft.fromJson({
@@ -249,7 +262,8 @@ class CaptureProcessor {
             ? draft
             : draft.copyWith(task: task.copyWith(dueDate: day, hasTime: false));
       }).toList();
-      if (drafts.isEmpty) {
+      // With commands, an answer may hold no task.
+      if (drafts.isEmpty && commands.isEmpty) {
         throw StateError('No tasks were found. Your capture is kept.');
       }
       if (drafts.any((draft) => draft.task.kind != existing.kind)) {
@@ -261,6 +275,7 @@ class CaptureProcessor {
         status: 'ready',
         transcript: transcript,
         drafts: drafts,
+        commands: commands,
       );
       // Saved as written meanwhile: the answer is too late.
       if (_written.contains(key)) return _latest(existing);

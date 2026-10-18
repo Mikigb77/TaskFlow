@@ -26,6 +26,14 @@ class TaskDraft {
   final List<String> assignmentIssues;
   final Map<String, String?> assignmentHints;
 
+  /// The project a `project` command of the same answer creates, by name:
+  /// the task goes there once it exists.
+  final String? newProject;
+
+  /// The project as said, when none matched it and nobody asked to create
+  /// it: the result offers to create it or to pick another.
+  final String? projectSuggestion;
+
   TaskDraft.fromJson(Map<String, dynamic> data)
     : title = data['title'] as String,
       clarifications = (data['clarifications'] as List? ?? [])
@@ -42,6 +50,8 @@ class TaskDraft {
       assignmentHints = Map<String, String?>.from(
         data['assignment_hints'] ?? {},
       ),
+      newProject = _name(data['new_project']),
+      projectSuggestion = _name(data['project_suggestion']),
       kind = data['kind'] as String? ?? 'task',
       dueDate = data['due_date'] == null
           ? (data['scheduled_date'] ?? data['date']) == null
@@ -73,4 +83,11 @@ class TaskDraft {
           .toList(),
       transcript = data['transcript'] as String,
       questions = List<String>.from(data['questions'] as List);
+
+  /// A project name from the server: absent from older servers.
+  static String? _name(Object? value) {
+    if (value is! String) return null;
+    final name = value.trim();
+    return name.isEmpty || name.length > 80 ? null : name;
+  }
 }

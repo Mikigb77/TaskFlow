@@ -37,6 +37,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
     this.onReviewed,
     this.compact = false,
     this.asRow,
+    this.newProjectName,
   });
   final Task task;
   final ValueChanged<Task>? onChanged;
@@ -46,6 +47,9 @@ class TaskAssignmentPicker extends ConsumerWidget {
   final VoidCallback? onReviewed;
   final bool compact;
   final bool? asRow;
+
+  /// The project a dictation creates for this task on its confirming tap.
+  final String? newProjectName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,6 +80,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
               asRow: asRow ?? compact,
               listId: task.listId,
               lockShared: lockShared,
+              newName: newProjectName,
               onChanged: onChanged == null
                   ? null
                   : (project) => onChanged!(taskWithProject(task, project)),

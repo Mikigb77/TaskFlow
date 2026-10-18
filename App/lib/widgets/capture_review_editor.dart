@@ -1,8 +1,11 @@
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/capture_clarification.dart';
+import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/services/text_encoding_repair.dart';
+import 'package:agenda/widgets/capture_command_cards.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/repeat_rule_control.dart';
@@ -11,6 +14,7 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The same draft stays mounted as a compact card or a direct editor. All
 /// changes go immediately to the parent's durable capture journal.
@@ -283,6 +287,48 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     onTap: widget.enabled ? onTap : null,
   );
 
+  /// A project said that doesn't exist: create it, or take an existing one
+  /// or none instead, one tap each. Never created without that tap. A person
+  /// named for a shared project chosen is then checked as before.
+  Widget _projectChoice(String said) => Consumer(
+    builder: (context, ref, _) {
+      final name = spokenProjectName(said);
+      final member =
+          widget.draft.assignmentHints['member']?.trim().isNotEmpty == true;
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 8),
+        child: ProjectChoices(
+          name: name,
+          enabled: widget.enabled,
+          projects: editableProjects(
+            ref.watch(taskListsProvider).valueOrNull ?? const [],
+          ),
+          onCreate: () => widget.onChanged(
+            widget.draft.copyWith(
+              newProject: name,
+              clearProjectSuggestion: true,
+              assignmentReviewed: true,
+            ),
+          ),
+          onPick: (project) => widget.onChanged(
+            widget.draft.copyWith(
+              task: taskWithProject(task, project),
+              clearProjectSuggestion: true,
+              assignmentReviewed: !(project.shared && member),
+            ),
+          ),
+          onNone: () => widget.onChanged(
+            widget.draft.copyWith(
+              task: taskWithProject(task, null),
+              clearProjectSuggestion: true,
+              assignmentReviewed: true,
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
   /// `Dejar como está`: the typed words become the title again, with the
   /// date the task would have had without them.
   void _keepAsTyped() {
@@ -369,25 +415,65 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             ));
     // The project and the person show only when they are set: by the
     // assistant, or because capture opened inside a project. The personal
-    // inbox is the default, so it stays behind `Más opciones`.
+    // inbox is the default, so it stays behind `Más opciones`. A project
+    // the dictation creates, or one said that doesn't exist, shows too.
+    final newProject = widget.draft.newProject;
+    final suggestion = widget.draft.projectSuggestion;
     final showAssignment =
-        task.listId != null || !widget.draft.assignmentReviewed;
+        task.listId != null ||
+        newProject != null ||
+        suggestion != null ||
+        !widget.draft.assignmentReviewed;
     // The date was read from typed words: say so under it.
     final fromWords = widget.draft.asTyped != null;
-    TaskAssignmentPicker assignment({bool asRow = false}) =>
-        TaskAssignmentPicker(
-          task: task,
-          compact: true,
-          asRow: asRow,
-          needsReview: !widget.draft.assignmentReviewed,
-          hints: widget.draft.assignmentHints,
-          onChanged: widget.enabled ? _change : null,
-          onReviewed: !widget.enabled
-              ? null
-              : () => widget.onChanged(
-                  widget.draft.copyWith(assignmentReviewed: true),
-                ),
-        );
+    Widget assignment({bool asRow = false}) => suggestion != null
+        ? _projectChoice(suggestion)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TaskAssignmentPicker(
+                task: task,
+                compact: true,
+                asRow: asRow,
+                needsReview: !widget.draft.assignmentReviewed,
+                hints: widget.draft.assignmentHints,
+                newProjectName: newProject == null
+                    ? null
+                    : spokenProjectName(newProject),
+                // Another project chosen: none is created for this task.
+                onChanged: !widget.enabled
+                    ? null
+                    : newProject == null
+                    ? _change
+                    : (value) => widget.onChanged(
+                        widget.draft.copyWith(
+                          task: value,
+                          clearNewProject: true,
+                        ),
+                      ),
+                onReviewed: !widget.enabled
+                    ? null
+                    : () => widget.onChanged(
+                        widget.draft.copyWith(assignmentReviewed: true),
+                      ),
+              ),
+              // Nobody is in a new project yet: whoever was named waits
+              // for an invitation.
+              if (newProject != null && task.listId == null)
+                if (widget.draft.assignmentHints['member']?.trim()
+                    case final member? when member.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      l.commandMemberNotIn(
+                        member,
+                        spokenProjectName(newProject),
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+            ],
+          );
     // A note's body is its notes, so it always shows.
     final showNotes = task.isNote || _notesOpen;
     // An underline says the field can be tapped and corrected, and keeps
@@ -687,7 +773,8 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
           _questions('title'),
           if (!task.isNote) ...[_dateLine(main: false), _questions('schedule')],
           ...repair,
-          if (!widget.draft.assignmentReviewed) assignment(),
+          if (!widget.draft.assignmentReviewed || newProject != null)
+            assignment(),
           if (!task.isNote) ...[_questions('deadline'), _questions('duration')],
           _questions('recurrence'),
           _questions('details'),

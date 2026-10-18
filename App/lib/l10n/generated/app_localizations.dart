@@ -5745,6 +5745,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your account has been deleted.'**
   String get accountDeleted;
+
+  /// A dictation's result: the card of a project the confirming tap creates, and the project chip of a task that goes into it. {name} is the project's name as said.
+  ///
+  /// In en, this message translates to:
+  /// **'New project: {name}'**
+  String commandNewProject(String name);
+
+  /// A dictation's result, when the project the person asked to create already exists: nothing is created. {name} is that project's real name.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have “{name}”'**
+  String commandExistingProject(String name);
+
+  /// Under commandExistingProject, when tasks in the same dictation name that project.
+  ///
+  /// In en, this message translates to:
+  /// **'The tasks go there.'**
+  String get commandExistingProjectTasks;
+
+  /// A dictation's result, for a project that was named but doesn't exist, or that matches several projects. Chips follow: create it, or pick an existing project. {name} is the name as said.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the project “{name}”?'**
+  String commandCreateProjectQuestion(String name);
+
+  /// Chip under commandCreateProjectQuestion: creates that project on the confirming tap. {name} is the name as said.
+  ///
+  /// In en, this message translates to:
+  /// **'Create “{name}”'**
+  String commandCreateNamed(String name);
+
+  /// The confirming button of a dictation's result that only creates projects.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Create project} other{Create {count} projects}}'**
+  String commandCreateProjects(int count);
+
+  /// The confirming button of a dictation's result that changes or deletes tasks and adds none.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get commandApply;
+
+  /// Heading of a dictation's search results. {words} are the words searched for.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks with “{words}”'**
+  String commandFindWords(String words);
+
+  /// Heading of a dictation's search results for all of a project's tasks. {name} is the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks in “{name}”'**
+  String commandFindProject(String name);
+
+  /// Heading of a dictation's search results for the tasks assigned to someone. {name} is that person.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}’s tasks'**
+  String commandFindPerson(String name);
+
+  /// Heading of a dictation's search results for the person's own tasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Your tasks'**
+  String get commandFindMine;
+
+  /// On a completed task in a dictation's search results.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get commandCompleted;
+
+  /// A dictation's search found nothing. {words} are the words searched for.
+  ///
+  /// In en, this message translates to:
+  /// **'There’s no task with “{words}”'**
+  String commandFindNone(String words);
+
+  /// A dictation's search without words (a project's, a person's tasks) found nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no tasks'**
+  String get commandFindNoneAtAll;
+
+  /// Under a dictation's search results or choice list, when more tasks match than are shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{And 1 more} other{And {count} more}}'**
+  String commandMore(int count);
+
+  /// Under a dictation's search results in a project: opens that project's page. {name} is the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Open “{name}”'**
+  String commandOpenProject(String name);
+
+  /// A dictation named a project to search or change tasks in, and none matched: nothing is searched. {name} is the name as said.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find the project “{name}”'**
+  String commandProjectNotFound(String name);
+
+  /// A dictation's search named a person, and nobody matched: nothing is searched. {name} is the name as said.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find {name}'**
+  String commandPersonNotFound(String name);
+
+  /// A dictation asked to change or delete a task, and no task on the phone matched. {words} are the words looked for.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find a task with “{words}”'**
+  String commandTaskNotFound(String words);
+
+  /// As commandTaskNotFound, when the task was described only by its day or project.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t find that task'**
+  String get commandTaskNotFoundPlain;
+
+  /// A dictation asked to change a task and several match: a short list to tap one follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one should change?'**
+  String get commandWhichToChange;
+
+  /// A dictation asked to delete a task and several match: a short list to tap one follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one should be deleted?'**
+  String get commandWhichToDelete;
+
+  /// A dictation's result, in a destructive style: the task the confirming tap deletes. {title} is the task's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Will be deleted: {title}'**
+  String commandWillDelete(String title);
+
+  /// As commandWillDelete, for a task with a day or a repeat. {date} is its day (Tomorrow, Wed, Oct 21) or its repeat (Weekly).
+  ///
+  /// In en, this message translates to:
+  /// **'Will be deleted: {title} ({date})'**
+  String commandWillDeleteOn(String title, String date);
+
+  /// On a dictation's change or deletion card after one of several matching tasks was tapped: shows the list again.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another'**
+  String get commandChooseAnother;
+
+  /// A dictation asked to change a task, and the task already is as asked.
+  ///
+  /// In en, this message translates to:
+  /// **'It’s already like that.'**
+  String get commandNothingToChange;
+
+  /// A dictation set a time on a task with no day: Today, Tomorrow and Pick a day follow.
+  ///
+  /// In en, this message translates to:
+  /// **'Which day?'**
+  String get commandWhichDay;
+
+  /// A dictation named someone for a task, who can't be its assignee because they aren't in its shared project (or the project is new and has nobody yet). The task is left as it is. {name} is the name as said; {project} the project.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} isn’t in “{project}”'**
+  String commandMemberNotIn(String name, String project);
+
+  /// A dictation named someone for a task that isn't in a shared project: the assignee stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Only tasks in shared projects can be assigned.'**
+  String get commandAssignNeedsShared;
+
+  /// A dictation named someone for a task, and two or more people match: the assignee stays as it is. {name} is the name as said.
+  ///
+  /// In en, this message translates to:
+  /// **'More than one person is called {name}.'**
+  String commandAmbiguousMember(String name);
+
+  /// Brief message after a dictation's changes were applied, with Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task changed} other{{count} tasks changed}}'**
+  String commandTasksChanged(int count);
+
+  /// Brief message after a dictation's deletions were applied, with Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task deleted} other{{count} tasks deleted}}'**
+  String commandTasksDeleted(int count);
+
+  /// Brief message after a dictation's new projects were created, with Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Project created} other{{count} projects created}}'**
+  String commandProjectsCreated(int count);
+
+  /// What TalkBack reads for one line of a dictation's change card, shown as before → after. {label} names the field (Date and time, Deadline…).
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: from {before} to {after}'**
+  String commandChangeSemantics(String label, String before, String after);
+
+  /// On a dictation's change card: text the confirming tap adds at the end of the task's notes. {text} is that text.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to the notes: {text}'**
+  String commandNotesAdd(String text);
+
+  /// What TalkBack calls the assignee line of a dictation's change card.
+  ///
+  /// In en, this message translates to:
+  /// **'Assignee'**
+  String get commandAssignee;
 }
 
 class _AppLocalizationsDelegate
