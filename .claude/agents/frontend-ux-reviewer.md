@@ -74,11 +74,13 @@ Do every step. Don't stop after the first few problems.
 
    For each screen, list its states: first use or empty; loading; success; partial; error; offline; permission denied or revoked; slow AI; interrupted (a call, the app backgrounded); many items; very long text; keyboard open; 320 dp width; 2× text; Spanish and Catalan strings; dark mode.
 4. **Look at it.**
-   - Read the existing renders in `App/build/*.png` and `App/artifacts/design/*.png`.
-   - Compare each render's timestamp with the last change to the code it shows. A render older than the code is not evidence.
-   - When a visual judgement matters and a preview test covers the screen, run it (commands in CLAUDE.md) and read the PNG. PNGs land in `App/build/`, except the sign-in ones, which land in `App/artifacts/auth/`.
+   - Read `App/build/ux/INDEX.md` first. It lists every render of the UX preview suite: what it shows, its state, the source files it covers, its size and text scale, and when it was rendered. Then read the PNGs for your scope, in `App/build/ux/<area>/`.
+   - Read `App/build/ux/AUDIT.md` with the renders. For each screen and state it records Flutter's accessibility guidelines (tap targets, labels, contrast), what TalkBack would read, clipped text and layout errors, and every tap target's size and the gap to its neighbour. Treat its numbers as measured evidence: still widget-test level, not a device.
+   - Check each render's time against the code it shows. From the repo root, `find App/lib App/assets -newer <png> -type f` lists the app files changed since that render. A render older than the code it shows is not evidence.
+   - Older renders: `App/build/*.png` and `App/artifacts/auth/`, from the earlier preview tests. `App/artifacts/design/*.png` dates from September and is stale.
+   - When a visual judgement matters and a render is missing or stale, run the preview for that screen (commands in CLAUDE.md) and read the PNG.
    - Inside the UX loop, the previews are rendered just before you start, and other reviewers may be running in parallel, so don't run Flutter there.
-   - Otherwise reason from the widget code — sizes, paddings, constraints, colours — and say that's what you did.
+   - For what no preview shows (INDEX.md, "Not covered"), reason from the widget code — sizes, paddings, constraints, colours — and say that's what you did.
 5. **Walk it.** Do a cognitive walkthrough (Wharton et al. 1994) for each person, at every step:
    - Will they try to do the right thing here?
    - Will they notice the control that does it?
@@ -360,7 +362,7 @@ Don't report 0s.
   - Never build, install, run `flutter drive` or `adb`, start an emulator, touch a device, or call the backend.
   - The only things you may write are:
     - your memory files;
-    - the PNGs the existing preview tests produce;
+    - what the preview tests produce: their PNGs, and `App/build/ux/INDEX.md` and `AUDIT.md`;
     - when the delegation names a UX-loop run folder, your report file inside it.
 - **Exhaustive within scope.** Walk every state of every affected flow. A lens with no findings is fine; skipping a lens is not.
 - **Specific.** Every finding names a place and a fix. No generic advice such as "improve consistency".

@@ -37,7 +37,7 @@ Implementers run one at a time, so you may run Flutter commands. Earlier package
 - **Tests:**
   - Keep the existing tests that cover your change passing. Update one only when your change breaks it for the right reason.
   - Don't write the acceptance tests yourself. `ux-tester` writes them after you, from the plan, so that the code and its proof come from different hands.
-- **Layout:** check Spanish and Catalan at 2× text and 320 dp width by reasoning through the constraints. If the brief asks for a preview, add or update it.
+- **Layout:** check Spanish and Catalan at 2× text and 320 dp width by reasoning through the constraints. If the brief asks for a preview, add or update it in `App/test/ux_previews/`.
 
 # Checks
 
@@ -46,7 +46,7 @@ Run all of these from `App/`:
 1. `flutter gen-l10n`, if you touched an ARB file.
 2. `flutter analyze --no-pub`. Introduce no new issues.
 3. `flutter test --no-pub test/<file>_test.dart` for the tests that cover what you touched. They must pass.
-4. If a preview test covers a screen you touched, re-run that preview. The commands are in CLAUDE.md. Sign-in PNGs land in `App/artifacts/auth/`; all others land in `App/build/`.
+4. Refresh the previews of the screens you touched. For each screen, run the UX preview suite with `--plain-name "<area>/<screen>."` (the command is in CLAUDE.md; each screen's area and name are in `App/build/ux/INDEX.md`), and re-run any older preview test that covers it. Read the new PNGs, and the screen's sections in `App/build/ux/AUDIT.md`. If a preview's flow breaks because the screen changed on purpose, update the flow in `App/test/ux_previews/`. The older tests' sign-in PNGs land in `App/artifacts/auth/`; their others in `App/build/`.
 5. If you changed Kotlin, Gradle, the manifest or Android resources, compile with `flutter build apk --debug --no-pub --target-platform android-x64`. The analyzer and the tests don't compile native code. Only build: never install it.
 
 Fix whatever fails. If something fails for a reason outside your package, report it rather than fixing unrelated code.

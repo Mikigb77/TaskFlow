@@ -68,12 +68,15 @@ Shared files:
 Run these from `App/`, one after another, before any reviewer starts:
 
 ```
+flutter test --no-pub --dart-define=WRITE_UX_PREVIEWS=true test/ux_previews/ux_previews_test.dart
 flutter test --no-pub --dart-define=WRITE_CALENDAR_PREVIEWS=true test/calendar_feedback_test.dart
 flutter test --no-pub --dart-define=WRITE_REVIEW_PREVIEWS=true test/review_tasks_test.dart
 flutter test --no-pub --dart-define=WRITE_AUTH_PREVIEWS=true test/auth_gate_test.dart
 ```
 
-The third command fails after writing its PNGs; that's expected (see `KNOWN_FAILURES.md`). If a preview fails in any other way, mention it, but keep going: previews are evidence, not a gate.
+The first is the UX preview suite. It renders every route and tab in its key states to `App/build/ux/<area>/`, and writes `App/build/ux/INDEX.md` (what each PNG shows, its sources and when it was rendered) and `App/build/ux/AUDIT.md` (measured accessibility, clipping and tap-target evidence for each one). It takes about two and a half minutes for about 300 PNGs. A preview whose flow fails keeps its earlier render, and INDEX.md shows that render's older time.
+
+The fourth command fails after writing its PNGs; that's expected (see `KNOWN_FAILURES.md`). If a preview fails in any other way, mention it, but keep going: previews are evidence, not a gate.
 
 ## 5. Review and plan — workflow `ux-review`
 

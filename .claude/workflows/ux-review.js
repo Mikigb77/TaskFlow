@@ -108,7 +108,7 @@ function reviewPrompt(s) {
     others.length
       ? `Other areas are reviewed in parallel (${others.join('; ')}). Stay in yours; put anything else in one line under "Cross-slice notes".`
       : 'You are the only reviewer in this run.',
-    'The previews were rendered just before this run. Read them; do not run Flutter.',
+    'The previews were rendered just before this run. Start with App/build/ux/INDEX.md, then read App/build/ux/AUDIT.md with the PNGs in App/build/ux/<area>/; the older ones are in App/build/*.png and App/artifacts/auth/. Check each render\'s time against its sources. Do not run Flutter.',
     `Number new findings from UX-${s.idStart} upward. Anything already in .claude/ux-review/ISSUES.md keeps its ID and is not reported as new.`,
     'Another step records memory: skip the memory update and end your report with a "Memory notes" section.',
     `Write your full report to ${a.runDir}/review-${s.key}.md, then return the structured result. If writing the file is refused, put the full report in "reportText" instead.`,

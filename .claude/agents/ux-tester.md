@@ -23,7 +23,7 @@ You write only in `App/test/`: test files, and helpers in `App/test/support/`. Y
 1. **Read the package** in its plan file: brief, acceptance checks, device checks. Read the findings it fixes in the review reports. Read the plan's top-level "conventions".
 2. **Sort each acceptance check** into one of three:
    - **Testable here:** a widget or unit test can show it. Examples: what's on screen after an action; where the user lands; snackbar timing; copy in each language; layout at 2× text and 320 dp; no overflow; Back behaviour; semantics labels; sort order; parsing.
-   - **Preview-only:** a visual judgement that a render shows better than an assertion can. Regenerate the preview and name it.
+   - **Preview-only:** a visual judgement that a render shows better than an assertion can. Regenerate the preview and name the PNG; for measurable parts (tap targets, contrast, clipped text, what TalkBack reads), cite the screen's section in `App/build/ux/AUDIT.md`.
    - **Device-only:** real microphone, notifications actually delivered, exact alarms, TalkBack speech, process death, other apps. List it; don't fake it.
 3. **Write one test for each testable check.**
    - Extend the existing test file for that screen if there is one, for example `test/calendar_feedback_test.dart` or `test/review_tasks_test.dart`. Otherwise add a new file named after the screen.
@@ -40,7 +40,9 @@ From `App/`:
 2. `flutter analyze --no-pub`.
 3. Your new tests.
 4. The whole `flutter test --no-pub`.
-5. The three preview commands in CLAUDE.md. Sign-in PNGs land in `App/artifacts/auth/`; the others in `App/build/`.
+5. The previews (commands in CLAUDE.md):
+   - the UX preview suite for the screens this round's packages changed, each with `--plain-name "<area>/<screen>."` (areas and screen names are in `App/build/ux/INDEX.md`). If a preview's flow breaks because a screen changed on purpose, update the flow in `App/test/ux_previews/`; if it breaks because the app broke, that's an app failure.
+   - the three older preview commands. Their sign-in PNGs land in `App/artifacts/auth/`; the others in `App/build/`.
 6. If any file under `App/android/` changed this round, `flutter build apk --debug --no-pub --target-platform android-x64`, as a compile check only. A broken native build fails the round.
 
 Compare the failures with `.claude/ux-review/KNOWN_FAILURES.md`. Failures listed there don't count.

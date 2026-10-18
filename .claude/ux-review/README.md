@@ -23,20 +23,25 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
      - **B** — calendar, home and tasks;
      - **C** — lists, notes, groups and sharing;
      - **D** — first run, sign-in, settings, notifications, native surfaces and theme.
-2. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder. It reviews against `GUIDELINES.md` and cites its rule IDs.
-3. **Plan.** `ux-organizer` (Opus, max effort):
+2. **Render.** The UX preview suite (`App/test/ux_previews/`) renders every route and tab in its key states, in Spanish, Catalan and English, light and dark, at 1×, 1.3× and 2× text, into `App/build/ux/`. With the PNGs it writes:
+   - `INDEX.md`: what each render shows, the code it covers and when it was rendered, and what no preview can show;
+   - `AUDIT.md`: measured evidence for each one — Flutter's accessibility guidelines, what TalkBack would read, clipped text, and the size of every tap target and the gap to its neighbour.
+
+   So the reviewer judges what a person sees, not only the code. It is still widget-test evidence, not a phone.
+3. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder. It reviews against `GUIDELINES.md` and cites its rule IDs.
+4. **Plan.** `ux-organizer` (Opus, max effort):
    - merges duplicates;
    - sends product decisions to you;
    - groups the fixes into work packages, each with an exact brief.
-4. **Fix.** `ux-implementer` (Opus, high effort) works through the packages one at a time. Each one changes the code, the copy in all three languages, and the tests, then checks its own work.
-5. **Test.** `ux-tester` (Opus, high effort) runs once per round.
+5. **Fix.** `ux-implementer` (Opus, high effort) works through the packages one at a time. Each one changes the code, the copy in all three languages, and the tests, then checks its own work and refreshes the previews of the screens it touched.
+6. **Test.** `ux-tester` (Opus, high effort) runs once per round.
    - It writes a test for every acceptance check a test can prove, working from the plan rather than the code, so the fix and its proof come from different hands.
-   - It then runs the analyzer, the whole suite and the previews.
+   - It then runs the analyzer, the whole suite, and the previews of the screens the round changed.
    - If a test fails because the app falls short, that finding counts as not fixed, whatever the reviewer says.
    - Every fix that passes stays protected by its test.
-6. **Verify.** The reviewer checks only the findings just fixed and the files just changed.
-7. **Re-plan.** Anything that failed goes back to the organizer, for at most 2 more rounds. A finding that fails twice comes to you instead.
-8. **Record.** The issue log and the run report are updated, and the reviewer updates its memory. If the gate passed, the round is committed on `dev`. The snapshot then moves forward.
+7. **Verify.** The reviewer checks only the findings just fixed and the files just changed.
+8. **Re-plan.** Anything that failed goes back to the organizer, for at most 2 more rounds. A finding that fails twice comes to you instead.
+9. **Record.** The issue log and the run report are updated, and the reviewer updates its memory. If the gate passed, the round is committed on `dev`. The snapshot then moves forward.
 
 ## Rules (your decisions, 2026-10-13)
 
@@ -63,7 +68,8 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
 The other pieces:
 - the agents: `.claude/agents/`;
 - the workflows: `.claude/workflows/ux-review.js` and `ux-fix.js`;
-- the command: `.claude/skills/ux/SKILL.md`.
+- the command: `.claude/skills/ux/SKILL.md`;
+- the previews: `App/test/ux_previews/`, rendered into `App/build/ux/` with `INDEX.md` and `AUDIT.md` (command in CLAUDE.md).
 
 ## Cost
 
