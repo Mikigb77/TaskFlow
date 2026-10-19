@@ -142,15 +142,18 @@ void main() {
   test(
     'UX-125: the shortcuts point at a microphone and a pencil drawable, which are vector XML',
     () {
+      // Published from code (CaptureShortcuts.kt): a static shortcuts.xml can't name the
+      // package of each build, so its shortcuts never started.
       final shortcuts = File(
-        '$_res/xml/capture_shortcuts.xml',
+        'android/app/src/main/kotlin/com/example/agenda/CaptureShortcuts.kt',
       ).readAsStringSync();
       String iconOf(String id) => RegExp(
-        'android:shortcutId="$id"[^>]*android:icon="@drawable/([a-z_]+)"',
+        '"$id", R\.string\.[a-z_]+, R\.drawable\.([a-z_]+)',
       ).firstMatch(shortcuts)![1]!;
       expect(iconOf('capture_voice'), 'capture_shortcut_voice');
       expect(iconOf('capture_text'), 'capture_shortcut_text');
-      expect(shortcuts, isNot(contains('@drawable/app_icon')));
+      expect(shortcuts, isNot(contains('R.drawable.app_icon')));
+      expect(File('$_res/xml/capture_shortcuts.xml').existsSync(), isFalse);
       for (final name in ['capture_shortcut_voice', 'capture_shortcut_text']) {
         final file = File('$_res/drawable/$name.xml');
         expect(file.existsSync(), isTrue, reason: name);

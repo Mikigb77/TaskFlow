@@ -21,6 +21,7 @@ class MainActivity: FlutterFragmentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CaptureShortcuts.publish(this)
         if (savedInstanceState == null) entries?.receive(intent)
     }
     override fun onNewIntent(intent: Intent) {

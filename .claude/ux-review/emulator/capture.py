@@ -70,9 +70,12 @@ def android_ids() -> tuple[str, str, dict[str, str]]:
         package = found.group(1) if found else package
         found = re.search(r'namespace\s*=?\s*"([^"]+)"', gradle)
         namespace = found.group(1) if found else package
-        shortcuts = (android / "src" / "main" / "res" / "xml" / "capture_shortcuts.xml").read_text(encoding="utf-8")
-        actions = dict(re.findall(r'shortcutId="([^"]+)".*?android:action="([^"]+)"', shortcuts, re.S))
-    except OSError:
+        # The shortcuts are published from code (CaptureShortcuts.kt) with the actions
+        # CaptureEntryBridge.kt declares.
+        bridge = next((android / "src" / "main" / "kotlin").rglob("CaptureEntryBridge.kt")).read_text(encoding="utf-8")
+        found = dict(re.findall(r'const val (VOICE|TEXT) = "([^"]+)"', bridge))
+        actions = {key: found[name] for key, name in (("capture_voice", "VOICE"), ("capture_text", "TEXT")) if name in found}
+    except (OSError, StopIteration):
         pass
     actions.setdefault("capture_voice", f"{namespace}.CAPTURE_VOICE")
     actions.setdefault("capture_text", f"{namespace}.CAPTURE_TEXT")

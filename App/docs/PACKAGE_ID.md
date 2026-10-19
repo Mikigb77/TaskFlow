@@ -17,10 +17,10 @@ The app's Android package is still Flutter's placeholder, `com.example.agenda`, 
 4. **RevenueCat:** point the Play app at `tech.garbar.taskflow`, and re-link the service credentials. See `App/docs/REVENUECAT_SETUP.md`.
 
 ## Changes in the code (one commit, after steps 1 and 4)
-- `App/android/app/build.gradle`: `namespace` and `applicationId`, and the `taskflow_package` resValue, including the staging value.
+- `App/android/app/build.gradle`: `namespace` and `applicationId`.
 - Move the Kotlin sources from `android/app/src/main/kotlin/com/example/agenda/` to `tech/garbar/taskflow/`, and change their `package` lines. That covers `MainActivity`, the speech, calendar, accessibility and capture bridges, and `CaptureWidget`. Do the same for `androidTest/…/StagingBillingReleaseTest.kt`.
 - `android/app/src/main/AndroidManifest.xml`: class names and any intent actions with the old prefix.
-- `android/app/src/main/res/xml/capture_shortcuts.xml`: the `com.example.agenda.CAPTURE_*` actions and `targetClass`. Pinned shortcuts made by the old app don't carry over.
+- The launcher shortcuts need nothing: since 2026-10-19 they're published from code (`CaptureShortcuts.kt`) with an intent built from the app's own context. Only their action names, `com.example.agenda.CAPTURE_*` in `CaptureEntryBridge.kt`, may change for tidiness. Pinned shortcuts from the old app don't carry over.
 - Tests and scripts that name it:
   - `App/test/native_resources_test.dart`;
   - `App/integration_test/projects_flow_test.dart`;
