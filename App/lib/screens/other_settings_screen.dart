@@ -7,6 +7,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/screens/voice_settings_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
+import 'package:agenda/services/site_links.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
 /// Version and build, e.g. `1.0.5 (4007)`.
@@ -96,6 +97,18 @@ class OtherSettingsScreen extends ConsumerWidget {
               applicationName: 'TaskFlow',
               applicationVersion: version,
             ),
+          ),
+          ListTile(
+            leading: Icon(Icons.privacy_tip_outlined, color: colors.primary),
+            title: Text(context.l10n.privacyPolicy),
+            trailing: const Icon(Icons.open_in_new_rounded),
+            onTap: () => openSitePage(context, ref, SitePage.privacy),
+          ),
+          ListTile(
+            leading: Icon(Icons.gavel_outlined, color: colors.primary),
+            title: Text(context.l10n.termsAndConditions),
+            trailing: const Icon(Icons.open_in_new_rounded),
+            onTap: () => openSitePage(context, ref, SitePage.terms),
           ),
           if (debug)
             ListTile(

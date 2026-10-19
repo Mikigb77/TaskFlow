@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:agenda/l10n/archive_locale.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
@@ -14,6 +13,7 @@ import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/services/account_deletion.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/services/site_links.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/google_login_button.dart';
@@ -21,12 +21,6 @@ import 'package:agenda/widgets/google_login_button.dart';
 /// Google Play's subscriptions page, for when billing knows of no purchase.
 final playSubscriptions = Uri.parse(
   'https://play.google.com/store/account/subscriptions',
-);
-
-/// Opens a web page outside the app; false when nothing could open it.
-final openWebPageProvider = Provider<Future<bool> Function(Uri)>(
-  (ref) =>
-      (uri) => launchUrl(uri, mode: LaunchMode.externalApplication),
 );
 
 /// Why the account wasn't deleted.
@@ -61,6 +55,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
   late final String _email = ref.read(authProvider).account?.email ?? '';
   late final bool _complimentary =
       ref.read(authProvider).account?.complimentaryPro == true;
+
+  /// A password account with Google linked can confirm either way.
+  late final bool _googleLinked =
+      ref.read(authProvider).account?.googleLinked == true;
   DeletionPreview? _preview;
   bool _loading = true;
   bool _reloading = false;
@@ -125,7 +123,8 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
   bool get _ready {
     final preview = _preview;
     if (preview == null || _deleting || _reloading) return false;
-    return preview.google ? _googleToken != null : _password.text.isNotEmpty;
+    return _googleToken != null ||
+        (!preview.google && _password.text.isNotEmpty);
   }
 
   Future<void> _confirmWithGoogle() async {
@@ -200,7 +199,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
         'auth/delete-account/',
         accountId: account.id,
         data: {
-          if (preview.google)
+          if (_googleToken != null)
             'google_id_token': _googleToken
           else
             'password': _password.text,
@@ -340,15 +339,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       }
       return;
     }
-    var opened = false;
-    try {
-      opened = await ref.read(openWebPageProvider)(playSubscriptions);
-    } catch (_) {
-      opened = false;
-    }
-    if (!opened && messenger.mounted) {
-      unawaited(showFeedback(messenger, strings.deleteAccountLinkError));
-    }
+    await openWebPage(context, ref, playSubscriptions);
   }
 
   @override
@@ -408,9 +399,23 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                     _copy(context, preview),
                   const SizedBox(height: 24),
                   if (preview.google)
-                    _googleConfirmation(context)
-                  else
-                    _passwordConfirmation(context),
+                    _googleConfirmation(
+                      context,
+                      strings.deleteAccountGoogleHelp(_email),
+                    )
+                  else ...[
+                    // Confirmed with Google, the password isn't needed.
+                    if (_googleToken == null) _passwordConfirmation(context),
+                    if (_googleLinked) ...[
+                      if (_googleToken == null) const SizedBox(height: 16),
+                      _googleConfirmation(
+                        context,
+                        _googleToken == null
+                            ? strings.deleteAccountGoogleInstead(_email)
+                            : null,
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 24),
                   // Above the button: read before confirming again.
                   if (_problem == _Problem.planChanged) ...[
@@ -682,9 +687,11 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
             }),
             decoration: InputDecoration(
               labelText: strings.password,
-              errorText: _problem == _Problem.wrongPassword
-                  ? strings.deleteAccountWrongPassword
-                  : null,
+              errorText: _problem != _Problem.wrongPassword
+                  ? null
+                  : _googleLinked
+                  ? strings.deleteAccountWrongPasswordGoogle
+                  : strings.deleteAccountWrongPassword,
               errorMaxLines: 10,
               suffixIcon: IconButton(
                 tooltip: _showPassword
@@ -707,7 +714,9 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     );
   }
 
-  Widget _googleConfirmation(BuildContext context) {
+  /// [help] says which Google account to choose; null once confirmed in
+  /// place of the password.
+  Widget _googleConfirmation(BuildContext context, String? help) {
     final strings = context.l10n;
     final colors = Theme.of(context).colorScheme;
     final error = _problem == _Problem.otherGoogleAccount
@@ -720,8 +729,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(strings.deleteAccountGoogleHelp(_email)),
-          const SizedBox(height: 12),
+          if (help != null) ...[Text(help), const SizedBox(height: 12)],
           if (_googleToken == null)
             GoogleLoginButton(
               key: const ValueKey('delete-account-google'),

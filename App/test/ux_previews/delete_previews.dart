@@ -4,11 +4,13 @@ import 'dart:async';
 
 import 'package:agenda/screens/delete_account_screen.dart';
 import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/app.dart';
+import 'support/fakes.dart';
 import 'support/fixtures.dart';
 import 'support/preview.dart';
 
@@ -58,15 +60,27 @@ Map<String, dynamic> _plan({
   'plan': 'plan-1',
 };
 
+/// Google sign-in that confirms as the account's Google account.
+class _ConfirmingGoogle extends PreviewGoogle {
+  @override
+  Future<String?> authenticate() async => 'google-id-token';
+}
+
 Future<PreviewApp> _open(
   Preview p, {
   Map<String, dynamic>? plan,
   bool load = true,
+  bool googleLinked = false,
 }) async {
   final app = await PreviewApp.open(
     p,
+    user: googleLinked ? account(google: true) : null,
     tasks: [...normalDay(), ...sharedProjectTasks()],
     projects: allProjects,
+    overrides: [
+      if (googleLinked)
+        googleSignInServiceProvider.overrideWithValue(_ConfirmingGoogle()),
+    ],
   );
   if (load) {
     app.api.handlers['GET auth/delete-account/'] = (_) => plan ?? _plan();
@@ -74,19 +88,22 @@ Future<PreviewApp> _open(
   return app;
 }
 
+/// Scrolls the page until [target] shows.
+Future<void> _scrollTo(Preview p, Finder target) => p.tester.scrollUntilVisible(
+  target,
+  200,
+  scrollable: find
+      .descendant(
+        of: find.byType(DeleteAccountScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first,
+);
+
 /// Types the password at the end of the page.
 Future<void> _password(Preview p) async {
   final field = find.byKey(const ValueKey('delete-account-password'));
-  await p.tester.scrollUntilVisible(
-    field,
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(DeleteAccountScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
-  );
+  await _scrollTo(p, field);
   await p.tester.enterText(field, 'contraseña de María');
   await p.tester.pumpAndSettle();
   FocusManager.instance.primaryFocus?.unfocus();
@@ -240,6 +257,38 @@ void deletePreviews() {
         await app.push('/deleteAccount');
         final google = find.byKey(const ValueKey('delete-account-google'));
         await p.tester.ensureVisible(google);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      deleteAccount,
+      'password-or-google',
+      'An account with a password and Google linked: the password, or Confirmar con Google instead.',
+      [es2, ca2],
+      (p) async {
+        final app = await _open(p, googleLinked: true);
+        await app.push('/deleteAccount');
+        final google = find.byKey(const ValueKey('delete-account-google'));
+        await _scrollTo(p, google);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      deleteAccount,
+      'google-instead-confirmed',
+      'That account confirmed with Google: the password field and the Or-confirm-with-Google line are gone, and Eliminar mi cuenta is on.',
+      [es2],
+      (p) async {
+        final app = await _open(p, googleLinked: true);
+        await app.push('/deleteAccount');
+        final google = find.byKey(const ValueKey('delete-account-google'));
+        await _scrollTo(p, google);
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(google);
         await p.tester.pumpAndSettle();
         await p.shoot();
       },

@@ -67,6 +67,17 @@ What the app does today, so a consistency finding can name the standard and the 
 - `lockShared`: once a task is in a shared project, it can't leave, and its project chip is disabled.
 - Archiving a project or group, or muting a project, hides its tasks from Calendar and Tasks and stops their reminders. Notes from archived projects stay in Notes.
 
+## Person chips on a project page (b5, 2026-10-19)
+- On a shared project page, a person's chip (`_personChip`, `screens/home_screen.dart`) is also the default assignee: every way in (Añadir tarea form, capture sheet, «Escribir» from the sheet) carries that person, but only while the task goes into the page's project.
+- Capture: drafts that named nobody become that person's (`_forPerson` in `voice_task_screen.dart`, via `_store.update` so Deshacer restores it); a person named in the dictation wins. Notes and new-project drafts are untouched.
+- «Todas», «Para mí», Calendar and the Tareas root pass no person. Changing project resets the person (`taskWithProject`).
+- Watch: the form shows «Ana ▾» above «Visible para todos en {proyecto}», which a newcomer may read as "for everyone"; TalkBack reads the chip as just «Ana».
+
+## Links to the website (b5, 2026-10-19)
+- Every link to the site goes through `services/site_links.dart`: one base URL, localized paths (`/es/`, `/ca/`, English otherwise), and `openWebPage`, which shows `webPageOpenError` when nothing opens. A new hard-coded site URL is a departure.
+- Privacy and Terms appear in two places: quiet TextButtons under the sign-in card (hidden in recovery and sign-in-again), and two rows in Otros ajustes after Licencias. Names match the site's page titles in EN/ES/CA.
+- Billing copy says "the Android app" only — no value in the ARBs names iOS, iPhone or Apple.
+
 ## Capture
 - **Pro gate.** Every way into capture (button, widget, shortcuts, share) goes through `hasProProvider`.
   - Without Pro, a full-page Pro wall replaces voice, typing and shared text alike.

@@ -1338,6 +1338,7 @@ void main() {
   _commandsRound3();
   _commandsRound3b();
   _commandsRound4();
+  _commandsRound5();
 }
 
 /// The phone's recognizer, shared by the tests: it listens until stopped,
@@ -5648,6 +5649,167 @@ void _commandsRound4() {
               'ca': 'Desa-ho com a tasca',
             }[language],
           );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+}
+
+// ---- Run 2026-10-18-commands, b5 · P159 (UX-1111, D7) ---------------------
+//
+// With Pro, a dictation said on a shared project's page with a person's chip
+// on gives that person the tasks whose words named nobody.
+
+void _commandsRound5() {
+  group('UX-1111: a dictation under a person’s chip is theirs', () {
+    final familia = TaskListInfo(
+      id: 'familia',
+      name: 'Familia',
+      version: 1,
+      shared: true,
+      role: 'owner',
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+        ProjectMember(id: 3, name: 'Paul', role: 'editor'),
+      ],
+    );
+
+    /// Familia's page, from Tareas, with the chip [chip] on.
+    Future<_App> openFamilia(WidgetTester tester, String chip) async {
+      final app = await _App.open(tester, projects: [familia]);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(es.tasks),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        Navigator.of(tester.element(find.byType(HomeScreen).first)).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const HomeScreen(isRoot: false, listId: 'familia'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(chip)).last);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ChoiceChip>(find.byKey(ValueKey(chip)).last).selected,
+        isTrue,
+      );
+      return app;
+    }
+
+    Map<String, dynamic> breadFor({
+      String assignment = 'group',
+      int? assigneeId,
+      String? assigneeName,
+      Map<String, String?> hints = const {},
+    }) => {
+      'transcript': 'Comprar pan',
+      'tasks': [
+        {
+          ...serverTask('Comprar pan', listId: 'familia', hints: hints),
+          'assignment': assignment,
+          'assignee_id': assigneeId,
+          'assignee_name': assigneeName,
+        },
+      ],
+      'commands': [],
+    };
+
+    /// The person chip on the result's card reading [name].
+    Finder personChip(String name) => find.descendant(
+      of: find.byType(CaptureResult),
+      matching: find.widgetWithText(ActionChip, name),
+    );
+
+    testWidgets(
+      'UX-1111: Pro, on Familia with Ana’s chip on, «Comprar pan» (a draft in Familia for everyone, no hints) shows the person chip «Ana»; one tap adds it as Ana’s, and Deshacer brings the card back as shown',
+      (tester) async {
+        final app = await openFamilia(tester, 'people-2');
+        app.api.answer = breadFor();
+        await app.speak(tester, 'Comprar pan');
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(personChip('Ana'), findsOneWidget);
+        expect(personChip(es.assignedToGroup), findsNothing);
+        // Kept with the capture, as a card's edit is.
+        final kept = app.store.current!.drafts.single.task;
+        expect(kept.assignment, 'member');
+        expect(kept.assigneeId, 2);
+
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        final saved = app.tasks.named('Comprar pan')!;
+        expect(saved.listId, 'familia');
+        expect(saved.assignment, 'member');
+        expect(saved.assigneeId, 2);
+        expect(saved.assigneeName, 'Ana');
+        expect(find.byType(CaptureResult), findsNothing);
+
+        await tester.tap(find.text(es.undo));
+        await tester.pumpAndSettle();
+        expect(app.tasks.named('Comprar pan'), isNull);
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(personChip('Ana'), findsOneWidget);
+        expect(app.store.current!.drafts.single.task.assigneeId, 2);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1111: Pro, on Ana’s chip, «Paul tiene que comprar pan» (a draft assigned to Paul) stays Paul’s',
+      (tester) async {
+        final app = await openFamilia(tester, 'people-2');
+        app.api.answer = breadFor(
+          assignment: 'member',
+          assigneeId: 3,
+          assigneeName: 'Paul',
+          hints: {'member': 'Paul'},
+        );
+        await app.speak(tester, 'Paul tiene que comprar pan');
+        expect(personChip('Paul'), findsOneWidget);
+        expect(personChip('Ana'), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        final saved = app.tasks.named('Comprar pan')!;
+        expect(saved.assignment, 'member');
+        expect(saved.assigneeId, 3);
+        expect(saved.assigneeName, 'Paul');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1111: Pro, on Ana’s chip, a draft whose words named Paul without matching him (a hint, no assignee) is not given to Ana',
+      (tester) async {
+        final app = await openFamilia(tester, 'people-2');
+        app.api.answer = breadFor(hints: {'member': 'Paul'});
+        await app.speak(tester, 'Paul tiene que comprar pan');
+        expect(personChip('Ana'), findsNothing);
+        expect(app.store.current!.drafts.single.task.assigneeId, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (chip, name) in [('people-all', 'Todas'), ('people-me', 'Para mí')]) {
+      testWidgets(
+        'UX-1111: Pro, on Familia with $name on, «Comprar pan» stays as the assistant said it: for everyone',
+        (tester) async {
+          final app = await openFamilia(tester, chip);
+          app.api.answer = breadFor();
+          await app.speak(tester, 'Comprar pan');
+          expect(find.byType(CaptureResult), findsOneWidget);
+          expect(personChip('Ana'), findsNothing);
+          await tester.tap(find.byKey(const ValueKey('save-drafts')));
+          await tester.pumpAndSettle();
+          final saved = app.tasks.named('Comprar pan')!;
+          expect(saved.assignment, 'group');
+          expect(saved.assigneeId, isNull);
           expect(tester.takeException(), isNull);
         },
       );

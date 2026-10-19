@@ -268,8 +268,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _labels = TextEditingController(text: task.labels.join(', '));
     _listId = task.listId;
     // A new task follows its project: everyone in a shared one, until a
-    // person is chosen.
-    _assignment = _creating ? null : task.assignment;
+    // person is chosen. One given a person (opened under their chip)
+    // keeps them.
+    _assignment = _creating && task.assignment != 'member'
+        ? null
+        : task.assignment;
     _assigneeId = task.assigneeId;
     _assigneeName = task.assigneeName;
     _hasTime = task.hasTime;

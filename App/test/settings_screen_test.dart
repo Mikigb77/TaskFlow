@@ -3,6 +3,7 @@ import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
+import 'package:agenda/services/site_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -649,16 +650,19 @@ void main() {
     WidgetTester tester, {
     bool debug = false,
     bool staging = false,
+    String language = 'es',
+    Future<bool> Function(Uri)? openPage,
   }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final container = designContainer(
       regionalStore: MemoryRegionalStore(
-        const RegionalPreferences(language: 'es'),
+        RegionalPreferences(language: language),
       ),
       overrides: [
         appVersionProvider.overrideWith((ref) async => '1.0.5 (4007)'),
+        if (openPage != null) openWebPageProvider.overrideWithValue(openPage),
       ],
     );
     addTearDown(container.dispose);
@@ -666,7 +670,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
-          locale: const Locale('es'),
+          locale: Locale(language),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: OtherSettingsScreen(debug: debug, staging: staging),
@@ -677,7 +681,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-404 / UX-120: Otros ajustes lists Hora y región, Calendarios del teléfono, Botón de dictar en la pantalla de inicio, Exportar e importar and Licencias, then TaskFlow 1.0.5 (4007); outside debug builds no Diagnóstico de captura',
+    'UX-404 / UX-120: Otros ajustes lists Hora y región, Calendarios del teléfono, Botón de dictar en la pantalla de inicio, Exportar e importar, Licencias, Política de privacidad and Términos y condiciones (P158), then TaskFlow 1.0.5 (4007); outside debug builds no Diagnóstico de captura',
     (tester) async {
       expect(es.homeCapture, 'Botón de dictar en la pantalla de inicio');
       expect(es.appVersion('1.0.5 (4007)'), 'TaskFlow 1.0.5 (4007)');
@@ -690,6 +694,8 @@ void main() {
         es.homeCapture,
         es.exportImport,
         es.licenses,
+        es.privacyPolicy,
+        es.termsAndConditions,
       ];
       expect(es.regionalFormats, 'Hora y región');
       var above = double.negativeInfinity;
@@ -740,6 +746,79 @@ void main() {
         find.descendant(of: sheet, matching: find.text(es.connectionDetails)),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- P158 (UX-1222): the Privacy Policy and the Terms ----
+
+  for (final (language, prefix) in [('es', '/es'), ('ca', '/ca'), ('en', '')]) {
+    testWidgets(
+      'UX-1222: in $language, Otros ajustes’ Política de privacidad and Términos y condiciones come right after Licencias, with their icons, and open the site’s pages in the app’s language',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final opened = <Uri>[];
+        await openOther(
+          tester,
+          language: language,
+          openPage: (uri) async {
+            opened.add(uri);
+            return true;
+          },
+        );
+        final licenses = find.widgetWithText(ListTile, l.licenses);
+        final privacy = find.widgetWithText(ListTile, l.privacyPolicy);
+        final terms = find.widgetWithText(ListTile, l.termsAndConditions);
+        final tiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+        final at = tiles.indexOf(tester.widget<ListTile>(licenses));
+        expect(tiles[at + 1], same(tester.widget<ListTile>(privacy)));
+        expect(tiles[at + 2], same(tester.widget<ListTile>(terms)));
+        final colors = Theme.of(tester.element(privacy)).colorScheme;
+        for (final (row, icon) in [
+          (privacy, Icons.privacy_tip_outlined),
+          (terms, Icons.gavel_outlined),
+        ]) {
+          final leading = find.descendant(of: row, matching: find.byIcon(icon));
+          expect(leading, findsOneWidget);
+          expect(tester.widget<Icon>(leading).color, colors.primary);
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.byIcon(Icons.open_in_new_rounded),
+            ),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(privacy);
+        await tester.pumpAndSettle();
+        await tester.tap(terms);
+        await tester.pumpAndSettle();
+        expect(opened.map((uri) => uri.toString()), [
+          'https://taskflow.garbar.tech$prefix/privacy/',
+          'https://taskflow.garbar.tech$prefix/terms/',
+        ]);
+        expect(find.text(l.webPageOpenError), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1222: when nothing can open the page, Otros ajustes says «No se ha podido abrir la página.»',
+    (tester) async {
+      await openOther(
+        tester,
+        openPage: (uri) async => throw PlatformException(code: 'none'),
+      );
+      await tester.tap(find.widgetWithText(ListTile, es.termsAndConditions));
+      await tester.pumpAndSettle();
+      expect(find.text(es.webPageOpenError), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await openOther(tester, openPage: (uri) async => false);
+      await tester.tap(find.widgetWithText(ListTile, es.privacyPolicy));
+      await tester.pumpAndSettle();
+      expect(find.text(es.webPageOpenError), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

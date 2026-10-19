@@ -1,0 +1,45 @@
+{
+ "runId": "2026-10-18-commands",
+ "mode": "changes",
+ "round": "b5-r2",
+ "packages": [
+  {
+   "id": "P165",
+   "title": "Delete page: the «O confirma con Google…» line goes once confirmed",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1232"
+   ],
+   "files": [
+    "App/lib/screens/delete_account_screen.dart",
+    "App/test/delete_account_test.dart",
+    "App/test/ux_previews/delete_previews.dart"
+   ],
+   "brief": [
+    "Round 2 of b5, run 2026-10-18-commands. P157 (UX-815), P158 (UX-1222, UX-1221) and P159 (UX-1111) are in the working tree, uncommitted, and their reviewers found all four findings fixed (verify-b5-r1-C.md, verify-b5-r1-D.md). Build on them and don't undo them. Line numbers are from the current working tree; search if they have moved. One problem is left: UX-1232, regression R1D-1 from P157.",
+    "UX-1232 (S2): a password account with Google linked taps «Confirmar con Google» on the delete page, and the confirmation succeeds. The password section goes, but the help line «O confirma con Google y elige ana@example.com. Tu cuenta de Google no se elimina.» stays above «Confirmado con Google». It begins with «O», an alternative to a password that is no longer on screen, and it asks for an action already done, right before the one irreversible button in the app. Where: App/lib/screens/delete_account_screen.dart:408-413 passes `strings.deleteAccountGoogleInstead(_email)` to `_googleConfirmation` (:716), which always renders `Text(help)` and the 12 dp gap after it (:729-730). Seen in the render build/ux/delete/delete-account.google-instead-confirmed.es.light.2x.png.",
+    "The fix (subtract, no new copy): make `_googleConfirmation`'s `help` a `String?`. Render `Text(help)` and its `SizedBox(height: 12)` only when `help` is not null. In the Google-instead call (:411-414) pass `_googleToken == null ? strings.deleteAccountGoogleInstead(_email) : null`. Once confirmed, the «Confirmado con Google» row stands alone above the enabled «Eliminar mi cuenta». Update the doc comment on `_googleConfirmation`: «[help] says which Google account to choose; null once confirmed in place of the password.»",
+    "When the token is cleared (a refused Google confirmation, `google_reauth_failed` or `reauth_required`, :224-229), `_googleToken` is null again, so the password section and «O confirma con Google…» come back together with the button. That is the current behaviour and stays.",
+    "Google-only accounts (`preview.google`, :401-405) stay exactly as they are: they still pass `deleteAccountGoogleHelp(_email)` in every state. No ARB change.",
+    "Preview: re-render delete/delete-account.google-instead-confirmed (ES, 2×), App/test/ux_previews/delete_previews.dart:280-295. Update its description to say the «O confirma con Google» line is gone too, e.g. 'That account confirmed with Google: the password field and the Or-confirm-with-Google line are gone, and Eliminar mi cuenta is on.'",
+    "Tests: the UX-815 tests in App/test/delete_account_test.dart (from about :820) must keep passing. The confirmed-state test near :858-870 already checks that the password field and help are gone; it may gain a findsNothing for the Google-instead line, which ux-tester adds if you don't.",
+    "Don't touch: the password section, `_ready`, the request body, the errors under the Google button, the consequences, the copy link, the red button, the 15-minute lock's line (UX-809), P158's links, the ARB files."
+   ],
+   "acceptance": [
+    "ES, a password account «ana@example.com» with Google linked, after «Confirmar con Google» succeeds (the fake returns a token): no text containing «O confirma con Google» shows; «Confirmado con Google» shows; «Eliminar mi cuenta» is enabled; the password field is gone.",
+    "ES, the same account before confirming: «Para confirmar, escribe tu contraseña.», the password field, «O confirma con Google y elige ana@example.com. Tu cuenta de Google no se elimina.» and «Confirmar con Google» all show (unchanged).",
+    "ES, the same account after a confirmation the server refuses with `google_reauth_failed`: «O confirma con Google y elige ana@example.com. Tu cuenta de Google no se elimina.» and the password field show again, with «Elige ana@example.com, la cuenta de Google con la que entras en TaskFlow.».",
+    "ES, a Google-only account «ana@example.com»: «Para confirmar, elige ana@example.com cuando Google te lo pida. Tu cuenta de Google no se elimina.» shows before confirming and still shows above «Confirmado con Google» after confirming (unchanged).",
+    "ES at 2× on 320×640, the confirmed state: «Confirmado con Google» and «Eliminar mi cuenta» show whole, and the button can be scrolled to."
+   ],
+   "deviceChecks": [
+    "Phone, staging, a throwaway password account with Google linked: Ajustes › Cuenta › Eliminar cuenta › «Confirmar con Google». After choosing the account, only «Confirmado con Google» shows above the red button; then «Eliminar mi cuenta» deletes it (P157's check)."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

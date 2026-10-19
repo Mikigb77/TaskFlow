@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
@@ -50,7 +51,9 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 /// as [page] to show them there instead; [showCalendar] first goes back to
 /// the Calendar tab. [day] is the day shown where capture opened (Calendar's
 /// selected day, the timeline's day): when it is a later day, a task said or
-/// typed without a date goes there.
+/// typed without a date goes there. [person] is the person whose chip is on,
+/// on the shared project's page it opens from: a task going into
+/// [projectId] whose words named nobody is theirs (D7).
 ///
 /// The mic comes with Pro, or while free dictations are left; otherwise the
 /// sheet types. Typed words go to the assistant only with Pro. [typing]
@@ -68,6 +71,7 @@ Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
   String? projectId,
+  ProjectMember? person,
   String? captureId,
   bool startListening = true,
   Object? page,
@@ -84,6 +88,7 @@ Future<void> showCaptureSheet(
         return openTaskForm(
           context,
           projectId: projectId,
+          person: person,
           day: day,
           page: page,
           showCalendar: showCalendar,
@@ -126,6 +131,7 @@ Future<void> showCaptureSheet(
           child: VoiceTaskScreen(
             kind: kind,
             projectId: projectId,
+            person: person,
             captureId: captureId,
             startListening: startListening,
             day: day,
@@ -343,6 +349,7 @@ class VoiceTaskScreen extends ConsumerWidget {
     this.startListening = true,
     this.kind = 'task',
     this.projectId,
+    this.person,
     this.day,
     this.typing = false,
     this.askedToSpeak = false,
@@ -351,6 +358,7 @@ class VoiceTaskScreen extends ConsumerWidget {
   final bool startListening;
   final String kind;
   final String? projectId;
+  final ProjectMember? person;
   final DateTime? day;
   final bool typing;
   final bool askedToSpeak;
@@ -373,6 +381,7 @@ class VoiceTaskScreen extends ConsumerWidget {
       startListening: startListening,
       kind: kind,
       projectId: projectId,
+      person: person,
       day: day,
       voice: voice,
       typing: typing,
@@ -392,6 +401,7 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
     this.startListening = true,
     this.kind = 'task',
     this.projectId,
+    this.person,
     this.day,
     this.voice = true,
     this.typing = false,
@@ -399,6 +409,10 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
   });
   final String kind;
   final String? projectId;
+
+  /// The person whose chip is on, on the page the sheet opened from: the
+  /// results shown here give them the tasks going into [projectId] (D7).
+  final ProjectMember? person;
   final String? captureId;
   final bool startListening;
   final DateTime? day;
@@ -1298,10 +1312,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         await _dropSaidAgain(session, replacing!);
         return;
       }
-      _session = session;
+      final shown = await _forPerson(session);
+      if (superseded()) return;
+      if (wentBack()) {
+        await _dropSaidAgain(shown, replacing!);
+        return;
+      }
+      _session = shown;
       if (mounted) {
         ref.invalidate(pendingCapturesProvider);
-        _review(session);
+        _review(shown);
       }
     } catch (error) {
       if (superseded()) return;
@@ -1393,10 +1413,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     });
     try {
       await _writes;
-      final written = await CaptureProcessor(
-        _store,
-        ref.read(apiClientProvider),
-      ).asWritten(session, now: ref.read(calendarClockProvider)());
+      final written = await _forPerson(
+        await CaptureProcessor(
+          _store,
+          ref.read(apiClientProvider),
+        ).asWritten(session, now: ref.read(calendarClockProvider)()),
+      );
       if (!mounted) return;
       _session = written;
       _saveAtOnce = written.id;
@@ -1420,15 +1442,58 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final words = result.transcript.trim().isNotEmpty
         ? result.transcript
         : result.text;
-    final written = await CaptureProcessor(
-      _store,
-      ref.read(apiClientProvider),
-    ).asWritten(result, text: words, now: ref.read(calendarClockProvider)());
+    final written = await _forPerson(
+      await CaptureProcessor(
+        _store,
+        ref.read(apiClientProvider),
+      ).asWritten(result, text: words, now: ref.read(calendarClockProvider)()),
+    );
     if (!mounted) return;
     _session = written;
     _saveAtOnce = written.id;
     ref.invalidate(pendingCapturesProvider);
     _review(written);
+  }
+
+  /// A sheet opened under a person's chip (D7): each task of a new result
+  /// going into that page's project whose words named nobody is theirs, as
+  /// if chosen on its card. Kept with the capture as a card's edit is, so
+  /// `Deshacer` brings it back as shown. A person named in the words wins.
+  Future<CaptureSession> _forPerson(CaptureSession session) async {
+    final person = widget.person;
+    final projectId = widget.projectId;
+    if (person == null || projectId == null) return session;
+    bool named(CaptureDraft draft) =>
+        draft.task.assignment == 'member' ||
+        (draft.assignmentHints['member']?.trim().isNotEmpty ?? false);
+    bool theirs(CaptureDraft draft) =>
+        draft.pending &&
+        !draft.task.isNote &&
+        draft.newProject == null &&
+        draft.task.listId == projectId &&
+        !named(draft);
+    if (!session.drafts.any(theirs)) return session;
+    final next = session.copyWith(
+      drafts: [
+        for (final draft in session.drafts)
+          theirs(draft)
+              ? draft.copyWith(
+                  task: draft.task.copyWith(
+                    assignment: 'member',
+                    assigneeId: person.id,
+                    assigneeName: person.name,
+                  ),
+                )
+              : draft,
+      ],
+    );
+    try {
+      await _store.update(next);
+      return next;
+    } catch (_) {
+      // Shown as the assistant said it, as it is kept.
+      return session;
+    }
   }
 
   /// The result replaces the words in this same sheet.
@@ -1595,6 +1660,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       openTaskForm(
         navigator.context,
         projectId: _projectId ?? widget.projectId,
+        person: (_projectId ?? widget.projectId) == widget.projectId
+            ? widget.person
+            : null,
         day: widget.day,
         page: origin?.page,
         showCalendar: origin?.showCalendar ?? false,

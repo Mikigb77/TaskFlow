@@ -755,67 +755,190 @@ void main() {
     },
   );
 
-  testWidgets(
-    'from a shared project’s page filtered to Ana, a new task for everyone lands with Todas chosen again and its row lit',
-    (tester) async {
-      await _App.open(
-        tester,
-        projects: [
-          TaskListInfo(
-            id: 'familia',
-            name: 'Familia',
-            version: 1,
-            shared: true,
-            role: 'owner',
-            ownerId: 1,
-            people: const [
-              ProjectMember(id: 1, name: 'Yo', role: 'owner'),
-              ProjectMember(id: 2, name: 'Ana', role: 'editor'),
-            ],
-          ),
-        ],
-        tasks: [
-          Task(
-            id: 1,
-            title: 'Recoger a los niños',
-            priority: 1,
-            listId: 'familia',
-            assignment: 'member',
-            assigneeId: 2,
-            assigneeName: 'Ana',
-          ),
-        ],
-      );
-      await openTasksTab(tester);
-      unawaited(
-        Navigator.of(tester.element(find.byType(HomeScreen))).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const HomeScreen(isRoot: false, listId: 'familia'),
-          ),
+  // D7: a task added under a person's chip is theirs, and stays under it.
+  Future<_App> openFamiliaOnAna(WidgetTester tester) async {
+    final app = await _App.open(
+      tester,
+      projects: [
+        TaskListInfo(
+          id: 'familia',
+          name: 'Familia',
+          version: 1,
+          shared: true,
+          role: 'owner',
+          ownerId: 1,
+          people: const [
+            ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+            ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+          ],
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('people-2')));
-      await tester.pumpAndSettle();
-      expect(selected(tester, 'people-2'), isTrue);
+      ],
+      tasks: [
+        Task(
+          id: 1,
+          title: 'Recoger a los niños',
+          priority: 1,
+          listId: 'familia',
+          assignment: 'member',
+          assigneeId: 2,
+          assigneeName: 'Ana',
+        ),
+      ],
+    );
+    await openTasksTab(tester);
+    unawaited(
+      Navigator.of(tester.element(find.byType(HomeScreen))).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const HomeScreen(isRoot: false, listId: 'familia'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('people-2')));
+    await tester.pumpAndSettle();
+    expect(selected(tester, 'people-2'), isTrue);
+    return app;
+  }
+
+  Finder familiaRow(String title) => find.descendant(
+    of: find.byWidgetPredicate(
+      (widget) => widget is HomeScreen && widget.listId == 'familia',
+    ),
+    matching: row(title),
+  );
+
+  testWidgets(
+    'from a shared project’s page filtered to Ana, a new task is Ana’s, lands with Ana still chosen and its row lit',
+    (tester) async {
+      final app = await openFamiliaOnAna(tester);
       await openForm(tester);
+      final chip = find.widgetWithText(ActionChip, 'Ana');
+      expect(chip, findsOneWidget);
       await typeTitle(tester, 'Comprar pan');
       await tapSave(tester);
-      expect(selected(tester, 'people-all'), isTrue);
-      expect(selected(tester, 'people-2'), isFalse);
-      final page = find.byWidgetPredicate(
-        (widget) => widget is HomeScreen && widget.listId == 'familia',
-      );
-      final newRow = find.descendant(of: page, matching: row('Comprar pan'));
+      final saved = app.tasks.state.requireValue.last;
+      expect(saved.title, 'Comprar pan');
+      expect(saved.assignment, 'member');
+      expect(saved.assigneeId, 2);
+      expect(selected(tester, 'people-2'), isTrue);
+      expect(selected(tester, 'people-all'), isFalse);
+      final newRow = familiaRow('Comprar pan');
       expect(newRow.hitTestable(), findsOneWidget);
       expect(tester.widget<TaskTile>(newRow).color, lit(tester));
-      expect(
-        find.descendant(of: page, matching: row('Recoger a los niños')),
-        findsOneWidget,
-      );
+      expect(familiaRow('Recoger a los niños'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'from a shared project’s page filtered to Ana, a new task changed to Todos is for everyone and lands with Todas chosen again and its row lit',
+    (tester) async {
+      final app = await openFamiliaOnAna(tester);
+      await openForm(tester);
+      await tester.tap(find.widgetWithText(ActionChip, 'Ana'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, 'Todos'));
+      await tester.pumpAndSettle();
+      await typeTitle(tester, 'Comprar pan');
+      await tapSave(tester);
+      final saved = app.tasks.state.requireValue.last;
+      expect(saved.title, 'Comprar pan');
+      expect(saved.assignment, 'group');
+      expect(saved.assigneeId, isNull);
+      expect(selected(tester, 'people-all'), isTrue);
+      expect(selected(tester, 'people-2'), isFalse);
+      final newRow = familiaRow('Comprar pan');
+      expect(newRow.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(newRow).color, lit(tester));
+      expect(familiaRow('Recoger a los niños'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1111: on Familia with Ana’s chip on, Nueva tarea opens the form with the person chip Ana beside Familia; one tap asks ¿Quién es responsable?, and the saved task is Ana’s by id and name',
+    (tester) async {
+      final app = await openFamiliaOnAna(tester);
+      await openForm(tester);
+      final picker = find.descendant(
+        of: find.byType(TaskEditor),
+        matching: find.byType(TaskAssignmentPicker),
+      );
+      expect(picker, findsOneWidget);
+      final person = find.descendant(
+        of: picker,
+        matching: find.widgetWithText(ActionChip, 'Ana'),
+      );
+      final project = find.descendant(of: picker, matching: find.text('Familia'));
+      expect(person, findsOneWidget);
+      expect(project, findsOneWidget);
+      // With it: the form's project row is a full-width row, and the person
+      // chip comes right after it, as the shared project's «Todos» chip did.
+      final projectRow = find.ancestor(
+        of: project,
+        matching: find.byType(ListTile),
+      );
+      final personRect = tester.getRect(person);
+      final rowRect = tester.getRect(projectRow.first);
+      expect(personRect.top, greaterThanOrEqualTo(rowRect.bottom - 0.5));
+      expect(personRect.top - rowRect.bottom, lessThan(16));
+      expect(person.hitTestable(), findsOneWidget);
+
+      await tester.tap(person);
+      await tester.pumpAndSettle();
+      expect(find.text(es.assignmentChoose), findsOneWidget);
+      // Keep Ana.
+      await tester.tap(find.widgetWithText(ListTile, 'Ana'));
+      await tester.pumpAndSettle();
+      expect(find.text(es.assignmentChoose), findsNothing);
+      expect(
+        find.descendant(
+          of: picker,
+          matching: find.widgetWithText(ActionChip, 'Ana'),
+        ),
+        findsOneWidget,
+      );
+      await typeTitle(tester, 'Comprar pan');
+      await tapSave(tester);
+      final saved = app.tasks.state.requireValue.last;
+      expect(saved.title, 'Comprar pan');
+      expect(saved.listId, 'familia');
+      expect(saved.assignment, 'member');
+      expect(saved.assigneeId, 2);
+      expect(saved.assigneeName, 'Ana');
+      expect(selected(tester, 'people-2'), isTrue);
+      expect(tester.widget<TaskTile>(familiaRow('Comprar pan')).color, lit(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (key, name) in [('people-all', 'Todas'), ('people-me', 'Para mí')]) {
+    testWidgets(
+      'UX-1111: on Familia with $name on, a new task is for everyone, as before, with no person chip in the form',
+      (tester) async {
+        final app = await openFamiliaOnAna(tester);
+        await tester.tap(find.byKey(ValueKey(key)));
+        await tester.pumpAndSettle();
+        expect(selected(tester, key), isTrue);
+        await openForm(tester);
+        expect(
+          find.descendant(
+            of: find.byType(TaskEditor),
+            matching: find.widgetWithText(ActionChip, 'Ana'),
+          ),
+          findsNothing,
+        );
+        await typeTitle(tester, 'Comprar pan');
+        await tapSave(tester);
+        final saved = app.tasks.state.requireValue.last;
+        expect(saved.title, 'Comprar pan');
+        expect(saved.listId, 'familia');
+        expect(saved.assignment, isNot('member'));
+        expect(saved.assigneeId, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'words carried over from the capture sheet: the first sentence is the title and the rest shows at once as the notes, saved with it',

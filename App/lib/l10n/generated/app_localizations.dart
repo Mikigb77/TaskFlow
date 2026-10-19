@@ -1240,6 +1240,18 @@ abstract class AppLocalizations {
   /// **'Open-source licences'**
   String get licenses;
 
+  /// Link that opens the website’s Privacy Policy in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicy;
+
+  /// Link that opens the website’s Terms and Conditions in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms and Conditions'**
+  String get termsAndConditions;
+
   /// No description provided for @todayAgenda.
   ///
   /// In en, this message translates to:
@@ -4921,7 +4933,7 @@ abstract class AppLocalizations {
   /// No description provided for @billingError.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
+  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
   String billingError(String reason);
 
   /// No description provided for @billingResult.
@@ -5746,6 +5758,12 @@ abstract class AppLocalizations {
   /// **'To confirm, choose {email} when Google asks. Your Google account isn’t deleted.'**
   String deleteAccountGoogleHelp(String email);
 
+  /// Above the Confirm with Google button, under the password field, for an account with a password and Google linked: confirming with Google instead of the password. {email} is the TaskFlow account's email. Says the Google account itself isn't deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Or confirm with Google and choose {email}. Your Google account isn’t deleted.'**
+  String deleteAccountGoogleInstead(String email);
+
   /// Button that opens Google sign-in to confirm deleting the account.
   ///
   /// In en, this message translates to:
@@ -5775,6 +5793,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”'**
   String get deleteAccountWrongPassword;
+
+  /// Under the password field on the delete-account page after a wrong password, for an account with Google linked: the Confirm with Google button below confirms instead. The quoted words must match deleteAccountConfirmGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'That password isn’t right. If you don’t remember it, tap “Confirm with Google”.'**
+  String get deleteAccountWrongPasswordGoogle;
 
   /// On the delete-account page, when the Google account chosen to confirm isn't the one linked to this TaskFlow account. {email} is the TaskFlow account's email, which for these accounts is the Google address.
   ///
@@ -5836,11 +5860,11 @@ abstract class AppLocalizations {
   /// **'Your account couldn’t be deleted. Try again later.'**
   String get deleteAccountFailed;
 
-  /// Brief message when the Google Play subscriptions page could not be opened.
+  /// Brief message when nothing on the phone could open a web page: the Privacy Policy, the Terms and Conditions, or Google Play’s subscriptions page.
   ///
   /// In en, this message translates to:
   /// **'Couldn’t open the page.'**
-  String get deleteAccountLinkError;
+  String get webPageOpenError;
 
   /// On the sign-in screen, right after the account was deleted.
   ///

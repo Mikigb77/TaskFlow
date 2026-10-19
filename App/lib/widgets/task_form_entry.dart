@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/free_voice_notice_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
@@ -15,6 +16,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// already heard, typed or shared, for the title and notes; [spoken] marks
 /// words dictated, heard at [heardAt], whose day and time the form reads;
 /// [captureId] is the capture that keeps them until the task is saved.
+/// [person] is the person whose chip is on, on the shared project's page it
+/// opens from: a task going into [projectId] is theirs (D7).
 /// [askedToSpeak]
 /// marks the ways in that ask to speak (the widget, the voice shortcut):
 /// without the mic, the form says why. The form's route is pushed, not
@@ -22,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 Future<void> openTaskForm(
   BuildContext context, {
   String? projectId,
+  ProjectMember? person,
   DateTime? day,
   Object? page,
   bool showCalendar = false,
@@ -63,6 +67,7 @@ Future<void> openTaskForm(
       arguments: NewTaskArguments(
         day: day,
         projectId: projectId,
+        person: person,
         page: page,
         showCalendar: showCalendar,
         words: words,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -53,6 +54,7 @@ class NewTaskArguments {
   const NewTaskArguments({
     this.day,
     this.projectId,
+    this.person,
     this.page,
     this.showCalendar = false,
     this.words = '',
@@ -68,6 +70,10 @@ class NewTaskArguments {
 
   /// The project the page adds to, when the user can add to it.
   final String? projectId;
+
+  /// The person whose chip is on, on the shared project's page the form was
+  /// opened from: a task going into [projectId] is theirs (D7).
+  final ProjectMember? person;
 
   /// The task page that lands the new task instead of Calendar.
   final Object? page;
@@ -128,6 +134,13 @@ class _NewTaskScreenState extends ConsumerState<NewTaskScreen> {
           )
         : null;
     final deadline = found != null && found.isDeadline;
+    final listId =
+        arguments.projectId ??
+        (ref.read(listCanEditProvider(scoped)) ? scoped : null);
+    // Opened under a person's chip: the task is theirs, one tap to change.
+    final person = listId != null && listId == arguments.projectId
+        ? arguments.person
+        : null;
     final lead = leadingTitle(
       found == null || found.title.isEmpty ? arguments.words : found.title,
       taskTitleLength,
@@ -147,9 +160,10 @@ class _NewTaskScreenState extends ConsumerState<NewTaskScreen> {
       deadline: deadline ? found.date : null,
       deadlineHasTime: deadline && found.hasTime,
       reminderAnchor: deadline ? 'deadline' : 'planned',
-      listId:
-          arguments.projectId ??
-          (ref.read(listCanEditProvider(scoped)) ? scoped : null),
+      listId: listId,
+      assignment: person == null ? 'personal' : 'member',
+      assigneeId: person?.id,
+      assigneeName: person?.name,
     );
   }
 

@@ -20,6 +20,7 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
   - recovery takes 2 steps, both labelled "Continuar recuperación";
   - Google comes last, below "o" — `test/auth_gate_test.dart` enforces that order;
   - it has a language picker, which works before sign-in, and the sun–moon toggle;
+  - Privacidad · Términos links sit under the card (b5; see [[ui-patterns]] › Links to the website);
   - Back from create or recovery exits the app.
 - **Install → Calendar:** 5 actions by email, 3 with Google.
 - **First run:** Calendar's empty day carries a one-time try-it line until the account's first task (b10, U12). The notification permission is only ever asked from Settings.
@@ -51,6 +52,13 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
   - check-ins labelled "Mañana" / "Tarde", the list of upcoming alerts, and "Actualizar y reintentar" (always shown);
   - about 8 controls and 135 words.
 - **Subscription** (`/subscription`): four secondary buttons.
+- **Otros ajustes** (`lib/screens/other_settings_screen.dart`): ends with Licencias, Privacidad, Términos (open_in_new trailing), then the version line (b5).
+- **Delete account** (`lib/screens/delete_account_screen.dart`), as of b5 (2026-10-19):
+  - consequences → copy link → confirmation → the red «Eliminar mi cuenta», enabled only once confirmed (`_ready`);
+  - Google-only account: «Confirmar con Google» with its help line in every state;
+  - password account with Google linked: password field, then «O confirma con Google…» + Confirmar con Google; once Google confirms, the password section and the «O…» line go, leaving «Confirmado con Google» alone. A refused Google confirmation brings both back;
+  - a wrong password names the Google button below when Google is linked;
+  - no way back from a Google confirmation to the password without leaving the page (accepted, rare).
 
 ## Reminders and notifications
 - **Turning reminders on from Calendar:** Ajustes → scroll → Notificaciones → the switch → the system dialog, plus exact alarms on Android 14+. That's 7–8 steps.

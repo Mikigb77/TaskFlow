@@ -379,6 +379,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final readOnly =
         widget.listId != null &&
         (list == null ? !lists.isLoading && lists.hasValue : !list.canEdit);
+    // The project a new task goes to, when the user can add to it.
+    final addTo = ref.watch(listCanEditProvider(scope.projectId))
+        ? scope.projectId
+        : null;
     return Scaffold(
       key: _page,
       appBar: CustomAppBar(
@@ -657,8 +661,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             )
           : TaskActions(
-              projectId: ref.watch(listCanEditProvider(scope.projectId))
-                  ? scope.projectId
+              projectId: addTo,
+              // Under a person's chip, a new task is theirs (D7).
+              person: widget.listId != null && addTo == widget.listId
+                  ? _personChip
                   : null,
               page: this,
             ),

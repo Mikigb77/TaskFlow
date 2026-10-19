@@ -409,3 +409,18 @@ Round 1 of b4 (P152–P156) passed its round check, and ux-tester reported no fa
 ### Notes for the main session
 - **No new copy and no Catalan written by the organizer:** all three packages reuse existing strings.
 - **Evidence:** this is a plan only, read from verify-b4-r1-B/C/D.md and the working tree. Nothing was run.
+
+## Round 2 (b5)
+
+Round 1 of b5 (P157–P159) passed its round check. The reviewers found all four findings fixed: UX-815, UX-1222, UX-1221 and UX-1111. The one failing test is the sign-in preview's known plugin error (KNOWN_FAILURES.md), so it doesn't count. The reviewer raised one small regression on the delete page (P157). Round 2 fixes it in one small package. Nothing is escalated, and there's no new owner question.
+
+### P165 · S2 · D · S · Delete page: the «O confirma con Google…» line goes once confirmed
+- **UX-1232 (S2), regression R1D-1 from P157:** after a password account with Google linked confirms with Google, «O confirma con Google y elige …» still shows above «Confirmado con Google». It offers an alternative to a password that is gone and asks for something already done. Now the line shows only until Google confirms; the confirmed row stands alone above the red button. If Google is refused, the line and the password field come back together. No new copy. Google-only accounts don't change.
+
+### Phone checks added
+- P165: on the delete page of a password account with Google linked, after «Confirmar con Google», only «Confirmado con Google» shows above «Eliminar mi cuenta» (part of P157's staging check).
+
+### Notes for the main session
+- **No new copy and no Catalan written by the organizer:** P165 only removes a line.
+- **Implementer notes carried, not planned:** P157 noted that `deleteAccountGoogleInstead` names the TaskFlow email as the Google account to choose, while the server matches a linked account on Google's subject, so the Google address can differ. The decided copy (UX-815) stays; the reviewer raised nothing. If the owner wants wording for that case, it's a copy question for later, not a fix in this round.
+- **Evidence:** this is a plan only, read from verify-b5-r1-C/D.md and `delete_account_screen.dart` in the working tree. Nothing was run.

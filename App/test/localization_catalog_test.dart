@@ -801,4 +801,74 @@ void main() {
       'Escriu',
     );
   });
+
+  test('UX-1221: billingError’s unsupportedPlatform says the Android app, in '
+      'EN, ES and CA, and no catalog value names iOS, iPhone or Apple', () {
+    expect(
+      lookupAppLocalizations(const Locale('en'))
+          .billingError('unsupportedPlatform'),
+      'Subscriptions are available in the Android app.',
+    );
+    expect(
+      lookupAppLocalizations(const Locale('es'))
+          .billingError('unsupportedPlatform'),
+      'Las suscripciones están disponibles en la app para Android.',
+    );
+    expect(
+      lookupAppLocalizations(const Locale('ca'))
+          .billingError('unsupportedPlatform'),
+      'Les subscripcions estan disponibles a l’aplicació d’Android.',
+    );
+    final apple = RegExp(r'iOS|iPhone|Apple');
+    for (final language in ['en', 'es', 'ca']) {
+      final catalog = jsonDecode(
+        File('${directory.path}/app_$language.arb').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      expect(
+        [
+          for (final entry in catalog.entries)
+            if (!entry.key.startsWith('@') &&
+                entry.value is String &&
+                apple.hasMatch(entry.value as String))
+              '${entry.key}: ${entry.value}',
+        ],
+        isEmpty,
+        reason: language,
+      );
+    }
+  });
+
+  test('UX-1222: the two page names and the open-page error read as the site '
+      'titles them, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      [en.privacyPolicy, en.termsAndConditions, en.webPageOpenError],
+      ['Privacy Policy', 'Terms and Conditions', 'Couldn’t open the page.'],
+    );
+    expect(
+      [es.privacyPolicy, es.termsAndConditions, es.webPageOpenError],
+      [
+        'Política de privacidad',
+        'Términos y condiciones',
+        'No se ha podido abrir la página.',
+      ],
+    );
+    expect(
+      [ca.privacyPolicy, ca.termsAndConditions, ca.webPageOpenError],
+      [
+        'Política de privacitat',
+        'Termes i condicions',
+        'No s’ha pogut obrir la pàgina.',
+      ],
+    );
+    // The old key went from every catalog.
+    for (final language in ['en', 'es', 'ca']) {
+      final catalog = jsonDecode(
+        File('${directory.path}/app_$language.arb').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      expect(catalog.containsKey('deleteAccountLinkError'), isFalse);
+    }
+  });
 }

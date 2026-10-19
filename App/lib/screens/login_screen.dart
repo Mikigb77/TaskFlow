@@ -13,6 +13,7 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/development_login.dart';
 import 'package:agenda/services/pending_verification.dart';
+import 'package:agenda/services/site_links.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/google_login_button.dart';
 import 'package:agenda/widgets/language_selector.dart';
@@ -806,6 +807,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
+                    // Before an account is created, Google's included: the
+                    // terms must be available beforehand.
+                    if (!_recover && !widget.signInAgain)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final (page, label) in [
+                              (SitePage.privacy, strings.privacyPolicy),
+                              (SitePage.terms, strings.termsAndConditions),
+                            ])
+                              TextButton(
+                                key: ValueKey('site-${page.path}'),
+                                onPressed: () =>
+                                    openSitePage(context, ref, page),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: colors.onSurfaceVariant,
+                                  // Narrow enough that both fit on one line
+                                  // of a 360 dp phone, 8 dp apart.
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  textStyle: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall,
+                                ),
+                                child: Text(label, textAlign: TextAlign.center),
+                              ),
+                          ],
+                        ),
+                      ),
                     if (DevelopmentLogin.enabled && !_register && !_recover)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),

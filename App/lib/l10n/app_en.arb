@@ -302,6 +302,14 @@
   "previousDay": "Previous day",
   "nextDay": "Next day",
   "licenses": "Open-source licences",
+  "privacyPolicy": "Privacy Policy",
+  "@privacyPolicy": {
+    "description": "Link that opens the website’s Privacy Policy in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page."
+  },
+  "termsAndConditions": "Terms and Conditions",
+  "@termsAndConditions": {
+    "description": "Link that opens the website’s Terms and Conditions in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page."
+  },
   "todayAgenda": "Today’s agenda",
   "breathingRoom": "A little breathing room.",
   "loadTasksError": "Couldn’t load your tasks",
@@ -1754,7 +1762,7 @@
   "billingRestore": "Restore purchases",
   "billingManage": "Manage subscription",
   "billingRestoreHelp": "Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.",
-  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android and iOS app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
+  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
   "billingResult": "{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}",
   "@billingStatus": {
     "placeholders": {
@@ -2248,6 +2256,15 @@
       }
     }
   },
+  "deleteAccountGoogleInstead": "Or confirm with Google and choose {email}. Your Google account isn’t deleted.",
+  "@deleteAccountGoogleInstead": {
+    "description": "Above the Confirm with Google button, under the password field, for an account with a password and Google linked: confirming with Google instead of the password. {email} is the TaskFlow account's email. Says the Google account itself isn't deleted.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "deleteAccountConfirmGoogle": "Confirm with Google",
   "@deleteAccountConfirmGoogle": {
     "description": "Button that opens Google sign-in to confirm deleting the account."
@@ -2267,6 +2284,10 @@
   "deleteAccountWrongPassword": "That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”",
   "@deleteAccountWrongPassword": {
     "description": "Under the password field on the delete-account page after a wrong password. Says how to recover a forgotten one: sign out, then Forgot password? on sign-in. The quoted words must match forgotPassword, and the verb the signOut button."
+  },
+  "deleteAccountWrongPasswordGoogle": "That password isn’t right. If you don’t remember it, tap “Confirm with Google”.",
+  "@deleteAccountWrongPasswordGoogle": {
+    "description": "Under the password field on the delete-account page after a wrong password, for an account with Google linked: the Confirm with Google button below confirms instead. The quoted words must match deleteAccountConfirmGoogle."
   },
   "deleteAccountOtherGoogle": "Choose {email}, the Google account you use for TaskFlow.",
   "@deleteAccountOtherGoogle": {
@@ -2318,9 +2339,9 @@
   "@deleteAccountFailed": {
     "description": "Under Delete my account for any other failure."
   },
-  "deleteAccountLinkError": "Couldn’t open the page.",
-  "@deleteAccountLinkError": {
-    "description": "Brief message when the Google Play subscriptions page could not be opened."
+  "webPageOpenError": "Couldn’t open the page.",
+  "@webPageOpenError": {
+    "description": "Brief message when nothing on the phone could open a web page: the Privacy Policy, the Terms and Conditions, or Google Play’s subscriptions page."
   },
   "accountDeleted": "Your account has been deleted.",
   "@accountDeleted": {

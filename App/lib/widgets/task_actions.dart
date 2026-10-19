@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/free_voice_notice_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
@@ -18,10 +19,20 @@ import 'package:agenda/widgets/task_form_entry.dart';
 /// are used up, its first tap that month says why, once. Its space is
 /// reserved so it never covers the agenda.
 class TaskActions extends ConsumerStatefulWidget {
-  const TaskActions({super.key, this.projectId, this.page, this.day});
+  const TaskActions({
+    super.key,
+    this.projectId,
+    this.person,
+    this.page,
+    this.day,
+  });
 
   /// The project a new task goes to, when the user can add to it.
   final String? projectId;
+
+  /// The person whose chip is on, on a shared project's page: a new task
+  /// there is theirs (D7).
+  final ProjectMember? person;
 
   /// A task page that shows what capture saves, instead of Calendar.
   final Object? page;
@@ -66,6 +77,7 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
         await openTaskForm(
           context,
           projectId: widget.projectId,
+          person: widget.person,
           day: widget.day,
           page: widget.page,
         );
@@ -78,6 +90,7 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
       showCaptureSheet(
         context,
         projectId: widget.projectId,
+        person: widget.person,
         page: widget.page,
         day: widget.day,
       ),

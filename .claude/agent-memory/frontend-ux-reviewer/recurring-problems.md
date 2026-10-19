@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Twenty-three problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text...), as a checklist to run first on any screen
+description: Twenty-four problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -107,5 +107,9 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - One-time teaching needs a persisted, per-account flag; check delete-to-empty, restart, account switch and the loading state.
 23. **Fixed timeouts outside the in-app snackbar path ignore accessibility settings.**
     - The notification Undo started at a fixed 10 s (R1D-1 → UX-631). Background isolates can't read the platform timeout, so it must be stored from the foreground.
+
+24. **Instruction copy outlives the state it describes.**
+    - On delete-account, «O confirma con Google…» stayed after Google had confirmed: an alternative to nothing, asking for an action already done (R1D-1 → UX-1232, b5).
+    - For any help line that offers an alternative or asks for an action, check each state after the action succeeds, fails and is retried; derive the line's visibility from the same state as the control.
 
 Related: [[ui-patterns]], [[review-techniques]].

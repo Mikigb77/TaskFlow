@@ -11,6 +11,7 @@ import 'package:agenda/screens/main_shell.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/services/site_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +56,7 @@ Future<(ProviderContainer, _Auth)> _open(
   OfflineApiClient? client,
   String language = 'en',
   Size size = const Size(390, 844),
+  Future<bool> Function(Uri)? openPage,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -74,6 +76,7 @@ Future<(ProviderContainer, _Auth)> _open(
       regionalStoreProvider.overrideWithValue(
         MemoryRegionalStore(RegionalPreferences(language: language)),
       ),
+      if (openPage != null) openWebPageProvider.overrideWithValue(openPage),
     ],
   );
   addTearDown(container.dispose);
@@ -1019,6 +1022,178 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- P158 (UX-1222): the Privacy Policy and the Terms, under the card ----
+
+  final privacyLink = find.byKey(const ValueKey('site-privacy'));
+  final termsLink = find.byKey(const ValueKey('site-terms'));
+
+  /// Sign-in in [language], noting every page it asks to open.
+  Future<List<Uri>> openSignIn(
+    WidgetTester tester, {
+    String language = 'es',
+    Size size = const Size(390, 844),
+    bool opens = true,
+  }) async {
+    final opened = <Uri>[];
+    final (_, auth) = await _open(
+      tester,
+      client: _LoginApi(),
+      language: language,
+      size: size,
+      openPage: (uri) async {
+        opened.add(uri);
+        return opens;
+      },
+    );
+    auth.finish();
+    await tester.pumpAndSettle();
+    return opened;
+  }
+
+  for (final (language, prefix) in [('es', '/es'), ('en', ''), ('ca', '/ca')]) {
+    testWidgets(
+      'UX-1222: in $language, sign-in shows Privacy Policy and Terms under the card, quiet, and each opens the site’s page in the app’s language',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final opened = await openSignIn(tester, language: language);
+        for (final (link, label) in [
+          (privacyLink, l.privacyPolicy),
+          (termsLink, l.termsAndConditions),
+        ]) {
+          expect(
+            find.descendant(of: link, matching: find.text(label)),
+            findsOneWidget,
+          );
+          // Under the card, after its last button.
+          expect(
+            tester.getTopLeft(link).dy,
+            greaterThan(tester.getBottomLeft(find.text(l.createAnAccount)).dy),
+          );
+          final colors = Theme.of(tester.element(link)).colorScheme;
+          final style = tester.widget<TextButton>(link).style!;
+          expect(style.foregroundColor!.resolve({}), colors.onSurfaceVariant);
+        }
+        await tapVisible(tester, privacyLink);
+        await tapVisible(tester, termsLink);
+        expect(opened.map((uri) => uri.toString()), [
+          'https://taskflow.garbar.tech$prefix/privacy/',
+          'https://taskflow.garbar.tech$prefix/terms/',
+        ]);
+        expect(find.text(l.webPageOpenError), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1222: the two links show in Crea tu cuenta too, and not in password recovery',
+    (tester) async {
+      await openSignIn(tester);
+      expect(privacyLink, findsOneWidget);
+      expect(termsLink, findsOneWidget);
+      await tapVisible(tester, find.text(es.createAnAccount));
+      expect(find.text(es.registerHeading), findsOneWidget);
+      expect(privacyLink, findsOneWidget);
+      expect(termsLink, findsOneWidget);
+      expect(find.text(es.privacyPolicy), findsOneWidget);
+      expect(find.text(es.termsAndConditions), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.text(es.forgotPassword));
+      expect(find.text(es.recoveryHeading), findsOneWidget);
+      expect(find.text(es.privacyPolicy), findsNothing);
+      expect(find.text(es.termsAndConditions), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1222: on sign-in, a page that can’t open says «No se ha podido abrir la página.»',
+    (tester) async {
+      final opened = await openSignIn(tester, opens: false);
+      await tapVisible(tester, privacyLink);
+      expect(opened, hasLength(1));
+      expect(find.text(es.webPageOpenError), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1222: at 2× on 320×640 in $language, sign-in’s two links show whole, each tap target is at least 48 dp tall, and Google is still the first button',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await openSignIn(
+          tester,
+          language: language,
+          size: const Size(320, 640),
+        );
+        // Google first: above the email, and above every other button the
+        // page scrolls.
+        final googleRect = tester.getRect(google);
+        expect(googleRect.top, lessThan(tester.getTopLeft(email).dy));
+        final body = find
+            .descendant(
+              of: find.byType(LoginScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final buttons = find.descendant(
+          of: body,
+          matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+          skipOffstage: false,
+        );
+        expect(buttons.evaluate(), isNotEmpty);
+        // Icon buttons (the language menu, show password) aren't ways in.
+        final icons = find
+            .descendant(
+              of: find.byType(IconButton, skipOffstage: false),
+              matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+              skipOffstage: false,
+            )
+            .evaluate()
+            .toSet();
+        for (final element in buttons.evaluate()) {
+          if (icons.contains(element)) continue;
+          final rect = tester.getRect(find.byElementPredicate(
+            (e) => identical(e, element),
+            skipOffstage: false,
+          ));
+          // The Google button itself, or anything inside it.
+          if (rect.top >= googleRect.top - 0.5 &&
+              rect.bottom <= googleRect.bottom + 0.5) {
+            continue;
+          }
+          expect(
+            rect.top,
+            greaterThanOrEqualTo(googleRect.bottom - 0.5),
+            reason: '${element.widget}',
+          );
+        }
+        for (final (link, label) in [
+          (privacyLink, l.privacyPolicy),
+          (termsLink, l.termsAndConditions),
+        ]) {
+          await tester.scrollUntilVisible(link, 100, scrollable: body);
+          await tester.pumpAndSettle();
+          final rect = tester.getRect(link);
+          expect(rect.left, greaterThanOrEqualTo(-0.5), reason: label);
+          expect(rect.right, lessThanOrEqualTo(320.5), reason: label);
+          expect(rect.height, greaterThanOrEqualTo(48), reason: label);
+          final text = find.descendant(of: link, matching: find.text(label));
+          final textRect = tester.getRect(text);
+          expect(textRect.left, greaterThanOrEqualTo(-0.5), reason: label);
+          expect(textRect.right, lessThanOrEqualTo(320.5), reason: label);
+          final paragraph = tester.renderObject<RenderParagraph>(text);
+          expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 /// The server for sign-in: [signInError] answers every sign-in until it is

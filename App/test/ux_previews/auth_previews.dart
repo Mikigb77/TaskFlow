@@ -85,7 +85,7 @@ void authPreviews() {
     preview(
       login,
       'sign-in',
-      'The first screen signed out: Google first, then email and password.',
+      'The first screen signed out: Google first, then email and password; the Privacy Policy and Terms links under the card.',
       [...mainScreen, ...longText],
       (p) async {
         await _signedOut(p);
@@ -96,7 +96,7 @@ void authPreviews() {
     preview(
       login,
       'sign-up',
-      'Crear una cuenta: the same card for a new account, with the password rule.',
+      'Crear una cuenta: the same card for a new account, with the password rule; the Privacy Policy and Terms links under the card.',
       [es1, ca2],
       (p) async {
         await _signedOut(p);

@@ -26,7 +26,7 @@ Current as of 2026-10-13 (whole-app run, slice C). Paths are under `App/lib/`.
   - "New project": a name dialog, a "where does it belong" choice and 5 colour chips. Afterwards the user stays on the list.
 - **Project page** = HomeScreen(listId):
   - the eyebrow "YOUR PROJECT";
-  - For me / Team (shared projects only; inherits the global filter);
+  - For me / Team (shared projects only; inherits the global filter), plus one chip per member who can edit; a person's chip makes new tasks theirs (b5, see [[ui-patterns]] › Person chips);
   - Members, and a bell for project updates (shared projects only);
   - Notes; ✓ (completed tasks from every project); search;
   - Dictar una tarea / Nueva tarea — still shown on view-only projects.

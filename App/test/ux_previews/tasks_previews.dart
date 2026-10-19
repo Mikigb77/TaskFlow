@@ -268,6 +268,28 @@ void tasksPreviews() {
 
     preview(
       projectPage,
+      'person-form',
+      'Ana chosen, then Nueva tarea (an account without Pro): the form opens with the task given to Ana, «Matemáticas · Ana ▾» (D7).',
+      [es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          pro: false,
+          tasks: [...normalDay(), ...sharedProjectTasks()],
+          projects: allProjects,
+        );
+        await _openProject(app, 'matematicas');
+        await p.tester.tap(find.widgetWithText(ChoiceChip, 'Ana').first);
+        await p.tester.pumpAndSettle();
+        await app.tap(p.l.newTask);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      projectPage,
       'many-people',
       '«Excursión de fin de curso», with seven people: the person chips scroll sideways.',
       [es2, ca2],

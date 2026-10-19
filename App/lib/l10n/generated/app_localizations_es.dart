@@ -711,6 +711,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get licenses => 'Licencias de código abierto';
 
   @override
+  String get privacyPolicy => 'Política de privacidad';
+
+  @override
+  String get termsAndConditions => 'Términos y condiciones';
+
+  @override
   String get todayAgenda => 'Agenda de hoy';
 
   @override
@@ -3204,7 +3210,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String billingError(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'unsupportedPlatform':
-          'Las suscripciones están disponibles en la app para Android e iOS.',
+          'Las suscripciones están disponibles en la app para Android.',
       'configuration':
           'Las suscripciones aún no están disponibles. Inténtalo más tarde.',
       'accountUnavailable':
@@ -3838,6 +3844,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String deleteAccountGoogleInstead(String email) {
+    return 'O confirma con Google y elige $email. Tu cuenta de Google no se elimina.';
+  }
+
+  @override
   String get deleteAccountConfirmGoogle => 'Confirmar con Google';
 
   @override
@@ -3852,6 +3863,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get deleteAccountWrongPassword =>
       'La contraseña no es correcta. Si no la recuerdas, cierra sesión y toca «¿Has olvidado tu contraseña?».';
+
+  @override
+  String get deleteAccountWrongPasswordGoogle =>
+      'La contraseña no es correcta. Si no la recuerdas, toca «Confirmar con Google».';
 
   @override
   String deleteAccountOtherGoogle(String email) {
@@ -3901,7 +3916,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se ha podido eliminar tu cuenta. Inténtalo más tarde.';
 
   @override
-  String get deleteAccountLinkError => 'No se ha podido abrir la página.';
+  String get webPageOpenError => 'No se ha podido abrir la página.';
 
   @override
   String get accountDeleted => 'Tu cuenta se ha eliminado.';

@@ -26,6 +26,7 @@ import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/services/revenuecat_service.dart';
+import 'package:agenda/services/site_links.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -146,9 +147,11 @@ class _Auth extends AuthNotifier {
     super.prepareErase,
     this.complimentary = false,
     this.email = 'ana@example.invalid',
+    this.googleLinked = false,
   });
   final bool complimentary;
   final String email;
+  final bool googleLinked;
   @override
   Future<void> restore() async {
     state = AuthState(
@@ -157,6 +160,7 @@ class _Auth extends AuthNotifier {
         'email': email,
         'timezone': 'Europe/Madrid',
         'complimentary_pro': complimentary,
+        'google_linked': googleLinked,
       }),
     );
   }
@@ -255,6 +259,7 @@ void main() {
     bool complimentary = false,
     CustomerInfo? purchases,
     String email = 'ana@example.invalid',
+    bool googleLinked = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -279,6 +284,7 @@ void main() {
             prepareErase: (id) => prepareAccountErase(ref.read, id),
             complimentary: complimentary,
             email: email,
+            googleLinked: googleLinked,
           ),
         ),
         subscriptionProvider.overrideWith((_) => phone.subscription),
@@ -543,7 +549,7 @@ void main() {
       phone.opens = false;
       await tapVisible(tester, link);
       await tester.pumpAndSettle();
-      expect(find.text(es.deleteAccountLinkError), findsOneWidget);
+      expect(find.text(es.webPageOpenError), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -806,6 +812,357 @@ void main() {
       expect(enabled(tester), isFalse);
       expect(phone.auth.account, isNotNull);
       expect(phone.log, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX-815: a password account with Google linked ----
+
+  const linkedEmail = 'ana@example.com';
+
+  testWidgets(
+    'UX-815: a password account with Google linked shows the password help and field, then «O confirma con Google…» and Confirmar con Google, before the red button',
+    (tester) async {
+      await open(tester, email: linkedEmail, googleLinked: true);
+      final help = find.text(es.deleteAccountPasswordHelp);
+      final instead = find.text(es.deleteAccountGoogleInstead(linkedEmail));
+      var top = double.negativeInfinity;
+      for (final item in [help, passwordField, instead, googleButton, confirm]) {
+        expect(item, findsOneWidget, reason: '$item');
+        final y = tester.getTopLeft(item).dy;
+        expect(y, greaterThan(top), reason: '$item');
+        top = y;
+      }
+      expect(
+        tester.getTopLeft(instead).dy - tester.getBottomLeft(passwordField).dy,
+        greaterThanOrEqualTo(15.5),
+        reason: 'the Google way comes 16 dp after the password section',
+      );
+      expect(
+        find.descendant(
+          of: googleButton,
+          matching: find.text(es.deleteAccountConfirmGoogle),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(es.deleteAccountGoogleHelp(linkedEmail)), findsNothing);
+      expect(find.text(es.deleteAccountGoogleConfirmed), findsNothing);
+      expect(enabled(tester), isFalse, reason: 'neither way confirmed yet');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-815: once confirmed with Google, Confirmado con Google shows, the password field goes, Eliminar mi cuenta is enabled, and the request sends google_id_token and plan, no password',
+    (tester) async {
+      final phone = await open(tester, email: linkedEmail, googleLinked: true);
+      // Typed something, then chose Google instead.
+      await tester.enterText(passwordField, 'half-remembered');
+      await tester.pump();
+      phone.google.answers.add('fresh-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      expect(phone.google.calls, 1);
+      expect(find.text(es.deleteAccountGoogleConfirmed), findsOneWidget);
+      expect(passwordField, findsNothing);
+      expect(find.text(es.deleteAccountPasswordHelp), findsNothing);
+      expect(googleButton, findsNothing);
+      expect(enabled(tester), isTrue);
+
+      await tapVisible(tester, confirm);
+      await frames(tester);
+      sentLast(phone, 'POST', {
+        'google_id_token': 'fresh-google-id-token',
+        'plan': 'plan-1',
+      });
+      expect(phone.api.requests.last.$3!.containsKey('password'), isFalse);
+      expect(phone.auth.deleted, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-815: a password account with Google linked can still confirm with its password, which is what is sent',
+    (tester) async {
+      final phone = await open(tester, email: linkedEmail, googleLinked: true);
+      await tester.enterText(passwordField, password);
+      await tester.pump();
+      expect(enabled(tester), isTrue);
+      await tapVisible(tester, confirm);
+      await frames(tester);
+      sentLast(phone, 'POST', {'password': password, 'plan': 'plan-1'});
+      expect(phone.google.calls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final linked in [true, false]) {
+    testWidgets(
+      linked
+          ? 'UX-815: a wrong password with Google linked names Confirmar con Google'
+          : 'UX-815: a wrong password without Google keeps UX-801’s sign-out-and-recover line',
+      (tester) async {
+        final phone = await open(
+          tester,
+          email: linkedEmail,
+          googleLinked: linked,
+        );
+        phone.api.deleteError = ApiException(400, 'Wrong password.', {
+          'code': 'wrong_password',
+          'detail': 'Wrong password.',
+        });
+        await tester.enterText(passwordField, 'not-the-password');
+        await tapVisible(tester, confirm);
+        await tester.pumpAndSettle();
+        expect(
+          fieldError(tester),
+          linked
+              ? es.deleteAccountWrongPasswordGoogle
+              : es.deleteAccountWrongPassword,
+        );
+        expect(googleButton, linked ? findsOneWidget : findsNothing);
+        expect(phone.auth.account, isNotNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-815: google_reauth_failed on a password account with Google linked names the account to choose and brings the password field back',
+    (tester) async {
+      final phone = await open(tester, email: linkedEmail, googleLinked: true);
+      phone.google.answers.add('other-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      expect(passwordField, findsNothing);
+      phone.api.deleteError = ApiException(400, 'Google account mismatch.', {
+        'code': 'google_reauth_failed',
+        'detail': 'Google account mismatch.',
+      });
+      await tapVisible(tester, confirm);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(es.deleteAccountOtherGoogle(linkedEmail)),
+        findsOneWidget,
+      );
+      expect(find.text(es.deleteAccountGoogleConfirmed), findsNothing);
+      expect(passwordField, findsOneWidget, reason: 'the password is back');
+      expect(find.text(es.deleteAccountPasswordHelp), findsOneWidget);
+      expect(googleButton, findsOneWidget, reason: 'or Google again');
+      expect(enabled(tester), isFalse);
+      expect(phone.auth.account, isNotNull);
+      expect(phone.log, isEmpty);
+
+      // The password way works again.
+      phone.api.deleteError = null;
+      await tester.enterText(passwordField, password);
+      await tester.pump();
+      expect(enabled(tester), isTrue);
+      await tapVisible(tester, confirm);
+      await frames(tester);
+      sentLast(phone, 'POST', {'password': password, 'plan': 'plan-1'});
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-815: an account without Google linked shows no Google button; a Google-only account still shows only the Google way, with its own help line',
+    (tester) async {
+      await open(tester, email: linkedEmail);
+      expect(passwordField, findsOneWidget);
+      expect(googleButton, findsNothing);
+      expect(find.byType(GoogleLoginButton), findsNothing);
+      expect(
+        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findsNothing,
+      );
+
+      await open(
+        tester,
+        email: linkedEmail,
+        googleLinked: true,
+        preview: previewJson(reauth: 'google'),
+      );
+      expect(passwordField, findsNothing);
+      expect(find.text(es.deleteAccountPasswordHelp), findsNothing);
+      expect(
+        find.text(es.deleteAccountGoogleHelp(linkedEmail)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findsNothing,
+      );
+      expect(googleButton, findsOneWidget);
+      expect(enabled(tester), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UX-815: the two new lines read as planned in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      en.deleteAccountGoogleInstead('a@b.c'),
+      'Or confirm with Google and choose a@b.c. Your Google account isn’t deleted.',
+    );
+    expect(
+      es.deleteAccountGoogleInstead('a@b.c'),
+      'O confirma con Google y elige a@b.c. Tu cuenta de Google no se elimina.',
+    );
+    expect(
+      ca.deleteAccountGoogleInstead('a@b.c'),
+      'O confirma-ho amb Google i tria a@b.c. El compte de Google no se suprimeix.',
+    );
+    expect(
+      es.deleteAccountWrongPasswordGoogle,
+      'La contraseña no es correcta. Si no la recuerdas, toca «Confirmar con Google».',
+    );
+    // Each names the button as the page shows it.
+    for (final l in [en, es, ca]) {
+      expect(
+        l.deleteAccountWrongPasswordGoogle,
+        contains(l.deleteAccountConfirmGoogle),
+      );
+    }
+  });
+
+  // ---- UX-1232: the «O confirma con Google…» line goes once confirmed ----
+
+  /// Any text that offers Google as the alternative to the password,
+  /// whatever email it names: the copy up to its email placeholder.
+  Finder orConfirmWithGoogle(AppLocalizations l) {
+    const marker = '\u0000';
+    final full = l.deleteAccountGoogleInstead(marker);
+    return find.textContaining(full.substring(0, full.indexOf(marker)));
+  }
+
+  testWidgets(
+    'UX-1232: before confirming, a password account with Google linked shows the password help, the field, «O confirma con Google…» and Confirmar con Google',
+    (tester) async {
+      await open(tester, email: linkedEmail, googleLinked: true);
+      expect(find.text(es.deleteAccountPasswordHelp), findsOneWidget);
+      expect(passwordField, findsOneWidget);
+      expect(
+        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'O confirma con Google y elige ana@example.com. Tu cuenta de Google no se elimina.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: googleButton,
+          matching: find.text(es.deleteAccountConfirmGoogle),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1232: once confirmed with Google, no «O confirma con Google» text shows; Confirmado con Google stands alone above an enabled Eliminar mi cuenta',
+    (tester) async {
+      final phone = await open(tester, email: linkedEmail, googleLinked: true);
+      phone.google.answers.add('fresh-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      expect(phone.google.calls, 1);
+
+      expect(orConfirmWithGoogle(es), findsNothing);
+      expect(
+        find.textContaining('O confirma con Google'),
+        findsNothing,
+        reason: 'the literal Spanish copy is gone too',
+      );
+      expect(find.text(es.deleteAccountGoogleConfirmed), findsOneWidget);
+      expect(passwordField, findsNothing);
+      expect(find.text(es.deleteAccountPasswordHelp), findsNothing);
+      expect(
+        find.text(es.deleteAccountGoogleHelp(linkedEmail)),
+        findsNothing,
+        reason: 'no other Google help line takes its place',
+      );
+      expect(enabled(tester), isTrue);
+      expect(
+        tester.getTopLeft(find.text(es.deleteAccountGoogleConfirmed)).dy,
+        lessThan(tester.getTopLeft(confirm).dy),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1232: a Google confirmation the server refuses with google_reauth_failed brings «O confirma con Google…» back with the password field and names the account to choose',
+    (tester) async {
+      final phone = await open(tester, email: linkedEmail, googleLinked: true);
+      phone.google.answers.add('other-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      expect(orConfirmWithGoogle(es), findsNothing);
+
+      phone.api.deleteError = ApiException(400, 'Google account mismatch.', {
+        'code': 'google_reauth_failed',
+        'detail': 'Google account mismatch.',
+      });
+      await tapVisible(tester, confirm);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findsOneWidget,
+      );
+      expect(passwordField, findsOneWidget);
+      expect(
+        find.text(es.deleteAccountOtherGoogle(linkedEmail)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Elige ana@example.com, la cuenta de Google con la que entras en TaskFlow.',
+        ),
+        findsOneWidget,
+      );
+      expect(googleButton, findsOneWidget);
+      expect(find.text(es.deleteAccountGoogleConfirmed), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1232: a Google-only account keeps its «Para confirmar, elige…» help before and after confirming, above Confirmado con Google',
+    (tester) async {
+      final phone = await open(
+        tester,
+        email: linkedEmail,
+        googleLinked: true,
+        preview: previewJson(reauth: 'google'),
+      );
+      final help = find.text(es.deleteAccountGoogleHelp(linkedEmail));
+      expect(help, findsOneWidget);
+      expect(
+        find.text(
+          'Para confirmar, elige ana@example.com cuando Google te lo pida. Tu cuenta de Google no se elimina.',
+        ),
+        findsOneWidget,
+      );
+
+      phone.google.answers.add('fresh-google-id-token');
+      await tapVisible(tester, googleButton);
+      await tester.pumpAndSettle();
+      final confirmed = find.text(es.deleteAccountGoogleConfirmed);
+      expect(confirmed, findsOneWidget);
+      expect(help, findsOneWidget, reason: 'unchanged for Google-only');
+      expect(
+        tester.getTopLeft(help).dy,
+        lessThan(tester.getTopLeft(confirmed).dy),
+      );
+      expect(orConfirmWithGoogle(es), findsNothing);
+      expect(enabled(tester), isTrue);
       expect(tester.takeException(), isNull);
     },
   );
@@ -3397,6 +3754,87 @@ void main() {
           await fitsWidth(tester, message);
           final paragraph = tester.renderObject<RenderParagraph>(message);
           expect(paragraph.didExceedMaxLines, isFalse, reason: 'no ellipsis');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-815: at 2× on 320 dp in $language, with Google linked, every line of both ways shows whole, before and after confirming with Google, and Eliminar mi cuenta can be scrolled to',
+        (tester) async {
+          const email = 'ana@example.com';
+          final l = lookupAppLocalizations(Locale(language));
+          // From the top each time: the page builds lazily.
+          Future<void> fromTop(Finder target) async {
+            tester.state<ScrollableState>(pageScroll).position.jumpTo(0);
+            await tester.pumpAndSettle();
+            await fitsWidth(tester, target);
+          }
+
+          Future<void> whole(Finder target) async {
+            await fromTop(target);
+            final paragraphs = tester.renderObjectList<RenderParagraph>(
+              find.descendant(
+                of: target,
+                matching: find.byType(RichText),
+                matchRoot: true,
+              ),
+            );
+            for (final paragraph in paragraphs) {
+              expect(
+                paragraph.didExceedMaxLines,
+                isFalse,
+                reason: '$target is cut',
+              );
+            }
+          }
+
+          final phone = await open(
+            tester,
+            language: language,
+            textScale: 2,
+            size: const Size(320, 640),
+            email: email,
+            googleLinked: true,
+          );
+          await whole(find.text(l.deleteAccountPasswordHelp));
+          await fromTop(passwordField);
+          await whole(find.text(l.deleteAccountGoogleInstead(email)));
+          await whole(find.text(l.deleteAccountConfirmGoogle));
+          await whole(find.text(l.deleteAccountButton));
+          expect(tester.takeException(), isNull);
+
+          // A wrong password names the Google button.
+          phone.api.deleteError = ApiException(400, 'Wrong password.', {
+            'code': 'wrong_password',
+          });
+          await reach(tester, passwordField);
+          await tester.enterText(passwordField, 'not-the-password');
+          await tapVisible(tester, confirm);
+          await tester.pumpAndSettle();
+          await whole(find.text(l.deleteAccountWrongPasswordGoogle));
+          expect(tester.takeException(), isNull);
+
+          phone.api.deleteError = null;
+          phone.google.answers.add('fresh-google-id-token');
+          await tapVisible(tester, googleButton);
+          await tester.pumpAndSettle();
+          await whole(find.text(l.deleteAccountGoogleConfirmed));
+          await whole(find.text(l.deleteAccountButton));
+          // Confirmed: the «O confirma con Google» line goes with the password.
+          expect(find.text(l.deleteAccountGoogleInstead(email)), findsNothing);
+          expect(passwordField, findsNothing);
+          expect(enabled(tester), isTrue);
+
+          phone.api.deleteError = ApiException(400, 'Mismatch.', {
+            'code': 'google_reauth_failed',
+          });
+          await tapVisible(tester, confirm);
+          await tester.pumpAndSettle();
+          await whole(find.text(l.deleteAccountOtherGoogle(email)));
+          await fromTop(passwordField);
+          await whole(find.text(l.deleteAccountButton));
           expect(tester.takeException(), isNull);
         },
       );
