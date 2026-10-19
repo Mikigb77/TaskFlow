@@ -251,3 +251,50 @@ Say if any of these is wrong; only the package named changes.
   - WhatsApp previews, after a deploy;
   - a native Catalan read;
   - the delete summary read aloud to someone over 60.
+
+## Round 2 (b1)
+
+Re-plan after batch 1's first round (WP14–WP18), 2026-10-19. Two findings came back partly fixed (WEB-6, WEB-2; each failed once) and six regressions were reported. Merged, they're four new issues (WEB-705–WEB-708). There are three packages, no new decisions and no escalations. Full briefs: `plan-b1-r2.json`.
+
+### WP33 · The last three pointers to the removed walkthrough go · H · S · **held** · S3
+- WEB-6 (second attempt): the footer's ‘Try the demo’ → `/#demo` becomes ‘Try it with your voice’ → `/#voice` (`Footer.tsx:22`, outside the other session's lines). The tries-used line drops ‘The sample walkthrough below is always available.’ (`VoiceDemo.tsx:828`). Privacy §8 loses its walkthrough sentences in en, es and ca (`src/content/legal/*.ts:139`, deletions only; WP31 still rewrites §8). The tester moves the footer, demo and privacy checks out of the committed `tests/ux-web-home.spec.ts` into the held test files.
+
+### WP34 · Bare address: the cache check as meant, a host-free redirect; the English demo marked English · G · S · commits · S3
+- WEB-2 (second attempt): WP15's check 4 is relaxed. Every answer for / must be `private, no-store`, and only the 307s must carry `Vary: Accept-Language, Cookie`, because Next 16 overwrites Vary on the 200 and `no-store` already stops any cache from keeping it. The implementer also checks the 307's Location and makes it path-only if it's absolute, which removes the risk of a redirect to the Cloud Run host after deploy.
+- WEB-707 (R1G-1): the still-English live demo sits inside `lang="es"`/`lang="ca"`. It's wrapped in `lang="en"` with `display: contents` in HomePage.tsx until WP26–WP29 translate it. **WP26 must remove this wrapper** when the demo reads the page's language. The FAQ half of R1G-1 is WP19's.
+
+### WP35 · Features and the account answer: the password named, no half-empty card, no wrong dates · F · S · commits · S2 · after WP34
+- WEB-708 (R1F-1): the account answer names the password the app asks for (EN, ES and CA as the F verifier wrote them; the Catalan needs a native read).
+- WEB-705 (R1H-1, merged R1F-2): the half-empty voice card. The calendar card spans two rows, voice and details stack beside it, and offline goes full width. CSS only. R1F-2's fix (put the microphone drawing back) is overruled because it would undo WEB-16.
+- WEB-706 (R1H-2, merged R1F-3): the drawing's hard-coded days 21–27 go. It keeps the weekday letters, the dots and the selected first day.
+
+### Skipped this round
+- R1F-2: duplicate of R1H-1 (WEB-705).
+- R1F-3: duplicate of R1H-2 (WEB-706).
+- WEB-707's FAQ half: superseded by WP19.
+
+### For the main session
+- **Hold `src/proxy.ts` uncommitted until WP20 commits.** Nothing writes `taskflow-lang` before WP20's switch exists, so with the proxy committed alone, a browser that prefers Spanish or Catalan can never reach the English home. The rest of WP15 (`/es/`, `/ca/`, the copy tables, HomePage) commits as planned.
+- WP33 stays uncommitted: `Footer.tsx`, `VoiceDemo.tsx` and `src/content/legal/` all hold the other session's work.
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Round 3 (b1)
+
+This is the re-plan after batch 1's second round (WP33–WP35), made on 2026-10-19. The round check passed and no test failed. WEB-6 (WP33's part), WEB-705, WEB-706, WEB-707 and WEB-708 came back fixed. WEB-2 came back partly fixed for the second time, so it's escalated. One regression was reported (R2F-1, now WEB-709). This round has one package, no new decisions and one escalation. The full brief is in `plan-b1-r3.json`.
+
+### WP36 · The full-width offline card fills its width · F · S · commits · S1
+- WEB-709 (R2F-1) is a regression of WP35. The offline card now spans the full width, but its text uses only the left third. The fix is CSS only: above 800 px the card has two columns, with the icon and heading on the left and the paragraph on the right (max-width 32rem). At 800 px and below, the card goes back to today's stack. WP35's grid and its test stay as they are.
+
+### Escalated
+- **WEB-2** (the bare-address part that WP15 and WP34 carry) has failed twice.
+  - Round 1: the Vary check failed on the 200, because Next 16 overwrites Vary.
+  - Round 2: the relaxed checks pass locally, but the host-free redirect wasn't done. `src/proxy.ts:37` still builds the 307's Location from `request.url`. The implementer says the built server already answers with a path-only Location; the tester found it absolute.
+  - The risk: after a deploy, Spanish and Catalan visitors who type the bare address could land on the run.app host or a dead host. This is inferred, not seen, and the cause is likely server-side.
+  - **Recommendation:** allow the one-line change at `src/proxy.ts:37` (`new NextResponse(null, { status: 307, headers: { Location: homePath(language) } })`, keeping lines 38–39). Check it with curl locally, and on taskflow.garbar.tech after a deploy.
+  - WEB-2's other parts (WP20, WP22–WP24, WP28, WP29) stay planned.
+
+### Noted, not planned
+- WP35 reported that the calendar card ends with some mint space below its drawing between 801 and 1100 px (9–10%) and at 200% text (19%). This is under the 25% bound and the F verifier accepted it.
+
+### For the main session
+- `src/proxy.ts` stays held uncommitted until WP20 commits, as in round 2.

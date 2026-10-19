@@ -1,0 +1,170 @@
+{
+  "runId": "2026-10-18-site",
+  "mode": "replan",
+  "round": "b1-r2",
+  "created": "2026-10-19",
+  "conventions": [
+    "Paths are relative to the website root, C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb; app-repo paths start with `App/`, `Backend/` or `.claude/`. Line numbers come from the 2026-10-19 reports, before any package ran. Earlier packages move them (WP15 moves the home from `src/app/page.tsx` into `src/components/HomePage.tsx` and its strings into `src/content/site/`), so search for the code a line number points at.",
+    "Copy is shown between backticks as EN / ES / CA and is exact; the backticks aren't part of it. Apostrophes are ’ in English and Catalan; quotations use “ ” in English and « » in Spanish and Catalan; Catalan «l·l» uses the middle dot U+00B7. On the home, in the frame and in the live demo, Catalan says «l’aplicació», as the app does; the legal documents keep their own «l’app». Copy marked (organizer's) wasn't written by a reviewer: write it as given and list its Catalan in your notes for a native read.",
+    "Every visible string, alt text, accessible name, title, metadata field and message a package adds or touches exists in English, Spanish and Catalan. English is at `/`, Spanish at `/es/…`, Catalan at `/ca/…`, as the legal pages already are. Home, frame, 404 and demo strings live in `src/content/site/` (WP15 creates it): one object per language with the same TypeScript type, so a missing string fails `npm run check`. The page's language comes from the URL through `useSiteLanguage()` (WP15), never from the browser's language. Dates, times and numbers use `Intl` with the page's language. Developer-only text shown with `?developer=1` may stay English.",
+    "Use the app's own words (`App/lib/l10n/app_{en,es,ca}.arb`): `Add a task` / `Añadir tarea` / `Afegeix una tasca`; `Done` / `Listo` / `Fet`; `Listening · 0:12` / `Escuchando · 0:12` / `S’està escoltant · 0:12`; `Understanding…` / `Entendiendo…` / `Entenent…`; `{n} things to add` / `{n} cosas para añadir` / `{n} coses per afegir`; `Say it again` / `Volver a decirlo` / `Torna-ho a dir`; `See what I said` / `Ver lo que dije` / `Mostra què he dit`; `No date` / `Sin fecha` / `Sense data`; `Check this detail` / `Revisa este dato` / `Revisa aquesta dada`; `Type instead` / `Escribir` / `Escriu`; `One moment…` / `Un momento…` / `Un moment…`; `Try again` / `Reintentar` / `Torna-ho a provar`; `Undo` / `Deshacer` / `Desfés`; `Projects` / `Proyectos` / `Projectes`; `Share` / `Compartir` / `Comparteix`; `Add a note` / `Añadir nota` / `Afegeix una nota`; `Continue with Google` / `Continuar con Google` / `Continua amb Google`; `Settings → Account → Delete account` / `Ajustes → Cuenta → Eliminar cuenta` / `Configuració → Compte → Suprimeix el compte`; dictation / dictado / dictat; `TaskFlow Pro`. The app's teaching example is `Tomorrow, call the dentist and buy bread.` / `Mañana, llamar al dentista y comprar pan.` / `Demà, trucar al dentista i comprar pa.` Visible text never says draft, voice-to-task, allowance, transcript, sync, or list for a project.",
+    "One label per destination, in the header, the phone menu, the footer and in-page links: `#voice` `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu`; `#features` `What it does` / `Qué hace` / `Què fa`; `#questions` `Questions` / `Preguntas` / `Preguntes`; `#get-taskflow` (phone menu only) `Coming soon to Android` / `Muy pronto en Android` / `Molt aviat a Android`. Links from the frame keep the page's language prefix (`/es/#voice`, `/ca/#questions`). No link points at `#demo`: WD1 removed the sample walkthrough.",
+    "TaskFlow isn't on Google Play yet (WD9, WD13). Say it's coming soon in plain text. Never a Google Play badge, logo, store link or `play.google.com` URL, never a price, never `100 MB`, and no label that promises a download or an app to explore. TaskFlow is for Android phones only (WD7): the first ‘Android’ in a page's main content carries ™, and the footer says ‘Android is a trademark of Google LLC.’ (WP23). WD2's free-plan line is fixed wording (WP18, WP28); don't rephrase it.",
+    "Type floor for any text a package adds or restyles: sizes in rem, with the root at 100%; body text and paragraphs 1rem (16 px) or more; button labels 1rem or more; small print 0.875rem where it fits; nothing visible under 0.75rem (12 px). Contrast: text 4.5:1 or more; controls, states, field edges and focus rings 3:1 or more; in light and dark. Targets 44 px or more (48 px for the header's controls). Use the site's tokens in `src/styles/global.css` (`--green`, `--ink`, `--muted`, `--paper`, `--surface`, `--mint`, `--lime` and the rest), its `.button` and `.text-link` styles, and `Icon` for every arrow or symbol: no ↗ ↑ ← text glyphs (Manrope lacks some). Keep reduced motion and the demo's focus-to-stage-heading behaviour working.",
+    "Subtract first. Removing something means its markup, its CSS (with the responsive blocks at `@media (max-width: 1100px)`, `800px`, `580px` and `360px`), its images, strings and tests: leave no dead code. Don't add sections, pages, forms, sign-ups, tracking, settings or features that a brief doesn't name.",
+    "Another session's uncommitted work is in TaskFlowWeb; never stage, commit, revert or reformat it. Untracked (theirs): `docs/`, `scripts/check-legal.mjs`, `src/app/[language]/[document]/`, `src/app/terms/`, `src/app/legal/`, `src/app/delete-account/`, `src/components/LegalPage.tsx`, `src/content/legal/`, `src/styles/legal.css`, `tests/legal.spec.ts`. Their uncommitted lines: `src/app/layout.tsx:8` (the legal.css import), `src/components/Footer.tsx` lines 2, 18, 26–32 and 34–36, `src/components/VoiceDemo.tsx:396` (the privacy link), the body of `src/app/sitemap.ts`, `src/app/privacy/page.tsx`, `Dockerfile`, `README.md`, `package.json`, `scripts/deploy-cloud-run.ps1`. Packages marked held in their `commit` field change those files where their brief says, and those changes stay uncommitted for the owner. New files you create (in `src/content/site/`, `src/components/`, `src/app/[language]/` next to `[document]/`) are this run's own and can be committed.",
+    "Committed files must never depend on a held change: they don't import from `src/content/legal/` or `src/components/LegalPage.tsx`, don't pass new props to `VoiceDemo.tsx` or `Footer.tsx`, and leave today's `layout.tsx` working. Held files may use committed ones. When a held package breaks an assertion in a committed test file (`tests/website.spec.ts`), make that assertion independent of the held change (for example, go to `/privacy/` directly instead of through a footer label). Acceptance tests for held packages go in their own files, so they can stay uncommitted with them: `tests/ux-web-voice.spec.ts` (WP26–WP29), `tests/ux-web-frame.spec.ts` (WP22, WP23), `tests/ux-web-legal.spec.ts` (WP24, WP30–WP32); the rest in `tests/ux-web-site.spec.ts`. Held with `VoiceDemo.tsx`: `src/styles/voice.css`, and the demo packages' changes to `tests/voice.spec.ts` and `tests/support/ux-voice.ts`.",
+    "Checks run in WSL from the website root: `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command>'`, with `npm run check`, `npm run legal:check`, `npm run build` (with `SITE_URL=https://taskflow.garbar.tech` whenever canonical, hreflang or og:url matter; before any Playwright run; stop anything listening on port 3000 first), `npm test`, `npm run test:unit`, and the renders `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert \"perf \"` (lab performance: `--workers=1 --grep \"perf \"`). Git runs on Windows. Keep every check passing, and update the existing tests that pin text or flows you change. Keep `PAGES` in `tests/ux-renders.spec.ts` current. Never call the real voice API: tests and renders stub it.",
+    "Today is 2026-10-19. Sample content in the site's own text never names a fixed month or year; anything date-dependent is relative to today. The WD4 hero images are the app's own render and show its date; they're exempt.",
+    "Owner decisions in force: WD1–WD13 in `.claude/ux-web/DECISIONS.md` (2026-10-18, night) are decided, and each brief carries what it needs from them. A part marked ‘waits on WD#’ stays exactly as it is today: don't build it; the tester and the verifier leave it out.",
+    "Every claim must be true of the app on `dev` today (`.claude/ux-review/DECISIONS.md`, the ARB files, `Backend/docs/`). If a brief's copy seems to contradict the app, keep the brief's copy and say so in your notes; don't improvise.",
+    "Round 2 of batch 1 (2026-10-19). These packages run before batch 2 (WP19 onwards), one at a time, in this order: WP33, WP34, WP35. Line numbers below are today's, after round 1, read from the files."
+  ],
+  "packages": [
+    {
+      "id": "WP33",
+      "title": "The last three pointers to the removed walkthrough go",
+      "area": "H",
+      "size": "S",
+      "severity": 3,
+      "findings": [
+        "WEB-6"
+      ],
+      "aliases": {},
+      "commit": "Held. All three files hold the other session's work: `src/components/Footer.tsx` (line 22 sits in the same diff hunk as their lines 18 and 26–32, so the file stays uncommitted with WP23), `src/components/VoiceDemo.tsx` (held with WP26–WP29), and `src/content/legal/` (their untracked files; can't commit until they do). The tester's tests for this package go in the held files named in the acceptance.",
+      "files": [
+        "src/components/Footer.tsx:22 (held: the other session's lines are 2, 18, 26–32 and 34–36; change only line 22)",
+        "src/components/VoiceDemo.tsx:828 (held: the other session's line is 396; change only the sentence at :828)",
+        "src/content/legal/en.ts:139, es.ts:139, ca.ts:139 (the other session's untracked files; change only the first paragraph of §8)"
+      ],
+      "brief": [
+        "Last attempt (WP14, round 1): the walkthrough itself is gone (TaskDemo.tsx deleted, no #demo section, no .task-demo or .demo-* rules) and the header's two #demo links are fixed. Three pointers to it remain, all in held files the WP14 brief kept out of scope: the footer link, the demo's tries-used line and privacy §8. The tester's WEB-6 test fails on the first (`/: Try the demo → /#demo`, `/privacy/: Try the demo → /#demo`). This is WEB-6's second attempt; another failure goes to the owner.",
+        "`src/components/Footer.tsx:22`: replace `<a href={`/#demo`}>Try the demo</a>` with a link to `/#voice` that reads EN `Try it with your voice`. English only, like the rest of today's footer: WP23 translates the footer later and keeps this label and destination. Change nothing else in the file: not the link order, not ‘Features’ (WP23), and never the other session's lines 2, 18, 26–32 and 34–36.",
+        "`src/components/VoiceDemo.tsx:828` (tries-used status, `allowanceUsed && !busy`): delete the sentence ` The sample walkthrough below is always available.` and keep the period right after the reset-time expression, so the line reads `Your allowance returns {time}.` Nothing else in VoiceDemo.tsx: WP28 rewrites lines 818–830 later, and line 396 is the other session's.",
+        "Privacy §8, first paragraph (`src/content/legal/en.ts:139`, `es.ts:139`, `ca.ts:139`): delete the walkthrough sentences, and the word that set the live demo apart from it. Exact results: EN `The live demo sends audio/text to Google only when you select Create drafts. Its drafts do not synchronise to an app account.` / ES `La demo en vivo envía audio/texto a Google solo al pulsar Create drafts (Crear borradores); no sincroniza esos borradores con una cuenta.` / CA `La demo en viu envia àudio/text a Google només amb Create drafts (Crear esborranys), sense sincronitzar-los amb un compte.` These are the existing sentences with words removed; write nothing new. ‘Create drafts’ and ‘drafts’ stay until WP31, which rewrites §8 under WD3; leave the rest of §8, the section title, `company.json` and the document's version and date alone.",
+        "Out of scope, leave as is: `README.md:38` (the other session's; not shown to visitors) and the `(voice|sample)-` filter at `tests/support/ux-audit.ts:1594`.",
+        "Tests: no existing test pins the three removed strings (grep found none). For web-ux-tester: the WEB-6 link test at `tests/ux-web-home.spec.ts:146-160` is in a committed file but now proves a held change. Following the conventions, keep there only a check of the header and `main` of /, /es/ and /ca/; move the footer and /privacy/ part to `tests/ux-web-frame.spec.ts`, the tries-used check to `tests/ux-web-voice.spec.ts`, and the §8 check to `tests/ux-web-legal.spec.ts`."
+      ],
+      "acceptance": [
+        "On /, /es/, /ca/ and /privacy/, at 1440 × 1000 and 390 × 664, in light, no link anywhere on the page (header, phone menu, main, footer) has an href ending in `#demo`.",
+        "On / at both sizes, the footer link that used to read ‘Try the demo’ reads `Try it with your voice` and its href is `/#voice`; clicking it on / brings the section `#voice` into the viewport.",
+        "With the `voice-tries-used` scenario stubbed on / at both sizes, the demo's status line contains no ‘walkthrough’, still says `Your allowance returns`, and ends with a period.",
+        "On /privacy/, /es/privacy/ and /ca/privacy/, the first paragraph of §8 equals the given EN, ES and CA text exactly, and §8 contains none of ‘walkthrough’, ‘recorrido’, ‘recorregut’, ‘separate live demo’ or ‘en vivo independiente’.",
+        "axe reports no violations on / and /privacy/, light and dark; `npm run check`, `npm run legal:check` and `npm test` pass."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    },
+    {
+      "id": "WP34",
+      "title": "Bare address: the cache check as meant, a host-free redirect; the English demo marked English",
+      "area": "G",
+      "size": "S",
+      "severity": 3,
+      "findings": [
+        "WEB-2",
+        "WEB-707"
+      ],
+      "aliases": {
+        "WEB-707": [
+          "R1G-1"
+        ]
+      },
+      "commit": "Commits: `src/components/HomePage.tsx` and `src/proxy.ts` are this run's own files. The main session holds `src/proxy.ts` uncommitted until WP20's language switch commits (see plan.md, Round 2 (b1)).",
+      "files": [
+        "src/proxy.ts:31-43",
+        "src/components/HomePage.tsx:61 (`<VoiceDemo />`)",
+        "tests/ux-web-global.spec.ts:87-98 (web-ux-tester rewrites check 4; the implementer doesn't touch it)"
+      ],
+      "brief": [
+        "Last attempt (WP15, round 1): /es/ and /ca/ serve the home, canonical and hreflang are right, the proxy reads the cookie and then Accept-Language, only / redirects, and axe is clean: 6 of 7 checks pass. Check 4 failed: the 200 for / lacks `Vary: Accept-Language, Cookie`. The proxy sets it (`src/proxy.ts:39`), but Next 16 overwrites Vary when it renders the page (`node_modules/next/dist/build/templates/app-page-runtime.js:466-467`). The 307s keep it, and the 200 keeps `Cache-Control: private, no-store` and nosniff. `no-store` forbids any cache from keeping the answer, so no cache can serve the English home to a Spanish visitor. Organizer's call: check 4 is relaxed to what it was for (see acceptance). Don't patch Node's `setHeader` or Next's internals to force Vary, and keep `src/proxy.ts:39-40` as they are. This is WEB-2's second attempt.",
+        "The redirect's Location (the G verifier's deploy concern). `src/proxy.ts:37` builds it from `request.url`. Behind the edge worker the request's host is the origin's, and `edge/worker.ts:79-83` rewrites a Location only when it starts with `env.ORIGIN` exactly. First check what the built server sends: `npm run build`, `npm start`, then `curl -sI -H 'Accept-Language: es' http://localhost:3000/`. If Location is already a path (`/es/`), change nothing in proxy.ts and say so in your notes. If it's absolute, answer the 307 with a path-only Location, for example `new NextResponse(null, { status: 307, headers: { Location: homePath(language) } })`, and keep the Vary and Cache-Control lines on both answers. Don't touch `edge/worker.ts`.",
+        "WEB-707 (regression R1G-1): `src/components/HomePage.tsx:18` wraps the whole home in `lang={language}`, but the live demo at `:61` is still English: VoiceDemo.tsx is held until WP26–WP29 translate it. So on /es/ and /ca/, TalkBack in Spanish or Catalan reads ‘Say it. See it take shape.’, ‘Try the live demo’ and ‘3 free tries · no account’ with Spanish or Catalan pronunciation (WCAG 3.1.2; axe can't detect it). Mark the demo as what it is: wrap `<VoiceDemo />` in `<div lang=\"en\" style={{ display: \"contents\" }}>`, with the comment `{/* The demo is English until WP26–WP29 translate it; then remove this wrapper. */}` above it. `display: contents` keeps the layout exactly as it is (no selector in global.css or voice.css depends on the demo's parent). Don't edit VoiceDemo.tsx or pass it props.",
+        "The FAQ's English parts on /es/ and /ca/ (the heading ‘Glad you asked.’, the intro and answers 4–7 reused from `en.faq`) are the other half of R1G-1. WP19 translates them in the next batch, so don't mark them here.",
+        "Don't touch: VoiceDemo.tsx, Header.tsx (WP20), Footer.tsx, layout.tsx, sitemap.ts and the copy tables."
+      ],
+      "acceptance": [
+        "GET / with no Accept-Language, with `accept-language: en-US,en;q=0.9,es;q=0.8`, and with `cookie: taskflow-lang=en` plus `accept-language: es-ES` each answers 200, with Cache-Control containing both `private` and `no-store`, and `x-content-type-options: nosniff`. Vary isn't checked on the 200.",
+        "GET / with `accept-language: es-ES,es;q=0.9` answers 307 to /es/, and with `accept-language: ca-ES,ca;q=0.9,es;q=0.8` answers 307 to /ca/. Each Location is the path or the request's own origin plus the path, never another host. Each 307 has Cache-Control containing `private` and `no-store`, and Vary naming accept-language and cookie.",
+        "web-ux-tester rewrites the WEB-2 test at `tests/ux-web-global.spec.ts:87` to the two checks above. Check 4 of WP15 is replaced by them.",
+        "On /es/ and /ca/ at 1440 × 1000 and 390 × 664, the closest `[lang]` ancestor of `#voice` has lang `en`, and its wrapper's computed display is `contents`. The hero, `#features`, `#questions` and `#get-taskflow` keep `es` or `ca`; on / everything is `en`.",
+        "On the renders of /, /es/ and /ca/ (desktop and mobile, light and dark), `#voice` sits and looks as it did in round 1: directly under the hero, same spacing, no new box.",
+        "axe reports no violations on /, /es/ and /ca/, light and dark; `npm run check` and `npm test` pass."
+      ],
+      "deviceChecks": [
+        "After the owner deploys: `curl -sI -H 'Accept-Language: es' https://taskflow.garbar.tech/` gives a location of `/es/` or `https://taskflow.garbar.tech/es/`, never the Cloud Run host (`src/proxy.ts:37`, `edge/worker.ts:79-83`). Inferred risk, not seen.",
+        "TalkBack set to Spanish on /es/: the hero is read in Spanish, and the demo's English heading with English pronunciation."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "WP35",
+      "title": "Features and the account answer: the password named, no half-empty card, no wrong dates",
+      "area": "F",
+      "size": "S",
+      "severity": 2,
+      "findings": [
+        "WEB-708",
+        "WEB-705",
+        "WEB-706"
+      ],
+      "aliases": {
+        "WEB-705": [
+          "R1H-1",
+          "R1F-2"
+        ],
+        "WEB-706": [
+          "R1H-2",
+          "R1F-3"
+        ],
+        "WEB-708": [
+          "R1F-1"
+        ]
+      },
+      "commit": "Commits: HomePage.tsx, src/content/site/ and the round's changes to global.css are this run's, with none of the other session's lines.",
+      "files": [
+        "src/content/site/en.ts:61, es.ts:61, ca.ts:67 (`faq.items[2].answer`)",
+        "src/components/HomePage.tsx:82-91 (`.mini-week`)",
+        "src/styles/global.css:531-535 (`.feature-calendar`), :560-575 (`.mini-day`, `.mini-day strong`), :652-681 (`.feature-voice`, `.feature-details`, `.feature-offline`), :1050-1055 (the 800 px block), :1185-1189 (the 580 px block)",
+        "tests/support/ux-web-copy.ts:146 (the pinned account answer)"
+      ],
+      "brief": [
+        "These are regressions from round 1, first attempt. WP35 runs after WP34, which also edits HomePage.tsx (line 61 only); search, don't trust line numbers.",
+        "WEB-708 (R1F-1, S2): the account answer WP18 wrote from its brief says ‘use your email and a 6-digit code’ and never mentions the password. The app asks for a password of 12–128 characters first, then emails a code to confirm the address (`Backend/docs/EMAIL_VERIFICATION.md:3`; `App/lib/l10n/app_en.arb:43`). Replace `faq.items[2].answer` exactly, and leave the question as it is: EN `Yes. You sign in once: tap Continue with Google, or use your email and a password, then type the 6-digit code we email you. Your tasks are kept in your account, so you don’t lose them if you change phones.` / ES `Sí. Inicias sesión una vez: toca Continuar con Google, o usa tu correo y una contraseña, y escribe el código de 6 cifras que te enviamos. Tus tareas se guardan en tu cuenta, así no las pierdes si cambias de móvil.` / CA `Sí. Inicies la sessió una vegada: toca Continua amb Google, o fes servir el teu correu i una contrasenya, i escriu el codi de 6 xifres que t’enviem. Les tasques es desen al teu compte, així no les perds si canvies de mòbil.` (the reviewer's Catalan; list it in your notes for a native read). Update the pinned copy at `tests/support/ux-web-copy.ts:146`, and its es and ca entries.",
+        "WEB-706 (R1H-2 and R1F-3, merged): `HomePage.tsx:83` hard-codes the days 21–27 under ‘This week’, while the hero image one scroll up shows Mon 19 – Sun 25 October. Most weeks the drawing names a week that isn't this one. Organizer's call, settling the two options the reports gave: subtract, don't compute. Map over `features.calendar.weekdays` (7 entries) instead of the dates array. Each `.mini-day` keeps only its weekday `<span>` and its dot `<i>`, and the first keeps `selected`. Delete `<strong>{date}</strong>` and the `.mini-day strong` rule (`global.css:572-575`). Remove `.mini-day`'s `min-height: 60px` and keep its `padding-block`. If the selected pill looks cramped in the render, use `min-height: 2.75rem` instead. Keep ‘This week’, both events, the 10:00 and 18:00 times and the transparent dots on the last two days.",
+        "WEB-705 (R1H-1 and R1F-2, merged): WP14 removed the voice card's drawing (WEB-16, a fourth fake microphone), so the voice card (span 5) stretches to the calendar card's row height and about 60% of it is empty. The reports gave two fixes. Settled: rearrange the grid, CSS only. Don't put the microphone drawing back: WEB-16 removed it on purpose, and `tests/ux-web-home.spec.ts:31` pins `.voice-illustration` absent. Base rules: `.feature-calendar { grid-column: span 7; grid-row: span 2; }`; `.feature-voice` stays span 5; `.feature-details { grid-column: span 5; }` (was 6); `.feature-offline { grid-column: span 12; }` (was 6). In the `@media (max-width: 800px)` block (`global.css:1053-1055`; the report calls it the 1100 px block, but it's the 800 px one, and the 1100 px block sets no spans), replace the shared rule with `.feature-calendar { grid-column: span 6; grid-row: span 2; }`, `.feature-voice, .feature-details { grid-column: span 6; }` and `.feature-offline { grid-column: span 12; }`. In the 580 px block, add `grid-row: auto;` to `.feature-card` (`:1185`), so the single column spans no rows. The DOM order stays calendar, voice, details, offline.",
+        "Then look at the renders at desktop 1440, desktop-zoom200, desktop-text200 and a width between 801 and 1100 px, in light and dark. Every card should be as tall as its content plus at most about 25%. If the calendar card now gets the empty space instead (because voice and details stacked are taller), report it with the render instead of improvising another layout.",
+        "Don't touch the hero, the demo, the headings and other copy of `#features`, the other FAQ answers (WP19) or the closing card. `.voice-illustration` stays gone."
+      ],
+      "acceptance": [
+        "On /, /es/ and /ca/ at 1440 × 1000 and 390 × 664, in light, the third answer in `#questions` equals the given EN, ES and CA text exactly, and contains `password`, `contraseña` and `contrasenya` respectively.",
+        "On /, /es/ and /ca/, `#features .mini-week` holds 7 `.mini-day` elements and no text matching a digit. The first is `.selected`, and their letters are EN `M T W T F S S`, ES `L M X J V S D` and CA `dl dt dc dj dv ds dg`.",
+        "On / at 1440 × 1000, in light and dark: the calendar card spans two grid rows; the voice card and the details card sit to its right, one above the other, and the offline card spans the full width below them. For the voice, details and offline cards, the space between the bottom of the last child and the card's bottom edge is at most 25% of the card's height.",
+        "On / at 390 × 664, the four feature cards are one column in the order calendar, voice, details, offline, and none has more than 40 px between its last child and its bottom edge.",
+        "`.voice-illustration` is absent on every home. No home scrolls sideways at 320 px. axe reports no violations on the three homes, light and dark. `npm run check` and `npm test` pass."
+      ],
+      "deviceChecks": [
+        "A native Catalan speaker reads the new account answer."
+      ],
+      "dependsOn": [
+        "WP34"
+      ]
+    }
+  ],
+  "decisions": [],
+  "skipped": [
+    {
+      "id": "R1F-2",
+      "reason": "duplicate of R1H-1, merged into WEB-705 (WP35). Its fix (put the microphone drawing back) is overruled: it would undo WEB-16."
+    },
+    {
+      "id": "R1F-3",
+      "reason": "duplicate of R1H-2, merged into WEB-706 (WP35)"
+    },
+    {
+      "id": "WEB-707 (the FAQ half)",
+      "reason": "superseded by WP19 (next batch), which translates the FAQ heading, intro and answers 4–7 on /es/ and /ca/"
+    }
+  ],
+  "escalated": []
+}
