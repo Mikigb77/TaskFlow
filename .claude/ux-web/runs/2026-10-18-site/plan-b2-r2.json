@@ -1,0 +1,121 @@
+{
+ "runId": "2026-10-18-site",
+ "mode": "replan",
+ "round": "b2-r2",
+ "created": "2026-10-19",
+ "conventions": [
+  "Paths are relative to the website root, C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb; app-repo paths start with `App/`, `Backend/` or `.claude/`. Line numbers come from the 2026-10-19 reports, before any package ran. Earlier packages move them (WP15 moves the home from `src/app/page.tsx` into `src/components/HomePage.tsx` and its strings into `src/content/site/`), so search for the code a line number points at.",
+  "Copy is shown between backticks as EN / ES / CA and is exact; the backticks aren't part of it. Apostrophes are ’ in English and Catalan; quotations use “ ” in English and « » in Spanish and Catalan; Catalan «l·l» uses the middle dot U+00B7. On the home, in the frame and in the live demo, Catalan says «l’aplicació», as the app does; the legal documents keep their own «l’app». Copy marked (organizer's) wasn't written by a reviewer: write it as given and list its Catalan in your notes for a native read.",
+  "Every visible string, alt text, accessible name, title, metadata field and message a package adds or touches exists in English, Spanish and Catalan. English is at `/`, Spanish at `/es/…`, Catalan at `/ca/…`, as the legal pages already are. Home, frame, 404 and demo strings live in `src/content/site/` (WP15 creates it): one object per language with the same TypeScript type, so a missing string fails `npm run check`. The page's language comes from the URL through `useSiteLanguage()` (WP15), never from the browser's language. Dates, times and numbers use `Intl` with the page's language. Developer-only text shown with `?developer=1` may stay English.",
+  "Use the app's own words (`App/lib/l10n/app_{en,es,ca}.arb`): `Add a task` / `Añadir tarea` / `Afegeix una tasca`; `Done` / `Listo` / `Fet`; `Listening · 0:12` / `Escuchando · 0:12` / `S’està escoltant · 0:12`; `Understanding…` / `Entendiendo…` / `Entenent…`; `{n} things to add` / `{n} cosas para añadir` / `{n} coses per afegir`; `Say it again` / `Volver a decirlo` / `Torna-ho a dir`; `See what I said` / `Ver lo que dije` / `Mostra què he dit`; `No date` / `Sin fecha` / `Sense data`; `Check this detail` / `Revisa este dato` / `Revisa aquesta dada`; `Type instead` / `Escribir` / `Escriu`; `One moment…` / `Un momento…` / `Un moment…`; `Try again` / `Reintentar` / `Torna-ho a provar`; `Undo` / `Deshacer` / `Desfés`; `Projects` / `Proyectos` / `Projectes`; `Share` / `Compartir` / `Comparteix`; `Add a note` / `Añadir nota` / `Afegeix una nota`; `Continue with Google` / `Continuar con Google` / `Continua amb Google`; `Settings → Account → Delete account` / `Ajustes → Cuenta → Eliminar cuenta` / `Configuració → Compte → Suprimeix el compte`; dictation / dictado / dictat; `TaskFlow Pro`. The app's teaching example is `Tomorrow, call the dentist and buy bread.` / `Mañana, llamar al dentista y comprar pan.` / `Demà, trucar al dentista i comprar pa.` Visible text never says draft, voice-to-task, allowance, transcript, sync, or list for a project.",
+  "One label per destination, in the header, the phone menu, the footer and in-page links: `#voice` `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu`; `#features` `What it does` / `Qué hace` / `Què fa`; `#questions` `Questions` / `Preguntas` / `Preguntes`; `#get-taskflow` (phone menu only) `Coming soon to Android` / `Muy pronto en Android` / `Molt aviat a Android`. Links from the frame keep the page's language prefix (`/es/#voice`, `/ca/#questions`). No link points at `#demo`: WD1 removed the sample walkthrough.",
+  "TaskFlow isn't on Google Play yet (WD9, WD13). Say it's coming soon in plain text. Never a Google Play badge, logo, store link or `play.google.com` URL, never a price, never `100 MB`, and no label that promises a download or an app to explore. TaskFlow is for Android phones only (WD7): the first ‘Android’ in a page's main content carries ™, and the footer says ‘Android is a trademark of Google LLC.’ (WP23). WD2's free-plan line is fixed wording (WP18, WP28); don't rephrase it.",
+  "Type floor for any text a package adds or restyles: sizes in rem, with the root at 100%; body text and paragraphs 1rem (16 px) or more; button labels 1rem or more; small print 0.875rem where it fits; nothing visible under 0.75rem (12 px). Contrast: text 4.5:1 or more; controls, states, field edges and focus rings 3:1 or more; in light and dark. Targets 44 px or more (48 px for the header's controls). Use the site's tokens in `src/styles/global.css` (`--green`, `--ink`, `--muted`, `--paper`, `--surface`, `--mint`, `--lime` and the rest), its `.button` and `.text-link` styles, and `Icon` for every arrow or symbol: no ↗ ↑ ← text glyphs (Manrope lacks some). Keep reduced motion and the demo's focus-to-stage-heading behaviour working.",
+  "Subtract first. Removing something means its markup, its CSS (with the responsive blocks at `@media (max-width: 1100px)`, `800px`, `580px` and `360px`), its images, strings and tests: leave no dead code. Don't add sections, pages, forms, sign-ups, tracking, settings or features that a brief doesn't name.",
+  "Another session's uncommitted work is in TaskFlowWeb; never stage, commit, revert or reformat it. Untracked (theirs): `docs/`, `scripts/check-legal.mjs`, `src/app/[language]/[document]/`, `src/app/terms/`, `src/app/legal/`, `src/app/delete-account/`, `src/components/LegalPage.tsx`, `src/content/legal/`, `src/styles/legal.css`, `tests/legal.spec.ts`. Their uncommitted lines: `src/app/layout.tsx:8` (the legal.css import), `src/components/Footer.tsx` lines 2, 18, 26–32 and 34–36, `src/components/VoiceDemo.tsx:396` (the privacy link), the body of `src/app/sitemap.ts`, `src/app/privacy/page.tsx`, `Dockerfile`, `README.md`, `package.json`, `scripts/deploy-cloud-run.ps1`. Packages marked held in their `commit` field change those files where their brief says, and those changes stay uncommitted for the owner. New files you create (in `src/content/site/`, `src/components/`, `src/app/[language]/` next to `[document]/`) are this run's own and can be committed.",
+  "Committed files must never depend on a held change: they don't import from `src/content/legal/` or `src/components/LegalPage.tsx`, don't pass new props to `VoiceDemo.tsx` or `Footer.tsx`, and leave today's `layout.tsx` working. Held files may use committed ones. When a held package breaks an assertion in a committed test file (`tests/website.spec.ts`), make that assertion independent of the held change (for example, go to `/privacy/` directly instead of through a footer label). Acceptance tests for held packages go in their own files, so they can stay uncommitted with them: `tests/ux-web-voice.spec.ts` (WP26–WP29), `tests/ux-web-frame.spec.ts` (WP22, WP23), `tests/ux-web-legal.spec.ts` (WP24, WP30–WP32); the rest in `tests/ux-web-site.spec.ts`. Held with `VoiceDemo.tsx`: `src/styles/voice.css`, and the demo packages' changes to `tests/voice.spec.ts` and `tests/support/ux-voice.ts`.",
+  "Checks run in WSL from the website root: `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command>'`, with `npm run check`, `npm run legal:check`, `npm run build` (with `SITE_URL=https://taskflow.garbar.tech` whenever canonical, hreflang or og:url matter; before any Playwright run; stop anything listening on port 3000 first), `npm test`, `npm run test:unit`, and the renders `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert \"perf \"` (lab performance: `--workers=1 --grep \"perf \"`). Git runs on Windows. Keep every check passing, and update the existing tests that pin text or flows you change. Keep `PAGES` in `tests/ux-renders.spec.ts` current. Never call the real voice API: tests and renders stub it.",
+  "Today is 2026-10-19. Sample content in the site's own text never names a fixed month or year; anything date-dependent is relative to today. The WD4 hero images are the app's own render and show its date; they're exempt.",
+  "Owner decisions in force: WD1–WD13 in `.claude/ux-web/DECISIONS.md` (2026-10-18, night) are decided, and each brief carries what it needs from them. A part marked ‘waits on WD#’ stays exactly as it is today: don't build it; the tester and the verifier leave it out.",
+  "Every claim must be true of the app on `dev` today (`.claude/ux-review/DECISIONS.md`, the ARB files, `Backend/docs/`). If a brief's copy seems to contradict the app, keep the brief's copy and say so in your notes; don't improvise.",
+  "Round 2 of batch 2 (2026-10-19). These packages run after WP19–WP23 and before WP24, one at a time, in this order: WP37, WP38. Line numbers are today's, after round 1, read from the files. `src/styles/global.css`, `src/app/not-found.tsx` and `tests/ux-web-global.spec.ts` are listed by git as modified: their uncommitted changes are this run's own (WP19–WP23), not the other session's. `src/app/layout.tsx` stays held (its `legal.css` import, line 11 today, is the other session's; the `localFont` block is WP22's)."
+ ],
+ "packages": [
+  {
+   "id": "WP37",
+   "title": "Language links 8 px apart; large-text desktops get the Menu",
+   "area": "G",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "WEB-711",
+    "WEB-712",
+    "WEB-703"
+   ],
+   "aliases": {
+    "WEB-711": [
+     "R1G-2"
+    ],
+    "WEB-712": [
+     "R1G-3"
+    ]
+   },
+   "commit": "Commits: the round's changes to `src/styles/global.css` (only the rules named here) and the tester's additions to `tests/ux-web-global.spec.ts` are this run's. No held file is touched.",
+   "files": [
+    "src/styles/global.css:287-291 (`.language-switch`)",
+    "src/styles/global.css:1021-1023 (the comment and the `@media (max-width: 1024px)` that opens the phone-menu block)",
+    "src/styles/global.css:857-865 (`.footer-top nav a`)",
+    "src/styles/global.css:131-135 (`.section-eyebrow > span`, dead)",
+    "tests/ux-web-global.spec.ts"
+   ],
+   "brief": [
+    "Two round-1 regressions of WP20, both Severity 1, plus two one-line tidy-ups in the same file. CSS only: no markup, copy, component or PAGES-table change.",
+    "WEB-711 (R1G-2): the language links sit 4 px apart. `src/styles/global.css:287-291` is `.language-switch { display: flex; flex-wrap: wrap; gap: 4px; }`. The same class draws the switch in the desktop header, the phone menu's first row and the footer, on every page (`src/components/LanguageSwitch.tsx:33`). `audit.json` (footer switch, mobile) measured boxes of 80 × 48, 85 × 48 and 75 × 48 with a 4 px gap; the conventions and CT-6 ask 8 px between neighbouring targets. Change `gap: 4px` to `gap: 8px`. Nothing else in the switch changes (min-height 48 px, padding, weights and the ring stay). The verifier measured about 32 px spare in the Catalan desktop header at 1025 px, so the extra 8 px (two gaps of 4) still fits; check it at 1025 and 1100 px in Catalan.",
+    "WEB-712 (R1G-3): at 200% browser text the desktop header wraps to two rows (the nav on row 1; the switch and theme toggle on row 2), about 130 px tall, which is more than `:root { scroll-padding-top: 105px }` (`global.css:34`), so in-page anchors would land under the sticky header (inferred from the sizes, not rendered). Renders: `artifacts/ux-web/home.en.desktop-text200.light.fold.png`, `home.ca.desktop-text200.light.fold.png`. Fix: write the phone-menu breakpoint at `global.css:1023` in em: `@media (max-width: 64em)`. Media-query em follows the browser's default text size, so this is 1024 px at default text (nothing changes at 100%) and 2048 px at 200%, and large-text desktops get the one-row header with the Menu button. Update the comment above it (`global.css:1021-1022`) to: `/* The phone menu, up to 64em (1024 px at default text, wider when the browser's text is larger): below that, the Catalan nav and the language switch don't fit on one row. */`. Leave every other breakpoint (1100, 800, 580, 360 px) and `scroll-padding-top` as they are. No JavaScript reads this breakpoint (checked: no `matchMedia` on it).",
+    "WEB-703, its footer part (the G verifier's note, not a regression): the footer nav's “Què fa” on `/ca/` is 43 × 44 px, 1 px under the conventions' 44 px floor. In `.footer-top nav a` (`global.css:857-865`) add `min-width: 44px; justify-content: center;`. Change nothing else there. The header logo's part of WEB-703 stays WP25's.",
+    "In passing (the F verifier's note): `.section-eyebrow > span` (`global.css:131-135`) no longer matches anything. WP19 removed the FAQ's `<span>04 /</span>`, its last user, and `LegalPage.tsx:128`'s eyebrow has no span. Delete that rule. Don't touch `.section-eyebrow` itself.",
+    "Tests: put the new checks in `tests/ux-web-global.spec.ts`, next to WP20's WEB-307 test (line 505), which must keep passing. For 200% text use the DevTools protocol as `tests/ux-web-frame.spec.ts:344-346` does (`Page.setFontSizes`, standard 32, fixed 26), measure while the setting is live, and run those checks in the desktop project only (skip them on mobile).",
+    "For the verifier: in the text200 renders use the fold PNG. The harness pins the root size after measuring, and a full-page screenshot resets the browser setting, so the full PNG can show the em breakpoint back at 1024 px.",
+    "Don't touch the header's markup, the menu's behaviour, the theme controls, the footer's other rules or anything WP25 owns (type sizes, the logo, tap feedback)."
+   ],
+   "acceptance": [
+    "On /, /es/ and /ca/ at 1440 × 1000 (light): the three header language links (`.header-languages .language-switch a`) are at least 8 px apart (each link's left edge minus the previous link's right edge is 8 or more), and each is at least 48 px tall.",
+    "On /, /es/ and /ca/ at 390 × 664 (light): with the menu open, the menu's language links, and the footer's language links, are each at least 8 px apart and at least 48 px tall.",
+    "WP20's test still passes: on /ca/ at 801, 1024 and 1100 px nothing scrolls sideways, and the header fits one row or shows the phone menu. Also on /ca/ at 1025 and 1100 px with default text: the desktop nav and the language switch are visible, the Menu button isn't, nothing scrolls sideways, and the header is at most 105 px tall (one row).",
+    "Desktop project, on /, /es/ and /ca/ at 1440 × 1000 with the browser's default font size at 32 px (Page.setFontSizes, live): the Menu button (`.header-menu summary`, “Menu” / “Menú” / “Menú”) is visible, `.desktop-nav` and `.header-languages` aren't, the header is at most 105 px tall, and after going to `#questions` (`/#questions`, `/es/#questions`, `/ca/#questions`) the top of `#questions-title` is at or below the header's bottom.",
+    "On /, /es/ and /ca/ at 1440 × 1000 with default text: the desktop nav is visible and the Menu button isn't, as before this round.",
+    "On /ca/ at 390 × 664 and at 1440 × 1000: every footer nav link (`.footer-top nav a`) is at least 44 × 44 px.",
+    "`src/styles/global.css` has no `.section-eyebrow > span` rule. axe reports no violations on /, /es/ and /ca/ at both sizes, in light and dark. `npm run check` and `npm test` pass.",
+    "Visual (verifier): `home.en.desktop-text200.light.fold.png` and `home.ca.desktop-text200.light.fold.png` show a one-row header with the logo and the Menu button. The 100% desktop renders of the three homes look as before this round, apart from the switch's wider gaps."
+   ],
+   "deviceChecks": [
+    "Desktop Chrome or Firefox with the browser's font size set to Very large (or 200%): the header is one row with the Menu button, and the menu's links land their sections below the header."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "WP38",
+   "title": "The 404 preloads the same font as every other page",
+   "area": "G",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "WEB-713"
+   ],
+   "aliases": {
+    "WEB-713": [
+     "R1G-1"
+    ]
+   },
+   "commit": "Held with WP22: the change depends on WP22's `next/font` block in `src/app/layout.tsx`, which stays uncommitted for the owner, so this package's lines stay uncommitted with it. Keep them separable: in `src/app/not-found.tsx` add only an import and one call (or one import), so WP21's lines there can still be committed without them. Tests go in `tests/ux-web-frame.spec.ts` (held with WP22). A new `src/app/fonts.ts`, if option 1 needs it, is held too.",
+   "files": [
+    "src/app/not-found.tsx (29 lines; WP21's, this run's)",
+    "src/app/layout.tsx:2 and 13-21 (WP22's `localFont` import, comment and block; held; never line 11, the other session's `legal.css` import) — option 1 only",
+    "src/app/fonts.ts (new) — option 1 only",
+    "tests/ux-web-frame.spec.ts"
+   ],
+   "brief": [
+    "WEB-713 (R1G-1, S1) is a regression of WP22. WP22 replaced the layout's manual TTF preload with `next/font/local` (`src/app/layout.tsx:17-21`, `manropeSubset`, `./fonts/Manrope-latin.woff2`). Next emits that font's preload on the pages but not on the 404. The built `.next/server/app/index.html` has `<link rel=\"preload\" href=\"/_next/static/media/Manrope_latin-s.p.1xbpjvy34wz9n.woff2\" as=\"font\" crossorigin=\"\" type=\"font/woff2\"/>`, and `.next/server/app/_not-found.html` has none. AUDIT §2 (lab): on every 404 the font arrives 1202–1293 ms after first paint, and the text reflows (CLS 0.021–0.028, from `div.not-found-links`) just as a leaver reaches for “Eliminar cuenta”. The `/es/` 404's LCP was 2.96 s (one run). Every other page has CLS 0.000.",
+    "Goal: the 404, in every language, gets the same woff2 preload as the other pages, with the same href, so the browser downloads one font file, the same one as on the home. Change nothing else on the 404: not its copy, its order, its inline language script, its metadata or its CSS.",
+    "Option 1 (try first): move the `localFont({...})` call and its comment (`layout.tsx:13-21`) out of `layout.tsx` into a new `src/app/fonts.ts` that exports `manropeSubset`. Keep that exact constant name: the comment explains that a constant named `manrope` would match global.css's `@font-face \"Manrope\"` and fetch the TTF too. `layout.tsx` imports it from there in place of line 2 and lines 13-21, and `not-found.tsx` imports it too (it needn't apply the class; the layout's `<body className>` already does). Run `npm run build`, then look for the preload in `.next/server/app/_not-found.html` and in the response for `/es/ux-renders-missing-page/`.",
+    "Option 2, if option 1 doesn't make Next emit it: first undo your option-1 move, so `layout.tsx` is exactly as WP22 left it and `src/app/fonts.ts` doesn't exist. Then, in `not-found.tsx`, `import { preload } from \"react-dom\";` and inside `NotFound()` call `preload(FONT_URL, { as: \"font\", type: \"font/woff2\", crossOrigin: \"anonymous\" })`, where `FONT_URL` is the built href that `index.html` preloads (today `/_next/static/media/Manrope_latin-s.p.1xbpjvy34wz9n.woff2`). Add a one-line comment saying it must equal the layout font's built URL and that `tests/ux-web-frame.spec.ts` checks it. The hash comes from the file's content, so it changes only if the woff2 changes, and the test then fails.",
+    "Don't add a second `localFont` declaration of the same file (it creates a second family). Don't import the woff2 as a static asset (that emits a second URL and a second download). Don't touch `global.css`'s `@font-face` or `public/fonts/Manrope.ttf` (WP22's follow-up for the owner).",
+    "Say in your notes which option worked and, if it was option 2, what option 1 produced."
+   ],
+   "acceptance": [
+    "On /ux-renders-missing-page/, /es/ux-renders-missing-page/ and /ca/ux-renders-missing-page/ (status 404), at 1440 × 1000 and 390 × 664: the response HTML's `<head>` holds exactly one `<link rel=\"preload\" as=\"font\" type=\"font/woff2\">` with `crossorigin`, and its href equals the woff2 preload href in the response for `/`.",
+    "On the same three 404s, after load: exactly one font file is downloaded, it has the same URL as on `/`, its `PerformanceResourceTiming.initiatorType` is `link`, and no `.ttf` is requested.",
+    "On /, /es/ and /ca/: still exactly one woff2 preload in `<head>` (no duplicate) and one font download.",
+    "On the three 404s, in light and dark: the h1 is in the address's language (“Page not found” / “Página no encontrada” / “No hem trobat aquesta pàgina”), as WP21 left it, and axe reports no violations. `npm run check` and `npm test` pass.",
+    "Verifier, after `npm run build`: `.next/server/app/_not-found.html` contains the woff2 preload. AUDIT §2's not-found rows (lab) no longer say the font “arrives … after FCP”, and they show CLS 0.000."
+   ],
+   "deviceChecks": [
+    "After a deploy, on an Android phone on mobile data: a broken link such as taskflow.garbar.tech/es/no-existe draws in Manrope from the start, with no visible jump."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": [],
+ "escalated": []
+}

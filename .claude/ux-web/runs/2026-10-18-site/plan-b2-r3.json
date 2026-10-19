@@ -1,0 +1,17 @@
+{
+  "runId": "2026-10-18-site",
+  "mode": "replan",
+  "created": "2026-10-19",
+  "round": 3,
+  "batch": "b2",
+  "conventions": [],
+  "note": "No round-3 packages. The workflow listed WEB-711, WEB-712, WEB-703 (footer part) and WEB-713 as unchecked because the G verifier's structured result didn't reach it, but the verifier's notes (verify-b2-r2-G.md, 12:51, written after the 12:42-12:48 renders and the tester's run) judge all four fixed, with measured evidence, and find no regressions. The tester reported no failures and the round check passed. Re-running WP37 and WP38 would redo finished work. The close step should take the verdicts from verify-b2-r2-G.md. Conventions stay those of plan.json.",
+  "packages": [],
+  "decisions": [],
+  "skipped": [
+    {"id": "WEB-711", "reason": "already fixed: verify-b2-r2-G.md says fixed (gap 8 px, measured in audit.json on header and footer switches; tests at tests/ux-web-global.spec.ts:764 and :792-809). Not re-planned."},
+    {"id": "WEB-712", "reason": "already fixed: verify-b2-r2-G.md says fixed (@media (max-width: 64em), comment as briefed; text200 fold renders show a one-row header with Menu; anchor test at tests/ux-web-global.spec.ts:811-863). Device check stays: a desktop browser at Very large text."},
+    {"id": "WEB-703", "reason": "footer part already fixed: verify-b2-r2-G.md says fixed (“Què fa” 44 × 44 at 1440 and 390; test at tests/ux-web-global.spec.ts:880). The header-logo part stays WP25's, so the finding stays open for WP25."},
+    {"id": "WEB-713", "reason": "already fixed (option 2): verify-b2-r2-G.md says fixed (_not-found.html holds the same woff2 preload as index.html, es.html and ca.html; AUDIT §2 not-found CLS 0.000; tests at tests/ux-web-frame.spec.ts:393-470). Held with WP22's layout.tsx. Device check stays: a 404 on a phone on mobile data after a deploy."}
+  ]
+}

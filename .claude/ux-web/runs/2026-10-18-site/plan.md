@@ -298,3 +298,53 @@ This is the re-plan after batch 1's second round (WP33–WP35), made on 2026-10-
 
 ### For the main session
 - `src/proxy.ts` stays held uncommitted until WP20 commits, as in round 2.
+
+## Round 2 (b2)
+
+This is the re-plan after batch 2's first round (WP19–WP23), made on 2026-10-19. The round check passed and no test failed. Every finding in WP19–WP23 came back fixed (or fixed in its parts for this batch). The G verifier reported three Severity 1 regressions, now WEB-711, WEB-712 and WEB-713. This round has two packages, no new decisions and no escalations. Full briefs: `plan-b2-r2.json`. Both run before WP24.
+
+### WP37 · Language links 8 px apart; large-text desktops get the Menu · G · S · commits · S1
+- WEB-711 (R1G-2), a regression of WP20: `.language-switch` goes from `gap: 4px` to `gap: 8px` (header, phone menu, footer). The Catalan header still fits at 1025 px.
+- WEB-712 (R1G-3), a regression of WP20: the phone-menu breakpoint is written as `@media (max-width: 64em)`. That's the same 1024 px at default text, and large-text desktops get the one-row header with Menu instead of a two-row header taller than the anchor offset.
+- WEB-703 (its footer part, from the G verifier's note): `.footer-top nav a` gets `min-width: 44px`, because “Què fa” was 43 px wide. The logo's part stays WP25's.
+- In passing: the dead `.section-eyebrow > span` rule goes (F verifier's note).
+
+### WP38 · The 404 preloads the same font as every other page · G · S · **held** (with WP22's layout.tsx) · S1
+- WEB-713 (R1G-1), a regression of WP22: `next/font` emits no font preload for `_not-found`, so the font arrives about 1.2 s late and the links shift (CLS 0.021–0.028). Option 1 is a shared `src/app/fonts.ts` imported by the layout and the 404. Option 2 is `ReactDOM.preload` of the same built URL from `not-found.tsx`, guarded by a test that it equals the home's preload. Either way it's one download, the same file as the home.
+
+### Noted, not planned
+- “Idioma” labels two navigation landmarks on desktop. That's correct: the WAI-ARIA APG says identical link sets share a label.
+- The 404's description and preview are the English home's on `/es/` and `/ca/`. A 404 isn't indexed or shared.
+- The legal pages' `twitter:title` is the English home's. This isn't new; WP30 owns legal metadata.
+- The menu panel sits 8 px inside the Menu button's edge at 801–1100 px. Cosmetic, and the verifier didn't report it.
+- The Catalan 404's title (“No hem trobat la pàgina”) and its h1 (“No hem trobat aquesta pàgina”) differ. Both are the brief's copy; a native reader can settle it.
+- The FAQ's left column on desktop holds only the one-word heading. That was the brief's subtraction, and it reads fine.
+
+### For the main session
+- WP38's lines stay uncommitted with `src/app/layout.tsx` (WP22, held). WP21's own lines in `not-found.tsx` can still commit; the brief keeps WP38's change there to an import and one call.
+- For a native Catalan read: the frame, 404 and metadata strings listed in `verify-b2-r1-G.md` (“Catalan for a native read”), and WP19's «Puc desar notes a més de tasques?» and «La puc fer servir sense connexió?».
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Round 3 (b2)
+
+This is the re-plan after batch 2's second round (WP37, WP38), made on 2026-10-19. There are no round-3 packages, no new decisions, no escalations and no regressions. `plan-b2-r3.json` records this with empty `packages`.
+
+The workflow passed WEB-711, WEB-712, WEB-703 (footer part) and WEB-713 back as "not checked by the reviewer", because the G verifier's structured result didn't reach it. The verifier's notes, `verify-b2-r2-G.md`, judge all four fixed with measured evidence, and find no regressions in `src/styles/global.css` or `src/app/not-found.tsx`. The tester reported no failures and the round check passed. So nothing failed, and re-running WP37 and WP38 would only redo finished work.
+
+### Not re-planned (fixed per `verify-b2-r2-G.md`)
+- WEB-711: `.language-switch` gap is 8 px; `audit.json` measures 8 px between links in the header and footer switches. Tests: `tests/ux-web-global.spec.ts:764`, `:792-809`.
+- WEB-712: the phone-menu block opens `@media (max-width: 64em)`; the text200 fold renders (home en/ca, privacy es, not-found ca) show a one-row header with Menu. Anchor test: `tests/ux-web-global.spec.ts:811-863`. A desktop browser at Very large text still needs a person to check it.
+- WEB-703 (footer part): “Què fa” is 44 × 44 at 1440 and 390. Test: `tests/ux-web-global.spec.ts:880`. The finding stays open for the logo part, which is WP25's.
+- In passing: `.section-eyebrow > span` is gone.
+- WEB-713: option 2 worked. Option 1 couldn't work in Next 16.4: the font manifest keys the woff2 under `_not-found/page`, and the 404 looks fonts up by `layout` and `not-found`. `_not-found.html` now has the same woff2 preload as `index.html`, `es.html` and `ca.html`; AUDIT §2 shows not-found CLS 0.000. Tests: `tests/ux-web-frame.spec.ts:393-470`. Held with WP22's `layout.tsx`. A 404 on a phone on mobile data, after a deploy, still needs a device check.
+
+### Noted, not planned
+- At 200% text on desktop, the hero's secondary link (“What it does” / “Què fa”) wraps onto two lines, with its chevron set apart (`home.*.desktop-text200.light.fold.png`). The WP37 implementer and the G verifier both saw it. It's the hero's layout under px breakpoints, not this round's files. It belongs to WP25's type work (WEB-8, WEB-309): pass it to WP25's implementer as a note, and to its verifier to check.
+- The 404 now hard-codes the hashed woff2 URL. That's a maintenance coupling, not something visitors see, and `tests/ux-web-frame.spec.ts:393` fails if the URL drifts from the home's.
+- At 200% text the theme toggle moves into the menu (`.appearance-choice`), so nothing is lost. Nothing renders the menu open at 200% on desktop; the verifier inferred from the CSS that it fits.
+- The tester's selector note: `LanguageSwitch` puts both classes on one `<nav>`, so the selector is `.header-languages.language-switch a`, not the descendant form in WP37's acceptance.
+
+### For the main session
+- In close, take WEB-711, WEB-712, WEB-713 and WEB-703's footer part from `verify-b2-r2-G.md` (fixed, and no test failed). Don't count them as unchecked.
+- WP38's two lines in `src/app/not-found.tsx` stay uncommitted with WP22's `layout.tsx`, which is held. WP21's own lines there can commit apart from them. `src/app/fonts.ts` doesn't exist, and `layout.tsx` is as WP22 left it.
+- WP37 changed only this run's rules in `src/styles/global.css` and adds tests in `tests/ux-web-global.spec.ts`. Both can commit.
