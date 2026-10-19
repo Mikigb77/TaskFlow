@@ -1396,6 +1396,18 @@ abstract class AppLocalizations {
   /// **'Try a different word or filter.'**
   String get differentFilter;
 
+  /// Empty-state title on a shared project's page when only a person's chip filters it and that person has no open tasks assigned in this project. {name} is the name on the chip.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} has nothing open here'**
+  String personNothingOpen(String name);
+
+  /// Empty-state message under personNothingOpen. 'All' names the chip forTeam, which shows every task of the project.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap All to see every task.'**
+  String get personNothingOpenHelp;
+
   /// No description provided for @listEmpty.
   ///
   /// In en, this message translates to:
@@ -2638,6 +2650,12 @@ abstract class AppLocalizations {
   /// **'Confirm'**
   String get verifyEmailConfirm;
 
+  /// What TalkBack reads for the spinner inside the Confirm button (verifyEmailConfirm) while the code is being checked.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming'**
+  String get verifyEmailConfirming;
+
   /// Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn.
   ///
   /// In en, this message translates to:
@@ -2650,10 +2668,10 @@ abstract class AppLocalizations {
   /// **'{seconds, plural, =1{Resend code in 1 second} other{Resend code in {seconds} seconds}}'**
   String verifyEmailResendIn(int seconds);
 
-  /// Under the code field after a new code was emailed.
+  /// Under the code field after a new code was emailed, when the person has shown they didn’t get the first one. Names the mail folders where codes often land, as Gmail names them in the language (Spam and Promotions in English).
   ///
   /// In en, this message translates to:
-  /// **'We’ve sent you a new code'**
+  /// **'We’ve sent you a new code. If you can’t see it, check Spam or Promotions.'**
   String get verifyEmailResent;
 
   /// Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line.
@@ -5488,6 +5506,12 @@ abstract class AppLocalizations {
   /// **'Created by {name}'**
   String createdBy(String name);
 
+  /// On a task's or note's details page in a shared project, in place of “Created by {name}” when the signed-in account created it; the same screen calls that account “Me” in who it's for.
+  ///
+  /// In en, this message translates to:
+  /// **'Created by you'**
+  String get createdByYou;
+
   /// Title of a sheet shown at most once a month: the first time an account without Pro taps New task with this month's free dictations used up. {limit} is the account's monthly free dictations (10).
   ///
   /// In en, this message translates to:
@@ -5497,7 +5521,7 @@ abstract class AppLocalizations {
   /// Under that title. {limit} is how many free dictations come back, and {date} the local short date they do.
   ///
   /// In en, this message translates to:
-  /// **'You can keep creating tasks with the form, with no limit. {limit, plural, =1{You’ll get 1 more dictation on {date}.} other{You’ll get {limit} more dictations on {date}.}}'**
+  /// **'You can keep creating tasks by hand, with no limit. {limit, plural, =1{On {date} you’ll get 1 more dictation.} other{On {date} you’ll get {limit} more dictations.}}'**
   String freeVoiceNoticeBody(int limit, String date);
 
   /// That sheet's main button: opens the task form. Its other button is voiceProAction.
@@ -5758,11 +5782,29 @@ abstract class AppLocalizations {
   /// **'Your account has been deleted.'**
   String get accountDeleted;
 
-  /// A dictation's result: the card of a project the confirming tap creates, and the project chip of a task that goes into it. {name} is the project's name as said.
+  /// A dictation's result: the card of a project the confirming tap creates, and the row for it in a task's project sheet (the chip uses commandNewProjectChip). {name} is the project's name as said.
   ///
   /// In en, this message translates to:
   /// **'New project: {name}'**
   String commandNewProject(String name);
+
+  /// A dictation's result: the project chip of a task that goes into a project the confirming tap creates, name first so it shows at large text. {name} is the project's name as said, or as corrected.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (new)'**
+  String commandNewProjectChip(String name);
+
+  /// The button of the dialog that corrects the name of a project a dictation creates, opened from the task's project sheet. Nothing is created until the result's confirming tap.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this name'**
+  String get commandUseName;
+
+  /// TalkBack name of the pencil on the project sheet's row for a project a dictation creates; a tap on the row opens the dialog that corrects that project's name. Nothing is created until the result's confirming tap.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the name'**
+  String get commandRenameProject;
 
   /// A dictation's result, when the project the person asked to create already exists: nothing is created. {name} is that project's real name.
   ///
@@ -6028,11 +6070,17 @@ abstract class AppLocalizations {
   /// **'{hour, plural, other{Which day, at {time}?}}'**
   String commandWhichDay(int hour, String time);
 
-  /// A dictation named someone for a task, who can't be its assignee because they aren't in its shared project (or the project is new and has nobody yet). The task is left as it is. {name} is the name as said; {project} the project.
+  /// A dictation named someone for a task, who can't be its assignee because they aren't in its existing shared project (a new project uses commandMemberNotInNew). The task is left as it is. {name} is the name as said; {project} the project.
   ///
   /// In en, this message translates to:
   /// **'{name} isn’t in “{project}”'**
   String commandMemberNotIn(String name, String project);
+
+  /// A dictation named someone for a task going into a project the confirming tap creates, which has nobody yet. The task stays the account's own; the next step is the project page's Share button. {name} is the name as said; {project} the new project.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} isn’t in “{project}” yet. Afterwards, share the project with {name}.'**
+  String commandMemberNotInNew(String name, String project);
 
   /// A dictation named someone for a task that isn't in a shared project: the assignee stays as it is.
   ///

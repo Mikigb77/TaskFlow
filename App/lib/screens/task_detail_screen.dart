@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -142,8 +143,12 @@ class TaskDetailScreen extends ConsumerWidget {
             final projects = ref.watch(taskListsProvider).valueOrNull;
             final hasProjects = projects?.isNotEmpty == true;
             // Who created it, in a shared project only. No name: the
-            // account has left the project or been deleted.
+            // account has left the project or been deleted. The signed-in
+            // account is «ti», as who it's for calls it «Yo».
             final creator = task.createdByName?.trim() ?? '';
+            final mine =
+                task.createdBy != null &&
+                task.createdBy == ref.watch(authProvider).account?.id;
             final project = projects?.firstWhereOrNull(
               (p) => p.id == task.listId,
             );
@@ -233,7 +238,9 @@ class TaskDetailScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        context.l10n.createdBy(creator),
+                        mine
+                            ? context.l10n.createdByYou
+                            : context.l10n.createdBy(creator),
                         key: const ValueKey('task-created-by'),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),

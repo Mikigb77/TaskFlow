@@ -795,6 +795,14 @@ class AppLocalizationsCa extends AppLocalizations {
   String get differentFilter => 'Prova una altra paraula o un altre filtre.';
 
   @override
+  String personNothingOpen(String name) {
+    return '$name no té tasques pendents aquí';
+  }
+
+  @override
+  String get personNothingOpenHelp => 'Toca Totes per veure totes les tasques.';
+
+  @override
   String get listEmpty =>
       'Afegeix una tasca a aquest projecte. Tu tries la data i el recordatori.';
 
@@ -1548,6 +1556,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get verifyEmailConfirm => 'Confirma';
 
   @override
+  String get verifyEmailConfirming => 'S’està confirmant';
+
+  @override
   String get verifyEmailResend => 'Torna a enviar el codi';
 
   @override
@@ -1562,7 +1573,8 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get verifyEmailResent => 'T’hem enviat un codi nou';
+  String get verifyEmailResent =>
+      'T’hem enviat un codi nou. Si no el veus, mira a Correu brossa o a Promocions.';
 
   @override
   String get verifyEmailCodeInvalid =>
@@ -3579,6 +3591,9 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String get createdByYou => 'Creada per tu';
+
+  @override
   String freeVoiceNoticeTitle(int limit) {
     String _temp0 = intl.Intl.pluralLogic(
       limit,
@@ -3597,7 +3612,7 @@ class AppLocalizationsCa extends AppLocalizations {
       other: 'El dia $date tindràs $limit dictats més.',
       one: 'El dia $date tindràs 1 dictat més.',
     );
-    return 'Pots continuar creant tasques amb el formulari, sense límit. $_temp0';
+    return 'Pots continuar creant tasques a mà, sense límit. $_temp0';
   }
 
   @override
@@ -3830,6 +3845,17 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String commandNewProjectChip(String name) {
+    return '$name (nou)';
+  }
+
+  @override
+  String get commandUseName => 'Fes servir aquest nom';
+
+  @override
+  String get commandRenameProject => 'Canvia el nom';
+
+  @override
   String commandExistingProject(String name) {
     return 'Ja tens «$name»';
   }
@@ -4044,6 +4070,11 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String commandMemberNotIn(String name, String project) {
     return '$name no és a «$project»';
+  }
+
+  @override
+  String commandMemberNotInNew(String name, String project) {
+    return '$name encara no és a «$project». Després, comparteix el projecte amb $name.';
   }
 
   @override

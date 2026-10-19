@@ -597,8 +597,11 @@ class FindCommandCard extends ConsumerWidget {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute<void>(
-                    builder: (_) =>
-                        HomeScreen(isRoot: false, listId: project.id),
+                    builder: (_) => HomeScreen(
+                      isRoot: false,
+                      listId: project.id,
+                      person: command.personId,
+                    ),
                   ),
                 ),
                 icon: const Icon(Icons.folder_open_outlined, size: 18),

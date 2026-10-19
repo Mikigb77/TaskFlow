@@ -11,6 +11,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -418,6 +419,71 @@ void main() {
       }
     },
   );
+
+  // Run 2026-10-18-commands, b3 · P144 (UX-1012): chip borders that can be
+  // seen, in the app's own themes.
+  for (final (name, theme) in [
+    ('light', AppTheme.light),
+    ('dark', AppTheme.dark),
+  ]) {
+    testWidgets(
+      'UX-1012: an unselected ChoiceChip’s and an ActionChip’s border is colorScheme.outline, at least 3:1 against colorScheme.surface ($name)',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: Column(
+                children: [
+                  ChoiceChip(
+                    key: const ValueKey('choice'),
+                    label: const Text('Mañana'),
+                    selected: false,
+                    onSelected: (_) {},
+                  ),
+                  ActionChip(
+                    key: const ValueKey('action'),
+                    label: const Text('Añadir hora'),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        final scheme = theme.colorScheme;
+        expect(
+          _contrast(scheme.outline, scheme.surface),
+          greaterThanOrEqualTo(3),
+          reason: 'outline on surface',
+        );
+        for (final key in ['choice', 'action']) {
+          // The chip draws its border as its Material's shape side.
+          final material = tester.widget<Material>(
+            find
+                .descendant(
+                  of: find.byKey(ValueKey(key)),
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Material && widget.shape is OutlinedBorder,
+                  ),
+                )
+                .first,
+          );
+          final side = (material.shape! as OutlinedBorder).side;
+          expect(side.style, BorderStyle.solid, reason: key);
+          expect(side.width, greaterThan(0), reason: key);
+          expect(side.color, scheme.outline, reason: '$key, $name');
+          expect(
+            _contrast(side.color, scheme.surface),
+            greaterThanOrEqualTo(3),
+            reason: '$key border on surface, $name',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'UX-413 / UX-421: the selected tab label is bolder and darker, 12 sp, in both themes',

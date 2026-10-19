@@ -34,6 +34,10 @@ How the loop runs until he's back:
   - With commands: median 3.5 s, p95 3.8 s. Without: median 4.3 s, p95 4.6 s.
   - All 24 gave one task and no false commands.
 
+- **D12 (UX-1227, from b3's round 2):** in «Elegir día», after a year pick Flutter keeps the same day of the new year highlighted, though nothing was applied. Accepted as Flutter's own behaviour; no custom month display.
+  - Why: nothing is lost, the form's chip shows the real day, and a custom calendar adds code and risk.
+  - Revisit if the phone check (report-b3.md, check 4) shows people pausing on it.
+
 **Other open items, decided:**
 - **Cleaning up completed tasks** (the owner floated 1 month on free, 3 months on Pro): **none for now**, so nothing is ever deleted on its own.
   - Why: it deletes people's history irreversibly, voice search now finds completed tasks (decided earlier today), the privacy page he approved promises the opposite, and a free plan shouldn't lose data.

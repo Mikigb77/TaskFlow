@@ -17,6 +17,9 @@ Color taskListColor(String color) => switch (color) {
 /// Sheet result for the "New project" row; project ids are UUIDs.
 const _newProject = '+new';
 
+/// Sheet result for the dictated project's row: its name is corrected.
+const _renameProject = '+rename';
+
 /// A pick in the project sheet: a project, or none.
 typedef TaskListChoice = ({TaskListInfo? project});
 
@@ -25,6 +28,8 @@ typedef TaskListChoice = ({TaskListInfo? project});
 /// [none], it offers no project too. Null when it is closed without a pick.
 /// «Sin proyecto» shows as chosen only when [selectedNone] is true and
 /// there is no [listId] or [newName]; false while a card still asks.
+/// With [onRename], a tap on [newName]'s row corrects its name, and the
+/// sheet returns null.
 Future<TaskListChoice?> chooseTaskList(
   BuildContext context,
   WidgetRef ref, {
@@ -32,7 +37,9 @@ Future<TaskListChoice?> chooseTaskList(
   String? newName,
   bool none = true,
   bool selectedNone = true,
+  ValueChanged<String>? onRename,
 }) async {
+  final creating = newName != null && listId == null;
   final lists = ref.read(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
   final choices = lists
       .where((list) => list.canEdit && (!list.inactive || list.id == listId))
@@ -44,13 +51,23 @@ Future<TaskListChoice?> chooseTaskList(
         shrinkWrap: true,
         children: [
           ListTile(title: Text(context.l10n.list)),
-          // Keeping it closes the sheet as it is.
-          if (newName != null && listId == null)
+          // A tap opens its name to correct; nothing is created yet.
+          if (creating)
             ListTile(
               leading: const Icon(Icons.create_new_folder_outlined),
               title: Text(context.l10n.commandNewProject(newName)),
+              trailing: onRename == null
+                  ? null
+                  : Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      semanticLabel: context.l10n.commandRenameProject,
+                    ),
               selected: true,
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.pop(
+                context,
+                onRename == null ? null : _renameProject,
+              ),
             ),
           if (none)
             ListTile(
@@ -74,7 +91,8 @@ Future<TaskListChoice?> chooseTaskList(
               selected: listId == list.id,
               onTap: () => Navigator.pop(context, list.id),
             ),
-          if (choices.isEmpty)
+          // The dictated project is already the new one.
+          if (choices.isEmpty && !creating)
             ListTile(
               leading: const Icon(Icons.add_rounded),
               title: Text(context.l10n.newList),
@@ -85,11 +103,75 @@ Future<TaskListChoice?> chooseTaskList(
     ),
   );
   if (chosen == null || !context.mounted) return null;
+  if (chosen == _renameProject) {
+    final name = await _correctName(context, newName!);
+    if (name != null && name != newName.trim()) onRename!(name);
+    return null;
+  }
   if (chosen == _newProject) {
     final project = await editTaskList(context, ref);
     return project == null ? null : (project: project);
   }
   return (project: lists.where((list) => list.id == chosen).firstOrNull);
+}
+
+/// The name of a project a dictation creates, to correct: the name, or null
+/// when cancelled.
+Future<String?> _correctName(BuildContext context, String name) =>
+    showDialog<String>(
+      context: context,
+      builder: (context) => _ProjectNameDialog(name: name),
+    );
+
+class _ProjectNameDialog extends StatefulWidget {
+  const _ProjectNameDialog({required this.name});
+  final String name;
+
+  @override
+  State<_ProjectNameDialog> createState() => _ProjectNameDialogState();
+}
+
+class _ProjectNameDialogState extends State<_ProjectNameDialog> {
+  // Selected, so typing replaces a misheard name.
+  late final _name = TextEditingController(text: widget.name)
+    ..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.name.length,
+    );
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: Text(context.l10n.newList),
+    content: TextField(
+      key: const ValueKey('new-project-name'),
+      controller: _name,
+      maxLength: 80,
+      autofocus: true,
+      decoration: InputDecoration(labelText: context.l10n.listName),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(context.l10n.cancel),
+      ),
+      ValueListenableBuilder(
+        valueListenable: _name,
+        builder: (context, value, _) => FilledButton(
+          onPressed: value.text.trim().isEmpty
+              ? null
+              : () => Navigator.pop(context, _name.text.trim()),
+          child: Text(context.l10n.commandUseName),
+        ),
+      ),
+    ],
+  );
 }
 
 class TaskListPicker extends ConsumerWidget {
@@ -100,6 +182,7 @@ class TaskListPicker extends ConsumerWidget {
     this.asRow = false,
     this.lockShared = false,
     this.newName,
+    this.onRename,
   });
   final String? listId;
   final ValueChanged<TaskListInfo?>? onChanged;
@@ -113,6 +196,9 @@ class TaskListPicker extends ConsumerWidget {
   /// name, and chosen in the sheet, until another is picked.
   final String? newName;
 
+  /// [newName] corrected in the sheet. Nothing is created yet.
+  final ValueChanged<String>? onRename;
+
   Future<void> _choose(
     BuildContext context,
     WidgetRef ref,
@@ -123,6 +209,7 @@ class TaskListPicker extends ConsumerWidget {
       ref,
       listId: listId,
       newName: newName,
+      onRename: onRename,
     );
     if (choice == null || !context.mounted) return;
     final project = choice.project;
@@ -161,7 +248,10 @@ class TaskListPicker extends ConsumerWidget {
     final name =
         selected?.name ??
         (creating
-            ? context.l10n.commandNewProject(newName!)
+            // The chip's name comes first, so it shows at large text.
+            ? asRow
+                  ? context.l10n.commandNewProject(newName!)
+                  : context.l10n.commandNewProjectChip(newName!)
             : listId == null
             ? context.l10n.noList
             : context.l10n.listUnavailable);

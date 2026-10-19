@@ -380,6 +380,7 @@ class CaptureCommand {
   }
 
   CaptureCommand copyWith({
+    String? name,
     bool? removed,
     bool? done,
     int? taskId,
@@ -394,7 +395,7 @@ class CaptureCommand {
     id: id,
     kind: kind,
     issues: issues,
-    name: name,
+    name: name ?? this.name,
     existingListId: existingListId,
     words: words,
     listId: listId,

@@ -72,6 +72,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   // half-typed step across `Más detalles`.
   final _steps = GlobalKey();
   late final TextEditingController _title;
+  // Caps the title at three lines only while typing in it.
+  final _titleFocus = FocusNode();
   late final TextEditingController _notes;
   late final TextEditingController _labels;
   String? _listId;
@@ -256,6 +258,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   @override
   void initState() {
     super.initState();
+    _titleFocus.addListener(_titleFocusChanged);
     final task = widget.task;
     _isNote = task.isNote;
     _detailsExpanded = false;
@@ -298,24 +301,47 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
 
   @override
   void dispose() {
+    _titleFocus.dispose();
     _title.dispose();
     _notes.dispose();
     _labels.dispose();
     super.dispose();
   }
 
-  /// The date sheet. For a new task, [applyDays] makes its Hoy, Mañana and
-  /// Sin fecha apply at once, as on a capture's result.
-  Future<void> _pickDate({bool applyDays = false}) async {
+  /// The edit form's date sheet.
+  Future<void> _pickDate() async {
     final result = await editSchedule(
       context,
       date: _dueDate,
       hasTime: _hasTime,
-      applyDays: applyDays,
     );
     if (result == null || !mounted) return;
     _schedule(result.date, result.hasTime);
   }
+
+  /// A new task's «Elegir día»: a sheet with only days, where the day
+  /// tapped applies at once and a time already chosen stays.
+  Future<void> _pickDay() async {
+    _dropKeyboard();
+    final result = await editSchedule(
+      context,
+      date: _dueDate,
+      hasTime: false,
+      dayOnly: true,
+    );
+    if (result == null || !mounted) return;
+    _setDay(result.date);
+  }
+
+  /// A new task's day and time chips first put the keyboard away, so the
+  /// rest of the form shows. Unfocusing the field itself, not the form's
+  /// scope, keeps a sheet or picker from giving it the focus back when it
+  /// closes; tapping the title brings the keyboard back.
+  void _titleFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _dropKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
 
   void _schedule(DateTime? date, bool hasTime) => setState(() {
     _dueDate = date;
@@ -342,14 +368,17 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     );
   }
 
-  /// A new task's time, on its day: the phone's own time picker, as for a
-  /// reminder's time. It starts on the next full hour.
+  /// A new task's time, on its day: the phone's time picker, opened on its
+  /// number boxes, so the hour and minutes go in on the number keys. It
+  /// starts on the next full hour.
   Future<void> _pickTime() async {
     final day = _dueDate;
     if (day == null) return;
+    _dropKeyboard();
     final next = (TimeOfDay.now().hour + 1) % 24;
     final picked = await showTimePicker(
       context: context,
+      initialEntryMode: TimePickerEntryMode.input,
       initialTime: _hasTime
           ? TimeOfDay.fromDateTime(day)
           : TimeOfDay(hour: next, minute: 0),
@@ -619,14 +648,19 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  local
-                      ? context.l10n.fileLocalHelp
-                      : context.l10n.fileUploadHelp,
-                ),
-              ),
+              // A new task has no older files to explain: its two rows
+              // speak for themselves.
+              if (!_creating)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    local
+                        ? context.l10n.fileLocalHelp
+                        : context.l10n.fileUploadHelp,
+                  ),
+                )
+              else
+                const SizedBox(height: 12),
               ListTile(
                 leading: const Icon(Icons.photo_outlined),
                 title: Text(context.l10n.choosePhoto),
@@ -732,8 +766,14 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         key: const ValueKey('task-title'),
                         controller: _title,
                         // A new task opens with the keyboard up. Its Done key
-                        // only closes the keyboard: the day comes next.
+                        // only closes the keyboard: the day comes next. While
+                        // typing, a long title wraps up to three lines so the
+                        // days still show; without the focus it shows whole.
+                        focusNode: _titleFocus,
                         autofocus: _creating,
+                        minLines: 1,
+                        maxLines: _titleFocus.hasFocus ? 3 : null,
+                        keyboardType: TextInputType.text,
                         textInputAction: _isNote
                             ? TextInputAction.next
                             : TextInputAction.done,
@@ -845,6 +885,19 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         ),
                       ),
                       if (!_detailsExpanded) ...[
+                        // A new task keeps showing the details that hold
+                        // something: notes with text, its files, a chosen
+                        // project. Empty ones wait in Más detalles.
+                        if (_creating &&
+                            !_notesUpFront &&
+                            _notes.text.trim().isNotEmpty) ...[
+                          _notesField(),
+                          const SizedBox(height: 16),
+                        ],
+                        if (_creating && _attachments.isNotEmpty) ...[
+                          ..._files(colors, add: false),
+                          const SizedBox(height: 8),
+                        ],
                         // What Más detalles holds, as plain text.
                         if (_deadline != null ||
                             _priority > 1 ||
@@ -873,6 +926,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             onChanged: (items) =>
                                 setState(() => _checklist = items),
                           ),
+                        if (_creating &&
+                            !_projectUpFront &&
+                            _listId != null) ...[
+                          const SizedBox(height: 8),
+                          _project(),
+                        ],
                       ],
                       // A new task's details: notes and files first, as the
                       // owner listed them, then reminder, repeat, steps and
@@ -1124,7 +1183,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
               selected: day == today,
               onSelected: _saving
                   ? null
-                  : (selected) => _setDay(selected ? today : null),
+                  : (selected) {
+                      _dropKeyboard();
+                      _setDay(selected ? today : null);
+                    },
             ),
             ChoiceChip(
               key: const ValueKey('new-task-tomorrow'),
@@ -1132,16 +1194,17 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
               selected: day == tomorrow,
               onSelected: _saving
                   ? null
-                  : (selected) => _setDay(selected ? tomorrow : null),
+                  : (selected) {
+                      _dropKeyboard();
+                      _setDay(selected ? tomorrow : null);
+                    },
             ),
             ChoiceChip(
               key: const ValueKey('new-task-pick-day'),
               avatar: const Icon(Icons.calendar_today_outlined, size: icon),
               label: Text(other ? context.weekdayDate(day) : l.pickDay),
               selected: other,
-              onSelected: _saving
-                  ? null
-                  : (_) => unawaited(_pickDate(applyDays: true)),
+              onSelected: _saving ? null : (_) => unawaited(_pickDay()),
             ),
           ],
         ),
@@ -1155,7 +1218,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
               onPressed: _saving ? null : () => unawaited(_pickTime()),
               onDeleted: _saving
                   ? null
-                  : () => _schedule(Task.day(_dueDate!), false),
+                  : () {
+                      _dropKeyboard();
+                      _schedule(Task.day(_dueDate!), false);
+                    },
               deleteButtonTooltipMessage: l.removeTime,
             )
           else
@@ -1207,9 +1273,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     onChanged: (items) => setState(() => _checklist = items),
   );
 
-  /// The files, and the button that adds one. A new task's file is kept on
-  /// the phone with the task, and goes up once the task reaches the server.
-  List<Widget> _files(ColorScheme colors) => [
+  /// The files, and, unless [add] is false, the button that adds one. A new
+  /// task's file is kept on the phone with the task, and goes up once the
+  /// task reaches the server.
+  List<Widget> _files(ColorScheme colors, {bool add = true}) => [
     if (_attachments.isNotEmpty) ...[
       SectionLabel(context.l10n.attachments),
       for (var i = 0; i < _attachments.length; i++)
@@ -1253,10 +1320,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           ),
         ),
     ],
-    TextButton.icon(
-      onPressed: _pickingFile || _saving ? null : _attach,
-      icon: const Icon(Icons.attach_file_rounded, size: 20),
-      label: Text(context.l10n.addAttachment),
-    ),
+    if (add)
+      TextButton.icon(
+        onPressed: _pickingFile || _saving ? null : _attach,
+        icon: const Icon(Icons.attach_file_rounded, size: 20),
+        label: Text(context.l10n.addAttachment),
+      ),
   ];
 }

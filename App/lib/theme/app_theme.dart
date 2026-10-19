@@ -150,7 +150,7 @@ abstract final class AppTheme {
           shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)))),
       chipTheme: ChipThemeData(
-          side: BorderSide(color: scheme.outlineVariant),
+          side: BorderSide(color: scheme.outline),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
     );

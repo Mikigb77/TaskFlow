@@ -2416,6 +2416,48 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     await _write();
   }
 
+  /// A project the confirming tap creates, renamed from a task's chip: its
+  /// card and every task going there take the name [to], linked by the
+  /// folded name as in [_removeCommand]. The name of a project the person
+  /// can edit takes that project, as a tap on its row does. Nothing is
+  /// created yet.
+  Future<void> _renameProject(String from, String to) async {
+    final name = to.trim();
+    if (name.isEmpty || _saving) return;
+    final key = foldForSearch(spokenProjectName(name));
+    final same = editableProjects(
+      ref.read(taskListsProvider).valueOrNull ?? const [],
+    ).where((p) => foldForSearch(p.name.trim()) == key).firstOrNull;
+    setState(() {
+      _commands = [
+        for (final command in _commands)
+          command.kind == CommandKind.project &&
+                  !command.removed &&
+                  !command.existing &&
+                  _sameProject(command.name, from)
+              ? same != null
+                    ? command.copyWith(choice: same.id)
+                    : command.copyWith(name: name)
+              : command,
+      ];
+      _items = [
+        for (final draft in _items)
+          draft.pending &&
+                  draft.newProject != null &&
+                  _sameProject(draft.newProject!, from)
+              ? same != null
+                    ? draft.copyWith(
+                        task: taskWithProject(draft.task, same),
+                        clearNewProject: true,
+                      )
+                    : draft.copyWith(newProject: name)
+              : draft,
+      ];
+      _error = null;
+    });
+    await _write();
+  }
+
   /// The projects whose card still asks which one is meant: two projects
   /// match, or one matched under another name. [names] holds the new
   /// projects' folded names, [lists] the ids of the matched projects the
@@ -3591,6 +3633,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                           ),
                           onChanged: (draft) => unawaited(_change(draft)),
                           onRemove: () => _remove(item),
+                          onRenameProject: (from, to) =>
+                              unawaited(_renameProject(from, to)),
                         ),
                       ),
                     for (final view in views)

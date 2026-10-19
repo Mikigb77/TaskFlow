@@ -39,12 +39,14 @@ import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 
 import 'support/capture_fixtures.dart'
     show ListeningSpeech, MemoryCaptures, QuietSpeech, SilentRecorder;
@@ -336,7 +338,7 @@ void main() {
   );
 
   testWidgets(
-    'Elegir día opens the date sheet; its Mañana applies at once, and the form shows Mañana chosen',
+    'Elegir día opens the day sheet, titled Elegir día; its Mañana applies at once, and the form shows Mañana chosen',
     (tester) async {
       await _App.open(tester);
       await openForm(tester);
@@ -344,7 +346,7 @@ void main() {
       await tester.pumpAndSettle();
       final sheet = find.byType(BottomSheet);
       expect(
-        find.descendant(of: sheet, matching: find.text(es.reviewSchedule)),
+        find.descendant(of: sheet, matching: find.text(es.pickDay)),
         findsOneWidget,
       );
       await tester.tap(
@@ -779,7 +781,7 @@ void main() {
   );
 
   testWidgets(
-    'files can be added before the first save: Añadir adjunto offers a photo or a file, and says files go up when the task is saved',
+    'files can be added before the first save: Añadir adjunto offers a photo or a file, with no paragraph about older files (UX-1006)',
     (tester) async {
       // A signed-in account's phone copy.
       await _App.open(tester, phone: _Phone());
@@ -793,10 +795,8 @@ void main() {
       await tester.pumpAndSettle();
       final sheet = find.byType(BottomSheet);
       expect(sheet, findsOneWidget);
-      expect(
-        find.descendant(of: sheet, matching: find.text(es.fileUploadHelp)),
-        findsOneWidget,
-      );
+      expect(find.text(es.fileUploadHelp), findsNothing);
+      expect(find.text(es.fileLocalHelp), findsNothing);
       expect(
         find.descendant(of: sheet, matching: find.text(es.choosePhoto)),
         findsOneWidget,
@@ -1304,6 +1304,725 @@ void main() {
     },
   );
 
+  // ---- Run 2026-10-18-commands, b3 · P139 (UX-1002, UX-1003, UX-1004) and
+  // P140 (UX-1006, UX-1007): the form at large text, and its details ----
+  // With Manrope, as the phone measures; after every other test but the
+  // renders, which load it too.
+
+  group('b3: the form at large text, and its details', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    /// Whether any text field on screen holds the primary focus.
+    bool anyFieldFocused(WidgetTester tester) => tester
+        .widgetList<EditableText>(find.byType(EditableText))
+        .any((field) => field.focusNode.hasPrimaryFocus);
+
+    /// The title's lines as laid out, and whether all of it shows.
+    ({int lines, bool whole, AxisDirection axis}) titleLayout(
+      WidgetTester tester,
+    ) {
+      final editable = find.descendant(
+        of: title(),
+        matching: find.byType(EditableText),
+      );
+      final render = tester.state<EditableTextState>(editable).renderEditable;
+      final scroll = tester.state<ScrollableState>(
+        find.descendant(of: editable, matching: find.byType(Scrollable)),
+      );
+      return (
+        lines: (render.size.height / render.preferredLineHeight).round(),
+        whole: scroll.position.maxScrollExtent == 0,
+        axis: scroll.axisDirection,
+      );
+    }
+
+    /// Nueva tarea at 2× text on 320×640, with a 300 dp keyboard up and
+    /// «Llamar al médico» typed.
+    Future<void> largeForm(WidgetTester tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _App.open(tester, size: const Size(320, 640));
+      await openForm(tester);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      await typeTitle(tester, 'Llamar al médico');
+      expect(focused(tester), isTrue);
+      expect(tester.testTextInput.isVisible, isTrue, reason: 'keyboard up');
+    }
+
+    /// Mañana tapped where it shows above the keyboard; once the keyboard
+    /// is asked down, the phone gives its space back.
+    Future<void> tapTomorrowOverKeyboard(WidgetTester tester) async {
+      await tester.ensureVisible(chip('new-task-tomorrow'));
+      await tester.pumpAndSettle();
+      await tester.tap(chip('new-task-tomorrow'));
+      await tester.pumpAndSettle();
+      if (!tester.testTextInput.isVisible) tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'UX-1002: at 2× on 320×640 with the keyboard, a title then Mañana puts the keyboard away: no field has the focus, and «Añadir hora» and «Más detalles» can be tapped without scrolling',
+      (tester) async {
+        await largeForm(tester);
+        await tapTomorrowOverKeyboard(tester);
+        expect(selected(tester, 'new-task-tomorrow'), isTrue);
+        expect(tester.testTextInput.isVisible, isFalse, reason: 'keyboard down');
+        expect(focused(tester), isFalse);
+        expect(anyFieldFocused(tester), isFalse);
+        expect(
+          find.widgetWithText(ActionChip, es.addTime).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('task-more-details')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1002: then «Añadir hora» and 17:00 confirmed: the title still isn’t focused, the keyboard stays down, and the «17:00» chip can be tapped',
+      (tester) async {
+        await largeForm(tester);
+        await tapTomorrowOverKeyboard(tester);
+        await tester.tap(find.widgetWithText(ActionChip, es.addTime));
+        await tester.pumpAndSettle();
+        final dialog = find.byType(TimePickerDialog);
+        expect(dialog, findsOneWidget);
+        final boxes = find.descendant(
+          of: dialog,
+          matching: find.byType(TextField),
+        );
+        expect(boxes, findsNWidgets(2), reason: 'hour and minutes');
+        await tester.enterText(boxes.at(0), '17');
+        await tester.enterText(boxes.at(1), '00');
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.text(MaterialLocalizations.of(tester.element(dialog)).okButtonLabel),
+        );
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        // The picker's own keyboard went with it; the form's stays down.
+        if (!tester.testTextInput.isVisible) tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+        expect(focused(tester), isFalse, reason: 'no focus given back');
+        expect(anyFieldFocused(tester), isFalse);
+        expect(tester.testTextInput.isVisible, isFalse);
+        final form = tester.element(find.byType(TaskEditor));
+        final at = form.clockTime(
+          DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 17),
+        );
+        expect(at, '17:00');
+        expect(find.widgetWithText(InputChip, at).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1003: at 2× on 320 dp with the keyboard a 40-character title wraps down to at most 3 lines and the done action adds no line break; once Mañana puts the keyboard away it shows whole on 4 lines from «Llamar»',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _App.open(tester, size: const Size(320, 640));
+        await openForm(tester);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpAndSettle();
+        // The father's own example (UX_REVIEW §7), 40 characters.
+        const words = 'Llamar al médico el viernes por la tarde';
+        expect(words.length, 40);
+        await typeTitle(tester, words);
+        expect(focused(tester), isTrue);
+        var layout = titleLayout(tester);
+        expect(layout.lines, greaterThan(1), reason: 'it wraps');
+        expect(layout.lines, lessThanOrEqualTo(3), reason: 'while typing');
+        expect(layout.axis, AxisDirection.down, reason: 'no sideways scroll');
+        EditableText field() => tester.widget<EditableText>(
+          find.descendant(of: title(), matching: find.byType(EditableText)),
+        );
+        expect(field().maxLines, 3);
+        expect(field().textInputAction, TextInputAction.done);
+        expect(field().keyboardType, isNot(TextInputType.multiline));
+
+        await tapTomorrowOverKeyboard(tester);
+        expect(focused(tester), isFalse);
+        expect(field().maxLines, isNull, reason: 'no cap without the focus');
+        layout = titleLayout(tester);
+        expect(layout.lines, 4);
+        expect(layout.whole, isTrue, reason: 'all of it shows');
+        final first = tester.getRect(title());
+        expect(first.top, greaterThanOrEqualTo(0), reason: '«Llamar» shows');
+
+        await tester.showKeyboard(title());
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        final typed = tester.widget<TextFormField>(title()).controller!.text;
+        expect(typed, words);
+        expect(typed, isNot(contains('\n')));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1003: at 1× on 390 dp a 20-character title stays on one line',
+      (tester) async {
+        await _App.open(tester);
+        await openForm(tester);
+        const words = 'Llamar al médico hoy';
+        expect(words.length, 20);
+        await typeTitle(tester, words);
+        final layout = titleLayout(tester);
+        expect(layout.lines, 1);
+        expect(layout.whole, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1003: at 2× on 320 dp, once Mañana puts the keyboard away, the 40-character title has no scroll left and its first word «Llamar» lies inside the field and the screen',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _App.open(tester, size: const Size(320, 640));
+        await openForm(tester);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.pumpAndSettle();
+        const words = 'Llamar al médico el viernes por la tarde';
+        await typeTitle(tester, words);
+        final editable = find.descendant(
+          of: title(),
+          matching: find.byType(EditableText),
+        );
+        final scroll = tester.state<ScrollableState>(
+          find.descendant(of: editable, matching: find.byType(Scrollable)),
+        );
+        // While typing, the cap holds: the field scrolls, downwards only.
+        expect(scroll.axisDirection, AxisDirection.down);
+        expect(titleLayout(tester).lines, lessThanOrEqualTo(3));
+
+        await tapTomorrowOverKeyboard(tester);
+        expect(focused(tester), isFalse);
+        expect(tester.testTextInput.isVisible, isFalse);
+        final position = tester
+            .state<ScrollableState>(
+              find.descendant(of: editable, matching: find.byType(Scrollable)),
+            )
+            .position;
+        expect(position.maxScrollExtent, 0, reason: 'nothing hidden');
+        expect(position.pixels, 0);
+        expect(titleLayout(tester).lines, 4);
+        // «Llamar» is the first word: the text's first glyph sits inside the
+        // field's box, and the field inside the screen.
+        final render = tester.state<EditableTextState>(editable).renderEditable;
+        final firstGlyph = render.localToGlobal(
+          render.getLocalRectForCaret(const TextPosition(offset: 0)).center,
+        );
+        final field = tester.getRect(editable);
+        expect(field.contains(firstGlyph), isTrue, reason: '«Llamar» shows');
+        final screen = Offset.zero & tester.view.physicalSize;
+        expect(screen.contains(firstGlyph), isTrue);
+        final lastGlyph = render.localToGlobal(
+          render
+              .getLocalRectForCaret(const TextPosition(offset: words.length))
+              .center,
+        );
+        expect(field.contains(lastGlyph), isTrue, reason: '«tarde» shows');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1003: at 2× on 360×740 the edit form shows the whole unfocused title «Pedir cita en el ayuntamiento para renovar el DNI», «DNI» included, with no scroll left',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        const words = 'Pedir cita en el ayuntamiento para renovar el DNI';
+        await _App.open(
+          tester,
+          size: const Size(360, 740),
+          tasks: [Task(id: 1, title: words, priority: 1, dueDate: tomorrow)],
+        );
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/editTask', arguments: 1),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsOneWidget);
+        expect(focused(tester), isFalse, reason: 'the edit form doesn’t focus');
+        final editable = find.descendant(
+          of: title(),
+          matching: find.byType(EditableText),
+        );
+        expect(tester.widget<EditableText>(editable).controller.text, words);
+        final position = tester
+            .state<ScrollableState>(
+              find.descendant(of: editable, matching: find.byType(Scrollable)),
+            )
+            .position;
+        expect(position.maxScrollExtent, 0, reason: 'all of it shows');
+        final layout = titleLayout(tester);
+        expect(layout.whole, isTrue);
+        expect(layout.lines, greaterThan(3), reason: 'longer than the cap');
+        final render = tester.state<EditableTextState>(editable).renderEditable;
+        final field = tester.getRect(editable);
+        final dni = render.localToGlobal(
+          render
+              .getLocalRectForCaret(const TextPosition(offset: words.length - 1))
+              .center,
+        );
+        expect(field.contains(dni), isTrue, reason: '«DNI» shows');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1004: «Elegir día» opens a sheet titled «Elegir día» with no time switch and no «Listo»; a date 9 days ahead tapped closes it, the third chip shows that date, and the time set before is kept',
+      (tester) async {
+        final app = await _App.open(tester);
+        await openForm(tester);
+        await typeTitle(tester, 'Renovar el DNI');
+        await tester.tap(chip('new-task-today'));
+        await tester.pumpAndSettle();
+        await tester.tap(chip('new-task-time'));
+        await tester.pumpAndSettle();
+        final dialog = find.byType(TimePickerDialog);
+        await tester.tap(
+          find.text(MaterialLocalizations.of(tester.element(dialog)).okButtonLabel),
+        );
+        await tester.pumpAndSettle();
+        final hour = (TimeOfDay.now().hour + 1) % 24;
+        final form = tester.element(find.byType(TaskEditor));
+        final time = form.clockTime(DateTime(2030, 1, 1, hour));
+        expect(find.widgetWithText(InputChip, time), findsOneWidget);
+
+        await tester.tap(chip('new-task-pick-day'));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        expect(es.pickDay, 'Elegir día');
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.pickDay)),
+          findsOneWidget,
+        );
+        expect(find.text(es.reviewSchedule), findsNothing);
+        expect(find.byKey(const ValueKey('schedule-has-time')), findsNothing);
+        expect(find.byKey(const ValueKey('schedule-hour')), findsNothing);
+        expect(find.byKey(const ValueKey('schedule-minute')), findsNothing);
+        expect(find.byKey(const ValueKey('schedule-done')), findsNothing);
+
+        final later = plus(today, 9);
+        final calendar = find.descendant(
+          of: sheet,
+          matching: find.byType(CalendarDatePicker),
+        );
+        expect(calendar, findsOneWidget);
+        if (later.month != today.month) {
+          await tester.tap(
+            find.descendant(
+              of: calendar,
+              matching: find.byTooltip(
+                MaterialLocalizations.of(
+                  tester.element(calendar),
+                ).nextMonthTooltip,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(
+          find.descendant(of: calendar, matching: find.text('${later.day}')),
+        );
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing, reason: 'the day applied at once');
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        expect(
+          find.descendant(
+            of: chip('new-task-pick-day'),
+            matching: find.text(form.weekdayDate(later)),
+          ),
+          findsOneWidget,
+        );
+        expect(selected(tester, 'new-task-today'), isFalse);
+        expect(
+          find.widgetWithText(InputChip, time),
+          findsOneWidget,
+          reason: 'the time stays on the new day',
+        );
+        await tapSave(tester);
+        final saved = app.tasks.state.requireValue.single;
+        expect(
+          saved.dueDate,
+          DateTime(later.year, later.month, later.day, hour),
+        );
+        expect(saved.hasTime, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1004: «Añadir hora» and the time chip open the time picker on its number boxes (TimePickerEntryMode.input)',
+      (tester) async {
+        await _App.open(tester);
+        await openForm(tester);
+        await tester.tap(chip('new-task-tomorrow'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ActionChip, es.addTime));
+        await tester.pumpAndSettle();
+        final dialog = find.byType(TimePickerDialog);
+        expect(
+          tester.widget<TimePickerDialog>(dialog).initialEntryMode,
+          TimePickerEntryMode.input,
+        );
+        await tester.tap(
+          find.text(MaterialLocalizations.of(tester.element(dialog)).okButtonLabel),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(InputChip));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TimePickerDialog>(dialog).initialEntryMode,
+          TimePickerEntryMode.input,
+          reason: 'the time chip too',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1004: the edit form’s date sheet keeps «Fecha y hora», its time switch and «Listo»',
+      (tester) async {
+        await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Médico', priority: 1, dueDate: tomorrow)],
+        );
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/editTask', arguments: 1),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('task-date')));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.reviewSchedule)),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('schedule-has-time')), findsOneWidget);
+        expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    /// The calendar in the open date sheet.
+    Finder sheetCalendar() => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(CalendarDatePicker),
+    );
+
+    /// The calendar's month header («octubre de 2026 ▾») tapped: the year
+    /// grid opens.
+    Future<void> openYearGrid(WidgetTester tester, DateTime shown) async {
+      final calendar = sheetCalendar();
+      final header = MaterialLocalizations.of(
+        tester.element(calendar),
+      ).formatMonthYear(DateTime(shown.year, shown.month));
+      await tester.tap(
+        find.descendant(of: calendar, matching: find.text(header)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(YearPicker), findsOneWidget, reason: 'year grid');
+    }
+
+    Future<void> tapYear(WidgetTester tester, int year) async {
+      final cell = find.descendant(
+        of: find.byType(YearPicker),
+        matching: find.text('$year'),
+      );
+      await tester.ensureVisible(cell);
+      await tester.pumpAndSettle();
+      await tester.tap(cell);
+      await tester.pumpAndSettle();
+    }
+
+    /// The form's third chip still reads «Elegir día»: no day applied.
+    void pickDayUnapplied(WidgetTester tester) {
+      expect(
+        find.descendant(
+          of: chip('new-task-pick-day'),
+          matching: find.text(es.pickDay),
+        ),
+        findsOneWidget,
+      );
+      expect(selected(tester, 'new-task-pick-day'), isFalse);
+    }
+
+    testWidgets(
+      'UX-1224: «Elegir día», the month header, then next year: the sheet stays open on that year’s month and nothing is applied; day 15 then closes it, the third chip shows that date, and the time set before is kept',
+      (tester) async {
+        final app = await _App.open(tester);
+        await openForm(tester);
+        await typeTitle(tester, 'Renovar el DNI');
+        await tester.tap(chip('new-task-today'));
+        await tester.pumpAndSettle();
+        await tester.tap(chip('new-task-time'));
+        await tester.pumpAndSettle();
+        final dialog = find.byType(TimePickerDialog);
+        await tester.tap(
+          find.text(MaterialLocalizations.of(tester.element(dialog)).okButtonLabel),
+        );
+        await tester.pumpAndSettle();
+        final hour = (TimeOfDay.now().hour + 1) % 24;
+        final form = tester.element(find.byType(TaskEditor));
+        final time = form.clockTime(DateTime(2030, 1, 1, hour));
+        expect(find.widgetWithText(InputChip, time), findsOneWidget);
+
+        await tester.tap(chip('new-task-pick-day'));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        await openYearGrid(tester, today);
+        final next = today.year + 1;
+        await tapYear(tester, next);
+
+        expect(sheet, findsOneWidget, reason: 'a year pick doesn’t close it');
+        expect(find.byType(YearPicker), findsNothing, reason: 'day grid back');
+        final calendar = sheetCalendar();
+        final material = MaterialLocalizations.of(tester.element(calendar));
+        expect(
+          find.descendant(
+            of: calendar,
+            matching: find.text(
+              material.formatMonthYear(DateTime(next, today.month)),
+            ),
+          ),
+          findsOneWidget,
+          reason: 'a month of $next shows',
+        );
+        pickDayUnapplied(tester);
+        expect(selected(tester, 'new-task-today'), isTrue, reason: 'Hoy stays');
+
+        await tester.tap(
+          find.descendant(of: calendar, matching: find.text('15')),
+        );
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing, reason: 'a tapped day applies');
+        final picked = DateTime(next, today.month, 15);
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        expect(
+          find.descendant(
+            of: chip('new-task-pick-day'),
+            matching: find.text(form.weekdayDate(picked)),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.widgetWithText(InputChip, time),
+          findsOneWidget,
+          reason: 'the time stays',
+        );
+        await tapSave(tester);
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.dueDate, DateTime(next, today.month, 15, hour));
+        expect(saved.hasTime, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1224: «Elegir día», the month header, then the year already shown: the sheet stays open and nothing is applied',
+      (tester) async {
+        await _App.open(tester);
+        await openForm(tester);
+        await typeTitle(tester, 'Renovar el DNI');
+        await tester.tap(chip('new-task-pick-day'));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        await openYearGrid(tester, today);
+        await tapYear(tester, today.year);
+        expect(sheet, findsOneWidget, reason: 'still open');
+        expect(find.byType(YearPicker), findsNothing);
+        pickDayUnapplied(tester);
+        for (final key in ['new-task-today', 'new-task-tomorrow']) {
+          expect(selected(tester, key), isFalse, reason: key);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1224: in the edit form’s full date sheet a year pick still only selects: the sheet stays open with «Añadir hora» and «Listo»',
+      (tester) async {
+        await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Médico', priority: 1, dueDate: tomorrow)],
+        );
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/editTask', arguments: 1),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('task-date')));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        await openYearGrid(tester, tomorrow);
+        await tapYear(tester, tomorrow.year + 1);
+        expect(sheet, findsOneWidget, reason: 'only selects');
+        expect(find.byKey(const ValueKey('schedule-has-time')), findsOneWidget);
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.addTime)),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('schedule-done')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1006: an existing task’s «Añadir adjunto» sheet still explains its files in a paragraph',
+      (tester) async {
+        await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Médico', priority: 1, dueDate: tomorrow)],
+        );
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/editTask', arguments: 1),
+        );
+        await tester.pumpAndSettle();
+        await showDetails(tester);
+        final add = find.text(es.addAttachment);
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        final paragraphs =
+            find
+                .descendant(of: sheet, matching: find.text(es.fileLocalHelp))
+                .evaluate()
+                .length +
+            find
+                .descendant(of: sheet, matching: find.text(es.fileUploadHelp))
+                .evaluate()
+                .length;
+        expect(paragraphs, 1);
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.attachFile)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1007: notes typed, a file added and a project chosen under Más detalles stay on screen after «Menos detalles»; Recordatorio and Repetir at their defaults don’t, and nothing shows twice',
+      (tester) async {
+        // The phone's files: a folder of the test's own, and a picker that
+        // hands back one PDF from it.
+        final folder = Directory.systemTemp.createTempSync('taskflow-form-');
+        addTearDown(() {
+          try {
+            folder.deleteSync(recursive: true);
+          } catch (_) {}
+        });
+        final pdf = File(p.join(folder.path, 'analisis.pdf'))
+          ..writeAsStringSync('resultados');
+        const pathProvider = MethodChannel('plugins.flutter.io/path_provider');
+        platform.setMockMethodCallHandler(
+          pathProvider,
+          (_) async => p.join(folder.path, 'support'),
+        );
+        addTearDown(() => platform.setMockMethodCallHandler(pathProvider, null));
+        FilePicker.platform = _OnePicked(pdf.path);
+
+        await _App.open(
+          tester,
+          projects: [TaskListInfo(id: 'casa', name: 'Casa')],
+        );
+        await openForm(tester);
+        await typeTitle(tester, 'Médico');
+        await showDetails(tester);
+        expect(find.text(es.fewerDetails), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const ValueKey('task-notes')),
+          'Llevar los análisis',
+        );
+        await tester.pumpAndSettle();
+
+        final add = find.text(es.addAttachment);
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(es.attachFile));
+        await tester.pump();
+        for (var i = 0; i < 50 && find.text('analisis.pdf').evaluate().isEmpty; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+        expect(find.text('analisis.pdf'), findsOneWidget, reason: 'file added');
+
+        final picker = find.byType(TaskAssignmentPicker);
+        final projectRow = find.descendant(
+          of: picker,
+          matching: find.byType(ListTile),
+        );
+        await tester.ensureVisible(projectRow.first);
+        await tester.pumpAndSettle();
+        await tester.tap(projectRow.first);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(of: find.byType(BottomSheet), matching: find.text('Casa')),
+        );
+        await tester.pumpAndSettle();
+
+        // «Menos detalles».
+        final toggle = find.byKey(const ValueKey('task-more-details'));
+        await tester.ensureVisible(toggle);
+        await tester.pumpAndSettle();
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        expect(find.text(es.moreDetails), findsOneWidget, reason: 'closed');
+
+        for (final (what, finder) in [
+          ('notes', find.text('Llevar los análisis')),
+          ('file', find.text('analisis.pdf')),
+          ('project', find.descendant(of: picker, matching: find.text('Casa'))),
+        ]) {
+          expect(finder, findsOneWidget, reason: what);
+          await tester.ensureVisible(finder);
+          await tester.pumpAndSettle();
+          expect(finder.hitTestable(), findsOneWidget, reason: what);
+        }
+        expect(find.byKey(const ValueKey('task-notes')), findsOneWidget);
+        expect(picker, findsOneWidget);
+        expect(find.byType(ReminderControl), findsNothing);
+        expect(find.byKey(const ValueKey('task-repeat')), findsNothing);
+        expect(find.text(es.addAttachment), findsNothing, reason: 'empty rows wait');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
   // ---- Renders, on request: --dart-define=WRITE_FORM_PREVIEWS=true ----
   // Last in the file: they load the app's fonts, which every later test
   // would then use.
@@ -1375,6 +2094,10 @@ void main() {
         );
         await openForm(tester, strings(language));
         await tester.tap(chip('new-task-today'));
+        await tester.pumpAndSettle();
+        // A day chip puts the keyboard away; tapping the title brings it
+        // back.
+        await tester.tap(title());
         await tester.pumpAndSettle();
         tester.view.viewInsets = const FakeViewPadding(bottom: 300);
         await shoot('new-task-form-2x-$language');
@@ -1647,4 +2370,31 @@ class _Phone extends TaskRepository {
     rows.removeWhere((task) => task.id == id);
     return before - rows.length;
   }
+}
+
+/// The phone's file picker, handing back [path].
+class _OnePicked extends FilePicker {
+  _OnePicked(this.path);
+  final String path;
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = true,
+    int compressionQuality = 30,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async => FilePickerResult([
+    PlatformFile(
+      path: path,
+      name: p.basename(path),
+      size: File(path).lengthSync(),
+    ),
+  ]);
 }

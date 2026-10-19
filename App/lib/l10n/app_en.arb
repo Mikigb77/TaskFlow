@@ -337,6 +337,19 @@
   "noMatches": "No matching tasks",
   "freshStart": "A fresh start",
   "differentFilter": "Try a different word or filter.",
+  "personNothingOpen": "{name} has nothing open here",
+  "@personNothingOpen": {
+    "description": "Empty-state title on a shared project's page when only a person's chip filters it and that person has no open tasks assigned in this project. {name} is the name on the chip.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personNothingOpenHelp": "Tap All to see every task.",
+  "@personNothingOpenHelp": {
+    "description": "Empty-state message under personNothingOpen. 'All' names the chip forTeam, which shows every task of the project."
+  },
   "listEmpty": "Add a task to this project. Its date and reminder are yours to choose.",
   "readOnlyListEmpty": "No tasks in this project yet.",
   "@readOnlyListEmpty": {
@@ -729,6 +742,10 @@
   "@verifyEmailConfirm": {
     "description": "Sends the typed code. When it is right, the person is signed in."
   },
+  "verifyEmailConfirming": "Confirming",
+  "@verifyEmailConfirming": {
+    "description": "What TalkBack reads for the spinner inside the Confirm button (verifyEmailConfirm) while the code is being checked."
+  },
   "verifyEmailResend": "Resend code",
   "@verifyEmailResend": {
     "description": "Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn."
@@ -742,9 +759,9 @@
       }
     }
   },
-  "verifyEmailResent": "We’ve sent you a new code",
+  "verifyEmailResent": "We’ve sent you a new code. If you can’t see it, check Spam or Promotions.",
   "@verifyEmailResent": {
-    "description": "Under the code field after a new code was emailed."
+    "description": "Under the code field after a new code was emailed, when the person has shown they didn’t get the first one. Names the mail folders where codes often land, as Gmail names them in the language (Spam and Promotions in English)."
   },
   "verifyEmailCodeInvalid": "That code isn’t right. Check the newest email we sent.",
   "@verifyEmailCodeInvalid": {
@@ -1963,6 +1980,10 @@
       }
     }
   },
+  "createdByYou": "Created by you",
+  "@createdByYou": {
+    "description": "On a task's or note's details page in a shared project, in place of “Created by {name}” when the signed-in account created it; the same screen calls that account “Me” in who it's for."
+  },
   "freeVoiceNoticeTitle": "{limit, plural, =1{You’ve used your free dictation for this month} other{You’ve used your {limit} free dictations for this month}}",
   "@freeVoiceNoticeTitle": {
     "description": "Title of a sheet shown at most once a month: the first time an account without Pro taps New task with this month's free dictations used up. {limit} is the account's monthly free dictations (10).",
@@ -1972,7 +1993,7 @@
       }
     }
   },
-  "freeVoiceNoticeBody": "You can keep creating tasks with the form, with no limit. {limit, plural, =1{You’ll get 1 more dictation on {date}.} other{You’ll get {limit} more dictations on {date}.}}",
+  "freeVoiceNoticeBody": "You can keep creating tasks by hand, with no limit. {limit, plural, =1{On {date} you’ll get 1 more dictation.} other{On {date} you’ll get {limit} more dictations.}}",
   "@freeVoiceNoticeBody": {
     "description": "Under that title. {limit} is how many free dictations come back, and {date} the local short date they do.",
     "placeholders": {
@@ -2242,12 +2263,29 @@
   },
   "commandNewProject": "New project: {name}",
   "@commandNewProject": {
-    "description": "A dictation's result: the card of a project the confirming tap creates, and the project chip of a task that goes into it. {name} is the project's name as said.",
+    "description": "A dictation's result: the card of a project the confirming tap creates, and the row for it in a task's project sheet (the chip uses commandNewProjectChip). {name} is the project's name as said.",
     "placeholders": {
       "name": {
         "type": "String"
       }
     }
+  },
+  "commandNewProjectChip": "{name} (new)",
+  "@commandNewProjectChip": {
+    "description": "A dictation's result: the project chip of a task that goes into a project the confirming tap creates, name first so it shows at large text. {name} is the project's name as said, or as corrected.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandUseName": "Use this name",
+  "@commandUseName": {
+    "description": "The button of the dialog that corrects the name of a project a dictation creates, opened from the task's project sheet. Nothing is created until the result's confirming tap."
+  },
+  "commandRenameProject": "Change the name",
+  "@commandRenameProject": {
+    "description": "TalkBack name of the pencil on the project sheet's row for a project a dictation creates; a tap on the row opens the dialog that corrects that project's name. Nothing is created until the result's confirming tap."
   },
   "commandExistingProject": "You already have “{name}”",
   "@commandExistingProject": {
@@ -2564,7 +2602,19 @@
   },
   "commandMemberNotIn": "{name} isn’t in “{project}”",
   "@commandMemberNotIn": {
-    "description": "A dictation named someone for a task, who can't be its assignee because they aren't in its shared project (or the project is new and has nobody yet). The task is left as it is. {name} is the name as said; {project} the project.",
+    "description": "A dictation named someone for a task, who can't be its assignee because they aren't in its existing shared project (a new project uses commandMemberNotInNew). The task is left as it is. {name} is the name as said; {project} the project.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "commandMemberNotInNew": "{name} isn’t in “{project}” yet. Afterwards, share the project with {name}.",
+  "@commandMemberNotInNew": {
+    "description": "A dictation named someone for a task going into a project the confirming tap creates, which has nobody yet. The task stays the account's own; the next step is the project page's Share button. {name} is the name as said; {project} the new project.",
     "placeholders": {
       "name": {
         "type": "String"

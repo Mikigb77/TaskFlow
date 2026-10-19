@@ -28,6 +28,7 @@ class CaptureReviewEditor extends StatefulWidget {
     required this.onChanged,
     required this.onRemove,
     this.enabled = true,
+    this.onRenameProject,
   });
   final CaptureDraft draft;
   final bool compact;
@@ -36,6 +37,10 @@ class CaptureReviewEditor extends StatefulWidget {
   final VoidCallback onExpand;
   final ValueChanged<CaptureDraft> onChanged;
   final VoidCallback onRemove;
+
+  /// The project this task's confirming tap creates, renamed from its chip:
+  /// the name it had, and the one typed. Nothing is created yet.
+  final void Function(String from, String to)? onRenameProject;
   @override
   State<CaptureReviewEditor> createState() => _CaptureReviewEditorState();
 }
@@ -432,6 +437,12 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 newProjectName: newProject == null
                     ? null
                     : spokenProjectName(newProject),
+                onRenameProject:
+                    !widget.enabled ||
+                        newProject == null ||
+                        widget.onRenameProject == null
+                    ? null
+                    : (name) => widget.onRenameProject!(newProject, name),
                 // Another project chosen: none is created for this task.
                 onChanged: !widget.enabled
                     ? null
@@ -450,14 +461,14 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                       ),
               ),
               // Nobody is in a new project yet: whoever was named waits
-              // for an invitation.
+              // for an invitation, sent from the project's Compartir.
               if (newProject != null && task.listId == null)
                 if (widget.draft.assignmentHints['member']?.trim()
                     case final member? when member.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      l.commandMemberNotIn(
+                      l.commandMemberNotInNew(
                         member,
                         spokenProjectName(newProject),
                       ),

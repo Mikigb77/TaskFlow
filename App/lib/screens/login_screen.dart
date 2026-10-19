@@ -60,6 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _replaced = false;
   Object? _error;
   final _emailField = GlobalKey();
+  final _emailFocus = FocusNode();
   final _passwordField = GlobalKey();
   final _outcome = GlobalKey();
 
@@ -91,6 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     for (final controller in [_email, _password, _code, _server]) {
       controller.dispose();
     }
+    _emailFocus.dispose();
     super.dispose();
   }
 
@@ -234,6 +236,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
     if (back == null || !mounted) return;
     _mode(register: true);
+    if (back == VerifyEmailReturn.otherAddress) {
+      // Ready to correct the address: the cursor at its end.
+      _email.selection = TextSelection.collapsed(offset: _email.text.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _emailFocus.requestFocus();
+      });
+    }
     if (back == VerifyEmailReturn.replaced) {
       _password.clear();
       setState(() {
@@ -425,15 +434,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
+                            AuthHeading(
                               _recover
                                   ? strings.recoveryHeading
                                   : _register
                                   ? strings.registerHeading
                                   : strings.signInHeading,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.headlineLarge?.copyWith(fontSize: 30),
                             ),
                             const SizedBox(height: 10),
                             Text(
@@ -508,6 +514,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                                 'account-email',
                                               ),
                                               controller: _email,
+                                              focusNode: _emailFocus,
                                               enabled: !busy,
                                               keyboardType:
                                                   TextInputType.emailAddress,
@@ -867,6 +874,26 @@ BoxDecoration authCardDecoration(ColorScheme colors) => BoxDecoration(
     ),
   ],
 );
+
+/// The heading of sign-in's card and the confirm screen's: it names the
+/// screen, so TalkBack says it as the screen opens. It grows with the text
+/// size up to 1.2×, so at 2× its longest words still fit on a 320 dp phone
+/// and it stays larger than the text under it.
+class AuthHeading extends StatelessWidget {
+  const AuthHeading(this.text, {super.key});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    header: true,
+    namesRoute: true,
+    child: Text(
+      text,
+      textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
+      style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 30),
+    ),
+  );
+}
 
 class AuthBrand extends StatelessWidget {
   const AuthBrand({super.key});

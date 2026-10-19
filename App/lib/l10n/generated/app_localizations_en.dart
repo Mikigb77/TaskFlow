@@ -787,6 +787,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get differentFilter => 'Try a different word or filter.';
 
   @override
+  String personNothingOpen(String name) {
+    return '$name has nothing open here';
+  }
+
+  @override
+  String get personNothingOpenHelp => 'Tap All to see every task.';
+
+  @override
   String get listEmpty =>
       'Add a task to this project. Its date and reminder are yours to choose.';
 
@@ -1517,6 +1525,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get verifyEmailConfirm => 'Confirm';
 
   @override
+  String get verifyEmailConfirming => 'Confirming';
+
+  @override
   String get verifyEmailResend => 'Resend code';
 
   @override
@@ -1531,7 +1542,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get verifyEmailResent => 'We’ve sent you a new code';
+  String get verifyEmailResent =>
+      'We’ve sent you a new code. If you can’t see it, check Spam or Promotions.';
 
   @override
   String get verifyEmailCodeInvalid =>
@@ -3496,6 +3508,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get createdByYou => 'Created by you';
+
+  @override
   String freeVoiceNoticeTitle(int limit) {
     String _temp0 = intl.Intl.pluralLogic(
       limit,
@@ -3511,10 +3526,10 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       limit,
       locale: localeName,
-      other: 'You’ll get $limit more dictations on $date.',
-      one: 'You’ll get 1 more dictation on $date.',
+      other: 'On $date you’ll get $limit more dictations.',
+      one: 'On $date you’ll get 1 more dictation.',
     );
-    return 'You can keep creating tasks with the form, with no limit. $_temp0';
+    return 'You can keep creating tasks by hand, with no limit. $_temp0';
   }
 
   @override
@@ -3743,6 +3758,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String commandNewProjectChip(String name) {
+    return '$name (new)';
+  }
+
+  @override
+  String get commandUseName => 'Use this name';
+
+  @override
+  String get commandRenameProject => 'Change the name';
+
+  @override
   String commandExistingProject(String name) {
     return 'You already have “$name”';
   }
@@ -3956,6 +3982,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String commandMemberNotIn(String name, String project) {
     return '$name isn’t in “$project”';
+  }
+
+  @override
+  String commandMemberNotInNew(String name, String project) {
+    return '$name isn’t in “$project” yet. Afterwards, share the project with $name.';
   }
 
   @override

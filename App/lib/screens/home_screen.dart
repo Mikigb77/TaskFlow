@@ -17,6 +17,7 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/notes_screen.dart';
 
@@ -26,11 +27,17 @@ class HomeScreen extends ConsumerStatefulWidget {
     this.initialFilter = 0,
     this.isRoot = true,
     this.listId,
+    this.person,
     this.landing = const {},
   });
   final int initialFilter;
   final bool isRoot;
   final String? listId;
+
+  /// The person a project page opens on, as a search for their tasks
+  /// found them: their chip, or `Para mí` for the account itself. Anyone
+  /// without a chip there (a viewer, someone who left) opens on `Todas`.
+  final int? person;
 
   /// Tasks just saved that this page, opened for them, lights once they
   /// show: a project made by voice with its new tasks.
@@ -64,6 +71,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   double _listEnd = 100;
 
   @override
+  void initState() {
+    super.initState();
+    final person = widget.person;
+    if (person == null || widget.listId == null) return;
+    if (person == ref.read(authProvider).account?.id) {
+      // `Para mí` only where its chip shows: on a shared project.
+      _team = !(ref.read(taskListsProvider).valueOrNull ?? []).any(
+        (p) => p.id == widget.listId && p.shared,
+      );
+    } else {
+      _person = person;
+    }
+  }
+
+  @override
   void dispose() {
     _highlightTimer?.cancel();
     _search.dispose();
@@ -72,7 +94,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// The person whose tasks this project page shows, while they can still
   /// be chosen: someone who left takes their filter with them.
-  int? get _personShown {
+  int? get _personShown => _personChip?.id;
+
+  /// The person behind [_personShown], whose name their chip shows.
+  ProjectMember? get _personChip {
     final project = (ref.read(taskListsProvider).valueOrNull ?? [])
         .where((p) => p.id == widget.listId)
         .firstOrNull;
@@ -80,7 +105,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       project,
       ref.read(authProvider).account?.id,
     );
-    return people.any((p) => p.id == _person) ? _person : null;
+    return people.where((p) => p.id == _person).firstOrNull;
   }
 
   /// The open tasks this page lists with the given search and filters.
@@ -556,13 +581,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _label != null ||
                   (widget.isRoot && _filter != 0) ||
                   (widget.listId != null && (!_team || _personShown != null));
+              // Only a person's chip on: nothing was searched, so it says
+              // whose tasks are missing.
+              final person =
+                  _query.isEmpty &&
+                      _label == null &&
+                      !(widget.isRoot && _filter != 0)
+                  ? _personChip
+                  : null;
               return ListView(
                 children: [
                   EmptyState(
-                    title: filtering
+                    title: person != null
+                        ? context.l10n.personNothingOpen(person.name)
+                        : filtering
                         ? context.l10n.noMatches
                         : context.l10n.freshStart,
-                    message: filtering
+                    message: person != null
+                        ? context.l10n.personNothingOpenHelp
+                        : filtering
                         ? context.l10n.differentFilter
                         : readOnly
                         ? context.l10n.readOnlyListEmpty

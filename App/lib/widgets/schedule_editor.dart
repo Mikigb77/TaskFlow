@@ -17,6 +17,9 @@ class ScheduleChoice {
 /// then apply at once, and a repeating task chooses this occurrence or the
 /// whole series. [applyDays] makes those chips apply at once without a move,
 /// as on the capture result. Otherwise (the edit form) they only select.
+/// [dayOnly] is the new-task form's «Elegir día»: only a day, with no time
+/// and no «Listo»; a day tapped, in the chips or the calendar, applies at
+/// once.
 Future<ScheduleChoice?> editSchedule(
   BuildContext context, {
   DateTime? date,
@@ -24,6 +27,7 @@ Future<ScheduleChoice?> editSchedule(
   String? title,
   Task? moving,
   bool applyDays = false,
+  bool dayOnly = false,
 }) => showModalBottomSheet<ScheduleChoice>(
   context: context,
   isScrollControlled: true,
@@ -34,6 +38,7 @@ Future<ScheduleChoice?> editSchedule(
     title: title,
     moving: moving,
     applyDays: applyDays,
+    dayOnly: dayOnly,
   ),
 );
 
@@ -44,12 +49,14 @@ class _ScheduleEditor extends StatefulWidget {
     this.title,
     this.moving,
     this.applyDays = false,
+    this.dayOnly = false,
   });
   final DateTime? date;
   final bool hasTime;
   final String? title;
   final Task? moving;
   final bool applyDays;
+  final bool dayOnly;
   @override
   State<_ScheduleEditor> createState() => _ScheduleEditorState();
 }
@@ -64,6 +71,7 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
   final _minute = TextEditingController();
   final _form = GlobalKey<FormState>();
   final _periodRow = GlobalKey();
+  final _calendarBox = GlobalKey();
   bool? _clock24;
   // Null until chosen when there was no time, so 5 never becomes 5 a. m.
   bool? _pm;
@@ -75,7 +83,7 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
     super.didChangeDependencies();
     if (_clock24 != null) return;
     _clock24 = MediaQuery.alwaysUse24HourFormatOf(context);
-    _load(widget.date, widget.hasTime);
+    _load(widget.date, widget.hasTime && !widget.dayOnly);
   }
 
   void _load(DateTime? date, bool hasTime) {
@@ -119,6 +127,23 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
     _missingDate = false;
     if (day == null) _hasTime = false;
   });
+
+  /// Whether the calendar shows its year grid. A year pick is the only change
+  /// the calendar reports while that grid is still mounted.
+  bool _yearGridShown() {
+    var found = false;
+    void visit(Element element) {
+      if (found) return;
+      if (element.widget is YearPicker) {
+        found = true;
+        return;
+      }
+      element.visitChildElements(visit);
+    }
+
+    (_calendarBox.currentContext as Element?)?.visitChildElements(visit);
+    return found;
+  }
 
   void _done() {
     if (_hasTime && _day == null) {
@@ -199,7 +224,8 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.title ?? l.reviewSchedule,
+                          widget.title ??
+                              (widget.dayOnly ? l.pickDay : l.reviewSchedule),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         if (repeating) ...[
@@ -246,7 +272,9 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                                   // day chip applies at once (Hoy and Mañana
                                   // keep the time). In the edit form a time
                                   // often follows, so they only select.
-                                  if (moving != null || widget.applyDays) {
+                                  if (moving != null ||
+                                      widget.applyDays ||
+                                      widget.dayOnly) {
                                     _done();
                                   }
                                 },
@@ -281,24 +309,38 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                               child: Text(l.restoreOriginal),
                             ),
                         ],
-                        CalendarDatePicker(
-                          key: ValueKey('schedule-calendar-$_day'),
-                          // The calendar and time validation must share the
-                          // same selection, including an explicit "No date".
-                          initialDate: _day,
-                          firstDate: pickerFirstDate(_day),
-                          lastDate: pickerLastDate(_day),
-                          onDateChanged: _select,
+                        KeyedSubtree(
+                          key: _calendarBox,
+                          child: CalendarDatePicker(
+                            key: ValueKey('schedule-calendar-$_day'),
+                            // The calendar and time validation must share the
+                            // same selection, including an explicit "No date".
+                            initialDate: _day,
+                            firstDate: pickerFirstDate(_day),
+                            lastDate: pickerLastDate(_day),
+                            onDateChanged: (day) {
+                              if (!widget.dayOnly) {
+                                _select(day);
+                                return;
+                              }
+                              // A year pick only moves the calendar to that
+                              // year; a tapped day applies and closes.
+                              if (_yearGridShown()) return;
+                              _select(day);
+                              _done();
+                            },
+                          ),
                         ),
-                        SwitchListTile.adaptive(
-                          key: const ValueKey('schedule-has-time'),
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(l.addTime),
-                          value: _hasTime,
-                          subtitle: _hasTime ? null : Text(l.anyTime),
-                          onChanged: (value) =>
-                              setState(() => _hasTime = value),
-                        ),
+                        if (!widget.dayOnly)
+                          SwitchListTile.adaptive(
+                            key: const ValueKey('schedule-has-time'),
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(l.addTime),
+                            value: _hasTime,
+                            subtitle: _hasTime ? null : Text(l.anyTime),
+                            onChanged: (value) =>
+                                setState(() => _hasTime = value),
+                          ),
                         if (_missingDate)
                           Text(l.reviewChooseDate, style: error),
                         if (_hasTime) ...[
@@ -409,11 +451,12 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                       onPressed: () => Navigator.pop(context),
                       child: Text(l.cancel),
                     ),
-                    FilledButton(
-                      key: const ValueKey('schedule-done'),
-                      onPressed: _done,
-                      child: Text(l.done),
-                    ),
+                    if (!widget.dayOnly)
+                      FilledButton(
+                        key: const ValueKey('schedule-done'),
+                        onPressed: _done,
+                        child: Text(l.done),
+                      ),
                   ],
                 ),
               ),

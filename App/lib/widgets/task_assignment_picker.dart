@@ -38,6 +38,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
     this.compact = false,
     this.asRow,
     this.newProjectName,
+    this.onRenameProject,
   });
   final Task task;
   final ValueChanged<Task>? onChanged;
@@ -50,6 +51,9 @@ class TaskAssignmentPicker extends ConsumerWidget {
 
   /// The project a dictation creates for this task on its confirming tap.
   final String? newProjectName;
+
+  /// [newProjectName] corrected from the project sheet.
+  final ValueChanged<String>? onRenameProject;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,6 +68,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
         (task.assignment != 'member' ||
             project?.people.any((p) => p.id == task.assigneeId && p.canEdit) ==
                 true);
+    final changeable = onChanged != null && editable;
     final names = hints.values
         .whereType<String>()
         .where((s) => s.isNotEmpty)
@@ -81,6 +86,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
               listId: task.listId,
               lockShared: lockShared,
               newName: newProjectName,
+              onRename: onRenameProject,
               onChanged: onChanged == null
                   ? null
                   : (project) => onChanged!(taskWithProject(task, project)),
@@ -93,8 +99,24 @@ class TaskAssignmentPicker extends ConsumerWidget {
                       : Icons.person_outline,
                   size: 18,
                 ),
-                label: Text(responsibilityLabel(context, task, account?.id)),
-                onPressed: onChanged == null || !editable
+                // ▾ says it can be changed, as on the project chip.
+                label: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 230),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          responsibilityLabel(context, task, account?.id),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (changeable)
+                        const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                    ],
+                  ),
+                ),
+                onPressed: !changeable
                     ? null
                     : () async {
                         final selected = await showModalBottomSheet<int>(

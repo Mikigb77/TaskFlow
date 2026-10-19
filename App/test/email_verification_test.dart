@@ -335,7 +335,10 @@ void main() {
     expect(es.verifyEmailResend, 'Reenviar código');
     expect(es.verifyEmailResendIn(42), 'Reenviar código en 42 segundos');
     expect(es.verifyEmailResendIn(1), 'Reenviar código en 1 segundo');
-    expect(es.verifyEmailResent, 'Te hemos enviado un código nuevo');
+    expect(
+      es.verifyEmailResent,
+      'Te hemos enviado un código nuevo. Si no lo ves, mira en Spam o en Promociones.',
+    );
     expect(
       es.verifyEmailCodeInvalid,
       'Ese código no es correcto. Mira el último correo que te hemos enviado.',
@@ -604,7 +607,7 @@ void main() {
         'language': 'es',
       });
       expect(errorUnder(tester, code), isNull);
-      expect(find.text('Te hemos enviado un código nuevo'), findsOneWidget);
+      expect(find.text(es.verifyEmailResent), findsOneWidget);
       expect(typed(tester, code), isEmpty);
       expect(focused(tester, code), isTrue);
       expect(resendEnabled(tester), isFalse);
@@ -2238,6 +2241,321 @@ void main() {
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.text(es.signInHeading), findsOneWidget);
       expect(again.app.server.requests, isEmpty, reason: 'nothing sent');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, b3 · P143 (UX-1205, UX-1207, UX-1209,
+  // UX-1210): help when the email doesn't come, a named screen, a readable
+  // countdown, unbroken headings ----
+
+  /// The help line's spans, as drawn.
+  TextSpan helpSpan(WidgetTester tester, AppLocalizations l, String address) {
+    final help = find.text(l.verifyEmailHelp(address));
+    expect(help, findsOneWidget);
+    return tester.widget<Text>(help).textSpan! as TextSpan;
+  }
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-1205: the address inside «${strings(language).verifyEmailHelp('…')}» is its own span, bold and in onSurface; the sentence is unchanged ($language)',
+      (tester) async {
+        final l = strings(language);
+        await _App.open(tester, language: language);
+        await createAccount(tester, l, address: 'ana@exmple.invalid');
+        expect(screen(), findsOneWidget);
+        final span = helpSpan(tester, l, 'ana@exmple.invalid');
+        expect(span.toPlainText(), l.verifyEmailHelp('ana@exmple.invalid'));
+        final parts = <TextSpan>[];
+        span.visitChildren((child) {
+          if (child is TextSpan && child.text != null) parts.add(child);
+          return true;
+        });
+        final address = parts.where((part) => part.text == 'ana@exmple.invalid');
+        expect(address, hasLength(1), reason: 'its own span');
+        final colors = Theme.of(tester.element(screen())).colorScheme;
+        expect(address.single.style?.fontWeight, FontWeight.w700);
+        expect(address.single.style?.color, colors.onSurface);
+        for (final rest in parts.where((part) => part != address.single)) {
+          expect(rest.style?.fontWeight, isNot(FontWeight.w700));
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1205: at 2× on 320×640 with the keyboard up ($language), after Reenviar the line «${strings(language).verifyEmailResent}» shows whole, above the keyboard',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = strings(language);
+        final clock = _Clock();
+        final app = await _App.open(
+          tester,
+          language: language,
+          size: const Size(320, 640),
+          clock: clock.call,
+        );
+        await createAccount(tester, l);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.showKeyboard(code);
+        await tester.pumpAndSettle();
+        await later(tester, clock, 61);
+        expect(resendEnabled(tester), isTrue);
+        await tapVisible(tester, resend);
+        expect(app.server.bodies('auth/verify-email/resend/'), hasLength(1));
+        final line = find.text(l.verifyEmailResent);
+        expect(line, findsOneWidget);
+        final rect = tester.getRect(line);
+        expect(rect.top, greaterThanOrEqualTo(0), reason: 'in view');
+        expect(rect.bottom, lessThanOrEqualTo(340.5), reason: 'above the keyboard');
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          find.descendant(
+            of: line,
+            matching: find.byType(RichText),
+            matchRoot: true,
+          ),
+        )) {
+          expect(paragraph.didExceedMaxLines, isFalse);
+        }
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  }
+
+  test(
+    'UX-1205: «Te hemos enviado un código nuevo» now says where to look, in all three languages',
+    () {
+      expect(
+        es.verifyEmailResent,
+        'Te hemos enviado un código nuevo. Si no lo ves, mira en Spam o en Promociones.',
+      );
+      expect(
+        en.verifyEmailResent,
+        'We’ve sent you a new code. If you can’t see it, check Spam or Promotions.',
+      );
+      expect(
+        ca.verifyEmailResent,
+        'T’hem enviat un codi nou. Si no el veus, mira a Correu brossa o a Promocions.',
+      );
+    },
+  );
+
+  testWidgets(
+    'UX-1205: after «Usar otro correo», «Crea tu cuenta» shows with the email field focused and the cursor at the end of the address',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es, address: 'ana@exmple.invalid');
+      await tapVisible(tester, otherAddress);
+      expect(screen(), findsNothing);
+      expect(find.text(es.registerHeading), findsOneWidget);
+      final field = tester.widget<EditableText>(
+        find.descendant(of: email, matching: find.byType(EditableText)),
+      );
+      expect(field.controller.text, 'ana@exmple.invalid');
+      expect(field.focusNode.hasFocus, isTrue, reason: 'ready to correct');
+      expect(
+        field.controller.selection,
+        const TextSelection.collapsed(offset: 'ana@exmple.invalid'.length),
+      );
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1207: the confirm screen’s heading names the screen (namesRoute and header), sign-in’s heading names its screen too, and Confirmar’s spinner is read «Confirmando»',
+    (tester) async {
+      final app = await _App.open(tester);
+      final signIn = tester
+          .getSemantics(find.text(es.signInHeading))
+          .getSemanticsData()
+          .flagsCollection;
+      expect(signIn.namesRoute, isTrue, reason: 'sign-in');
+      expect(signIn.isHeader, isTrue);
+      await tapVisible(tester, find.text(es.createAnAccount));
+      expect(
+        tester
+            .getSemantics(find.text(es.registerHeading))
+            .getSemanticsData()
+            .flagsCollection
+            .namesRoute,
+        isTrue,
+        reason: 'create',
+      );
+      await tester.enterText(email, 'ana@example.invalid');
+      await tester.enterText(password, typedPassword);
+      await tapVisible(tester, submit);
+      expect(screen(), findsOneWidget);
+      final heading = tester.getSemantics(find.text(es.verifyEmailHeading));
+      expect(heading.label, es.verifyEmailHeading);
+      final flags = heading.getSemanticsData().flagsCollection;
+      expect(flags.namesRoute, isTrue);
+      expect(flags.isHeader, isTrue);
+
+      expect(es.verifyEmailConfirming, 'Confirmando');
+      expect(en.verifyEmailConfirming, 'Confirming');
+      expect(ca.verifyEmailConfirming, 'S’està confirmant');
+      app.server.holdVerify = Completer<void>();
+      await tester.enterText(code, '123456');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(app.server.bodies('auth/verify-email/'), hasLength(1));
+      expect(
+        find.descendant(
+          of: confirm,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      final spinner = tester.widget<CircularProgressIndicator>(
+        find.descendant(
+          of: confirm,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+      );
+      expect(spinner.semanticsLabel, es.verifyEmailConfirming);
+      // The button reads it with its own label.
+      expect(
+        tester.getSemantics(confirm).label,
+        contains(es.verifyEmailConfirming),
+      );
+      app.server.holdVerify!.complete();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  /// The places [paragraph] breaks its lines, as offsets in its text.
+  List<int> lineBreaks(RenderParagraph paragraph) {
+    final painter = TextPainter(
+      text: paragraph.text,
+      textDirection: TextDirection.ltr,
+      textScaler: paragraph.textScaler,
+    )..layout(maxWidth: paragraph.size.width);
+    final text = paragraph.text.toPlainText();
+    final breaks = <int>[];
+    var offset = 0;
+    while (offset < text.length) {
+      final line = painter.getLineBoundary(TextPosition(offset: offset));
+      if (line.end >= text.length || line.end <= offset) break;
+      breaks.add(line.end);
+      offset = line.end;
+    }
+    painter.dispose();
+    return breaks;
+  }
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-1209: at linear 2× on 320×640 ($language), «${strings(language).verifyEmailHeading}» and sign-in’s three headings break lines only at spaces',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = strings(language);
+        await _App.open(tester, language: language, size: const Size(320, 640));
+
+        Future<void> expectWhole(String heading) async {
+          final finder = find.descendant(
+            of: find.byType(AuthHeading),
+            matching: find.text(heading),
+          );
+          expect(finder, findsOneWidget, reason: heading);
+          await tester.ensureVisible(finder);
+          await tester.pumpAndSettle();
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: finder,
+              matching: find.byType(RichText),
+              matchRoot: true,
+            ),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse, reason: heading);
+          final rect = tester.getRect(finder);
+          expect(rect.left, greaterThanOrEqualTo(0), reason: heading);
+          expect(rect.right, lessThanOrEqualTo(320.5), reason: heading);
+          final text = paragraph.text.toPlainText();
+          for (final at in lineBreaks(paragraph)) {
+            final before = text[at - 1];
+            final after = text[at];
+            expect(
+              before == ' ' || after == ' ',
+              isTrue,
+              reason: '«$heading» breaks inside a word at $at: '
+                  '«${text.substring(0, at)}|${text.substring(at)}»',
+            );
+          }
+          // Still larger than the body text at 2×: it grows to 1.2×.
+          expect(paragraph.textScaler.scale(30), closeTo(36, 0.01));
+        }
+
+        await expectWhole(l.signInHeading);
+        await tapVisible(tester, find.text(l.forgotPassword).first);
+        await expectWhole(l.recoveryHeading);
+        await tester.pumpWidget(const SizedBox());
+        await _App.open(tester, language: language, size: const Size(320, 640));
+        await createAccount(tester, l);
+        expect(screen(), findsOneWidget);
+        await expectWhole(l.verifyEmailHeading);
+        await tapVisible(tester, otherAddress);
+        await expectWhole(l.registerHeading);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    testWidgets(
+      'UX-1210: while it waits, «Reenviar código en N segundos» is drawn in onSurfaceVariant (${mode.name})',
+      (tester) async {
+        final app = await _App.open(tester);
+        await setAppearance(app.container, mode);
+        await tester.pumpAndSettle();
+        await createAccount(tester, es);
+        expect(resendEnabled(tester), isFalse);
+        expect(waitLeft(tester, es), isNotNull);
+        final colors = Theme.of(tester.element(screen())).colorScheme;
+        expect(
+          Theme.of(tester.element(screen())).brightness,
+          mode == ThemeMode.dark ? Brightness.dark : Brightness.light,
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: resend, matching: find.byType(RichText)),
+        );
+        expect(paragraph.text.style?.color, colors.onSurfaceVariant);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1210: with the clock moved 120 s ahead and one tick, the button reads «Reenviar código» and can be tapped',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      expect(waitLeft(tester, es), greaterThanOrEqualTo(59));
+      // Android froze the app: the clock moved, the timer ticked once.
+      clock.now = clock.now.add(const Duration(seconds: 120));
+      await tester.pump(const Duration(seconds: 1));
+      expect(resendLabel(tester), es.verifyEmailResend);
+      expect(resendEnabled(tester), isTrue);
+      await tapVisible(tester, resend);
+      expect(app.server.bodies('auth/verify-email/resend/'), hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1210: there are at least 8 dp between «Reenviar código» and «Usar otro correo»',
+    (tester) async {
+      await _App.open(tester);
+      await createAccount(tester, es);
+      final above = tester.getRect(resend);
+      final below = tester.getRect(otherAddress);
+      expect(below.top - above.bottom, greaterThanOrEqualTo(8 - 0.01));
       expect(tester.takeException(), isNull);
     },
   );

@@ -258,7 +258,7 @@ void main() {
   );
 
   testWidgets(
-    'someone with nothing assigned: the page says No hay coincidencias and to try another filter',
+    'someone with nothing assigned: the page says they have nothing open here and to tap Todas',
     (tester) async {
       await openProject(
         tester,
@@ -274,9 +274,78 @@ void main() {
       );
       await choose(tester, 'people-5');
       expect(listed(tester), isEmpty);
-      expect(find.text(es.noMatches), findsOneWidget);
-      expect(find.text(es.differentFilter), findsOneWidget);
+      expect(find.text(es.personNothingOpen('Marta')), findsOneWidget);
+      expect(find.text(es.personNothingOpenHelp), findsOneWidget);
+      expect(find.text(es.noMatches), findsNothing);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, b3 · P142 (UX-1109): an empty person's
+  // view says why, not «No hay tareas que coincidan» ----
+
+  for (final (language, l, nothing, help) in [
+    (
+      'es',
+      es,
+      'Marta no tiene tareas pendientes aquí',
+      'Toca Todas para ver todas las tareas.',
+    ),
+    (
+      'ca',
+      ca,
+      'Marta no té tasques pendents aquí',
+      'Toca Totes per veure totes les tasques.',
+    ),
+  ]) {
+    testWidgets(
+      'UX-1109: on a shared project’s page, tapping Marta, who has nothing open, says «$nothing» and «$help» ($language); with «pan» searched it says no task matches',
+      (tester) async {
+        expect(l.personNothingOpen('Marta'), nothing);
+        expect(l.personNothingOpenHelp, help);
+        await openProject(
+          tester,
+          language: language,
+          projects: [
+            familia(
+              people: const [
+                miki,
+                ana,
+                ProjectMember(id: 5, name: 'Marta', role: 'editor'),
+              ],
+            ),
+          ],
+        );
+        await choose(tester, 'people-5');
+        expect(chosen(tester, 'people-5'), isTrue);
+        expect(listed(tester), isEmpty);
+        expect(find.text(nothing), findsOneWidget);
+        expect(find.text(help), findsOneWidget);
+        expect(find.text(l.noMatches), findsNothing);
+        expect(find.text(l.differentFilter), findsNothing);
+
+        final search = find.widgetWithText(TextField, l.findTask);
+        expect(search, findsOneWidget);
+        await tester.enterText(search, 'pan');
+        await tester.pumpAndSettle();
+        expect(listed(tester), isEmpty);
+        expect(find.text(l.noMatches), findsOneWidget);
+        expect(find.text(l.differentFilter), findsOneWidget);
+        expect(find.text(nothing), findsNothing);
+        expect(find.text(help), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test(
+    'UX-1109: the empty person view reads “{name} has nothing open here” / “Tap All to see every task.” in English, and the search lines are unchanged in Spanish',
+    () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(en.personNothingOpen('Marta'), 'Marta has nothing open here');
+      expect(en.personNothingOpenHelp, 'Tap All to see every task.');
+      expect(es.noMatches, 'No hay tareas que coincidan');
+      expect(es.differentFilter, 'Prueba otra palabra o filtro.');
     },
   );
 

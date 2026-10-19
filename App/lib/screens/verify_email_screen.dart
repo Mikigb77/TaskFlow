@@ -84,7 +84,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   // When this screen's last code was sent: just before it opened, or at
   // [VerifyEmailScreen.sentAt], then at each new one.
   late DateTime _sentAt;
-  // Seconds until «Reenviar código» can be tapped.
+  // When «Reenviar código» can be tapped again, by the clock.
+  late DateTime _readyAt;
+  // Seconds until then, as shown.
   int _wait = 0;
   Timer? _timer;
   // The last answer: from the server or the connection.
@@ -135,14 +137,20 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     super.dispose();
   }
 
-  /// «Reenviar código» waits [seconds], counting down each second.
+  /// «Reenviar código» waits [seconds], counting down each second. What is
+  /// left is read from the clock, not counted: Android freezes the app while
+  /// the person reads the email, and the timer then fires once on return.
+  /// Never longer than the seconds the timer saw pass, should the phone's
+  /// clock be set back.
   void _countDown([int seconds = VerifyEmailScreen.resendWait]) {
     _timer?.cancel();
-    _wait = seconds;
-    if (seconds <= 0) return;
+    _readyAt = _now().add(Duration(seconds: seconds));
+    _wait = math.max(0, seconds);
+    if (_wait == 0) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() => _wait--);
-      if (_wait <= 0) timer.cancel();
+      final left = (_readyAt.difference(_now()).inMilliseconds / 1000).ceil();
+      setState(() => _wait = math.max(0, math.min(left, seconds - timer.tick)));
+      if (_wait == 0) timer.cancel();
     });
   }
 
@@ -429,6 +437,28 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     }
   }
 
+  /// [VerifyEmailScreen.email] stands out in its sentence: a mistyped
+  /// address is the usual reason the email never comes.
+  TextSpan _help(AppLocalizations l, ColorScheme colors) {
+    final email = widget.email;
+    final help = l.verifyEmailHelp(email);
+    final at = help.indexOf(email);
+    if (email.isEmpty || at < 0) return TextSpan(text: help);
+    return TextSpan(
+      children: [
+        TextSpan(text: help.substring(0, at)),
+        TextSpan(
+          text: email,
+          style: TextStyle(
+            color: colors.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        TextSpan(text: help.substring(at + email.length)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -468,21 +498,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                           children: [
                             // Each its own node for TalkBack: otherwise the
                             // field takes the heading and the help as its name.
-                            Semantics(
-                              container: true,
-                              header: true,
-                              child: Text(
-                                l.verifyEmailHeading,
-                                style: theme.textTheme.headlineLarge?.copyWith(
-                                  fontSize: 30,
-                                ),
-                              ),
-                            ),
+                            AuthHeading(l.verifyEmailHeading),
                             const SizedBox(height: 10),
                             Semantics(
                               container: true,
-                              child: Text(
-                                l.verifyEmailHelp(widget.email),
+                              child: Text.rich(
+                                _help(l, colors),
                                 style: TextStyle(
                                   color: colors.onSurfaceVariant,
                                   height: 1.55,
@@ -592,11 +613,13 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     if (_confirming) ...[
-                                      const SizedBox(
+                                      SizedBox(
                                         width: 18,
                                         height: 18,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
+                                          semanticsLabel:
+                                              l.verifyEmailConfirming,
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -617,6 +640,14 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                               onPressed: _confirming || _resending || waiting
                                   ? null
                                   : () => unawaited(_resend()),
+                              // The countdown is the screen's only "when":
+                              // read as easily as the help above.
+                              style: waiting
+                                  ? TextButton.styleFrom(
+                                      disabledForegroundColor:
+                                          colors.onSurfaceVariant,
+                                    )
+                                  : null,
                               child: Text(
                                 waiting
                                     ? l.verifyEmailResendIn(_wait)
@@ -624,6 +655,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                                 textAlign: TextAlign.center,
                               ),
                             ),
+                            // Apart, so a tap on the countdown doesn't leave.
+                            const SizedBox(height: 8),
                             TextButton(
                               key: const ValueKey('verify-email-other-address'),
                               onPressed: _confirming

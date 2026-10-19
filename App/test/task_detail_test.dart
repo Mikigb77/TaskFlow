@@ -651,6 +651,59 @@ void main() {
     );
   });
 
+  // ---- Run 2026-10-18-commands, b3 · P140 (UX-1008): the signed-in
+  // account is «ti», as who it's for calls it «Yo» ----
+
+  /// A shared task as the server sends it, created by account [by].
+  Task createdByAccount(int by, String name) => Task.fromApi({
+    ...Task(
+      title: 'Comprar pan',
+      priority: 1,
+      dueDate: friday,
+      listId: 'familia',
+      assignment: 'group',
+    ).toApi(),
+    'created_by': by,
+    'created_by_name': name,
+  }).copyWith(id: 1);
+
+  for (final (language, you) in [
+    ('es', 'Creada por ti'),
+    ('en', 'Created by you'),
+    ('ca', 'Creada per tu'),
+  ]) {
+    testWidgets(
+      'UX-1008: a shared task the signed-in account created reads «$you» ($language); Ana’s still reads her name',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        expect(l.createdByYou, you);
+        // The fixture's signed-in account is 1, Miki.
+        await _App.open(
+          tester,
+          [createdByAccount(1, 'Miki')],
+          projects: [familia],
+          language: language,
+        );
+        await _App.detail(tester, 1);
+        expect(createdBy(), findsOneWidget);
+        expect(tester.widget<Text>(createdBy()).data, you);
+        expect(find.text(l.createdBy('Miki')), findsNothing);
+        await tester.pumpWidget(const SizedBox());
+
+        await _App.open(
+          tester,
+          [createdByAccount(2, 'Ana')],
+          projects: [familia],
+          language: language,
+        );
+        await _App.detail(tester, 1);
+        expect(tester.widget<Text>(createdBy()).data, l.createdBy('Ana'));
+        expect(find.text(you), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final language in ['es', 'ca']) {
     testWidgets(
       'at 2× text on 320 dp ($language), «Creada por» with a long name reads in full with no overflow',

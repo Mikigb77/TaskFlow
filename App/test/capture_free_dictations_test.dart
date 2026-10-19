@@ -1633,7 +1633,7 @@ void main() {
   }
 
   test(
-    '2026-10-18 (later): the button reads Nueva tarea / New task / Tasca nova; the notice speaks of the form, names the limit and the date (mid-sentence in Catalan) and offers Crear una tarea',
+    '2026-10-18 (later): the button reads Nueva tarea / New task / Tasca nova; the notice says tasks go on by hand, names the date before the number and offers Crear una tarea',
     () {
       expect(es.newTask, 'Nueva tarea');
       expect(en.newTask, 'New task');
@@ -1644,7 +1644,7 @@ void main() {
       );
       expect(
         es.freeVoiceNoticeBody(10, '1 nov'),
-        'Puedes seguir creando tareas con el formulario, sin límite. Tendrás 10 dictados más el 1 nov.',
+        'Puedes seguir creando tareas a mano, sin límite. El 1 nov tendrás 10 dictados más.',
       );
       expect(es.freeVoiceNoticeCreate, 'Crear una tarea');
       expect(es.voiceProAction, 'Ver Pro');
@@ -1654,7 +1654,7 @@ void main() {
       );
       expect(
         en.freeVoiceNoticeBody(10, 'Nov 1'),
-        'You can keep creating tasks with the form, with no limit. You’ll get 10 more dictations on Nov 1.',
+        'You can keep creating tasks by hand, with no limit. On Nov 1 you’ll get 10 more dictations.',
       );
       expect(en.freeVoiceNoticeCreate, 'Create a task');
       expect(
@@ -1664,7 +1664,7 @@ void main() {
       // The date keeps its own full stop: «1 de nov.».
       expect(
         ca.freeVoiceNoticeBody(10, '1 de nov.'),
-        'Pots continuar creant tasques amb el formulari, sense límit. El dia 1 de nov. tindràs 10 dictats més.',
+        'Pots continuar creant tasques a mà, sense límit. El dia 1 de nov. tindràs 10 dictats més.',
       );
       expect(ca.freeVoiceNoticeCreate, 'Crea una tasca');
       // The limit comes from the account, in the singular too.
@@ -1674,7 +1674,7 @@ void main() {
       );
       expect(
         es.freeVoiceNoticeBody(1, 'D'),
-        endsWith('Tendrás 1 dictado más el D.'),
+        endsWith('El D tendrás 1 dictado más.'),
       );
       for (final l in [en, es, ca]) {
         expect(l.freeVoiceNoticeTitle(7), contains('7'), reason: l.localeName);
@@ -2589,6 +2589,107 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-18-commands, b3 · P140 (UX-1009): the used-up notice
+  // says «a mano», with the date before the number ----
+
+  group('UX-1009: the used-up notice', () {
+    setUpAll(() async {
+      final font = FontLoader('Manrope')
+        ..addFont(rootBundle.load('assets/fonts/Manrope.ttf'));
+      await font.load();
+    });
+
+    test(
+      'UX-1009: freeVoiceNoticeBody names no form in any language, puts the date before the number, keeps its plurals, and the Catalan reads «El dia {date}»',
+      () {
+        for (final (l, form) in [
+          (es, 'formulario'),
+          (en, 'form'),
+          (ca, 'formulari'),
+        ]) {
+          for (final limit in [1, 10]) {
+            final body = l.freeVoiceNoticeBody(limit, 'DATE');
+            expect(
+              body.toLowerCase(),
+              isNot(contains(form)),
+              reason: '${l.localeName}: $body',
+            );
+            expect(
+              body.indexOf('DATE'),
+              lessThan(body.indexOf('$limit')),
+              reason: '${l.localeName}: the date before the number: $body',
+            );
+          }
+        }
+        expect(
+          es.freeVoiceNoticeBody(10, 'DATE'),
+          'Puedes seguir creando tareas a mano, sin límite. El DATE tendrás 10 dictados más.',
+        );
+        expect(
+          es.freeVoiceNoticeBody(1, 'DATE'),
+          'Puedes seguir creando tareas a mano, sin límite. El DATE tendrás 1 dictado más.',
+        );
+        expect(
+          en.freeVoiceNoticeBody(10, 'DATE'),
+          'You can keep creating tasks by hand, with no limit. On DATE you’ll get 10 more dictations.',
+        );
+        expect(
+          en.freeVoiceNoticeBody(1, 'DATE'),
+          'You can keep creating tasks by hand, with no limit. On DATE you’ll get 1 more dictation.',
+        );
+        expect(
+          ca.freeVoiceNoticeBody(10, 'DATE'),
+          'Pots continuar creant tasques a mà, sense límit. El dia DATE tindràs 10 dictats més.',
+        );
+        expect(
+          ca.freeVoiceNoticeBody(1, 'DATE'),
+          'Pots continuar creant tasques a mà, sense límit. El dia DATE tindràs 1 dictat més.',
+        );
+        expect(ca.freeVoiceNoticeBody(10, 'DATE'), contains('El dia DATE'));
+      },
+    );
+
+    testWidgets(
+      'UX-1009: at 2× on 320×640 in Spanish the notice’s body reads «Puedes seguir creando tareas a mano, sin límite. El {date} tendrás 10 dictados más.» in full, with no overflow',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final resets = nextReset();
+        await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0, resets: resets),
+          size: const Size(320, 640),
+        );
+        await tester.tap(inActions(find.text(es.newTask)).hitTestable());
+        await tester.pumpAndSettle();
+        expect(notice(), findsOneWidget);
+        final date = resetDay(tester, resets);
+        final expected =
+            'Puedes seguir creando tareas a mano, sin límite. El $date tendrás 10 dictados más.';
+        expect(es.freeVoiceNoticeBody(10, date), expected);
+        final body = inNotice(find.text(expected));
+        expect(body, findsOneWidget);
+        await tester.ensureVisible(body);
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(body);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(640.5));
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          find.descendant(
+            of: body,
+            matching: find.byType(RichText),
+            matchRoot: true,
+          ),
+        )) {
+          expect(paragraph.didExceedMaxLines, isFalse);
+        }
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  });
 }
 
 /// A phone whose database can't be read or written.

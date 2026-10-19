@@ -347,3 +347,41 @@ b3 runs first: P139–P144, as planned above and unchanged. Then b4 and b5. The 
   - P158's links load only once the site's legal pages are published (WD13).
 - **Catalan the organizer wrote, to read with a native speaker:** `tasksWithFiles`, `tasksWithFilesHelp`, `tasksWithFilesRow`, `tasksWithFilesEmpty`, `storageSeeTasks`, `nameAskTitle`, `nameAskBody`, `verifyEmailResendInMinutes`, `deleteAccountGoogleInstead` and `deleteAccountWrongPasswordGoogle`. «Desa-ho com a tasca» comes from the decision.
 - **Evidence:** this is a plan only, read from the code at 8993690. Nothing was run.
+
+## Round 2 (b3)
+
+Round 1 of b3 (P139–P144) failed its round check on one test: at 2× on 320 dp, a 40-character title still doesn't show whole in three lines (UX-1003). The reviewers found the other 17 findings fixed, and raised three regressions: one in the new «Elegir día» sheet (P139) and two in the new project rename (P141). Round 2 retries UX-1003 and fixes the regressions in two packages. Nothing is escalated, since UX-1003 has failed once, and there's no new owner question.
+
+### P160 · S2 · B · M · The form's title shows whole once the keyboard is down; a year pick in «Elegir día» applies nothing
+- **UX-1003 (S2), second attempt:** P139 capped the title at 3 lines. At 2× on 320 dp a line holds about 13 characters, so the father's «Llamar al médico el viernes por la tarde» needs 4 lines and its first line scrolled away, in the edit form too. Now the cap holds only while the title has the focus (keyboard up, Hoy and Mañana stay in reach). Without the focus the whole title shows. UX-1002 already drops the keyboard on every day and time tap.
+- **UX-1224 (S2), regression R1B-1 from P139:** in «Elegir día», picking a year in the calendar's «octubre de 2026 ▾» header closed the sheet on a day nobody chose. Now only a tap in the day grid applies and closes. A year pick just moves the calendar, including a pick of the year already shown.
+- **Settled here:** the cap that depends on the focus, over the reviewer's smaller `maxLines: 4`, which would still hide longer titles carried from a dictation. The day sheet's range stays 2000–2101: narrowing it would limit which days can be chosen and wouldn't remove the problem.
+
+### P161 · S2 · C · M · Renaming a dictated project: an existing project's name files the tasks there; a pencil shows the row can be renamed
+- **UX-1225 (S2), regression R1C-1 from P141:** renaming a dictated project to «Física», which the person already has, kept «Física (nuevo)», then filed the task into the existing «Física» at save. Now the rename acts like tapping that project's row: the card reads «Ya tienes «Física»» and the chip shows «Física».
+- **UX-1226 (S1), regression R1C-2 from P141:** the dictated project's row in the project sheet gets a pencil at its end. TalkBack reads it as new copy: “Change the name” / «Cambiar el nombre» / «Canvia el nom».
+- **Settled here:** a name that matches only a project the person can view stays a new project, with «(nuevo)», as when that name is dictated directly. A task can't go into a view-only project.
+
+### Phone checks added
+- P160: at the largest font on a 360 dp phone, type the 40-character title and tap Mañana: the whole title shows. In «Elegir día», tap the month header and then 2027: the sheet stays open.
+- P161: with TalkBack, the dictated project's row reads its name and «Cambiar el nombre».
+
+### Notes for the main session
+- **Catalan the organizer wrote, to read with a native speaker:** `commandRenameProject` («Canvia el nom»).
+- **Evidence:** this is a plan only, read from the working tree after b3 round 1 and from Flutter's `calendar_date_picker.dart`. Nothing was run.
+
+## Round 3 (b3)
+
+Round 2 of b3 (P160, P161) passed its round check. The reviewers found every finding fixed, and ux-tester reported no failing tests. One severity-1 regression came from P160, and the reviewer recommends no code change for it, so this round has no packages. It goes to the owner as D12.
+
+### D12 · After a year pick, a day looks chosen but isn't (UX-1227, S1)
+- **UX-1227 (S1), regression R2B-1 from P160:** in «Elegir día», after a year pick from the «octubre de 2026 ▾» header, Flutter's `_handleYearChanged` paints the same day number (or day 1) of that year as selected. The sheet rightly ignores the pick (`App/lib/widgets/schedule_editor.dart:321-330`), and the day-only sheet has no «Listo», so the sheet shows a choice nobody made. Nothing is lost: the form's chip shows the real day, and tapping any day applies it. Verified in code (the app and Flutter's source); no render shows it.
+- **The two directions:** accept it as known Flutter polish, or build a custom displayed-month path for the calendar. Remounting the calendar with `initialDate: _day` clears the highlight but jumps back to the old month, which undoes the year pick. CalendarDatePicker can't show a month with nothing selected.
+- **Recommendation:** accept it for now (subtract first) and check it on the phone. Only if the walk shows a real pause, plan the custom path as a fix.
+
+### Phone checks added
+- UX-1227: at the largest font on a 360 dp phone, open «Elegir día», tap the month header, then 2027. The sheet stays open with a day highlighted. Note whether that highlight makes you pause before tapping a day.
+
+### Notes for the main session
+- **No packages:** b3 has nothing left to fix. UX-1003, UX-1224, UX-1225 and UX-1226 wait for the close.
+- **Evidence:** this is a plan only, read from verify-b3-r2-B.md and `schedule_editor.dart` in the working tree. Nothing was run.
