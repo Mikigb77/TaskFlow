@@ -348,3 +348,50 @@ The workflow passed WEB-711, WEB-712, WEB-703 (footer part) and WEB-713 back as 
 - In close, take WEB-711, WEB-712, WEB-713 and WEB-703's footer part from `verify-b2-r2-G.md` (fixed, and no test failed). Don't count them as unchecked.
 - WP38's two lines in `src/app/not-found.tsx` stay uncommitted with WP22's `layout.tsx`, which is held. WP21's own lines there can commit apart from them. `src/app/fonts.ts` doesn't exist, and `layout.tsx` is as WP22 left it.
 - WP37 changed only this run's rules in `src/styles/global.css` and adds tests in `tests/ux-web-global.spec.ts`. Both can commit.
+
+## Round 2 (b3)
+
+This is the re-plan after batch 3's first round (WP24–WP28), made on 2026-10-19. The round check passed and no test failed. Every finding in WP24–WP28 came back fixed (or fixed in its parts for this batch). The verifiers reported five regressions, now WEB-714 to WEB-718. This round has three packages, no new decisions and no escalations. Full briefs: `plan-b3-r2.json`. All three run before WP29.
+
+### WP39 · Live demo: the weekday in full, one way to resend, a status that clears · H · M · **held** (with VoiceDemo.tsx) · S2
+- WEB-716 (R1H-1), a regression of WP28: the tries-used line uses the full weekday («el martes», «dimarts», ‘on Tuesday’), says ‘today’ / «hoy» / «avui» when the reset is today, and «a la 1:30» for one o'clock in ES and CA. The task cards keep the short weekday.
+- WEB-717 (R1H-2), a regression of WP27: after a refused recording, the extra filled ‘Done’ goes, along with the recording; only ‘Tap to talk’ remains. When the request can be retrieved (offline, timeout, 503, processing), one filled ‘Try again’ / «Reintentar» / «Torna-ho a provar» (`tryAgain`, `.voice-retry`) resends it without using a try. Typed mode keeps its Done.
+- WEB-718 (R1H-3), a regression of WP27: the hidden status is cleared once the answer arrives, so ‘Understanding…’ no longer sits above the result.
+
+### WP40 · At 200% text on phones, the sticky header stays one row · G · S · commits · S1
+- WEB-715 (R1G-1), a side effect of WP25: the wordmark is capped at 28 px (`min(1.4375rem, 28px)`; WCAG 1.4.4 exempts logotypes), so the logo and Menu fit one row at 390 px and the sticky header is 90 px or less, not about 127 px. The Menu label still grows.
+
+### WP41 · Legal pages: the back arrow grows with its label · L · S · **held** (legal.css) · S1
+- WEB-714 (R1L-1), a regression of WP24: `.legal-utility .inline-link svg { width: 1em; height: 1em; }`, so the arrow follows the label at any text size, including WP30's.
+
+### Noted, not planned
+- **Focus is lost when ‘Tap to talk’ is pressed** (H verifier, not caused by this run): `record()` sets `loading`, which disables the focused button, so keyboard and screen-reader users land on the page and have to find Done again (AUDIT §13: Focus “page” for voice-mic-waiting and voice-recording). The verifier's fix: don't disable the record button while the microphone starts; ignore repeated clicks with a guard, so focus stays on the element that becomes Done. It isn't in the ledger yet. Pass it to WP29's implementer, who edits the same component, or give it an ID at the next review.
+- On desktop legal pages, two identical language switches sit about 120 px apart: the header's (WP20) and the legal pill (WP24). On phones the pill is the only visible one. Subtract-first option for WP30, the legal template: hide `.legal-languages` above the 64em phone-menu breakpoint. Screen readers already tell them apart.
+- ‘See what I said’ also labels a typed result's transcript; «what I wrote» would be more exact. The copy is the app's, so it stays unless the owner changes it.
+- When a result is sent, AUDIT §13 announces the waiting state's own `role=status` line too. WP29 deletes that line.
+- Without JavaScript, the hidden theme toggle leaves a 44 px gap at the right end of the desktop header. That's the brief's ‘no layout shift’, not a finding.
+
+### For the main session
+- WP39's lines stay uncommitted with `VoiceDemo.tsx` (held). Its strings in `src/content/site/` commit; the `triesUsed` string becomes four sentences, read only by the held `VoiceDemo.tsx`.
+- WP29 runs after WP39. Tell its implementer that `tryAgain` and the voice-mode `.voice-retry` button already exist, so WP29 extends them to typed mode, ‘Stop waiting’, the connection errors and the security check rather than adding a second ‘Try again’.
+- WP41's one rule stays uncommitted with `legal.css` (the other session's untracked file). WP40's change to `global.css` commits.
+- For a native Catalan read: WP39's «Hi podràs tornar a provar avui a les {time}.» and «… a la {time}.», as well as the strings listed in `verify-b3-r1-H.md` (‘Observations’).
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Round 3 (b3)
+
+This is the re-plan after batch 3's second round (WP39–WP41), made on 2026-10-19. The round check passed and no test failed. WEB-714 to WEB-718 all came back fixed. The H verifier reported one regression, now WEB-719. This round has one package, no new decisions and no escalations. Full brief: `plan-b3-r3.json`. It runs before WP29.
+
+### WP42 · Live demo: Try again stays put while the resend waits · H · S · **held** (with VoiceDemo.tsx) · S1
+- WEB-719 (R2H-1), a regression of WP39: tapping ‘Try again’ / «Reintentar» made the button vanish and turned the record circle into a disabled ‘Done’ until the new security token arrived. The fix leaves out a resend from `listening`, so ‘Try again’ stays in place, disabled and focused, ‘Tap to talk’ stays a disabled circle, and ‘One moment…’ / «Un momento…» / «Un moment…» shows under it. No new copy. The tests hold the security stand-in's token to see this moment. The same file also gets one test fix: WEB-2's tries-used test now runs on a fixed clock, so it can't fail on 23 October.
+
+### Noted, not planned
+- The WP39 implementer centred `.voice-retry` with one selector in `voice.css`, against the brief's ‘don't touch voice.css’. The verifier accepted it as harmless, so it stays.
+- Left for WP29, as planned: offline still shows the browser's raw ‘Failed to fetch’. A gateway error page that isn't JSON (a 502 or 503 HTML page) throws in `response.json()`, so in voice mode it clears the recording and shows no ‘Try again’. WP29's brief on the connection errors should treat a non-JSON 5xx as retryable.
+- There's no render of the voice-mode Try again state (`voice-offline` and `voice-error-processing-*` are typed-mode renders). A `voice-offline-recording` render would let the next reviewer see it; WP29 can add it to `PAGES` when it touches those states.
+
+### For the main session
+- WP42's changes stay uncommitted with `VoiceDemo.tsx` (held), along with its test changes in `tests/ux-web-voice.spec.ts` and `tests/support/ux-voice.ts`.
+- WP29 runs after WP42. Tell its implementer to keep the `!retryPending` exclusion in `listening` when it extends `.voice-retry`, and to look at the non-JSON 5xx case above.
+- For a native Catalan read (unchanged from round 2): «Hi podràs tornar a provar avui a les {time}.», «… a la {time}.», «… {weekday} a la {time}.», and `tryAgain` «Torna-ho a provar».
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
