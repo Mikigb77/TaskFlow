@@ -80,7 +80,12 @@ Do every step. Don't stop after the first few problems.
    - Older renders: `App/build/*.png` and `App/artifacts/auth/`, from the earlier preview tests. `App/artifacts/design/*.png` dates from September and is stale.
    - When a visual judgement matters and a render is missing or stale, run the preview for that screen (commands in CLAUDE.md) and read the PNG.
    - Inside the UX loop, the previews are rendered just before you start, and other reviewers may be running in parallel, so don't run Flutter there.
-   - For what no preview shows (INDEX.md, "Not covered"), reason from the widget code — sizes, paddings, constraints, colours — and say that's what you did.
+   - Read the device captures, when `App/build/ux/device/INDEX.md` exists. They show what previews can't draw: the launcher icon and shortcuts, the home-screen widget, notifications, permission dialogs, sharing, the capture flow on Android, and TalkBack.
+     - The index lists each PNG with what it shows, its time and its commit, and what wasn't captured and why.
+     - `App/build/ux/device/a11y/*.xml` are uiautomator trees: roughly what TalkBack reads (labels, roles, states). Use them for lens L.
+     - The main session makes them on the separate `TaskFlow_Review` test emulator. Never run that lane yourself.
+     - Their evidence level is **emulator**, not physical phone: there's no real voice, and another phone's launcher may differ. A capture older than the code it shows is not evidence.
+   - For what neither the previews nor the device captures show (each INDEX.md lists what it doesn't cover), reason from the widget code — sizes, paddings, constraints, colours — and say that's what you did.
 5. **Walk it.** Do a cognitive walkthrough (Wharton et al. 1994) for each person, at every step:
    - Will they try to do the right thing here?
    - Will they notice the control that does it?
@@ -342,7 +347,7 @@ Don't report 0s.
 - Why it fails: the principle, with its source
 - Fix: the concrete change — what to remove, move, rename or show; exact copy in English and Spanish (Catalan if you're confident, otherwise "needs Catalan translation")
 - Verify: how to confirm it's fixed — a preview, a test, a walkthrough step, or a device check
-- Evidence: verified in code / seen in a current render / inferred, needs a device check
+- Evidence: verified in code / seen in a current render / seen in an emulator capture / inferred, needs a device check
 
 ### Keep (5 bullets at most)
 ### Progress against UX_REVIEW.md (U1–U14): advanced / regressed / still open

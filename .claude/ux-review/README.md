@@ -28,6 +28,8 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
    - `AUDIT.md`: measured evidence for each one — Flutter's accessibility guidelines, what TalkBack would read, clipped text, and the size of every tap target and the gap to its neighbour.
 
    So the reviewer judges what a person sees, not only the code. It is still widget-test evidence, not a phone.
+
+   For what previews can't draw, the main session also captures the app on the `TaskFlow_Review` test emulator, into `App/build/ux/device/` with its own `INDEX.md` (`emulator/README.md`). That's emulator evidence: closer, but still not your phone.
 3. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder. It reviews against `GUIDELINES.md` and cites its rule IDs.
 4. **Plan.** `ux-organizer` (Opus, max effort):
    - merges duplicates;
@@ -48,7 +50,7 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
 - The loop fixes everything the reviewer finds **except product decisions**; those come to you.
 - Only whole-app runs stop for your approval.
 - Each verified round becomes one commit on `dev`. Nothing is ever pushed, and `main` is never touched.
-- No agent touches a phone or an emulator. Anything that needs a device is listed for you to check.
+- No agent touches your phone or your own emulators. The main session captures what previews can't draw — the launcher, the widget, notifications, permission dialogs, sharing, TalkBack — from the separate `TaskFlow_Review` test emulator, which holds only test data (2026-10-18; `emulator/README.md`). Anything that needs a real phone is listed for you to check.
 
 ## Files
 
@@ -62,6 +64,7 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
 | `ux.sh` | The snapshot helper (`refs/ux-review/last`). It never touches your branch or files. |
 | `PHONE_CHECKS.md` | Everything fixed in code that still needs a real phone, with steps, by area. Generated from `ISSUES.md` by `phone_checks.py`; when a check passes, move its line in `ISSUES.md` to Verified and regenerate. |
 | `pkg.py`, `phone_checks.py` | Helpers: print plan packages for the agents; rebuild `PHONE_CHECKS.md`. |
+| `emulator/` | The device-capture lane. `capture.py` captures Android's own surfaces from the `TaskFlow_Review` test emulator into `App/build/ux/device/`, with its own `INDEX.md`. Its test account, `review.local.json`, is gitignored. |
 | `free-tier-plan.md`, `free-tier-backend-notes.md` | The free tier's design and the server's contract for the app. |
 | `speed-review-brief.md` | The brief for the capture-speed review (run `2026-10-14-speed`). |
 

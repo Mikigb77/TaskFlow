@@ -78,6 +78,30 @@ The first is the UX preview suite. It renders every route and tab in its key sta
 
 The fourth command fails after writing its PNGs; that's expected (see `KNOWN_FAILURES.md`). If a preview fails in any other way, mention it, but keep going: previews are evidence, not a gate.
 
+### Device captures
+
+Previews can't draw what Android draws around the app. Capture it from the separate `TaskFlow_Review` test emulator, never from the owner's phone or his own emulators. How the lane works, and its safety rules: `.claude/ux-review/emulator/README.md`.
+
+- **When:**
+  - always in **app** mode;
+  - otherwise, whenever the scope includes native surfaces, notifications or reminders, permissions, the home-screen widget, launcher shortcuts or sharing. In practice that's area A or D, or any file under `App/android/` or `App/ios/`.
+- **How:** after the previews, run from the repo root:
+
+  ```
+  python .claude/ux-review/emulator/capture.py
+  ```
+
+  - It builds the review APK from the working tree, installs it on `TaskFlow_Review` and writes `App/build/ux/device/`, with its own `INDEX.md`. The preview suite leaves that folder alone.
+  - For a scoped run, pass only the sections in scope: for example `--only journey,launcher,widget,share` for area A, or `--only journey,calendar-permission,notifications` for area D. Add `languages` when English or Catalan copy on those surfaces changed.
+  - `--apk <path>` installs an APK that's already built. If the build fails with "requires symlink support", run the command from PowerShell, or build there and pass `--apk`.
+- **Time:** a full run takes about an hour, longer when the machine is busy, so start it in the background and keep working. A scoped run takes 2–4 minutes to boot the emulator and install, plus its sections: 1–10 minutes each, and 21–25 for `languages`. Per-section times are in the lane's README.
+  - Check on it with short commands, such as the last lines of its output; never wait on it in one long blocking call.
+  - If its output hasn't moved for about 8 minutes, stop it, run `python .claude/ux-review/emulator/capture.py stop`, and report what wasn't captured. (The notifications section says "waiting" and then waits about 5 minutes for its reminders.)
+- **If the emulator can't start or the run fails,** carry on without it.
+  - Say so in `notes`, for example "No device captures this run: <reason>", and in the report to the owner.
+  - Device-only checks stay on the phone list.
+- **Tell the reviewers** in `notes` which sections were captured, and when. Their evidence level is "emulator", not "physical phone".
+
 ## 5. Review and plan — workflow `ux-review`
 
 Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-review.js` (the repo root comes from `git rev-parse --show-toplevel`). Don't use `name`: saved workflows are only looked up by name if they existed when the session started. Pass these args:

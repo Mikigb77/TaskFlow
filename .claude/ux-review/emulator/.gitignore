@@ -1,0 +1,4 @@
+# The review emulator's test account and its build defines stay on this
+# computer: never commit them.
+*.local.json
+__pycache__/
