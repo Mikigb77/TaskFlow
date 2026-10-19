@@ -381,7 +381,7 @@ void main() {
   // ---- D12: Back ----
 
   testWidgets(
-    'D12: Back with a title saves it, says Cambios guardados with Deshacer and lands it lit; Deshacer removes it',
+    'D12, D6: Back with a title saves it, says the day it was added to with Deshacer and lands it lit; Deshacer removes it',
     (tester) async {
       final app = await _App.open(tester);
       await openForm(tester);
@@ -394,8 +394,12 @@ void main() {
       final saved = app.tasks.state.requireValue.single;
       expect(saved.title, 'Regar las plantas');
       expect(Task.day(saved.dueDate!), tomorrow);
-      expect(es.changesSaved, 'Cambios guardados');
-      expect(find.text(es.changesSaved), findsOneWidget);
+      final calendar = tester.element(find.byType(CalendarScreen));
+      expect(
+        find.text(es.taskAddedOn(calendar.weekdayDate(tomorrow))),
+        findsOneWidget,
+      );
+      expect(find.text(es.changesSaved), findsNothing);
       expect(find.text(es.undo), findsOneWidget);
       expect(row('Regar las plantas').hitTestable(), findsOneWidget);
       expect(
@@ -405,6 +409,72 @@ void main() {
       await tester.tap(find.text(es.undo));
       await tester.pumpAndSettle();
       expect(app.tasks.state.requireValue, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, b4 · P153 (UX-1010, D6): Back on a new
+  // task says what the button says ----
+
+  testWidgets(
+    'UX-1010: on Monday 19 October, Back on a new task «Comprar pan» with Mañana says «Añadida al mar, 20 oct» with Deshacer, never Cambios guardados; Deshacer removes the task',
+    (tester) async {
+      final monday = DateTime(2026, 10, 19, 10);
+      final tuesday = DateTime(2026, 10, 20);
+      final app = await _App.open(tester, clock: monday);
+      await openForm(tester);
+      await typeTitle(tester, 'Comprar pan');
+      await tester.tap(chip('new-task-tomorrow'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+      final saved = app.tasks.state.requireValue.single;
+      expect(saved.title, 'Comprar pan');
+      expect(Task.day(saved.dueDate!), tuesday);
+      final calendar = tester.element(find.byType(CalendarScreen));
+      final message = find.byType(SnackBar);
+      expect(
+        find.descendant(
+          of: message,
+          matching: find.text(es.taskAddedOn(calendar.weekdayDate(tuesday))),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: message, matching: find.text(es.undo)),
+        findsOneWidget,
+      );
+      expect(find.text(es.changesSaved), findsNothing);
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(app.tasks.state.requireValue, isEmpty, reason: 'Deshacer');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1010: Back on a new task with no day says «Añadida sin fecha» with Deshacer, never Cambios guardados',
+    (tester) async {
+      final app = await _App.open(tester, clock: DateTime(2026, 10, 19, 10));
+      await openForm(tester);
+      await typeTitle(tester, 'Comprar pan');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+      final saved = app.tasks.state.requireValue.single;
+      expect(saved.dueDate, isNull);
+      final message = find.byType(SnackBar);
+      expect(
+        find.descendant(of: message, matching: find.text(es.taskSavedInbox)),
+        findsOneWidget,
+      );
+      expect(es.taskSavedInbox, 'Añadida sin fecha');
+      expect(
+        find.descendant(of: message, matching: find.text(es.undo)),
+        findsOneWidget,
+      );
+      expect(find.text(es.changesSaved), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

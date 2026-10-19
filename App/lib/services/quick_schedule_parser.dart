@@ -10,7 +10,8 @@ class ScheduleSuggestion {
   final bool ambiguousTime;
 
   /// A bare hour from 1 to 12 (`a las 5`): morning or afternoon is asked, not
-  /// guessed. Its words are left out of [title].
+  /// guessed. Its words are left out of [title], unless the parse was asked
+  /// to keep them.
   final int? ambiguousHour;
   final bool isDeadline;
   const ScheduleSuggestion(this.title, this.date, this.hasTime,
@@ -134,10 +135,13 @@ class QuickScheduleParser {
   /// day when that time has already passed. A day of the month alone (`el
   /// 12`, `the 12th`) is this month's until it has passed, then next
   /// month's. The title can be empty when the words are only a date.
+  /// With [keepAmbiguousHour], a bare hour from 1 to 12 stays in the title
+  /// and says nothing when: the task form sets no time it would guess.
   static ScheduleSuggestion? parse(
     String input,
     DateTime reference, {
     DateTime? day,
+    bool keepAmbiguousHour = false,
   }) {
     if (input.length > 4000) return null;
     // Quoted titles, alternatives and explicit corrections require human/AI review.
@@ -266,7 +270,11 @@ class QuickScheduleParser {
         acceptedPart = settled?.$1;
       } else if (bare.isNotEmpty) {
         ambiguous = true;
-        if (hour != null && hour >= 1 && hour <= 12 && !beforeDeadline) {
+        if (hour != null &&
+            hour >= 1 &&
+            hour <= 12 &&
+            !beforeDeadline &&
+            !keepAmbiguousHour) {
           ambiguousHour = hour;
           acceptedTime = bare.single;
         }

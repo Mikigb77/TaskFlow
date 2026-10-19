@@ -82,7 +82,7 @@ final freeVoiceUsedUpProvider = Provider<bool>(
 /// An account without Pro, once billing has answered: words it types never
 /// become tasks on the phone. It creates tasks with the form, and the
 /// capture sheet's keyboard opens the form (DECISIONS.md, 2026-10-18
-/// later). Dictations, and `Guardar tal cual` after one, stay. False while
+/// later). Dictations, and `Guardar como tarea` after one, stay. False while
 /// billing is still finding out: then the sheet types as before.
 final typesInFormProvider = Provider<bool>(
   (ref) => !ref.watch(billingLoadingProvider) && !ref.watch(hasProProvider),

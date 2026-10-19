@@ -486,7 +486,7 @@ void main() {
   // ---- P89 · UX-499: capture_id, and the cancel ----
 
   testWidgets(
-    'UX-499: Guardar tal cual while a free dictation is understood sends one DELETE for its capture_id, saves the words, ignores the 409 that follows; the next dictation uses a new capture_id',
+    'UX-499: Guardar como tarea while a free dictation is understood sends one DELETE for its capture_id, saves the words, ignores the 409 that follows; the next dictation uses a new capture_id',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
       app.api.hold = Completer<void>();
@@ -643,7 +643,7 @@ void main() {
   });
 
   testWidgets(
-    'UX-498: a 402 free_voice_used_up keeps the said words in the typing field with Guardar tal cual and the used-up line; no second request is made',
+    'UX-498: a 402 free_voice_used_up keeps the said words in the typing field with Guardar como tarea and the used-up line; no second request is made',
     (tester) async {
       final resets = nextReset();
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(1));
@@ -1168,7 +1168,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-502: spoken words refused with 402 still show the typing field with the words, Guardar tal cual and Cancelar, and Cancelar still asks whether to keep them',
+    'UX-502: spoken words refused with 402 still show the typing field with the words, Guardar como tarea and Cancelar, and Cancelar still asks whether to keep them',
     (tester) async {
       final resets = nextReset();
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(1));
@@ -2690,6 +2690,202 @@ void main() {
       },
     );
   });
+
+  // ---- Run 2026-10-18-commands, b4 · P153 (UX-918, D2): words dictated
+  // before «Escribir» keep the day and time they name; typed and shared
+  // words stay as typed ----
+
+  group('UX-918: dictated words carried into the form by Escribir', () {
+    // Monday 19 October 2026 at 10:00; that week's Friday is the 23rd.
+    final monday = DateTime(2026, 10, 19, 10);
+    final friday = DateTime(2026, 10, 23);
+    Finder chip(String key) => find.byKey(ValueKey(key));
+    bool selected(WidgetTester tester, String key) =>
+        tester.widget<ChoiceChip>(chip(key)).selected;
+    String chipLabel(WidgetTester tester, String key) => tester
+        .widget<Text>(
+          find.descendant(of: chip(key), matching: find.byType(Text)).last,
+        )
+        .data!;
+    BuildContext formContext(WidgetTester tester) =>
+        tester.element(find.byType(TaskEditor));
+
+    /// A free account with dictations left: Añadir tarea, the mic hears
+    /// [words], then Escribir.
+    Future<_FreeApp> heardThenEscribir(
+      WidgetTester tester,
+      String words,
+    ) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(5),
+        clock: monday,
+      );
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      app.speech.send('ready');
+      app.speech.send('segment', text: words);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.byKey(const ValueKey('capture-fill-by-hand')));
+      await tester.pumpAndSettle();
+      expect(form(), findsOneWidget);
+      expect(app.api.drafts, isEmpty, reason: 'no dictation used');
+      return app;
+    }
+
+    testWidgets(
+      'UX-918: heard «Médico el viernes a las 5 de la tarde», Escribir opens the form titled «Médico», with the third day chip reading Friday 23 and selected, and the time chip reading 17:00',
+      (tester) async {
+        await heardThenEscribir(tester, 'Médico el viernes a las 5 de la tarde');
+        expect(formTitle(tester), 'Médico');
+        final context = formContext(tester);
+        expect(
+          chipLabel(tester, 'new-task-pick-day'),
+          context.weekdayDate(friday),
+        );
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        expect(selected(tester, 'new-task-today'), isFalse);
+        expect(selected(tester, 'new-task-tomorrow'), isFalse);
+        expect(
+          find.widgetWithText(
+            InputChip,
+            context.clockTime(DateTime(2026, 10, 23, 17)),
+          ),
+          findsOneWidget,
+        );
+        expect(context.clockTime(DateTime(2026, 10, 23, 17)), '17:00');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-918: heard «Médico el viernes a las 5» (no a. m. or p. m.), the form never guesses: titled «Médico a las 5», Friday 23 selected, and «Añadir hora» with no time set',
+      (tester) async {
+        await heardThenEscribir(tester, 'Médico el viernes a las 5');
+        expect(formTitle(tester), 'Médico a las 5');
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        expect(
+          chipLabel(tester, 'new-task-pick-day'),
+          formContext(tester).weekdayDate(friday),
+        );
+        expect(find.widgetWithText(ActionChip, es.addTime), findsOneWidget);
+        expect(find.byType(InputChip), findsNothing, reason: 'no time set');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-918, UX-1010: heard «Entregar la factura antes del viernes»: titled «Entregar la factura», no day chosen, the collapsed form says «Vence vie, 23 oct»; Añadir tarea lands on Friday 23 with the row lit and «Añadida · vence el vie, 23 oct»',
+      (tester) async {
+        final app = await heardThenEscribir(
+          tester,
+          'Entregar la factura antes del viernes',
+        );
+        expect(formTitle(tester), 'Entregar la factura');
+        for (final key in [
+          'new-task-today',
+          'new-task-tomorrow',
+          'new-task-pick-day',
+        ]) {
+          expect(selected(tester, key), isFalse, reason: key);
+        }
+        final due = es.deadlineLabel(formContext(tester).weekdayDate(friday));
+        expect(find.text(due), findsOneWidget, reason: due);
+
+        await tester.ensureVisible(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        expect(form(), findsNothing);
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.title, 'Entregar la factura');
+        expect(saved.dueDate, isNull);
+        expect(Task.day(saved.deadline!), friday);
+        final calendar = tester.element(find.byType(CalendarScreen));
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(friday)),
+          findsOneWidget,
+          reason: 'Calendar shows Friday 23',
+        );
+        final row = find.widgetWithText(TaskTile, 'Entregar la factura');
+        expect(row.hitTestable(), findsOneWidget);
+        expect(
+          tester.widget<TaskTile>(row).color,
+          Theme.of(calendar).colorScheme.primaryContainer,
+        );
+        expect(
+          find.text(es.taskAddedDue(calendar.weekdayDate(friday))),
+          findsOneWidget,
+        );
+        expect(find.text(es.undo), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-918: a title typed in the form, «Médico el viernes», saved with Añadir tarea has no day; shared text «Médico el viernes» opened in the form keeps that title and no day',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: monday,
+        );
+        // Escribir before anything is said: an empty form, typed in.
+        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('capture-fill-by-hand')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('task-title')),
+          'Médico el viernes',
+        );
+        await tester.pumpAndSettle();
+        expect(selected(tester, 'new-task-pick-day'), isFalse);
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        final typed = app.tasks.state.requireValue.single;
+        expect(typed.title, 'Médico el viernes');
+        expect(typed.dueDate, isNull);
+        expect(typed.deadline, isNull);
+
+        // Shared text opens straight in the form.
+        app.store.sessions['shared'] = CaptureSession(
+          id: 'shared',
+          ownerKey: app.owner,
+          timezone: 'Europe/Madrid',
+          capturedAt: monday.toUtc(),
+          text: 'Médico el viernes',
+          source: 'shared',
+        );
+        unawaited(
+          showCaptureSheet(
+            tester.element(find.byType(Scaffold).first),
+            captureId: 'shared',
+            startListening: false,
+            typing: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Médico el viernes');
+        for (final key in [
+          'new-task-today',
+          'new-task-tomorrow',
+          'new-task-pick-day',
+        ]) {
+          expect(selected(tester, key), isFalse, reason: key);
+        }
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        final shared = app.tasks.state.requireValue.last;
+        expect(shared.title, 'Médico el viernes');
+        expect(shared.dueDate, isNull);
+        expect(shared.deadline, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// A phone whose database can't be read or written.
@@ -2815,6 +3011,7 @@ class _FreeApp {
     int accountId = 1,
     _Notices? notices,
     bool noticeSeen = false,
+    DateTime? clock,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -2870,6 +3067,7 @@ class _FreeApp {
         }),
         captureEntriesProvider.overrideWithValue(entries),
         freeVoiceNoticeStoreProvider.overrideWithValue(seen),
+        if (clock != null) calendarClockProvider.overrideWithValue(() => clock),
       ],
     );
     app = _FreeApp(container, api, store, tasks, speech, seen);

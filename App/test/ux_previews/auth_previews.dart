@@ -317,6 +317,31 @@ void authPreviews() {
 
     preview(
       verify,
+      'resend-limited',
+      'Reenviar código refused for 30 minutes, too many codes asked for: the wait is said, nothing was sent, the digits typed stay.',
+      [es2, ca2],
+      (p) async {
+        final app = await _verify(p);
+        app.api.handlers['POST auth/verify-email/resend/'] = (_) => throw ApiException(
+          429,
+          'Too many codes requested. Try again later.',
+          {'code': 'resend_limited', 'retry_after': 1800},
+          const Duration(seconds: 1800),
+        );
+        await p.tester.pump(const Duration(seconds: 61));
+        await p.tester.pumpAndSettle();
+        await _code(p, '4829');
+        final resend = find.byKey(const ValueKey('verify-email-resend'));
+        await p.tester.ensureVisible(resend);
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(resend);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      verify,
       'offline',
       'Confirming the code with no connection.',
       [es1],

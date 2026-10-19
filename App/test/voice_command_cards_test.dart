@@ -1337,6 +1337,7 @@ void main() {
   _commandsRound2b();
   _commandsRound3();
   _commandsRound3b();
+  _commandsRound4();
 }
 
 /// The phone's recognizer, shared by the tests: it listens until stopped,
@@ -1838,7 +1839,7 @@ void _commandsRound1() {
 
     testWidgets(
       'UX-901: a dictation answered with one change that finds no task shows '
-      'No encuentro…, a filled full-width «Guardar tal cual», and «Cerrar» '
+      'No encuentro…, a filled full-width «Guardar como tarea», and «Cerrar» '
       'under it',
       (tester) async {
         final app = await _App.open(
@@ -1860,7 +1861,7 @@ void _commandsRound1() {
           ),
           findsOneWidget,
         );
-        expect(es.captureSaveAsWritten, 'Guardar tal cual');
+        expect(es.captureSaveAsWritten, 'Guardar como tarea');
         // The only filled button: nothing else to confirm.
         expect(_filledInResult(), findsOneWidget);
         expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
@@ -1880,7 +1881,7 @@ void _commandsRound1() {
     );
 
     testWidgets(
-      'UX-901: «Guardar tal cual» sends nothing more to the assistant, saves '
+      'UX-901: «Guardar como tarea» sends nothing more to the assistant, saves '
       '«Cambia el aceite del coche» on Saturday with no command applied, '
       'closes the sheet, and Calendar shows Saturday with the row lit and '
       '«Añadida al …» with Deshacer',
@@ -1921,7 +1922,7 @@ void _commandsRound1() {
 
     testWidgets(
       'UX-901: a search that finds nothing («Busca piso en Valencia») shows '
-      '«Guardar tal cual» above «Cerrar»; a search that finds two tasks shows '
+      '«Guardar como tarea» above «Cerrar»; a search that finds two tasks shows '
       'no filled button, only «Cerrar»',
       (tester) async {
         final app = await _App.open(
@@ -1975,7 +1976,7 @@ void _commandsRound1() {
 
     testWidgets(
       'UX-901: a change that found its task with nothing to change («Ya está '
-      'así.») shows no «Guardar tal cual»',
+      'así.») shows no «Guardar como tarea»',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -2129,17 +2130,11 @@ void _commandsRound1() {
         expect(ending(), findsNWidgets(2));
         expect(find.text('${weekday(day(-2))} · 09:00$suffix'), findsOneWidget);
         expect(find.text('${weekday(day(-4))} · 09:00$suffix'), findsOneWidget);
+        // Only a deletion, nothing to add: Cancelar just closes (UX-917).
         await tester.tap(
           find.descendant(
             of: find.byType(CaptureResult),
             matching: find.widgetWithText(TextButton, es.cancel),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.descendant(
-            of: find.byType(AlertDialog),
-            matching: find.text(es.discard),
           ),
         );
         await tester.pumpAndSettle();
@@ -2164,7 +2159,7 @@ void _commandsRound1() {
     );
 
     testWidgets(
-      'UX-901: a free account with 3 dictations left: «Guardar tal cual» makes '
+      'UX-901: a free account with 3 dictations left: «Guardar como tarea» makes '
       'no request to ai/drafts/ and «Te quedan 3 dictados gratis este mes» '
       'stays as it was',
       (tester) async {
@@ -2381,15 +2376,18 @@ void _commandsRound1() {
       matching: find.widgetWithText(TextButton, es.cancel),
     );
 
-    testWidgets('UX-903: Cancelar on a spoken result holding a deletion asks '
-        '«¿Conservar lo que has dicho para más tarde?» with Descartar and '
-        'Conservar', (tester) async {
+    // A task to add beside the deletion: with none, Cancelar just closes
+    // (UX-917, D1).
+    testWidgets('UX-903: Cancelar on a spoken result holding a task and a '
+        'deletion asks «¿Conservar lo que has dicho para más tarde?» with '
+        'Descartar and Conservar', (tester) async {
       final app = await _App.open(
         tester,
         tasks: [Task(id: 1, title: 'Dentista', priority: 1)],
       );
       await app.showResult(
         tester,
+        drafts: [draft('Comprar pan', date: day(1))],
         commands: [
           command({
             'kind': 'delete',
@@ -2412,16 +2410,16 @@ void _commandsRound1() {
     });
 
     testWidgets(
-      'UX-903: Cancelar on a typed result asks «¿Conservar el texto para más '
-      'tarde?»',
+      'UX-903: Cancelar on a typed result with a task and a deletion asks '
+      '«¿Conservar el texto para más tarde?»',
       (tester) async {
         final app = await _App.open(
           tester,
           tasks: [Task(id: 1, title: 'Dentista', priority: 1)],
         );
         app.api.answer = {
-          'transcript': 'Borra el dentista',
-          'tasks': [],
+          'transcript': 'Comprar pan mañana y borra el dentista',
+          'tasks': [serverTask('Comprar pan', date: day(1))],
           'commands': [
             {
               'kind': 'delete',
@@ -2432,7 +2430,7 @@ void _commandsRound1() {
             },
           ],
         };
-        await app.type(tester, 'Borra el dentista');
+        await app.type(tester, 'Comprar pan mañana y borra el dentista');
         expect(find.byType(DeleteCommandCard), findsOneWidget);
         await tester.tap(cancelInResult());
         await tester.pumpAndSettle();
@@ -5464,5 +5462,195 @@ void _commandsRound3b() {
         }
       },
     );
+  });
+}
+
+// ---- Run 2026-10-18-commands, b4 · P152 (UX-917, UX-919; D1, D3) ----
+//
+// A result with nothing to add closes on Cancelar, Back or a tap above the
+// sheet with no question; the phone-parser fallback reads «Guardar como
+// tarea».
+
+void _commandsRound4() {
+  group('UX-917: Cancelar on a result with nothing to add just closes', () {
+    CaptureCommand deletion() => command({
+      'kind': 'delete',
+      'target': {
+        'words': ['dentista'],
+      },
+    });
+
+    /// The one capture showResult wrote.
+    CaptureSession only(_App app) => app.store.sessions.values.single;
+
+    final exits = <(String, Future<void> Function(WidgetTester))>[
+      (
+        'Cancelar',
+        (tester) => tester.tap(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        ),
+      ),
+      ('Back', (tester) => tester.binding.handlePopRoute()),
+      (
+        'a tap above the sheet',
+        (tester) async {
+          final top = tester.getRect(find.byType(BottomSheet)).top;
+          expect(top, greaterThan(40), reason: 'room above the sheet');
+          await tester.tapAt(Offset(195, top / 2));
+        },
+      ),
+    ];
+
+    for (final (name, leave) in exits) {
+      testWidgets(
+        'UX-917: $name on a spoken result holding only the deletion of '
+        '«Dentista» closes the sheet with no dialog; «Dentista» still exists '
+        'and no capture is pending',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            tasks: [Task(id: 1, title: 'Dentista', priority: 1)],
+          );
+          await app.showResult(tester, commands: [deletion()]);
+          expect(find.byType(DeleteCommandCard), findsOneWidget);
+          expect(only(app).source, 'speech');
+          await leave(tester);
+          await tester.pump();
+          expect(find.byType(AlertDialog), findsNothing, reason: 'no question');
+          await tester.pumpAndSettle();
+          expect(find.byType(AlertDialog), findsNothing);
+          expect(find.byType(CaptureResult), findsNothing);
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(app.tasks.byId(1), isNotNull, reason: 'Dentista survives');
+          expect(app.tasks.byId(1)!.title, 'Dentista');
+          expect(
+            only(app).status,
+            'discarded',
+            reason: 'nothing waits in «Sin guardar»',
+          );
+          expect(app.store.saves, 0, reason: 'nothing was applied');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-917: Cancelar on a result holding only a change closes with no '
+      'dialog, and the task doesn’t change',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            Task(id: 2, title: 'Ir al médico', priority: 1, dueDate: day(3, 10)),
+          ],
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['médico'],
+              },
+              'changes': {'title': 'Ir al médico de cabecera'},
+            }),
+          ],
+        );
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(CaptureResult), findsNothing);
+        expect(app.tasks.byId(2)!.title, 'Ir al médico');
+        expect(Task.day(app.tasks.byId(2)!.dueDate!), day(3));
+        expect(only(app).status, 'discarded');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-917: Cancelar on a result holding only a new project «Física» '
+      'closes with no dialog, and no project is created',
+      (tester) async {
+        final app = await _App.open(tester);
+        await app.showResult(
+          tester,
+          commands: [
+            command({'kind': 'project', 'name': 'Física'}),
+          ],
+        );
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(CaptureResult), findsNothing);
+        expect(app.lists.created, isEmpty);
+        expect(app.lists.projects, isEmpty);
+        expect(only(app).status, 'discarded');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-919: the fallback reads «Guardar como tarea»', () {
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-919 ($language): a change result that found nothing offers the '
+        'filled «${lookupAppLocalizations(Locale(language)).captureSaveAsWritten}»',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final app = await _App.open(
+            tester,
+            language: language,
+            tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+          );
+          await app.showResult(
+            tester,
+            commands: [
+              command({
+                'kind': 'update',
+                'target': {
+                  'words': ['aceite', 'coche'],
+                },
+                'changes': {'date': key(_saturday())},
+              }),
+            ],
+          );
+          expect(
+            find.text(l.commandTaskNotFound('aceite coche')),
+            findsOneWidget,
+          );
+          expect(_asWritten(), findsOneWidget);
+          expect(tester.widget(_asWritten()), isA<FilledButton>());
+          expect(
+            find.descendant(
+              of: _asWritten(),
+              matching: find.text(l.captureSaveAsWritten),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            l.captureSaveAsWritten,
+            {
+              'es': 'Guardar como tarea',
+              'en': 'Save as a task',
+              'ca': 'Desa-ho com a tasca',
+            }[language],
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   });
 }

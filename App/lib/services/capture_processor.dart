@@ -50,7 +50,7 @@ class CaptureProcessor {
     );
   }
 
-  /// `Guardar tal cual`: the words as written, understood on the phone, while
+  /// `Guardar como tarea`: the words as written, understood on the phone, while
   /// the assistant is slow or after it failed. Its answer, if one still
   /// comes, is ignored. On a result whose commands found nothing, [text] is
   /// its words (a dictation transcribed online has no text of its own); the

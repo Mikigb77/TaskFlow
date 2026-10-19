@@ -8,6 +8,8 @@ import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/invitation_review_screen.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/services/task_database.dart';
+import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -57,6 +59,18 @@ const activity = Screen(
   'Activity in shared projects (from the people button on Calendar)',
   sources: ['lib/screens/activity_screen.dart'],
 );
+
+/// Nobody asked its name yet on this phone.
+class _NameAsks extends NameAskStore {
+  _NameAsks() : super(TaskDatabase());
+  final owners = <String>{};
+  @override
+  Future<bool> asked(String owner) async => owners.contains(owner);
+  @override
+  Future<void> markAsked(String owner) async {
+    owners.add(owner);
+  }
+}
 
 Map<String, dynamic> _sharingData({String role = 'owner', String name = 'Matemáticas'}) => {
   'list': {'name': name, 'role': role, 'version': 3},
@@ -166,6 +180,38 @@ void sharingPreviews() {
           'jordi.puig@example.com',
         );
         await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sharing,
+      'name-ask',
+      'An account with no name has just sent its first invitation and closed «Invitación enviada»: «¿Cómo te llamas?», once, prefilled from its email.',
+      everywhere,
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+          overrides: [
+            listSharingProvider.overrideWith((ref, id) async => _sharingData()),
+            nameAskStoreProvider.overrideWithValue(_NameAsks()),
+          ],
+        );
+        app.api.handlers['POST lists/matematicas/invite/'] =
+            (_) => {'code': 'K7P2Q9MX'};
+        await app.pushPage(const ListSharingScreen(listId: 'matematicas'));
+        await p.tester.tap(find.byKey(const ValueKey('invite-person')));
+        await p.tester.pumpAndSettle();
+        await p.tester.enterText(
+          find.byType(TextFormField).last,
+          'jordi.puig@example.com',
+        );
+        await p.tester.pumpAndSettle();
+        await p.tester.testTextInput.receiveAction(TextInputAction.send);
+        await p.tester.pumpAndSettle();
+        await app.tap(p.l.done);
         await p.shoot();
       },
     );

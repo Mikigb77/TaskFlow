@@ -1,11 +1,19 @@
 // The Tareas tab, a project's page (a shared one with its person filter and
-// «Creada por»), a task's details and the projects list.
+// «Creada por»), a task's details, the projects list and the tasks with files.
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_attachment.dart';
+import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
+import 'package:agenda/screens/tasks_with_files_screen.dart';
+import 'package:agenda/services/attachment_store.dart';
+import 'package:agenda/services/task_database.dart';
+import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/design_fixtures.dart';
 import 'support/app.dart';
 import 'support/fixtures.dart';
 import 'support/preview.dart';
@@ -61,6 +69,71 @@ const projects = Screen(
     'lib/widgets/invitation_cards.dart',
   ],
 );
+
+const tasksWithFiles = Screen(
+  'tasks',
+  'tasks-with-files',
+  'Tareas con archivos: the tasks whose files use a free account’s full file space',
+  sources: [
+    'lib/screens/tasks_with_files_screen.dart',
+    'lib/services/attachment_store.dart',
+  ],
+);
+
+const _megabyte = 1024 * 1024;
+
+/// A signed-in account's tasks, whose files the phone has counted.
+class _FileTasks extends MemoryTasks {
+  _FileTasks(this.usage);
+  final Map<int, TaskFileUsage> usage;
+  @override
+  String get ownerKey => 'https://preview/users/1';
+  @override
+  AttachmentStore get attachments => _FileUsage(usage);
+}
+
+class _FileUsage extends AttachmentStore {
+  _FileUsage(this.usage) : super(TaskDatabase(), 'https://preview/users/1');
+  final Map<int, TaskFileUsage> usage;
+  @override
+  Future<Map<int, TaskFileUsage>> usageByTask() async => usage;
+}
+
+/// Someone else's shared project: its files use its owner's space.
+final _choir = TaskListInfo(
+  id: 'coro',
+  name: 'Coro',
+  color: 'rose',
+  version: 1,
+  role: 'editor',
+  shared: true,
+);
+
+/// Tasks and a note holding files; the choir's isn't this account's.
+List<Task> _fileTasks() => [
+  Task(
+    id: 80,
+    title: 'Viaje a Lisboa',
+    dueDate: day(9),
+    hasTime: false,
+    priority: 2,
+  ),
+  Task(id: 81, title: 'Recetas de la abuela', kind: 'note', priority: 1),
+  Task(
+    id: 82,
+    title: 'Factura del seguro del coche',
+    priority: 2,
+    listId: 'casa',
+  ),
+  Task(id: 83, title: 'Partituras del concierto', priority: 1, listId: 'coro'),
+];
+
+final _fileUsage = {
+  80: TaskFileUsage(3, (12.4 * _megabyte).round()),
+  81: TaskFileUsage(1, (0.3 * _megabyte).round()),
+  82: TaskFileUsage(2, (4.1 * _megabyte).round()),
+  83: const TaskFileUsage(5, 30 * _megabyte),
+};
 
 Future<void> _openProject(PreviewApp app, String id) async {
   await app.tab(app.p.l.tasks);
@@ -279,6 +352,92 @@ void tasksPreviews() {
         await p.shoot();
       },
     );
+
+    preview(
+      detail,
+      'file-space-full',
+      'A free account’s file space is full: a refused file says so, with «Ver Pro» and «Ver tareas con archivos».',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._fileTasks()],
+          projects: [...allProjects, _choir],
+          pro: false,
+          user: account(storageMb: 100),
+          overrides: [
+            taskRepositoryProvider.overrideWithValue(_FileTasks(_fileUsage)),
+            attachmentEntriesProvider.overrideWith(
+              (ref, taskId) async => [
+                if (taskId == 80)
+                  const AttachmentEntry(
+                    'Billetes de avión.pdf',
+                    '/preview/billetes.pdf',
+                    true,
+                    item: TaskAttachment(
+                      id: 'refused',
+                      taskId: 'viaje',
+                      name: 'Billetes de avión.pdf',
+                      size: 2 * _megabyte,
+                      sha256: '',
+                      uploadPending: true,
+                      error: TaskAttachment.storageFull,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        );
+        await app.push('/taskDetails', arguments: 80);
+        // The file's message and its buttons, further down the details.
+        await p.tester.scrollUntilVisible(
+          find.text(p.l.storageSeeTasks),
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    // --------------------------------------------------- tasks with files
+    preview(
+      tasksWithFiles,
+      'list',
+      'Three of this account’s tasks hold files, largest first; a shared project’s, whose owner is someone else, isn’t listed.',
+      [es1, es2, esDark, const Variant('es', true, 2), ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._fileTasks()],
+          projects: [...allProjects, _choir],
+          pro: false,
+          user: account(storageMb: 100),
+          overrides: [
+            taskRepositoryProvider.overrideWithValue(_FileTasks(_fileUsage)),
+          ],
+        );
+        await app.pushPage(const TasksWithFilesScreen());
+        await p.shoot();
+      },
+    );
+
+    preview(tasksWithFiles, 'empty', 'No task holds files.', [es1, es2], (
+      p,
+    ) async {
+      final app = await PreviewApp.open(
+        p,
+        tasks: normalDay(),
+        projects: allProjects,
+        pro: false,
+        user: account(storageMb: 100),
+        overrides: [
+          taskRepositoryProvider.overrideWithValue(_FileTasks(const {})),
+        ],
+      );
+      await app.pushPage(const TasksWithFilesScreen());
+      await p.shoot();
+    });
 
     // ---------------------------------------------------------- projects
     preview(

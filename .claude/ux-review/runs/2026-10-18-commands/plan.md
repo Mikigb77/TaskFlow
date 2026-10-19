@@ -385,3 +385,27 @@ Round 2 of b3 (P160, P161) passed its round check. The reviewers found every fin
 ### Notes for the main session
 - **No packages:** b3 has nothing left to fix. UX-1003, UX-1224, UX-1225 and UX-1226 wait for the close.
 - **Evidence:** this is a plan only, read from verify-b3-r2-B.md and `schedule_editor.dart` in the working tree. Nothing was run.
+
+## Round 2 (b4)
+
+Round 1 of b4 (P152–P156) passed its round check, and ux-tester reported no failing tests. The reviewers found all nine findings fixed. They raised four small regressions in the new parts: one in «Tareas con archivos» (P154), two in the name sheet (P155) and one in the resend limit's line (P156). Round 2 fixes them in three small packages. Nothing is escalated, and there's no new owner question.
+
+### P162 · S2 · D · S · The resend limit's line counts down with the button
+- **UX-1231 (S2), regression R1D-1 from P156:** after a 30-minute refusal, the line kept saying «Espera 30 minutos» while the button counted down to «22 minutos». Now the line takes the time left, the same number as the button. In the last minute the line goes, and only the button's seconds show. No new copy.
+
+### P163 · S1 · B · S · «Tareas con archivos» counts only files already on the server
+- **UX-1228 (S1), regression R1B-1 from P154:** files still waiting to upload counted toward a row, so a row could read «1 archivo · 0,0 MB», and removing that file frees nothing. Now only files the server holds count (`remote = 1`).
+- **Settled here:** `remote = 1` over `upload_pending = 0`. Both remarks came from the reviewer, and they mean the same here. `remote` says it directly, and a refused upload also keeps `remote = 0`.
+
+### P164 · S1 · C · S · The name sheet: a plain error, and progress while «Guardar» waits
+- **UX-1229 (S1), regression R1C-1 from P155:** with no connection, the error under the name ended «Tus tareas siguen guardadas en este teléfono», which is about tasks. Now it gives only the reason: «No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.» (existing copy).
+- **UX-1230 (S1), regression R1C-2 from P155:** while «Guardar» waits, the button shows a small spinner, as the join dialog does, and «Ahora no» is off until the call answers.
+- **Settled here:** the plain reason comes from `requestProblemText(…, onSignIn: true)`, not from mapping `requestProblem` to `requestError` by hand. That keeps the staging, sharing and wait-time texts. request_locale.dart doesn't change. Back and swipe stay as they are while saving: the save still finishes.
+
+### Phone checks added
+- P162: after the resend refusal, leave for the mail app for a few minutes and come back. The line and the button name the same minutes, and TalkBack doesn't re-read the line each minute.
+- P164: on a slow connection, tap «Guardar» in the name sheet. The spinner shows at once, and «Ahora no» is off until the call answers.
+
+### Notes for the main session
+- **No new copy and no Catalan written by the organizer:** all three packages reuse existing strings.
+- **Evidence:** this is a plan only, read from verify-b4-r1-B/C/D.md and the working tree. Nothing was run.

@@ -5,6 +5,9 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/services/text_search.dart';
 
+/// When a task falls in a search's period, and whether at a time.
+typedef _When = ({DateTime at, bool timed});
+
 /// How a command finds the phone's own tasks (Backend/docs/VOICE_COMMANDS.md):
 /// the server never searches, and no task is sent to the assistant.
 ///
@@ -94,32 +97,51 @@ abstract final class TaskMatcher {
     return task.assignment == 'member' && task.assigneeId == personId;
   }
 
-  /// The task's planned day, or its deadline's when it has none, falls in
-  /// the period. A repeating task needs a repetition in it.
-  static bool _within(Task task, DateTime? from, DateTime? to) {
+  /// When the task falls in the period, or null when it doesn't: its planned
+  /// day, or its deadline's when it has none. A repeating task, by its first
+  /// repetition in the period.
+  static _When? _when(Task task, DateTime? from, DateTime? to) {
     final first = from == null ? null : Task.day(from);
     final last = to == null ? null : Task.day(to);
     bool inside(DateTime day) =>
         (first == null || !day.isBefore(first)) &&
         (last == null || !day.isAfter(last));
     if (!task.isRecurring) {
-      final date = task.dueDate ?? task.deadline;
-      return date != null && inside(Task.day(date));
+      final planned = task.dueDate;
+      final date = planned ?? task.deadline;
+      if (date == null || !inside(Task.day(date))) return null;
+      return (
+        at: date,
+        timed: planned != null ? task.hasTime : task.deadlineHasTime,
+      );
     }
     final start = Task.day(task.dueDate!);
     var day = first == null || first.isBefore(start) ? start : first;
     final end = last ?? DateTime(day.year, day.month, day.day + 366);
     // A year of days at most, so an open period stays quick.
     for (var i = 0; i <= 366 && !day.isAfter(end); i++) {
-      if (task.occurrencesOn(day).isNotEmpty) return true;
+      if (task.occurrencesOn(day).firstOrNull case final shown?) {
+        return (at: shown.displayDate!, timed: shown.hasTime);
+      }
       day = DateTime(day.year, day.month, day.day + 1);
     }
-    return false;
+    return null;
+  }
+
+  /// Soonest first, as Calendar lists a day: by day, then the tasks with no
+  /// time, then by time.
+  static int _soonestFirst(_When a, _When b) {
+    final day = Task.day(a.at).compareTo(Task.day(b.at));
+    if (day != 0) return day;
+    if (a.timed != b.timed) return a.timed ? 1 : -1;
+    return a.timed ? a.at.compareTo(b.at) : 0;
   }
 
   /// `find`: the tasks the person can see, completed ones included unless
-  /// [CaptureCommand.status] says otherwise, newest first. A project or
-  /// person that wasn't found searches nothing: the card says so instead.
+  /// [CaptureCommand.status] says otherwise. With a period, soonest first,
+  /// by when each falls in it; without one, newest first. Words the title
+  /// holds still come first. A project or person that wasn't found searches
+  /// nothing: the card says so instead.
   static List<Task> find(
     Iterable<Task> tasks,
     CaptureCommand command, {
@@ -129,27 +151,29 @@ abstract final class TaskMatcher {
     if (command.projectName != null || command.personName != null) {
       return const [];
     }
-    final candidates =
-        tasks.where((task) {
-          if (task.isNote) return false;
-          if (command.listId != null && task.listId != command.listId) {
-            return false;
-          }
-          if (command.personId != null &&
-              !_isFor(task, command.personId!, accountId, projects)) {
-            return false;
-          }
-          if (command.status == 'open' && _completed(task)) return false;
-          if (command.status == 'completed' && !_completed(task)) {
-            return false;
-          }
-          if ((command.from != null || command.to != null) &&
-              !_within(task, command.from, command.to)) {
-            return false;
-          }
-          return true;
-        }).toList()..sort(_newestFirst);
-    return _ranked(candidates, command.words);
+    final period = command.from != null || command.to != null;
+    final found = <(Task, _When?)>[];
+    for (final task in tasks) {
+      if (task.isNote) continue;
+      if (command.listId != null && task.listId != command.listId) continue;
+      if (command.personId != null &&
+          !_isFor(task, command.personId!, accountId, projects)) {
+        continue;
+      }
+      if (command.status == 'open' && _completed(task)) continue;
+      if (command.status == 'completed' && !_completed(task)) continue;
+      final when = period ? _when(task, command.from, command.to) : null;
+      if (period && when == null) continue;
+      found.add((task, when));
+    }
+    found.sort((a, b) {
+      if (period) {
+        final order = _soonestFirst(a.$2!, b.$2!);
+        if (order != 0) return order;
+      }
+      return _newestFirst(a.$1, b.$1);
+    });
+    return _ranked([for (final (task, _) in found) task], command.words);
   }
 
   /// The task as the card shows it: a repeating task's repetition on [date],

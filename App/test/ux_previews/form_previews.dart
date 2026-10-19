@@ -6,6 +6,7 @@ import 'package:agenda/models/task_list_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'capture_previews.dart' show hear, openSheet;
 import 'support/app.dart';
 import 'support/fixtures.dart';
 import 'support/preview.dart';
@@ -150,6 +151,37 @@ void formPreviews() {
         await p.tester.pumpAndSettle();
         await p.tester.tap(more);
         await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      newTask,
+      'from-dictation',
+      'A free account with dictations left heard «Médico el viernes a las 5 de la tarde» and tapped Escribir: the form opens on Friday at 17:00, titled Médico.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          pro: false,
+          freeLeft: 5,
+          tasks: normalDay(),
+          projects: allProjects,
+        );
+        await openSheet(app);
+        await hear(app, 'Médico el viernes a las 5 de la tarde');
+        await p.tester.tap(
+          find
+              .ancestor(
+                of: find.text(p.l.captureTypeInstead),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget is TextButton,
+                ),
+              )
+              .first,
+        );
+        await p.tester.pumpAndSettle();
+        await _keyboardDown(p);
         await p.shoot();
       },
     );

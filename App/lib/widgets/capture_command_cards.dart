@@ -39,7 +39,7 @@ class CommandView {
   /// has another name. The card asks whether to create it.
   final bool asks;
 
-  /// `find`: the results, newest first.
+  /// `find`: the results: soonest first with a period, else newest first.
   final List<Task> found;
 
   /// `update` and `delete`: the tasks the words may mean.
@@ -525,8 +525,9 @@ class ProjectCommandCard extends ConsumerWidget {
   }
 }
 
-/// `find`: the tasks found, newest first, completed ones marked, each with
-/// its project and assignee. A tap opens the task. No sentence answers.
+/// `find`: the tasks found, in `TaskMatcher.find`'s order, completed ones
+/// marked, each with its project and assignee. A tap opens the task. No
+/// sentence answers.
 class FindCommandCard extends ConsumerWidget {
   const FindCommandCard({super.key, required this.view});
   final CommandView view;

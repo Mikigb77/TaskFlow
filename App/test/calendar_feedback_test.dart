@@ -2793,7 +2793,7 @@ void main() {
     ('ca', 'Trucar al dentista i comprar pa'),
   ]) {
     test(
-      'UX-701: Guardar tal cual on the spoken example ($language) is one task dated tomorrow, no time, no question',
+      'UX-701: Guardar como tarea on the spoken example ($language) is one task dated tomorrow, no time, no question',
       () {
         final words = quoted(
           lookupAppLocalizations(Locale(language)).calendarTrySaying,

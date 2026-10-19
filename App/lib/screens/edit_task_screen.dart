@@ -8,6 +8,7 @@ import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/services/local_capture.dart';
+import 'package:agenda/services/quick_schedule_parser.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -55,6 +56,8 @@ class NewTaskArguments {
     this.page,
     this.showCalendar = false,
     this.words = '',
+    this.spoken = false,
+    this.heardAt,
     this.captureId,
     this.askedToSpeak = false,
   });
@@ -75,6 +78,14 @@ class NewTaskArguments {
   /// Words already heard, typed or shared: the title, and the notes for
   /// whatever follows its first sentence.
   final String words;
+
+  /// [words] were dictated before `Escribir`: the form reads their day and
+  /// time once, as it opens, as `Guardar como tarea` does (D2). Words typed
+  /// or shared stay as written.
+  final bool spoken;
+
+  /// When the dictated [words] were heard: the day they name counts from it.
+  final DateTime? heardAt;
 
   /// The capture that holds [words]. The form keeps its title and notes
   /// there until the task is saved.
@@ -99,20 +110,43 @@ class _NewTaskScreenState extends ConsumerState<NewTaskScreen> {
 
   Task _start() {
     final arguments = widget.arguments;
-    final today = Task.day(ref.read(calendarClockProvider)());
+    final now = ref.read(calendarClockProvider)();
+    final today = Task.day(now);
     final shown = arguments.day == null ? null : Task.day(arguments.day!);
+    // Today, or a day gone by, adds nothing.
+    final later = shown != null && shown.isAfter(today) ? shown : null;
     // As Calendar's project choice does for a capture.
     final scoped = ref.read(projectScopeProvider).projectId;
-    final lead = leadingTitle(arguments.words, taskTitleLength);
+    // Dictated words name their day and time, as `Guardar como tarea`
+    // reads them; an hour with no a. m. or p. m. stays in the title.
+    final found = arguments.spoken
+        ? QuickScheduleParser.parse(
+            arguments.words,
+            arguments.heardAt ?? now,
+            day: later,
+            keepAmbiguousHour: true,
+          )
+        : null;
+    final deadline = found != null && found.isDeadline;
+    final lead = leadingTitle(
+      found == null || found.title.isEmpty ? arguments.words : found.title,
+      taskTitleLength,
+    );
     return Task(
       title: lead.title.isEmpty
           ? ''
           : lead.title[0].toUpperCase() + lead.title.substring(1),
       notes: lead.rest.isEmpty ? null : lead.rest,
       priority: 1,
-      // Today, or a day gone by, adds nothing.
-      dueDate: shown != null && shown.isAfter(today) ? shown : null,
-      hasTime: false,
+      dueDate: found == null
+          ? later
+          : deadline
+          ? null
+          : found.date,
+      hasTime: found != null && !deadline && found.hasTime,
+      deadline: deadline ? found.date : null,
+      deadlineHasTime: deadline && found.hasTime,
+      reminderAnchor: deadline ? 'deadline' : 'planned',
       listId:
           arguments.projectId ??
           (ref.read(listCanEditProvider(scoped)) ? scoped : null),

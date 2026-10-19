@@ -311,7 +311,7 @@
   "calendarEmpty": "Nothing planned for this day.",
   "calendarTrySaying": "Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”",
   "@calendarTrySaying": {
-    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as written (the phone's parser) still dates it without a question."
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as a task (the phone's parser) still dates it without a question."
   },
   "calendarTryTyping": "Try it: tap Add a task and type “Tomorrow, call the dentist.”",
   "@calendarTryTyping": {
@@ -748,13 +748,31 @@
   },
   "verifyEmailResend": "Resend code",
   "@verifyEmailResend": {
-    "description": "Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn."
+    "description": "Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn. When the server refuses because too many codes were asked for, it stays disabled for the wait it names, reading verifyEmailResendInMinutes while over a minute is left."
   },
   "verifyEmailResendIn": "{seconds, plural, =1{Resend code in 1 second} other{Resend code in {seconds} seconds}}",
   "@verifyEmailResendIn": {
-    "description": "The resend button while it waits, counting down each second from 60.",
+    "description": "The resend button while it waits, counting down each second from 60, or through the last minute of a longer wait.",
     "placeholders": {
       "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "verifyEmailResendInMinutes": "{minutes, plural, =1{Resend code in 1 minute} other{Resend code in {minutes} minutes}}",
+  "@verifyEmailResendInMinutes": {
+    "description": "The resend button while a wait the server set is longer than a minute, in whole minutes rounded up; under a minute the button counts seconds with verifyEmailResendIn.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "verifyEmailResendLimited": "{minutes, plural, =1{You’ve asked for a lot of codes. Wait a minute to ask for another.} other{You’ve asked for a lot of codes. Wait {minutes} minutes to ask for another.}}",
+  "@verifyEmailResendLimited": {
+    "description": "Under the code field when the server refused to send another code because too many were asked for, and the wait is longer than a minute. No new code went out, so the last one still works. The minutes are rounded up, at least 1.",
+    "placeholders": {
+      "minutes": {
         "type": "int"
       }
     }
@@ -1057,6 +1075,22 @@
   },
   "reminderAskYes": "Yes, remind me",
   "reminderAskNotNow": "Not now",
+  "nameAskTitle": "What’s your name?",
+  "@nameAskTitle": {
+    "description": "Title of a sheet asked once, right after an account without a name sends its first invitation or joins its first project or group."
+  },
+  "nameAskBody": "It’s how people you share projects with will see you.",
+  "@nameAskBody": {
+    "description": "Line under nameAskTitle: why the name is asked."
+  },
+  "nameAskField": "Name",
+  "@nameAskField": {
+    "description": "Label of the name field in the name sheet; prefilled from the email."
+  },
+  "nameAskNotNow": "Not now",
+  "@nameAskNotNow": {
+    "description": "Closes the name sheet without saving; it isn't asked again."
+  },
   "details": "Details",
   "mobileNotificationsOnly": "Mobile notifications only",
   "notificationPermissionOff": "System permission is off",
@@ -1579,7 +1613,10 @@
   "captureUnderstanding": "Understanding…",
   "captureFailed": "That didn’t work. Your words are saved here — try again.",
   "captureSlow": "Taking longer than usual.",
-  "captureSaveAsWritten": "Save as written",
+  "captureSaveAsWritten": "Save as a task",
+  "@captureSaveAsWritten": {
+    "description": "Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant, after a failure (below Try again), and on a command result that found nothing."
+  },
   "captureThingsToAdd": "{count, plural, one{1 thing to add} other{{count} things to add}}",
   "@captureThingsToAdd": {
     "placeholders": {
@@ -2033,6 +2070,34 @@
   "storageFullShared": "This project’s file space is full. Its owner can remove files to make room.",
   "@storageFullShared": {
     "description": "Under an attachment the server refused because the file space of the shared project's owner is full."
+  },
+  "storageSeeTasks": "Show tasks with files",
+  "@storageSeeTasks": {
+    "description": "Button beside Explore Pro, only while the user's own free file space is full: under a file refused for it, and on the Pro screen under the usage line. Opens the list of tasks with files."
+  },
+  "tasksWithFiles": "Tasks with files",
+  "@tasksWithFiles": {
+    "description": "Title of the screen listing the tasks and notes whose files use this account's file space, largest first."
+  },
+  "tasksWithFilesHelp": "Open a task to remove the files you no longer need.",
+  "@tasksWithFilesHelp": {
+    "description": "One line above the rows of the Tasks with files screen."
+  },
+  "tasksWithFilesRow": "{count, plural, =1{1 file} other{{count} files}} · {size} MB",
+  "@tasksWithFilesRow": {
+    "description": "Under a task's title on the Tasks with files screen: how many files it holds and their total size. {size} is already formatted in the app's locale, to one decimal (12.4).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "tasksWithFilesEmpty": "No tasks have files.",
+  "@tasksWithFilesEmpty": {
+    "description": "The Tasks with files screen when no task holds files in this account's space."
   },
   "projectPinned": "Pinned",
   "@projectPinned": {

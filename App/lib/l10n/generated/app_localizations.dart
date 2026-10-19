@@ -1282,7 +1282,7 @@ abstract class AppLocalizations {
   /// **'Nothing planned for this day.'**
   String get calendarEmpty;
 
-  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as written (the phone's parser) still dates it without a question.
+  /// Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as a task (the phone's parser) still dates it without a question.
   ///
   /// In en, this message translates to:
   /// **'Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”'**
@@ -2656,17 +2656,29 @@ abstract class AppLocalizations {
   /// **'Confirming'**
   String get verifyEmailConfirming;
 
-  /// Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn.
+  /// Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn. When the server refuses because too many codes were asked for, it stays disabled for the wait it names, reading verifyEmailResendInMinutes while over a minute is left.
   ///
   /// In en, this message translates to:
   /// **'Resend code'**
   String get verifyEmailResend;
 
-  /// The resend button while it waits, counting down each second from 60.
+  /// The resend button while it waits, counting down each second from 60, or through the last minute of a longer wait.
   ///
   /// In en, this message translates to:
   /// **'{seconds, plural, =1{Resend code in 1 second} other{Resend code in {seconds} seconds}}'**
   String verifyEmailResendIn(int seconds);
+
+  /// The resend button while a wait the server set is longer than a minute, in whole minutes rounded up; under a minute the button counts seconds with verifyEmailResendIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{Resend code in 1 minute} other{Resend code in {minutes} minutes}}'**
+  String verifyEmailResendInMinutes(int minutes);
+
+  /// Under the code field when the server refused to send another code because too many were asked for, and the wait is longer than a minute. No new code went out, so the last one still works. The minutes are rounded up, at least 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{You’ve asked for a lot of codes. Wait a minute to ask for another.} other{You’ve asked for a lot of codes. Wait {minutes} minutes to ask for another.}}'**
+  String verifyEmailResendLimited(int minutes);
 
   /// Under the code field after a new code was emailed, when the person has shown they didn’t get the first one. Names the mail folders where codes often land, as Gmail names them in the language (Spam and Promotions in English).
   ///
@@ -3393,6 +3405,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not now'**
   String get reminderAskNotNow;
+
+  /// Title of a sheet asked once, right after an account without a name sends its first invitation or joins its first project or group.
+  ///
+  /// In en, this message translates to:
+  /// **'What’s your name?'**
+  String get nameAskTitle;
+
+  /// Line under nameAskTitle: why the name is asked.
+  ///
+  /// In en, this message translates to:
+  /// **'It’s how people you share projects with will see you.'**
+  String get nameAskBody;
+
+  /// Label of the name field in the name sheet; prefilled from the email.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nameAskField;
+
+  /// Closes the name sheet without saving; it isn't asked again.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get nameAskNotNow;
 
   /// No description provided for @details.
   ///
@@ -4594,10 +4630,10 @@ abstract class AppLocalizations {
   /// **'Taking longer than usual.'**
   String get captureSlow;
 
-  /// No description provided for @captureSaveAsWritten.
+  /// Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant, after a failure (below Try again), and on a command result that found nothing.
   ///
   /// In en, this message translates to:
-  /// **'Save as written'**
+  /// **'Save as a task'**
   String get captureSaveAsWritten;
 
   /// No description provided for @captureThingsToAdd.
@@ -5547,6 +5583,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This project’s file space is full. Its owner can remove files to make room.'**
   String get storageFullShared;
+
+  /// Button beside Explore Pro, only while the user's own free file space is full: under a file refused for it, and on the Pro screen under the usage line. Opens the list of tasks with files.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tasks with files'**
+  String get storageSeeTasks;
+
+  /// Title of the screen listing the tasks and notes whose files use this account's file space, largest first.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks with files'**
+  String get tasksWithFiles;
+
+  /// One line above the rows of the Tasks with files screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a task to remove the files you no longer need.'**
+  String get tasksWithFilesHelp;
+
+  /// Under a task's title on the Tasks with files screen: how many files it holds and their total size. {size} is already formatted in the app's locale, to one decimal (12.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}} · {size} MB'**
+  String tasksWithFilesRow(int count, String size);
+
+  /// The Tasks with files screen when no task holds files in this account's space.
+  ///
+  /// In en, this message translates to:
+  /// **'No tasks have files.'**
+  String get tasksWithFilesEmpty;
 
   /// Spoken label of the pin icon before a pinned project's name in Projects.
   ///

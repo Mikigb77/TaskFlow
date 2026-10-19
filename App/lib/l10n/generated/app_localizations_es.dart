@@ -1576,6 +1576,29 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String verifyEmailResendInMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Reenviar código en $minutes minutos',
+      one: 'Reenviar código en 1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String verifyEmailResendLimited(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other:
+          'Has pedido muchos códigos. Espera $minutes minutos para pedir otro.',
+      one: 'Has pedido muchos códigos. Espera un minuto para pedir otro.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get verifyEmailResent =>
       'Te hemos enviado un código nuevo. Si no lo ves, mira en Spam o en Promociones.';
 
@@ -2013,6 +2036,19 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get reminderAskNotNow => 'Ahora no';
+
+  @override
+  String get nameAskTitle => '¿Cómo te llamas?';
+
+  @override
+  String get nameAskBody =>
+      'Así te verán las personas con las que compartes proyectos.';
+
+  @override
+  String get nameAskField => 'Nombre';
+
+  @override
+  String get nameAskNotNow => 'Ahora no';
 
   @override
   String get details => 'Detalles';
@@ -2898,7 +2934,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get captureSlow => 'Está tardando más de lo normal.';
 
   @override
-  String get captureSaveAsWritten => 'Guardar tal cual';
+  String get captureSaveAsWritten => 'Guardar como tarea';
 
   @override
   String captureThingsToAdd(int count) {
@@ -3637,6 +3673,30 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get storageFullShared =>
       'El espacio para archivos de este proyecto está lleno. Su propietario puede eliminar archivos para hacer sitio.';
+
+  @override
+  String get storageSeeTasks => 'Ver tareas con archivos';
+
+  @override
+  String get tasksWithFiles => 'Tareas con archivos';
+
+  @override
+  String get tasksWithFilesHelp =>
+      'Abre una tarea para eliminar los archivos que ya no necesites.';
+
+  @override
+  String tasksWithFilesRow(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count archivos',
+      one: '1 archivo',
+    );
+    return '$_temp0 · $size MB';
+  }
+
+  @override
+  String get tasksWithFilesEmpty => 'No hay tareas con archivos.';
 
   @override
   String get projectPinned => 'Fijado';

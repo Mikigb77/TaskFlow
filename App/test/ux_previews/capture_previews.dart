@@ -316,7 +316,7 @@ void capturePreviews() {
     preview(
       sheet,
       'understanding-slow',
-      'The assistant has taken 10 s: the slow line and Guardar tal cual.',
+      'The assistant has taken 10 s: the slow line and Guardar como tarea.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -335,7 +335,7 @@ void capturePreviews() {
     preview(
       sheet,
       'error-offline',
-      'Typed words sent with no connection: the reason, Reintentar and Guardar tal cual.',
+      'Typed words sent with no connection: the reason, Reintentar and Guardar como tarea.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());

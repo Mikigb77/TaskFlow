@@ -656,7 +656,7 @@ void main() {
   });
 
   test(
-    'UX-901: Guardar tal cual on a result whose commands found nothing reads '
+    'UX-901: Guardar como tarea on a result whose commands found nothing reads '
     'its transcript when it has no text, and keeps no command',
     () async {
       final api = _CaptureApi();

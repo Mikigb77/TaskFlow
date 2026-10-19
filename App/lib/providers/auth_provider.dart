@@ -157,6 +157,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Saves the account's first name on the server. Failures are thrown, so
+  /// the caller can say why and keep what was typed.
+  Future<void> setFirstName(String firstName) async {
+    final current = state.account;
+    if (state.loading || state.expired || current == null) {
+      throw ApiException(401, 'Sign in to continue.');
+    }
+    final account = await api.setFirstName(firstName);
+    if (mounted && !state.loading && state.account?.id == account.id) {
+      state = AuthState(account: account);
+    }
+  }
+
   /// Failures are kept in [AuthState.error], except
   /// [EmailVerificationRequired], which is thrown: it isn't a problem to
   /// show, and the caller opens the screen that asks for the code.

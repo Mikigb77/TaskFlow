@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -12,6 +13,7 @@ import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/name_ask_sheet.dart';
 
 /// One pending invitation. Tapping it opens the join dialog; [more] counts
 /// the invitations waiting behind it.
@@ -357,4 +359,12 @@ void showJoined({
     navigator.pop(true);
   }
   if (messenger.mounted) showFeedback(messenger, strings.joinedInvitation(name));
+  // An account without a name is asked for one, once, over what it joined.
+  final account = ProviderScope.containerOf(
+    navigator.context,
+    listen: false,
+  ).read(authProvider).account;
+  if (account != null) {
+    unawaited(askForNameOnce(navigator, accountId: account.id));
+  }
 }

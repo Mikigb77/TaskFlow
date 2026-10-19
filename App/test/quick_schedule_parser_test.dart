@@ -429,7 +429,7 @@ void main() {
       expect(found.ambiguousTime, isFalse, reason: words);
       expect(found.ambiguousHour, isNull, reason: words);
       expect(found.title, title, reason: words);
-      // On the phone: no question to answer, so Guardar tal cual saves it.
+      // On the phone: no question to answer, so Guardar como tarea saves it.
       final draft = localDrafts(words, reference, defaultDay: day).single;
       expect(draft.clarifications, isEmpty, reason: words);
       expect(draft.task.dueDate, date, reason: words);
@@ -536,7 +536,7 @@ void main() {
       expect(found.ambiguousTime, isFalse, reason: words);
       expect(found.isDeadline, deadline, reason: words);
       expect(found.title, title, reason: words);
-      // The phone's result, as Guardar tal cual saves it.
+      // The phone's result, as Guardar como tarea saves it.
       final task = localDrafts(words, at).single.task;
       expect(task.title, title, reason: words);
       expect(deadline ? task.deadline : task.dueDate, day, reason: words);

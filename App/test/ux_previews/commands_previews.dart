@@ -561,7 +561,7 @@ void commandPreviews() {
     preview(
       cards,
       'not-found',
-      'A change that found no task: it says so, and offers Guardar tal cual to keep the words as a task.',
+      'A change that found no task: it says so, and offers Guardar como tarea to keep the words as a task.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay(), projects: allProjects);

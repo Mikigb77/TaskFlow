@@ -1573,6 +1573,29 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String verifyEmailResendInMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Torna a enviar el codi d’aquí a $minutes minuts',
+      one: 'Torna a enviar el codi d’aquí a 1 minut',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String verifyEmailResendLimited(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other:
+          'Has demanat molts codis. Espera $minutes minuts per demanar-ne un altre.',
+      one: 'Has demanat molts codis. Espera un minut per demanar-ne un altre.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get verifyEmailResent =>
       'T’hem enviat un codi nou. Si no el veus, mira a Correu brossa o a Promocions.';
 
@@ -2013,6 +2036,19 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get reminderAskNotNow => 'Ara no';
+
+  @override
+  String get nameAskTitle => 'Com et dius?';
+
+  @override
+  String get nameAskBody =>
+      'Així et veuran les persones amb qui comparteixes projectes.';
+
+  @override
+  String get nameAskField => 'Nom';
+
+  @override
+  String get nameAskNotNow => 'Ara no';
 
   @override
   String get details => 'Detalls';
@@ -2889,7 +2925,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get captureSlow => 'Està trigant més del normal.';
 
   @override
-  String get captureSaveAsWritten => 'Desa-ho tal com està';
+  String get captureSaveAsWritten => 'Desa-ho com a tasca';
 
   @override
   String captureThingsToAdd(int count) {
@@ -3631,6 +3667,30 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get storageFullShared =>
       'L’espai per a fitxers d’aquest projecte és ple. El seu propietari pot treure fitxers per fer lloc.';
+
+  @override
+  String get storageSeeTasks => 'Mostra les tasques amb fitxers';
+
+  @override
+  String get tasksWithFiles => 'Tasques amb fitxers';
+
+  @override
+  String get tasksWithFilesHelp =>
+      'Obre una tasca per treure els fitxers que ja no necessitis.';
+
+  @override
+  String tasksWithFilesRow(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fitxers',
+      one: '1 fitxer',
+    );
+    return '$_temp0 · $size MB';
+  }
+
+  @override
+  String get tasksWithFilesEmpty => 'Cap tasca no té fitxers.';
 
   @override
   String get projectPinned => 'Fixat';

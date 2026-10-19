@@ -8,6 +8,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/screens/tasks_with_files_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -380,7 +381,7 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                   ),
                                 if (entry.item?.error ==
                                         TaskAttachment.storageFull &&
-                                    !ref.watch(hasProProvider))
+                                    !ref.watch(hasProProvider)) ...[
                                   TextButton(
                                     onPressed: () => Navigator.pushNamed(
                                       context,
@@ -388,6 +389,13 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                     ),
                                     child: Text(context.l10n.voiceProAction),
                                   ),
+                                  // Which tasks use the space, to make room.
+                                  TextButton(
+                                    onPressed: () =>
+                                        TasksWithFilesScreen.open(context),
+                                    child: Text(context.l10n.storageSeeTasks),
+                                  ),
+                                ],
                                 if (entry.item?.deleted != true &&
                                     ref.watch(
                                       listCanEditProvider(widget.task.listId),

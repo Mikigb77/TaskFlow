@@ -1542,6 +1542,29 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String verifyEmailResendInMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Resend code in $minutes minutes',
+      one: 'Resend code in 1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String verifyEmailResendLimited(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other:
+          'You’ve asked for a lot of codes. Wait $minutes minutes to ask for another.',
+      one: 'You’ve asked for a lot of codes. Wait a minute to ask for another.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get verifyEmailResent =>
       'We’ve sent you a new code. If you can’t see it, check Spam or Promotions.';
 
@@ -1977,6 +2000,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reminderAskNotNow => 'Not now';
+
+  @override
+  String get nameAskTitle => 'What’s your name?';
+
+  @override
+  String get nameAskBody =>
+      'It’s how people you share projects with will see you.';
+
+  @override
+  String get nameAskField => 'Name';
+
+  @override
+  String get nameAskNotNow => 'Not now';
 
   @override
   String get details => 'Details';
@@ -2819,7 +2855,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureSlow => 'Taking longer than usual.';
 
   @override
-  String get captureSaveAsWritten => 'Save as written';
+  String get captureSaveAsWritten => 'Save as a task';
 
   @override
   String captureThingsToAdd(int count) {
@@ -3548,6 +3584,30 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get storageFullShared =>
       'This project’s file space is full. Its owner can remove files to make room.';
+
+  @override
+  String get storageSeeTasks => 'Show tasks with files';
+
+  @override
+  String get tasksWithFiles => 'Tasks with files';
+
+  @override
+  String get tasksWithFilesHelp =>
+      'Open a task to remove the files you no longer need.';
+
+  @override
+  String tasksWithFilesRow(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0 · $size MB';
+  }
+
+  @override
+  String get tasksWithFilesEmpty => 'No tasks have files.';
 
   @override
   String get projectPinned => 'Pinned';

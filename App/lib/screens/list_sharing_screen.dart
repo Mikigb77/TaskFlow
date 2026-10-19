@@ -8,6 +8,7 @@ import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:agenda/widgets/project_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -139,6 +140,10 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
           },
         ),
       );
+      // An account without a name is asked for one, once.
+      if (mounted) {
+        await askForNameOnce(Navigator.of(context), accountId: accountId);
+      }
     }
     if (mounted && (deleting || leave)) {
       final messenger = ScaffoldMessenger.of(context);

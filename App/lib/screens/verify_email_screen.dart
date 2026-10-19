@@ -88,6 +88,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   late DateTime _readyAt;
   // Seconds until then, as shown.
   int _wait = 0;
+  // Until when the server refuses another code, as it said: too many were
+  // asked for. No countdown ends before it.
+  DateTime? _limitedUntil;
   Timer? _timer;
   // The last answer: from the server or the connection.
   Object? _error;
@@ -144,15 +147,54 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   /// clock be set back.
   void _countDown([int seconds = VerifyEmailScreen.resendWait]) {
     _timer?.cancel();
-    _readyAt = _now().add(Duration(seconds: seconds));
+    final now = _now();
+    final limit = _limitedUntil;
+    if (limit != null) {
+      seconds = math.max(seconds, _secondsUntil(limit, now));
+    }
+    _readyAt = now.add(Duration(seconds: seconds));
     _wait = math.max(0, seconds);
-    if (_wait == 0) return;
+    if (_wait == 0) {
+      _limitedUntil = null;
+      return;
+    }
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final left = (_readyAt.difference(_now()).inMilliseconds / 1000).ceil();
-      setState(() => _wait = math.max(0, math.min(left, seconds - timer.tick)));
+      final left = _secondsUntil(_readyAt, _now());
+      setState(() {
+        _wait = math.max(0, math.min(left, seconds - timer.tick));
+        if (_wait > 0) return;
+        _limitedUntil = null;
+        // Over: another code can be asked for.
+        if (_error != null && _resendLimit(_error!) != null) _error = null;
+      });
       if (_wait == 0) timer.cancel();
     });
   }
+
+  static int _secondsUntil(DateTime time, DateTime now) =>
+      (time.difference(now).inMilliseconds / 1000).ceil();
+
+  /// The wait the server set when it refused to send another code because
+  /// too many were asked for (`resend_limited`): its `retry_after`, or else
+  /// its `Retry-After` header. Null for any other answer, or one that names
+  /// no wait.
+  static Duration? _resendLimit(Object error) {
+    if (error is! ApiException || error.status != 429) return null;
+    final body = error.body;
+    if (body?['code'] != 'resend_limited') return null;
+    final seconds =
+        switch (body?['retry_after']) {
+          final num value => value.ceil(),
+          final String value => int.tryParse(value.trim()),
+          _ => null,
+        } ??
+        error.retryAfter?.inSeconds;
+    if (seconds == null) return null;
+    return Duration(seconds: math.max(0, seconds));
+  }
+
+  /// [seconds] in whole minutes, rounded up, at least 1.
+  static int _minutes(int seconds) => math.max(1, (seconds + 59) ~/ 60);
 
   /// How the server refused the code: `code_expired` (too old, or tried too
   /// often), `signup_replaced`, or `code_invalid` for a wrong one and any
@@ -181,6 +223,14 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         break;
     }
     if (error == null) return null;
+    if (_resendLimit(error) != null) {
+      // The time left, as the button counts it; in its last minute only the
+      // button's seconds say it.
+      if (_limitedUntil == null || _wait <= VerifyEmailScreen.resendWait) {
+        return null;
+      }
+      return l.verifyEmailResendLimited(_minutes(_wait));
+    }
     return switch (_refusal(error)) {
       'code_invalid' => l.verifyEmailCodeInvalid,
       _ => requestProblemText(l, error, onSignIn: true),
@@ -427,13 +477,26 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       _field.requestFocus();
     } catch (error) {
       if (!mounted) return;
+      final limit = _resendLimit(error);
       setState(() {
         _resending = false;
+        if (limit != null) {
+          // Too many codes asked for: nothing went out, so the last code,
+          // and the digits typed, still work. Said only past a minute;
+          // within it, it is the usual wait between codes.
+          _error = limit.inSeconds > VerifyEmailScreen.resendWait
+              ? error
+              : null;
+          _limitedUntil = _now().add(limit);
+          _countDown(limit.inSeconds);
+          return;
+        }
         _error = error;
         // Too many requests: the next one waits too.
         if (error is ApiException && error.status == 429) _countDown();
       });
-      _show(_problem(l)!);
+      final problem = _problem(l);
+      if (problem != null) _show(problem);
     }
   }
 
@@ -649,9 +712,15 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                                     )
                                   : null,
                               child: Text(
-                                waiting
-                                    ? l.verifyEmailResendIn(_wait)
-                                    : l.verifyEmailResend,
+                                // A long wait the server set reads in
+                                // minutes, its last minute in seconds.
+                                !waiting
+                                    ? l.verifyEmailResend
+                                    : _wait > VerifyEmailScreen.resendWait
+                                    ? l.verifyEmailResendInMinutes(
+                                        _minutes(_wait),
+                                      )
+                                    : l.verifyEmailResendIn(_wait),
                                 textAlign: TextAlign.center,
                               ),
                             ),

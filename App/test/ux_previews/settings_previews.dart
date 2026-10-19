@@ -6,6 +6,7 @@ import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
 import 'package:agenda/services/capture_problem.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../support/billing_fixtures.dart';
@@ -227,6 +228,30 @@ void settingsPreviews() {
           billing: FakeRevenueCat()..info = billingInfo(),
         );
         await app.push('/subscription');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      pro,
+      'file-space-full',
+      'The file space full, 100 of 100 MB: «Ver tareas con archivos» under the usage line.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          pro: false,
+          user: account(freeLeft: 4, storageMb: 100),
+          billing: FakeRevenueCat()..info = billingInfo(),
+        );
+        await app.push('/subscription');
+        // At large text the button sits below the fold: show it with the
+        // usage line above it.
+        await p.tester.ensureVisible(find.text(p.l.storageSeeTasks));
+        await p.tester.pumpAndSettle();
+        await p.tester.drag(app.mainScroll(), const Offset(0, 200));
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

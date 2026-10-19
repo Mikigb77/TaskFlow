@@ -3,7 +3,7 @@
 // without Pro, understood on the phone, and the selected day.
 // P39 (UX-102, UX-106, UX-114): every way in works, with or without Pro, and
 // keeps nothing until something is said or typed.
-// P40 (U7, UX-103, UX-451): `Guardar tal cual` when the assistant is slow or
+// P40 (U7, UX-103, UX-451): `Guardar como tarea` when the assistant is slow or
 // fails, and errors in plain words, read out by TalkBack.
 // Round 2: P67 (UX-103, UX-467–UX-470) messages that name what's on screen,
 // slow spoken, the typing hint, the failed pair stacked; P68 (UX-465) the
@@ -45,6 +45,7 @@ import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -720,7 +721,7 @@ void main() {
   // ---- P40 · U7: the assistant slow or failing ----
 
   testWidgets(
-    'U7: with an assistant that never answers, after 8 s the sheet says Está tardando más de lo normal. with Guardar tal cual; it saves Llamar al médico on Friday, lands with Deshacer, and the late answer changes nothing',
+    'U7: with an assistant that never answers, after 8 s the sheet says Está tardando más de lo normal. with Guardar como tarea; it saves Llamar al médico on Friday, lands with Deshacer, and the late answer changes nothing',
     (tester) async {
       final start = monday();
       final friday = plus(start, 4);
@@ -745,7 +746,7 @@ void main() {
       expect(find.text(es.captureSlow), findsOneWidget);
       final save = find.widgetWithText(FilledButton, es.captureSaveAsWritten);
       expect(save, findsOneWidget);
-      expect(es.captureSaveAsWritten, 'Guardar tal cual');
+      expect(es.captureSaveAsWritten, 'Guardar como tarea');
 
       await tester.tap(save);
       await tester.pumpAndSettle();
@@ -797,7 +798,7 @@ void main() {
     ),
   ]) {
     testWidgets(
-      'U7 / UX-103: after $what the sheet shows the words, the reason in plain words under the status line as a live region, with Reintentar and Guardar tal cual; no Tu captura se conserva',
+      'U7 / UX-103: after $what the sheet shows the words, the reason in plain words under the status line as a live region, with Reintentar and Guardar como tarea; no Tu captura se conserva',
       (tester) async {
         final semantics = tester.ensureSemantics();
         final app = await _App.open(tester, pro: true);
@@ -873,7 +874,7 @@ void main() {
   }
 
   testWidgets(
-    'U7: saved audio with no words that failed offers Reintentar but not Guardar tal cual',
+    'U7: saved audio with no words that failed offers Reintentar but not Guardar como tarea',
     (tester) async {
       final app = await _App.open(tester, pro: true);
       app.store.sessions['audio'] = CaptureSession(
@@ -1332,7 +1333,7 @@ void main() {
   // ---- Round 2 · P67 · UX-469: the failed pair stacked ----
 
   testWidgets(
-    'UX-469: Catalan, 1.0× text, 360×740: after a failure with words, Torna-ho a provar sits above Desa-ho tal com està, each as wide as the controls',
+    'UX-469: Catalan, 1.0× text, 360×740: after a failure with words, Torna-ho a provar sits above Desa-ho com a tasca, each as wide as the controls',
     (tester) async {
       final app = await _App.open(
         tester,
@@ -1350,7 +1351,7 @@ void main() {
       await tester.tap(button(ca.done));
       await tester.pumpAndSettle();
       expect(ca.tryAgain, 'Torna-ho a provar');
-      expect(ca.captureSaveAsWritten, 'Desa-ho tal com està');
+      expect(ca.captureSaveAsWritten, 'Desa-ho com a tasca');
       final retry = tester.getRect(button(ca.tryAgain));
       final save = tester.getRect(button(ca.captureSaveAsWritten));
       expect(retry.bottom, lessThanOrEqualTo(save.top), reason: '$retry $save');
@@ -1590,7 +1591,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-604: with the assistant offline, a spoken “Médico el viernes a las 5 de la tarde” saved with Guardar tal cual is saved at once on Friday at 17:00, titled Médico',
+    'UX-604: with the assistant offline, a spoken “Médico el viernes a las 5 de la tarde” saved with Guardar como tarea is saved at once on Friday at 17:00, titled Médico',
     (tester) async {
       final start = monday();
       final friday = plus(start, 4);
@@ -1626,7 +1627,7 @@ void main() {
   // next day ----
 
   testWidgets(
-    'UX-618: at 10:00 with the assistant offline, a spoken “Llamar a Juan a las 9 de la mañana” saved with Guardar tal cual is saved on the next day at 09:00, titled Llamar a Juan',
+    'UX-618: at 10:00 with the assistant offline, a spoken “Llamar a Juan a las 9 de la mañana” saved with Guardar como tarea is saved on the next day at 09:00, titled Llamar a Juan',
     (tester) async {
       final wednesday = plus(monday(), 2);
       final start = DateTime(
@@ -1929,6 +1930,159 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-18-commands, b4 · P152 (UX-919, D3): «Guardar tal
+  // cual» becomes «Guardar como tarea» ----
+
+  AppLocalizations lang(String language) =>
+      lookupAppLocalizations(Locale(language));
+  const saveAsATask = {
+    'es': 'Guardar como tarea',
+    'en': 'Save as a task',
+    'ca': 'Desa-ho com a tasca',
+  };
+
+  /// Pro, typing [text] in the sheet in [language], then Listo.
+  Future<_App> typeAndSend(
+    WidgetTester tester,
+    String language,
+    String text, {
+    Size size = const Size(390, 844),
+    Completer<void>? hold,
+    Object? failure,
+  }) async {
+    final l = lang(language);
+    final app = await _App.open(
+      tester,
+      pro: true,
+      language: language,
+      size: size,
+    );
+    app.api.hold = hold;
+    app.api.failure = failure;
+    await tester.tap(find.text(l.addTask).hitTestable());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(l.captureTypeInstead));
+    await tester.pumpAndSettle();
+    await tester.enterText(words(), text);
+    await tester.pumpAndSettle();
+    final done = find.widgetWithText(FilledButton, l.done);
+    await tester.ensureVisible(done);
+    await tester.pump();
+    await tester.tap(done);
+    return app;
+  }
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-919 ($language): after 8 s of waiting the filled button reads «${saveAsATask[language]}», and after a failure the same label shows below Reintentar',
+      (tester) async {
+        final l = lang(language);
+        expect(l.captureSaveAsWritten, saveAsATask[language]);
+        final hold = Completer<void>();
+        await typeAndSend(tester, language, 'llamar al médico', hold: hold);
+        await frames(tester);
+        expect(find.text(l.captureSaveAsWritten), findsNothing);
+        await tester.pump(const Duration(milliseconds: 8200));
+        expect(find.text(l.captureSlow), findsOneWidget);
+        expect(
+          find.widgetWithText(FilledButton, l.captureSaveAsWritten),
+          findsOneWidget,
+        );
+        hold.complete();
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+
+        await typeAndSend(
+          tester,
+          language,
+          'llamar al médico',
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.pumpAndSettle();
+        final retry = find.widgetWithText(FilledButton, l.tryAgain);
+        final save = find.widgetWithText(FilledButton, l.captureSaveAsWritten);
+        expect(retry, findsOneWidget);
+        expect(save, findsOneWidget);
+        expect(
+          tester.getRect(retry).bottom,
+          lessThanOrEqualTo(tester.getRect(save).top),
+          reason: 'below Reintentar',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test(
+    'UX-919: no value in app_en.arb, app_es.arb or app_ca.arb says «tal cual», “as written” or «tal com està»',
+    () {
+      for (final language in ['en', 'es', 'ca']) {
+        final arb =
+            jsonDecode(File('lib/l10n/app_$language.arb').readAsStringSync())
+                as Map<String, dynamic>;
+        for (final MapEntry(:key, :value) in arb.entries) {
+          if (key.startsWith('@') || value is! String) continue;
+          final text = value.toLowerCase();
+          for (final gone in ['tal cual', 'as written', 'tal com està']) {
+            expect(text, isNot(contains(gone)), reason: '$language: $key');
+          }
+        }
+      }
+    },
+  );
+
+  // Last in this file: it loads Manrope, which the tests after it would
+  // otherwise draw with.
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-919 ($language, 2× on 320×640): the slow state’s «${saveAsATask[language]}» shows whole, on screen, with no clipped text',
+      (tester) async {
+        await (FontLoader(
+          'Manrope',
+        )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = lang(language);
+        final hold = Completer<void>();
+        await typeAndSend(
+          tester,
+          language,
+          'llamar al médico',
+          size: const Size(320, 640),
+          hold: hold,
+        );
+        await frames(tester);
+        await tester.pump(const Duration(milliseconds: 8200));
+        final save = find.widgetWithText(FilledButton, l.captureSaveAsWritten);
+        expect(save, findsOneWidget);
+        await tester.ensureVisible(save);
+        await tester.pump(const Duration(milliseconds: 400));
+        final rect = tester.getRect(save);
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(320.5));
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(640.5));
+        expect(save.hitTestable(), findsOneWidget);
+        final label = find.descendant(
+          of: save,
+          matching: find.text(l.captureSaveAsWritten),
+        );
+        expect(label, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: label, matching: find.byType(RichText)),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final text = tester.getRect(label);
+        expect(text.left, greaterThanOrEqualTo(rect.left - 0.5));
+        expect(text.right, lessThanOrEqualTo(rect.right + 0.5));
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+        hold.complete();
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 }
 
 Map<String, dynamic> _found(String title) => {

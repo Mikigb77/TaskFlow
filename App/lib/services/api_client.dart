@@ -93,6 +93,9 @@ class AccountStorage {
 class Account {
   final int id;
   final String email;
+
+  /// The name others see on shared projects; '' when the account has none.
+  final String firstName;
   final String timezone;
   final String? billingId;
   final bool googleLinked;
@@ -105,6 +108,7 @@ class Account {
   Account.fromJson(Map<String, dynamic> data)
     : id = data['id'] as int,
       email = data['email'] as String,
+      firstName = (data['first_name'] as String?) ?? '',
       timezone = data['timezone'] as String,
       billingId = data['billing_id'] as String?,
       googleLinked = data['google_linked'] == true,
@@ -292,6 +296,30 @@ class ApiClient {
     final current = account;
     if (current == null) throw ApiException(401, 'Sign in to continue.');
     final user = await request('GET', 'auth/me/', accountId: current.id);
+    if (generation != _generation || _session == null) {
+      throw ApiException(401, 'The account changed. Please try again.');
+    }
+    final next = {..._session!, 'user': Map<String, dynamic>.from(user as Map)};
+    await _persist(next, generation);
+    if (generation != _generation) {
+      throw ApiException(401, 'The account changed. Please try again.');
+    }
+    return Account.fromJson(next['user']);
+  }
+
+  /// Sets the account's first name, the name others see on shared
+  /// projects, and saves the user the server answers, as [refreshAccount]
+  /// does. The server tidies [firstName]; a blank one clears it.
+  Future<Account> setFirstName(String firstName) async {
+    final generation = _generation;
+    final current = account;
+    if (current == null) throw ApiException(401, 'Sign in to continue.');
+    final user = await request(
+      'PATCH',
+      'auth/me/',
+      data: {'first_name': firstName},
+      accountId: current.id,
+    );
     if (generation != _generation || _session == null) {
       throw ApiException(401, 'The account changed. Please try again.');
     }

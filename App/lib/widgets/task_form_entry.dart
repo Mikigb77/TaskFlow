@@ -12,8 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// tasks once there is no mic, or from the capture sheet's `Escribir`. The
 /// first time in a month that its free dictations are used up, a notice
 /// says why first, once; it offers the form and Pro. [words] are words
-/// already heard, typed or shared, for the title and notes; [captureId] is
-/// the capture that keeps them until the task is saved. [askedToSpeak]
+/// already heard, typed or shared, for the title and notes; [spoken] marks
+/// words dictated, heard at [heardAt], whose day and time the form reads;
+/// [captureId] is the capture that keeps them until the task is saved.
+/// [askedToSpeak]
 /// marks the ways in that ask to speak (the widget, the voice shortcut):
 /// without the mic, the form says why. The form's route is pushed, not
 /// awaited.
@@ -24,6 +26,8 @@ Future<void> openTaskForm(
   Object? page,
   bool showCalendar = false,
   String words = '',
+  bool spoken = false,
+  DateTime? heardAt,
   String? captureId,
   bool askedToSpeak = false,
 }) async {
@@ -62,6 +66,8 @@ Future<void> openTaskForm(
         page: page,
         showCalendar: showCalendar,
         words: words,
+        spoken: spoken,
+        heardAt: heardAt,
         captureId: captureId,
         askedToSpeak: askedToSpeak,
       ),

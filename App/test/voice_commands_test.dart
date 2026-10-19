@@ -574,6 +574,54 @@ void main() {
       );
     });
 
+    // Run 2026-10-18-commands, b4 · P152 (UX-920, D4): a search with a
+    // period lists soonest first, as Calendar lists the days.
+    test('UX-920: a period from Monday 19 to Sunday 25 October lists soonest '
+        'first: by day, then untimed before timed, then by time; a weekly '
+        'task by its first repetition in the period, a deadline-only task by '
+        'its deadline', () {
+      // Added in this order: ids grow as the phone numbers them.
+      final week = [
+        Task(id: 1, title: 'Miércoles', priority: 1,
+            dueDate: DateTime(2026, 10, 21)),
+        Task(id: 2, title: 'Lunes a las 9', priority: 1,
+            dueDate: DateTime(2026, 10, 19, 9), hasTime: true),
+        Task(id: 3, title: 'Martes a las 10', priority: 1,
+            dueDate: DateTime(2026, 10, 20, 10), hasTime: true),
+        Task(id: 4, title: 'Lunes', priority: 1,
+            dueDate: DateTime(2026, 10, 19)),
+        Task(id: 5, title: 'Entrega', priority: 1,
+            deadline: DateTime(2026, 10, 22), reminderAnchor: 'deadline'),
+        Task(id: 6, title: 'Yoga', priority: 1,
+            dueDate: DateTime(2026, 10, 5, 19), hasTime: true,
+            recurrence: 'weekly'),
+      ];
+      final thisWeek = find({'from': '2026-10-19', 'to': '2026-10-25'});
+      expect(ids(TaskMatcher.find(week, thisWeek)), [4, 2, 6, 3, 1, 5]);
+      // Without a period: newest first, as before.
+      expect(ids(TaskMatcher.find(week, find({}))), [6, 5, 4, 3, 2, 1]);
+    });
+
+    test('UX-920: with words and a period, a task holding the words in its '
+        'title comes before one holding them only in its notes, even when '
+        'the latter is sooner', () {
+      final found = TaskMatcher.find(
+        [
+          Task(id: 1, title: 'Recoger las gafas', priority: 1,
+              notes: 'Pasar por el dentista',
+              dueDate: DateTime(2026, 10, 19, 9), hasTime: true),
+          Task(id: 2, title: 'Llamar al dentista', priority: 1,
+              dueDate: DateTime(2026, 10, 23, 17), hasTime: true),
+        ],
+        find({
+          'words': ['dentista'],
+          'from': '2026-10-19',
+          'to': '2026-10-25',
+        }),
+      );
+      expect(ids(found), [2, 1]);
+    });
+
     test('a project or person that wasn’t found searches nothing', () {
       expect(
         TaskMatcher.find(tasks, find({

@@ -473,10 +473,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       Navigator.pop(context);
       return;
     }
-    await _save(back: true);
+    await _save();
   }
 
-  Future<void> _save({bool back = false}) async {
+  Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
     // Leaving the step field keeps a step typed without Enter; focus
     // changes land in a microtask, so wait for that one first.
@@ -486,7 +486,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _saving = false;
     if (!mounted) return;
     if (_creating) {
-      await _add(back: back);
+      await _add();
       return;
     }
     if (const DeepCollectionEquality().equals(_edited().toMap(), _unchanged)) {
@@ -561,8 +561,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   /// Saves a new task on the phone (it syncs behind, so it works offline),
   /// then lands as a capture does: Calendar, or the page the form came
   /// from, shows it lit, with Deshacer. The message says the day it went
-  /// to; after Back, that the changes were saved (D12).
-  Future<void> _add({required bool back}) async {
+  /// to, or its deadline's, after Back too (D6). A task with only a
+  /// deadline lands on its deadline's day, as a capture does.
+  Future<void> _add() async {
     setState(() => _saving = true);
     final task = _edited();
     try {
@@ -572,11 +573,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       final messenger = ScaffoldMessenger.of(context);
       final strings = context.l10n;
       final day = task.dueDate == null ? null : Task.day(task.dueDate!);
-      final message = back
-          ? strings.changesSaved
-          : day == null
-          ? strings.taskSavedInbox
-          : strings.taskAddedOn(context.weekdayDate(day));
+      final due = task.deadline == null ? null : Task.day(task.deadline!);
+      final message = day != null
+          ? strings.taskAddedOn(context.weekdayDate(day))
+          : due != null
+          ? strings.taskAddedDue(context.weekdayDate(due))
+          : strings.taskSavedInbox;
       final id = await notifier.addTask(task);
       _letGoOfWords();
       // Shown from the phone at once, even while a sync is under way.
@@ -588,11 +590,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         navigator.pop();
       }
       final focus = CalendarFocus(
-        day,
+        day ?? due,
         {id},
         page: widget.page,
         showCalendar: widget.showCalendar,
-        undated: day == null,
+        undated: day == null && due == null,
       );
       container.read(calendarFocusProvider.notifier).state = focus;
       final feedback = showFeedback(

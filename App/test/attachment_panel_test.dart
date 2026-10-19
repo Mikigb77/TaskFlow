@@ -327,6 +327,43 @@ void main() {
     });
   }
 
+  // ---- Run 2026-10-18-commands, b4 · P154 (UX-1223) ----
+
+  testWidgets(
+      'UX-1223: at 100 of 100 MB, a file refused for the account’s own full space shows «Ver tareas con archivos» beside «Ver Pro»; one refused for a shared project owner’s space shows neither',
+      (tester) async {
+    final es = lookupAppLocalizations(const Locale('es'));
+    expect(es.storageSeeTasks, 'Ver tareas con archivos');
+    await pumpPanel(tester, language: 'es', usedMb: 100, entries: [
+      AttachmentEntry('Scan.pdf', '/local/scan.pdf', true, item: refused())
+    ]);
+    final see = find.widgetWithText(TextButton, es.storageSeeTasks);
+    final pro = find.widgetWithText(TextButton, es.voiceProAction);
+    expect(see, findsOneWidget);
+    expect(pro, findsOneWidget);
+    // In the file's row of actions, next to each other.
+    final actions = find.ancestor(of: pro, matching: find.byType(Wrap)).first;
+    expect(find.descendant(of: actions, matching: see), findsOneWidget);
+    final buttons = tester
+        .widgetList<TextButton>(
+            find.descendant(of: actions, matching: find.byType(TextButton)))
+        .toList();
+    final proAt = buttons.indexOf(tester.widget<TextButton>(pro));
+    expect(buttons[proAt + 1], tester.widget<TextButton>(see),
+        reason: 'right after Ver Pro');
+    expect(tester.takeException(), isNull);
+
+    await pumpPanel(tester, language: 'es', usedMb: 100, entries: [
+      AttachmentEntry('Scan.pdf', '/local/scan.pdf', true,
+          item: refused(shared: true))
+    ]);
+    expect(find.text(es.storageFullShared), findsOneWidget);
+    expect(find.widgetWithText(TextButton, es.storageSeeTasks), findsNothing);
+    expect(find.widgetWithText(TextButton, es.voiceProAction), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('UX-506: storageFull points to other tasks, in EN, ES and CA', () {
     final en = lookupAppLocalizations(const Locale('en'));
     final es = lookupAppLocalizations(const Locale('es'));

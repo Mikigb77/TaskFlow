@@ -14,6 +14,7 @@ import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/services/revenuecat_service.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -292,6 +293,55 @@ void main() {
       },
     );
   }
+
+  // ---- Run 2026-10-18-commands, b4 · P154 (UX-1223) ----
+
+  testWidgets(
+    'UX-1223: a free account’s Pro screen at 100 of 100 MB shows «Ver tareas con archivos» under «Archivos: 100 de 100 MB usados»; at 80 of 100 MB it doesn’t; with Pro it doesn’t',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final es = lookupAppLocalizations(const Locale('es'));
+      Map<String, dynamic> used(int mb) => {
+        'storage': {'used_bytes': mb * megabyte, 'limit_bytes': 100 * megabyte},
+      };
+      final see = find.widgetWithText(TextButton, es.storageSeeTasks);
+
+      await openPro(tester, sdk: _CountingRevenueCat(), user: used(100));
+      final usage = find.text(es.storageUsage(100, 100));
+      expect(es.storageUsage(100, 100), 'Archivos: 100 de 100 MB usados');
+      expect(usage, findsOneWidget);
+      expect(see, findsOneWidget);
+      expect(
+        tester.getRect(see).top,
+        greaterThanOrEqualTo(tester.getRect(usage).bottom - 0.5),
+        reason: 'under the usage line',
+      );
+      final colors = Theme.of(
+        tester.element(find.byType(SubscriptionScreen)),
+      ).colorScheme;
+      final label = tester.renderObject<RenderParagraph>(
+        find.descendant(of: see, matching: find.byType(RichText)),
+      );
+      expect(label.text.style?.color, colors.onPrimaryContainer);
+      expect(tester.takeException(), isNull);
+
+      await openPro(tester, sdk: _CountingRevenueCat(), user: used(80));
+      expect(find.text(es.storageUsage(80, 100)), findsOneWidget);
+      expect(see, findsNothing);
+
+      await openPro(
+        tester,
+        sdk: _CountingRevenueCat()..info = billingInfo(active: true),
+        user: used(100),
+      );
+      expect(see, findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test('UX-501: freeVoiceStatus has a singular and a plural in EN, ES and CA', () {
     for (final language in ['en', 'es', 'ca']) {

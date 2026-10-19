@@ -15,6 +15,7 @@ import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/invitation_cards.dart';
+import 'package:agenda/widgets/name_ask_sheet.dart';
 
 String groupRoleLabel(BuildContext context, String role) =>
     role == 'admin' ? context.l10n.groupAdmin : context.listRole(role);
@@ -427,6 +428,10 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
           },
         ),
       );
+      // An account without a name is asked for one, once.
+      if (mounted) {
+        await askForNameOnce(Navigator.of(context), accountId: accountId);
+      }
     }
   }
 

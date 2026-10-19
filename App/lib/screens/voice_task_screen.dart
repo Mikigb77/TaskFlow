@@ -462,7 +462,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   int _wordsAt = 0;
   double _level = 0;
   String? _error;
-  // Understanding the words failed: `Reintentar`, and `Guardar tal cual`.
+  // Understanding the words failed: `Reintentar`, and `Guardar como tarea`.
   bool _failed = false;
   // The assistant has taken more than a few seconds.
   bool _slow = false;
@@ -1376,7 +1376,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   /// Words that can be saved as written: saved audio with no words can't.
   bool get _hasWords => _words.text.trim().isNotEmpty;
 
-  /// `Guardar tal cual`: the words as written, with the date they name, saved
+  /// `Guardar como tarea`: the words as written, with the date they name, saved
   /// at once as any result is, while the assistant is slow or after it
   /// failed.
   Future<void> _saveAsWritten() async {
@@ -1413,7 +1413,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
   }
 
-  /// `Guardar tal cual` on a result whose commands found nothing: its words
+  /// `Guardar como tarea` on a result whose commands found nothing: its words
   /// become a task, understood on the phone and saved at once. No command is
   /// applied, and nothing goes to the assistant, so no dictation is used.
   Future<void> _saveResultAsWritten(CaptureSession result) async {
@@ -1545,7 +1545,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
   /// Words typed (or shared) for a task by an account without Pro: they
   /// become a task only through the form, never the phone's parser. A
-  /// dictation still goes to the assistant, and `Guardar tal cual` after it
+  /// dictation still goes to the assistant, and `Guardar como tarea` after it
   /// stays.
   bool get _typedForForm =>
       _kind == 'task' &&
@@ -1557,12 +1557,14 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   /// `Escribir`, for an account without Pro: the task form instead of
   /// typing here. Listening stops; words heard or typed so far go to the
   /// form as its title, with their capture, which the form keeps until the
-  /// task is saved.
+  /// task is saved. Words dictated get the day and time they name (D2).
   Future<void> _fillByHand() async {
     if (_asking) return;
     _asking = true;
     var words = '';
     String? captureId;
+    var spoken = false;
+    DateTime? heardAt;
     try {
       await _starting;
       await _finishRecording(submit: false, quiet: true);
@@ -1570,6 +1572,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       words = _words.text.trim();
       final session = _session;
       if (session != null) {
+        spoken = session.source == 'speech' || session.audioPath != null;
+        heardAt = session.capturedAt.toLocal();
         if (CaptureStore.isEmpty(session.copyWith(text: words))) {
           await _store.discard(session.id, _owner);
         } else {
@@ -1595,6 +1599,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         page: origin?.page,
         showCalendar: origin?.showCalendar ?? false,
         words: words,
+        spoken: spoken,
+        heardAt: heardAt,
         captureId: captureId,
       ),
     );
@@ -2077,7 +2083,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               _controls(
                 context,
                 primary,
-                // `Reintentar` and `Guardar tal cual` read in full only
+                // `Reintentar` and `Guardar como tarea` read in full only
                 // stacked.
                 stack: failed && saveAsWritten,
                 showCancel: !recordingWaits,
@@ -2242,7 +2248,7 @@ class CaptureResult extends ConsumerStatefulWidget {
   /// its edits written, so Cancel can bring it back.
   final ValueChanged<CaptureSession>? onSayAgain;
 
-  /// `Guardar tal cual`, when every command found nothing: the words become
+  /// `Guardar como tarea`, when every command found nothing: the words become
   /// a task instead.
   final Future<void> Function(CaptureSession)? onSaveAsWritten;
   @override
@@ -3297,7 +3303,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     if (mounted) widget.onSayAgain?.call(_session);
   }
 
-  /// `Guardar tal cual`: the words, not the commands, are what to keep.
+  /// `Guardar como tarea`: the words, not the commands, are what to keep.
   Future<void> _saveAsWritten() async {
     final save = widget.onSaveAsWritten;
     if (_saving || save == null) return;
@@ -3317,14 +3323,22 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     }
   }
 
-  /// Cancel, Back, a tap above the sheet and a swipe down: ask once whether
-  /// to keep it, as while listening. With every card removed, it finishes as
-  /// `Terminar` does. While saving, nothing happens.
+  /// Cancel, Back, a tap above the sheet and a swipe down. With a task or a
+  /// note still to add, ask once whether to keep it, as while listening.
+  /// With none (only changes, deletions, searches or new projects, or every
+  /// task card removed), it means “don't do it”: discarded at once, as
+  /// `Descartar` does, so nothing is applied and nothing waits in
+  /// «Sin guardar». With nothing left at all, it finishes as `Terminar`
+  /// does. While saving, nothing happens.
   Future<void> _leave() async {
     if (_saving || _asking || !mounted) return;
     // Nothing waits (a search, a task not found): it only closes.
     if (!_worthKeeping()) {
       await _finishEmpty();
+      return;
+    }
+    if (!_items.any((d) => d.pending)) {
+      await _discard();
       return;
     }
     _asking = true;

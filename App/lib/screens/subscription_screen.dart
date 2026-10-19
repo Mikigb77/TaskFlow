@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/screens/tasks_with_files_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
@@ -128,6 +129,17 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     style: TextStyle(color: colors.onPrimaryContainer),
                   ),
                 ],
+                // A full space: which tasks use it, to make room.
+                if (storage != null &&
+                    storage.limitBytes > 0 &&
+                    storage.usedBytes >= storage.limitBytes)
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.onPrimaryContainer,
+                    ),
+                    onPressed: () => TasksWithFilesScreen.open(context),
+                    child: Text(l10n.storageSeeTasks),
+                  ),
               ],
             ),
           ),

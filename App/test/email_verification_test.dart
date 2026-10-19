@@ -2559,4 +2559,287 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-18-commands, b4 · P156 (UX-1206, D9): «Reenviar código»
+  // past the server's limit says how long to wait ----
+
+  /// The server refuses another code: too many were asked for.
+  http.Response resendLimited(int seconds, {bool header = true}) =>
+      http.Response.bytes(
+        utf8.encode(
+          jsonEncode({
+            'code': 'resend_limited',
+            'retry_after': seconds,
+            'detail': 'Too many codes were requested.',
+          }),
+        ),
+        429,
+        headers: {
+          'content-type': 'application/json',
+          if (header) 'retry-after': '$seconds',
+        },
+      );
+
+  testWidgets(
+    'UX-1206: Reenviar answered 429 resend_limited with retry_after 1800 says «Has pedido muchos códigos. Espera 30 minutos para pedir otro.» under the code field, not «Te hemos enviado un código nuevo»; the typed digits stay, and the button is off reading «Reenviar código en 30 minutos»',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      await later(tester, clock, 61);
+      expect(resendEnabled(tester), isTrue);
+      await tester.enterText(code, '123');
+      await tester.pump();
+      app.server.resend = (_) => resendLimited(1800);
+      await tapVisible(tester, resend);
+      expect(app.server.bodies('auth/verify-email/resend/'), hasLength(1));
+      expect(
+        es.verifyEmailResendLimited(30),
+        'Has pedido muchos códigos. Espera 30 minutos para pedir otro.',
+      );
+      expect(errorUnder(tester, code), es.verifyEmailResendLimited(30));
+      expect(says(tester, es.verifyEmailResent), isFalse);
+      expect(
+        find.textContaining('Te hemos enviado un código nuevo'),
+        findsNothing,
+      );
+      expect(typed(tester, code), '123', reason: 'the digits stay');
+      expect(resendEnabled(tester), isFalse);
+      expect(
+        es.verifyEmailResendInMinutes(30),
+        'Reenviar código en 30 minutos',
+      );
+      expect(resendLabel(tester), es.verifyEmailResendInMinutes(30));
+      // Tapping it does nothing.
+      await tester.tap(resend, warnIfMissed: false);
+      await tester.pump();
+      expect(app.server.bodies('auth/verify-email/resend/'), hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1206: after the 30-minute refusal, the clock 29 min 30 s ahead and one tick reads «Reenviar código en 30 segundos»; 30 minutes ahead it reads «Reenviar código» and can be tapped',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      await later(tester, clock, 61);
+      app.server.resend = (_) => resendLimited(1800);
+      await tapVisible(tester, resend);
+      expect(resendLabel(tester), es.verifyEmailResendInMinutes(30));
+      final refusedAt = clock.now;
+      // Android froze the app: the clock moved, the timer ticked once.
+      clock.now = refusedAt.add(const Duration(minutes: 29, seconds: 30));
+      await tester.pump(const Duration(seconds: 1));
+      expect(es.verifyEmailResendIn(30), 'Reenviar código en 30 segundos');
+      expect(resendLabel(tester), es.verifyEmailResendIn(30));
+      expect(resendEnabled(tester), isFalse);
+      clock.now = refusedAt.add(const Duration(minutes: 30));
+      await tester.pump(const Duration(seconds: 1));
+      expect(resendLabel(tester), es.verifyEmailResend);
+      expect(resendEnabled(tester), isTrue);
+      app.server.resend = (_) => _json(204);
+      await tapVisible(tester, resend);
+      expect(app.server.bodies('auth/verify-email/resend/'), hasLength(2));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1206: a 429 resend_limited with retry_after 20 shows no «Has pedido…» line, and the button reads «Reenviar código en 20 segundos»',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await createAccount(tester, es);
+      await later(tester, clock, 61);
+      app.server.resend = (_) => resendLimited(20);
+      await tapVisible(tester, resend);
+      for (final minutes in [1, 2, 30]) {
+        expect(says(tester, es.verifyEmailResendLimited(minutes)), isFalse);
+      }
+      expect(find.textContaining('Has pedido'), findsNothing);
+      expect(errorUnder(tester, code), isNull);
+      expect(says(tester, es.verifyEmailResent), isFalse);
+      expect(resendLabel(tester), es.verifyEmailResendIn(20));
+      expect(resendEnabled(tester), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['en', 'ca']) {
+    testWidgets(
+      'UX-1206 ($language, 2× on 320×640 with the keyboard): the 30-minute refusal’s line shows whole above the keyboard',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final l = strings(language);
+        final clock = _Clock();
+        final app = await _App.open(
+          tester,
+          language: language,
+          size: const Size(320, 640),
+          clock: clock.call,
+        );
+        await createAccount(tester, l);
+        await later(tester, clock, 61);
+        // The keyboard takes the bottom 300 dp.
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        await tester.showKeyboard(code);
+        await tester.pumpAndSettle();
+        app.server.resend = (_) => resendLimited(1800);
+        await tester.ensureVisible(resend);
+        await tester.pumpAndSettle();
+        await tester.tap(resend);
+        await tester.pumpAndSettle();
+        final line = l.verifyEmailResendLimited(30);
+        expect(
+          line,
+          {
+            'en':
+                'You’ve asked for a lot of codes. Wait 30 minutes to ask for another.',
+            'ca':
+                'Has demanat molts codis. Espera 30 minuts per demanar-ne un altre.',
+          }[language],
+        );
+        final shown = find.text(line);
+        expect(shown, findsOneWidget);
+        final rect = tester.getRect(shown);
+        expect(rect.left, greaterThanOrEqualTo(0), reason: line);
+        expect(rect.right, lessThanOrEqualTo(320.5), reason: line);
+        expect(rect.top, greaterThanOrEqualTo(0), reason: line);
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(340.5),
+          reason: 'above the keyboard',
+        );
+        for (final paragraph in tester.renderObjectList<RenderParagraph>(
+          find.descendant(
+            of: shown,
+            matching: find.byType(RichText),
+            matchRoot: true,
+          ),
+        )) {
+          expect(paragraph.didExceedMaxLines, isFalse, reason: line);
+        }
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1206: Confirmar answered 429 with Retry-After 900 still says «Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.»',
+    (tester) async {
+      final app = await _App.open(tester);
+      await createAccount(tester, es);
+      app.server.verify = (_) => throttled(retryAfter: 900);
+      await tester.enterText(code, '333333');
+      await tester.pumpAndSettle();
+      if (app.server.paths.last != 'auth/verify-email/') {
+        await tapVisible(tester, confirm);
+      }
+      expect(
+        es.tooManyTriesWait(15),
+        'Demasiados intentos. Espera 15 minutos y vuelve a intentarlo.',
+      );
+      expect(says(tester, es.tooManyTriesWait(15)), isTrue);
+      expect(find.textContaining('Has pedido'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-18-commands, b4 round 2 · P162 (UX-1231): the resend
+  // limit's line counts down with the button ----
+
+  /// Reenviar, with «123» typed, refused for 30 minutes; returns when.
+  Future<DateTime> refusedFor30Minutes(
+    WidgetTester tester,
+    _App app,
+    _Clock clock,
+  ) async {
+    await createAccount(tester, es);
+    await later(tester, clock, 61);
+    await tester.enterText(code, '123');
+    await tester.pump();
+    app.server.resend = (_) => resendLimited(1800);
+    await tapVisible(tester, resend);
+    return clock.now;
+  }
+
+  testWidgets(
+    'UX-1231: right after the 30-minute refusal, before the clock moves, the line still reads «Has pedido muchos códigos. Espera 30 minutos para pedir otro.»',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      await refusedFor30Minutes(tester, app, clock);
+      expect(errorUnder(tester, code), es.verifyEmailResendLimited(30));
+      expect(resendLabel(tester), es.verifyEmailResendInMinutes(30));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1231: 8 minutes after the 30-minute refusal and one tick, the line reads «Has pedido muchos códigos. Espera 22 minutos para pedir otro.» above «Reenviar código en 22 minutos»',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      final refusedAt = await refusedFor30Minutes(tester, app, clock);
+      // The person went to the mail app; the timer fires once on return.
+      clock.now = refusedAt.add(const Duration(minutes: 8));
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        es.verifyEmailResendLimited(22),
+        'Has pedido muchos códigos. Espera 22 minutos para pedir otro.',
+      );
+      expect(es.verifyEmailResendInMinutes(22), 'Reenviar código en 22 minutos');
+      expect(errorUnder(tester, code), es.verifyEmailResendLimited(22));
+      expect(find.text(es.verifyEmailResendLimited(22)), findsOneWidget);
+      expect(find.text(es.verifyEmailResendLimited(30)), findsNothing);
+      expect(resendLabel(tester), es.verifyEmailResendInMinutes(22));
+      expect(resendEnabled(tester), isFalse);
+      expect(typed(tester, code), '123');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1231: 28 min 30 s after the 30-minute refusal and one tick, the line reads «Espera 2 minutos» and the button «Reenviar código en 2 minutos»',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      final refusedAt = await refusedFor30Minutes(tester, app, clock);
+      clock.now = refusedAt.add(const Duration(minutes: 28, seconds: 30));
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        es.verifyEmailResendLimited(2),
+        'Has pedido muchos códigos. Espera 2 minutos para pedir otro.',
+      );
+      expect(es.verifyEmailResendInMinutes(2), 'Reenviar código en 2 minutos');
+      expect(errorUnder(tester, code), es.verifyEmailResendLimited(2));
+      expect(resendLabel(tester), es.verifyEmailResendInMinutes(2));
+      expect(resendEnabled(tester), isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1231: 29 minutes after the 30-minute refusal and one tick, no line shows under the code field and nothing reads «Has pedido»; the button reads «Reenviar código en 60 segundos», is off, and the digits stay',
+    (tester) async {
+      final clock = _Clock();
+      final app = await _App.open(tester, clock: clock.call);
+      final refusedAt = await refusedFor30Minutes(tester, app, clock);
+      clock.now = refusedAt.add(const Duration(minutes: 29));
+      await tester.pump(const Duration(seconds: 1));
+      expect(errorUnder(tester, code), isNull);
+      expect(find.textContaining('Has pedido'), findsNothing);
+      expect(es.verifyEmailResendIn(60), 'Reenviar código en 60 segundos');
+      expect(resendLabel(tester), es.verifyEmailResendIn(60));
+      expect(resendEnabled(tester), isFalse);
+      expect(typed(tester, code), '123');
+      // No other 429 line takes its place.
+      expect(says(tester, es.verifyEmailResent), isFalse);
+      expect(find.textContaining('Demasiad'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
