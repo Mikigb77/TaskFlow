@@ -822,7 +822,12 @@ def build_apk() -> Path:
     flutter = shutil.which("flutter")
     if not flutter:
         raise RuntimeError("flutter isn't on PATH; pass --apk with a built debug APK instead.")
-    if not (APP / ".dart_tool" / "package_config.json").exists():
+    # The plugin registrant is part of pub get's output too: a pub get that failed half way
+    # (no symlink support) leaves package_config.json but no registrant, and the APK then
+    # starts with no plugins at all, so sign-in fails with a generic error.
+    registrant = APP / "android" / "app" / "src" / "main" / "java" / "io" / "flutter" / "plugins" / \
+        "GeneratedPluginRegistrant.java"
+    if not (APP / ".dart_tool" / "package_config.json").exists() or not registrant.exists():
         log("running flutter pub get (first build in this checkout)")
         subprocess.run([flutter, "pub", "get"], cwd=APP, check=True)
     log("building the review APK (debug, android-x64)")
