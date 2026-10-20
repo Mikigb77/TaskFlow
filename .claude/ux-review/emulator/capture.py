@@ -1279,8 +1279,38 @@ class Lane:
         self.variants("permission-notifications", "settings-on", "Settings > Recordatorios with "
                       "everything allowed.")
 
+    def ensure_calendar(self) -> None:
+        """One local phone calendar, «Trabajo», with two events today, on TaskFlow_Review only.
+        A real phone has calendars, so connecting them has something to show (D7, UX-1611).
+        Its events are replaced on every run, so they're always today's."""
+        verify()
+        uri = "content://com.android.calendar/calendars"
+        rows = sh(f"content query --uri {uri} --projection _id:name")
+        match = re.search(r"_id=(\d+), name=taskflow_review", rows)
+        if match is None:
+            sh(f"content insert --uri '{uri}?caller_is_syncadapter=true&account_name=review"
+               "&account_type=LOCAL' --bind account_name:s:review --bind account_type:s:LOCAL "
+               "--bind name:s:taskflow_review --bind calendar_displayName:s:Trabajo "
+               "--bind calendar_color:i:-14575885 --bind calendar_access_level:i:700 "
+               "--bind ownerAccount:s:review --bind visible:i:1 --bind sync_events:i:1 "
+               f"--bind calendar_timezone:s:{TIMEZONE}", check=True)
+            rows = sh(f"content query --uri {uri} --projection _id:name")
+            match = re.search(r"_id=(\d+), name=taskflow_review", rows)
+            if match is None:
+                raise Skip("couldn't add the review emulator's local calendar")
+        calendar = match.group(1)
+        sh(f"content delete --uri content://com.android.calendar/events --where 'calendar_id={calendar}'")
+        today = dt.datetime.now().astimezone()
+        for title, hour, minutes in (("Reunion de equipo", 10, 60), ("Cita con el dentista", 17, 30)):
+            start = today.replace(hour=hour, minute=0, second=0, microsecond=0)
+            ms = int(start.timestamp() * 1000)
+            sh(f"content insert --uri content://com.android.calendar/events --bind calendar_id:i:{calendar} "
+               f"--bind 'title:s:{title}' --bind dtstart:l:{ms} --bind dtend:l:{ms + minutes * 60000} "
+               f"--bind eventTimezone:s:{TIMEZONE}", check=True)
+
     def calendar_permission(self) -> None:
         L = self.L
+        self.ensure_calendar()
         self.reset_permission("READ_CALENDAR")
         self.restart_app()
         self.open_other_settings()
@@ -1297,8 +1327,15 @@ class Lane:
         if self.dialog() is None:
             raise Skip("the calendar dialog didn't come back")
         tap_id("permission_allow_button", wait=2.5)
-        self.variants("permission-calendar", "allowed", "After 'Permitir' (the emulator has no "
-                      "calendar accounts).")
+        self.variants("permission-calendar", "allowed", "After 'Permitir'. The review emulator has one "
+                      "local phone calendar, «Trabajo», with two events today, which the lane adds.")
+        # Where the events land: Calendar's today, with the phone's two events among the tasks.
+        key("KEYCODE_BACK", 1)
+        key("KEYCODE_BACK", 1)
+        self.tab("calendar")
+        self.variants("permission-calendar", "calendar-after", "Calendar's today after connecting: "
+                      "the phone calendar's events «Reunion de equipo» (10:00) and «Cita con el "
+                      "dentista» (17:00) among the day's tasks.")
 
     # The launcher ------------------------------------------------------------
 
