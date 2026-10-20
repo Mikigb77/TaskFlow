@@ -19,10 +19,6 @@ final _timezoneProvider = FutureProvider.autoDispose<CaptureTimezone>((ref) {
   );
 });
 
-/// A time zone as people know it: its city, e.g. `Buenos Aires` for
-/// `America/Argentina/Buenos_Aires`. The IANA id is still what's stored.
-String timeZoneName(String id) => id.split('/').last.replaceAll('_', ' ');
-
 class RegionalSettingsScreen extends ConsumerWidget {
   const RegionalSettingsScreen({super.key});
   Future<void> _save(

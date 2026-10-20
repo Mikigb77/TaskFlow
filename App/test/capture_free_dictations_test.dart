@@ -195,7 +195,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(app.speech.starts, 1, reason: 'it opens on the mic');
       expect(find.byKey(const ValueKey('capture-fill-by-hand')), findsNothing);
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'Comprar pan');
       await tester.pumpAndSettle();
@@ -236,7 +236,7 @@ void main() {
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
       expect(app.speech.starts, 1, reason: 'mic first, as today');
-      expect(find.byTooltip(es.captureTypeInstead), findsNothing);
+      expect(find.byKey(const ValueKey('capture-type-instead')), findsNothing);
       final byHand = find.byKey(const ValueKey('capture-fill-by-hand'));
       expect(byHand, findsOneWidget);
       expect(
@@ -1034,7 +1034,7 @@ void main() {
     expect(filled, findsOneWidget, reason: 'exactly one filled button');
     final close = inSheet(find.widgetWithText(FilledButton, l.captureClose));
     expect(close, findsOneWidget);
-    expect(find.byTooltip(l.captureTypeInstead), findsNothing);
+    expect(find.byKey(const ValueKey('capture-type-instead')), findsNothing);
     final rect = tester.getRect(close);
     expect(rect.left, greaterThanOrEqualTo(0));
     expect(rect.right, lessThanOrEqualTo(width + 0.5));
@@ -2737,7 +2737,10 @@ void main() {
     testWidgets(
       'UX-918: heard «Médico el viernes a las 5 de la tarde», Escribir opens the form titled «Médico», with the third day chip reading Friday 23 and selected, and the time chip reading 17:00',
       (tester) async {
-        await heardThenEscribir(tester, 'Médico el viernes a las 5 de la tarde');
+        await heardThenEscribir(
+          tester,
+          'Médico el viernes a las 5 de la tarde',
+        );
         expect(formTitle(tester), 'Médico');
         final context = formContext(tester);
         expect(
@@ -2917,6 +2920,229 @@ void main() {
       expect(filled.hitTestable(), findsOneWidget);
       expect(inSheet(find.text(es.captureSayAgain)), findsNothing);
       expect(inSheet(find.text(es.tryAgain)), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX loop 2026-10-19-app, batch b2 round 2 · P200 (UX-1630) ----
+  // Today's dictation limit refuses a recording that has no words yet: the
+  // banner says the recording is kept, and the only button is Cerrar.
+
+  final limitRefusal = ApiException(
+    429,
+    'Too many requests.',
+    null,
+    const Duration(seconds: 3600),
+  );
+
+  /// Waits for the sheet's request number [requests] and its answer.
+  Future<void> answered(WidgetTester tester, _FreeApp app, int requests) async {
+    for (var i = 0; i < 10 && app.api.drafts.length < requests; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    expect(app.api.drafts, hasLength(requests));
+  }
+
+  /// [keepRecording]'s capture opened in the sheet and sent with Listo; the
+  /// server refuses it with today's limit.
+  Future<_FreeApp> refusedByTheLimit(
+    WidgetTester tester, {
+    String language = 'es',
+  }) async {
+    final l = strings(language);
+    final app = await _FreeApp.open(
+      tester,
+      freeVoice: freeVoice(5),
+      language: language,
+      size: const Size(360, 800),
+    );
+    keepRecording(app, id: 'limit-wav');
+    app.api.failure = limitRefusal;
+    unawaited(
+      showCaptureSheet(
+        tester.element(find.byType(Scaffold).first),
+        captureId: 'limit-wav',
+        startListening: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(button(l.done));
+    await answered(tester, app, 1);
+    return app;
+  }
+
+  /// The labels of the sheet's text buttons, filled, outlined or plain.
+  List<String> sheetButtons(WidgetTester tester) => [
+    for (final element in inSheet(
+      find.byWidgetPredicate((w) => w is ButtonStyleButton),
+    ).evaluate())
+      [
+        for (final text
+            in find
+                .descendant(
+                  of: find.byWidget(element.widget),
+                  matching: find.byType(Text),
+                )
+                .evaluate())
+          (text.widget as Text).data ?? '',
+      ].join(' '),
+  ];
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-1630 ($language, 1× on 360×800): a recording with no words refused by today’s limit says the recording is kept, and the only button is Cerrar',
+      (tester) async {
+        final l = strings(language);
+        await refusedByTheLimit(tester, language: language);
+        final banner = inSheet(find.byType(MessageBanner));
+        expect(banner, findsOneWidget);
+        expect(
+          find.descendant(
+            of: banner,
+            matching: find.text(l.captureAllowanceRecording),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(l.captureAllowance), findsNothing);
+        expect(sheetButtons(tester), [l.captureClose]);
+        expect(
+          inSheet(find.widgetWithText(FilledButton, l.captureClose)),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.byKey(const ValueKey('capture-close'))).hitTestable(),
+          findsOneWidget,
+        );
+        for (final hidden in [
+          l.tryAgain,
+          l.cancel,
+          l.captureSaveAsWritten,
+          l.recordingKept,
+        ]) {
+          expect(inSheet(find.text(hidden)), findsNothing, reason: hidden);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test(
+    'UX-1630: the limit line for a recording reads as written in each language',
+    () {
+      expect(
+        es.captureAllowanceRecording,
+        'Has llegado al límite de dictados de hoy. Tu grabación se conserva; inténtalo mañana.',
+      );
+      expect(
+        en.captureAllowanceRecording,
+        'You’ve reached today’s dictation limit. Your recording is kept; try again tomorrow.',
+      );
+      expect(
+        ca.captureAllowanceRecording,
+        'Has arribat al límit de dictats d’avui. La gravació es conserva; torna-ho a provar demà.',
+      );
+    },
+  );
+
+  for (final (how, close) in [
+    (
+      'Cerrar',
+      (WidgetTester tester) => tester.tap(
+        inSheet(find.widgetWithText(FilledButton, es.captureClose)),
+      ),
+    ),
+    ('Back', (WidgetTester tester) => tester.binding.handlePopRoute()),
+  ]) {
+    testWidgets(
+      'UX-1630: in that state $how closes the sheet without the discard question, and the recording stays in Capturas pendientes',
+      (tester) async {
+        final app = await refusedByTheLimit(tester);
+        await close(tester);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing, reason: 'closed');
+        expect(app.store.sessions['limit-wav']!.status, isNot('discarded'));
+        app.container.invalidate(pendingCapturesProvider);
+        expect(
+          (await app.container.read(
+            pendingCapturesProvider.future,
+          )).map((s) => s.id),
+          contains('limit-wav'),
+        );
+        tester
+            .state<NavigatorState>(find.byType(Navigator).first)
+            .pushNamed('/captures');
+        await tester.pumpAndSettle();
+        expect(find.byType(CapturesScreen), findsOneWidget);
+        expect(find.text(es.voiceRecording), findsOneWidget);
+        expect(app.api.drafts, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1630: the refused recording, reopened from Capturas pendientes, shows Reintentar and not the limit line; when the server answers, the result shows',
+    (tester) async {
+      final app = await refusedByTheLimit(tester);
+      await tester.tap(
+        inSheet(find.widgetWithText(FilledButton, es.captureClose)),
+      );
+      await tester.pumpAndSettle();
+      // The fixture put the recording in the store directly: read afresh.
+      app.container.invalidate(pendingCapturesProvider);
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed('/captures');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.voiceRecording));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget, reason: 'reopened');
+      expect(find.text(es.captureAllowanceRecording), findsNothing);
+      expect(find.text(es.captureAllowance), findsNothing);
+      final retry = inSheet(find.widgetWithText(FilledButton, es.tryAgain));
+      expect(retry, findsOneWidget);
+      expect(retry.hitTestable(), findsOneWidget);
+
+      // Tomorrow: the server understands it.
+      app.api
+        ..failure = null
+        ..transcript = 'Comprar pan';
+      await tester.tap(retry);
+      await answered(tester, app, 2);
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(find.text('Comprar pan'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1630: reopened while the limit still holds, the refusal comes back with only Cerrar',
+    (tester) async {
+      final app = await refusedByTheLimit(tester);
+      await tester.tap(
+        inSheet(find.widgetWithText(FilledButton, es.captureClose)),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(Scaffold).first),
+          captureId: 'limit-wav',
+          startListening: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet(find.widgetWithText(FilledButton, es.tryAgain)));
+      await answered(tester, app, 2);
+      expect(inSheet(find.text(es.captureAllowanceRecording)), findsOneWidget);
+      expect(sheetButtons(tester), [es.captureClose]);
       expect(tester.takeException(), isNull);
     },
   );
@@ -3148,6 +3374,10 @@ class _Api extends ApiClient {
   Object? failure;
   Map<String, dynamic>? answerFreeVoice;
 
+  /// What the assistant heard in a recording, when set; otherwise the words
+  /// sent.
+  String? transcript;
+
   /// The assistant finds no task and no command in the words.
   bool findsNothing = false;
 
@@ -3178,7 +3408,7 @@ class _Api extends ApiClient {
       }
       final error = failure;
       if (error != null) throw error;
-      final text = '${data?['text'] ?? ''}';
+      final text = transcript ?? '${data?['text'] ?? ''}';
       return {
         'transcript': text,
         'tasks': [if (!findsNothing) _found(text)],

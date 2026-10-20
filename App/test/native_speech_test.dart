@@ -94,7 +94,7 @@ void main() {
         listen: false,
       );
       const original = 'Doctor Friday at 17:00 · bring José’s report';
-      await tester.tap(find.byTooltip('Type instead'));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('capture-words')),
@@ -148,7 +148,7 @@ void main() {
     final store = _Captures();
     final api = _OfflineExtraction();
     final container = await _open(tester, _Speech(), store, api, listen: false);
-    await tester.tap(find.byTooltip('Type instead'));
+    await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
     await tester.pumpAndSettle();
     final words = find.byKey(const ValueKey('capture-words'));
     await tester.enterText(words, 'Already kept');
@@ -360,7 +360,7 @@ void main() {
       final store = _Captures();
       await _open(tester, speech, store, _OfflineExtraction());
       expect(speech.run, isNull);
-      await tester.tap(find.byTooltip('Type instead'));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('capture-words')),
@@ -867,7 +867,7 @@ void main() {
       final store = _Captures();
       final api = _OfflineExtraction();
       await _open(tester, _Speech(), store, api, language: 'es', listen: false);
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('capture-words')),
@@ -921,11 +921,17 @@ void main() {
           inSheet(find.text(es.listeningSeconds('00:00'))),
           findsOneWidget,
         );
-        // No mic button: the only icon button is the keyboard.
-        final icons = inSheet(find.byType(IconButton));
-        expect(icons, findsOneWidget);
-        expect(tester.widget<IconButton>(icons).tooltip, es.captureTypeInstead);
+        // No mic button and no icon-only button: the keyboard is
+        // `Escribir`, named.
+        expect(inSheet(find.byType(IconButton)), findsNothing);
         expect(inSheet(find.byIcon(Icons.keyboard_outlined)), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('capture-type-instead')),
+            matching: find.text(es.captureTypeInstead),
+          ),
+          findsOneWidget,
+        );
         // The controls, and nothing else to press.
         expect(
           inSheet(find.widgetWithText(TextButton, es.cancel)),
@@ -939,7 +945,7 @@ void main() {
           inSheet(
             find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
           ),
-          // Cancelar, Listo and the keyboard (an M3 IconButton).
+          // Cancelar, Listo and Escribir.
           findsNWidgets(3),
         );
         // No Task/Note chips, speech options or help from the old page.
@@ -954,12 +960,14 @@ void main() {
         ]) {
           expect(inSheet(find.byType(type)), findsNothing, reason: '$type');
         }
-        // One label per control, the same for TalkBack and the tooltip.
+        // One label per control, with no tooltip to read twice.
         final keyboard = tester
-            .getSemantics(inSheet(find.byTooltip(es.captureTypeInstead)))
+            .getSemantics(
+              inSheet(find.byKey(const ValueKey('capture-type-instead'))),
+            )
             .getSemanticsData();
-        expect(keyboard.tooltip, es.captureTypeInstead);
-        expect(keyboard.label, anyOf('', es.captureTypeInstead));
+        expect(keyboard.tooltip, isEmpty);
+        expect(keyboard.label, es.captureTypeInstead);
         // UX-109 (d): the labelled creation button has no tooltip to read
         // twice.
         expect(
@@ -1178,7 +1186,7 @@ void main() {
           inSheet(
             find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
           ),
-          // Cancelar, Listo and the keyboard (an M3 IconButton).
+          // Cancelar, Listo and Escribir.
           findsNWidgets(3),
         );
         expect(tester.takeException(), isNull);
@@ -1374,7 +1382,7 @@ void main() {
         for (final control in [
           find.widgetWithText(TextButton, es.cancel),
           find.widgetWithText(FilledButton, es.done),
-          find.byTooltip(es.captureTypeInstead),
+          find.byKey(const ValueKey('capture-type-instead')),
         ]) {
           expect(control.hitTestable(), findsOneWidget);
           expect(onScreen(tester.getRect(control)), isTrue, reason: '$control');
@@ -1547,7 +1555,7 @@ void main() {
       'UX-441: the keyboard button stops listening without announcing Listo or En pausa',
       (tester) async {
         await listeningWithWords(tester);
-        await tester.tap(find.byTooltip(es.captureTypeInstead));
+        await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('capture-words')), findsOneWidget);
         final heard = announced(tester);
@@ -2142,7 +2150,9 @@ void main() {
       );
       expect(inSheet(find.text(l.captureStartTalking)), findsNothing);
       expect(
-        inSheet(find.byTooltip(l.captureTypeInstead)).hitTestable(),
+        inSheet(
+          find.byKey(const ValueKey('capture-type-instead')),
+        ).hitTestable(),
         findsOneWidget,
       );
       expect(
@@ -2455,7 +2465,9 @@ void main() {
           findsOneWidget,
         );
         expect(
-          inSheet(find.byTooltip(es.captureTypeInstead)).hitTestable(),
+          inSheet(
+            find.byKey(const ValueKey('capture-type-instead')),
+          ).hitTestable(),
           findsOneWidget,
         );
         expect(inSheet(find.text(es.captureMicrophoneBlocked)), findsNothing);
@@ -2580,7 +2592,9 @@ void main() {
         expect(inSheet(find.text(es.captureCantListen)), findsOneWidget);
         expect(inSheet(find.byType(MessageBanner)), findsOneWidget);
         expect(
-          inSheet(find.byTooltip(es.captureTypeInstead)).hitTestable(),
+          inSheet(
+            find.byKey(const ValueKey('capture-type-instead')),
+          ).hitTestable(),
           findsOneWidget,
         );
         expect(tester.takeException(), isNull);

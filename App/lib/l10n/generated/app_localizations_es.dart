@@ -461,6 +461,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tomorrow => 'Mañana';
 
   @override
+  String get yesterday => 'Ayer';
+
+  @override
   String get all => 'Todas';
 
   @override
@@ -695,10 +698,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get day => 'Día';
 
   @override
-  String get previousPeriod => 'Mes o semana anterior';
+  String get previousWeek => 'Semana anterior';
 
   @override
-  String get nextPeriod => 'Mes o semana siguiente';
+  String get nextWeek => 'Semana siguiente';
+
+  @override
+  String get previousMonth => 'Mes anterior';
+
+  @override
+  String get nextMonth => 'Mes siguiente';
+
+  @override
+  String dayTaskCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas',
+      one: '1 tarea',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get previousDay => 'Día anterior';
@@ -2693,10 +2713,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'No he encontrado ninguna tarea. Di qué y cuándo, por ejemplo: «Mañana, llamar al dentista».';
 
   @override
-  String get captureUnsupportedKind =>
-      'Este servidor no admite esta forma de añadir tareas. Tus palabras se conservan.';
-
-  @override
   String get captureOffline =>
       'Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.';
 
@@ -2705,8 +2721,16 @@ class AppLocalizationsEs extends AppLocalizations {
       'No he podido contactar con el asistente; tus palabras se conservan.';
 
   @override
+  String get captureTooFast =>
+      'Has dictado muchas veces seguidas. Espera un minuto y toca Reintentar.';
+
+  @override
   String get captureAllowance =>
-      'Has llegado al límite de hoy. Escribe la tarea o inténtalo mañana.';
+      'Has llegado al límite de dictados de hoy. Toca Guardar como tarea o inténtalo mañana.';
+
+  @override
+  String get captureAllowanceRecording =>
+      'Has llegado al límite de dictados de hoy. Tu grabación se conserva; inténtalo mañana.';
 
   @override
   String get captureSignIn =>
@@ -2718,7 +2742,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureTooLarge =>
-      'Esta grabación supera el límite del servicio. Consérvala para más tarde o escribe una descripción más breve.';
+      'Esta grabación es demasiado larga. Descártala y dicta algo más corto.';
 
   @override
   String get captureTypedFirst =>
@@ -2808,12 +2832,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'Ahora no puedo escucharte en este teléfono. Toca Escribir.';
 
   @override
-  String get captureSpeechBusy =>
-      'Ya hay una solicitud del micrófono abierta. Termínala antes de volver a intentarlo.';
-
-  @override
   String get captureIncompleteAudio =>
-      'El audio guardado está incompleto y no se puede procesar. Sigue conservado en este teléfono.';
+      'Esta grabación no se puede usar. Descártala y vuelve a dictarla.';
 
   @override
   String get captureWriteFailed =>
@@ -2821,7 +2841,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureStopFailed =>
-      'No se ha podido finalizar la grabación. El contenido guardado anteriormente se conserva.';
+      'No he podido terminar de escuchar. Lo que dijiste antes se conserva.';
 
   @override
   String get captureDiscardFailed =>
@@ -2833,7 +2853,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureSaveFailed =>
-      'No se ha podido terminar de guardar. Tus palabras se conservan; al reintentar no se duplicarán las tareas guardadas.';
+      'No se ha podido añadir. Tus palabras siguen aquí; vuelve a intentarlo.';
 
   @override
   String get captureSetupRequested =>
@@ -2860,10 +2880,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get capturesEmptyHelp =>
       'Aquí se guardan las grabaciones y las tareas que dejes a medias.';
-
-  @override
-  String get captureResumeHelp =>
-      'Guardado en este teléfono · Toca para continuar';
 
   @override
   String captureDraftSummary(int count) {
@@ -4018,6 +4034,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String commandDontChange(String title) {
     return 'No cambiar $title';
   }
+
+  @override
+  String get commandDontChangeAny => 'No cambiar ninguna';
+
+  @override
+  String get commandDontDeleteAny => 'No eliminar ninguna';
 
   @override
   String commandDontCreate(String name) {

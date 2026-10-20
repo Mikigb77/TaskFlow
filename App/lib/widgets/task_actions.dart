@@ -125,20 +125,27 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
         ref
             .watch(pendingCapturesProvider)
             .when(
+              // 8 dp apart from `Añadir tarea` under it.
               data: (sessions) => sessions.isEmpty
                   ? const SizedBox.shrink()
-                  : TextButton.icon(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/captures'),
-                      icon: const Icon(Icons.restore_rounded, size: 18),
-                      label: Text(
-                        context.l10n.pendingCaptureCount(sessions.length),
+                  : Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TextButton.icon(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/captures'),
+                        icon: const Icon(Icons.restore_rounded, size: 18),
+                        label: Text(
+                          context.l10n.pendingCaptureCount(sessions.length),
+                        ),
                       ),
                     ),
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => TextButton(
-                onPressed: () => Navigator.pushNamed(context, '/captures'),
-                child: Text(context.l10n.checkCaptures),
+              error: (_, __) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/captures'),
+                  child: Text(context.l10n.checkCaptures),
+                ),
               ),
             ),
         SizedBox(width: double.infinity, child: _button(context)),

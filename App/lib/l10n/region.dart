@@ -33,6 +33,19 @@ extension TaskFlowLocale on BuildContext {
     return weekdayDate(date);
   }
 
+  /// When something already happened, as of [now]: `Hoy, 9:41` or
+  /// `Ayer, 18:05`, otherwise the day alone (`vie, 16 oct`).
+  String pastMoment(DateTime date, DateTime now) {
+    final local = date.toLocal();
+    final today = Task.day(now);
+    final day = Task.day(local);
+    if (day == today) return '${l10n.today}, ${clockTime(local)}';
+    if (day == DateTime(today.year, today.month, today.day - 1)) {
+      return '${l10n.yesterday}, ${clockTime(local)}';
+    }
+    return weekdayDate(local);
+  }
+
   String priorityName(int priority) => switch (priority) {
     3 => l10n.high,
     2 => l10n.medium,
@@ -80,6 +93,10 @@ extension TaskFlowLocale on BuildContext {
     return '$interval · $days';
   }
 }
+
+/// A time zone as people know it: its city, e.g. `Buenos Aires` for
+/// `America/Argentina/Buenos_Aires`. The IANA id is still what's stored.
+String timeZoneName(String id) => id.split('/').last.replaceAll('_', ' ');
 
 /// Regional formats stay separate from UI language. Explicit clock and week
 /// preferences apply to Material date/time pickers as well as task labels.

@@ -23,32 +23,39 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     leading: !isRoot && !canGoBack ? const SizedBox.shrink() : null,
     titleSpacing: isRoot ? 24 : null,
     toolbarHeight: 64,
+    // A root tab shows the brand but is announced by its own name.
     title: isRoot
-        ? Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(10),
+        ? Semantics(
+            header: true,
+            namesRoute: true,
+            label: title,
+            excludeSemantics: true,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.done_all_rounded,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                 ),
-                child: Icon(
-                  Icons.done_all_rounded,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                const SizedBox(width: 10),
+                const Flexible(
+                  child: Text(
+                    'taskflow',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              const Flexible(
-                child: Text(
-                  'taskflow',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+              ],
+            ),
           )
         : Text(title),
     actions: [

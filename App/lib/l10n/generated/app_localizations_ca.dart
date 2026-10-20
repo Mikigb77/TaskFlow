@@ -461,6 +461,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get tomorrow => 'Demà';
 
   @override
+  String get yesterday => 'Ahir';
+
+  @override
   String get all => 'Totes';
 
   @override
@@ -695,10 +698,27 @@ class AppLocalizationsCa extends AppLocalizations {
   String get day => 'Dia';
 
   @override
-  String get previousPeriod => 'Mes o setmana anterior';
+  String get previousWeek => 'Setmana anterior';
 
   @override
-  String get nextPeriod => 'Mes o setmana següent';
+  String get nextWeek => 'Setmana següent';
+
+  @override
+  String get previousMonth => 'Mes anterior';
+
+  @override
+  String get nextMonth => 'Mes següent';
+
+  @override
+  String dayTaskCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques',
+      one: '1 tasca',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get previousDay => 'Dia anterior';
@@ -2686,10 +2706,6 @@ class AppLocalizationsCa extends AppLocalizations {
       'No he trobat cap tasca. Digues què i quan, per exemple: «Demà, trucar al dentista».';
 
   @override
-  String get captureUnsupportedKind =>
-      'Aquest servidor no admet aquesta manera d’afegir tasques. Les teves paraules es conserven.';
-
-  @override
   String get captureOffline =>
       'Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.';
 
@@ -2698,8 +2714,16 @@ class AppLocalizationsCa extends AppLocalizations {
       'No he pogut contactar amb l’assistent; les teves paraules es conserven.';
 
   @override
+  String get captureTooFast =>
+      'Has dictat moltes vegades seguides. Espera un minut i toca Torna-ho a provar.';
+
+  @override
   String get captureAllowance =>
-      'Has arribat al límit d’avui. Escriu la tasca o torna-ho a provar demà.';
+      'Has arribat al límit de dictats d’avui. Toca Desa-ho com a tasca o torna-ho a provar demà.';
+
+  @override
+  String get captureAllowanceRecording =>
+      'Has arribat al límit de dictats d’avui. La gravació es conserva; torna-ho a provar demà.';
 
   @override
   String get captureSignIn =>
@@ -2711,7 +2735,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureTooLarge =>
-      'Aquesta gravació supera el límit del servei. Conserva-la per a més endavant o escriu una descripció més curta.';
+      'Aquesta gravació és massa llarga. Descarta-la i dicta alguna cosa més curta.';
 
   @override
   String get captureTypedFirst =>
@@ -2799,12 +2823,8 @@ class AppLocalizationsCa extends AppLocalizations {
       'Ara no et puc escoltar en aquest telèfon. Toca Escriu.';
 
   @override
-  String get captureSpeechBusy =>
-      'Ja hi ha una petició de micròfon oberta. Acaba-la abans de tornar-ho a provar.';
-
-  @override
   String get captureIncompleteAudio =>
-      'L’àudio conservat és incomplet i no es pot processar. Es continua conservant en aquest telèfon.';
+      'Aquesta gravació no es pot fer servir. Descarta-la i torna-la a dictar.';
 
   @override
   String get captureWriteFailed =>
@@ -2812,7 +2832,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureStopFailed =>
-      'No s’ha pogut acabar la gravació. El contingut conservat anteriorment es manté.';
+      'No he pogut acabar d’escoltar. El que has dit abans es conserva.';
 
   @override
   String get captureDiscardFailed =>
@@ -2824,7 +2844,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureSaveFailed =>
-      'No s’ha pogut acabar de desar. Les teves paraules es conserven; tornar-ho a provar no duplicarà les tasques desades.';
+      'No s’ha pogut afegir. Les paraules continuen aquí; torna-ho a provar.';
 
   @override
   String get captureSetupRequested =>
@@ -2851,10 +2871,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get capturesEmptyHelp =>
       'Aquí es guarden les gravacions i les tasques que deixis a mig fer.';
-
-  @override
-  String get captureResumeHelp =>
-      'Conservat en aquest telèfon · Toca per continuar';
 
   @override
   String captureDraftSummary(int count) {
@@ -4011,6 +4027,12 @@ class AppLocalizationsCa extends AppLocalizations {
   String commandDontChange(String title) {
     return 'No canviïs $title';
   }
+
+  @override
+  String get commandDontChangeAny => 'No en canviïs cap';
+
+  @override
+  String get commandDontDeleteAny => 'No en suprimeixis cap';
 
   @override
   String commandDontCreate(String name) {

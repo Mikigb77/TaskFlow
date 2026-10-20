@@ -455,6 +455,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tomorrow => 'Tomorrow';
 
   @override
+  String get yesterday => 'Yesterday';
+
+  @override
   String get all => 'All';
 
   @override
@@ -688,10 +691,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get day => 'Day';
 
   @override
-  String get previousPeriod => 'Previous month or week';
+  String get previousWeek => 'Previous week';
 
   @override
-  String get nextPeriod => 'Next month or week';
+  String get nextWeek => 'Next week';
+
+  @override
+  String get previousMonth => 'Previous month';
+
+  @override
+  String get nextMonth => 'Next month';
+
+  @override
+  String dayTaskCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks',
+      one: '1 task',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get previousDay => 'Previous day';
@@ -2620,10 +2640,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”';
 
   @override
-  String get captureUnsupportedKind =>
-      'This server does not support this way of adding tasks. Your words are kept.';
-
-  @override
   String get captureOffline =>
       'No internet. Your words are saved — try again when you’re online.';
 
@@ -2632,8 +2648,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn’t reach the assistant — your words are kept.';
 
   @override
+  String get captureTooFast =>
+      'You’ve dictated a lot in a row. Wait a minute, then tap Try again.';
+
+  @override
   String get captureAllowance =>
-      'You’ve reached today’s limit. Type the task, or try again tomorrow.';
+      'You’ve reached today’s dictation limit. Tap Save as a task, or try again tomorrow.';
+
+  @override
+  String get captureAllowanceRecording =>
+      'You’ve reached today’s dictation limit. Your recording is kept; try again tomorrow.';
 
   @override
   String get captureSignIn => 'Sign in again to turn your words into tasks.';
@@ -2644,7 +2668,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureTooLarge =>
-      'This recording exceeds the service limit. Keep it for later or use a shorter typed description.';
+      'This recording is too long. Discard it and dictate something shorter.';
 
   @override
   String get captureTypedFirst =>
@@ -2731,12 +2755,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'I can’t listen on this phone right now. Tap Type instead.';
 
   @override
-  String get captureSpeechBusy =>
-      'A microphone request is already open. Finish it before trying again.';
-
-  @override
   String get captureIncompleteAudio =>
-      'The retained audio is incomplete and cannot be processed. It is still kept on this phone.';
+      'This recording can’t be used. Discard it and dictate it again.';
 
   @override
   String get captureWriteFailed =>
@@ -2744,7 +2764,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureStopFailed =>
-      'Could not finish recording. Previously retained input is kept.';
+      'I couldn’t finish listening. What you said before is kept.';
 
   @override
   String get captureDiscardFailed =>
@@ -2756,7 +2776,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureSaveFailed =>
-      'Could not finish saving. Your words are kept; retry will not duplicate saved tasks.';
+      'Couldn’t add it. Your words are still here; try again.';
 
   @override
   String get captureSetupRequested =>
@@ -2783,9 +2803,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get capturesEmptyHelp =>
       'Recordings and tasks you leave unfinished are kept here.';
-
-  @override
-  String get captureResumeHelp => 'Kept on this phone · Tap to resume';
 
   @override
   String captureDraftSummary(int count) {
@@ -3924,6 +3941,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String commandDontChange(String title) {
     return 'Don’t change $title';
   }
+
+  @override
+  String get commandDontChangeAny => 'Don’t change any';
+
+  @override
+  String get commandDontDeleteAny => 'Don’t delete any';
 
   @override
   String commandDontCreate(String name) {

@@ -1650,7 +1650,7 @@ class _App {
   }) async {
     await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip(es.captureTypeInstead));
+    await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('capture-words')), words);
     await tester.pumpAndSettle();

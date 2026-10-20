@@ -760,6 +760,12 @@ abstract class AppLocalizations {
   /// **'Tomorrow'**
   String get tomorrow;
 
+  /// The day before today, before a time: when a kept capture was made (Yesterday, 18:05).
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get yesterday;
+
   /// No description provided for @all.
   ///
   /// In en, this message translates to:
@@ -1210,17 +1216,35 @@ abstract class AppLocalizations {
   /// **'Day'**
   String get day;
 
-  /// No description provided for @previousPeriod.
+  /// Calendar's back arrow, read aloud, in the week view: shows the week before.
   ///
   /// In en, this message translates to:
-  /// **'Previous month or week'**
-  String get previousPeriod;
+  /// **'Previous week'**
+  String get previousWeek;
 
-  /// No description provided for @nextPeriod.
+  /// Calendar's forward arrow, read aloud, in the week view: shows the week after.
   ///
   /// In en, this message translates to:
-  /// **'Next month or week'**
-  String get nextPeriod;
+  /// **'Next week'**
+  String get nextWeek;
+
+  /// Calendar's back arrow, read aloud, in the month view: shows the month before.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get previousMonth;
+
+  /// Calendar's forward arrow, read aloud, in the month view: shows the month after.
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get nextMonth;
+
+  /// Read aloud for a day in Calendar's week or month strip: how many open tasks it has. Follows the day's date, after “today · ” when the day is today. Lowercase.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 task} other{{count} tasks}}'**
+  String dayTaskCount(int count);
 
   /// No description provided for @previousDay.
   ///
@@ -4288,12 +4312,6 @@ abstract class AppLocalizations {
   /// **'I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”'**
   String get captureNoTasks;
 
-  /// No description provided for @captureUnsupportedKind.
-  ///
-  /// In en, this message translates to:
-  /// **'This server does not support this way of adding tasks. Your words are kept.'**
-  String get captureUnsupportedKind;
-
   /// No description provided for @captureOffline.
   ///
   /// In en, this message translates to:
@@ -4306,11 +4324,23 @@ abstract class AppLocalizations {
   /// **'Couldn’t reach the assistant — your words are kept.'**
   String get captureUnavailable;
 
+  /// Shown in the dictation sheet when many dictations came in a row and the per-minute limit refused this one. Names the Try again button under it; waiting a minute is enough.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve dictated a lot in a row. Wait a minute, then tap Try again.'**
+  String get captureTooFast;
+
   /// No description provided for @captureAllowance.
   ///
   /// In en, this message translates to:
-  /// **'You’ve reached today’s limit. Type the task, or try again tomorrow.'**
+  /// **'You’ve reached today’s dictation limit. Tap Save as a task, or try again tomorrow.'**
   String get captureAllowance;
+
+  /// Capture sheet banner when the daily dictation limit refuses a recording that has no words yet. The only button is Close; the recording stays in Pending captures.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve reached today’s dictation limit. Your recording is kept; try again tomorrow.'**
+  String get captureAllowanceRecording;
 
   /// No description provided for @captureSignIn.
   ///
@@ -4327,7 +4357,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureTooLarge.
   ///
   /// In en, this message translates to:
-  /// **'This recording exceeds the service limit. Keep it for later or use a shorter typed description.'**
+  /// **'This recording is too long. Discard it and dictate something shorter.'**
   String get captureTooLarge;
 
   /// No description provided for @captureTypedFirst.
@@ -4462,16 +4492,10 @@ abstract class AppLocalizations {
   /// **'I can’t listen on this phone right now. Tap Type instead.'**
   String get captureCantListen;
 
-  /// No description provided for @captureSpeechBusy.
-  ///
-  /// In en, this message translates to:
-  /// **'A microphone request is already open. Finish it before trying again.'**
-  String get captureSpeechBusy;
-
   /// No description provided for @captureIncompleteAudio.
   ///
   /// In en, this message translates to:
-  /// **'The retained audio is incomplete and cannot be processed. It is still kept on this phone.'**
+  /// **'This recording can’t be used. Discard it and dictate it again.'**
   String get captureIncompleteAudio;
 
   /// No description provided for @captureWriteFailed.
@@ -4483,7 +4507,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureStopFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not finish recording. Previously retained input is kept.'**
+  /// **'I couldn’t finish listening. What you said before is kept.'**
   String get captureStopFailed;
 
   /// No description provided for @captureDiscardFailed.
@@ -4501,7 +4525,7 @@ abstract class AppLocalizations {
   /// No description provided for @captureSaveFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not finish saving. Your words are kept; retry will not duplicate saved tasks.'**
+  /// **'Couldn’t add it. Your words are still here; try again.'**
   String get captureSaveFailed;
 
   /// No description provided for @captureSetupRequested.
@@ -4545,12 +4569,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recordings and tasks you leave unfinished are kept here.'**
   String get capturesEmptyHelp;
-
-  /// No description provided for @captureResumeHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Kept on this phone · Tap to resume'**
-  String get captureResumeHelp;
 
   /// In Unfinished captures, under a capture's first task: how many of its tasks are not added yet.
   ///
@@ -4618,7 +4636,7 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get captureFinish;
 
-  /// No description provided for @captureYourWords.
+  /// Screen-reader label of the field in the capture sheet where the person types (or sees) the words for their tasks. Not shown on screen.
   ///
   /// In en, this message translates to:
   /// **'Your words'**
@@ -5985,6 +6003,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Don’t change {title}'**
   String commandDontChange(String title);
+
+  /// Tooltip and screen-reader label of the ✕ on a change's card in a dictation's result while it asks which of several tasks to change (“Which one do you want to change?”): none of them is changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t change any'**
+  String get commandDontChangeAny;
+
+  /// Tooltip and screen-reader label of the ✕ on a deletion's card in a dictation's result while it asks which of several tasks to delete (“Which one do you want to delete?”): none of them is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t delete any'**
+  String get commandDontDeleteAny;
 
   /// Tooltip and screen-reader label of the ✕ on a new project's card in a dictation's result: the project isn't created. {name} is the project's name.
   ///

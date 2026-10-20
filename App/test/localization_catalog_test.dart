@@ -16,8 +16,8 @@ void main() {
           as Map<String, dynamic>;
   final keys = template.keys.where((key) => !key.startsWith('@')).toSet();
   final files = directory.listSync().whereType<File>().where(
-        (file) => file.path.endsWith('.arb'),
-      );
+    (file) => file.path.endsWith('.arb'),
+  );
 
   test('generated locales match the translation catalogs', () {
     final codes = files
@@ -70,13 +70,22 @@ void main() {
 
   test('server errors keep their meaning without leaking raw English', () {
     expect(
-        requestProblemText(lookupAppLocalizations(const Locale('ca')),
-            'A list changed on another device. Choose which version to keep in Lists.'),
-        contains('Tria quina versió'));
+      requestProblemText(
+        lookupAppLocalizations(const Locale('ca')),
+        'A list changed on another device. Choose which version to keep in Lists.',
+      ),
+      contains('Tria quina versió'),
+    );
     expect(
-        requestProblemText(lookupAppLocalizations(const Locale('ca')),
-            ApiException(400, 'Ask the list owner for the current invitation code.')),
-        contains('codi d’invitació actual'));
+      requestProblemText(
+        lookupAppLocalizations(const Locale('ca')),
+        ApiException(
+          400,
+          'Ask the list owner for the current invitation code.',
+        ),
+      ),
+      contains('codi d’invitació actual'),
+    );
     final errors = <(Object, String)>[
       (
         ApiException(401, 'No active account found with the given credentials'),
@@ -195,28 +204,33 @@ void main() {
       final en = strings('en');
       final es = strings('es');
       final ca = strings('ca');
-      expect([en.reviewRemoved, es.reviewRemoved, ca.reviewRemoved], [
-        'Removed',
-        'Quitada',
-        'Treta',
-      ]);
-      expect([en.reviewRemove, es.reviewRemove, ca.reviewRemove], [
-        'Remove',
-        'Quitar',
-        'Treu',
-      ]);
-      expect([en.reviewUndoSaved, es.reviewUndoSaved, ca.reviewUndoSaved], [
-        'They’re back here, not saved yet.',
-        'Han vuelto aquí, sin guardar.',
-        'Tornen a ser aquí, sense desar.',
-      ]);
+      expect(
+        [en.reviewRemoved, es.reviewRemoved, ca.reviewRemoved],
+        ['Removed', 'Quitada', 'Treta'],
+      );
+      expect(
+        [en.reviewRemove, es.reviewRemove, ca.reviewRemove],
+        ['Remove', 'Quitar', 'Treu'],
+      );
+      expect(
+        [en.reviewUndoSaved, es.reviewUndoSaved, ca.reviewUndoSaved],
+        [
+          'They’re back here, not saved yet.',
+          'Han vuelto aquí, sin guardar.',
+          'Tornen a ser aquí, sense desar.',
+        ],
+      );
       expect(
         [
           en.captureRemovedDraftsHelp,
           es.captureRemovedDraftsHelp,
           ca.captureRemovedDraftsHelp,
         ],
-        ['Nothing will change.', 'No se hará ningún cambio.', 'No es farà cap canvi.'],
+        [
+          'Nothing will change.',
+          'No se hará ningún cambio.',
+          'No es farà cap canvi.',
+        ],
       );
       expect(
         [en.capturesEmptyHelp, es.capturesEmptyHelp, ca.capturesEmptyHelp],
@@ -262,48 +276,46 @@ void main() {
           'Vols conservar el que has dit per a més tard?',
         ],
       );
-      expect([en.discard, es.discard, ca.discard], [
-        'Discard',
-        'Descartar',
-        'Descarta',
-      ]);
+      expect(
+        [en.discard, es.discard, ca.discard],
+        ['Discard', 'Descartar', 'Descarta'],
+      );
       expect([en.keep, es.keep, ca.keep], ['Keep', 'Conservar', 'Conserva']);
     },
   );
 
-  test(
-    'UX-225: no catalog value keeps the Lista → Proyecto rename slips',
-    () {
-      final slip = RegExp(
-        'Proyecto de pasos|Projecte de passos|proyecto compartida',
-        caseSensitive: false,
-      );
-      for (final file in files) {
-        final catalog =
-            jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-        for (final MapEntry(:key, :value) in catalog.entries) {
-          if (key.startsWith('@')) continue;
-          expect(
-            slip.hasMatch(value as String),
-            isFalse,
-            reason: '${file.path} $key: $value',
-          );
-        }
+  test('UX-225: no catalog value keeps the Lista → Proyecto rename slips', () {
+    final slip = RegExp(
+      'Proyecto de pasos|Projecte de passos|proyecto compartida',
+      caseSensitive: false,
+    );
+    for (final file in files) {
+      final catalog =
+          jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      for (final MapEntry(:key, :value) in catalog.entries) {
+        if (key.startsWith('@')) continue;
+        expect(
+          slip.hasMatch(value as String),
+          isFalse,
+          reason: '${file.path} $key: $value',
+        );
       }
-    },
-  );
+    }
+  });
 
   // ---- Round 1 · P22 · UX-225, UX-122, UX-123: Spanish and Catalan slips ----
 
-  test('UX-225: in Spanish, agendaCounts(1, 1) reads 1 pendiente · 1 completada',
-      () {
-    final es = lookupAppLocalizations(const Locale('es'));
-    expect(es.agendaCounts(1, 1), '1 pendiente · 1 completada');
-    expect(es.agendaCounts(0, 1), '0 pendientes · 1 completada');
-    expect(es.agendaCounts(2, 3), '2 pendientes · 3 completadas');
-    final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(ca.agendaCounts(1, 1), isNot(contains('1 completades')));
-  });
+  test(
+    'UX-225: in Spanish, agendaCounts(1, 1) reads 1 pendiente · 1 completada',
+    () {
+      final es = lookupAppLocalizations(const Locale('es'));
+      expect(es.agendaCounts(1, 1), '1 pendiente · 1 completada');
+      expect(es.agendaCounts(0, 1), '0 pendientes · 1 completada');
+      expect(es.agendaCounts(2, 3), '2 pendientes · 3 completadas');
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(ca.agendaCounts(1, 1), isNot(contains('1 completades')));
+    },
+  );
 
   for (final (language, one, two) in [
     ('es', 'Cada semana', 'Cada 2 semanas'),
@@ -311,33 +323,40 @@ void main() {
     ('en', 'Every week', 'Every 2 weeks'),
   ]) {
     testWidgets(
-        'UX-225: a weekly repeat with weekdays reads $one · …, never Cada 1 semanas ($language)',
-        (tester) async {
-      late BuildContext context;
-      await tester.pumpWidget(MaterialApp(
-          locale: Locale(language),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          home: Builder(builder: (c) {
-            context = c;
-            return const SizedBox();
-          })));
-      await tester.pumpAndSettle();
-      Task weekly(int interval) => Task(
+      'UX-225: a weekly repeat with weekdays reads $one · …, never Cada 1 semanas ($language)',
+      (tester) async {
+        late BuildContext context;
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: Locale(language),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: Builder(
+              builder: (c) {
+                context = c;
+                return const SizedBox();
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Task weekly(int interval) => Task(
           title: 'Correr',
           priority: 1,
           dueDate: DateTime(2026, 10, 12),
           recurrence: 'weekly',
           repeatInterval: interval,
-          repeatWeekdays: const [1, 3]);
-      final label = context.repeatLabel(weekly(1));
-      expect(label, startsWith('$one · '));
-      expect(label, isNot(contains(' 1 ')));
-      expect(context.repeatLabel(weekly(2)), startsWith('$two · '));
-      if (language == 'es') {
-        expect(label, 'Cada semana · lun, mié');
-      }
-    });
+          repeatWeekdays: const [1, 3],
+        );
+        final label = context.repeatLabel(weekly(1));
+        expect(label, startsWith('$one · '));
+        expect(label, isNot(contains(' 1 ')));
+        expect(context.repeatLabel(weekly(2)), startsWith('$two · '));
+        if (language == 'es') {
+          expect(label, 'Cada semana · lun, mié');
+        }
+      },
+    );
   }
 
   test('UX-225: Lista de pasos is the one Spanish name for a checklist', () {
@@ -404,9 +423,11 @@ void main() {
 
   /// Keys of [language]'s catalog whose user-facing text matches [banned].
   List<String> offending(String language, RegExp banned) {
-    final catalog = jsonDecode(
-      File('${directory.path}/app_$language.arb').readAsStringSync(),
-    ) as Map<String, dynamic>;
+    final catalog =
+        jsonDecode(
+              File('${directory.path}/app_$language.arb').readAsStringSync(),
+            )
+            as Map<String, dynamic>;
     return [
       for (final entry in catalog.entries)
         if (!entry.key.startsWith('@') &&
@@ -421,90 +442,234 @@ void main() {
     'U11: the Spanish catalog has no Bandeja, Capturas pendientes, captura or Lista para cuando in user-facing text',
     () {
       expect(
-        offending('es', RegExp(r'Bandeja|Capturas pendientes|captura|Lista para cuando', caseSensitive: false)),
+        offending(
+          'es',
+          RegExp(
+            r'Bandeja|Capturas pendientes|captura|Lista para cuando',
+            caseSensitive: false,
+          ),
+        ),
         isEmpty,
       );
     },
   );
 
-  test('U11: the English catalog has no Inbox or capture in user-facing text', () {
-    expect(offending('en', RegExp(r'inbox|captur', caseSensitive: false)), isEmpty);
-  });
+  test(
+    'U11: the English catalog has no Inbox or capture in user-facing text',
+    () {
+      expect(
+        offending('en', RegExp(r'inbox|captur', caseSensitive: false)),
+        isEmpty,
+      );
+    },
+  );
 
-  test('U11: the Catalan catalog has no Safata or captura in user-facing text', () {
-    expect(offending('ca', RegExp(r'safata|captura', caseSensitive: false)), isEmpty);
-  });
+  test(
+    'U11: the Catalan catalog has no Safata or captura in user-facing text',
+    () {
+      expect(
+        offending('ca', RegExp(r'safata|captura', caseSensitive: false)),
+        isEmpty,
+      );
+    },
+  );
 
-  test('U11: Sin fecha, Sin proyecto and Sin guardar read as decided in each language', () {
-    final en = lookupAppLocalizations(const Locale('en'));
-    final es = lookupAppLocalizations(const Locale('es'));
-    final ca = lookupAppLocalizations(const Locale('ca'));
-    for (final (l, inbox, count, saved, moved, noList, notSaved, notSavedCount, remove) in [
-      (en, 'No date', 'No date · 2', 'Added with no date', 'Date removed', 'No project', 'Not saved yet', 'Not saved yet · 1', 'Remove'),
-      (es, 'Sin fecha', 'Sin fecha · 2', 'Añadida sin fecha', 'Se ha quitado la fecha', 'Sin proyecto', 'Sin guardar', 'Sin guardar · 1', 'Quitar'),
-      (ca, 'Sense data', 'Sense data · 2', 'Afegida sense data', 'S’ha tret la data', 'Sense projecte', 'Sense desar', 'Sense desar · 1', 'Treu'),
-    ]) {
-      expect(l.inbox, inbox);
-      expect(l.inboxCount(2), count);
-      expect(l.taskSavedInbox, saved);
-      expect(l.movedInbox, moved);
-      expect(l.noList, noList);
-      expect(l.unfinishedCaptures, notSaved);
-      expect(l.pendingCaptureCount(1), notSavedCount);
-      expect(l.reviewRemove, remove);
-    }
-    expect(es.inboxEmpty, startsWith('Las tareas sin fecha esperan aquí hasta que elijas una.'));
-    expect(en.inboxEmpty, startsWith('Tasks without a date wait here until you choose one.'));
-    expect(ca.inboxEmpty, startsWith('Les tasques sense data esperen aquí fins que en triïs una.'));
-    expect(es.checkCaptures, 'Ver lo que falta por guardar');
-    expect(ca.checkCaptures, 'Mostra el que falta per desar');
-    expect(en.checkCaptures, 'See what’s not saved yet');
-    expect(es.sharedCaptureRetained,
-        'Lo que has compartido se ha conservado. Vuelve a abrir TaskFlow para intentarlo de nuevo.');
-    expect(en.sharedCaptureRetained, 'What you shared is kept. Open TaskFlow again to try again.');
-    expect(ca.sharedCaptureRetained,
-        'El que has compartit s’ha conservat. Torna a obrir TaskFlow per tornar-ho a provar.');
-    expect(es.capturePrivacy,
-        endsWith('Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.'));
-    expect(en.capturePrivacy,
-        endsWith('Anything not saved yet stays on this phone until you save or discard it.'));
-    expect(ca.capturePrivacy,
-        endsWith('El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.'));
-    // retryCaptures is gone; the Sin guardar list retries with tryAgain.
-    expect(keys.contains('retryCaptures'), isFalse);
-  });
+  test(
+    'U11: Sin fecha, Sin proyecto and Sin guardar read as decided in each language',
+    () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      for (final (
+            l,
+            inbox,
+            count,
+            saved,
+            moved,
+            noList,
+            notSaved,
+            notSavedCount,
+            remove,
+          )
+          in [
+            (
+              en,
+              'No date',
+              'No date · 2',
+              'Added with no date',
+              'Date removed',
+              'No project',
+              'Not saved yet',
+              'Not saved yet · 1',
+              'Remove',
+            ),
+            (
+              es,
+              'Sin fecha',
+              'Sin fecha · 2',
+              'Añadida sin fecha',
+              'Se ha quitado la fecha',
+              'Sin proyecto',
+              'Sin guardar',
+              'Sin guardar · 1',
+              'Quitar',
+            ),
+            (
+              ca,
+              'Sense data',
+              'Sense data · 2',
+              'Afegida sense data',
+              'S’ha tret la data',
+              'Sense projecte',
+              'Sense desar',
+              'Sense desar · 1',
+              'Treu',
+            ),
+          ]) {
+        expect(l.inbox, inbox);
+        expect(l.inboxCount(2), count);
+        expect(l.taskSavedInbox, saved);
+        expect(l.movedInbox, moved);
+        expect(l.noList, noList);
+        expect(l.unfinishedCaptures, notSaved);
+        expect(l.pendingCaptureCount(1), notSavedCount);
+        expect(l.reviewRemove, remove);
+      }
+      expect(
+        es.inboxEmpty,
+        startsWith('Las tareas sin fecha esperan aquí hasta que elijas una.'),
+      );
+      expect(
+        en.inboxEmpty,
+        startsWith('Tasks without a date wait here until you choose one.'),
+      );
+      expect(
+        ca.inboxEmpty,
+        startsWith(
+          'Les tasques sense data esperen aquí fins que en triïs una.',
+        ),
+      );
+      expect(es.checkCaptures, 'Ver lo que falta por guardar');
+      expect(ca.checkCaptures, 'Mostra el que falta per desar');
+      expect(en.checkCaptures, 'See what’s not saved yet');
+      expect(
+        es.sharedCaptureRetained,
+        'Lo que has compartido se ha conservado. Vuelve a abrir TaskFlow para intentarlo de nuevo.',
+      );
+      expect(
+        en.sharedCaptureRetained,
+        'What you shared is kept. Open TaskFlow again to try again.',
+      );
+      expect(
+        ca.sharedCaptureRetained,
+        'El que has compartit s’ha conservat. Torna a obrir TaskFlow per tornar-ho a provar.',
+      );
+      expect(
+        es.capturePrivacy,
+        endsWith(
+          'Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.',
+        ),
+      );
+      expect(
+        en.capturePrivacy,
+        endsWith(
+          'Anything not saved yet stays on this phone until you save or discard it.',
+        ),
+      );
+      expect(
+        ca.capturePrivacy,
+        endsWith(
+          'El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.',
+        ),
+      );
+      // retryCaptures is gone; the Sin guardar list retries with tryAgain.
+      expect(keys.contains('retryCaptures'), isFalse);
+    },
+  );
 
-  test('P25–P27: the new Projects, Groups and Activity copy reads as the plan wrote it in EN / ES / CA', () {
-    final en = lookupAppLocalizations(const Locale('en'));
-    final es = lookupAppLocalizations(const Locale('es'));
-    final ca = lookupAppLocalizations(const Locale('ca'));
-    // The catalogs write apostrophes as ’; the plan's straight ones match.
-    String plain(String text) => text.replaceAll('’', "'");
-    for (final (l, expected) in [
-      (en, [
-        'Group activity', 'Unread', 'Pinned', 'Shared · Editor', 'Everyone in Máster will see it.',
-        'Create group', 'Next', 'Enter a name.', 'What can Ana do?',
-        "Couldn't load. Check your connection.", 'Invited', 'Pending', 'Name for voice assignments',
-      ]),
-      (es, [
-        'Actividad del grupo', 'No leída', 'Fijado', 'Compartido · Editor', 'Todos en Máster lo verán.',
-        'Crear grupo', 'Siguiente', 'Escribe un nombre.', '¿Qué puede hacer Ana?',
-        'No se ha podido cargar. Revisa la conexión.', 'Invitados', 'Pendiente', 'Nombre para asignarte por voz',
-      ]),
-      (ca, [
-        'Activitat del grup', 'No llegida', 'Fixat', 'Compartit · Editor', 'Tothom a Máster el veurà.',
-        'Crea el grup', 'Següent', 'Escriu un nom.', 'Què pot fer Ana?',
-        "No s'ha pogut carregar. Revisa la connexió.", 'Convidats', 'Pendent', 'Nom per assignar-te per veu',
-      ]),
-    ]) {
-      final actual = [
-        l.groupActivity, l.activityUnread, l.projectPinned, l.projectSharedRole('Editor'),
-        l.projectGroupSees('Máster'), l.createGroup, l.nextStep, l.enterName,
-        l.groupRoleQuestion('Ana'), l.loadFailed, l.groupInvited, l.invitationPending, l.groupVoiceName,
-      ].map(plain).toList();
-      expect(actual, expected, reason: l.localeName);
-    }
-  });
+  test(
+    'P25–P27: the new Projects, Groups and Activity copy reads as the plan wrote it in EN / ES / CA',
+    () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      // The catalogs write apostrophes as ’; the plan's straight ones match.
+      String plain(String text) => text.replaceAll('’', "'");
+      for (final (l, expected) in [
+        (
+          en,
+          [
+            'Group activity',
+            'Unread',
+            'Pinned',
+            'Shared · Editor',
+            'Everyone in Máster will see it.',
+            'Create group',
+            'Next',
+            'Enter a name.',
+            'What can Ana do?',
+            "Couldn't load. Check your connection.",
+            'Invited',
+            'Pending',
+            'Name for voice assignments',
+          ],
+        ),
+        (
+          es,
+          [
+            'Actividad del grupo',
+            'No leída',
+            'Fijado',
+            'Compartido · Editor',
+            'Todos en Máster lo verán.',
+            'Crear grupo',
+            'Siguiente',
+            'Escribe un nombre.',
+            '¿Qué puede hacer Ana?',
+            'No se ha podido cargar. Revisa la conexión.',
+            'Invitados',
+            'Pendiente',
+            'Nombre para asignarte por voz',
+          ],
+        ),
+        (
+          ca,
+          [
+            'Activitat del grup',
+            'No llegida',
+            'Fixat',
+            'Compartit · Editor',
+            'Tothom a Máster el veurà.',
+            'Crea el grup',
+            'Següent',
+            'Escriu un nom.',
+            'Què pot fer Ana?',
+            "No s'ha pogut carregar. Revisa la connexió.",
+            'Convidats',
+            'Pendent',
+            'Nom per assignar-te per veu',
+          ],
+        ),
+      ]) {
+        final actual = [
+          l.groupActivity,
+          l.activityUnread,
+          l.projectPinned,
+          l.projectSharedRole('Editor'),
+          l.projectGroupSees('Máster'),
+          l.createGroup,
+          l.nextStep,
+          l.enterName,
+          l.groupRoleQuestion('Ana'),
+          l.loadFailed,
+          l.groupInvited,
+          l.invitationPending,
+          l.groupVoiceName,
+        ].map(plain).toList();
+        expect(actual, expected, reason: l.localeName);
+      }
+    },
+  );
 
   // ---- Run 2026-10-18-commands, round 1 (P128, P129, P132) ----
 
@@ -805,25 +970,30 @@ void main() {
   test('UX-1221: billingError’s unsupportedPlatform says the Android app, in '
       'EN, ES and CA, and no catalog value names iOS, iPhone or Apple', () {
     expect(
-      lookupAppLocalizations(const Locale('en'))
-          .billingError('unsupportedPlatform'),
+      lookupAppLocalizations(
+        const Locale('en'),
+      ).billingError('unsupportedPlatform'),
       'Subscriptions are available in the Android app.',
     );
     expect(
-      lookupAppLocalizations(const Locale('es'))
-          .billingError('unsupportedPlatform'),
+      lookupAppLocalizations(
+        const Locale('es'),
+      ).billingError('unsupportedPlatform'),
       'Las suscripciones están disponibles en la app para Android.',
     );
     expect(
-      lookupAppLocalizations(const Locale('ca'))
-          .billingError('unsupportedPlatform'),
+      lookupAppLocalizations(
+        const Locale('ca'),
+      ).billingError('unsupportedPlatform'),
       'Les subscripcions estan disponibles a l’aplicació d’Android.',
     );
     final apple = RegExp(r'iOS|iPhone|Apple');
     for (final language in ['en', 'es', 'ca']) {
-      final catalog = jsonDecode(
-        File('${directory.path}/app_$language.arb').readAsStringSync(),
-      ) as Map<String, dynamic>;
+      final catalog =
+          jsonDecode(
+                File('${directory.path}/app_$language.arb').readAsStringSync(),
+              )
+              as Map<String, dynamic>;
       expect(
         [
           for (final entry in catalog.entries)
@@ -865,22 +1035,23 @@ void main() {
     );
     // The old key went from every catalog.
     for (final language in ['en', 'es', 'ca']) {
-      final catalog = jsonDecode(
-        File('${directory.path}/app_$language.arb').readAsStringSync(),
-      ) as Map<String, dynamic>;
+      final catalog =
+          jsonDecode(
+                File('${directory.path}/app_$language.arb').readAsStringSync(),
+              )
+              as Map<String, dynamic>;
       expect(catalog.containsKey('deleteAccountLinkError'), isFalse);
     }
   });
 
   // ---- UX loop 2026-10-19-app, round 1: P166, P167, P169, P170 ----
 
-  Map<String, dynamic> catalogOf(String language) => jsonDecode(
-        File('${directory.path}/app_$language.arb').readAsStringSync(),
-      ) as Map<String, dynamic>;
+  Map<String, dynamic> catalogOf(String language) =>
+      jsonDecode(File('${directory.path}/app_$language.arb').readAsStringSync())
+          as Map<String, dynamic>;
 
   /// Every message value of a catalog, without its @ descriptions.
-  Iterable<String> valuesOf(String language) => catalogOf(language)
-      .entries
+  Iterable<String> valuesOf(String language) => catalogOf(language).entries
       .where((entry) => !entry.key.startsWith('@'))
       .map((entry) => '${entry.value}');
 
@@ -902,7 +1073,11 @@ void main() {
       ],
     );
     expect(
-      [en.captureMicrophoneWhy, es.captureMicrophoneWhy, ca.captureMicrophoneWhy],
+      [
+        en.captureMicrophoneWhy,
+        es.captureMicrophoneWhy,
+        ca.captureMicrophoneWhy,
+      ],
       [
         'Allow the microphone to dictate your tasks. It only listens while you dictate.',
         'Permite el micrófono para dictar tus tareas. Solo escucha mientras dictas.',
@@ -934,16 +1109,25 @@ void main() {
     for (final language in ['en', 'es', 'ca']) {
       final catalog = catalogOf(language);
       // UX-1306: one line replaces both.
-      expect(catalog.containsKey('captureSpeechLanguage'), isFalse,
-          reason: language);
-      expect(catalog.containsKey('captureSpeechUnavailable'), isFalse,
-          reason: language);
+      expect(
+        catalog.containsKey('captureSpeechLanguage'),
+        isFalse,
+        reason: language,
+      );
+      expect(
+        catalog.containsKey('captureSpeechUnavailable'),
+        isFalse,
+        reason: language,
+      );
       // UX-1305: there is no field below to type in.
       for (final value in valuesOf(language)) {
         final lower = value.toLowerCase();
         for (final gone in ['escribe abajo', 'type below', 'escriu a sota']) {
-          expect(lower.contains(gone), isFalse,
-              reason: '$language: «$value» contains «$gone»');
+          expect(
+            lower.contains(gone),
+            isFalse,
+            reason: '$language: «$value» contains «$gone»',
+          );
         }
       }
     }
@@ -999,8 +1183,14 @@ void main() {
       ['Queden 3 segons', 'Queda 1 segon', 'Queden 10 segons'],
     );
     // Unchanged: once words are heard, and a silent 60 s.
-    expect(es.captureStillListening, 'Sigo escuchando. Toca Listo cuando termines.');
-    expect(es.captureNoSpeech, 'No te he entendido. Vuelve a intentarlo o escríbelo.');
+    expect(
+      es.captureStillListening,
+      'Sigo escuchando. Toca Listo cuando termines.',
+    );
+    expect(
+      es.captureNoSpeech,
+      'No te he entendido. Vuelve a intentarlo o escríbelo.',
+    );
   });
 
   test('UX-1404: an empty day’s line with the phone’s calendars reads No tasks '
@@ -1017,11 +1207,17 @@ void main() {
       ],
     );
     for (final language in ['en', 'es', 'ca']) {
-      expect(catalogOf(language).containsKey('breathingRoom'), isFalse,
-          reason: language);
+      expect(
+        catalogOf(language).containsKey('breathingRoom'),
+        isFalse,
+        reason: language,
+      );
       for (final value in valuesOf(language)) {
-        expect(value.contains('tareas de TaskFlow programadas'), isFalse,
-            reason: '$language: «$value»');
+        expect(
+          value.contains('tareas de TaskFlow programadas'),
+          isFalse,
+          reason: '$language: «$value»',
+        );
       }
     }
   });
@@ -1044,8 +1240,10 @@ void main() {
         'Si maria.lopez@example.com té compte, t’arribarà un correu amb un codi. Escriu-lo aquí.',
       ],
     );
-    final placeholders = (template['@recoveryEmailRequested']
-        as Map<String, dynamic>)['placeholders'] as Map<String, dynamic>;
+    final placeholders =
+        (template['@recoveryEmailRequested']
+                as Map<String, dynamic>)['placeholders']
+            as Map<String, dynamic>;
     expect((placeholders['email'] as Map)['type'], 'String');
     expect([en.email, es.email, ca.email], ['Email', 'Correo', 'Correu']);
     expect(
@@ -1072,5 +1270,79 @@ void main() {
         'Tens una invitació. Entra amb el correu on l’has rebuda.',
       ],
     );
+  });
+  test('UX-1318: no capture* message names the server, a service or a request, '
+      'and captureUnsupportedKind and captureSpeechBusy are gone', () {
+    const words = {
+      'en': ['server', 'service', 'request'],
+      'es': ['servidor', 'servicio', 'solicitud'],
+      'ca': ['servidor', 'servei', 'sol·licitud'],
+    };
+    for (final MapEntry(key: language, value: banned) in words.entries) {
+      final catalog =
+          jsonDecode(
+                File('${directory.path}/app_$language.arb').readAsStringSync(),
+              )
+              as Map<String, dynamic>;
+      for (final gone in ['captureUnsupportedKind', 'captureSpeechBusy']) {
+        expect(catalog.containsKey(gone), isFalse, reason: '$language: $gone');
+        expect(
+          catalog.containsKey('@$gone'),
+          isFalse,
+          reason: '$language: @$gone',
+        );
+      }
+      for (final MapEntry(:key, :value) in catalog.entries) {
+        if (!key.startsWith('capture') || value is! String) continue;
+        final text = value.toLowerCase();
+        // The word itself (or its plural), not a verb built on it: “was
+        // requested” is not “a request”.
+        for (final word in banned) {
+          expect(
+            RegExp(
+              r'(^|[^\p{L}])' + RegExp.escape(word) + r's?($|[^\p{L}])',
+              unicode: true,
+            ).hasMatch(text),
+            isFalse,
+            reason: '$language: $key: $value',
+          );
+        }
+      }
+    }
+  });
+
+  test('UX-1630: captureAllowanceRecording is in the three catalogs, described '
+      'in English, with the reviewer’s copy and none of the banned words', () {
+    const copy = {
+      'en':
+          'You’ve reached today’s dictation limit. Your recording is kept; try again tomorrow.',
+      'es':
+          'Has llegado al límite de dictados de hoy. Tu grabación se conserva; inténtalo mañana.',
+      'ca':
+          'Has arribat al límit de dictats d’avui. La gravació es conserva; torna-ho a provar demà.',
+    };
+    const banned = {
+      'en': ['server', 'service', 'request'],
+      'es': ['servidor', 'servicio', 'solicitud'],
+      'ca': ['servidor', 'servei', 'sol·licitud'],
+    };
+    for (final MapEntry(key: language, value: text) in copy.entries) {
+      final catalog =
+          jsonDecode(
+                File('${directory.path}/app_$language.arb').readAsStringSync(),
+              )
+              as Map<String, dynamic>;
+      expect(catalog['captureAllowanceRecording'], text, reason: language);
+      for (final word in banned[language]!) {
+        expect(text.toLowerCase(), isNot(contains(word)), reason: language);
+      }
+    }
+    final english =
+        jsonDecode(File('${directory.path}/app_en.arb').readAsStringSync())
+            as Map<String, dynamic>;
+    final description =
+        (english['@captureAllowanceRecording'] as Map?)?['description'];
+    expect(description, isA<String>());
+    expect((description as String).trim(), isNotEmpty);
   });
 }

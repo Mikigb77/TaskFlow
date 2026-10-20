@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -239,10 +240,9 @@ void main() {
         );
         expect(saveButton(tester).onPressed, isNull);
         expect(find.text(es.captureCheckDetails), findsOneWidget);
-        // Neither is like «Mates»: both are in the project sheet.
-        await tester.tap(find.byKey(const ValueKey('project-choice-other')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Matemáticas').last);
+        // Both start like «Mates» («mate»): one chip each (UX-1315).
+        expect(find.byKey(const ValueKey('project-choice-maths2')), findsOne);
+        await tester.tap(find.byKey(const ValueKey('project-choice-maths')));
         await tester.pumpAndSettle();
         expect(
           find.text(es.commandExistingProject('Matemáticas')),
@@ -1341,6 +1341,8 @@ void main() {
   _commandsRound3b();
   _commandsRound4();
   _commandsRound5();
+  _round20261019();
+  _round20261019b2();
 
   // UX loop 2026-10-19-app, round 1 · P168 (UX-1302).
   group('P168: the result at large text', () {
@@ -2042,7 +2044,7 @@ class _App {
   Future<void> type(WidgetTester tester, String words) async {
     await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip(es.captureTypeInstead));
+    await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('capture-words')), words);
     await tester.pumpAndSettle();
@@ -2163,11 +2165,15 @@ class _Lists extends TaskListStore {
   final created = <String>[];
   final takenBack = <String>[];
 
+  /// Set, creating a project fails with it, as a request offline does.
+  Object? failure;
+
   @override
   Future<List<TaskListInfo>> all() async => [...projects];
 
   @override
   Future<void> create(TaskListInfo list) async {
+    if (failure case final error?) throw error;
     projects.add(list);
     created.add(list.name);
   }
@@ -6354,4 +6360,467 @@ void _commandsRound5() {
       );
     }
   });
+}
+
+// ---- UX loop 2026-10-19-app, round 1 ------------------------------------
+//
+// P171 (UX-1321): TalkBack names the command cards' rows and ✕. P172
+// (UX-1314, UX-1315): the project question's chips whole at 2×, and similar
+// names offered, or the server's candidates. P173 (UX-1318): a command
+// result applied offline says «Sin conexión».
+
+void _round20261019() {
+  final mathsTwo = TaskListInfo(
+    id: 'maths2',
+    name: 'Matemáticas II',
+    version: 2,
+  );
+  final mathsThree = TaskListInfo(
+    id: 'maths3',
+    name: 'Matemáticas III',
+    version: 2,
+  );
+
+  /// The keys of the project question's chips, in the order they read.
+  List<String> chipKeys(WidgetTester tester) => [
+    for (final chip in tester.widgetList<ActionChip>(
+      find.descendant(
+        of: find.byType(ProjectCommandCard),
+        matching: find.byType(ActionChip),
+      ),
+    ))
+      (chip.key! as ValueKey<String>).value,
+  ];
+
+  CaptureCommand ambiguousMates([List<Map<String, String>>? candidates]) =>
+      command({
+        'kind': 'project',
+        'name': 'Mates',
+        'issues': ['ambiguous_project'],
+        'project_candidates': ?candidates,
+      });
+
+  group('UX-1321: TalkBack names the command cards’ rows and their ✕', () {
+    List<Task> twoCalls() => [
+      Task(id: 43, title: 'Llamar a Ana', priority: 1, dueDate: day(2, 9)),
+      Task(
+        id: 44,
+        title: 'Llamar a Ana por el viaje',
+        priority: 1,
+        dueDate: day(4, 9),
+      ),
+    ];
+
+    testWidgets('UX-1321: found rows of a search have the button flag', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.open(tester, tasks: twoCalls());
+      await app.showResult(
+        tester,
+        commands: [
+          command({
+            'kind': 'find',
+            'words': ['llamar', 'ana'],
+          }),
+        ],
+      );
+      for (final id in [43, 44]) {
+        final row = find.byKey(ValueKey('found-$id'));
+        expect(row, findsOneWidget);
+        final data = tester.getSemantics(row).getSemanticsData();
+        expect(data.flagsCollection.isButton, isTrue, reason: 'found-$id');
+        expect(data.label, contains('Llamar a Ana'));
+      }
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final (kind, question, dontLabel, language) in [
+      ('update', es.commandWhichToChange, es.commandDontChangeAny, 'es'),
+      ('update', ca.commandWhichToChange, ca.commandDontChangeAny, 'ca'),
+      ('delete', es.commandWhichToDelete, es.commandDontDeleteAny, 'es'),
+    ]) {
+      testWidgets(
+        'UX-1321 ($language): on «$question» the pick rows have the button flag, and the ✕ reads «$dontLabel», not the search words',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final app = await _App.open(
+            tester,
+            tasks: twoCalls(),
+            language: language,
+          );
+          await app.showResult(
+            tester,
+            commands: [
+              command({
+                'kind': kind,
+                'target': {
+                  'words': ['llamar', 'ana'],
+                },
+                if (kind == 'update') 'changes': {'time': '18:00'},
+              }),
+            ],
+          );
+          expect(find.text(question), findsOneWidget);
+          final picks = find.byWidgetPredicate(
+            (widget) =>
+                widget.key is ValueKey<String> &&
+                (widget.key! as ValueKey<String>).value.startsWith('choose-'),
+          );
+          expect(picks, findsNWidgets(2));
+          for (final pick in picks.evaluate().toList()) {
+            expect(
+              tester
+                  .getSemantics(find.byWidget(pick.widget))
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isButton,
+              isTrue,
+              reason: '${pick.widget.key}',
+            );
+          }
+          final remove = find.byTooltip(dontLabel);
+          expect(remove, findsOneWidget);
+          final data = tester.getSemantics(remove).getSemanticsData();
+          expect('${data.label} ${data.tooltip}', contains(dontLabel));
+          expect(find.bySemanticsLabel(RegExp('llamar ana')), findsNothing);
+          expect(find.byTooltip(RegExp('llamar ana')), findsNothing);
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-1321: the ✕ labels read as the plan wrote them', () {
+      expect(es.commandDontChangeAny, 'No cambiar ninguna');
+      expect(ca.commandDontChangeAny, 'No en canviïs cap');
+      expect(es.commandDontDeleteAny, 'No eliminar ninguna');
+      expect(ca.commandDontDeleteAny, 'No en suprimeixis cap');
+    });
+  });
+
+  group('UX-1315: similar project names are offered', () {
+    test(
+      'UX-1315: similarProjects(«Mates») returns «Matemáticas» and «Matemáticas II»',
+      () {
+        expect(
+          similarProjects('Mates', [
+            physics,
+            maths,
+            mathsTwo,
+          ]).map((p) => p.name),
+          ['Matemáticas', 'Matemáticas II'],
+        );
+      },
+    );
+
+    test(
+      'UX-1315: prefix and contains matches come first, then the 4-letter ones, never more than 3; accents and case don’t count',
+      () {
+        final lasMates = TaskListInfo(id: 'a', name: 'Las mates', version: 2);
+        final matesDos = TaskListInfo(id: 'b', name: 'Mates de 2º', version: 2);
+        expect(
+          similarProjects('Mates', [
+            maths,
+            mathsTwo,
+            lasMates,
+            matesDos,
+            mathsThree,
+          ]).map((p) => p.name),
+          ['Las mates', 'Mates de 2º', 'Matemáticas'],
+        );
+        final music = TaskListInfo(id: 'm', name: 'Musica clásica', version: 2);
+        expect(
+          similarProjects('Músicas', [physics, music]).map((p) => p.name),
+          ['Musica clásica'],
+        );
+        expect(similarProjects('Física', [physics, maths]), [physics]);
+      },
+    );
+
+    testWidgets(
+      'UX-1315: ES 1×, projects «Matemáticas» and «Matemáticas II», the said project «Mates»: the card offers chips «Matemáticas» and «Matemáticas II»',
+      (tester) async {
+        final app = await _App.open(tester, projects: [maths, mathsTwo]);
+        await app.showResult(
+          tester,
+          drafts: [draft('Ejercicio 4', newProject: 'Mates')],
+          commands: [ambiguousMates()],
+        );
+        final card = find.byType(ProjectCommandCard);
+        for (final name in ['Matemáticas', 'Matemáticas II']) {
+          expect(
+            find.descendant(
+              of: card,
+              matching: find.widgetWithText(ActionChip, name),
+            ),
+            findsOneWidget,
+            reason: name,
+          );
+        }
+        expect(chipKeys(tester), [
+          'project-choice-create',
+          'project-choice-maths',
+          'project-choice-maths2',
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1315: with project_candidates «Matemáticas II» then «Matemáticas» the chips follow the server’s order, whatever the names would guess; a candidate not on the phone is skipped',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [maths, mathsTwo, mathsThree, physics],
+        );
+        await app.showResult(
+          tester,
+          drafts: [draft('Ejercicio 4', newProject: 'Mates')],
+          commands: [
+            ambiguousMates([
+              {'id': 'gone', 'name': 'Mates viejas'},
+              {'id': 'maths2', 'name': 'Matemáticas II'},
+              {'id': 'maths', 'name': 'Matemáticas'},
+            ]),
+          ],
+        );
+        final keys = chipKeys(tester);
+        expect(
+          keys.where((k) => k.startsWith('project-choice-maths')).toList(),
+          ['project-choice-maths2', 'project-choice-maths'],
+          reason: 'not «Matemáticas III», which the names alone would offer',
+        );
+        expect(keys, isNot(contains('project-choice-gone')));
+        expect(find.text('Mates viejas'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    test(
+      'UX-1315: CaptureCommand.fromServer keeps the candidates’ ids, at most 3, in order, and they survive being stored and read back',
+      () {
+        final parsed = ambiguousMates([
+          {'id': 'maths2', 'name': 'Matemáticas II'},
+          {'id': 'maths', 'name': 'Matemáticas'},
+          {'id': 'maths3', 'name': 'Matemáticas III'},
+          {'id': 'physics', 'name': 'Física'},
+        ]);
+        expect(parsed.projectCandidates, ['maths2', 'maths', 'maths3']);
+        final stored = CaptureCommand.fromJson(
+          Map<String, dynamic>.from(
+            jsonDecode(jsonEncode(parsed.toJson())) as Map,
+          ),
+        )!;
+        expect(stored.projectCandidates, ['maths2', 'maths', 'maths3']);
+        // An older server: no field, no candidates.
+        expect(ambiguousMates().projectCandidates, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'UX-1315: a capture stored with project_candidates and resumed from «Sin guardar» shows the same chips',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [maths, mathsTwo, mathsThree],
+        );
+        final session = CaptureSession(
+          id: 'kept',
+          ownerKey: 'owner',
+          timezone: 'Europe/Madrid',
+          capturedAt: DateTime.now().toUtc(),
+          status: 'ready',
+          source: 'speech',
+          transcript: 'Lo que dije',
+          drafts: [draft('Ejercicio 4', newProject: 'Mates')],
+          commands: [
+            ambiguousMates([
+              {'id': 'maths3', 'name': 'Matemáticas III'},
+              {'id': 'maths', 'name': 'Matemáticas'},
+            ]),
+          ],
+        );
+        final resumed = CaptureSession.fromJson(
+          Map<String, dynamic>.from(
+            jsonDecode(jsonEncode(session.toJson())) as Map,
+          ),
+        );
+        await app.showResult(
+          tester,
+          drafts: resumed.drafts,
+          commands: resumed.commands,
+        );
+        expect(
+          chipKeys(
+            tester,
+          ).where((k) => k.startsWith('project-choice-maths')).toList(),
+          ['project-choice-maths3', 'project-choice-maths'],
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('UX-1314: the project question’s chips whole at 2× (Manrope)', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    for (final (language, l) in [('es', es), ('ca', ca)]) {
+      testWidgets(
+        'UX-1314 ($language, 2× on 360×800): «${l.commandCreateNamed('Mates')}» and «${l.commandOtherProject}» show whole, on screen, wrapping to 2 lines where needed',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            projects: [maths, mathsTwo, physics],
+            language: language,
+            size: const Size(360, 800),
+            textScale: 2,
+          );
+          await app.showResult(
+            tester,
+            drafts: [draft('Ejercicio 4', newProject: 'Mates')],
+            commands: [ambiguousMates()],
+          );
+          for (final label in [
+            l.commandCreateNamed('Mates'),
+            l.commandOtherProject,
+            'Matemáticas',
+            'Matemáticas II',
+          ]) {
+            final chip = find.widgetWithText(ActionChip, label);
+            expect(chip, findsOneWidget, reason: label);
+            await tester.ensureVisible(chip);
+            await tester.pumpAndSettle();
+            final text = find.descendant(of: chip, matching: find.text(label));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: text, matching: find.byType(RichText)),
+            );
+            expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+            final box = tester.getRect(chip);
+            expect(box.left, greaterThanOrEqualTo(0), reason: label);
+            expect(box.right, lessThanOrEqualTo(360.5), reason: label);
+            expect(
+              tester.getRect(text).right,
+              lessThanOrEqualTo(box.right + 0.5),
+              reason: label,
+            );
+          }
+          expect(tester.takeException(), isNull, reason: 'no overflow');
+        },
+      );
+    }
+  });
+
+  testWidgets(
+    'UX-1318: a command result applied while offline says «Sin conexión…», not that it couldn’t be added',
+    (tester) async {
+      final app = await _App.open(tester);
+      app.lists.failure = ApiException(0, 'Offline. Retry when connected.');
+      await app.showResult(
+        tester,
+        drafts: [
+          draft('Estudiar el tema 2', date: day(4), newProject: 'Física'),
+        ],
+        commands: [
+          command({'kind': 'project', 'name': 'Física'}),
+        ],
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget, reason: 'still open');
+      expect(
+        find.descendant(
+          of: find.byType(CaptureResult),
+          matching: find.text(es.captureOffline),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(es.captureSaveFailed), findsNothing);
+      expect(app.lists.created, isEmpty);
+      expect(app.tasks.named('Estudiar el tema 2'), isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+// ---- UX loop 2026-10-19-app, batch b2 round 2 ---------------------------
+//
+// P200 (UX-1631): a failed save says it couldn't add. Only a lost
+// connection says why («Sin conexión»); a 5xx, a timeout, an unreachable
+// server, 403, 413, 422 or the daily limit never read as a dictation
+// problem.
+
+void _round20261019b2() {
+  group(
+    'UX-1631: a failed save says it couldn’t add, not a dictation problem',
+    () {
+      final failures = <String, ApiException>{
+        '503': ApiException(503, 'Service unavailable.'),
+        'timeout': ApiException(0, ApiClient.timeoutMessage),
+        'unreachable': ApiException(0, ApiClient.unreachableMessage),
+        '403': ApiException(403, 'Forbidden.'),
+        '413': ApiException(413, 'Too large.'),
+        '422': ApiException(422, 'Unprocessable.'),
+        '429 with Retry-After 3600': ApiException(
+          429,
+          'Too many requests.',
+          null,
+          const Duration(seconds: 3600),
+        ),
+      };
+      for (final MapEntry(key: name, value: failure) in failures.entries) {
+        testWidgets(
+          'UX-1631: a command result whose save fails with $name reads «No se ha podido añadir…»',
+          (tester) async {
+            final app = await _App.open(tester);
+            app.lists.failure = failure;
+            await app.showResult(
+              tester,
+              drafts: [
+                draft('Estudiar el tema 2', date: day(4), newProject: 'Física'),
+              ],
+              commands: [
+                command({'kind': 'project', 'name': 'Física'}),
+              ],
+            );
+            await tester.tap(find.byKey(const ValueKey('save-drafts')));
+            await tester.pumpAndSettle();
+            expect(
+              find.byType(CaptureResult),
+              findsOneWidget,
+              reason: 'still open',
+            );
+            expect(
+              find.descendant(
+                of: find.byType(CaptureResult),
+                matching: find.text(es.captureSaveFailed),
+              ),
+              findsOneWidget,
+            );
+            for (final other in [
+              es.captureUnavailable,
+              es.captureForbidden,
+              es.captureTooLarge,
+              es.captureNoSpeech,
+              es.captureAllowance,
+              es.captureOffline,
+            ]) {
+              expect(find.text(other), findsNothing, reason: other);
+            }
+            expect(app.lists.created, isEmpty);
+            expect(app.tasks.named('Estudiar el tema 2'), isNull);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    },
+  );
 }

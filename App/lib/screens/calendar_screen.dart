@@ -426,6 +426,195 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     );
   }
 
+  /// A day tapped or long-pressed. From Mes, the strip goes back to Semana on
+  /// that day, so its first tasks show under the week.
+  void _pickDay(DateTime day) => setState(() {
+    _picked = true;
+    _select(day);
+    _format = CalendarFormat.week;
+  });
+
+  /// The open tasks overdue on [now]'s day that aren't among its own
+  /// occurrences, oldest first: what today's agenda lists above its tasks.
+  List<Task> _overdueOn(List<Task> tasks, DateTime now) {
+    String key(Task task) => '${task.id}:${task.occurrenceId}';
+    final listed = {
+      for (final task in tasks.expand(
+        (task) => task.calendarOccurrencesOn(now),
+      ))
+        key(task),
+    };
+    return tasks
+        .map((task) => task.overdueOn(now))
+        .whereType<Task>()
+        .where((task) => !listed.contains(key(task)))
+        .toList()
+      ..sort(
+        (a, b) => (a.displayDate ?? a.displayDeadline!).compareTo(
+          b.displayDate ?? b.displayDeadline!,
+        ),
+      );
+  }
+
+  /// The week or the month. At any text size each day is at least 48 dp
+  /// tall, its number whole inside its pill and the weekday names whole; a
+  /// screen reader hears which day is chosen, today, and how many tasks.
+  Widget _weekStrip(
+    BuildContext context, {
+    required List<Task> tasks,
+    required DateTime now,
+    required int overdueToday,
+    required bool instant,
+    required double cellWidth,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    final locale = context.localeName;
+    final scaler = MediaQuery.textScalerOf(context);
+    final base = Theme.of(context).textTheme.bodyMedium!.copyWith(height: 1.2);
+    final plainStyle = base.copyWith(
+      color: colors.onSurface,
+      fontWeight: FontWeight.w600,
+    );
+    final weekendStyle = base.copyWith(color: colors.onSurfaceVariant);
+    final selectedStyle = base.copyWith(
+      color: colors.onPrimary,
+      fontWeight: FontWeight.w800,
+    );
+    final todayStyle = base.copyWith(
+      color: colors.primary,
+      fontWeight: FontWeight.w800,
+    );
+    final weekdayStyle = base.copyWith(
+      color: colors.onSurfaceVariant,
+      fontSize: 11,
+    );
+    Size measure(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+      )..layout();
+      final size = painter.size;
+      painter.dispose();
+      return size;
+    }
+
+    const margin = 4.0;
+    // The short weekday names, or the narrow ones when a short one doesn't
+    // fit its day.
+    final week = [for (var i = 0; i < 7; i++) DateTime(2024, 1, 1 + i)];
+    final weekday =
+        week.any(
+          (day) =>
+              measure(DateFormat.E(locale).format(day), weekdayStyle).width >
+              cellWidth - margin,
+        )
+        ? DateFormat.EEEEE(locale)
+        : DateFormat.E(locale);
+    final rowHeight = math.max(
+      48.0,
+      measure('30', selectedStyle).height + 4 * margin,
+    );
+    final weekdayHeight = math.max(
+      30.0,
+      measure('Mg', weekdayStyle).height + 2 * margin,
+    );
+    Widget cell(DateTime day, TextStyle style, [Color? fill]) =>
+        AnimatedContainer(
+          duration: instant ? Duration.zero : const Duration(milliseconds: 250),
+          margin: const EdgeInsets.all(margin),
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          // Shrunk only as far as the pill needs, never cut.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text('${day.day}', style: style),
+          ),
+        );
+    // Another month's days look like any other: they can be chosen too.
+    Widget plain(DateTime day) =>
+        cell(day, day.weekday >= DateTime.saturday ? weekendStyle : plainStyle);
+    return TableCalendar<Task>(
+      firstDay: DateTime(2010),
+      lastDay: DateTime(2100, 12, 31),
+      focusedDay: _focusedDay,
+      currentDay: now,
+      calendarFormat: _format,
+      headerVisible: false,
+      locale: locale,
+      startingDayOfWeek:
+          StartingDayOfWeek.values[(MaterialLocalizations.of(
+                    context,
+                  ).firstDayOfWeekIndex +
+                  6) %
+              7],
+      rowHeight: rowHeight,
+      daysOfWeekHeight: weekdayHeight,
+      pageAnimationEnabled: !instant,
+      onCalendarCreated: (controller) => _calendarPage = controller,
+      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+      onDaySelected: (selected, _) => _pickDay(selected),
+      onDayLongPressed: (selected, _) => _pickDay(selected),
+      onPageChanged: (focused) => setState(() => _focusedDay = focused),
+      eventLoader: (day) => tasks
+          .expand((task) => task.calendarOccurrencesOn(day))
+          .where((task) => !task.isCompleted)
+          .toList(),
+      daysOfWeekStyle: DaysOfWeekStyle(
+        dowTextFormatter: (day, _) => weekday.format(day),
+        weekdayStyle: weekdayStyle,
+        weekendStyle: weekdayStyle,
+      ),
+      calendarBuilders: CalendarBuilders(
+        defaultBuilder: (context, day, _) => plain(day),
+        outsideBuilder: (context, day, _) => plain(day),
+        selectedBuilder: (context, day, _) =>
+            cell(day, selectedStyle, colors.primary),
+        todayBuilder: (context, day, _) =>
+            cell(day, todayStyle, colors.primaryContainer),
+        // The cell names only its date. Beside it, every day says whether
+        // it's the chosen one, and whether it's today and has open tasks.
+        // Today counts its overdue tasks too, as its agenda does.
+        markerBuilder: (context, day, dayTasks) {
+          final isToday = isSameDay(day, now);
+          final count = dayTasks.length + (isToday ? overdueToday : 0);
+          final value = [
+            if (isToday) context.l10n.today.toLowerCase(),
+            if (count > 0) context.l10n.dayTaskCount(count),
+          ].join(' · ');
+          return Positioned(
+            bottom: 1,
+            child: Semantics(
+              selected: isSameDay(_selectedDay, day),
+              value: value.isEmpty ? null : value,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: dayTasks
+                    .take(3)
+                    .map(
+                      (task) => Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.priorityColor(context, task.priority),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
@@ -487,19 +676,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final instant = MediaQuery.disableAnimationsOf(context);
     final now = _now();
     final today = isSameDay(_selectedDay, now);
-    final listed = {for (final task in events) key(task)};
-    final overdue = today
-        ? (tasks
-              .map((task) => task.overdueOn(now))
-              .whereType<Task>()
-              .where((task) => !listed.contains(key(task)))
-              .toList()
-            ..sort(
-              (a, b) => (a.displayDate ?? a.displayDeadline!).compareTo(
-                b.displayDate ?? b.displayDeadline!,
-              ),
-            ))
-        : <Task>[];
+    final overdueToday = _overdueOn(tasks, now);
+    final overdue = today ? overdueToday : <Task>[];
     final completed = events.where((task) => task.isCompleted).length;
     final total = events.length + overdue.length;
     final hasAny = (tasksState.valueOrNull ?? const []).isNotEmpty;
@@ -573,15 +751,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         ),
                 ),
               ),
+            // 12 dp a side in all, so each day is 48 dp wide at 360 dp.
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               sliver: SliverToBoxAdapter(
                 child: AppSurface(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 14),
+                  padding: const EdgeInsets.fromLTRB(4, 10, 4, 14),
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.only(left: 12),
                         child: Row(
                           children: [
                             Expanded(
@@ -663,121 +842,30 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                               ),
                             ),
                             IconButton(
-                              tooltip: context.l10n.previousPeriod,
+                              tooltip: _format == CalendarFormat.month
+                                  ? context.l10n.previousMonth
+                                  : context.l10n.previousWeek,
                               onPressed: () => _turnPage(-1, instant: instant),
                               icon: const Icon(Icons.chevron_left_rounded),
                             ),
                             IconButton(
-                              tooltip: context.l10n.nextPeriod,
+                              tooltip: _format == CalendarFormat.month
+                                  ? context.l10n.nextMonth
+                                  : context.l10n.nextWeek,
                               onPressed: () => _turnPage(1, instant: instant),
                               icon: const Icon(Icons.chevron_right_rounded),
                             ),
                           ],
                         ),
                       ),
-                      TableCalendar<Task>(
-                        firstDay: DateTime(2010),
-                        lastDay: DateTime(2100, 12, 31),
-                        focusedDay: _focusedDay,
-                        currentDay: now,
-                        calendarFormat: _format,
-                        headerVisible: false,
-                        locale: context.localeName,
-                        startingDayOfWeek:
-                            StartingDayOfWeek.values[(MaterialLocalizations.of(
-                                      context,
-                                    ).firstDayOfWeekIndex +
-                                    6) %
-                                7],
-                        rowHeight: 48,
-                        daysOfWeekHeight: 30,
-                        pageAnimationEnabled: !instant,
-                        onCalendarCreated: (controller) =>
-                            _calendarPage = controller,
-                        selectedDayPredicate: (day) =>
-                            isSameDay(_selectedDay, day),
-                        onDaySelected: (selected, focused) => setState(() {
-                          _picked = true;
-                          _select(selected, focused);
-                        }),
-                        onPageChanged: (focused) =>
-                            setState(() => _focusedDay = focused),
-                        eventLoader: (day) => tasks
-                            .expand((task) => task.calendarOccurrencesOn(day))
-                            .where((task) => !task.isCompleted)
-                            .toList(),
-                        calendarStyle: CalendarStyle(
-                          outsideDaysVisible: false,
-                          cellMargin: const EdgeInsets.all(4),
-                          defaultTextStyle: TextStyle(
-                            color: colors.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          weekendTextStyle: TextStyle(
-                            color: colors.onSurfaceVariant,
-                          ),
-                          selectedTextStyle: TextStyle(
-                            color: colors.onPrimary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          todayTextStyle: TextStyle(
-                            color: colors.primary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          selectedDecoration: BoxDecoration(
-                            color: colors.primary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          todayDecoration: BoxDecoration(
-                            color: colors.primaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          defaultDecoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          weekendDecoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        daysOfWeekStyle: DaysOfWeekStyle(
-                          weekdayStyle: TextStyle(
-                            color: colors.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                          weekendStyle: TextStyle(
-                            color: colors.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                        calendarBuilders: CalendarBuilders(
-                          markerBuilder: (context, day, dayTasks) {
-                            if (dayTasks.isEmpty) return null;
-                            return Positioned(
-                              bottom: 1,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: dayTasks
-                                    .take(3)
-                                    .map(
-                                      (task) => Container(
-                                        margin: const EdgeInsets.symmetric(
-                                          horizontal: 1.5,
-                                        ),
-                                        width: 4,
-                                        height: 4,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: AppTheme.priorityColor(
-                                            context,
-                                            task.priority,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            );
-                          },
+                      LayoutBuilder(
+                        builder: (context, constraints) => _weekStrip(
+                          context,
+                          tasks: tasks,
+                          now: now,
+                          overdueToday: overdueToday.length,
+                          instant: instant,
+                          cellWidth: constraints.maxWidth / 7,
                         ),
                       ),
                     ],

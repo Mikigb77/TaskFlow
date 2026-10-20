@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/capture_session.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/l10n/capture_messages.dart';
 import 'package:agenda/services/capture_problem.dart';
@@ -20,9 +21,20 @@ class CapturesScreen extends ConsumerWidget {
     return context.l10n.voiceRecording;
   }
 
-  /// What happens next. A recording that waits for free dictations says
-  /// when it can be understood.
-  String _help(BuildContext context, WidgetRef ref, CaptureSession session) {
+  /// When it was kept, then only what tells it apart: a note, the tasks
+  /// not added yet, or when a recording waiting for free dictations can be
+  /// understood.
+  String _subtitle(
+      BuildContext context, WidgetRef ref, CaptureSession session) {
+    return [
+      context.pastMoment(
+          session.capturedAt, ref.watch(calendarClockProvider)()),
+      if (session.kind == 'note') context.l10n.note,
+      ?_detail(context, ref, session),
+    ].join(' · ');
+  }
+
+  String? _detail(BuildContext context, WidgetRef ref, CaptureSession session) {
     final l = context.l10n;
     if (session.remaining.isNotEmpty) {
       return l.captureDraftSummary(session.remaining.length);
@@ -35,7 +47,7 @@ class CapturesScreen extends ConsumerWidget {
       return freeVoiceUsedUpText(l, ref.watch(freeVoiceResetsProvider),
           recording: true);
     }
-    return l.captureResumeHelp;
+    return null;
   }
 
   @override
@@ -73,7 +85,7 @@ class CapturesScreen extends ConsumerWidget {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
                                   subtitle: Text(
-                                      '${session.kind == 'note' ? context.l10n.note : context.l10n.tasks} · ${_help(context, ref, session)}'),
+                                      _subtitle(context, ref, session)),
                                   trailing:
                                       const Icon(Icons.chevron_right_rounded),
                                   // Saved tasks land back on Calendar.

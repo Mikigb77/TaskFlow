@@ -45,7 +45,7 @@ import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/rendering.dart' show RenderEditable, RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -343,7 +343,7 @@ void main() {
         reason: 'the field is focused',
       );
       expect(app.speech.starts, 0);
-      expect(find.byTooltip(es.captureTypeInstead), findsNothing);
+      expect(find.byKey(const ValueKey('capture-type-instead')), findsNothing);
 
       await tester.enterText(words(), 'Dentista viernes 10:00');
       await tester.pumpAndSettle();
@@ -463,7 +463,9 @@ void main() {
           await tester.tap(find.text(es.addTask).hitTestable());
           await tester.pumpAndSettle();
           if (pro) {
-            await tester.tap(find.byTooltip(es.captureTypeInstead));
+            await tester.tap(
+              find.byKey(const ValueKey('capture-type-instead')),
+            );
             await tester.pumpAndSettle();
           }
           await tester.enterText(words(), 'Comprar pan');
@@ -730,7 +732,7 @@ void main() {
       app.api.found = [_found('Otra cosa')];
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'llamar al médico el viernes');
       await tester.pumpAndSettle();
@@ -805,7 +807,7 @@ void main() {
         app.api.failure = failure;
         await tester.tap(find.text(es.addTask).hitTestable());
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip(es.captureTypeInstead));
+        await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
         await tester.pumpAndSettle();
         await tester.enterText(words(), 'Comprar pan');
         await tester.pumpAndSettle();
@@ -1057,18 +1059,24 @@ void main() {
         captureProblemText(en, CaptureProblem.speechStopped),
         'Listening stopped. You can talk again, or type.',
       );
-      final limit = ApiException(429, 'Too many requests');
+      // Today's limit: the server says to wait longer than a minute or two.
+      final limit = ApiException(
+        429,
+        'Too many requests',
+        null,
+        const Duration(hours: 1),
+      );
       expect(
         text(es, limit),
-        'Has llegado al límite de hoy. Escribe la tarea o inténtalo mañana.',
+        'Has llegado al límite de dictados de hoy. Toca Guardar como tarea o inténtalo mañana.',
       );
       expect(
         text(ca, limit),
-        'Has arribat al límit d’avui. Escriu la tasca o torna-ho a provar demà.',
+        'Has arribat al límit de dictats d’avui. Toca Desa-ho com a tasca o torna-ho a provar demà.',
       );
       expect(
         text(en, limit),
-        'You’ve reached today’s limit. Type the task, or try again tomorrow.',
+        'You’ve reached today’s dictation limit. Tap Save as a task, or try again tomorrow.',
       );
     });
   });
@@ -1224,7 +1232,7 @@ void main() {
       app.api.failure = ApiException(422, 'Update the app to continue.');
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'Comprar pan');
       await tester.pumpAndSettle();
@@ -1260,7 +1268,7 @@ void main() {
       app.api.found = [_found('Comprar pan')];
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'Comprar pan');
       await tester.pumpAndSettle();
@@ -1319,7 +1327,7 @@ void main() {
       await _App.open(tester, pro: true);
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(words()).decoration!.hintText,
@@ -1344,7 +1352,7 @@ void main() {
       app.api.failure = ApiException(503, 'Service unavailable');
       await tester.tap(find.text(ca.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(ca.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'Comprar pa');
       await tester.pumpAndSettle();
@@ -1678,7 +1686,7 @@ void main() {
     await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
     if (pro) {
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
     }
     await tester.enterText(words(), said);
@@ -1962,7 +1970,7 @@ void main() {
     app.api.failure = failure;
     await tester.tap(find.text(l.addTask).hitTestable());
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip(l.captureTypeInstead));
+    await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
     await tester.pumpAndSettle();
     await tester.enterText(words(), text);
     await tester.pumpAndSettle();
@@ -2064,8 +2072,10 @@ void main() {
     return app;
   }
 
-  Finder sheetText(String text) =>
-      find.descendant(of: find.byType(VoiceTaskScreen), matching: find.text(text));
+  Finder sheetText(String text) => find.descendant(
+    of: find.byType(VoiceTaskScreen),
+    matching: find.text(text),
+  );
 
   testWidgets(
     'UX-1301: ES 1x on 360x800, a dictation answered with no task and no command shows No he encontrado ninguna tarea…, one filled Volver a decirlo, Guardar como tarea as a text button under it, and no Reintentar',
@@ -2136,10 +2146,14 @@ void main() {
   testWidgets(
     'UX-1301: Pro, typed words answered with nothing found keep the editable field and Listo, and no Volver a decirlo',
     (tester) async {
-      final app = await _App.open(tester, pro: true, size: const Size(360, 800));
+      final app = await _App.open(
+        tester,
+        pro: true,
+        size: const Size(360, 800),
+      );
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(words(), 'Bueno, a ver');
       await tester.pumpAndSettle();
@@ -2159,8 +2173,16 @@ void main() {
   );
 
   for (final (name, failure, line) in [
-    ('offline', ApiException(0, 'Offline. Retry when connected.'), es.captureOffline),
-    ('unavailable', ApiException(503, 'Service unavailable'), es.captureUnavailable),
+    (
+      'offline',
+      ApiException(0, 'Offline. Retry when connected.'),
+      es.captureOffline,
+    ),
+    (
+      'unavailable',
+      ApiException(503, 'Service unavailable'),
+      es.captureUnavailable,
+    ),
   ]) {
     testWidgets(
       'UX-1301: an $name failure still shows Reintentar above Guardar como tarea, and no Volver a decirlo',
@@ -2193,7 +2215,11 @@ void main() {
     'UX-1322: while Entendiendo…, the ring shows the spinner and no microphone; while listening it shows the microphone',
     (tester) async {
       final hold = Completer<void>();
-      final app = await _App.open(tester, pro: true, size: const Size(360, 800));
+      final app = await _App.open(
+        tester,
+        pro: true,
+        size: const Size(360, 800),
+      );
       app.api.hold = hold;
       app.api.found = [_found('Comprar pan')];
       await tester.tap(find.text(es.addTask).hitTestable());
@@ -2213,7 +2239,8 @@ void main() {
       final spinner = find.descendant(
         of: find.byType(VoiceTaskScreen),
         matching: find.byWidgetPredicate(
-          (widget) => widget is CircularProgressIndicator && widget.value == null,
+          (widget) =>
+              widget is CircularProgressIndicator && widget.value == null,
         ),
       );
       expect(spinner, findsOneWidget);
@@ -2221,6 +2248,343 @@ void main() {
       hold.complete();
       await tester.pumpAndSettle();
       expect(find.byType(CaptureResult), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX loop 2026-10-19-app, round 1 · P171 (UX-1310, UX-1313, UX-1321)
+  // and P173 (UX-1307, UX-1318): one labelled layout for the controls, the
+  // words field, and errors that say what to do ----
+
+  /// The controls under the words while listening, in the sheet.
+  ({Rect done, Rect cancel, Rect type, Finder typeButton}) listeningControls(
+    WidgetTester tester, {
+    required bool pro,
+  }) {
+    final done = inSheet(find.widgetWithText(FilledButton, es.done));
+    expect(done, findsOneWidget, reason: 'one filled Listo');
+    final cancel = inSheet(find.widgetWithText(TextButton, es.cancel));
+    expect(cancel, findsOneWidget);
+    final type = inSheet(
+      find.byKey(
+        ValueKey(pro ? 'capture-type-instead' : 'capture-fill-by-hand'),
+      ),
+    );
+    expect(type, findsOneWidget, reason: 'Escribir, named');
+    return (
+      done: tester.getRect(done),
+      cancel: tester.getRect(cancel),
+      type: tester.getRect(type),
+      typeButton: type,
+    );
+  }
+
+  for (final pro in [true, false]) {
+    testWidgets(
+      'UX-1310: ES 1× on 360×800, ${pro ? 'a Pro account' : 'a free account with dictations left'} listening: one full-width Listo at least 312 dp wide; under it Cancelar at the start and Escribir with the keyboard icon at the end; no icon-only keyboard button',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: pro,
+          freeLeft: pro ? null : 5,
+          size: const Size(360, 800),
+        );
+        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        expect(app.speech.starts, 1, reason: 'it opens on the mic');
+        app.speech.send('ready');
+        app.speech.send('segment', text: 'Comprar pan');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        final c = listeningControls(tester, pro: pro);
+        expect(c.done.width, greaterThanOrEqualTo(312));
+        // Under Listo, on one row: Cancelar at the start, Escribir at the end.
+        expect(c.cancel.top, greaterThanOrEqualTo(c.done.bottom));
+        expect(c.type.top, greaterThanOrEqualTo(c.done.bottom));
+        expect(
+          c.cancel.top - c.done.bottom,
+          greaterThanOrEqualTo(8),
+          reason: 'UX-1311: not touching Listo',
+        );
+        expect(
+          c.cancel.center.dy,
+          moreOrLessEquals(c.type.center.dy, epsilon: 1),
+        );
+        expect(c.cancel.left, moreOrLessEquals(c.done.left, epsilon: 1));
+        expect(c.type.right, moreOrLessEquals(c.done.right, epsilon: 1));
+        expect(
+          find.descendant(
+            of: c.typeButton,
+            matching: find.text(es.captureTypeInstead),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: c.typeButton,
+            matching: find.byIcon(Icons.keyboard_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.widgetWithIcon(IconButton, Icons.keyboard_outlined)),
+          findsNothing,
+        );
+        expect(inSheet(find.byTooltip(es.captureTypeInstead)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('UX-1310: Pro, Escribir under Listo still types in the sheet', (
+    tester,
+  ) async {
+    await _App.open(tester, pro: true, size: const Size(360, 800));
+    await tester.tap(find.text(es.addTask).hitTestable());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
+    await tester.pumpAndSettle();
+    expect(words(), findsOneWidget, reason: 'Pro types in the sheet');
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'UX-1321: after typing, TalkBack names the words field «Tus palabras»; while empty, the example hint still shows',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _App.open(tester, pro: true, size: const Size(360, 800));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
+      await tester.pumpAndSettle();
+      // Empty: the example shows (UX-1313 keeps it).
+      final hint = inSheet(find.text(es.examplePlan));
+      expect(hint, findsOneWidget);
+      expect(tester.getSize(hint).height, greaterThan(0));
+      await tester.enterText(words(), 'Comprar pan');
+      await tester.pumpAndSettle();
+      expect(es.captureYourWords, 'Tus palabras');
+      final field = tester
+          .getSemantics(find.byType(EditableText))
+          .getSemanticsData();
+      expect(field.flagsCollection.isTextField, isTrue);
+      expect(field.label, contains(es.captureYourWords));
+      expect(field.value, 'Comprar pan');
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-1307: a 429 with Retry-After 30 is tooFast, Retry-After 3600 is allowance, no Retry-After is unavailable',
+    () {
+      expect(
+        CaptureProblem.from(
+          ApiException(429, 'Too many', null, const Duration(seconds: 30)),
+        ),
+        CaptureProblem.tooFast,
+      );
+      expect(
+        CaptureProblem.from(
+          ApiException(429, 'Too many', null, const Duration(seconds: 120)),
+        ),
+        CaptureProblem.tooFast,
+        reason: '120 s or less',
+      );
+      expect(
+        CaptureProblem.from(
+          ApiException(429, 'Too many', null, const Duration(seconds: 3600)),
+        ),
+        CaptureProblem.allowance,
+      );
+      expect(
+        CaptureProblem.from(ApiException(429, 'Too many')),
+        CaptureProblem.unavailable,
+      );
+      // A 402 (free dictations used up) is unchanged.
+      expect(
+        CaptureProblem.from(ApiException(402, 'Payment required')),
+        isNot(anyOf(CaptureProblem.tooFast, CaptureProblem.allowance)),
+      );
+    },
+  );
+
+  for (final (name, wait, expected, filled) in [
+    (
+      'Retry-After 30',
+      const Duration(seconds: 30),
+      'Has dictado muchas veces seguidas. Espera un minuto y toca Reintentar.',
+      es.tryAgain,
+    ),
+    (
+      'Retry-After 3600',
+      const Duration(seconds: 3600),
+      'Has llegado al límite de dictados de hoy. Toca Guardar como tarea o inténtalo mañana.',
+      es.captureSaveAsWritten,
+    ),
+  ]) {
+    testWidgets(
+      'UX-1307: after a 429 with $name the sheet says «$expected», and the button it names is there',
+      (tester) async {
+        final app = await typeAndSend(
+          tester,
+          'es',
+          'Comprar pan',
+          failure: ApiException(429, 'Too many requests', null, wait),
+        );
+        await tester.pumpAndSettle();
+        final banner = find.byType(MessageBanner);
+        expect(banner, findsOneWidget);
+        expect(
+          find.descendant(of: banner, matching: find.text(expected)),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.widgetWithText(FilledButton, filled)),
+          findsOneWidget,
+        );
+        if (filled == es.tryAgain) {
+          // Reintentar works once the minute has passed.
+          app.api.failure = null;
+          app.api.found = [_found('Comprar pan')];
+          await tester.tap(
+            inSheet(find.widgetWithText(FilledButton, es.tryAgain)),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(CaptureResult), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1307: after a 429 with no Retry-After (the assistant’s own quota) the sheet says the assistant is unavailable, not the daily limit',
+    (tester) async {
+      await typeAndSend(
+        tester,
+        'es',
+        'Comprar pan',
+        failure: ApiException(429, 'Too many requests'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(es.captureUnavailable), findsOneWidget);
+      expect(find.text(es.captureAllowance), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // UX loop 2026-10-19-app, batch b2 round 2 · P200 (UX-1630): with words,
+  // today's limit is unchanged; only a recording with no words reads the
+  // recording's line.
+  testWidgets(
+    'UX-1630: typed words refused by today’s limit (Retry-After 3600) still read «Toca Guardar como tarea…», with Guardar como tarea and Reintentar',
+    (tester) async {
+      await typeAndSend(
+        tester,
+        'es',
+        'Comprar pan',
+        failure: ApiException(
+          429,
+          'Too many requests',
+          null,
+          const Duration(seconds: 3600),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final banner = find.byType(MessageBanner);
+      expect(
+        find.descendant(
+          of: banner,
+          matching: find.text(
+            'Has llegado al límite de dictados de hoy. Toca Guardar como tarea o inténtalo mañana.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(es.captureAllowanceRecording), findsNothing);
+      expect(
+        inSheet(find.widgetWithText(FilledButton, es.captureSaveAsWritten)),
+        findsOneWidget,
+      );
+      expect(inSheet(find.text(es.tryAgain)), findsOneWidget);
+      expect(
+        inSheet(find.byKey(const ValueKey('capture-close'))),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'UX-1318: rare errors say what to do; a choice the server can’t take and a busy microphone read the generic message',
+    () {
+      for (final l in [en, es, ca]) {
+        for (final problem in [
+          CaptureProblem.unsupportedKind,
+          CaptureProblem.speechBusy,
+        ]) {
+          expect(
+            captureProblemText(l, problem),
+            l.captureFailed,
+            reason: '${l.localeName}: $problem',
+          );
+        }
+        expect(
+          captureProblemText(l, CaptureProblem.saveFailed),
+          l.captureSaveFailed,
+        );
+        expect(
+          captureProblemText(l, CaptureProblem.stopFailed),
+          l.captureStopFailed,
+        );
+        expect(
+          captureProblemText(l, CaptureProblem.incompleteAudio),
+          l.captureIncompleteAudio,
+        );
+        expect(
+          captureProblemText(l, CaptureProblem.tooLarge),
+          l.captureTooLarge,
+        );
+        expect(captureProblemText(l, CaptureProblem.tooFast), l.captureTooFast);
+      }
+      expect(
+        es.captureSaveFailed,
+        'No se ha podido añadir. Tus palabras siguen aquí; vuelve a intentarlo.',
+      );
+      expect(
+        es.captureStopFailed,
+        'No he podido terminar de escuchar. Lo que dijiste antes se conserva.',
+      );
+      expect(
+        es.captureIncompleteAudio,
+        'Esta grabación no se puede usar. Descártala y vuelve a dictarla.',
+      );
+      expect(
+        es.captureTooLarge,
+        'Esta grabación es demasiado larga. Descártala y dicta algo más corto.',
+      );
+    },
+  );
+
+  testWidgets(
+    'UX-1318: ES, with the phone’s zone unavailable, the sheet’s banner ends «… Las tareas nuevas usarán Madrid.», not «Europe/Madrid»',
+    (tester) async {
+      platform.setMockMethodCallHandler(
+        timezone,
+        (_) async => throw PlatformException(code: 'unavailable'),
+      );
+      await _App.open(tester, pro: true, size: const Size(360, 800));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      final banner = inSheet(find.text(es.timezoneFallback('Madrid')));
+      expect(banner, findsOneWidget);
+      expect(
+        es.timezoneFallback('Madrid'),
+        endsWith('Las tareas nuevas usarán Madrid.'),
+      );
+      expect(inSheet(find.textContaining('Europe/Madrid')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2275,6 +2639,118 @@ void main() {
       },
     );
   }
+
+  // ---- UX loop 2026-10-19-app, round 1 · P171, with Manrope (loaded above)
+
+  /// [paragraph] is on one line: as high as its text laid out unbounded.
+  void expectOneLine(RenderParagraph paragraph, String reason) {
+    final oneLine = TextPainter(
+      text: paragraph.text,
+      textDirection: paragraph.textDirection,
+      textScaler: paragraph.textScaler,
+      locale: paragraph.locale,
+      strutStyle: paragraph.strutStyle,
+      textHeightBehavior: paragraph.textHeightBehavior,
+    )..layout();
+    expect(
+      paragraph.size.height,
+      moreOrLessEquals(oneLine.height, epsilon: 0.5),
+      reason:
+          '$reason: one line is ${oneLine.height} high, it is '
+          '${paragraph.size.height} (one-line width ${oneLine.width} in '
+          '${paragraph.size.width})',
+    );
+    oneLine.dispose();
+  }
+
+  testWidgets(
+    'UX-1310: ES 1× on 360×800, Pro, the slow state: «Guardar como tarea» is on one line',
+    (tester) async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      final hold = Completer<void>();
+      await typeAndSend(
+        tester,
+        'es',
+        'llamar al médico',
+        size: const Size(360, 800),
+        hold: hold,
+      );
+      await frames(tester);
+      await tester.pump(const Duration(milliseconds: 8200));
+      expect(find.text(es.captureSlow), findsOneWidget);
+      final save = inSheet(
+        find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+      );
+      expect(save, findsOneWidget);
+      final label = find.descendant(
+        of: save,
+        matching: find.text(es.captureSaveAsWritten),
+      );
+      expectOneLine(
+        tester.renderObject<RenderParagraph>(
+          find.descendant(of: label, matching: find.byType(RichText)),
+        ),
+        'Guardar como tarea',
+      );
+      expect(tester.takeException(), isNull);
+      hold.complete();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'UX-1313: ES 2× on 360×800, three typed lines: the first typed line is visible below the sheet’s top edge, and the field is about as tall as its text',
+    (tester) async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _App.open(tester, pro: true, size: const Size(360, 800));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      final type = find.byKey(const ValueKey('capture-type-instead'));
+      await tester.ensureVisible(type);
+      await tester.pumpAndSettle();
+      await tester.tap(type);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        words(),
+        'Comprar pan\nLlamar a Ana\nRecoger el paquete',
+      );
+      await tester.pumpAndSettle();
+      final sheet = tester.getRect(find.byType(BottomSheet));
+      final editable = find.descendant(
+        of: words(),
+        matching: find.byType(EditableText),
+      );
+      final text = tester.getRect(editable);
+      expect(
+        text.top,
+        greaterThanOrEqualTo(sheet.top),
+        reason: 'the first line is not under the sheet’s top edge',
+      );
+      // The first line itself is what a tap there reaches.
+      final firstLine = Offset(text.left + 12, text.top + 12);
+      final hit = tester.hitTestOnBinding(firstLine);
+      expect(
+        hit.path.any((entry) => entry.target is RenderEditable),
+        isTrue,
+        reason: 'the first typed line is in view at $firstLine',
+      );
+      final field = tester.getRect(words());
+      expect(
+        field.height,
+        lessThanOrEqualTo(text.height + 48),
+        reason:
+            'the field is about as tall as its text, not its hidden '
+            'example (field ${field.height}, text ${text.height})',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Map<String, dynamic> _found(String title) => {

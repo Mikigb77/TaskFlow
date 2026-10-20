@@ -25,9 +25,9 @@ String captureProblemText(
   CaptureProblem.gone => l.captureGone,
   CaptureProblem.noteLength => l.captureNoteLength,
   CaptureProblem.noTasks => l.captureNoTasks,
-  CaptureProblem.unsupportedKind => l.captureUnsupportedKind,
   CaptureProblem.offline => l.captureOffline,
   CaptureProblem.timeout || CaptureProblem.unavailable => l.captureUnavailable,
+  CaptureProblem.tooFast => l.captureTooFast,
   CaptureProblem.allowance => l.captureAllowance,
   CaptureProblem.freeVoiceUsedUp ||
   CaptureProblem.proRequired => freeVoiceUsedUpText(
@@ -46,7 +46,6 @@ String captureProblemText(
   // The phone's own recognizer failed, and listening online did too.
   CaptureProblem.speechLanguage ||
   CaptureProblem.speechUnavailable => l.captureCantListen,
-  CaptureProblem.speechBusy => l.captureSpeechBusy,
   CaptureProblem.incompleteAudio => l.captureIncompleteAudio,
   CaptureProblem.writeFailed => l.captureWriteFailed,
   CaptureProblem.stopFailed => l.captureStopFailed,
@@ -55,6 +54,8 @@ String captureProblemText(
   CaptureProblem.saveFailed => l.captureSaveFailed,
   CaptureProblem.setupRequested => l.captureSetupRequested,
   CaptureProblem.setupUnavailable => l.captureSetupUnavailable,
-  // Never a server's or the platform's own words.
+  // Never a server's or the platform's own words; nor a choice of capture
+  // the server can't take, or a microphone already in use: rare, and
+  // trying again is all there is to do.
   _ => l.captureFailed,
 };

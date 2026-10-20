@@ -13,6 +13,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/capture_messages.dart';
+import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_problem.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -309,6 +310,8 @@ Future<bool?> _askToKeep(BuildContext context, {required bool spoken}) =>
         // At large text on a small screen, the question scrolls instead of
         // overflowing.
         scrollable: true,
+        // Stacked at large text, `Descartar` doesn't touch `Conservar`.
+        actionsOverflowButtonSpacing: 12,
         title: Text(
           spoken
               ? context.l10n.captureKeepQuestion
@@ -614,6 +617,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         final heard = _session!.audioPath != null;
         _error = error == null ? null : _problemFor(error, heard: heard);
         _failed = _session!.status == 'failed';
+        // Today's limit refused it, maybe yesterday: trying again may work
+        // now. If the limit still holds, it says so again.
+        if (_error == CaptureProblem.allowance) _error = null;
         if (_voice && CaptureProblem.usedUp(_error)) {
           // Free dictations came back, or Pro: trying again works now.
           _error = null;
@@ -1759,7 +1765,19 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   /// the sheet only closes. After `Volver a decirlo`, Cancel still goes back
   /// to the result.
   bool _recordingWaits() =>
-      _freeVoice().waitsForMore && _previousResult == null;
+      (_freeVoice().waitsForMore || _limitWaits) && _previousResult == null;
+
+  /// Today's dictation limit refused a recording with no words: like one
+  /// that waits for more dictations, it is kept in Capturas pendientes and
+  /// the sheet only closes. Trying again can't work until tomorrow.
+  bool get _limitWaits {
+    final phase = _startPending ? _CapturePhase.starting : _phase;
+    return (phase == _CapturePhase.idle || phase == _CapturePhase.paused) &&
+        _session?.audioPath != null &&
+        !_hasWords &&
+        _error == CaptureProblem.allowance &&
+        _previousResult == null;
+  }
 
   /// `Listo`: stop listening and continue with the words. Typed by an
   /// account without Pro, they go to the form.
@@ -2057,8 +2075,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final resting =
         phase == _CapturePhase.idle || phase == _CapturePhase.paused;
     final (:usedUp, :refused, :waitsForMore) = _freeVoice(watch: true);
-    // Only a recording waits: the sheet only closes.
-    final recordingWaits = waitsForMore && _previousResult == null;
+    // Only a recording waits, for more dictations or for tomorrow: the sheet
+    // only closes.
+    final limitWaits = _limitWaits;
+    final recordingWaits =
+        (waitsForMore || limitWaits) && _previousResult == null;
     // The assistant found nothing in spoken words: say them again, or, with
     // no dictations left, type. Typed words stay in their field, with `Listo`.
     final nothingFound = _nothingFound && resting;
@@ -2078,8 +2099,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       ),
       _CapturePhase.starting => l10n.captureStarting,
       _CapturePhase.processing => l10n.captureUnderstanding,
-      // The used-up line already says the recording is kept.
-      _ when recorded && !waitsForMore => l10n.recordingKept,
+      // The used-up line, or the limit's, already says the recording is kept.
+      _ when recorded && !waitsForMore && !limitWaits => l10n.recordingKept,
       _CapturePhase.paused => l10n.capturePaused,
       _CapturePhase.idle => null,
     };
@@ -2215,25 +2236,32 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final wordsStyle = theme.textTheme.headlineSmall;
     // A recording that waits has no words to type.
     final Widget? words = _typing && !recordingWaits
-        ? TextField(
-            key: const ValueKey('capture-words'),
-            controller: _words,
-            focusNode: _wordsFocus,
-            readOnly: _busy || _recording,
-            onChanged: _changedText,
-            minLines: 1,
-            maxLines: null,
-            maxLength: 4000,
-            keyboardType: TextInputType.multiline,
-            style: wordsStyle,
-            decoration: InputDecoration(
-              // Typed words understood on the phone become one task.
-              hintText: _kind == 'note'
-                  ? l10n.noteHint
-                  : ref.watch(hasProProvider)
-                  ? l10n.examplePlan
-                  : l10n.exampleTask,
-              counterText: '',
+        // Named once typed into, when the example no longer shows.
+        ? Semantics(
+            label: l10n.captureYourWords,
+            child: TextField(
+              key: const ValueKey('capture-words'),
+              controller: _words,
+              focusNode: _wordsFocus,
+              readOnly: _busy || _recording,
+              onChanged: _changedText,
+              minLines: 1,
+              maxLines: null,
+              maxLength: 4000,
+              keyboardType: TextInputType.multiline,
+              style: wordsStyle,
+              decoration: InputDecoration(
+                // Typed words understood on the phone become one task.
+                hintText: _kind == 'note'
+                    ? l10n.noteHint
+                    : ref.watch(hasProProvider)
+                    ? l10n.examplePlan
+                    : l10n.exampleTask,
+                // The field grows with the words, not with the hidden example:
+                // at large text the first line stays in view.
+                maintainHintSize: false,
+                counterText: '',
+              ),
             ),
           )
         : _words.text.trim().isEmpty
@@ -2268,7 +2296,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           ),
         ),
       ],
-      if (_timezoneFallback) MessageBanner(l10n.timezoneFallback(_zone)),
+      if (_timezoneFallback)
+        MessageBanner(l10n.timezoneFallback(timeZoneName(_zone))),
       if (_micBlocked) ...[
         // A choice the person made, not a fault: the neutral style, still
         // read out when it appears.
@@ -2296,7 +2325,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         _error == null || (usedUpLine != null && CaptureProblem.usedUp(_error))
         ? null
         : MessageBanner(
-            captureProblemText(l10n, _error!),
+            limitWaits
+                ? l10n.captureAllowanceRecording
+                : captureProblemText(l10n, _error!),
             isError: _error != CaptureProblem.setupRequested && !microphone,
             icon: microphone ? Icons.mic_off_outlined : null,
             liveRegion: microphone ? true : null,
@@ -2385,7 +2416,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                 // stacked; Settings and the reason take the whole width.
                 stack: (failed && saveAsWritten) || settingsFirst || _askingMic,
                 showCancel: !recordingWaits,
-                // `Escribir` filled above needs no keyboard beside it.
+                // `Escribir` filled above needs no second one under it.
                 showType: !_typing && !recorded && !typeFirst,
                 byHand: byHand,
                 onType: working
@@ -2435,11 +2466,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     ),
   );
 
-  /// `Cancelar`, the filled action (with `Seguir` beside it when paused) and
-  /// the keyboard. They share a row when it fits, and stack at large text or
-  /// when [stack] asks. With [byHand] the keyboard is `Escribir`, named in
-  /// full, and opens the form: the filled action takes the whole width above
-  /// it.
+  /// The filled action (with `Seguir` beside it when paused) the whole width;
+  /// under it `Cancelar` at the start and `Escribir`, named in full, at the
+  /// end. The filled actions stack at large text or when [stack] asks, and
+  /// `Escribir` goes under `Cancelar` when both don't fit. With [byHand]
+  /// `Escribir` opens the form.
   Widget _controls(
     BuildContext context,
     List<Widget> primary, {
@@ -2458,73 +2489,43 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         : null;
     final type = !showType
         ? null
-        : byHand
-        ? TextButton.icon(
-            key: const ValueKey('capture-fill-by-hand'),
+        : TextButton.icon(
+            key: ValueKey(
+              byHand ? 'capture-fill-by-hand' : 'capture-type-instead',
+            ),
             onPressed: onType,
             icon: const Icon(Icons.keyboard_outlined),
             label: Text(l10n.captureTypeInstead),
-          )
-        : IconButton(
-            tooltip: l10n.captureTypeInstead,
-            onPressed: onType,
-            icon: const Icon(Icons.keyboard_outlined),
           );
     final large = MediaQuery.textScalerOf(context).scale(14) > 18;
-    Widget side(List<Widget> buttons) => Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < buttons.length; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
-          Expanded(child: buttons[i]),
+        if (large || stack)
+          for (var i = 0; i < primary.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            primary[i],
+          ]
+        else
+          Row(
+            children: [
+              for (var i = 0; i < primary.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: primary[i]),
+              ],
+            ],
+          ),
+        if (cancel != null || type != null) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runSpacing: 8,
+            children: [?cancel, ?type],
+          ),
         ],
       ],
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!large &&
-            !stack &&
-            !(byHand && type != null) &&
-            constraints.maxWidth >= (primary.length > 1 ? 440 : 280)) {
-          return Row(
-            children: [
-              if (cancel != null) ...[cancel, const SizedBox(width: 8)],
-              Expanded(child: side(primary)),
-              if (type != null) ...[const SizedBox(width: 4), type],
-            ],
-          );
-        }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (large || stack)
-              for (var i = 0; i < primary.length; i++) ...[
-                if (i > 0) const SizedBox(height: 8),
-                primary[i],
-              ]
-            else
-              side(primary),
-            if (cancel != null || type != null) ...[
-              const SizedBox(height: 4),
-              // `Escribir` goes under `Cancelar` when both don't fit.
-              if (byHand)
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [?cancel, ?type],
-                )
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (cancel != null) Flexible(child: cancel),
-                    ?type,
-                  ],
-                ),
-            ],
-          ],
-        );
-      },
     );
   }
 }
@@ -3318,6 +3319,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     context: context,
     builder: (context) => AlertDialog(
       scrollable: true,
+      // Stacked at large text, `Eliminar` doesn't touch `Conservar tarea`.
+      actionsOverflowButtonSpacing: 12,
       content: Text(context.l10n.deleteSeriesHelp(task.title)),
       actions: [
         TextButton(
@@ -3492,7 +3495,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           undoIds[draft.id] = draft.savedTaskId!;
         }
       }
-    } catch (_) {
+    } catch (error) {
       if (!committed) {
         // Nothing half done: what was done is taken back.
         await runner.undoChanges(applied);
@@ -3506,9 +3509,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           container.invalidate(taskListsProvider);
         }
       }
+      // Only a lost connection says why («Sin conexión»); any other failed
+      // save says it couldn't add.
+      final offline =
+          error is ApiException &&
+          CaptureProblem.from(error) == CaptureProblem.offline;
       if (mounted) {
         setState(() {
-          _error = CaptureProblem.saveFailed;
+          _error = offline ? CaptureProblem.offline : CaptureProblem.saveFailed;
           _saving = false;
           if (!committed) {
             _session = before;
@@ -3870,7 +3878,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [cancel, sayAgain],
+        children: [cancel, const SizedBox(height: 8), sayAgain],
       );
     }
     return Row(

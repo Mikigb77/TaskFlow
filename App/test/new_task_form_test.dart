@@ -1078,7 +1078,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(VoiceTaskScreen), findsOneWidget);
       expect(find.byType(TaskEditor), findsNothing);
-      expect(find.byTooltip(es.captureTypeInstead), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('capture-type-instead')),
+        findsOneWidget,
+      );
       expect(find.byKey(const ValueKey('capture-fill-by-hand')), findsNothing);
       expect(app.speech.starts, 0, reason: 'this phone has no recognizer');
       expect(tester.takeException(), isNull);

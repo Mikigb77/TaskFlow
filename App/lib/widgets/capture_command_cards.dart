@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/capture_command.dart';
@@ -176,17 +177,25 @@ CommandView resolveCommand(
 
 String _fold(String text) => foldForSearch(text).trim();
 
-/// The projects like [name], in their order: those it starts, that start
-/// it, or that contain it.
-List<TaskListInfo> _similar(String name, List<TaskListInfo> projects) {
+/// The projects like [name], at most [ProjectChoices.similar], in their
+/// order: first those it starts, that start it, or that contain it; then
+/// those that start with its first 4 letters («Mates»: «Matemáticas»).
+/// Accents and case don't count.
+@visibleForTesting
+List<TaskListInfo> similarProjects(String name, List<TaskListInfo> projects) {
   final said = _fold(name);
+  if (said.length < 3) return const [];
   bool like(TaskListInfo project) {
     final own = _fold(project.name);
-    return said.length >= 3 &&
-        (own.startsWith(said) || said.startsWith(own) || own.contains(said));
+    return own.startsWith(said) || said.startsWith(own) || own.contains(said);
   }
 
-  return projects.where(like).toList();
+  final start = said.length >= 4 ? said.substring(0, 4) : null;
+  return [
+    ...projects.where(like),
+    if (start != null)
+      ...projects.where((p) => !like(p) && _fold(p.name).startsWith(start)),
+  ].take(ProjectChoices.similar).toList();
 }
 
 /// The projects a task can go to: those the person can edit, not archived.
@@ -233,6 +242,7 @@ class ProjectChoices extends ConsumerWidget {
     required this.onCreate,
     required this.onPick,
     this.first,
+    this.candidates = const [],
     this.onNone,
     this.enabled = true,
   });
@@ -241,6 +251,11 @@ class ProjectChoices extends ConsumerWidget {
   /// Those the person can edit.
   final List<TaskListInfo> projects;
   final TaskListInfo? first;
+
+  /// The ids of the projects the server matched, best first. Those among
+  /// [projects] are the ones like [name]; without any, they're guessed from
+  /// the names.
+  final List<String> candidates;
   final VoidCallback onCreate;
   final ValueChanged<TaskListInfo> onPick;
   final VoidCallback? onNone;
@@ -249,69 +264,102 @@ class ProjectChoices extends ConsumerWidget {
   /// Projects shown as chips; the rest are in the sheet.
   static const similar = 3;
 
+  /// A chip's icon keeps its room at any text size.
+  static const _avatarBox = BoxConstraints.tightFor(width: 20, height: 20);
+
+  /// A chip's icon box and padding: 8 dp around, up to 8 dp each side of
+  /// the label.
+  static const _chipFrame = 20.0 + 16 + 16;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
-    Widget label(String text) => ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 230),
-      child: Text(text, overflow: TextOverflow.ellipsis),
-    );
+    final matched = [
+      for (final id in candidates)
+        ?projects.where((p) => p.id == id).firstOrNull,
+    ];
     final shown = [
       ?first,
-      ..._similar(name, projects).where((p) => p.id != first?.id),
+      ...(matched.isNotEmpty ? matched : similarProjects(name, projects)).where(
+        (p) => p.id != first?.id,
+      ),
     ].take(similar).toList();
     final more = projects.any((p) => !shown.any((s) => s.id == p.id));
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: [
-        ActionChip(
-          key: const ValueKey('project-choice-create'),
-          avatar: const Icon(Icons.create_new_folder_outlined, size: 18),
-          label: label(l.commandCreateNamed(name)),
-          onPressed: enabled ? onCreate : null,
-        ),
-        for (final project in shown)
-          ActionChip(
-            key: ValueKey('project-choice-${project.id}'),
-            avatar: Icon(
-              Icons.folder_outlined,
-              size: 18,
-              color: taskListColor(project.color),
+    return LayoutBuilder(
+      builder: (context, box) {
+        // A long name wraps to a second line rather than being cut, for
+        // large text. A chip measures its label at its whole width before
+        // taking off its icon and padding, so the label keeps to what is
+        // left.
+        Widget label(String text) => ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.max(0, box.maxWidth - _chipFrame),
+          ),
+          // A chip's own text style doesn't wrap.
+          child: Text(
+            text,
+            softWrap: true,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ActionChip(
+              key: const ValueKey('project-choice-create'),
+              avatar: const Icon(Icons.create_new_folder_outlined, size: 18),
+              avatarBoxConstraints: _avatarBox,
+              label: label(l.commandCreateNamed(name)),
+              onPressed: enabled ? onCreate : null,
             ),
-            label: label(project.name),
-            onPressed: enabled ? () => onPick(project) : null,
-          ),
-        if (more)
-          ActionChip(
-            key: const ValueKey('project-choice-other'),
-            avatar: const Icon(Icons.folder_open_outlined, size: 18),
-            label: label(l.commandOtherProject),
-            onPressed: !enabled
-                ? null
-                : () async {
-                    final choice = await chooseTaskList(
-                      context,
-                      ref,
-                      none: onNone != null,
-                      selectedNone: false,
-                    );
-                    if (choice == null) return;
-                    if (choice.project case final project?) {
-                      onPick(project);
-                    } else {
-                      onNone?.call();
-                    }
-                  },
-          ),
-        if (onNone != null)
-          ActionChip(
-            key: const ValueKey('project-choice-none'),
-            avatar: const Icon(Icons.folder_off_outlined, size: 18),
-            label: label(l.noList),
-            onPressed: enabled ? onNone : null,
-          ),
-      ],
+            for (final project in shown)
+              ActionChip(
+                key: ValueKey('project-choice-${project.id}'),
+                avatar: Icon(
+                  Icons.folder_outlined,
+                  size: 18,
+                  color: taskListColor(project.color),
+                ),
+                avatarBoxConstraints: _avatarBox,
+                label: label(project.name),
+                onPressed: enabled ? () => onPick(project) : null,
+              ),
+            if (more)
+              ActionChip(
+                key: const ValueKey('project-choice-other'),
+                avatar: const Icon(Icons.folder_open_outlined, size: 18),
+                avatarBoxConstraints: _avatarBox,
+                label: label(l.commandOtherProject),
+                onPressed: !enabled
+                    ? null
+                    : () async {
+                        final choice = await chooseTaskList(
+                          context,
+                          ref,
+                          none: onNone != null,
+                          selectedNone: false,
+                        );
+                        if (choice == null) return;
+                        if (choice.project case final project?) {
+                          onPick(project);
+                        } else {
+                          onNone?.call();
+                        }
+                      },
+              ),
+            if (onNone != null)
+              ActionChip(
+                key: const ValueKey('project-choice-none'),
+                avatar: const Icon(Icons.folder_off_outlined, size: 18),
+                avatarBoxConstraints: _avatarBox,
+                label: label(l.noList),
+                onPressed: enabled ? onNone : null,
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -494,14 +542,16 @@ class ProjectCommandCard extends ConsumerWidget {
             removeLabel: l.commandDontCreate(name),
             enabled: enabled,
           ),
+          // The chips span the card, for their room at large text.
           Padding(
-            padding: const EdgeInsets.only(left: 34, right: 8, bottom: 4),
+            padding: const EdgeInsets.only(right: 10, top: 4, bottom: 8),
             child: ProjectChoices(
               name: name,
               projects: editableProjects(projects),
               first: editableProjects(
                 projects,
               ).where((p) => p.id == command.existingListId).firstOrNull,
+              candidates: command.projectCandidates,
               enabled: enabled,
               onCreate: () => onChanged(
                 command.copyWith(choice: CaptureCommand.createChoice),
@@ -663,54 +713,60 @@ class _FoundRow extends ConsumerWidget {
         responsibilityLabel(context, task, ref.watch(authProvider).account?.id),
       if (completed) l.commandCompleted,
     ];
-    return InkWell(
-      key: ValueKey('found-${task.id}'),
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          settings: const RouteSettings(name: '/taskDetails'),
-          builder: (_) => TaskDetailScreen(
-            taskId: task.id!,
-            occurrenceDate: shown?.occurrenceDate,
-            occurrenceKey: shown?.occurrenceKey,
+    // Read out as a button, as it opens the task.
+    return Semantics(
+      button: true,
+      child: InkWell(
+        key: ValueKey('found-${task.id}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: '/taskDetails'),
+            builder: (_) => TaskDetailScreen(
+              taskId: task.id!,
+              occurrenceDate: shown?.occurrenceDate,
+              occurrenceKey: shown?.occurrenceKey,
+            ),
           ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(34, 8, 4, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: completed ? colors.onSurfaceVariant : null,
-                      decoration: completed ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  if (details.isNotEmpty)
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(34, 8, 4, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      details.join(' · '),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
+                      task.title,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: completed ? colors.onSurfaceVariant : null,
+                        decoration: completed
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
-                ],
+                    if (details.isNotEmpty)
+                      Text(
+                        details.join(' · '),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            ExcludeSemantics(
-              child: Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: colors.onSurfaceVariant,
+              const SizedBox(width: 4),
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -758,30 +814,33 @@ class _ChoiceState extends State<_Choice> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final task in more > 0 ? matches.take(_Choice.shown) : matches)
-          InkWell(
-            key: ValueKey('choose-${view.command.id}-${task.id}'),
-            borderRadius: BorderRadius.circular(12),
-            onTap: enabled
-                ? () => onChanged(view.command.copyWith(taskId: task.id))
-                : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(34, 8, 8, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(task.title, style: theme.textTheme.bodyLarge),
-                  Text(
-                    [
-                      task.displayDate == null && task.deadline != null
-                          ? taskDeadlineLabel(context, task)
-                          : taskDayLine(context, task),
-                      if (_completed(task)) l.commandCompleted,
-                    ].join(' · '),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+          Semantics(
+            button: true,
+            child: InkWell(
+              key: ValueKey('choose-${view.command.id}-${task.id}'),
+              borderRadius: BorderRadius.circular(12),
+              onTap: enabled
+                  ? () => onChanged(view.command.copyWith(taskId: task.id))
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(34, 8, 8, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(task.title, style: theme.textTheme.bodyLarge),
+                    Text(
+                      [
+                        task.displayDate == null && task.deadline != null
+                            ? taskDeadlineLabel(context, task)
+                            : taskDayLine(context, task),
+                        if (_completed(task)) l.commandCompleted,
+                      ].join(' · '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -885,7 +944,7 @@ class UpdateCommandCard extends ConsumerWidget {
             icon: Icons.edit_outlined,
             text: l.commandWhichToChange,
             onRemove: onRemove,
-            removeLabel: l.commandDontChange(_words(command.target.words)),
+            removeLabel: l.commandDontChangeAny,
             enabled: enabled,
           ),
           _Choice(view: view, onChanged: onChanged, enabled: enabled),
@@ -1148,7 +1207,6 @@ class DeleteCommandCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final command = view.command;
     if (view.notFound) {
       return _Frame(
         children: [
@@ -1166,7 +1224,7 @@ class DeleteCommandCard extends StatelessWidget {
             icon: Icons.delete_outline_rounded,
             text: l.commandWhichToDelete,
             onRemove: onRemove,
-            removeLabel: l.commandDontDelete(_words(command.target.words)),
+            removeLabel: l.commandDontDeleteAny,
             enabled: enabled,
           ),
           _Choice(view: view, onChanged: onChanged, enabled: enabled),

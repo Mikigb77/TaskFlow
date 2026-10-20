@@ -93,7 +93,7 @@ Future<void> speak(PreviewApp app, String words) async {
 /// Opens the sheet, `Escribir`, types [words]; the keyboard goes down.
 Future<void> typeWords(PreviewApp app, String words) async {
   await openSheet(app);
-  await app.tester.tap(find.byTooltip(app.p.l.captureTypeInstead));
+  await app.tester.tap(find.byKey(const ValueKey('capture-type-instead')));
   await app.tester.pumpAndSettle();
   await app.tester.enterText(
     find.byKey(const ValueKey('capture-words')),
@@ -422,6 +422,53 @@ void capturePreviews() {
         final app = await PreviewApp.open(p, tasks: normalDay());
         app.api.failure = ApiException(503, 'Service unavailable');
         await speak(app, said);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
+      'error-limit-recording',
+      'A recording with no words (online speech) refused by today\'s dictation limit (429, Retry-After 3600): the recording is kept, and Cerrar is the only button.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        final session = CaptureSession(
+          id: const Uuid().v4(),
+          ownerKey: app.container.read(captureOwnerProvider),
+          timezone: 'Europe/Madrid',
+          capturedAt: previewNow.toUtc(),
+          audioPath: 'preview-recording.wav',
+          status: 'editing',
+          source: 'speech',
+        );
+        app.captures.sessions[session.id] = session;
+        app.api.failure = ApiException(
+          429,
+          'Daily limit reached.',
+          null,
+          const Duration(seconds: 3600),
+        );
+        unawaited(
+          showCaptureSheet(
+            app.context,
+            captureId: session.id,
+            startListening: false,
+          ),
+        );
+        await p.tester.pumpAndSettle();
+        await sendWords(app);
+        // Sending a recording reads its file: real time passes for it.
+        for (var i = 0; i < 10 && app.api.asked.isEmpty; i++) {
+          await p.tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await p.tester.pump();
+        }
+        await p.tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

@@ -196,6 +196,10 @@
   },
   "today": "Today",
   "tomorrow": "Tomorrow",
+  "yesterday": "Yesterday",
+  "@yesterday": {
+    "description": "The day before today, before a time: when a kept capture was made (Yesterday, 18:05)."
+  },
   "all": "All",
   "upcoming": "Upcoming",
   "noDate": "No date",
@@ -300,8 +304,31 @@
   "week": "Week",
   "month": "Month",
   "day": "Day",
-  "previousPeriod": "Previous month or week",
-  "nextPeriod": "Next month or week",
+  "previousWeek": "Previous week",
+  "@previousWeek": {
+    "description": "Calendar's back arrow, read aloud, in the week view: shows the week before."
+  },
+  "nextWeek": "Next week",
+  "@nextWeek": {
+    "description": "Calendar's forward arrow, read aloud, in the week view: shows the week after."
+  },
+  "previousMonth": "Previous month",
+  "@previousMonth": {
+    "description": "Calendar's back arrow, read aloud, in the month view: shows the month before."
+  },
+  "nextMonth": "Next month",
+  "@nextMonth": {
+    "description": "Calendar's forward arrow, read aloud, in the month view: shows the month after."
+  },
+  "dayTaskCount": "{count, plural, =1{1 task} other{{count} tasks}}",
+  "@dayTaskCount": {
+    "description": "Read aloud for a day in Calendar's week or month strip: how many open tasks it has. Follows the day's date, after “today · ” when the day is today. Lowercase.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "previousDay": "Previous day",
   "nextDay": "Next day",
   "licenses": "Open-source licences",
@@ -1482,13 +1509,20 @@
   "@captureNoTasks": {
     "description": "Capture sheet banner, read out once, when the assistant found no task and no command in the words. Gives an example of what to say next; Say again (captureSayAgain) is the button under it."
   },
-  "captureUnsupportedKind": "This server does not support this way of adding tasks. Your words are kept.",
   "captureOffline": "No internet. Your words are saved — try again when you’re online.",
   "captureUnavailable": "Couldn’t reach the assistant — your words are kept.",
-  "captureAllowance": "You’ve reached today’s limit. Type the task, or try again tomorrow.",
+  "captureTooFast": "You’ve dictated a lot in a row. Wait a minute, then tap Try again.",
+  "@captureTooFast": {
+    "description": "Shown in the dictation sheet when many dictations came in a row and the per-minute limit refused this one. Names the Try again button under it; waiting a minute is enough."
+  },
+  "captureAllowance": "You’ve reached today’s dictation limit. Tap Save as a task, or try again tomorrow.",
+  "captureAllowanceRecording": "You’ve reached today’s dictation limit. Your recording is kept; try again tomorrow.",
+  "@captureAllowanceRecording": {
+    "description": "Capture sheet banner when the daily dictation limit refuses a recording that has no words yet. The only button is Close; the recording stays in Pending captures."
+  },
   "captureSignIn": "Sign in again to turn your words into tasks.",
   "captureForbidden": "This account can’t turn your words into tasks. Check your access and try again.",
-  "captureTooLarge": "This recording exceeds the service limit. Keep it for later or use a shorter typed description.",
+  "captureTooLarge": "This recording is too long. Discard it and dictate something shorter.",
   "captureTypedFirst": "Save or discard what you typed before starting a recording.",
   "captureMicrophone": "Without the microphone I can’t hear you. Tap Start talking to allow it, or Type instead.",
   "@captureMicrophone": {
@@ -1567,13 +1601,12 @@
   "@captureCantListen": {
     "description": "Capture sheet, when neither the phone’s own speech recognition nor listening online could start. Names the Type instead button (captureTypeInstead)."
   },
-  "captureSpeechBusy": "A microphone request is already open. Finish it before trying again.",
-  "captureIncompleteAudio": "The retained audio is incomplete and cannot be processed. It is still kept on this phone.",
+  "captureIncompleteAudio": "This recording can’t be used. Discard it and dictate it again.",
   "captureWriteFailed": "Couldn’t keep this on your phone. Try again before leaving.",
-  "captureStopFailed": "Could not finish recording. Previously retained input is kept.",
+  "captureStopFailed": "I couldn’t finish listening. What you said before is kept.",
   "captureDiscardFailed": "Could not discard your words. They are still kept.",
   "captureReviewWriteFailed": "Could not keep these changes. Please try again before leaving.",
-  "captureSaveFailed": "Could not finish saving. Your words are kept; retry will not duplicate saved tasks.",
+  "captureSaveFailed": "Couldn’t add it. Your words are still here; try again.",
   "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
   "voiceSetupRequested": "Follow Android’s steps, then tap Check again.",
   "@voiceSetupRequested": {
@@ -1587,7 +1620,6 @@
   "voiceRecording": "Voice recording",
   "capturesCaughtUp": "All caught up",
   "capturesEmptyHelp": "Recordings and tasks you leave unfinished are kept here.",
-  "captureResumeHelp": "Kept on this phone · Tap to resume",
   "captureDraftSummary": "{count, plural, one{1 not added yet} other{{count} not added yet}}",
   "@captureDraftSummary": {
     "description": "In Unfinished captures, under a capture's first task: how many of its tasks are not added yet.",
@@ -1652,6 +1684,9 @@
   "captureRemovedDraftsHelp": "Nothing will change.",
   "captureFinish": "Done",
   "captureYourWords": "Your words",
+  "@captureYourWords": {
+    "description": "Screen-reader label of the field in the capture sheet where the person types (or sees) the words for their tasks. Not shown on screen."
+  },
   "captureCheckDetails": "Check the details above",
   "captureUnderstanding": "Understanding…",
   "captureFailed": "That didn’t work. Your words are saved here — try again.",
@@ -2498,6 +2533,14 @@
         "type": "String"
       }
     }
+  },
+  "commandDontChangeAny": "Don’t change any",
+  "@commandDontChangeAny": {
+    "description": "Tooltip and screen-reader label of the ✕ on a change's card in a dictation's result while it asks which of several tasks to change (“Which one do you want to change?”): none of them is changed."
+  },
+  "commandDontDeleteAny": "Don’t delete any",
+  "@commandDontDeleteAny": {
+    "description": "Tooltip and screen-reader label of the ✕ on a deletion's card in a dictation's result while it asks which of several tasks to delete (“Which one do you want to delete?”): none of them is deleted."
   },
   "commandDontCreate": "Don’t create {name}",
   "@commandDontCreate": {

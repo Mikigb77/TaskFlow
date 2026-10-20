@@ -144,9 +144,15 @@ void main() {
           find.descendant(of: timeline, matching: finder);
       expect(inTimeline(find.byTooltip(previous)), findsOneWidget);
       expect(inTimeline(find.byTooltip(next)), findsOneWidget);
-      // Not the calendar's month-or-week wording.
-      expect(inTimeline(find.byTooltip(l.previousPeriod)), findsNothing);
-      expect(inTimeline(find.byTooltip(l.nextPeriod)), findsNothing);
+      // Not the calendar's week or month wording.
+      for (final calendar in [
+        l.previousWeek,
+        l.nextWeek,
+        l.previousMonth,
+        l.nextMonth,
+      ]) {
+        expect(inTimeline(find.byTooltip(calendar)), findsNothing);
+      }
       // timelineHelp and timelineShortBlocks, as they read before (keys gone).
       for (final gone in [
         'Trabajo planificado y eventos del teléfono',

@@ -263,6 +263,8 @@ void main() {
     bool settle = true,
     // Typing in the capture sheet without Pro, saved in memory.
     MemoryCaptures? captures,
+    // The first day of the week (1: Monday); the locale's when null.
+    int? weekStart,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -274,7 +276,7 @@ void main() {
     final container = designContainer(
       store: MemoryThemeStore(theme.name),
       regionalStore: MemoryRegionalStore(
-        RegionalPreferences(language: language),
+        RegionalPreferences(language: language, weekStart: weekStart),
       ),
       tasks: () => _GivenTasks(tasks),
       pro: captures == null,
@@ -1836,7 +1838,7 @@ void main() {
       await tester.tap(find.text(l.month).last);
       await tester.pumpAndSettle();
       for (var i = 0; i < 12; i++) {
-        await tester.tap(find.byTooltip(l.nextPeriod));
+        await tester.tap(find.byTooltip(l.nextMonth));
         await tester.pumpAndSettle();
       }
       expect(
@@ -1919,7 +1921,8 @@ void main() {
             expect(
               moving != from && moving != from + by,
               isTrue,
-              reason: 'mid-animation the page is between $from and ${from + by}',
+              reason:
+                  'mid-animation the page is between $from and ${from + by}',
             );
             await tester.pumpAndSettle();
             expect(page(), from + by);
@@ -1929,16 +1932,16 @@ void main() {
         // Week view: the 13th's week shows; the 20th is next week.
         expect(day(13), findsOneWidget);
         expect(day(20), findsNothing);
-        await turn(l.nextPeriod, 1);
+        await turn(l.nextWeek, 1);
         expect(day(20), findsOneWidget);
         expect(day(13), findsNothing);
-        await turn(l.previousPeriod, -1);
+        await turn(l.previousWeek, -1);
         expect(day(13), findsOneWidget);
 
         // Month view: the next month's name shows in the same frame.
         await monthView(tester);
         expect(inCalendar(find.text('octubre')), findsOneWidget);
-        await turn(l.nextPeriod, 1);
+        await turn(l.nextMonth, 1);
         expect(inCalendar(find.text('noviembre')), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
@@ -2380,7 +2383,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('calendar-inbox')));
         await tester.pumpAndSettle();
         expect(
-          find.descendant(of: find.byType(AppBar), matching: find.text(l.inbox)),
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text(l.inbox),
+          ),
           findsOneWidget,
         );
         expect(find.widgetWithText(TaskTile, 'Algún día'), findsOneWidget);
@@ -2406,7 +2412,10 @@ void main() {
         'Prueba: toca Añadir tarea y di «Mañana, llamar al dentista y comprar pan».',
       );
       expect(
-        find.descendant(of: emptyState(), matching: find.text(l.rememberPrompt)),
+        find.descendant(
+          of: emptyState(),
+          matching: find.text(l.rememberPrompt),
+        ),
         findsOneWidget,
       );
       expect(
@@ -2422,7 +2431,10 @@ void main() {
       // card or dismiss button of its own.
       expect(find.text(l.addTask), findsWidgets);
       expect(
-        find.descendant(of: emptyState(), matching: find.byType(ButtonStyleButton)),
+        find.descendant(
+          of: emptyState(),
+          matching: find.byType(ButtonStyleButton),
+        ),
         findsNothing,
       );
       expect(tester.takeException(), isNull);
@@ -2493,10 +2505,7 @@ void main() {
         dueDate: DateTime.now().add(const Duration(days: 30)),
       ),
     ),
-    (
-      'a task with no date',
-      Task(id: 1, title: 'Algún día', priority: 1),
-    ),
+    ('a task with no date', Task(id: 1, title: 'Algún día', priority: 1)),
     (
       'only a note',
       Task(id: 1, title: 'Ideas para el viaje', priority: 1, kind: 'note'),
@@ -2519,7 +2528,10 @@ void main() {
         final l = tester.element(find.byType(CalendarScreen)).l10n;
         expect(l.calendarEmpty, 'Nada previsto para este día.');
         expect(
-          find.descendant(of: emptyState(), matching: find.text(l.calendarEmpty)),
+          find.descendant(
+            of: emptyState(),
+            matching: find.text(l.calendarEmpty),
+          ),
           findsOneWidget,
         );
         expect(find.text(l.calendarTrySaying), findsNothing);
@@ -2599,12 +2611,17 @@ void main() {
     (tester) async {
       final store = MemoryFirstTaskStore();
       // First run: the account has one task, then deletes it.
-      final first = await openCalendar(tester, [
-        later(),
-      ], overrides: [firstTaskStoreProvider.overrideWithValue(store)]);
+      final first = await openCalendar(
+        tester,
+        [later()],
+        overrides: [firstTaskStoreProvider.overrideWithValue(store)],
+      );
       await first.read(taskProvider.notifier).deleteTask(1, sync: false);
       await tester.pumpAndSettle();
-      expect(store.owners, contains(first.read(taskRepositoryProvider).ownerKey));
+      expect(
+        store.owners,
+        contains(first.read(taskRepositoryProvider).ownerKey),
+      );
       // The app closes and opens again, with no tasks and no notes.
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -2664,7 +2681,9 @@ void main() {
         const [],
         settle: false,
         overrides: [
-          firstTaskStoreProvider.overrideWithValue(_PendingFirstTaskStore(never)),
+          firstTaskStoreProvider.overrideWithValue(
+            _PendingFirstTaskStore(never),
+          ),
         ],
       );
       final l = tester.element(find.byType(CalendarScreen)).l10n;
@@ -3023,7 +3042,9 @@ void main() {
     'UX-702: EmptyState without an icon argument shows the calendar icon; with icon: null it shows no Icon but keeps its title and message',
     (tester) async {
       Future<void> pump(Widget state) => tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: Center(child: state))),
+        MaterialApp(
+          home: Scaffold(body: Center(child: state)),
+        ),
       );
       await pump(const EmptyState(title: 'Título', message: 'Mensaje'));
       expect(find.byIcon(Icons.event_available_outlined), findsOneWidget);
@@ -3045,9 +3066,10 @@ void main() {
 
   /// Every line of text the empty state shows.
   List<String> emptyLines(WidgetTester tester) => [
-    for (final text in find
-        .descendant(of: emptyState(), matching: find.byType(Text))
-        .evaluate())
+    for (final text
+        in find
+            .descendant(of: emptyState(), matching: find.byType(Text))
+            .evaluate())
       (text.widget as Text).data ?? '',
   ];
 
@@ -3090,7 +3112,8 @@ void main() {
       expect(
         line.bottom,
         lessThanOrEqualTo(actions.top),
-        reason: 'the line ends ${line.bottom - actions.top} dp under Añadir tarea',
+        reason:
+            'the line ends ${line.bottom - actions.top} dp under Añadir tarea',
       );
       expect(line.top, greaterThanOrEqualTo(0));
       expect(tester.takeException(), isNull);
@@ -3142,6 +3165,560 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-19-app, round 1 · P175 (UX-1408, UX-1409, UX-1410,
+  // UX-1412): the week strip at large text and for TalkBack ----
+
+  /// Tuesday 20 October 2026 at 9:00, on the app's clock.
+  final october20 = DateTime(2026, 10, 20, 9);
+  final strip = find.byType(TableCalendar<Task>);
+  Finder inStrip(Finder finder) => find.descendant(of: strip, matching: finder);
+  final digits = RegExp(r'^\d{1,2}$');
+
+  /// Every text the strip shows: day numbers and weekday names.
+  List<Element> stripTexts(WidgetTester tester) =>
+      inStrip(find.byType(Text)).evaluate().toList();
+
+  /// The day cell (its pill plus margin) around the shown number [text].
+  Rect cellOf(WidgetTester tester, Finder text) => tester.getRect(
+    find.ancestor(of: text, matching: find.byType(AnimatedContainer)).first,
+  );
+
+  /// Every semantics node on screen, merged ones too.
+  List<SemanticsData> allSemantics(WidgetTester tester) {
+    final root = tester
+        .binding
+        .renderViews
+        .first
+        .owner!
+        .semanticsOwner!
+        .rootSemanticsNode!;
+    final found = <SemanticsData>[];
+    bool visit(SemanticsNode node) {
+      found.add(node.getSemanticsData());
+      node.visitChildren(visit);
+      return true;
+    }
+
+    visit(root);
+    return found;
+  }
+
+  for (final language in ['es', 'ca', 'en']) {
+    testWidgets(
+      'UX-1408 ($language, 2× on 360×800): no week-strip text is cut, day cells are at least 48 × 48 dp, and «20» sits whole inside its pill',
+      (tester) async {
+        await openCalendar(
+          tester,
+          const [],
+          language: language,
+          size: const Size(360, 800),
+          textScale: 2,
+          overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+        );
+        final texts = stripTexts(tester);
+        final numbers = [
+          for (final element in texts)
+            if (digits.hasMatch((element.widget as Text).data ?? '')) element,
+        ];
+        final names = [
+          for (final element in texts)
+            if (!digits.hasMatch((element.widget as Text).data ?? '')) element,
+        ];
+        expect(numbers, hasLength(7), reason: 'one week');
+        expect(names, hasLength(7), reason: 'seven weekday names');
+        // Weekday names: on one line, as wide as the word, inside the strip.
+        for (final element in names) {
+          final label = (element.widget as Text).data!;
+          final paragraph = element.renderObject! as RenderParagraph;
+          final whole = TextPainter(
+            text: paragraph.text,
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+            locale: paragraph.locale,
+            strutStyle: paragraph.strutStyle,
+            textHeightBehavior: paragraph.textHeightBehavior,
+          )..layout();
+          expect(
+            paragraph.size.height,
+            moreOrLessEquals(whole.height, epsilon: 0.5),
+            reason: '«$label» on one line',
+          );
+          expect(
+            paragraph.size.width,
+            greaterThanOrEqualTo(whole.width - 0.5),
+            reason: '«$label» not clipped',
+          );
+          whole.dispose();
+          final box = tester.getRect(find.byWidget(element.widget));
+          expect(box.left, greaterThanOrEqualTo(0), reason: label);
+          expect(box.right, lessThanOrEqualTo(360.5), reason: label);
+        }
+        final firstRow = tester.getRect(find.byWidget(numbers.first.widget));
+        for (final element in names) {
+          expect(
+            tester.getRect(find.byWidget(element.widget)).bottom,
+            lessThanOrEqualTo(
+              cellOf(tester, find.byWidget(numbers.first.widget)).top + 0.5,
+            ),
+            reason: 'the names sit above the days (${firstRow.top})',
+          );
+        }
+        // Day cells: at least 48 × 48, each number whole inside its pill.
+        for (final element in numbers) {
+          final label = (element.widget as Text).data!;
+          final text = find.byWidget(element.widget);
+          final cell = cellOf(tester, text);
+          expect(cell.width, greaterThanOrEqualTo(48 - 0.01), reason: label);
+          expect(cell.height, greaterThanOrEqualTo(48 - 0.01), reason: label);
+          final pill = cell.deflate(4);
+          final number = tester.getRect(text);
+          expect(
+            number.left,
+            greaterThanOrEqualTo(pill.left - 0.5),
+            reason: label,
+          );
+          expect(
+            number.right,
+            lessThanOrEqualTo(pill.right + 0.5),
+            reason: label,
+          );
+          expect(
+            number.top,
+            greaterThanOrEqualTo(pill.top - 0.5),
+            reason: label,
+          );
+          expect(
+            number.bottom,
+            lessThanOrEqualTo(pill.bottom + 0.5),
+            reason: label,
+          );
+          final paragraph = element.renderObject! as RenderParagraph;
+          expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+        }
+        expect(numbers.map((e) => (e.widget as Text).data), contains('20'));
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1408: ES 1× on 360×800: the week strip shows the usual short weekday names, not the narrow ones',
+    (tester) async {
+      await openCalendar(
+        tester,
+        const [],
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      for (var i = 0; i < 7; i++) {
+        final name = DateFormat.E('es').format(DateTime(2026, 10, 19 + i));
+        expect(inStrip(find.text(name)), findsOneWidget, reason: name);
+      }
+      expect(inStrip(find.text('X')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+    testWidgets(
+      'UX-1409 (${theme.name}): the week of 26 Oct – 1 Nov draws «1» in the normal day colour, like the month’s own weekend day «31»',
+      (tester) async {
+        await openCalendar(
+          tester,
+          const [],
+          theme: theme,
+          size: const Size(360, 800),
+          weekStart: 1,
+          overrides: [
+            calendarClockProvider.overrideWithValue(
+              () => DateTime(2026, 10, 28, 9),
+            ),
+          ],
+        );
+        Color colour(String day) =>
+            tester.widget<Text>(inStrip(find.text(day))).style!.color!;
+        expect(inStrip(find.text('1')), findsOneWidget, reason: '1 Nov shows');
+        expect(colour('1'), colour('31'), reason: 'both weekend days');
+        expect(colour('1'), isNot(const Color(0xFFAEAEAE)));
+        // A weekday of the month keeps its own, plain colour.
+        expect(colour('30'), isNot(colour('31')));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1410: TalkBack hears the chosen day as selected; today with 3 open tasks says «hoy · 3 tareas», a day with 1 open task «1 tarea»',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openCalendar(
+        tester,
+        [
+          for (final (title, hour) in [
+            ('Llamar al médico', 10),
+            ('Comer con Ana', 13),
+            ('Recoger a los niños', 17),
+          ])
+            Task(
+              title: title,
+              priority: 1,
+              dueDate: DateTime(2026, 10, 20, hour),
+            ),
+          Task(
+            title: 'Hecha',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 20, 8),
+            isCompleted: true,
+          ),
+          Task(
+            title: 'Dentista',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 22, 9),
+          ),
+        ],
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final todayValue = '${l.today.toLowerCase()} · ${l.dayTaskCount(3)}';
+      expect(todayValue, 'hoy · 3 tareas');
+      expect(l.dayTaskCount(1), '1 tarea');
+      List<SemanticsData> withValue(String value) =>
+          allSemantics(tester).where((d) => d.value == value).toList();
+
+      final today = withValue(todayValue);
+      expect(today, hasLength(1), reason: 'today is read once with its tasks');
+      expect(today.single.flagsCollection.isSelected, ui.Tristate.isTrue);
+      final thursday = withValue(l.dayTaskCount(1));
+      expect(thursday, hasLength(1));
+      expect(
+        thursday.single.flagsCollection.isSelected,
+        isNot(ui.Tristate.isTrue),
+      );
+
+      await tester.tap(inStrip(find.text('22')));
+      await tester.pumpAndSettle();
+      expect(
+        withValue(l.dayTaskCount(1)).single.flagsCollection.isSelected,
+        ui.Tristate.isTrue,
+      );
+      expect(
+        withValue(todayValue).single.flagsCollection.isSelected,
+        isNot(ui.Tristate.isTrue),
+      );
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('UX-1410: a long press on a day selects it, like a tap', (
+    tester,
+  ) async {
+    await openCalendar(
+      tester,
+      const [],
+      size: const Size(360, 800),
+      overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+    );
+    final thursday = DateTime(2026, 10, 22);
+    final header = find.text(DateFormat.MMMMEEEEd('es').format(thursday));
+    expect(header, findsNothing);
+    await tester.longPress(inStrip(find.text('22')));
+    await tester.pumpAndSettle();
+    expect(header, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'UX-1410: the arrows read «Semana anterior» / «Semana siguiente» in Semana and «Mes anterior» / «Mes siguiente» in Mes',
+    (tester) async {
+      await openCalendar(
+        tester,
+        const [],
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(
+        [l.previousWeek, l.nextWeek, l.previousMonth, l.nextMonth],
+        [
+          'Semana anterior',
+          'Semana siguiente',
+          'Mes anterior',
+          'Mes siguiente',
+        ],
+      );
+      expect(find.byTooltip(l.previousWeek), findsOneWidget);
+      expect(find.byTooltip(l.nextWeek), findsOneWidget);
+      expect(find.byTooltip(l.previousMonth), findsNothing);
+      await monthView(tester);
+      expect(find.byTooltip(l.previousMonth), findsOneWidget);
+      expect(find.byTooltip(l.nextMonth), findsOneWidget);
+      expect(find.byTooltip(l.previousWeek), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1410 / UX-1412: in Mes the next month’s first days show and can be chosen; every cell shows its number',
+    (tester) async {
+      await openCalendar(
+        tester,
+        const [],
+        size: const Size(360, 800),
+        weekStart: 1,
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      await monthView(tester);
+      final cells = inStrip(find.byType(AnimatedContainer)).evaluate().length;
+      final numbers = [
+        for (final element in stripTexts(tester))
+          if (digits.hasMatch((element.widget as Text).data ?? '')) element,
+      ];
+      expect(cells, greaterThanOrEqualTo(35));
+      expect(numbers, hasLength(cells), reason: 'no blank cell');
+      // October 2026 ends on a Saturday: Sunday 1 November closes the grid.
+      final ones = inStrip(find.text('1'));
+      expect(ones, findsNWidgets(2), reason: '1 Oct and 1 Nov');
+      await tester.tap(ones.last);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(DateFormat.MMMMEEEEd('es').format(DateTime(2026, 11, 1))),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1412: ES 1× on 360×800, in Mes, tapping a day with tasks shows Semana with that day chosen, and its first task is above «Añadir tarea»',
+    (tester) async {
+      await openCalendar(
+        tester,
+        [
+          Task(
+            title: 'Dentista',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 23, 10),
+          ),
+        ],
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      await monthView(tester);
+      await tester.tap(inStrip(find.text('23')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('calendar-format')),
+          matching: find.text(l.week),
+        ),
+        findsOneWidget,
+        reason: 'back to Semana',
+      );
+      final numbers = [
+        for (final element in stripTexts(tester))
+          if (digits.hasMatch((element.widget as Text).data ?? '')) element,
+      ];
+      expect(numbers, hasLength(7), reason: 'one week');
+      expect(
+        find.text(DateFormat.MMMMEEEEd('es').format(DateTime(2026, 10, 23))),
+        findsOneWidget,
+      );
+      final row = find.widgetWithText(TaskTile, 'Dentista');
+      expect(row.hitTestable(), findsOneWidget);
+      final add = find.descendant(
+        of: find.byType(TaskActions),
+        matching: find.text(l.addTask),
+      );
+      expect(
+        tester.getRect(row).top,
+        lessThan(tester.getRect(add).top),
+        reason: 'the day’s first task shows above Añadir tarea',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX loop 2026-10-19-app, batch b2 round 2 · P201 (UX-1632): what
+  // TalkBack hears for today counts the overdue tasks its agenda lists ----
+
+  /// [own] open tasks on 20 October, one completed, and [overdue] open tasks
+  /// from 15 October (outside the week shown).
+  List<Task> todayWith({required int own, required int overdue}) => [
+    for (var i = 0; i < own; i++)
+      Task(
+        id: 100 + i,
+        title: 'Hoy $i',
+        priority: 1,
+        dueDate: DateTime(2026, 10, 20, 10 + i),
+      ),
+    Task(
+      id: 90,
+      title: 'Hecha',
+      priority: 1,
+      dueDate: DateTime(2026, 10, 20, 8),
+      isCompleted: true,
+    ),
+    for (var i = 0; i < overdue; i++)
+      Task(
+        id: 200 + i,
+        title: 'Atrasada $i',
+        priority: 1,
+        dueDate: DateTime(2026, 10, 15, 9 + i),
+      ),
+    Task(
+      id: 300,
+      title: 'Dentista',
+      priority: 1,
+      dueDate: DateTime(2026, 10, 22, 9),
+    ),
+  ];
+
+  /// The values TalkBack reads for the strip's days, today's included.
+  List<String> dayValues(WidgetTester tester) => [
+    for (final data in allSemantics(tester))
+      if (data.value.isNotEmpty) data.value,
+  ];
+
+  for (final overdue in [0, 1]) {
+    testWidgets(
+      'UX-1632 (es, 1× on 360×800, today selected, $overdue overdue): today’s value names the same number as the count line’s pending tasks',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openCalendar(
+          tester,
+          todayWith(own: 3, overdue: overdue),
+          size: const Size(360, 800),
+          overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final pending = 3 + overdue;
+        expect(find.text(l.agendaCounts(pending, 1)), findsOneWidget);
+        final todayValue =
+            '${l.today.toLowerCase()} · ${l.dayTaskCount(pending)}';
+        expect(
+          dayValues(tester).where((v) => v == todayValue),
+          hasLength(1),
+          reason: 'values read: ${dayValues(tester)}',
+        );
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1632: the month fixture’s numbers: with 9 open tasks today, one completed and one overdue, today reads «hoy · 10 tareas» and the count line «10 pendientes · 1 completada»',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openCalendar(
+        tester,
+        todayWith(own: 9, overdue: 1),
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      expect(find.text('10 pendientes · 1 completada'), findsOneWidget);
+      expect(dayValues(tester), contains('hoy · 10 tareas'));
+      expect(dayValues(tester), isNot(contains('hoy · 9 tareas')));
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1632: with another day selected, today’s value still counts the overdue task and reads as when today is selected',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openCalendar(
+        tester,
+        todayWith(own: 3, overdue: 1),
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final todayValue = '${l.today.toLowerCase()} · ${l.dayTaskCount(4)}';
+      expect(dayValues(tester), contains(todayValue));
+      await tester.tap(inStrip(find.text('22')));
+      await tester.pumpAndSettle();
+      // Thursday's agenda now shows: today's count line is gone.
+      expect(find.text(l.agendaCounts(4, 1)), findsNothing);
+      expect(
+        dayValues(tester).where((v) => v == todayValue),
+        hasLength(1),
+        reason: 'values read: ${dayValues(tester)}',
+      );
+      expect(dayValues(tester), contains(l.dayTaskCount(1)));
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1632: today with no open task of its own and one overdue reads «hoy · 1 tarea»; another day with one open task still reads «1 tarea»',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openCalendar(
+        tester,
+        todayWith(own: 0, overdue: 1),
+        size: const Size(360, 800),
+        overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+      );
+      final values = dayValues(tester);
+      expect(values, contains('hoy · 1 tarea'), reason: '$values');
+      expect(values, isNot(contains('hoy')), reason: '$values');
+      expect(
+        values.where((v) => v == '1 tarea'),
+        hasLength(1),
+        reason: 'Thursday: $values',
+      );
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  /// The dots under the strip's days: 4 dp circles.
+  Finder dots() => inStrip(
+    find.byWidgetPredicate(
+      (w) =>
+          w is Container &&
+          w.decoration is BoxDecoration &&
+          (w.decoration! as BoxDecoration).shape == BoxShape.circle &&
+          w.constraints?.maxWidth == 4,
+    ),
+  );
+
+  /// The dots under the day whose number is [number].
+  int dotsUnder(WidgetTester tester, String number) {
+    final cell = cellOf(tester, inStrip(find.text(number)));
+    return [
+      for (final dot in dots().evaluate())
+        if ((tester.getCenter(find.byWidget(dot.widget)).dx - cell.center.dx)
+                .abs() <
+            cell.width / 2)
+          dot,
+    ].length;
+  }
+
+  for (final (own, expected) in [(2, 2), (4, 3)]) {
+    testWidgets(
+      'UX-1632: the dots under today are still one per open task of its own ($own → $expected), whatever is overdue',
+      (tester) async {
+        await openCalendar(
+          tester,
+          todayWith(own: own, overdue: 1),
+          size: const Size(360, 800),
+          overrides: [calendarClockProvider.overrideWithValue(() => october20)],
+        );
+        expect(dotsUnder(tester, '20'), expected);
+        expect(dotsUnder(tester, '22'), 1);
+        expect(dots(), findsNWidgets(expected + 1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 /// Tasks whose first read fails, as when the phone's database can't be read.

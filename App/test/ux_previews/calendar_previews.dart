@@ -161,6 +161,56 @@ void calendarPreviews() {
 
     preview(
       agenda,
+      'month-day-tapped',
+      'Mes, then a day with tasks tapped: back to Semana on that day, its first tasks in view.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        await p.tester.tap(find.byKey(const ValueKey('calendar-format')));
+        await p.tester.pumpAndSettle();
+        await app.tap(p.l.month);
+        // «Pagar la factura de la luz», in two days.
+        final picked = day(2);
+        final cell = find.byKey(
+          ValueKey('CellContent-${picked.year}-${picked.month}-${picked.day}'),
+        );
+        if (cell.evaluate().isEmpty) {
+          // Past the grid's last row: it's next month's.
+          await p.tester.tap(find.byTooltip(p.l.nextMonth));
+          await p.tester.pumpAndSettle();
+        }
+        await p.tester.tap(cell);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      agenda,
+      'month-boundary-week',
+      'A week that runs into the next month: the next month\'s days look like any other.',
+      [es1, esDark],
+      (p) async {
+        await PreviewApp.open(p, tasks: normalDay());
+        // The first week ahead whose days fall in two months.
+        final monday = day(1 - previewToday.weekday);
+        var weeks = 0;
+        while (DateTime(monday.year, monday.month, monday.day + 7 * weeks)
+                .month ==
+            DateTime(monday.year, monday.month, monday.day + 7 * weeks + 6)
+                .month) {
+          weeks++;
+        }
+        for (var i = 0; i < weeks; i++) {
+          await p.tester.tap(find.byTooltip(p.l.nextWeek));
+          await p.tester.pumpAndSettle();
+        }
+        await p.shoot();
+      },
+    );
+
+    preview(
+      agenda,
       'offline',
       'The last sync couldn\'t reach the server: the calm offline line.',
       [es1],
@@ -205,7 +255,7 @@ void calendarPreviews() {
       agenda,
       'pending-captures',
       'Words kept for later: the link to the pending captures above Añadir tarea.',
-      [es2],
+      [es1, es2],
       (p) async {
         await PreviewApp.open(
           p,

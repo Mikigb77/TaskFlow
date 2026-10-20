@@ -369,4 +369,68 @@ void main() {
       },
     );
   }
+
+  // ---- UX loop 2026-10-19-app, round 1 · P175 · UX-1411: each root tab is
+  // announced by its own name ----
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1411 ($language): each root tab has a heading that names the route (Calendario, Tareas, Notas, Ajustes); the logo still shows and isn’t read',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final l = await pumpShell(
+          tester,
+          language: language,
+          size: const Size(360, 800),
+          scale: 1,
+        );
+        List<SemanticsData> nodes() {
+          final found = <SemanticsData>[];
+          bool visit(SemanticsNode node) {
+            found.add(node.getSemanticsData());
+            node.visitChildren(visit);
+            return true;
+          }
+
+          visit(
+            tester
+                .binding
+                .renderViews
+                .first
+                .owner!
+                .semanticsOwner!
+                .rootSemanticsNode!,
+          );
+          return found;
+        }
+
+        for (final tab in [l.calendar, l.tasks, l.notes, l.settings]) {
+          if (tab != l.calendar) await select(tester, tab);
+          final headings = [
+            for (final data in nodes())
+              if (data.flagsCollection.isHeader &&
+                  data.flagsCollection.namesRoute &&
+                  data.label == tab)
+                data,
+          ];
+          expect(headings, hasLength(1), reason: '$tab names its route');
+          expect(
+            find.descendant(
+              of: find.byType(AppBar),
+              matching: find.text('taskflow'),
+            ),
+            findsOneWidget,
+            reason: '$tab: the logo still shows',
+          );
+          expect(
+            nodes().where((data) => data.label.contains('taskflow')),
+            isEmpty,
+            reason: '$tab: the brand isn’t read',
+          );
+        }
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

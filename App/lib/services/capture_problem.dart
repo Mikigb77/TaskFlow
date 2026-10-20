@@ -13,6 +13,8 @@ abstract final class CaptureProblem {
   static const timeout = 'capture_problem:timeout';
   static const unavailable = 'capture_problem:unavailable';
   static const allowance = 'capture_problem:allowance';
+  // Many dictations in a row: the per-minute limit, gone in a minute.
+  static const tooFast = 'capture_problem:too_fast';
   static const freeVoiceUsedUp = 'capture_problem:free_voice_used_up';
   // A refusal from before free dictations: it reads as [freeVoiceUsedUp].
   static const proRequired = 'capture_problem:pro_required';
@@ -89,7 +91,14 @@ abstract final class CaptureProblem {
       if (error.status == 413) return tooLarge;
       // Short or silent audio.
       if (error.status == 422) return noSpeech;
-      if (error.status == 429) return allowance;
+      // `Retry-After` tells the 429s apart: a minute or two is the
+      // per-minute limit, longer is today's, and none is the assistant's
+      // own quota.
+      if (error.status == 429) {
+        final wait = error.retryAfter;
+        if (wait == null) return unavailable;
+        return wait <= const Duration(seconds: 120) ? tooFast : allowance;
+      }
       if (error.status >= 500 && error.status < 600) return unavailable;
       return failed;
     }

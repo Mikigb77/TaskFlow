@@ -358,3 +358,30 @@ Nothing.
 - P197: with the largest font, reopen the app the morning after saving a task for Friday: the week strip and «Agenda de hoy» are at the top.
 - P198: on the emulator lane, `permission-mic.blocked` (ES and CA, both paths) shows no frame of «Permite el micrófono…» before the banner, and `permission-mic.dialog.es` still shows the line under Android's dialog. With TalkBack, a deletion-only dictation and a mixed one are each spoken once.
 - P199: at the largest font, the recovery form's labels sit whole on their borders.
+
+## Round 2 (b2)
+
+Round 1 of b2 (P171–P175) fixed all 14 of its findings, and the round check passed. Round 2 plans only the three regressions the reviewers found, in two small packages written to `plan-b2-r2.json`. Nothing has failed twice, so nothing is escalated, and there's no new owner question.
+
+### P200 · S2 · A · M · Capture errors: a refused recording waits with «Cerrar»; a failed save says it couldn't add
+- **UX-1630 (S2), R1A-1 from P173:** when the daily limit refuses a recording with no words, the sheet says «Has llegado al límite de dictados de hoy. Tu grabación se conserva; inténtalo mañana.» and shows only «Cerrar», like a recording that waits for free dictations. «Reintentar» and «Cancelar» are hidden. The organizer added one thing, inferred from the code: a recording reopened later drops the stored limit error, so it can be retried instead of being stuck with «Cerrar». One new string, in EN, ES and CA.
+- **UX-1631 (S1), R1A-2 from P173:** a failed save says «Sin conexión…» only when the phone is offline. Every other failure, timeouts included, reads «No se ha podido añadir. Tus palabras siguen aquí; vuelve a intentarlo.»
+
+### P201 · S2 · B · S · Calendar: TalkBack's count for today matches the agenda's
+- **UX-1632 (S2), R1B-1 from P175:** the number TalkBack hears for today («hoy · N tareas») now includes the overdue tasks the agenda lists, so it matches «N pendientes». One helper computes the overdue list for both. The dots don't change, and there are no new strings.
+
+### Order
+P200, then P201, one at a time.
+
+### Skipped
+Nothing.
+
+### Noted, not planned
+- When typed words hit the daily limit, «Reintentar» still shows, though it can't work until tomorrow. The reviewer didn't raise this; the next review of the capture sheet can rate it.
+- `captureTooLarge` and `captureIncompleteAudio` say «Descártala», but the button is «Cancelar», which then asks with «Descartar». Review A noted this and didn't count it: it takes two taps, and it's the plan's copy.
+- `CaptureProblem.setupRequested` and `setupUnavailable` seem to have no setter left (P173's notes). A later package could remove them.
+- The ES week strip shows «L M M J V S D» in previews because the preview locale is `es_US`; `es_ES` gives «X». This isn't a bug. The emulator lane checks it.
+
+### Phone checks added
+- P200: on staging, with an account at its daily limit and online speech on, a refused recording shows only «Cerrar» and stays in Capturas pendientes. Reopened the next day, «Reintentar» works.
+- P201: with TalkBack and an overdue task, today's day and the count line say the same number.

@@ -52,6 +52,21 @@ List<String> _strings(Object? value) => value is List
     ? value.whereType<String>().toList()
     : const [];
 
+/// The ids of `project_candidates` (`[{id, name}]`), in the server's order:
+/// at most [CaptureCommand.candidateLimit], each kept as `existing_list_id`
+/// is, and one without an id left out.
+List<String> _candidates(Object? value) {
+  if (value is! List) return const [];
+  final ids = <String>[];
+  for (final candidate in value) {
+    if (ids.length == CaptureCommand.candidateLimit) break;
+    if (candidate is! Map) continue;
+    final id = _text(candidate['id'], max: 64);
+    if (id != null && !ids.contains(id)) ids.add(id);
+  }
+  return ids;
+}
+
 /// Leading words that only say "the project of": `el proyecto de química`.
 /// An article alone stays: `La Caixa` is a name.
 final _projectLead = RegExp(
@@ -224,6 +239,7 @@ class CaptureCommand {
     this.issues = const [],
     this.name = '',
     this.existingListId,
+    this.projectCandidates = const [],
     this.words = const [],
     this.listId,
     this.projectName,
@@ -255,6 +271,13 @@ class CaptureCommand {
   /// edit that matches it.
   final String name;
   final String? existingListId;
+
+  /// `project` with `ambiguous_project`: the ids of the projects that
+  /// matched, best first, at most 3, as the server sent them.
+  final List<String> projectCandidates;
+
+  /// The candidates the server can send for one command.
+  static const candidateLimit = 3;
 
   /// `find`: the words, the project, the person, the status (`any`, `open`
   /// or `completed`) and an inclusive period. [projectName] and
@@ -344,6 +367,7 @@ class CaptureCommand {
           issues: issues,
           name: name,
           existingListId: _text(json['existing_list_id'], max: 64),
+          projectCandidates: _candidates(json['project_candidates']),
         );
       case CommandKind.find:
         var from = _day(json['from']);
@@ -397,6 +421,7 @@ class CaptureCommand {
     issues: issues,
     name: name ?? this.name,
     existingListId: existingListId,
+    projectCandidates: projectCandidates,
     words: words,
     listId: listId,
     projectName: projectName,
@@ -422,6 +447,7 @@ class CaptureCommand {
     'issues': issues,
     'name': name,
     'existingListId': existingListId,
+    'projectCandidates': projectCandidates,
     'words': words,
     'listId': listId,
     'projectName': projectName,
@@ -455,6 +481,9 @@ class CaptureCommand {
       issues: _strings(json['issues']),
       name: json['name'] as String? ?? '',
       existingListId: json['existingListId'] as String?,
+      projectCandidates: _strings(
+        json['projectCandidates'],
+      ).take(candidateLimit).toList(),
       words: _strings(json['words']),
       listId: json['listId'] as String?,
       projectName: json['projectName'] as String?,

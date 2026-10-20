@@ -192,6 +192,34 @@ void main() {
     );
   }
 
+  for (final scale in [1.3, 2.0]) {
+    testWidgets(
+      'UX-1311: ES at $scale× text on 360×800, the stacked Cancelar and Volver a decirlo are at least 8 dp apart',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final app = await _App.open(tester, size: const Size(360, 800));
+        await app.openResult(
+          tester,
+          _spoken(app, 'Comprar pan', DateTime.now()),
+        );
+        final cancel = resultButton(es.cancel);
+        final again = resultButton(es.captureSayAgain);
+        await tester.ensureVisible(again);
+        await tester.pumpAndSettle();
+        final top = tester.getRect(cancel);
+        final bottom = tester.getRect(again);
+        expect(bottom.top, greaterThanOrEqualTo(top.bottom), reason: 'stacked');
+        expect(
+          bottom.top - top.bottom,
+          greaterThanOrEqualTo(8),
+          reason: 'Cancelar $top, Volver a decirlo $bottom',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'UX-458: TalkBack reads the result’s date line as Fecha y hora: Hoy, and its tap opens the date sheet',
     (tester) async {
@@ -382,12 +410,10 @@ void main() {
   // waiting on the abandoned step ----
 
   /// The sheet's keyboard button, `Escribir`.
-  IconButton typeButton(WidgetTester tester) => tester.widget<IconButton>(
-    find.ancestor(
-      of: find.byIcon(Icons.keyboard_outlined),
-      matching: find.byType(IconButton),
-    ),
-  );
+  ButtonStyleButton typeButton(WidgetTester tester) =>
+      tester.widget<ButtonStyleButton>(
+        find.byKey(const ValueKey('capture-type-instead')),
+      );
 
   testWidgets(
     'UX-464: after Cancelar during Entendiendo…, Volver a decirlo listens at once and Escribir is enabled while the abandoned step is still held; Cancelar there brings the result back at once; the late answer changes nothing',
@@ -448,7 +474,7 @@ void main() {
       await frames(tester);
       expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);
 
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await frames(tester);
       final field = find.byKey(const ValueKey('capture-words'));
       expect(field, findsOneWidget);
@@ -628,7 +654,7 @@ void main() {
       await _App.open(tester);
       await tester.tap(find.text(es.addTask).hitTestable());
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('capture-words')),
@@ -725,7 +751,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-612: removing a batch card says Quitada with Deshacer; Capturas pendientes lists a capture with three cards left as Tareas · 3 sin añadir',
+    'UX-612: removing a batch card says Quitada with Deshacer; Capturas pendientes lists a capture with three cards left as 3 sin añadir, after when it was kept',
     (tester) async {
       final app = await _App.open(tester);
       final session = _spoken(app, 'Comprar pan', null);
@@ -773,9 +799,12 @@ void main() {
         ).pushNamed('/captures'),
       );
       await tester.pumpAndSettle();
-      final summary = '${es.tasks} · ${es.captureDraftSummary(3)}';
-      expect(summary, 'Tareas · 3 sin añadir');
-      expect(find.text(summary), findsOneWidget);
+      expect(es.captureDraftSummary(3), '3 sin añadir');
+      expect(
+        find.textContaining(' · ${es.captureDraftSummary(3)}'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('${es.tasks} · '), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -881,7 +910,7 @@ class _App {
   Future<void> type(WidgetTester tester, String words) async {
     await tester.tap(find.text(es.addTask).hitTestable());
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip(es.captureTypeInstead));
+    await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('capture-words')), words);
     await tester.pumpAndSettle();

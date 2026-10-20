@@ -644,7 +644,7 @@ void main() {
       for (final control in [
         find.widgetWithText(TextButton, l.cancel),
         find.widgetWithText(FilledButton, l.done),
-        find.byTooltip(l.captureTypeInstead),
+        find.byKey(const ValueKey('capture-type-instead')),
       ]) {
         expect(control.hitTestable(), findsOneWidget);
         expect(onScreen(tester.getRect(control)), isTrue, reason: '$control');
