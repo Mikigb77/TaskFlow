@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Settled by run 2026-10-18-site (b1-b4). Enforce these; a deviation in a new change is a finding.
+Settled by run 2026-10-18-site (b1-b5, closed 2026-10-20). Enforce these; a deviation in a new change is a finding.
 
 **Calls to action**
 - Primary CTA everywhere points to the live demo `#voice`, never to a download (Play not published). Availability line: "Coming soon to Google Play / You can't download it yet".
@@ -19,12 +19,17 @@ Settled by run 2026-10-18-site (b1-b4). Enforce these; a deviation in a new chan
 - Stages `off` / `unverified` replace the form with the static example + reason alert + hand-over; badge reads "Live demo", never a tries count.
 - Turnstile: interaction-only, compact <300 px, retry never; 2 failures → `unverified`.
 - Close demo disabled while recording/loading.
+- No sample walkthrough anywhere (WEB-6): no JS → `<noscript>` line + server-rendered `VoiceExample`, start button disabled until ready; `off` / `unverified` / gave-up stages show the example, then the alert, then the hand-over; tries-used shows only the tries line + hand-over. Re-flag any "walkthrough", `#demo`, "sample", «recorrido», «recorregut».
+- Capture is one "Tap to talk" mic, then "Done": two taps to a result; no listen-back, no "Record again". "Type instead" / «Escribir» / «Escriu» is a plain `.text-link` button, never a toggle (no `aria-pressed`, role, switch or fill).
+- A held/disabled "Try again" (`.voice-retry[aria-disabled]`) stays at opacity 1 with a dimmed green fill so its focus ring keeps contrast; other disabled buttons fade.
+- `<section id="voice" lang={language}>` gives the demo the page's language; no inner `lang` attributes. `HomePage.tsx` still wraps `<VoiceDemo/>` in `<div lang="en" style="display:contents">` until VoiceDemo is committed; then the wrapper goes and `ux-web-global.spec.ts:163` must assert the section's language instead. FAQ is translated in es/ca and sits outside that wrapper.
 
 **Type and targets**
 - All font sizes in rem (voice.css, legal.css); body text ≥ 1rem incl. legal `dd` values. Targets ≥ 44 px on phones.
 - Legal prose `max-width: 52ch` (≈ 75 chars at 1440).
 
 **Legal pages**
+- Legal copy uses "suggestions" / «sugerencias» / «suggeriments» and "limits", never draft/allowance/transcript/AI Studio; terms §5 heading "5. AI suggestions". Meta descriptions ~100-115 chars. Bumping the legal text moves `company.json` version, `docs/LEGAL_RELEASE.md` and the pinned dates in both legal specs together.
 - h1 = document name; plain numbered summary first; in-force line only; icons: `arrow` for internal, `arrowUp` only for `http` links, none on mailto.
 - Email addresses render split with `<wbr>` before `@` (not hard-coded).
 - Catalan uses «suprimir/supressió» for the account (eliminar only for records/exports).

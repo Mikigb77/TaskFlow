@@ -518,3 +518,36 @@ Strike any line you don't want; only that package changes.
   - the live demo with the real AI and a microphone, in Spanish (WEB-9);
   - a keyboard on the held Try again with the real security check (WEB-720).
 - If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Round 2 (b5)
+
+This is the re-plan after batch b5's first round (WP46–WP49), made on 2026-10-20. All seven findings came back fixed: WEB-6, WEB-9, WEB-109 (demo and legal parts), WEB-707, WEB-720, WEB-729 and WEB-730 (`verify-b5-r1-G.md`, `-H.md`, `-L.md`). There are no regressions, no new decisions and no escalations. The round check failed only because of the infrastructure: WSL stopped starting right after the tester added one test. Full brief: `plan-b5-r2.json`.
+
+### WP50 · Re-run only: the WEB-9 'Type instead' test and the type check WSL skipped · H · S · **held** (tests only) · S2
+- WEB-9: the H verifier ruled it fixed from the code and the capture render. The new test `tests/ux-web-voice.spec.ts:2144` (‘Type instead’ is a `.text-link` button, not a toggle, in each language) never ran, and neither did `npm run check` after it was added. WSL failed with `getpwuid(1000) … I/O error`, then `Wsl/Service/CreateInstance/E_UNEXPECTED` after `wsl --shutdown`. This doesn't count as a WEB-9 failure. WP50 changes no file: it confirms WSL starts, then the tester runs that test, the type check and the round's check. If WSL is still down, everything is classed as infrastructure again.
+
+### Noted, not planned
+- The WP46 implementer's two test gaps are already closed by the tester: the Turnstile stand-in records `appearance`, `retry` and `size` (`tests/support/ux-voice.ts:294-300`), and the Turnstile test is `tests/ux-web-voice.spec.ts:2112`; the Spanish and Catalan word scan, across every string the demo can show, is `:2157`. Both passed before the outage.
+- The L verifier saw terms §5's first paragraph (EN) still say ‘AI capture is optional’. That's older text that no reviewer flagged, outside WP47. It can be checked against the app at the next legal review.
+- Developer-only text (`?developer=1`) is now marked `es` / `ca` on those homes while it stays English. No visitor sees it, and the conventions let it stay English (G verifier).
+- The render `voice-check-gave-up.en.mobile.light.panel.png` is cut at the viewport's edge. That's the render tool, not the site; the `view.png` shows the whole stage.
+
+### For the main session
+- If WSL doesn't come back, don't run `wsl --shutdown` again: the second one left it unable to start. Restarting the WSL service or Windows is the owner's call. Once it works, WP50's check takes a few minutes.
+- In close, take WEB-6, WEB-109, WEB-707, WEB-720, WEB-729 and WEB-730 from round 1's verify notes (fixed, and no test failed). Take WEB-9 from WP50's round. If WP50 still can't run, WEB-9 stays fixed in code and render, with its new test never run. Record that in its line; don't count it as a test that passed.
+- Nothing from b5 commits in TaskFlowWeb; every file it touched is held (see "Re-plan for what's still open" above).
+- When `VoiceDemo.tsx` is committed: remove `HomePage.tsx`'s `lang="en"` wrapper (`:52-55`, with its comment), and change the committed WEB-707 test (`tests/ux-web-global.spec.ts:163-192`) in the same commit so it asserts the section's language.
+- For a native Catalan read: WP47's legal lines, and WP49's «El que dius o escrius va a Google només quan toques Fet. No desem la gravació, i el text s’esborra automàticament passades 24 hores.» (the H verifier finds it natural).
+- For the owner's WD3 sign-off: every legal page now reads "In force since 20 October 2026".
+
+## Round 3 (b5)
+
+This is the re-plan after batch b5's round 2 (WP50, re-run only), made on 2026-10-20. Nothing failed on the site, and there are no regressions, decisions or escalations. `verify-b5-r2-H.md` keeps WEB-9 fixed, from the code (`src/components/VoiceDemo.tsx:927-934`) and the capture render. Every check failed for the same infrastructure reason: WSL won't start (`Wsl/Service/CreateInstance/E_UNEXPECTED`, kali-linux and docker-desktop both Stopped). It's the same error as in round 1 and in WP50's attempt, and `wsl -e true` still failed the same way while this round was being planned. Record: `plan-b5-r3.json`.
+
+### No package this round
+- WEB-9: not re-planned. A third re-run would hit the same outage, so it would prove nothing. The test `tests/ux-web-voice.spec.ts:2144`, `npm run check` and the re-runs of `:2112` and `:2157` have still never run. They don't count as a WEB-9 failure, and the finding hasn't failed at all, so it isn't escalated.
+
+### For the main session
+- WSL needs the owner: restart the WSL service (`LxssManager` / `WslService`) or Windows. Don't run `wsl --shutdown` or `--terminate` again. Once `wsl -e true` exits 0, re-run WP50 as it stands (`plan-b5-r2.json`). Its check takes a few minutes and changes no site file.
+- If the run closes before that: take WEB-9 from `verify-b5-r2-H.md` as fixed in code and render, with its test `:2144` written but never run. Record it that way in its ledger line, and don't count the test as passed. The round check (`npm run check`, `legal:check`, `build`, `npm test`, `test:unit`, the renders) is also unrun for b5's rounds 1 and 2, after the outage. Say so in the report. `artifacts/ux-web/AUDIT.md` is still round 1's.
+- Everything else from round 2's notes still stands: nothing from b5 commits in TaskFlowWeb; the `HomePage.tsx` wrapper and the WEB-707 test change when `VoiceDemo.tsx` is committed; the native Catalan read; WD3's sign-off.

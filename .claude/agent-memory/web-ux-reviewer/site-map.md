@@ -1,6 +1,6 @@
 ---
 name: site-map
-description: TaskFlowWeb pages, home anchors, components, legal section ids and which renders show what (as of run 2026-10-18-site, b4 closed 2026-10-20)
+description: TaskFlowWeb pages, home anchors, components, legal section ids and which renders show what (as of run 2026-10-18-site, b5 closed 2026-10-20)
 metadata:
   type: project
 ---
@@ -10,7 +10,7 @@ Snapshot 2026-10-20. Check against the code before relying on line numbers.
 **Home** (`src/components/HomePage.tsx`; copy in `src/content/site/{en,es,ca}.ts`, shared type `types.ts`):
 - hero `#hero-title`; primary CTA → `#voice` (`.button`), secondary text link → `#features`
 - `#features` (cards: voice, calendar/reminders, notes/checklist/files, offline as a full-width card)
-- live voice demo `#voice` (`VoiceDemo.tsx`, static fallback `VoiceExample.tsx`)
+- live voice demo `#voice` (`VoiceDemo.tsx`, static fallback `VoiceExample.tsx`; plans block `.voice-plans` inside the section; `?developer=1` shows English-only developer text, not visitor-facing)
 - FAQ `#questions`; closing `#get-taskflow` (lime button → `#voice`)
 - `TaskDemo.tsx` (sample walkthrough) no longer exists; the agent prompt still names it.
 - Other components: `Header`, `Footer` (back-to-top → `#main-content`, company name GARBAR), `LanguageSwitch` (cookie `taskflow-lang`, 1 year), `SkipLink`, `NotFoundPage`, `useSiteLanguage`. Language routing in `src/proxy.ts` (cookie, then Accept-Language).
@@ -26,6 +26,6 @@ Snapshot 2026-10-20. Check against the code before relying on line numbers.
 
 **Tests the loop maintains** (TaskFlowWeb `tests/`): `ux-web-voice.spec.ts`, `ux-web-legal.spec.ts`, `legal.spec.ts`, `ux-web-home.spec.ts`, `ux-web-features.spec.ts`, `ux-web-frame.spec.ts`, `ux-web-global.spec.ts`. A fixed finding is expected to have a test.
 
-**Demo state renders** (artifacts/ux-web): voice-capture, voice-waiting-10s, voice-stop-waiting, voice-timeout, voice-connect-offline, voice-connect-gateway, voice-offline, voice-check-pending/-unreachable/-gave-up, voice-error-budget-pause, plus results/tries-used. AUDIT §13 holds the demo-state rows (axe, announcement).
+**Demo state renders** (artifacts/ux-web): voice-capture, voice-waiting-10s, voice-stop-waiting, voice-timeout, voice-connect-offline, voice-connect-gateway, voice-offline, voice-check-pending/-unreachable/-gave-up, voice-connect-paused (demo off), voice-resend-waiting, voice-typing, voice-error-budget-pause, plus results/tries-used. AUDIT §13 holds the demo-state rows (axe, announcement).
 
 Related: [[claims-map]], [[site-patterns]].

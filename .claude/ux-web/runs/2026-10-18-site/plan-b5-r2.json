@@ -1,0 +1,51 @@
+{
+ "runId": "2026-10-18-site",
+ "mode": "replan",
+ "created": "2026-10-20",
+ "round": 2,
+ "batch": "b5",
+ "conventions": [],
+ "note": "Re-plan after batch b5's round 1 (WP46-WP49). Every finding came back fixed in verify-b5-r1-G.md, verify-b5-r1-H.md and verify-b5-r1-L.md (WEB-6, WEB-9, WEB-109, WEB-707, WEB-720, WEB-729, WEB-730), with no regressions. The only failure is infrastructure: WSL broke (getpwuid(1000) I/O error, then Wsl/Service/CreateInstance/E_UNEXPECTED after wsl --shutdown) right after the tester added the WEB-9 'Type instead' test (tests/ux-web-voice.spec.ts:2144), so that test and the type check after it never ran. That isn't the site's fault and doesn't count as a WEB-9 failure. WP50 exists only to re-run that check. Conventions stay those of plan.json (pkg.py prints them).",
+ "packages": [
+  {
+   "id": "WP50",
+   "title": "Re-run only: the WEB-9 'Type instead' test and the type check that WSL's outage skipped",
+   "area": "H",
+   "size": "S",
+   "severity": 2,
+   "findings": ["WEB-9"],
+   "aliases": {},
+   "commit": "Held: tests/ux-web-voice.spec.ts holds this run's held demo tests, uncommitted with VoiceDemo.tsx. No site file changes in this package. Nothing from it commits in TaskFlowWeb.",
+   "files": [
+    "tests/ux-web-voice.spec.ts:2144-2155 (read and run; the tester may fix only this test if it fails for a reason in the test itself; held: this run's demo tests, uncommitted with VoiceDemo.tsx)",
+    "src/components/VoiceDemo.tsx:927-934 (read only: the 'Type instead' button; held: the other session's file, with this run's held demo)"
+   ],
+   "brief": [
+    "Re-run only. This package exists because round 1's check couldn't run, not because anything failed. In b5 round 1 every finding came back fixed. The H verifier (verify-b5-r1-H.md) ruled WEB-9 fixed from the code: 'Type instead' is `className=\"text-link voice-mode-link\"` with no aria-pressed or role (`src/components/VoiceDemo.tsx:927-934`), and the render `voice-capture.en.mobile.light.panel.png` shows it as an underlined link. The tester then added `WEB-9: ‘Type instead’ is a text-link button, not a toggle, in each language` (`tests/ux-web-voice.spec.ts:2144`). Right after, WSL stopped starting (first `getpwuid(1000) failed 5 … I/O error`, then `Wsl/Service/CreateInstance/E_UNEXPECTED` after `wsl --shutdown`). So that test, and `npm run check` with it in the file, never ran. Everything else in the round's check had passed before the outage, including the Turnstile options test (:2112) and the word scan (:2157).",
+    "web-ux-implementer: change no file. Don't build. First confirm WSL starts with one harmless command, for example `wsl -e true`. If it doesn't, stop at once and return 'blocked' with the error: infrastructure, not the site. Don't run `wsl --shutdown` or `wsl --terminate`; in round 1 a second shutdown left WSL unable to start at all. If WSL starts, return 'done' with no files changed.",
+    "web-ux-tester: run, in WSL from the website root, `npx playwright test tests/ux-web-voice.spec.ts --grep \"Type instead. is a text-link|no string the demo can show|Turnstile is rendered\"` on both projects (desktop 1440 × 1000 and mobile 390 × 664), then `npm run check`, then the round's usual full check. If the 'Type instead' test fails because of the test itself (a wrong selector, or `VOICE.typeInstead` not matching the copy), fix the test, not the site, and say what you changed. If it fails because the button really is filled, pressed or a toggle, report it as the site's failure on WEB-9. If WSL is still down, class every check as infrastructure and say so; don't re-run the renders for nothing.",
+    "H verifier: WEB-9 needs no new code reading. Rule from the tester's result for :2144 and the round check. Keep round 1's verdict unless that test fails on the site.",
+    "Don't touch: any file under `src/`; `voice.privacy` (WP49); the attributes of `<section id=\"voice\">` (WP48); `src/styles/voice.css`; the copy; `src/components/HomePage.tsx`; the legal files (WP47); every committed test file."
+   ],
+   "acceptance": [
+    "WEB-9: on /, /es/ and /ca/ at 1440 × 1000 and 390 × 664, light theme, once the demo is open at the capture stage, exactly one button in `#voice` is named ‘Type instead’ / «Escribir» / «Escriu». It has the class `text-link`, no `aria-pressed` attribute and no fill, and `#voice` holds no role=switch and no role=checkbox (`tests/ux-web-voice.spec.ts:2144`, now run).",
+    "`npm run check` (next typegen && tsc --noEmit) passes with `tests/ux-web-voice.spec.ts` as it stands after round 1.",
+    "The Turnstile options test (:2112) and the word-scan test (:2157) still pass on both projects in the same run."
+   ],
+   "deviceChecks": [
+    "Turnstile's real look on the deployed site, with Cloudflare's widget instead of the stand-in (carried from WEB-9).",
+    "The live demo with the real AI and a real microphone on a phone, in Spanish: two taps, «Toca para hablar» then «Listo» (carried from WEB-9)."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": [
+  {"id": "WEB-6", "reason": "already fixed: verify-b5-r1-H.md rules it fixed (no #demo or walkthrough in src/; the example shows without JavaScript, in the off stage and after the security check gives up; the tries-used stage promises no walkthrough). The tester reports its tests passing. Not re-planned."},
+  {"id": "WEB-109", "reason": "already fixed: verify-b5-r1-H.md (the demo's words, EN/ES/CA scan, test :2157) and verify-b5-r1-L.md (privacy §3 and §8, terms description, §2, §3, §5 and §6; legal version 2026-10-20) both rule it fixed. Held for WD3's sign-off and a native Catalan read. Not re-planned."},
+  {"id": "WEB-707", "reason": "already fixed: verify-b5-r1-G.md rules both halves fixed (`lang={language}` on #voice, tests :2176, :2201, :2240; the FAQ half via tests/ux-web-features.spec.ts and tests/ux-web-global.spec.ts:163). The HomePage wrapper and the committed test change when VoiceDemo.tsx is committed (main session). Not re-planned."},
+  {"id": "WEB-720", "reason": "already fixed: verify-b5-r1-H.md rules it fixed (voice.css:369-372; keyboard test :2259 measured opacity 1 and a 3 px ring in light and dark). Not re-planned."},
+  {"id": "WEB-729", "reason": "already fixed: verify-b5-r1-L.md rules it fixed (privacy §2 and §4 in the brief's words, true to Backend/core/ai.py:118-133). Held for WD3 and a native Catalan read. Not re-planned."},
+  {"id": "WEB-730", "reason": "already fixed: verify-b5-r1-H.md rules it fixed (voice.privacy in EN/ES/CA, test :2306). Not re-planned."}
+ ]
+}

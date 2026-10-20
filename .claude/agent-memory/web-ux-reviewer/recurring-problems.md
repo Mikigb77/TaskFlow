@@ -16,6 +16,10 @@ Regressions that fixes kept introducing; check for them in every verify.
 - **English leaking into ES/CA** and `lang` mismatches on passages.
 - **Focus ring contrast** dropping on held/disabled buttons.
 
+- **Old jargon surviving in one corner** after a word sweep (terms §5 "AI capture is optional"; "Google Play" vs "Android" availability lines). After a terminology fix, grep the whole of `src/content/` in all three languages, not just the brief's lines.
+
+Evidence gaps to name, not paper over: when WSL won't start (`Wsl/Service/CreateInstance/E_UNEXPECTED`), crop.mjs and the tester's specs can't run; say the verdict rests on code + existing renders/AUDIT, and list the unrun tests as pending evidence, not as failures. Files held because another session's uncommitted work shares them can't be committed; that's a loop status, not a finding. `voice-*.panel.png` can be cut at the viewport edge (render-tool artifact): read the `view.png` too. Language of parts (`lang`) isn't in renders or AUDIT: verify by nearest `[lang]` in code and spec.
+
 Techniques that worked: compare render mtimes with source mtimes first; crop full-page renders with `crop.mjs` at the screen in question; width arithmetic from the render (chars × px vs box padding); cite AUDIT row line numbers; check the tester's spec line numbers so a fix is protected by a test; list new Catalan strings for a native read rather than judging them.
 
 Related: [[site-patterns]].
