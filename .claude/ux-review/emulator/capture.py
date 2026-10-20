@@ -1130,7 +1130,7 @@ class Lane:
         if self.dialog() is None:
             raise Skip("the microphone dialog didn't appear")
         self.variants("permission-mic", "dialog", "The system microphone dialog, straight after the "
-                      "first tap on Añadir tarea. The app shows no explanation of its own before it.")
+                      "first tap on Añadir tarea, with the capture sheet behind it.")
         tap_id("permission_deny_button", wait=2)
         self.variants("permission-mic", "denied", "After 'No permitir': the capture sheet's banner.")
         must_tap(L.rx("captureStartTalking"), "Empezar a hablar", wait=0.5)
@@ -1154,7 +1154,13 @@ class Lane:
 
         # Allow, then listen. The emulator has no voice: this is what a person sees.
         self.reset_permission("RECORD_AUDIO")
-        must_tap(L.rx("captureStartTalking"), "Empezar a hablar", wait=0.5)
+        # While blocked, the sheet offers only «Abrir Ajustes» (UX-1303), and it can't tell that
+        # the permission was reset from outside: close it, and the next Añadir tarea asks again.
+        if find(ui(), L.rx("captureStartTalking")) is None:
+            self.cancel_capture()
+            must_tap(L.rx("addTask"), "Añadir tarea", wait=0.5)
+        else:
+            must_tap(L.rx("captureStartTalking"), "Empezar a hablar", wait=0.5)
         if self.dialog() is None:
             raise Skip("the microphone dialog didn't come back after resetting the permission")
         tap_id("permission_allow_foreground_only_button", wait=0.3)
