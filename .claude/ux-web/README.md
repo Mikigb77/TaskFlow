@@ -148,3 +148,5 @@ Project agents and skills load when a session starts or changes folder. After ad
 - Every implementer and tester builds the site (1.5 to 6 minutes) and runs Playwright in WSL. The tester's full renders and audit add about 5.5 minutes a round.
 
 To change a model or an effort level, edit the agent's frontmatter.
+
+**WSL is shared.** No agent may stop, restart or reset it (`wsl --shutdown`, `--terminate`, `--unregister`). On 2026-10-20 a tester's repeated shutdowns left it unable to start (`Wsl/Service/CreateInstance/E_UNEXPECTED`), and only the owner could restart it, through the WSL service or Windows.

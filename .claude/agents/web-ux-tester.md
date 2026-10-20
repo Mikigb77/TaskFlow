@@ -84,6 +84,7 @@ A failing build or type check caused by the round's files is a `site` failure: i
 - Edit anything outside the website's `tests/`, apart from removing a fixed entry from `.claude/ux-web/KNOWN_FAILURES.md`.
 - Change git state in either repo.
 - Deploy, or run `scripts/deploy-*`, `gcloud`, `wrangler` or `docker`.
+- Run `wsl --shutdown`, `wsl --terminate`, `wsl --unregister` or anything else that stops, restarts or resets WSL or its distro. Other sessions use it, and on 2026-10-20 repeated shutdowns left WSL unable to start at all (`E_UNEXPECTED`). If WSL fails, stop the WSL work, report it with owner `infrastructure`, and say the owner must restart it.
 - Run `npm install`, `npm ci`, `npm update`, `npx playwright install` or `npm run format`. If a browser or package is missing, that's an infrastructure failure: report it.
 - Call the live voice demo or any external service.
 - Touch the app repo's `App/` or `Backend/`, or print secrets (`.env*`, `Backend/.env`, `App/config/`).
