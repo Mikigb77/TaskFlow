@@ -2,6 +2,10 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-20 (later) — D11 of run 2026-10-19-app: no cue
+**The owner:** "no cue for D11, as recommended".
+- **D11 (UX-1309), a second new task far down the same day:** no cue for a lit row below the fold, and no new element or copy. The save message already counts every saved task, and a lit row stays lit until it's scrolled into view. UX-1309 stands as P169 and P197 built it.
+
 ## 2026-10-20 — The owner approves the whole-app plan 2026-10-19-app, with D1–D10 as recommended
 **The owner:** "go, as recommended". He is back, so the normal flow applies again: new product questions go to him.
 
