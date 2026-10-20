@@ -1447,6 +1447,35 @@
     "Emulator lane at Android font size 2.0 on 393 dp: the Día view of today with one date-only task at priority Media shows «Sin hora», the whole row, a line under it, then the first timed task, on arrival."
    ],
    "dependsOn": []
+  },
+  {
+   "id": "P214",
+   "title": "Activity: an unread row's spoken label holds still while it waits",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1648"
+   ],
+   "files": [
+    "App/lib/screens/activity_screen.dart",
+    "App/test/activity_screen_test.dart"
+   ],
+   "brief": [
+    "Batch b4's leftover (main session, 2026-10-20). It runs in batch b5. UX-1648 (S2) is regression R3C-1 from P213 (verify-b4-r3-C.md), raised in b4's last round, so it wasn't re-planned. Tapping an unread Activity row whose task isn't on the phone yet starts the row's wait, and marks the item read. Marking it read reloads the list while the row is still waiting, so «No leída» drops out of the row's merged label mid-wait. TalkBack then likely reads the whole row a second time. That's inferred from the code and the engine's AccessibilityBridge, which re-announces a focused node whose label changes.",
+    "Do (a removal): in `App/lib/screens/activity_screen.dart` (about :251), the row's `Semantics` label becomes `unread && !waiting ? context.l10n.activityUnread : null`. «No leída» then goes when the wait starts, together with the change the wait itself makes, and the read reload during the wait changes nothing more. No new strings.",
+    "Test (in `App/test/activity_screen_test.dart`): an activity override that returns the item as read after the first fetch, so the list reloads during the wait. From the tap until the wait ends, the row's merged semantics label stays one value, across that reload. Also check that an unread row that isn't waiting still has «No leída», and that a read row never has it.",
+    "Don't touch: P213's waiting bar and its copy (UX-1646, UX-1647); the bold title of unread rows; the row's layout; the mark-read call; the rest of Activity."
+   ],
+   "acceptance": [
+    "ES: double-tapping an unread row whose task isn't on the phone yet starts the wait. From then until the wait ends, the row's merged semantics label doesn't change, even when the list reloads with the item read. It doesn't contain «No leída».",
+    "ES: an unread row that isn't waiting still has «No leída» in its label; a read row never does.",
+    "The unread row's title is still bold until it's read, as before."
+   ],
+   "deviceChecks": [
+    "Emulator with TalkBack, in Spanish: double-tap an unread Activity row whose task isn't on the phone yet. «Buscando la tarea…» is heard once, and the row isn't read a second time."
+   ],
+   "dependsOn": []
   }
  ],
  "decisions": [
@@ -1689,7 +1718,8 @@
   "Phone checks from the reviews, not tied to a package: SEEN #2 (a server-added task's reminder minutes late; review D suggests the 2-minute reminder lease in reminder_engine.dart:255-277 after a killed refresh); SEEN #14 (the text shortcut started with launcher flags while the app is open; not reproduced with real taps); UX-424's cold start from a reminder; UX-702's check should add a 360 dp phone. Re-plan: D4 on staging, «Hola, ¿esto funciona?» leaves the free-dictation count as it was.",
   "Noted, not planned (re-plan 2026-10-20): review B's optional «Añadir sin fecha» on the form's button (not part of D3's answer); a phone with no calendar account still shows Calendar's «Elige calendarios para mostrar tus compromisos existentes.» after connecting (review B's cross-slice note; D7 fixes phones that have calendars, and nobody gave copy for this one).",
   "After the run, regenerate PHONE_CHECKS.md with phone_checks.py.",
-  "2026-10-20, main session: P209 added after batch b3 ended with UX-1639 open (failed once). It takes review B's option from verify-b3-r3-B.md, and it runs as batch b3x before b4."
+  "2026-10-20, main session: P209 added after batch b3 ended with UX-1639 open (failed once). It takes review B's option from verify-b3-r3-B.md, and it runs as batch b3x before b4.",
+  "2026-10-20, main session: P214 added for UX-1648, which batch b4 raised in its last round; it runs in batch b5 with P186-P189."
  ],
  "updated": "2026-10-20",
  "replans": [
