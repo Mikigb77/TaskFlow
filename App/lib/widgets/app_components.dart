@@ -124,7 +124,8 @@ class EmptyState extends StatelessWidget {
       required this.message,
       this.icon = Icons.event_available_outlined,
       this.action});
-  final String title;
+  // Without a title, the message is the state's one line.
+  final String? title;
   final String message;
   final IconData? icon;
   final Widget? action;
@@ -145,10 +146,12 @@ class EmptyState extends StatelessWidget {
                 child: Icon(icon, size: 28, color: colors.onPrimaryContainer)),
             const SizedBox(height: 16),
           ],
-          Text(title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
+          if (title case final title?) ...[
+            Text(title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 6),
+          ],
           Text(message,
               textAlign: TextAlign.center,
               style: TextStyle(color: colors.onSurfaceVariant, height: 1.5)),
@@ -159,16 +162,20 @@ class EmptyState extends StatelessWidget {
 
 class MessageBanner extends StatelessWidget {
   const MessageBanner(this.message,
-      {super.key, this.isError = false, this.icon});
+      {super.key, this.isError = false, this.icon, this.liveRegion});
   final String message;
   final bool isError;
   final IconData? icon;
+  // Read out as it appears; by default, only an error is.
+  final bool? liveRegion;
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    // An error is read out as soon as it appears or changes.
+    // Its own node, so only its line is read; an error is read out as soon
+    // as it appears or changes.
     return Semantics(
-        liveRegion: isError,
+        container: true,
+        liveRegion: liveRegion ?? isError,
         child: AppSurface(
             color: isError ? colors.errorContainer : colors.primaryContainer,
             padding: const EdgeInsets.all(16),

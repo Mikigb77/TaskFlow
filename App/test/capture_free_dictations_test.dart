@@ -2886,6 +2886,40 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-10-19-app, round 1 · P167 (UX-1301) ----
+
+  testWidgets(
+    'UX-1301: a free account whose last dictation was answered with nothing found has Escribir as the filled button, and no Volver a decirlo',
+    (tester) async {
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(1),
+        size: const Size(360, 800),
+      );
+      app.api
+        ..findsNothing = true
+        ..answerFreeVoice = freeVoice(0);
+      await dictate(tester, app, 'Bueno, a ver, no sé');
+      // The answer's count is saved with the session.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      expect(app.container.read(freeVoiceLeftProvider), 0);
+      expect(inSheet(find.text(es.captureNoTasks)), findsOneWidget);
+      final filled = inSheet(find.byType(FilledButton));
+      expect(filled, findsOneWidget);
+      expect(
+        find.descendant(of: filled, matching: find.text(es.captureTypeInstead)),
+        findsOneWidget,
+      );
+      expect(filled.hitTestable(), findsOneWidget);
+      expect(inSheet(find.text(es.captureSayAgain)), findsNothing);
+      expect(inSheet(find.text(es.tryAgain)), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// A phone whose database can't be read or written.
@@ -3114,6 +3148,9 @@ class _Api extends ApiClient {
   Object? failure;
   Map<String, dynamic>? answerFreeVoice;
 
+  /// The assistant finds no task and no command in the words.
+  bool findsNothing = false;
+
   @override
   Future<dynamic> request(
     String method,
@@ -3144,7 +3181,7 @@ class _Api extends ApiClient {
       final text = '${data?['text'] ?? ''}';
       return {
         'transcript': text,
-        'tasks': [_found(text)],
+        'tasks': [if (!findsNothing) _found(text)],
         if (answerFreeVoice != null) 'free_voice': answerFreeVoice,
       };
     }

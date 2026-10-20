@@ -9,6 +9,7 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -45,7 +46,10 @@ const usedUp = Screen(
   'capture',
   'used-up-notice',
   'Nueva tarea with no free dictations left: the once-a-month notice',
-  sources: ['lib/widgets/task_form_entry.dart', 'lib/widgets/task_actions.dart'],
+  sources: [
+    'lib/widgets/task_form_entry.dart',
+    'lib/widgets/task_actions.dart',
+  ],
 );
 
 /// Spoken words, long enough to wrap: what a person says in one go.
@@ -91,7 +95,10 @@ Future<void> typeWords(PreviewApp app, String words) async {
   await openSheet(app);
   await app.tester.tap(find.byTooltip(app.p.l.captureTypeInstead));
   await app.tester.pumpAndSettle();
-  await app.tester.enterText(find.byKey(const ValueKey('capture-words')), words);
+  await app.tester.enterText(
+    find.byKey(const ValueKey('capture-words')),
+    words,
+  );
   await app.tester.pumpAndSettle();
 }
 
@@ -182,7 +189,7 @@ void capturePreviews() {
     preview(
       sheet,
       'listening-quiet',
-      'Listening, nothing heard for 6 s: the still-listening hint; Listo is off until there are words.',
+      'Listening, nothing heard for 6 s: the nothing-heard-yet hint, naming Escribir; Listo is off until there are words.',
       [es2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -195,7 +202,7 @@ void capturePreviews() {
     preview(
       sheet,
       'listening-time-left',
-      'Listening 50 s in: 10 seconds left before it stops by itself.',
+      'Listening 51 s in: the countdown reads 9 seconds left before it stops by itself.',
       [es2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -269,14 +276,75 @@ void capturePreviews() {
 
     preview(
       sheet,
+      'mic-asking',
+      'The first start, Android’s microphone question open (drawn by Android over the sheet, not here): why it asks, in place of Listo.',
+      [es1, es2, ca1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        // Not allowed yet, as permission_handler reads it.
+        const permissions = MethodChannel(
+          'flutter.baseflow.com/permissions/methods',
+        );
+        final messenger = p.tester.binding.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(
+          permissions,
+          (call) async => call.method == 'checkPermissionStatus' ? 0 : null,
+        );
+        final question = app.speech.asking = Completer<SpeechPermission>();
+        p.onTearDown(() async {
+          if (!question.isCompleted) question.complete(SpeechPermission.denied);
+          messenger.setMockMethodCallHandler(permissions, null);
+        });
+        await openSheet(app);
+        // The line waits 300 ms, so a blocked answer never flashes it.
+        await p.tester.pump(const Duration(milliseconds: 350));
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
+      'mic-denied',
+      'The microphone refused once (Android can still ask): the neutral message, Empezar a hablar and Escribir.',
+      [es1, es2, ca1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          mic: SpeechPermission.denied,
+        );
+        await openSheet(app);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
       'mic-blocked',
-      'The microphone permission is blocked: the message, Abrir Ajustes, and typing still possible.',
-      [es1, es2, ca2],
+      'The microphone permission is blocked, on-device speech: the steps in Settings, Abrir Ajustes filled, and typing still possible.',
+      [es1, es2, ca1, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
           tasks: normalDay(),
           mic: SpeechPermission.blocked,
+        );
+        await openSheet(app);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
+      'mic-blocked-online',
+      'The microphone permission is blocked, listening online (the phone has no speech for the language): the same steps and Abrir Ajustes.',
+      [es1, es2, ca1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          mic: SpeechPermission.blocked,
+          speechInstalled: false,
         );
         await openSheet(app);
         await p.shoot();
@@ -361,7 +429,7 @@ void capturePreviews() {
     preview(
       sheet,
       'error-nothing-understood',
-      'The assistant found no task in the words.',
+      'The assistant found no task in the spoken words: the example, Volver a decirlo filled, Guardar como tarea under it, no Reintentar.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());

@@ -653,11 +653,15 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
         if (preview.files > 0)
           Padding(
             padding: inset,
-            child: Text(
-              strings.deleteAccountCopyNoFiles,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
+            // Its own node: read after the button it's about.
+            child: Semantics(
+              container: true,
+              child: Text(
+                strings.deleteAccountCopyNoFiles,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
       ],

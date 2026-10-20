@@ -121,8 +121,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'https': 'Use an HTTPS server address for this build.',
       'serverAddress':
           'Enter a valid server address, such as https://your-server.example.',
-      'emailUsed':
-          'An account with this email already exists. Sign in or recover your password.',
+      'emailUsed': 'This email already has an account.',
       'email': 'Enter a valid email address.',
       'credentials': 'We couldn’t find that account, or the password is wrong.',
       'session': 'Please sign in again to continue. Your local tasks are kept.',
@@ -430,7 +429,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'This event is no longer available in the selected calendars.';
 
   @override
-  String get noScheduledTasks => 'No TaskFlow tasks scheduled';
+  String get noScheduledTasks => 'No tasks for this day.';
 
   @override
   String get calendar => 'Calendar';
@@ -711,9 +710,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get todayAgenda => 'Today’s agenda';
-
-  @override
-  String get breathingRoom => 'A little breathing room.';
 
   @override
   String get loadTasksError => 'Couldn’t load your tasks';
@@ -1506,8 +1502,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.';
 
   @override
-  String get recoveryEmailRequested =>
-      'If that account exists, a recovery email has been sent.';
+  String recoveryEmailRequested(String email) {
+    return 'If $email has an account, an email with a code is on its way. Type it here.';
+  }
 
   @override
   String get passwordResetComplete =>
@@ -2619,7 +2616,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureNoteLength => 'A note needs 1 to 8000 characters.';
 
   @override
-  String get captureNoTasks => 'No tasks were found. Your words are kept.';
+  String get captureNoTasks =>
+      'I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”';
 
   @override
   String get captureUnsupportedKind =>
@@ -2654,14 +2652,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureMicrophone =>
-      'Allow microphone access to record, or type below.';
+      'Without the microphone I can’t hear you. Tap Start talking to allow it, or Type instead.';
 
   @override
   String get captureMicrophoneBlocked =>
-      'Microphone is off for TaskFlow. Turn it on in Settings, or type instead.';
+      'To dictate again, open Settings and tap Permissions › Microphone › Allow.';
 
   @override
   String get captureOpenSettings => 'Open Settings';
+
+  @override
+  String get captureMicrophoneWhy =>
+      'Allow the microphone to dictate your tasks. It only listens while you dictate.';
 
   @override
   String get captureStarting => 'One moment…';
@@ -2686,7 +2688,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Still listening. Tap Done when finished.';
 
   @override
-  String get captureTimeLeft => '10 seconds left';
+  String get captureNothingHeardYet =>
+      'Nothing heard yet. Speak when you’re ready, or tap Type instead.';
+
+  @override
+  String get captureListeningOnline =>
+      'I’m listening. You’ll see your words when you tap Done.';
+
+  @override
+  String captureTimeLeft(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds seconds left',
+      one: '1 second left',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get captureKeepQuestion => 'Keep what you said for later?';
@@ -2709,12 +2727,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureNoSpeech => 'I didn’t catch that. Try again, or type it.';
 
   @override
-  String get captureSpeechLanguage =>
-      'On-device speech is not installed for this language. Choose another language, record audio, or type.';
-
-  @override
-  String get captureSpeechUnavailable =>
-      'On-device speech is unavailable. Record audio or type instead.';
+  String get captureCantListen =>
+      'I can’t listen on this phone right now. Tap Type instead.';
 
   @override
   String get captureSpeechBusy =>
@@ -3166,6 +3180,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get invitationWaitingSignIn =>
+      'You have an invitation. Sign in with the email address it was sent to.';
 
   @override
   String get linkGoogleAccount => 'Link Google account';

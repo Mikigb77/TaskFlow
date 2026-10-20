@@ -378,8 +378,6 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
       child: ListTile(
         key: ValueKey('draft-schedule-${widget.draft.id}'),
         contentPadding: EdgeInsets.zero,
-        dense: !main,
-        visualDensity: main ? null : VisualDensity.compact,
         horizontalTitleGap: main ? 12 : 8,
         minLeadingWidth: 0,
         leading: Icon(
@@ -389,9 +387,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         ),
         title: Text(day),
         titleTextStyle: main ? text.titleLarge : text.bodyMedium,
-        trailing: main
-            ? const Icon(Icons.chevron_right_rounded, size: 20)
-            : null,
+        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
         onTap: widget.enabled ? _schedule : null,
       ),
     );

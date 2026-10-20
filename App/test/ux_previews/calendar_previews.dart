@@ -232,7 +232,12 @@ void calendarPreviews() {
       'Three dictated tasks just added: Calendar shows them lit, with the message and Deshacer.',
       [es1, es2, ca2, es1Wide],
       (p) async {
-        final app = await PreviewApp.open(p, tasks: normalDay());
+        // A day doesn't hold the same task twice at the same time: leave out
+        // the day's own 17:00 «Recoger…», which the answer adds again.
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay().where((task) => task.id != 4).toList(),
+        );
         app.api.answer = threeTasks();
         await speak(app, said);
         await p.tester.tap(find.byKey(const ValueKey('save-drafts')));

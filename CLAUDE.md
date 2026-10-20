@@ -79,7 +79,7 @@ flutter gen-l10n                                     # after editing ARB files
 flutter build apk --debug --no-pub --target-platform android-x64   # emulator APK
 ```
 
-Rendered screen previews, no device needed. The UX preview suite renders every route and tab in its key states to `App/build/ux/<area>/`, and writes `App/build/ux/INDEX.md` (what each PNG shows, its sources, size, text scale and render time, and what no preview covers) and `App/build/ux/AUDIT.md` (measured accessibility, clipping and tap-target evidence for each render). To render one area or screen, add `--plain-name "capture/"` or `--plain-name "capture/sheet."`. The older previews: the calendar and review ones write PNGs to `App/build/`; the sign-in ones write them to `App/artifacts/auth/`, and that command then fails on an unrelated plugin error (see `.claude/ux-review/KNOWN_FAILURES.md`):
+Rendered screen previews, no device needed. The UX preview suite renders every route and tab in its key states to `App/build/ux/<area>/`, and writes `App/build/ux/INDEX.md` (what each PNG shows, its sources, size, text scale and render time, and what no preview covers) and `App/build/ux/AUDIT.md` (measured accessibility, clipping and tap-target evidence for each render). To render one area or screen, add `--plain-name "capture/"` or `--plain-name "capture/sheet."`. The older previews: the calendar and review ones write PNGs to `App/build/`, and the sign-in ones write them to `App/artifacts/auth/`:
 
 ```powershell
 flutter test --no-pub --dart-define=WRITE_UX_PREVIEWS=true test/ux_previews/ux_previews_test.dart

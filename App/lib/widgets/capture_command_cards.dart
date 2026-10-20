@@ -379,8 +379,10 @@ class _Header extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
+            // TalkBack hears the card by this line, as shown.
             child: Text(
               text,
+              key: const ValueKey('command-headline'),
               style: theme.textTheme.titleMedium?.copyWith(color: color),
             ),
           ),

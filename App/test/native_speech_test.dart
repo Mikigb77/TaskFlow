@@ -612,7 +612,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(banner, findsOneWidget);
         expect(find.textContaining(es.captureMicrophone), findsNothing);
-        final open = find.widgetWithText(TextButton, es.captureOpenSettings);
+        final open = find.widgetWithText(FilledButton, es.captureOpenSettings);
         await tester.ensureVisible(open);
         await tester.pumpAndSettle();
         expect(open.hitTestable(), findsOneWidget);
@@ -1245,20 +1245,22 @@ void main() {
         for (var second = 0; second < 4; second++) {
           await tester.pump(const Duration(seconds: 1));
         }
-        expect(find.text(es.captureStillListening), findsNothing);
+        expect(find.text(es.captureNothingHeardYet), findsNothing);
         await tester.pump(const Duration(seconds: 1));
-        expect(inSheet(find.text(es.captureStillListening)), findsOneWidget);
+        // No words yet: nothing heard, not `Toca Listo` (UX-1304).
+        expect(inSheet(find.text(es.captureNothingHeardYet)), findsOneWidget);
         speech.emit('partial', text: 'Comprar pan');
         await tester.pump();
+        expect(find.text(es.captureNothingHeardYet), findsNothing);
         expect(find.text(es.captureStillListening), findsNothing);
         for (var second = 5; second < 49; second++) {
           await tester.pump(const Duration(seconds: 1));
           speech.emit('partial', text: 'Comprar pan $second');
         }
         await tester.pump();
-        expect(find.text(es.captureTimeLeft), findsNothing);
+        expect(find.text(es.captureTimeLeft(10)), findsNothing);
         await tester.pump(const Duration(seconds: 1));
-        expect(inSheet(find.text(es.captureTimeLeft)), findsOneWidget);
+        expect(inSheet(find.text(es.captureTimeLeft(10))), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
@@ -1596,7 +1598,7 @@ void main() {
     });
 
     testWidgets(
-      'UX-444: in English at 2x text on 360x740, after 5 s of silence the hint reads Still listening. Tap Done when finished. in full',
+      'UX-444: in English at 2x text on 360x740, after words and 5 s of silence the hint reads Still listening. Tap Done when finished. in full',
       (tester) async {
         tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -1614,6 +1616,9 @@ void main() {
           size: const Size(360, 740),
         );
         speech.emit('ready');
+        await tester.pump();
+        // Once words are heard (UX-1304); before, it says nothing was heard.
+        speech.emit('partial', text: 'Buy bread');
         await tester.pump();
         for (var second = 0; second < 5; second++) {
           await tester.pump(const Duration(seconds: 1));
@@ -1695,7 +1700,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-603: after a failed native start, the next open asks capability() again',
+      'UX-603 / UX-1306: after a failed native start, the sheet listens online; the next open starts online without asking capability() again',
       (tester) async {
         final speech = _OpeningSpeech()
           ..startError = PlatformException(code: 'recognizer-busy');
@@ -1713,20 +1718,25 @@ void main() {
         await tester.pumpAndSettle();
         expect(speech.starts, 1);
         expect(speech.capabilities, 1, reason: 'the open used the answer');
+        expect(
+          find.textContaining(es.listeningSeconds('')),
+          findsOneWidget,
+          reason: 'listening online, with no tap',
+        );
         await close(tester);
 
         speech.startError = null;
         await addTask(tester);
         await tester.pumpAndSettle();
-        expect(speech.capabilities, 2, reason: 'asked again after the failure');
-        expect(speech.starts, 2);
+        expect(speech.capabilities, 1, reason: '«not usable» is remembered');
+        expect(speech.starts, 1, reason: 'online without trying on-device');
         await close(tester);
         expect(tester.takeException(), isNull);
       },
     );
 
     testWidgets(
-      'UX-603: an error event before the recognizer is ready makes the next open ask capability() again',
+      'UX-603 / UX-1306: an error event before the recognizer is ready goes online; the next open starts online without asking capability() again',
       (tester) async {
         final speech = _OpeningSpeech();
         await _open(
@@ -1746,7 +1756,8 @@ void main() {
         await close(tester);
         await addTask(tester);
         await tester.pumpAndSettle();
-        expect(speech.capabilities, 2);
+        expect(speech.capabilities, 1);
+        expect(speech.starts, 1);
         await close(tester);
         expect(tester.takeException(), isNull);
       },
@@ -2008,6 +2019,725 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-10-19-app, round 1 · P166 (UX-107, UX-1303, UX-1305,
+  // UX-1306): the microphone, and P167 (UX-1304): what listening says ----
+
+  group('P166 / P167: the microphone and listening', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    const phone = Size(360, 800);
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: find.byType(VoiceTaskScreen), matching: finder);
+
+    /// The banner holding [text], and whether it shows in the error style.
+    void expectNeutralBanner(WidgetTester tester, String text) {
+      final line = inSheet(find.text(text));
+      expect(line, findsOneWidget, reason: text);
+      final banner = find.ancestor(
+        of: line,
+        matching: find.byType(MessageBanner),
+      );
+      expect(banner, findsOneWidget);
+      expect(tester.widget<MessageBanner>(banner).isError, isFalse);
+      final colors = Theme.of(tester.element(line)).colorScheme;
+      final surface = tester.widget<AppSurface>(
+        find.descendant(of: banner, matching: find.byType(AppSurface)).first,
+      );
+      expect(surface.color, isNot(colors.errorContainer));
+      final style = tester.widget<Text>(line).style;
+      expect(style?.color, isNot(colors.onErrorContainer));
+    }
+
+    /// The text [finder] is whole: not ellipsized, and inside the area its
+    /// scroll view shows.
+    void expectWhole(WidgetTester tester, Finder finder) {
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: finder, matching: find.byType(RichText)).first,
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final rect = tester.getRect(finder);
+      final scroll = find.ancestor(
+        of: finder,
+        matching: find.byType(Scrollable),
+      );
+      final area = scroll.evaluate().isEmpty
+          ? Offset.zero & tester.view.physicalSize
+          : tester.getRect(scroll.first);
+      expect(rect.top, greaterThanOrEqualTo(area.top - 0.5), reason: '$rect');
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(area.bottom + 0.5),
+        reason: '$rect in $area',
+      );
+    }
+
+    /// permission_handler's channel: the microphone's status, and Settings.
+    ({int Function() settings}) permissions(
+      WidgetTester tester, {
+      required bool Function() granted,
+    }) {
+      const channel = MethodChannel('flutter.baseflow.com/permissions/methods');
+      final messenger = tester.binding.defaultBinaryMessenger;
+      var opened = 0;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'openAppSettings') {
+          opened++;
+          return true;
+        }
+        // 1: granted; 0: denied, so Android can still ask.
+        if (call.method == 'checkPermissionStatus') return granted() ? 1 : 0;
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      return (settings: () => opened);
+    }
+
+    /// The blocked state, in [l]: one full-width filled «Abrir Ajustes» with
+    /// the focus, «Escribir» and «Cancelar», and no «Empezar a hablar».
+    void expectBlocked(WidgetTester tester, AppLocalizations l) {
+      expectNeutralBanner(tester, l.captureMicrophoneBlocked);
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: inSheet(find.text(l.captureMicrophoneBlocked)),
+            matching: find.byType(MessageBanner),
+          ),
+          matching: find.byIcon(Icons.mic_off_outlined),
+        ),
+        findsOneWidget,
+      );
+      final filled = inSheet(find.byType(FilledButton));
+      expect(filled, findsOneWidget);
+      expect(
+        find.descendant(of: filled, matching: find.text(l.captureOpenSettings)),
+        findsOneWidget,
+      );
+      expect(inSheet(find.text(l.captureOpenSettings)), findsOneWidget);
+      // The whole width of the sheet's content (24 dp each side).
+      final sheet = tester.getRect(find.byType(BottomSheet));
+      expect(
+        tester.getRect(filled).width,
+        moreOrLessEquals(sheet.width - 48, epsilon: 1),
+      );
+      expect(filled.hitTestable(), findsOneWidget);
+      final focused = FocusManager.instance.primaryFocus?.context;
+      expect(focused, isNotNull);
+      expect(
+        find.descendant(
+          of: filled,
+          matching: find.byElementPredicate((e) => e == focused),
+        ),
+        findsOneWidget,
+        reason: 'the focus starts on ${l.captureOpenSettings}',
+      );
+      expect(inSheet(find.text(l.captureStartTalking)), findsNothing);
+      expect(
+        inSheet(find.byTooltip(l.captureTypeInstead)).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        inSheet(find.widgetWithText(TextButton, l.cancel)).hitTestable(),
+        findsOneWidget,
+      );
+    }
+
+    testWidgets(
+      'UX-107 / UX-1303: ES 1x on 360x800, online path (Voz En línea, al terminar), the bridge answers blocked: the neutral Para volver a dictar… banner, one full-width focused filled Abrir Ajustes, Escribir and Cancelar, no Empezar a hablar',
+      (tester) async {
+        permissions(tester, granted: () => false);
+        final bridge = _Bridge(tester)..permission = 'blocked';
+        final recorder = _Recorder();
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: recorder,
+          language: 'es',
+          size: phone,
+          speechOnline: true,
+        );
+        expect(bridge.starts, 0);
+        expect(recorder.starts, 0);
+        expectBlocked(tester, es);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1303: the same blocked state on the on-device path (ES 1x, 360x800)',
+      (tester) async {
+        permissions(tester, granted: () => false);
+        final bridge = _Bridge(tester)..permission = 'blocked';
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: _Recorder(),
+          language: 'es',
+          size: phone,
+        );
+        expect(bridge.starts, 0);
+        expectBlocked(tester, es);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final online in [false, true]) {
+      testWidgets(
+        'UX-1303: CA at 2x on 360x800, ${online ? 'online' : 'on-device'} path, blocked: Obre Configuració is the filled button, no Comença a parlar, and the banner’s text isn’t cut',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          permissions(tester, granted: () => false);
+          final bridge = _Bridge(tester)..permission = 'blocked';
+          await _open(
+            tester,
+            bridge.speech,
+            _Captures(),
+            _OfflineExtraction(),
+            recorder: _Recorder(),
+            language: 'ca',
+            size: phone,
+            speechOnline: online,
+          );
+          expect(ca.captureOpenSettings, 'Obre Configuració');
+          expectBlocked(tester, ca);
+          expectWhole(tester, inSheet(find.text(ca.captureMicrophoneBlocked)));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final online in [false, true]) {
+      testWidgets(
+        'UX-107 / UX-1303: ${online ? 'online' : 'on-device'} path, tapping Abrir Ajustes opens the app’s settings once; back with the microphone allowed, the sheet listens',
+        (tester) async {
+          var granted = false;
+          final opener = permissions(tester, granted: () => granted);
+          final bridge = _Bridge(tester)..permission = 'blocked';
+          final recorder = _Recorder();
+          await _open(
+            tester,
+            bridge.speech,
+            _Captures(),
+            _OfflineExtraction(),
+            recorder: recorder,
+            language: 'es',
+            size: phone,
+            speechOnline: online,
+          );
+          await tester.tap(
+            inSheet(find.widgetWithText(FilledButton, es.captureOpenSettings)),
+          );
+          await tester.pumpAndSettle();
+          expect(opener.settings(), 1);
+
+          // Allowed in Settings: coming back starts listening.
+          granted = true;
+          bridge.permission = 'granted';
+          for (final state in [
+            AppLifecycleState.inactive,
+            AppLifecycleState.hidden,
+            AppLifecycleState.paused,
+            AppLifecycleState.hidden,
+            AppLifecycleState.inactive,
+            AppLifecycleState.resumed,
+          ]) {
+            tester.binding.handleAppLifecycleStateChanged(state);
+          }
+          await tester.pumpAndSettle();
+          expect(opener.settings(), 1);
+          expect(inSheet(find.text(es.captureMicrophoneBlocked)), findsNothing);
+          if (online) {
+            expect(recorder.starts, 1);
+            expect(bridge.starts, 0);
+            expect(
+              inSheet(find.textContaining(es.listeningSeconds(''))),
+              findsOneWidget,
+            );
+          } else {
+            expect(bridge.starts, 1);
+            expect(recorder.starts, 0);
+            expect(inSheet(find.text(es.captureStarting)), findsOneWidget);
+          }
+          await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1305: ES, first start with the microphone not granted and Android’s question open: Permite el micrófono… shows in place of Listo; once allowed it goes',
+      (tester) async {
+        permissions(tester, granted: () => false);
+        final speech = _Speech()..permissionGate = Completer<void>();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: phone,
+        );
+        // P198 (UX-1627): the line waits 300 ms, past a blocked answer.
+        await tester.pump(const Duration(milliseconds: 300));
+        final why = inSheet(find.text(es.captureMicrophoneWhy));
+        expect(why, findsOneWidget);
+        expect(inSheet(find.text(es.done)), findsNothing);
+        expect(speech.starts, 0);
+        speech.permissionGate!.complete();
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text(es.captureMicrophoneWhy)), findsNothing);
+        expect(speech.starts, 1);
+        speech.emit('ready');
+        await tester.pump();
+        await tester.pump();
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+          findsOneWidget,
+        );
+        await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1305: ES, with the microphone already granted, no frame of the start shows Permite el micrófono…',
+      (tester) async {
+        permissions(tester, granted: () => true);
+        final speech = _Speech()..permissionGate = Completer<void>();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: phone,
+          open: false,
+        );
+        unawaited(
+          showCaptureSheet(tester.element(find.byType(Scaffold).first)),
+        );
+        // Every frame of the opening and the start, the answer held back.
+        for (var frame = 0; frame < 40; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(
+            find.text(es.captureMicrophoneWhy),
+            findsNothing,
+            reason: 'frame $frame',
+          );
+        }
+        speech.permissionGate!.complete();
+        for (var frame = 0; frame < 20; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(
+            find.text(es.captureMicrophoneWhy),
+            findsNothing,
+            reason: 'after the answer, frame $frame',
+          );
+        }
+        expect(speech.starts, 1);
+        await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- round 2 · P198 (UX-1627): the reason only when Android asks ----
+
+    testWidgets(
+      'UX-1627: ES, first start, status denied and the request held open: at 200 ms no Permite el micrófono…; at 400 ms it shows in place of Listo; it goes when the request answers',
+      (tester) async {
+        permissions(tester, granted: () => false);
+        final speech = _AskedSpeech()..permissionGate = Completer<void>();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: phone,
+          open: false,
+        );
+        unawaited(
+          showCaptureSheet(tester.element(find.byType(Scaffold).first)),
+        );
+        // Up to the request, a frame at a time.
+        for (var frame = 0; frame < 200 && !speech.asked; frame++) {
+          await tester.pump(const Duration(milliseconds: 5));
+        }
+        expect(speech.asked, isTrue, reason: 'the start asked for the mic');
+        final why = inSheet(find.text(es.captureMicrophoneWhy));
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(why, findsNothing, reason: '200 ms after the request');
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(why, findsOneWidget, reason: '400 ms after the request');
+        expect(inSheet(find.text(es.done)), findsNothing);
+        speech.permissionGate!.complete();
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text(es.captureMicrophoneWhy)), findsNothing);
+        await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1627: ES, status denied and the bridge answers blocked 100 ms after the request: no frame shows Permite el micrófono…, then the blocked banner and the filled Abrir Ajustes show',
+      (tester) async {
+        permissions(tester, granted: () => false);
+        final speech = _AskedSpeech()
+          ..answer = SpeechPermission.blocked
+          ..delay = const Duration(milliseconds: 100);
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: phone,
+          open: false,
+        );
+        unawaited(
+          showCaptureSheet(tester.element(find.byType(Scaffold).first)),
+        );
+        // Every frame from the opening to well past the answer.
+        for (var frame = 0; frame < 120; frame++) {
+          await tester.pump(const Duration(milliseconds: 8));
+          expect(
+            find.text(es.captureMicrophoneWhy),
+            findsNothing,
+            reason: 'frame $frame (${frame * 8} ms)',
+          );
+        }
+        expect(speech.asked, isTrue);
+        await tester.pumpAndSettle();
+        expect(find.text(es.captureMicrophoneWhy), findsNothing);
+        expect(es.captureMicrophoneBlocked, contains('abre Ajustes'));
+        expectBlocked(tester, es);
+        expect(speech.starts, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1305: ES, after a refusal that isn’t blocked, the neutral banner reads Sin micrófono no puedo escucharte…, and both Empezar a hablar and Escribir show',
+      (tester) async {
+        final bridge = _Bridge(tester)..permission = 'denied';
+        await _open(
+          tester,
+          bridge.speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: phone,
+        );
+        expect(bridge.starts, 0);
+        expectNeutralBanner(tester, es.captureMicrophone);
+        expect(
+          inSheet(
+            find.widgetWithText(FilledButton, es.captureStartTalking),
+          ).hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(find.byTooltip(es.captureTypeInstead)).hitTestable(),
+          findsOneWidget,
+        );
+        expect(inSheet(find.text(es.captureMicrophoneBlocked)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (name, fail) in <(String, void Function(_OpeningSpeech))>[
+      (
+        'the language error',
+        (speech) => speech.controller.add(
+          SpeechEvent(
+            speech.run!,
+            'error',
+            error: CaptureProblem.speechLanguage,
+          ),
+        ),
+      ),
+      (
+        'speechUnavailable',
+        (speech) => speech.controller.add(
+          SpeechEvent(
+            speech.run!,
+            'error',
+            error: CaptureProblem.speechUnavailable,
+          ),
+        ),
+      ),
+    ]) {
+      testWidgets(
+        'UX-1306: an on-device start that fails with $name before ready records online at once, with no error line and no tap; a second sheet in the session starts online without trying on-device',
+        (tester) async {
+          final speech = _OpeningSpeech();
+          final recorder = _Recorder();
+          final api = _OfflineExtraction();
+          await _open(
+            tester,
+            speech,
+            _Captures(),
+            api,
+            recorder: recorder,
+            language: 'es',
+            size: phone,
+          );
+          expect(speech.starts, 1);
+          expect(recorder.starts, 0);
+          fail(speech);
+          await tester.pumpAndSettle();
+          expect(recorder.starts, 1, reason: 'online, with no tap');
+          expect(
+            inSheet(find.textContaining(es.listeningSeconds(''))),
+            findsOneWidget,
+          );
+          expect(inSheet(find.byType(MessageBanner)), findsNothing);
+          expect(inSheet(find.text(es.captureCantListen)), findsNothing);
+          expect(api.requests, 0, reason: 'nothing sent: no dictation used');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          if (find.byType(VoiceTaskScreen).evaluate().isNotEmpty) {
+            // The recording kept audio: the keep question asks first.
+            await tester.tap(find.text(es.discard).last);
+            await tester.pumpAndSettle();
+          }
+          expect(find.byType(VoiceTaskScreen), findsNothing);
+
+          unawaited(
+            showCaptureSheet(tester.element(find.byType(Scaffold).first)),
+          );
+          await tester.pumpAndSettle();
+          expect(speech.starts, 1, reason: 'online, not on-device first');
+          expect(recorder.starts, 2);
+          expect(inSheet(find.byType(MessageBanner)), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1306: an on-device start that throws before ready goes online too',
+      (tester) async {
+        final speech = _OpeningSpeech()
+          ..startError = PlatformException(code: 'speech_unavailable');
+        final recorder = _Recorder();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: recorder,
+          language: 'es',
+          size: phone,
+        );
+        expect(recorder.starts, 1);
+        expect(
+          inSheet(find.textContaining(es.listeningSeconds(''))),
+          findsOneWidget,
+        );
+        expect(inSheet(find.byType(MessageBanner)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1306: with the on-device start and then the online start both failing, one line: Ahora no puedo escucharte en este teléfono. Toca Escribir.',
+      (tester) async {
+        final speech = _OpeningSpeech();
+        final recorder = _Recorder()..startError = StateError('No microphone');
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: recorder,
+          language: 'es',
+          size: phone,
+        );
+        speech.controller.add(
+          SpeechEvent(speech.run!, 'error', error: CaptureProblem.speechLanguage),
+        );
+        await tester.pumpAndSettle();
+        expect(recorder.starts, 1);
+        expect(inSheet(find.text(es.captureCantListen)), findsOneWidget);
+        expect(inSheet(find.byType(MessageBanner)), findsOneWidget);
+        expect(
+          inSheet(find.byTooltip(es.captureTypeInstead)).hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- P167 · UX-1304 ----
+
+    testWidgets(
+      'UX-1304: ES, on-device path, nothing heard for 5 s: Aún no he oído nada…; after words are heard: Sigo escuchando. Toca Listo cuando termines.',
+      (tester) async {
+        final speech = _Speech();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          _OfflineExtraction(),
+          language: 'es',
+          size: phone,
+        );
+        speech.emit('ready');
+        await tester.pump();
+        for (var second = 0; second < 4; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(inSheet(find.text(es.captureNothingHeardYet)), findsNothing);
+        await tester.pump(const Duration(seconds: 1));
+        expect(inSheet(find.text(es.captureNothingHeardYet)), findsOneWidget);
+        expect(inSheet(find.text(es.captureStillListening)), findsNothing);
+        speech.emit('segment', text: 'Comprar pan');
+        await tester.pump();
+        for (var second = 0; second < 5; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(inSheet(find.text(es.captureStillListening)), findsOneWidget);
+        expect(inSheet(find.text(es.captureNothingHeardYet)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    /// Every announcement of the countdown, in [l].
+    bool countdown(AppLocalizations l, String message) => [
+      for (var left = 1; left <= 10; left++) l.captureTimeLeft(left),
+    ].contains(message);
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-1304: ${language.toUpperCase()}, the countdown counts the seconds left (57 s: 3, 59 s: 1), and TalkBack hears it once between 50 and 60 s',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final speech = _Speech();
+          await _open(
+            tester,
+            speech,
+            _Captures(),
+            _OfflineExtraction(),
+            language: language,
+            size: phone,
+          );
+          speech.emit('ready');
+          speech.emit('segment', text: 'Comprar pan mañana');
+          await tester.pump();
+          tester.takeAnnouncements();
+          final heard = <String>[];
+          for (var second = 1; second <= 57; second++) {
+            await tester.pump(const Duration(seconds: 1));
+            heard.addAll(tester.takeAnnouncements().map((a) => a.message));
+          }
+          expect(inSheet(find.text(l.captureTimeLeft(3))), findsOneWidget);
+          if (language == 'es') {
+            expect(l.captureTimeLeft(3), 'Quedan 3 segundos');
+          } else {
+            expect(l.captureTimeLeft(3), 'Queden 3 segons');
+          }
+          await tester.pump(const Duration(seconds: 1));
+          heard.addAll(tester.takeAnnouncements().map((a) => a.message));
+          expect(inSheet(find.text(l.captureTimeLeft(2))), findsOneWidget);
+          await tester.pump(const Duration(seconds: 1));
+          heard.addAll(tester.takeAnnouncements().map((a) => a.message));
+          expect(inSheet(find.text(l.captureTimeLeft(1))), findsOneWidget);
+          await tester.pump(const Duration(seconds: 1));
+          heard.addAll(tester.takeAnnouncements().map((a) => a.message));
+          expect(
+            heard.where((message) => countdown(l, message)),
+            hasLength(1),
+            reason: '$heard',
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1304: ES, on-device path, 60 s with no words: No te he entendido. Vuelve a intentarlo o escríbelo. shows, and no Listo is announced',
+      (tester) async {
+        final speech = _Speech();
+        final api = _OfflineExtraction();
+        await _open(
+          tester,
+          speech,
+          _Captures(),
+          api,
+          language: 'es',
+          size: phone,
+        );
+        speech.emit('ready');
+        await tester.pump();
+        tester.takeAnnouncements();
+        final heard = <String>[];
+        for (var second = 0; second < 60; second++) {
+          await tester.pump(const Duration(seconds: 1));
+          heard.addAll(tester.takeAnnouncements().map((a) => a.message));
+        }
+        await tester.pumpAndSettle();
+        heard.addAll(tester.takeAnnouncements().map((a) => a.message));
+        expect(inSheet(find.text(es.captureNoSpeech)), findsOneWidget);
+        expect(heard, isNot(contains(es.done)), reason: '$heard');
+        expect(api.requests, 0);
+        expect(
+          inSheet(find.textContaining(es.listeningSeconds(''))),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1304: ES, online path, while listening: Te escucho. Verás tus palabras al tocar Listo. shows from the start',
+      (tester) async {
+        final recorder = _Recorder();
+        await _open(
+          tester,
+          _Speech(),
+          _Captures(),
+          _OfflineExtraction(),
+          recorder: recorder,
+          language: 'es',
+          size: phone,
+          speechOnline: true,
+        );
+        expect(recorder.starts, 1);
+        expect(
+          inSheet(find.text(es.listeningSeconds('00:00'))),
+          findsOneWidget,
+        );
+        expect(inSheet(find.text(es.captureListeningOnline)), findsOneWidget);
+        for (var second = 0; second < 6; second++) {
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(inSheet(find.text(es.captureListeningOnline)), findsOneWidget);
+        expect(inSheet(find.text(es.captureNothingHeardYet)), findsNothing);
+        expect(inSheet(find.text(es.captureStillListening)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// A recognizer for opening capture: [capabilities] counts the questions,
@@ -2094,6 +2824,8 @@ Future<ProviderContainer> _open(
   bool fromButton = false,
   // Leaves opening capture to the test.
   bool open = true,
+  // Voz «En línea, al terminar»: the sheet records and the server listens.
+  bool speechOnline = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -2124,6 +2856,7 @@ Future<ProviderContainer> _open(
             language: language,
             clock: ClockFormat.twentyFour,
             weekStart: 1,
+            speechOnline: speechOnline,
           ),
         ),
       ),
@@ -2316,12 +3049,19 @@ class _Recorder extends Fake implements AudioRecorder {
   bool stopDuringStart = false;
   bool disposed = false;
   int stops = 0;
+
+  /// Recordings started, and what a start throws, if anything.
+  int starts = 0;
+  Object? startError;
   @override
   Stream<RecordState> onStateChanged() => states.stream;
   @override
   Future<bool> hasPermission({bool request = true}) async => true;
   @override
   Future<void> start(RecordConfig config, {required String path}) async {
+    starts++;
+    final error = startError;
+    if (error != null) throw error;
     if (pauseDuringStart) states.add(RecordState.pause);
     if (stopDuringStart) states.add(RecordState.stop);
   }
@@ -2422,4 +3162,18 @@ class _Bridge {
     'kind': kind,
     if (text != null) 'text': text,
   });
+}
+
+/// [_Speech] that notes when the start asks for the microphone, and can
+/// answer [delay] later, as the bridge does for a blocked microphone.
+class _AskedSpeech extends _Speech {
+  bool asked = false;
+  Duration? delay;
+  @override
+  Future<SpeechPermission> permission() async {
+    asked = true;
+    final wait = delay;
+    if (wait != null) await Future<void>.delayed(wait);
+    return super.permission();
+  }
 }

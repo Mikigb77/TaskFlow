@@ -35,6 +35,7 @@ import 'package:agenda/widgets/capture_review_editor.dart';
 import 'package:agenda/widgets/reminder_ask_sheet.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_form_entry.dart';
+import 'package:agenda/widgets/task_schedule_label.dart';
 
 // Each capture screen owns and releases its recorder. A factory also lets the
 // interruption contract be exercised without recording from a test machine.
@@ -461,6 +462,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _phase == _CapturePhase.processing ||
       (_phase == _CapturePhase.starting && !_recording);
   bool _micBlocked = false;
+  // Android's microphone question is open: the reason shows in place of
+  // `Listo`.
+  bool _askingMic = false;
+  Timer? _micAskTimer;
+  // The phone's own recognizer couldn't start, so this sheet listens online.
+  bool _wentOnline = false;
   bool _initialized = false;
   bool _autoStart = false;
   bool _autoStarted = false;
@@ -849,7 +856,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       _listening();
     }
     if (event.kind == 'error' && !_recognizerReady) {
-      // The recognizer never came up: the next capture asks again.
+      // The recognizer never came up: listen online instead, at once.
+      if (_canGoOnline &&
+          CaptureProblem.from(event.error ?? '') != CaptureProblem.microphone) {
+        unawaited(_listenOnline());
+        return;
+      }
       _speech.forget(_speechLanguage);
     }
     if (event.kind == 'ready') {
@@ -929,9 +941,25 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       setState(() => _seconds = timer.tick);
+      // The countdown shows each second; TalkBack hears it once.
+      if (timer.tick == 50) _announce(context.l10n.captureTimeLeft(10));
       // The time cap acts as if the user had stopped.
-      if (timer.tick >= 60) unawaited(_finishRecording());
+      if (timer.tick >= 60) unawaited(_timeUp());
     });
+  }
+
+  /// The time cap. The phone's own recognizer heard nothing: nothing to
+  /// send, so say so instead of `Listo`.
+  Future<void> _timeUp() async {
+    if (!_usingNative || _hasWords) return _finishRecording();
+    await _finishRecording(submit: false, quiet: true);
+    if (!mounted || _recording) return;
+    if (_hasWords) {
+      // The last words arrived as listening ended: they go on, as at `Listo`.
+      unawaited(_process());
+    } else {
+      setState(() => _error = CaptureProblem.noSpeech);
+    }
   }
 
   static bool _leaving(AppLifecycleState? state) =>
@@ -953,11 +981,39 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           'Save or discard this typed capture before starting a recording.',
         );
       }
-      final access = _usingNative
-          ? await _speech.permission()
-          : await _recorder!.hasPermission()
-          ? SpeechPermission.granted
-          : SpeechPermission.denied;
+      // The app's bridge asks on both paths: only it can tell `blocked`.
+      final asked = _speech.permission();
+      // Not allowed yet, and still unanswered after 300 ms: Android's
+      // question is up, so say why. A blocked microphone answers sooner,
+      // with no question. Read alongside, so an allowed start never waits.
+      var answered = false;
+      var waited = false;
+      var notGranted = false;
+      void ask() {
+        if (waited && notGranted && !answered && mounted) {
+          setState(() => _askingMic = true);
+        }
+      }
+
+      _micAskTimer?.cancel();
+      _micAskTimer = Timer(const Duration(milliseconds: 300), () {
+        waited = true;
+        ask();
+      });
+      unawaited(
+        _microphoneGranted().then((granted) {
+          notGranted = !granted;
+          ask();
+        }),
+      );
+      final SpeechPermission access;
+      try {
+        access = await asked;
+      } finally {
+        answered = true;
+        _micAskTimer?.cancel();
+        if (_askingMic && mounted) setState(() => _askingMic = false);
+      }
       if (access != SpeechPermission.granted) {
         unawaited(
           CaptureDiagnostics(
@@ -968,7 +1024,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           if (mounted) setState(() => _micBlocked = true);
           return;
         }
-        throw StateError('Allow microphone access to record, or type below.');
+        if (mounted) setState(() => _error = CaptureProblem.microphone);
+        return;
       }
       if (!mounted) return;
       if (_micBlocked) setState(() => _micBlocked = false);
@@ -1013,14 +1070,26 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         // Listening shows, and its clock runs, from the recognizer's `ready`,
         // or earlier from `listening` when the app's own microphone keeps
         // the words (Android 13+).
-        await _speech.start(
-          _nativeRun,
-          _speechLanguage,
-          hints: speechHints(
+        try {
+          await _speech.start(
+            _nativeRun,
             _speechLanguage,
-            projects: ref.read(taskListsProvider).valueOrNull ?? const [],
-          ),
-        );
+            hints: speechHints(
+              _speechLanguage,
+              projects: ref.read(taskListsProvider).valueOrNull ?? const [],
+            ),
+          );
+        } catch (error) {
+          if (!_canGoOnline ||
+              CaptureProblem.from(error) == CaptureProblem.microphone) {
+            rethrow;
+          }
+          // The phone can't listen by itself: listen online, with no tap.
+          _goOnline();
+          await _endNativeRun();
+          if (!mounted) return;
+          return await _startRecording();
+        }
         if (!mounted || _leaving(WidgetsBinding.instance.lifecycleState)) {
           await _finishRecording(submit: false, interrupted: true);
         }
@@ -1096,7 +1165,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           /* Preserve the transcript. */
         }
       }
-      _showProblem(error);
+      // Online after the phone's own recognizer failed, and that failed too.
+      _showProblem(
+        _wentOnline && !_usingNative ? CaptureProblem.speechUnavailable : error,
+      );
     } finally {
       await _stopping;
       if (mounted) {
@@ -1107,6 +1179,62 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         });
       }
     }
+  }
+
+  /// The microphone is allowed already (permission_handler's status). When
+  /// the phone can't say, as if it were: no reason line without a question.
+  Future<bool> _microphoneGranted() async {
+    try {
+      return await Permission.microphone.isGranted;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// The phone's own recognizer failed before it was ready, and nothing was
+  /// heard: this sheet can listen online instead.
+  bool get _canGoOnline =>
+      _usingNative &&
+      _recorder != null &&
+      _stopping == null &&
+      _words.text.trim().isEmpty &&
+      _session?.audioPath == null;
+
+  /// From now on this sheet listens online, and so do later captures in this
+  /// language this app session.
+  void _goOnline() {
+    _wentOnline = true;
+    _nativeMode = false;
+    _usingNative = false;
+    _capability = SpeechCapability(
+      onDevice: _capability.onDevice,
+      language: _speechLanguage,
+      languageInstalled: false,
+    );
+    _speech.remember(_speechLanguage, _capability);
+  }
+
+  /// Ends the phone's own listening run without keeping or sending anything.
+  Future<void> _endNativeRun() async {
+    _recording = false;
+    _acceptSpeech = false;
+    _timer?.cancel();
+    if (_speechEnded?.isCompleted == false) _speechEnded!.complete();
+    try {
+      await _speech.cancel(_nativeRun);
+    } catch (_) {
+      /* Nothing was heard. */
+    }
+  }
+
+  /// The phone's own recognizer stopped before it was ready: listen online,
+  /// with no message and no tap.
+  Future<void> _listenOnline() async {
+    _goOnline();
+    await _endNativeRun();
+    await _starting;
+    if (!mounted || _recording) return;
+    _starting = _startRecording();
   }
 
   /// Ends listening. Only the user stopping, or the time cap, [submit]s;
@@ -1565,6 +1693,39 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool get _hasInput =>
       _words.text.trim().isNotEmpty || _session?.audioPath != null;
 
+  /// The assistant found no task and no command in the words.
+  bool get _nothingFound => _failed && _error == CaptureProblem.noTasks;
+
+  /// `Volver a decirlo` after nothing was found: those words go, and a new
+  /// capture listens. Nothing is sent until `Listo`.
+  Future<void> _sayAgainAfterNothing() async {
+    if (_asking || _busy || !mounted) return;
+    _asking = true;
+    try {
+      await _writes;
+      final unfound = _session;
+      if (unfound != null) await _store.discard(unfound.id, _owner);
+    } catch (_) {
+      /* Kept in the pending list. */
+    } finally {
+      _asking = false;
+    }
+    if (!mounted) return;
+    ref.invalidate(pendingCapturesProvider);
+    _words.clear();
+    _nativePrefix = '';
+    _typedStarted = false;
+    _audioId = null;
+    setState(() {
+      _session = null;
+      _error = null;
+      _failed = false;
+      _phase = _CapturePhase.idle;
+    });
+    // With TalkBack, listening waits for `Empezar a hablar`, as on opening.
+    if (!MediaQuery.accessibleNavigationOf(context)) _beginRecording();
+  }
+
   /// Free dictations, as [build] and [_cancel] both see them. [watch] only
   /// from [build].
   ({bool usedUp, bool refused, bool waitsForMore}) _freeVoice({
@@ -1582,9 +1743,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // or from the server's refusal.
     final usedUp = !hasPro && (left == 0 || CaptureProblem.usedUp(_error));
     // Spoken words the assistant would refuse now: they are saved as written,
-    // or wait for more dictations. Nothing asks again.
+    // or wait for more dictations. Nothing asks again. Words it already found
+    // nothing in don't wait.
     final refused =
-        usedUp && resting && (recorded || _session?.source == 'speech');
+        usedUp &&
+        resting &&
+        !_nothingFound &&
+        (recorded || _session?.source == 'speech');
     // Only a recording, with no words to save: it waits.
     final waitsForMore = refused && recorded && !_hasWords;
     return (usedUp: usedUp, refused: refused, waitsForMore: waitsForMore);
@@ -1806,6 +1971,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _slowTimer?.cancel();
+    _micAskTimer?.cancel();
     unawaited(_release());
     _words.dispose();
     _wordsFocus.dispose();
@@ -1893,7 +2059,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final (:usedUp, :refused, :waitsForMore) = _freeVoice(watch: true);
     // Only a recording waits: the sheet only closes.
     final recordingWaits = waitsForMore && _previousResult == null;
-    final usedUpLine = usedUp && (!_voice || refused)
+    // The assistant found nothing in spoken words: say them again, or, with
+    // no dictations left, type. Typed words stay in their field, with `Listo`.
+    final nothingFound = _nothingFound && resting;
+    final sayAgain =
+        nothingFound && !_typing && _voice && ref.watch(voiceAvailableProvider);
+    final typeFirst = nothingFound && !_typing && !sayAgain;
+    final usedUpLine = usedUp && (!_voice || refused || typeFirst)
         ? freeVoiceUsedUpText(
             l10n,
             ref.watch(freeVoiceResetsProvider),
@@ -1917,10 +2089,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         : !listening
         ? null
         : _seconds >= 50
-        ? l10n.captureTimeLeft
-        : _seconds - _wordsAt >= 5
-        ? l10n.captureStillListening
-        : null;
+        ? l10n.captureTimeLeft(60 - _seconds)
+        // Online, no words show while speaking: say so from the start.
+        : !_usingNative
+        ? l10n.captureListeningOnline
+        : _seconds - _wordsAt < 5
+        ? null
+        : _words.text.trim().isEmpty
+        ? l10n.captureNothingHeardYet
+        : l10n.captureStillListening;
     // Nothing heard and nothing listening (TalkBack, or after a problem): one
     // button starts listening.
     final waiting = resting && !_typing && !_hasInput;
@@ -1932,6 +2109,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         !_typing &&
         !recorded &&
         _nativeMode &&
+        !_micBlocked &&
         _words.text.trim().isNotEmpty;
     final failed = _failed && resting;
     // The assistant is slow, or failed: the words can be saved as written.
@@ -1940,8 +2118,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     // Without Pro, typed words make a task only in the form: the keyboard,
     // `Escribir`, opens it, and so does `Listo` on typed words.
     final byHand = _kind == 'task' && ref.watch(typesInFormProvider);
+    // Blocked: asking again shows nothing, so Settings is the way back.
+    final settingsFirst = waiting && _micBlocked;
     final primary = <Widget>[
-      if (waiting)
+      if (settingsFirst)
+        FilledButton(
+          key: const ValueKey('capture-open-settings'),
+          autofocus: true,
+          onPressed: openAppSettings,
+          child: Text(l10n.captureOpenSettings),
+        )
+      else if (waiting)
         FilledButton(
           autofocus: true,
           onPressed: _busy ? null : _beginRecording,
@@ -1964,6 +2151,31 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             onPressed: () => unawaited(_saveAsWritten()),
             child: Text(l10n.captureSaveAsWritten),
           ),
+      ] else if (nothingFound) ...[
+        if (sayAgain)
+          FilledButton(
+            onPressed: _busy ? null : () => unawaited(_sayAgainAfterNothing()),
+            child: Text(l10n.captureSayAgain),
+          )
+        else if (typeFirst)
+          FilledButton(
+            onPressed: _busy
+                ? null
+                : byHand
+                ? () => unawaited(_fillByHand())
+                : () => unawaited(_typeInstead()),
+            child: Text(l10n.captureTypeInstead),
+          )
+        else
+          FilledButton(
+            onPressed: _busy || !_hasInput ? null : _done,
+            child: Text(l10n.done),
+          ),
+        if (saveAsWritten)
+          TextButton(
+            onPressed: () => unawaited(_saveAsWritten()),
+            child: Text(l10n.captureSaveAsWritten),
+          ),
       ] else if (saveAsWritten) ...[
         if (failed)
           FilledButton.tonal(
@@ -1978,6 +2190,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         FilledButton(
           onPressed: _busy || !_hasInput ? null : _done,
           child: Text(l10n.tryAgain),
+        )
+      // Android's microphone question is up: why, in place of `Listo`.
+      else if (_askingMic)
+        Text(
+          l10n.captureMicrophoneWhy,
+          key: const ValueKey('capture-microphone-why'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
         )
       else ...[
         if (canContinue)
@@ -2049,28 +2270,36 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       ],
       if (_timezoneFallback) MessageBanner(l10n.timezoneFallback(_zone)),
       if (_micBlocked) ...[
+        // A choice the person made, not a fault: the neutral style, still
+        // read out when it appears.
         MessageBanner(
           l10n.captureMicrophoneBlocked,
-          isError: true,
           icon: Icons.mic_off_outlined,
+          liveRegion: true,
         ),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: TextButton(
-            onPressed: openAppSettings,
-            child: Text(l10n.captureOpenSettings),
+        // With words kept, Settings has no filled button of its own.
+        if (!settingsFirst)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              onPressed: openAppSettings,
+              child: Text(l10n.captureOpenSettings),
+            ),
           ),
-        ),
       ],
     ];
     // Directly under the status line, read out when it appears.
     // A refusal for used-up dictations reads as the line above the words.
+    // A refused microphone is a choice, not a fault: the neutral style.
+    final microphone = _error == CaptureProblem.microphone;
     final error =
         _error == null || (usedUpLine != null && CaptureProblem.usedUp(_error))
         ? null
         : MessageBanner(
             captureProblemText(l10n, _error!),
-            isError: _error != CaptureProblem.setupRequested,
+            isError: _error != CaptureProblem.setupRequested && !microphone,
+            icon: microphone ? Icons.mic_off_outlined : null,
+            liveRegion: microphone ? true : null,
           );
     final working = phase == _CapturePhase.processing || _stopping != null;
     return PopScope(
@@ -2130,14 +2359,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                     ),
                   ),
                 ),
-              // Short, so it never pushes the newest words out of view.
+              // Short, so it never pushes the newest words out of view. With
+              // no words shown, it reads in full at large text.
               if (hint != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     hint,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: _hasWords ? 2 : null,
+                    overflow: _hasWords ? TextOverflow.ellipsis : null,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
@@ -2152,10 +2382,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                 context,
                 primary,
                 // `Reintentar` and `Guardar como tarea` read in full only
-                // stacked.
-                stack: failed && saveAsWritten,
+                // stacked; Settings and the reason take the whole width.
+                stack: (failed && saveAsWritten) || settingsFirst || _askingMic,
                 showCancel: !recordingWaits,
-                showType: !_typing && !recorded,
+                // `Escribir` filled above needs no keyboard beside it.
+                showType: !_typing && !recorded && !typeFirst,
                 byHand: byHand,
                 onType: working
                     ? null
@@ -2189,13 +2420,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               backgroundColor: colors.surfaceContainerHighest,
             ),
           ),
-          Icon(
-            Icons.mic_none_rounded,
-            size: 32,
-            color: phase == _CapturePhase.listening
-                ? colors.primary
-                : colors.onSurfaceVariant,
-          ),
+          // Understanding: the spinner alone, so it doesn't look like
+          // listening.
+          if (phase != _CapturePhase.processing)
+            Icon(
+              Icons.mic_none_rounded,
+              size: 32,
+              color: phase == _CapturePhase.listening
+                  ? colors.primary
+                  : colors.onSurfaceVariant,
+            ),
         ],
       ),
     ),
@@ -2337,6 +2571,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   bool _finished = false;
   bool _asking = false;
   final _actions = GlobalKey();
+  // Each card, by its draft's or command's id: the one still asking is
+  // scrolled into view.
+  final _cards = <String, GlobalKey>{};
 
   @override
   void initState() {
@@ -2345,14 +2582,175 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     unawaited(
       CaptureDiagnostics(_store.database).record(CaptureEvent.reviewOpened),
     );
-    if (widget.saveAtOnce) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final pending = _items.where((d) => d.pending);
-        if (mounted && pending.isNotEmpty && pending.every((d) => d.ready)) {
-          unawaited(_save());
-        }
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final pending = _items.where((d) => d.pending);
+      if (widget.saveAtOnce &&
+          pending.isNotEmpty &&
+          pending.every((d) => d.ready)) {
+        unawaited(_save());
+        return;
+      }
+      _reveal();
+      _announce();
+    });
+  }
+
+  /// The open questions and choices still to answer on the cards.
+  int _openCount() =>
+      _items
+          .where((d) => d.pending)
+          .fold(
+            0,
+            (count, draft) =>
+                count +
+                (draft.confirmed
+                    ? 0
+                    : draft.reviewQuestions
+                          .where((q) => !draft.resolvedQuestions.contains(q.id))
+                          .length) +
+                (draft.assignmentReviewed ? 0 : 1) +
+                (draft.projectSuggestion == null ? 0 : 1),
+          ) +
+      _views().where((view) => view.blocking).length;
+
+  /// The first card, in the order shown, that still asks something; with
+  /// nothing to answer, the first task the button deletes.
+  BuildContext? _firstOpen() {
+    final views = _views();
+    bool asks(CaptureDraft draft) =>
+        !draft.confirmed ||
+        !draft.assignmentReviewed ||
+        draft.projectSuggestion != null;
+    final id = [
+      for (final view in views)
+        if (view.kind == CommandKind.project && view.blocking) view.command.id,
+      for (final draft in _items)
+        if (draft.pending && asks(draft)) draft.id,
+      for (final view in views)
+        if (view.kind != CommandKind.project && view.blocking) view.command.id,
+      for (final view in views)
+        if (view.kind == CommandKind.delete && view.actionable) view.command.id,
+    ].firstOrNull;
+    return id == null ? null : _cards[id]?.currentContext;
+  }
+
+  /// The first widget under [root] that [test] accepts, in the order shown.
+  static Element? _firstIn(BuildContext root, bool Function(Widget) test) {
+    Element? found;
+    void visit(Element element) {
+      if (found != null) return;
+      if (test(element.widget)) {
+        found = element;
+      } else {
+        element.visitChildren(visit);
+      }
     }
+
+    (root as Element).visitChildren(visit);
+    return found;
+  }
+
+  /// The first question box inside [card], with the chips that answer it.
+  static Element? _questionIn(BuildContext card) =>
+      _firstIn(card, (widget) => widget is QuestionBox);
+
+  /// A command card's first line under [root], as shown.
+  static String? _headlineIn(BuildContext root) {
+    final headline = _firstIn(
+      root,
+      (widget) => widget.key == const ValueKey('command-headline'),
+    )?.widget;
+    return headline is Text ? headline.data : null;
+  }
+
+  /// The confirming button's label, as shown; none for a search.
+  String? _buttonLabel() {
+    final button = _firstIn(
+      context,
+      (widget) => widget.key == const ValueKey('save-drafts'),
+    );
+    final label = button == null
+        ? null
+        : _firstIn(button, (widget) => widget is Text)?.widget;
+    return label is Text ? label.data : null;
+  }
+
+  /// The first open question's answers, or its card, scrolled into view
+  /// above the buttons; with nothing open, the task the button deletes.
+  /// Otherwise the scroll stays where it is.
+  void _reveal() {
+    final card = _firstOpen();
+    if (card == null) return;
+    final still = MediaQuery.disableAnimationsOf(context);
+    unawaited(
+      Scrollable.ensureVisible(
+        _questionIn(card) ?? card,
+        alignment: 1,
+        duration: still ? Duration.zero : const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  /// After an answer, the next question comes into view.
+  void _revealAfter(int open) {
+    if (_openCount() >= open) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reveal();
+    });
+  }
+
+  /// TalkBack hears what the result understood, once, without moving focus:
+  /// one task's title and its date line, or how many things there are to
+  /// add; one command's first line as shown (a change's task, with the
+  /// button); for any other mix, the button's label as shown, or with no
+  /// button (a search) the first card's line; and the open question.
+  void _announce() {
+    final l = context.l10n;
+    final pending = _items.where((d) => d.pending).toList();
+    final views = _usesCommands ? _views() : const <CommandView>[];
+    final cards = pending.length + views.length;
+    final adding = views.every(
+      (view) => view.kind == CommandKind.project && !view.command.existing,
+    );
+    final button = _buttonLabel();
+    final String? summary;
+    if (cards == 1 && pending.length == 1) {
+      final task = pending.single.task;
+      summary = task.isNote
+          ? task.title
+          : '${task.title}, ${taskDayLine(context, task)}';
+    } else if (cards > 1 && adding) {
+      summary = l.captureThingsToAdd(cards);
+    } else if (cards == 1) {
+      final view = views.single;
+      final card = _cards[view.command.id]?.currentContext;
+      final headline = card == null ? null : _headlineIn(card);
+      // A change's card is headed by the task's title alone.
+      final titleOnly =
+          view.kind == CommandKind.update && !view.notFound && !view.choosing;
+      summary = headline != null && titleOnly && button != null
+          ? '$headline, $button'
+          : headline;
+    } else if (cards > 1) {
+      summary = button ?? _headlineIn(context);
+    } else {
+      return;
+    }
+    if (summary == null || summary.isEmpty) return;
+    final card = _firstOpen();
+    final question = card == null ? null : _questionIn(card)?.widget;
+    final message = question is QuestionBox
+        ? '$summary. ${question.question}'
+        : summary;
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
+        Directionality.of(context),
+      ),
+    );
   }
 
   @override
@@ -2393,6 +2791,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         ?.projectSuggestion;
     // A choice for a project said serves every task that said it.
     final chosen = said != null && draft.projectSuggestion == null;
+    final open = _openCount();
     setState(() {
       _items = _items
           .map(
@@ -2408,6 +2807,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           .toList();
       _error = null;
     });
+    _revealAfter(open);
     await _write();
   }
 
@@ -2455,6 +2855,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         matched != null &&
         draft.newProject == null &&
         draft.task.listId == matched;
+    final open = _openCount();
     setState(() {
       _commands = [
         for (final item in _commands) item.id == command.id ? command : item,
@@ -2487,6 +2888,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       }
       _error = null;
     });
+    _revealAfter(open);
     await _write();
   }
 
@@ -3659,7 +4061,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         views.every(
           (view) => view.kind == CommandKind.project && !view.command.existing,
         );
-    Widget card(Widget child) => Padding(
+    Widget card(String id, Widget child) => Padding(
+      key: _cards.putIfAbsent(id, GlobalKey.new),
       padding: EdgeInsets.only(bottom: compact ? 12 : 0),
       child: child,
     );
@@ -3699,9 +4102,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                   children: [
                     for (final view in views)
                       if (view.kind == CommandKind.project)
-                        card(_commandCard(view, pending)),
+                        card(view.command.id, _commandCard(view, pending)),
                     for (final item in pending)
                       card(
+                        item.id,
                         CaptureReviewEditor(
                           key: ValueKey(item.id),
                           draft: item,
@@ -3721,12 +4125,39 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                       ),
                     for (final view in views)
                       if (view.kind != CommandKind.project)
-                        card(_commandCard(view, pending)),
+                        card(view.command.id, _commandCard(view, pending)),
                     if (cards == 0)
                       EmptyState(
                         title: l.captureNothingToReview,
                         message: l.captureRemovedDraftsHelp,
                       ),
+                    // The words, rarely needed: after the cards, so the
+                    // buttons under them take less room. Quieter, and set
+                    // apart, so it doesn't read as one more card's option:
+                    // 16 dp under the last card (compact ones carry 12).
+                    SizedBox(height: compact ? 4 : 16),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      iconColor: theme.colorScheme.onSurfaceVariant,
+                      collapsedIconColor: theme.colorScheme.onSurfaceVariant,
+                      textColor: theme.colorScheme.onSurfaceVariant,
+                      collapsedTextColor: theme.colorScheme.onSurfaceVariant,
+                      leading: Icon(
+                        spoken
+                            ? Icons.graphic_eq_rounded
+                            : Icons.short_text_rounded,
+                        size: 20,
+                      ),
+                      title: Text(
+                        spoken ? l.reviewOriginal : l.reviewOriginalText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      childrenPadding: const EdgeInsets.only(bottom: 8),
+                      expandedAlignment: Alignment.centerLeft,
+                      children: [SelectableText(_session.transcript)],
+                    ),
                   ],
                 ),
               ),
@@ -3786,30 +4217,6 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                     ],
                     SizedBox(height: readOnly && !asWritten ? 0 : 12),
                     _exits(context, canSayAgain: sayAgain, close: readOnly),
-                    ExpansionTile(
-                      tilePadding: EdgeInsets.zero,
-                      leading: Icon(
-                        spoken
-                            ? Icons.graphic_eq_rounded
-                            : Icons.short_text_rounded,
-                        size: 20,
-                      ),
-                      title: Text(
-                        spoken ? l.reviewOriginal : l.reviewOriginalText,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      childrenPadding: const EdgeInsets.only(bottom: 8),
-                      expandedAlignment: Alignment.centerLeft,
-                      children: [
-                        // Long words scroll here, so the button stays in view.
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 160),
-                          child: SingleChildScrollView(
-                            child: SelectableText(_session.transcript),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ],
               ),

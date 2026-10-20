@@ -64,9 +64,10 @@ void main() {
       await tester.pumpAndSettle();
       // Requesting a recovery email must not require a password or a code.
       expect(api.requests.single.$1, 'auth/password-reset/');
-      expect(api.requests.single.$2, {'email': 'recovery@example.invalid'});
-      await reveal(find.text(
-          'Si la cuenta existe, se ha enviado un correo de recuperación.'));
+      expect(api.requests.single.$2,
+          {'email': 'recovery@example.invalid', 'language': 'es'});
+      await reveal(find.text('Si recovery@example.invalid tiene cuenta, te '
+          'llegará un correo con un código. Escríbelo aquí.'));
       expect(tester.takeException(), isNull);
 
       final code = find.byKey(const ValueKey('account-recovery-code'));

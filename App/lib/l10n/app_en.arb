@@ -40,7 +40,7 @@
       }
     }
   },
-  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
+  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{This email already has an account.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
   "@requestError": {
     "description": "Localized account, sync and file error categories. Never display raw server exception text.",
     "placeholders": {
@@ -178,7 +178,10 @@
   "calendarOpenEvent": "Open in calendar app",
   "calendarOpenError": "The calendar app could not open this event.",
   "calendarEventGone": "This event is no longer available in the selected calendars.",
-  "noScheduledTasks": "No TaskFlow tasks scheduled",
+  "noScheduledTasks": "No tasks for this day.",
+  "@noScheduledTasks": {
+    "description": "Calendar, an empty day while the phone's calendars are shown: the only line about tasks, followed by the line with the phone's events."
+  },
   "calendar": "Calendar",
   "tasks": "Tasks",
   "settings": "Settings",
@@ -311,7 +314,6 @@
     "description": "Link that opens the website’s Terms and Conditions in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page."
   },
   "todayAgenda": "Today’s agenda",
-  "breathingRoom": "A little breathing room.",
   "loadTasksError": "Couldn’t load your tasks",
   "refreshCalendar": "Try refreshing your calendar.",
   "tryAgain": "Try again",
@@ -723,7 +725,15 @@
   "connectionSettings": "Connection settings",
   "backendAddress": "Backend address",
   "backendAddressHelp": "Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.",
-  "recoveryEmailRequested": "If that account exists, a recovery email has been sent.",
+  "recoveryEmailRequested": "If {email} has an account, an email with a code is on its way. Type it here.",
+  "@recoveryEmailRequested": {
+    "description": "Recovery, shown above the recovery code field after the code was requested. Names the address typed without saying whether it has an account.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "passwordResetComplete": "Password updated. Sign in with your new password.",
   "verifyEmailHeading": "Confirm your email",
   "@verifyEmailHeading": {
@@ -1468,7 +1478,10 @@
   },
   "captureGone": "Your words are no longer available.",
   "captureNoteLength": "A note needs 1 to 8000 characters.",
-  "captureNoTasks": "No tasks were found. Your words are kept.",
+  "captureNoTasks": "I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”",
+  "@captureNoTasks": {
+    "description": "Capture sheet banner, read out once, when the assistant found no task and no command in the words. Gives an example of what to say next; Say again (captureSayAgain) is the button under it."
+  },
   "captureUnsupportedKind": "This server does not support this way of adding tasks. Your words are kept.",
   "captureOffline": "No internet. Your words are saved — try again when you’re online.",
   "captureUnavailable": "Couldn’t reach the assistant — your words are kept.",
@@ -1477,14 +1490,21 @@
   "captureForbidden": "This account can’t turn your words into tasks. Check your access and try again.",
   "captureTooLarge": "This recording exceeds the service limit. Keep it for later or use a shorter typed description.",
   "captureTypedFirst": "Save or discard what you typed before starting a recording.",
-  "captureMicrophone": "Allow microphone access to record, or type below.",
-  "captureMicrophoneBlocked": "Microphone is off for TaskFlow. Turn it on in Settings, or type instead.",
+  "captureMicrophone": "Without the microphone I can’t hear you. Tap Start talking to allow it, or Type instead.",
+  "@captureMicrophone": {
+    "description": "Capture sheet banner, not an error, after the person refused the microphone and Android can still ask. Names the two buttons shown under it: Start talking (captureStartTalking) and Type instead (captureTypeInstead)."
+  },
+  "captureMicrophoneBlocked": "To dictate again, open Settings and tap Permissions › Microphone › Allow.",
   "@captureMicrophoneBlocked": {
-    "description": "Shown by the microphone when Android will no longer ask for microphone access."
+    "description": "Capture sheet banner, not an error, when Android will no longer ask for the microphone. The steps name Android’s own App info screen: Permissions, then Microphone, then Allow."
   },
   "captureOpenSettings": "Open Settings",
   "@captureOpenSettings": {
     "description": "Opens the phone’s settings for TaskFlow, to turn the microphone on."
+  },
+  "captureMicrophoneWhy": "Allow the microphone to dictate your tasks. It only listens while you dictate.",
+  "@captureMicrophoneWhy": {
+    "description": "One line in the capture sheet, in place of the Done button, while Android’s own microphone question is open the first time. Says why the app asks."
   },
   "captureStarting": "One moment…",
   "@captureStarting": {
@@ -1512,11 +1532,24 @@
   },
   "captureStillListening": "Still listening. Tap Done when finished.",
   "@captureStillListening": {
-    "description": "Shown under the words after about 5 seconds without new words."
+    "description": "Shown under the words after about 5 seconds without new words, once some words were heard."
   },
-  "captureTimeLeft": "10 seconds left",
+  "captureNothingHeardYet": "Nothing heard yet. Speak when you’re ready, or tap Type instead.",
+  "@captureNothingHeardYet": {
+    "description": "Shown under the microphone after about 5 seconds of listening with no words heard yet, on the phone’s own speech recognition. Names the Type instead button (captureTypeInstead)."
+  },
+  "captureListeningOnline": "I’m listening. You’ll see your words when you tap Done.",
+  "@captureListeningOnline": {
+    "description": "Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done)."
+  },
+  "captureTimeLeft": "{seconds, plural, =1{1 second left} other{{seconds} seconds left}}",
   "@captureTimeLeft": {
-    "description": "Shown 10 seconds before the 60-second listening limit."
+    "description": "Shown under the microphone in the last 10 seconds of the 60-second listening limit, counting down each second; read out once, at 10 seconds left.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
   },
   "captureKeepQuestion": "Keep what you said for later?",
   "@captureKeepQuestion": {
@@ -1530,8 +1563,10 @@
   "captureEmptyInput": "Say or type what you need to do first.",
   "captureSpeechStopped": "Listening stopped. You can talk again, or type.",
   "captureNoSpeech": "I didn’t catch that. Try again, or type it.",
-  "captureSpeechLanguage": "On-device speech is not installed for this language. Choose another language, record audio, or type.",
-  "captureSpeechUnavailable": "On-device speech is unavailable. Record audio or type instead.",
+  "captureCantListen": "I can’t listen on this phone right now. Tap Type instead.",
+  "@captureCantListen": {
+    "description": "Capture sheet, when neither the phone’s own speech recognition nor listening online could start. Names the Type instead button (captureTypeInstead)."
+  },
   "captureSpeechBusy": "A microphone request is already open. Finish it before trying again.",
   "captureIncompleteAudio": "The retained audio is incomplete and cannot be processed. It is still kept on this phone.",
   "captureWriteFailed": "Couldn’t keep this on your phone. Try again before leaving.",
@@ -1803,6 +1838,10 @@
     }
   },
   "continueWithGoogle": "Continue with Google",
+  "invitationWaitingSignIn": "You have an invitation. Sign in with the email address it was sent to.",
+  "@invitationWaitingSignIn": {
+    "description": "Sign-in, above Continue with Google, while an invitation link opened before signing in waits: the invitation only works for the address it was sent to."
+  },
   "linkGoogleAccount": "Link Google account",
   "googleAccountLinked": "Google account linked",
   "googleLinkHelp": "Confirm your TaskFlow password, then choose the Google account with the same email. Your tasks and subscription will stay in this account.",

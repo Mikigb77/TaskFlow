@@ -122,8 +122,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'https': 'Utilitza una adreça de servidor HTTPS en aquesta versió.',
       'serverAddress':
           'Introdueix una adreça de servidor vàlida, com ara https://el-teu-servidor.example.',
-      'emailUsed':
-          'Ja existeix un compte amb aquest correu. Inicia la sessió o recupera la contrasenya.',
+      'emailUsed': 'Aquest correu ja té un compte.',
       'email': 'Introdueix una adreça de correu vàlida.',
       'credentials': 'No trobem aquest compte o la contrasenya no és correcta.',
       'session':
@@ -436,7 +435,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'Aquest esdeveniment ja no està disponible als calendaris seleccionats.';
 
   @override
-  String get noScheduledTasks => 'No hi ha tasques de TaskFlow planificades';
+  String get noScheduledTasks => 'No hi ha tasques per a aquest dia.';
 
   @override
   String get calendar => 'Calendari';
@@ -718,9 +717,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get todayAgenda => 'L’agenda d’avui';
-
-  @override
-  String get breathingRoom => 'Una mica d’espai per respirar.';
 
   @override
   String get loadTasksError => 'No s’han pogut carregar les tasques';
@@ -1460,7 +1456,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'Demana un correu de recuperació i utilitza el codi per establir una contrasenya nova.';
 
   @override
-  String get email => 'Correu electrònic';
+  String get email => 'Correu';
 
   @override
   String get enterEmail => 'Introdueix el teu correu electrònic';
@@ -1537,8 +1533,9 @@ class AppLocalizationsCa extends AppLocalizations {
       'Emulador: http://10.0.2.2:8088\nTelèfon: la IP local de l’ordinador a la mateixa xarxa Wi-Fi.';
 
   @override
-  String get recoveryEmailRequested =>
-      'Si aquest compte existeix, s’hi ha enviat un correu de recuperació.';
+  String recoveryEmailRequested(String email) {
+    return 'Si $email té compte, t’arribarà un correu amb un codi. Escriu-lo aquí.';
+  }
 
   @override
   String get passwordResetComplete =>
@@ -2686,7 +2683,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureNoTasks =>
-      'No s’ha trobat cap tasca. Les teves paraules es conserven.';
+      'No he trobat cap tasca. Digues què i quan, per exemple: «Demà, trucar al dentista».';
 
   @override
   String get captureUnsupportedKind =>
@@ -2722,14 +2719,18 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureMicrophone =>
-      'Permet l’accés al micròfon per gravar o escriu a sota.';
+      'Sense micròfon no et puc escoltar. Toca Comença a parlar per permetre-ho, o Escriu.';
 
   @override
   String get captureMicrophoneBlocked =>
-      'El micròfon està desactivat per a TaskFlow. Activa’l a Configuració o escriu.';
+      'Per tornar a dictar, obre Configuració i toca Permisos › Micròfon › Permet.';
 
   @override
   String get captureOpenSettings => 'Obre Configuració';
+
+  @override
+  String get captureMicrophoneWhy =>
+      'Permet el micròfon per dictar les tasques. Només escolta mentre dictes.';
 
   @override
   String get captureStarting => 'Un moment…';
@@ -2753,7 +2754,23 @@ class AppLocalizationsCa extends AppLocalizations {
   String get captureStillListening => 'Encara t’escolto. Toca Fet quan acabis.';
 
   @override
-  String get captureTimeLeft => 'Queden 10 segons';
+  String get captureNothingHeardYet =>
+      'Encara no he sentit res. Parla quan vulguis o toca Escriu.';
+
+  @override
+  String get captureListeningOnline =>
+      'T’escolto. Veuràs les paraules quan toquis Fet.';
+
+  @override
+  String captureTimeLeft(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: 'Queden $seconds segons',
+      one: 'Queda 1 segon',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get captureKeepQuestion =>
@@ -2778,12 +2795,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get captureNoSpeech => 'No t’he entès. Torna-ho a provar o escriu-ho.';
 
   @override
-  String get captureSpeechLanguage =>
-      'El reconeixement de veu local no està instal·lat per a aquest idioma. Tria un altre idioma, grava àudio o escriu.';
-
-  @override
-  String get captureSpeechUnavailable =>
-      'El reconeixement de veu local no està disponible. Grava àudio o escriu.';
+  String get captureCantListen =>
+      'Ara no et puc escoltar en aquest telèfon. Toca Escriu.';
 
   @override
   String get captureSpeechBusy =>
@@ -3241,6 +3254,10 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get continueWithGoogle => 'Continua amb Google';
+
+  @override
+  String get invitationWaitingSignIn =>
+      'Tens una invitació. Entra amb el correu on l’has rebuda.';
 
   @override
   String get linkGoogleAccount => 'Vincula el compte de Google';

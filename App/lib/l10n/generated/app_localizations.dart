@@ -235,7 +235,7 @@ abstract class AppLocalizations {
   /// Localized account, sync and file error categories. Never display raw server exception text.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{An account with this email already exists. Sign in or recover your password.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
+  /// **'{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{This email already has an account.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}'**
   String requestError(String reason);
 
   /// No description provided for @languageAutomatic.
@@ -712,10 +712,10 @@ abstract class AppLocalizations {
   /// **'This event is no longer available in the selected calendars.'**
   String get calendarEventGone;
 
-  /// No description provided for @noScheduledTasks.
+  /// Calendar, an empty day while the phone's calendars are shown: the only line about tasks, followed by the line with the phone's events.
   ///
   /// In en, this message translates to:
-  /// **'No TaskFlow tasks scheduled'**
+  /// **'No tasks for this day.'**
   String get noScheduledTasks;
 
   /// No description provided for @calendar.
@@ -1257,12 +1257,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Today’s agenda'**
   String get todayAgenda;
-
-  /// No description provided for @breathingRoom.
-  ///
-  /// In en, this message translates to:
-  /// **'A little breathing room.'**
-  String get breathingRoom;
 
   /// No description provided for @loadTasksError.
   ///
@@ -2620,11 +2614,11 @@ abstract class AppLocalizations {
   /// **'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.'**
   String get backendAddressHelp;
 
-  /// No description provided for @recoveryEmailRequested.
+  /// Recovery, shown above the recovery code field after the code was requested. Names the address typed without saying whether it has an account.
   ///
   /// In en, this message translates to:
-  /// **'If that account exists, a recovery email has been sent.'**
-  String get recoveryEmailRequested;
+  /// **'If {email} has an account, an email with a code is on its way. Type it here.'**
+  String recoveryEmailRequested(String email);
 
   /// No description provided for @passwordResetComplete.
   ///
@@ -4288,10 +4282,10 @@ abstract class AppLocalizations {
   /// **'A note needs 1 to 8000 characters.'**
   String get captureNoteLength;
 
-  /// No description provided for @captureNoTasks.
+  /// Capture sheet banner, read out once, when the assistant found no task and no command in the words. Gives an example of what to say next; Say again (captureSayAgain) is the button under it.
   ///
   /// In en, this message translates to:
-  /// **'No tasks were found. Your words are kept.'**
+  /// **'I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”'**
   String get captureNoTasks;
 
   /// No description provided for @captureUnsupportedKind.
@@ -4342,16 +4336,16 @@ abstract class AppLocalizations {
   /// **'Save or discard what you typed before starting a recording.'**
   String get captureTypedFirst;
 
-  /// No description provided for @captureMicrophone.
+  /// Capture sheet banner, not an error, after the person refused the microphone and Android can still ask. Names the two buttons shown under it: Start talking (captureStartTalking) and Type instead (captureTypeInstead).
   ///
   /// In en, this message translates to:
-  /// **'Allow microphone access to record, or type below.'**
+  /// **'Without the microphone I can’t hear you. Tap Start talking to allow it, or Type instead.'**
   String get captureMicrophone;
 
-  /// Shown by the microphone when Android will no longer ask for microphone access.
+  /// Capture sheet banner, not an error, when Android will no longer ask for the microphone. The steps name Android’s own App info screen: Permissions, then Microphone, then Allow.
   ///
   /// In en, this message translates to:
-  /// **'Microphone is off for TaskFlow. Turn it on in Settings, or type instead.'**
+  /// **'To dictate again, open Settings and tap Permissions › Microphone › Allow.'**
   String get captureMicrophoneBlocked;
 
   /// Opens the phone’s settings for TaskFlow, to turn the microphone on.
@@ -4359,6 +4353,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Settings'**
   String get captureOpenSettings;
+
+  /// One line in the capture sheet, in place of the Done button, while Android’s own microphone question is open the first time. Says why the app asks.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the microphone to dictate your tasks. It only listens while you dictate.'**
+  String get captureMicrophoneWhy;
 
   /// Capture status while the microphone starts, before it is listening.
   ///
@@ -4396,17 +4396,29 @@ abstract class AppLocalizations {
   /// **'Type instead'**
   String get captureTypeInstead;
 
-  /// Shown under the words after about 5 seconds without new words.
+  /// Shown under the words after about 5 seconds without new words, once some words were heard.
   ///
   /// In en, this message translates to:
   /// **'Still listening. Tap Done when finished.'**
   String get captureStillListening;
 
-  /// Shown 10 seconds before the 60-second listening limit.
+  /// Shown under the microphone after about 5 seconds of listening with no words heard yet, on the phone’s own speech recognition. Names the Type instead button (captureTypeInstead).
   ///
   /// In en, this message translates to:
-  /// **'10 seconds left'**
-  String get captureTimeLeft;
+  /// **'Nothing heard yet. Speak when you’re ready, or tap Type instead.'**
+  String get captureNothingHeardYet;
+
+  /// Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done).
+  ///
+  /// In en, this message translates to:
+  /// **'I’m listening. You’ll see your words when you tap Done.'**
+  String get captureListeningOnline;
+
+  /// Shown under the microphone in the last 10 seconds of the 60-second listening limit, counting down each second; read out once, at 10 seconds left.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds, plural, =1{1 second left} other{{seconds} seconds left}}'**
+  String captureTimeLeft(int seconds);
 
   /// The question asked when leaving the capture sheet with something said: by Cancel, Back, a tap above the sheet or a swipe down, while listening, or on the result of spoken words. No body text; its buttons are discard and keep.
   ///
@@ -4444,17 +4456,11 @@ abstract class AppLocalizations {
   /// **'I didn’t catch that. Try again, or type it.'**
   String get captureNoSpeech;
 
-  /// No description provided for @captureSpeechLanguage.
+  /// Capture sheet, when neither the phone’s own speech recognition nor listening online could start. Names the Type instead button (captureTypeInstead).
   ///
   /// In en, this message translates to:
-  /// **'On-device speech is not installed for this language. Choose another language, record audio, or type.'**
-  String get captureSpeechLanguage;
-
-  /// No description provided for @captureSpeechUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'On-device speech is unavailable. Record audio or type instead.'**
-  String get captureSpeechUnavailable;
+  /// **'I can’t listen on this phone right now. Tap Type instead.'**
+  String get captureCantListen;
 
   /// No description provided for @captureSpeechBusy.
   ///
@@ -4947,6 +4953,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue with Google'**
   String get continueWithGoogle;
+
+  /// Sign-in, above Continue with Google, while an invitation link opened before signing in waits: the invitation only works for the address it was sent to.
+  ///
+  /// In en, this message translates to:
+  /// **'You have an invitation. Sign in with the email address it was sent to.'**
+  String get invitationWaitingSignIn;
 
   /// No description provided for @linkGoogleAccount.
   ///

@@ -148,7 +148,7 @@ void main() {
         'android/app/src/main/kotlin/com/example/agenda/CaptureShortcuts.kt',
       ).readAsStringSync();
       String iconOf(String id) => RegExp(
-        '"$id", R\.string\.[a-z_]+, R\.drawable\.([a-z_]+)',
+        '"$id", R\\.string\\.[a-z_]+, R\\.drawable\\.([a-z_]+)',
       ).firstMatch(shortcuts)![1]!;
       expect(iconOf('capture_voice'), 'capture_shortcut_voice');
       expect(iconOf('capture_text'), 'capture_shortcut_text');

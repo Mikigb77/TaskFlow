@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
+import 'package:agenda/models/capture_clarification.dart';
 import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/checklist_item.dart';
@@ -402,10 +403,7 @@ void main() {
         final older = tester.getTopLeft(find.text('Hacer la introducción')).dy;
         expect(newer, lessThan(older));
         expect(find.text('Comprar pan'), findsNothing);
-        expect(
-          find.text('${weekday(day(5))} · Física'),
-          findsOneWidget,
-        );
+        expect(find.text('${weekday(day(5))} · Física'), findsOneWidget);
         expect(find.text('Física · ${es.commandCompleted}'), findsOneWidget);
         // No sentence, and nothing to confirm.
         expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
@@ -509,9 +507,7 @@ void main() {
         );
         expect(find.text('Ir al médico'), findsOneWidget);
         expect(
-          find.text(
-            '${weekday(day(3))} · 10:00 → ${weekday(day(7))} · 10:00',
-          ),
+          find.text('${weekday(day(3))} · 10:00 → ${weekday(day(7))} · 10:00'),
           findsOneWidget,
         );
         expect(
@@ -684,7 +680,10 @@ void main() {
         expect(find.text('${es.assignedToGroup} → Paul'), findsOneWidget);
         expect(find.text('${es.medium} → ${es.high}'), findsOneWidget);
         expect(find.text(es.commandNotesAdd('Con IVA')), findsOneWidget);
-        expect(find.text(es.commandMemberNotIn('Pol', 'Equipo')), findsOneWidget);
+        expect(
+          find.text(es.commandMemberNotIn('Pol', 'Equipo')),
+          findsOneWidget,
+        );
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
         final report = app.tasks.byId(1)!;
@@ -699,66 +698,64 @@ void main() {
       },
     );
 
-    testWidgets(
-      'nothing said to change opens the task to edit it',
-      (tester) async {
-        final app = await _App.open(
-          tester,
-          tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
-        );
-        await app.showResult(
-          tester,
-          commands: [
-            command({
-              'kind': 'update',
-              'target': {
-                'words': ['médico'],
-              },
-              'changes': {},
-            }),
-          ],
-        );
-        expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
-        await tester.tap(find.byKey(const ValueKey('command-edit-task')));
-        await tester.pumpAndSettle();
-        expect(find.byType(EditTaskScreen), findsOneWidget);
-        expect(app.tasks.byId(1)!.title, 'Ir al médico');
-      },
-    );
+    testWidgets('nothing said to change opens the task to edit it', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+      );
+      await app.showResult(
+        tester,
+        commands: [
+          command({
+            'kind': 'update',
+            'target': {
+              'words': ['médico'],
+            },
+            'changes': {},
+          }),
+        ],
+      );
+      expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('command-edit-task')));
+      await tester.pumpAndSettle();
+      expect(find.byType(EditTaskScreen), findsOneWidget);
+      expect(app.tasks.byId(1)!.title, 'Ir al médico');
+    });
 
-    testWidgets(
-      'a time for a task with no day asks «¿Qué día?» first',
-      (tester) async {
-        final app = await _App.open(
-          tester,
-          tasks: [Task(id: 1, title: 'Recoger las gafas', priority: 1)],
-        );
-        await app.showResult(
-          tester,
-          commands: [
-            command({
-              'kind': 'update',
-              'target': {
-                'words': ['gafas'],
-              },
-              'changes': {'time': '18:00'},
-            }),
-          ],
-        );
-        expect(find.text(es.commandWhichDay(18, '18:00')), findsOneWidget);
-        expect(saveButton(tester).onPressed, isNull);
-        await tester.tap(find.widgetWithText(ChoiceChip, es.tomorrow));
-        await tester.pumpAndSettle();
-        expect(
-          find.text('${es.noDate} → ${es.tomorrow} · 18:00'),
-          findsOneWidget,
-        );
-        await tester.tap(find.byKey(const ValueKey('save-drafts')));
-        await tester.pumpAndSettle();
-        expect(app.tasks.byId(1)!.dueDate, day(1, 18));
-        expect(app.tasks.byId(1)!.hasTime, isTrue);
-      },
-    );
+    testWidgets('a time for a task with no day asks «¿Qué día?» first', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [Task(id: 1, title: 'Recoger las gafas', priority: 1)],
+      );
+      await app.showResult(
+        tester,
+        commands: [
+          command({
+            'kind': 'update',
+            'target': {
+              'words': ['gafas'],
+            },
+            'changes': {'time': '18:00'},
+          }),
+        ],
+      );
+      expect(find.text(es.commandWhichDay(18, '18:00')), findsOneWidget);
+      expect(saveButton(tester).onPressed, isNull);
+      await tester.tap(find.widgetWithText(ChoiceChip, es.tomorrow));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('${es.noDate} → ${es.tomorrow} · 18:00'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(app.tasks.byId(1)!.dueDate, day(1, 18));
+      expect(app.tasks.byId(1)!.hasTime, isTrue);
+    });
 
     testWidgets(
       'a repeating task’s new day moves this repetition, or the whole series '
@@ -888,10 +885,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
         expect(find.text(es.deleteSeriesHelp('Clase de yoga')), findsOneWidget);
-        expect(
-          find.widgetWithText(FilledButton, es.keepTask),
-          findsOneWidget,
-        );
+        expect(find.widgetWithText(FilledButton, es.keepTask), findsOneWidget);
         await tester.tap(find.widgetWithText(FilledButton, es.keepTask));
         await tester.pumpAndSettle();
         // Kept, and nothing else to do here.
@@ -947,9 +941,7 @@ void main() {
         final change = tester.getTopLeft(find.text('Ir al médico')).dy;
         final deletion = tester
             .getTopLeft(
-              find.text(
-                es.commandWillDeleteOn('Dentista', weekday(day(5))),
-              ),
+              find.text(es.commandWillDeleteOn('Dentista', weekday(day(5)))),
             )
             .dy;
         expect(bread, lessThan(change));
@@ -1064,13 +1056,27 @@ void main() {
         app.api.answer = {
           'transcript': 'Crea el proyecto Física…',
           'tasks': [
-            serverTask('Estudiar el tema 2', date: day(4), newProject: 'Física'),
+            serverTask(
+              'Estudiar el tema 2',
+              date: day(4),
+              newProject: 'Física',
+            ),
           ],
           'commands': [
-            {'kind': 'project', 'name': 'Física', 'existing_list_id': null, 'issues': []},
+            {
+              'kind': 'project',
+              'name': 'Física',
+              'existing_list_id': null,
+              'issues': [],
+            },
             {
               'kind': 'delete',
-              'target': {'words': ['dentista'], 'list_id': null, 'project_name': null, 'date': null},
+              'target': {
+                'words': ['dentista'],
+                'list_id': null,
+                'project_name': null,
+                'date': null,
+              },
               'issues': [],
             },
           ],
@@ -1082,10 +1088,7 @@ void main() {
         expect(app.api.drafts, hasLength(1));
         expect(find.text(es.commandNewProject('Física')), findsOneWidget);
         expect(find.text(es.commandNewProjectChip('Física')), findsOneWidget);
-        expect(
-          find.text(es.commandWillDelete('Dentista')),
-          findsOneWidget,
-        );
+        expect(find.text(es.commandWillDelete('Dentista')), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
         expect(app.lists.created, ['Física']);
@@ -1103,24 +1106,28 @@ void main() {
       },
     );
 
-    testWidgets(
-      'Pro typed words go to the assistant asking for commands',
-      (tester) async {
-        final app = await _App.open(tester);
-        app.api.answer = {
-          'transcript': 'Busca el informe',
-          'tasks': [],
-          'commands': [
-            {'kind': 'find', 'words': ['informe'], 'status': 'any', 'issues': []},
-          ],
-        };
-        await app.type(tester, 'Busca el informe');
-        expect(app.api.drafts.single['text'], 'Busca el informe');
-        expect(app.api.drafts.single['source'], 'typed');
-        expect(app.api.drafts.single['commands'], isTrue);
-        expect(find.text(es.commandFindWords('informe')), findsOneWidget);
-      },
-    );
+    testWidgets('Pro typed words go to the assistant asking for commands', (
+      tester,
+    ) async {
+      final app = await _App.open(tester);
+      app.api.answer = {
+        'transcript': 'Busca el informe',
+        'tasks': [],
+        'commands': [
+          {
+            'kind': 'find',
+            'words': ['informe'],
+            'status': 'any',
+            'issues': [],
+          },
+        ],
+      };
+      await app.type(tester, 'Busca el informe');
+      expect(app.api.drafts.single['text'], 'Busca el informe');
+      expect(app.api.drafts.single['source'], 'typed');
+      expect(app.api.drafts.single['commands'], isTrue);
+      expect(find.text(es.commandFindWords('informe')), findsOneWidget);
+    });
 
     testWidgets(
       'without Pro, typed words never reach the assistant: «Escribir» '
@@ -1143,7 +1150,9 @@ void main() {
           'commands': [
             {
               'kind': 'delete',
-              'target': {'words': ['dentista']},
+              'target': {
+                'words': ['dentista'],
+              },
               'issues': [],
             },
           ],
@@ -1151,134 +1160,127 @@ void main() {
         await app.speak(tester, 'Borra la tarea del dentista');
         expect(app.api.drafts.single['commands'], isTrue);
         expect(app.api.drafts.single['source'], 'speech');
-        expect(
-          find.text(es.commandTaskNotFound('dentista')),
-          findsOneWidget,
-        );
+        expect(find.text(es.commandTaskNotFound('dentista')), findsOneWidget);
       },
     );
   });
 
   group('large text on a small phone', () {
     for (final (language, l) in [('es', es), ('ca', ca)]) {
-      testWidgets(
-        'every kind of card fits at 2× text on 320 dp ($language)',
-        (tester) async {
-          final app = await _App.open(
-            tester,
-            language: language,
-            size: const Size(320, 640),
-            textScale: 2,
-            projects: [physics, team],
-            tasks: [
-              Task(
-                id: 1,
-                title: 'Ir al médico de cabecera para la revisión',
-                priority: 1,
-                dueDate: day(3, 10),
-              ),
-              Task(
-                id: 2,
-                title: 'Introducción al tema 3 de la asignatura',
-                priority: 1,
-                listId: 'physics',
-                isCompleted: true,
-              ),
-              Task(id: 3, title: 'Dentista', priority: 1, dueDate: day(5)),
-              Task(
-                id: 4,
-                title: 'Informe trimestral',
-                priority: 1,
-                listId: 'team',
-                assignment: 'group',
-              ),
-            ],
-          );
-          await app.showResult(
-            tester,
-            drafts: [
-              draft(
-                'Estudiar el tema 2 con los apuntes nuevos',
-                date: day(4),
-                newProject: 'Física y Química',
-                issues: ['member_not_available'],
-                hints: {'member': 'Paul'},
-              ),
-              draft(
-                'Repasar el tema 3',
-                suggestion: 'geografía e historia',
-                issues: ['project_not_available'],
-              ),
-            ],
-            commands: [
-              command({'kind': 'project', 'name': 'Física y Química'}),
-              command({
-                'kind': 'find',
-                'words': ['introducción'],
-                'list_id': 'physics',
-              }),
-              command({
-                'kind': 'update',
-                'target': {
-                  'words': ['médico'],
-                },
-                'changes': {'date': key(day(7)), 'time': '18:30'},
-              }),
-              command({
-                'kind': 'update',
-                'target': {
-                  'words': ['informe'],
-                },
-                'changes': {'assignee_name': 'Pol'},
-                'issues': ['member_not_available'],
-              }),
-              command({
-                'kind': 'delete',
-                'target': {
-                  'words': ['dentista'],
-                },
-              }),
-            ],
+      testWidgets('every kind of card fits at 2× text on 320 dp ($language)', (
+        tester,
+      ) async {
+        final app = await _App.open(
+          tester,
+          language: language,
+          size: const Size(320, 640),
+          textScale: 2,
+          projects: [physics, team],
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Ir al médico de cabecera para la revisión',
+              priority: 1,
+              dueDate: day(3, 10),
+            ),
+            Task(
+              id: 2,
+              title: 'Introducción al tema 3 de la asignatura',
+              priority: 1,
+              listId: 'physics',
+              isCompleted: true,
+            ),
+            Task(id: 3, title: 'Dentista', priority: 1, dueDate: day(5)),
+            Task(
+              id: 4,
+              title: 'Informe trimestral',
+              priority: 1,
+              listId: 'team',
+              assignment: 'group',
+            ),
+          ],
+        );
+        await app.showResult(
+          tester,
+          drafts: [
+            draft(
+              'Estudiar el tema 2 con los apuntes nuevos',
+              date: day(4),
+              newProject: 'Física y Química',
+              issues: ['member_not_available'],
+              hints: {'member': 'Paul'},
+            ),
+            draft(
+              'Repasar el tema 3',
+              suggestion: 'geografía e historia',
+              issues: ['project_not_available'],
+            ),
+          ],
+          commands: [
+            command({'kind': 'project', 'name': 'Física y Química'}),
+            command({
+              'kind': 'find',
+              'words': ['introducción'],
+              'list_id': 'physics',
+            }),
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['médico'],
+              },
+              'changes': {'date': key(day(7)), 'time': '18:30'},
+            }),
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['informe'],
+              },
+              'changes': {'assignee_name': 'Pol'},
+              'issues': ['member_not_available'],
+            }),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['dentista'],
+              },
+            }),
+          ],
+        );
+        expect(tester.takeException(), isNull);
+        expect(find.text(l.commandWhichProject), findsWidgets);
+        // Every card can be scrolled to, and the button stays in view.
+        for (final text in [
+          l.commandFindWords('introducción'),
+          l.commandMemberNotIn('Pol', 'Equipo'),
+          l.commandWillDeleteOn('Dentista', weekday(day(5))),
+        ]) {
+          await tester.scrollUntilVisible(
+            find.text(text),
+            200,
+            scrollable: find
+                .descendant(
+                  of: find.byType(CaptureResult),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
           );
           expect(tester.takeException(), isNull);
-          expect(
-            find.text(l.commandWhichProject),
-            findsWidgets,
-          );
-          // Every card can be scrolled to, and the button stays in view.
-          for (final text in [
-            l.commandFindWords('introducción'),
-            l.commandMemberNotIn('Pol', 'Equipo'),
-            l.commandWillDeleteOn('Dentista', weekday(day(5))),
-          ]) {
-            await tester.scrollUntilVisible(
-              find.text(text),
-              200,
-              scrollable: find
-                  .descendant(
-                    of: find.byType(CaptureResult),
-                    matching: find.byType(Scrollable),
-                  )
-                  .first,
-            );
-            expect(tester.takeException(), isNull);
-          }
-          expect(
-            find.byKey(const ValueKey('save-drafts')).hitTestable(),
-            findsOneWidget,
-          );
-          // The project said still waits for its choice; the rest can go.
-          expect(find.text(l.commandAddChangeAndDelete), findsOneWidget);
-          await tester.ensureVisible(
-            find.byKey(const ValueKey('project-choice-none')),
-          );
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey('project-choice-none')));
-          await tester.pumpAndSettle();
-          expect(find.text(l.commandAddChangeAndDelete), findsOneWidget);
-          expect(tester.takeException(), isNull);
-        },
-      );
+        }
+        expect(
+          find.byKey(const ValueKey('save-drafts')).hitTestable(),
+          findsOneWidget,
+        );
+        // The project said still waits for its choice; the rest can go.
+        expect(find.text(l.commandAddChangeAndDelete), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('project-choice-none')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('project-choice-none')));
+        await tester.pumpAndSettle();
+        expect(find.text(l.commandAddChangeAndDelete), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
     }
 
     for (final (language, l) in [('es', es), ('ca', ca)]) {
@@ -1339,6 +1341,533 @@ void main() {
   _commandsRound3b();
   _commandsRound4();
   _commandsRound5();
+
+  // UX loop 2026-10-19-app, round 1 · P168 (UX-1302).
+  group('P168: the result at large text', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    testWidgets(
+      'UX-1302: ES, 2x on 360x800, a task, a change and a deletion (commands/cards.mixed): the deletion card is in view on arrival, above the pinned button',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          size: const Size(360, 800),
+          textScale: 2,
+          tasks: [
+            Task(
+              id: 40,
+              title: 'Ir a la peluquería',
+              priority: 1,
+              dueDate: day(3, 10),
+            ),
+            Task(id: 49, title: 'Dentista', priority: 1, dueDate: day(5, 9)),
+          ],
+        );
+        await app.showResult(
+          tester,
+          drafts: [draft('Comprar pan', date: day(1))],
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['peluquería'],
+                'date': key(day(3)),
+              },
+              'changes': {'date': key(day(7))},
+            }),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['dentista'],
+              },
+            }),
+          ],
+        );
+        final card = find.byType(DeleteCommandCard);
+        expect(card, findsOneWidget);
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.text(
+              es.commandWillDeleteOn('Dentista', weekday(day(5))),
+            ),
+          ),
+          findsOneWidget,
+        );
+        final area = tester.getRect(
+          find
+              .descendant(
+                of: find.byType(CaptureResult),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        final rect = tester.getRect(card);
+        expect(
+          rect.top,
+          greaterThanOrEqualTo(area.top - 0.5),
+          reason: '$rect in $area',
+        );
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(area.bottom + 0.5),
+          reason: '$rect in $area',
+        );
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(
+            tester.getRect(find.byKey(const ValueKey('save-drafts'))).top,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // P169 (UX-1309): after a voice command is applied, Calendar's lit row
+    // clears the save message.
+
+    /// Today and the next days as the preview suite's `normalDay()`.
+    List<Task> normalDay() => [
+      Task(
+        id: 1,
+        title: 'Paseo por el parque',
+        dueDate: day(0, 8, 30),
+        priority: 1,
+        isCompleted: true,
+      ),
+      Task(
+        id: 2,
+        title: 'Llamar al médico para pedir cita',
+        dueDate: day(0, 10),
+        priority: 2,
+        notes: 'Preguntar por los resultados de los análisis.',
+      ),
+      Task(id: 3, title: 'Comer con Ana', dueDate: day(0, 13, 30), priority: 1),
+      Task(
+        id: 4,
+        title: 'Recoger a los niños del colegio',
+        dueDate: day(0, 17),
+        priority: 3,
+        reminderMinutes: 30,
+      ),
+      Task(
+        id: 5,
+        title: 'Clase de yoga',
+        dueDate: day(0, 19, 30),
+        priority: 1,
+        recurrence: 'weekly',
+      ),
+      Task(id: 6, title: 'Comprar pilas para el mando', priority: 1),
+      Task(
+        id: 8,
+        title: 'Repasar fracciones con Paul',
+        dueDate: day(1, 18),
+        priority: 1,
+      ),
+    ];
+
+    Task haircut() => Task(
+      id: 40,
+      title: 'Ir a la peluquería',
+      priority: 1,
+      dueDate: day(3, 10),
+      notes: 'Pedir cita para mamá también',
+      checklist: [ChecklistItem(id: 's1', title: 'Llevar la tarjeta')],
+      reminderMinutes: 30,
+    );
+
+    CaptureCommand moveHaircut() => command({
+      'kind': 'update',
+      'target': {
+        'words': ['peluquería'],
+        'date': key(day(3)),
+      },
+      'changes': {'date': key(day(7))},
+    });
+
+    /// The lit row of [title] is on screen, under the week, and entirely
+    /// above the save message.
+    void expectLitAboveMessage(WidgetTester tester, String title) {
+      final row = find.byWidgetPredicate(
+        (widget) => widget is LandedTaskTile && widget.task.title == title,
+      );
+      expect(row, findsOneWidget, reason: '$title is on screen');
+      expect(tester.widget<LandedTaskTile>(row).lit, isTrue);
+      final rect = tester.getRect(row);
+      final message = tester.getRect(find.byType(SnackBar));
+      final agenda = tester.getRect(
+        find
+            .descendant(
+              of: find.descendant(
+                of: find.byType(CalendarScreen),
+                matching: find.byType(CustomScrollView),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(rect.top, greaterThanOrEqualTo(agenda.top - 0.5), reason: '$rect');
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(message.top),
+        reason: '$title $rect, message $message',
+      );
+    }
+
+    /// Taps the result's button and waits as a phone would: past the
+    /// message's entrance and the scroll, inside the 1.5 s highlight.
+    Future<void> apply(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      for (var frame = 0; frame < 48; frame++) {
+        await tester.pump(const Duration(milliseconds: 25));
+      }
+      expect(find.byType(CaptureResult), findsNothing);
+    }
+
+    testWidgets(
+      'UX-1309: ES, 2x on 360x800, a voice move (commands/applied.change-applied): the lit row and its time line are above Movida al …',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          size: const Size(360, 800),
+          textScale: 2,
+          tasks: [...normalDay(), haircut()],
+        );
+        await app.showResult(tester, commands: [moveHaircut()]);
+        await apply(tester);
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.textContaining(es.movedOccurrenceDate('').trim()),
+          ),
+          findsOneWidget,
+        );
+        expectLitAboveMessage(tester, 'Ir a la peluquería');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1309: ES, 1x on 360x800, a task, a change and a deletion applied (commands/applied.mixed-applied): the lit row’s bottom edge is above the message’s top',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          size: const Size(360, 800),
+          tasks: [
+            ...normalDay(),
+            haircut(),
+            Task(id: 49, title: 'Dentista', priority: 1, dueDate: day(5, 9)),
+          ],
+        );
+        await app.showResult(
+          tester,
+          drafts: [draft('Comprar pan', date: day(1))],
+          commands: [
+            moveHaircut(),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['dentista'],
+              },
+            }),
+          ],
+        );
+        await apply(tester);
+        expect(find.byType(SnackBar), findsOneWidget);
+        expectLitAboveMessage(tester, 'Comprar pan');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-19-app, round 2 · P198 (UX-1308): every result is
+  // spoken once ----
+
+  group('UX-1308: what TalkBack hears when a command result shows', () {
+    List<String> heard(WidgetTester tester) =>
+        tester.takeAnnouncements().map((a) => a.message).toList();
+
+    /// Every command card in the result.
+    final commandCards = find.byWidgetPredicate(
+      (widget) =>
+          widget is ProjectCommandCard ||
+          widget is FindCommandCard ||
+          widget is UpdateCommandCard ||
+          widget is DeleteCommandCard,
+    );
+
+    /// The headline of the first command card, as rendered.
+    String headline(WidgetTester tester) => tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: commandCards.first,
+                matching: find.byKey(const ValueKey('command-headline')),
+              )
+              .first,
+        )
+        .data!;
+
+    /// Nothing inside the result's cards took the focus.
+    void expectFocusNotInCards(WidgetTester tester) {
+      final focused = FocusManager.instance.primaryFocus?.context;
+      if (focused == null) return;
+      expect(
+        find.descendant(
+          of: commandCards,
+          matching: find.byElementPredicate((e) => e == focused),
+        ),
+        findsNothing,
+        reason: 'the focus stays where it was',
+      );
+    }
+
+    Task haircut() => Task(
+      id: 40,
+      title: 'Ir a la peluquería',
+      priority: 1,
+      dueDate: day(3, 10),
+      notes: 'Pedir cita para mamá también',
+    );
+
+    Map<String, dynamic> moveHaircut() => {
+      'kind': 'update',
+      'target': {
+        'words': ['peluquería'],
+        'date': key(day(3)),
+      },
+      'changes': {'date': key(day(7))},
+    };
+
+    testWidgets(
+      'UX-1308: ES, one deletion card (commands/cards.delete): exactly one announcement, the card’s headline as rendered (Se eliminará: Ir a la peluquería (…)); the focus doesn’t move into the card',
+      (tester) async {
+        final app = await _App.open(tester, tasks: [haircut()]);
+        heard(tester);
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['peluquería'],
+              },
+            }),
+          ],
+        );
+        final line = headline(tester);
+        expect(line, startsWith('Se eliminará: Ir a la peluquería ('));
+        expect(heard(tester), [line]);
+        expectFocusNotInCards(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1308: ES, one change card (commands/cards.change): one announcement «Ir a la peluquería, Cambiar fecha»',
+      (tester) async {
+        final app = await _App.open(tester, tasks: [haircut()]);
+        heard(tester);
+        await app.showResult(tester, commands: [command(moveHaircut())]);
+        expect(es.reschedule, 'Cambiar fecha');
+        expect(headline(tester), 'Ir a la peluquería');
+        expect(heard(tester), ['Ir a la peluquería, ${es.reschedule}']);
+        expectFocusNotInCards(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1308: ES, a new project alone (commands/cards.project-new): one announcement, its headline «Nuevo proyecto: Física»',
+      (tester) async {
+        final app = await _App.open(tester);
+        heard(tester);
+        await app.showResult(
+          tester,
+          commands: [
+            command({'kind': 'project', 'name': 'Física'}),
+          ],
+        );
+        expect(es.commandNewProject('Física'), 'Nuevo proyecto: Física');
+        expect(heard(tester), [es.commandNewProject('Física')]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1308: ES, a change that matches two tasks (commands/cards.change-which): one announcement «¿Cuál quieres cambiar?»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            Task(
+              id: 43,
+              title: 'Llamar a Ana',
+              priority: 1,
+              dueDate: day(2, 9),
+            ),
+            Task(
+              id: 44,
+              title: 'Llamar a Ana por el viaje',
+              priority: 1,
+              dueDate: day(4, 9),
+            ),
+          ],
+        );
+        heard(tester);
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['llamar', 'ana'],
+              },
+              'changes': {'time': '18:00'},
+            }),
+          ],
+        );
+        expect(es.commandWhichToChange, '¿Cuál quieres cambiar?');
+        expect(heard(tester), [es.commandWhichToChange]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    Future<_App> openMixed(
+      WidgetTester tester, {
+      List<CaptureDraft> more = const [],
+    }) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          haircut(),
+          Task(id: 49, title: 'Dentista', priority: 1, dueDate: day(5, 9)),
+        ],
+      );
+      heard(tester);
+      await app.showResult(
+        tester,
+        drafts: [
+          draft('Comprar pan', date: day(1)),
+          ...more,
+        ],
+        commands: [
+          command(moveHaircut()),
+          command({
+            'kind': 'delete',
+            'target': {
+              'words': ['dentista'],
+            },
+          }),
+        ],
+      );
+      return app;
+    }
+
+    testWidgets(
+      'UX-1308: ES, a task, a change and a deletion (commands/cards.mixed): one announcement, «Añadir, cambiar y eliminar», the filled button’s label as shown',
+      (tester) async {
+        await openMixed(tester);
+        expect(es.commandAddChangeAndDelete, 'Añadir, cambiar y eliminar');
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('save-drafts')),
+            matching: find.text(es.commandAddChangeAndDelete),
+          ),
+          findsOneWidget,
+        );
+        expect(heard(tester), [es.commandAddChangeAndDelete]);
+        expectFocusNotInCards(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1308: ES, the mixed result plus a second task whose AM/PM question is open: one announcement that starts with «Añadir, cambiar y eliminar» (the button as shown) and ends with the question',
+      (tester) async {
+        const question = '¿A las 5 de la mañana o de la tarde?';
+        await openMixed(
+          tester,
+          more: [
+            CaptureDraft(
+              id: 'car',
+              task: Task(
+                title: 'Recoger el coche del taller',
+                priority: 1,
+                dueDate: day(4, 17),
+                hasTime: true,
+              ),
+              confirmed: false,
+              clarifications: const [
+                CaptureClarification(
+                  question: question,
+                  field: 'schedule',
+                  times: ['05:00', '17:00'],
+                ),
+              ],
+            ),
+          ],
+        );
+        expect(find.text(question), findsOneWidget);
+        // The ready task keeps «Añadir» in the button while the other asks.
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('save-drafts')),
+            matching: find.text(es.commandAddChangeAndDelete),
+          ),
+          findsOneWidget,
+        );
+        final messages = heard(tester);
+        expect(messages, hasLength(1), reason: '$messages');
+        expect(messages.single, startsWith(es.commandAddChangeAndDelete));
+        expect(messages.single, endsWith(question));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1308: ES, a search (no filled button): one announcement, the first card’s headline as rendered',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          projects: [physics],
+          tasks: [
+            Task(
+              id: 4,
+              title: 'Introducción al tema 3',
+              priority: 1,
+              listId: 'physics',
+              dueDate: day(5),
+              hasTime: false,
+            ),
+          ],
+        );
+        heard(tester);
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'find',
+              'words': ['introducción'],
+              'list_id': 'physics',
+            }),
+          ],
+        );
+        expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
+        expect(heard(tester), [headline(tester)]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The phone's recognizer, shared by the tests: it listens until stopped,
@@ -4240,7 +4769,10 @@ void _commandsRound2b() {
       );
       await app.showResult(
         tester,
-        drafts: [draft('Repasar el tema 3', listId: 'fyq'), ...more],
+        drafts: [
+          draft('Repasar el tema 3', listId: 'fyq'),
+          ...more,
+        ],
         commands: [quimica],
       );
       return app;
@@ -4356,62 +4888,65 @@ void _commandsRound2b() {
     );
   });
 
-  group('P148 · UX-1219: «Otro proyecto…» opens the sheet with nothing chosen', () {
-    testWidgets(
-      'UX-1219: a task whose project «química» doesn’t exist: «Otro proyecto…» shows the sheet with no row selected, «Sin proyecto» included; «Sin proyecto» there puts the task in no project and the question goes',
-      (tester) async {
-        final app = await _App.open(
-          tester,
-          projects: [
-            _project('organica', 'Química orgánica'),
-            _project('casa', 'Casa'),
-            _project('fyq', 'Física y Química'),
-          ],
-        );
-        await app.showResult(
-          tester,
-          drafts: [
-            draft(
-              'Repasar el tema 3',
-              suggestion: 'química',
-              issues: ['project_not_available'],
-              hints: {'project': 'química'},
-            ),
-          ],
-        );
-        expect(find.text(es.commandWhichProject), findsOneWidget);
-        await tester.tap(find.text(es.commandOtherProject));
-        await tester.pumpAndSettle();
-        // The project sheet, over the capture sheet.
-        final sheets = find.byType(BottomSheet).evaluate().length;
-        expect(sheets, 2);
-        final sheet = find.byType(BottomSheet).last;
-        final none = find.descendant(
-          of: sheet,
-          matching: find.widgetWithText(ListTile, es.noList),
-        );
-        expect(none, findsOneWidget);
-        expect(tester.widget<ListTile>(none).selected, isFalse);
-        final selected = [
-          for (final tile in tester.widgetList<ListTile>(
-            find.descendant(of: sheet, matching: find.byType(ListTile)),
-          ))
-            if (tile.selected) (tile.title as Text?)?.data,
-        ];
-        expect(selected, isEmpty, reason: 'nothing is chosen yet: $selected');
-        await tester.tap(none);
-        await tester.pumpAndSettle();
-        expect(find.byType(BottomSheet), findsOneWidget, reason: 'closed');
-        expect(find.text(es.commandWhichProject), findsNothing);
-        expect(saveButton(tester).onPressed, isNotNull);
-        await tester.tap(find.byKey(const ValueKey('save-drafts')));
-        await tester.pumpAndSettle();
-        expect(app.lists.created, isEmpty);
-        expect(app.tasks.named('Repasar el tema 3')!.listId, isNull);
-        expect(tester.takeException(), isNull);
-      },
-    );
-  });
+  group(
+    'P148 · UX-1219: «Otro proyecto…» opens the sheet with nothing chosen',
+    () {
+      testWidgets(
+        'UX-1219: a task whose project «química» doesn’t exist: «Otro proyecto…» shows the sheet with no row selected, «Sin proyecto» included; «Sin proyecto» there puts the task in no project and the question goes',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            projects: [
+              _project('organica', 'Química orgánica'),
+              _project('casa', 'Casa'),
+              _project('fyq', 'Física y Química'),
+            ],
+          );
+          await app.showResult(
+            tester,
+            drafts: [
+              draft(
+                'Repasar el tema 3',
+                suggestion: 'química',
+                issues: ['project_not_available'],
+                hints: {'project': 'química'},
+              ),
+            ],
+          );
+          expect(find.text(es.commandWhichProject), findsOneWidget);
+          await tester.tap(find.text(es.commandOtherProject));
+          await tester.pumpAndSettle();
+          // The project sheet, over the capture sheet.
+          final sheets = find.byType(BottomSheet).evaluate().length;
+          expect(sheets, 2);
+          final sheet = find.byType(BottomSheet).last;
+          final none = find.descendant(
+            of: sheet,
+            matching: find.widgetWithText(ListTile, es.noList),
+          );
+          expect(none, findsOneWidget);
+          expect(tester.widget<ListTile>(none).selected, isFalse);
+          final selected = [
+            for (final tile in tester.widgetList<ListTile>(
+              find.descendant(of: sheet, matching: find.byType(ListTile)),
+            ))
+              if (tile.selected) (tile.title as Text?)?.data,
+          ];
+          expect(selected, isEmpty, reason: 'nothing is chosen yet: $selected');
+          await tester.tap(none);
+          await tester.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsOneWidget, reason: 'closed');
+          expect(find.text(es.commandWhichProject), findsNothing);
+          expect(saveButton(tester).onPressed, isNotNull);
+          await tester.tap(find.byKey(const ValueKey('save-drafts')));
+          await tester.pumpAndSettle();
+          expect(app.lists.created, isEmpty);
+          expect(app.tasks.named('Repasar el tema 3')!.listId, isNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    },
+  );
 }
 
 // ---- Run 2026-10-18-commands, b3 ---------------------------------------
@@ -5035,17 +5570,16 @@ void _commandsRound3() {
       },
     );
 
-    testWidgets(
-      'UX-1107: with the account’s own id, «Para mí» is selected',
-      (tester) async {
-        final page = await openFor(tester, 1);
-        expect(chosen(tester, page, 'people-me'), isTrue);
-        expect(chosen(tester, page, 'people-all'), isFalse);
-        expect(listed(tester, page), isNot(contains('Ejercicio 4')));
-        expect(listed(tester, page), contains('Repasar fracciones'));
-        expect(tester.takeException(), isNull);
-      },
-    );
+    testWidgets('UX-1107: with the account’s own id, «Para mí» is selected', (
+      tester,
+    ) async {
+      final page = await openFor(tester, 1);
+      expect(chosen(tester, page, 'people-me'), isTrue);
+      expect(chosen(tester, page, 'people-all'), isFalse);
+      expect(listed(tester, page), isNot(contains('Ejercicio 4')));
+      expect(listed(tester, page), contains('Repasar fracciones'));
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'UX-1107: with a viewer’s id (no chip there), the page opens on «Todas»',
@@ -5176,10 +5710,7 @@ void _commandsRound3b() {
         reason: 'the task’s chip reads «Física»',
       );
       expect(find.textContaining('(nuevo)'), findsNothing);
-      expect(
-        find.textContaining(es.commandNewProject('física')),
-        findsNothing,
-      );
+      expect(find.textContaining(es.commandNewProject('física')), findsNothing);
       expect(newChip(es, 'física'), findsNothing);
     }
 
@@ -5421,12 +5952,12 @@ void _commandsRound3b() {
         final sheetBox = tester.getRect(sheet);
         const screen = Rect.fromLTWH(0, 0, 320, 640);
         for (final (what, outer) in [('sheet', sheetBox), ('screen', screen)]) {
-          expect(box.left, greaterThanOrEqualTo(outer.left - 0.5), reason: what);
           expect(
-            box.right,
-            lessThanOrEqualTo(outer.right + 0.5),
+            box.left,
+            greaterThanOrEqualTo(outer.left - 0.5),
             reason: what,
           );
+          expect(box.right, lessThanOrEqualTo(outer.right + 0.5), reason: what);
           expect(box.top, greaterThanOrEqualTo(outer.top - 0.5), reason: what);
           expect(
             box.bottom,
@@ -5545,7 +6076,12 @@ void _commandsRound4() {
         final app = await _App.open(
           tester,
           tasks: [
-            Task(id: 2, title: 'Ir al médico', priority: 1, dueDate: day(3, 10)),
+            Task(
+              id: 2,
+              title: 'Ir al médico',
+              priority: 1,
+              dueDate: day(3, 10),
+            ),
           ],
         );
         await app.showResult(
@@ -5796,7 +6332,10 @@ void _commandsRound5() {
       },
     );
 
-    for (final (chip, name) in [('people-all', 'Todas'), ('people-me', 'Para mí')]) {
+    for (final (chip, name) in [
+      ('people-all', 'Todas'),
+      ('people-me', 'Para mí'),
+    ]) {
       testWidgets(
         'UX-1111: Pro, on Familia with $name on, «Comprar pan» stays as the assistant said it: for everyone',
         (tester) async {

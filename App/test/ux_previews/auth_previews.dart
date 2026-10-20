@@ -4,6 +4,7 @@
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/verify_email_screen.dart';
 import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/invitation_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -120,14 +121,33 @@ void authPreviews() {
     preview(
       login,
       'recovery-sent',
-      'Recovery code sent: the code and a new password.',
-      [es1],
+      'Recovery code sent: where it went, above the code and a new password.',
+      [es1, es2, ca2],
       (p) async {
         final app = await _signedOut(p);
         app.api.handlers['POST auth/password-reset/'] = (_) => <String, dynamic>{};
         await _tapText(p, p.l.forgotPassword);
         await _fill(p, password: null);
         await _submit(p);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      login,
+      'invitation',
+      'An invitation link opened while signed out: which address to sign in with, above Google.',
+      [es1, ca2, en2],
+      (p) async {
+        final app = await _signedOut(p);
+        app.container.read(invitationLinkProvider.notifier).receive(
+              Uri.parse(
+                'taskflow://invite?kind=list'
+                '&id=6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
+                '&code=preview-invitation-code',
+              ),
+            );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

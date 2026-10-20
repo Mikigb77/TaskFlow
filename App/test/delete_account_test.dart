@@ -43,6 +43,7 @@ import 'package:purchases_flutter/purchases_flutter.dart' show CustomerInfo;
 
 import 'support/billing_fixtures.dart';
 import 'support/design_fixtures.dart';
+import 'support/reading_order.dart';
 
 final es = lookupAppLocalizations(const Locale('es'));
 const password = 'synthetic-only-password';
@@ -3867,6 +3868,34 @@ void main() {
       },
     );
   });
+
+  // UX loop 2026-10-19-app, round 1 · P170 (UX-1604).
+  testWidgets(
+    'UX-1604: on the delete page (ES), TalkBack reads Guardar antes una copia de tus tareas before La copia no incluye los archivos., each as its own stop',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await open(tester);
+      expect(find.text(es.deleteAccountCopyNoFiles), findsOneWidget);
+      final stops = readingOrder(tester);
+      final copy = readAt(
+        stops,
+        (label) => label.contains(es.deleteAccountSaveCopy),
+      );
+      final note = readAt(
+        stops,
+        (label) => label == es.deleteAccountCopyNoFiles,
+      );
+      expect(copy, isNot(-1), reason: '$stops');
+      expect(note, isNot(-1), reason: 'the note is a stop of its own: $stops');
+      expect(copy, lessThan(note));
+      expect(
+        stops[copy].label.contains(es.deleteAccountCopyNoFiles),
+        isFalse,
+        reason: 'not merged into the button',
+      );
+      semantics.dispose();
+    },
+  );
 }
 
 /// Sign-in right after the account was deleted.

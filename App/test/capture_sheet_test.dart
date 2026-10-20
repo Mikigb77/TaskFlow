@@ -2033,6 +2033,198 @@ void main() {
     },
   );
 
+  // ---- UX loop 2026-10-19-app, round 1 · P167 (UX-1301, UX-1322): nothing
+  // found, and the ring while understanding ----
+
+  /// Pro, `Añadir tarea` listening, the recognizer hears [said], `Listo`.
+  Future<_App> dictateTo(
+    WidgetTester tester,
+    String said, {
+    List<Map<String, dynamic>> found = const [],
+    Object? failure,
+    Completer<void>? hold,
+    bool settle = true,
+  }) async {
+    final app = await _App.open(tester, pro: true, size: const Size(360, 800));
+    app.api.found = found;
+    app.api.failure = failure;
+    app.api.hold = hold;
+    await tester.tap(find.text(es.addTask).hitTestable());
+    await tester.pumpAndSettle();
+    app.speech.send('ready');
+    app.speech.send('segment', text: said);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await frames(tester);
+    }
+    return app;
+  }
+
+  Finder sheetText(String text) =>
+      find.descendant(of: find.byType(VoiceTaskScreen), matching: find.text(text));
+
+  testWidgets(
+    'UX-1301: ES 1x on 360x800, a dictation answered with no task and no command shows No he encontrado ninguna tarea…, one filled Volver a decirlo, Guardar como tarea as a text button under it, and no Reintentar',
+    (tester) async {
+      await dictateTo(tester, 'Bueno, a ver, no sé');
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(sheetText(es.captureNoTasks), findsOneWidget);
+      final filled = find.descendant(
+        of: find.byType(VoiceTaskScreen),
+        matching: find.byType(FilledButton),
+      );
+      expect(filled, findsOneWidget);
+      expect(
+        find.descendant(of: filled, matching: find.text(es.captureSayAgain)),
+        findsOneWidget,
+      );
+      final save = find.descendant(
+        of: find.byType(VoiceTaskScreen),
+        matching: find.widgetWithText(TextButton, es.captureSaveAsWritten),
+      );
+      expect(save, findsOneWidget);
+      expect(
+        tester.getRect(save).top,
+        greaterThanOrEqualTo(tester.getRect(filled).bottom),
+      );
+      expect(sheetText(es.tryAgain), findsNothing);
+      expect(filled.hitTestable(), findsOneWidget);
+      expect(save.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1301: that Volver a decirlo clears the words, starts listening on a new capture, and sends nothing until Listo',
+    (tester) async {
+      final app = await dictateTo(tester, 'Bueno, a ver, no sé');
+      expect(app.api.requests, 1);
+      expect(app.speech.starts, 1);
+      final first = app.store.sessions.keys.single;
+      await tester.tap(
+        find.descendant(
+          of: find.byType(VoiceTaskScreen),
+          matching: find.widgetWithText(FilledButton, es.captureSayAgain),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(sheetText('Bueno, a ver, no sé'), findsNothing);
+      expect(sheetText(es.captureNoTasks), findsNothing);
+      expect(app.speech.starts, 2, reason: 'listening again');
+      expect(app.api.requests, 1, reason: 'nothing sent yet');
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Mañana, llamar al dentista');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(app.api.requests, 1, reason: 'still nothing sent before Listo');
+      final fresh = app.store.sessions.keys.where((id) => id != first);
+      expect(fresh, hasLength(1), reason: 'a new capture id');
+      expect(app.store.sessions[first]!.terminal, isTrue);
+      app.api.found = [_found('Llamar al dentista')];
+      await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+      await tester.pumpAndSettle();
+      expect(app.api.requests, 2);
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1301: Pro, typed words answered with nothing found keep the editable field and Listo, and no Volver a decirlo',
+    (tester) async {
+      final app = await _App.open(tester, pro: true, size: const Size(360, 800));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(es.captureTypeInstead));
+      await tester.pumpAndSettle();
+      await tester.enterText(words(), 'Bueno, a ver');
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+      await tester.pumpAndSettle();
+      expect(app.api.requests, 1);
+      expect(sheetText(es.captureNoTasks), findsOneWidget);
+      expect(words(), findsOneWidget);
+      expect(tester.widget<TextField>(words()).readOnly, isFalse);
+      expect(
+        inSheet(find.widgetWithText(FilledButton, es.done)),
+        findsOneWidget,
+      );
+      expect(sheetText(es.captureSayAgain), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (name, failure, line) in [
+    ('offline', ApiException(0, 'Offline. Retry when connected.'), es.captureOffline),
+    ('unavailable', ApiException(503, 'Service unavailable'), es.captureUnavailable),
+  ]) {
+    testWidgets(
+      'UX-1301: an $name failure still shows Reintentar above Guardar como tarea, and no Volver a decirlo',
+      (tester) async {
+        await dictateTo(tester, 'Llamar al médico mañana', failure: failure);
+        expect(
+          find.descendant(
+            of: find.byType(VoiceTaskScreen),
+            matching: find.textContaining(line),
+          ),
+          findsOneWidget,
+        );
+        final retry = inSheet(find.widgetWithText(FilledButton, es.tryAgain));
+        final save = inSheet(
+          find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        );
+        expect(retry, findsOneWidget);
+        expect(save, findsOneWidget);
+        expect(
+          tester.getRect(retry).bottom,
+          lessThanOrEqualTo(tester.getRect(save).top),
+        );
+        expect(sheetText(es.captureSayAgain), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1322: while Entendiendo…, the ring shows the spinner and no microphone; while listening it shows the microphone',
+    (tester) async {
+      final hold = Completer<void>();
+      final app = await _App.open(tester, pro: true, size: const Size(360, 800));
+      app.api.hold = hold;
+      app.api.found = [_found('Comprar pan')];
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Comprar pan');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      final mic = find.descendant(
+        of: find.byType(VoiceTaskScreen),
+        matching: find.byIcon(Icons.mic_none_rounded),
+      );
+      expect(mic, findsOneWidget, reason: 'listening shows the microphone');
+      await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+      await frames(tester);
+      expect(sheetText(es.captureUnderstanding), findsOneWidget);
+      final spinner = find.descendant(
+        of: find.byType(VoiceTaskScreen),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is CircularProgressIndicator && widget.value == null,
+        ),
+      );
+      expect(spinner, findsOneWidget);
+      expect(mic, findsNothing);
+      hold.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   // Last in this file: it loads Manrope, which the tests after it would
   // otherwise draw with.
   for (final language in ['es', 'ca']) {
@@ -2156,7 +2348,7 @@ class _App {
         authProvider.overrideWith(
           (ref) => freeLeft == null
               ? SignedInFixtureAuth(api)
-              : _CountedAuth(api, freeLeft),
+              : _CountedAuth(api, freeLeft, clock: clock),
         ),
         attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
         regionalStoreProvider.overrideWithValue(
@@ -2210,13 +2402,16 @@ class _App {
   }
 }
 
-/// The fixture's account, with [left] free dictations this month.
+/// The fixture's account, with [left] free dictations this month: the month
+/// of the app's [clock], so a test whose clock is days ahead never sees the
+/// count reset to a whole new month.
 class _CountedAuth extends AuthNotifier {
-  _CountedAuth(super.api, this.left);
+  _CountedAuth(super.api, this.left, {this.clock});
   final int left;
+  final DateTime? clock;
   @override
   Future<void> restore() async {
-    final now = DateTime.now().toUtc();
+    final now = (clock ?? DateTime.now()).toUtc();
     state = AuthState(
       account: Account.fromJson({
         'id': 1,

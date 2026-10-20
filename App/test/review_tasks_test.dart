@@ -90,6 +90,8 @@ Future<(ProviderContainer, _SavingStore)> openResultIn(
   String transcript = 'Lo que dije',
   List<TaskListInfo>? projects,
   Size size = const Size(390, 844),
+  // False: the sheet's first frame only; the test pumps the rest.
+  bool settle = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -131,6 +133,7 @@ Future<(ProviderContainer, _SavingStore)> openResultIn(
       transcript: transcript,
       drafts: drafts,
     ),
+    settle: settle,
   );
   return (container, store);
 }
@@ -150,8 +153,9 @@ DateTime nextWeekday(int weekday) {
 Future<void> _openResult(
   WidgetTester tester,
   _SavingStore store,
-  CaptureSession session,
-) async {
+  CaptureSession session, {
+  bool settle = true,
+}) async {
   store.current = session;
   final messenger = tester.binding.defaultBinaryMessenger;
   const timezone = MethodChannel('flutter_timezone');
@@ -170,7 +174,11 @@ Future<void> _openResult(
       startListening: false,
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 void main() {
@@ -1921,6 +1929,589 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-19-app, round 1 · P168 (UX-1302, UX-1312, UX-1308):
+  // the result at large text ----
+
+  const phone = Size(360, 800);
+
+  /// The result's scrolling cards: the area a person sees them in.
+  Finder resultScroll() => find
+      .descendant(
+        of: find.byType(CaptureResult),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+
+  /// [finder] is entirely inside the visible scroll area, above the pinned
+  /// buttons.
+  void expectInView(WidgetTester tester, Finder finder, {String? reason}) {
+    final rect = tester.getRect(finder);
+    final area = tester.getRect(resultScroll());
+    final buttons = tester.getRect(button());
+    expect(rect.top, greaterThanOrEqualTo(area.top - 0.5), reason: reason);
+    expect(
+      rect.bottom,
+      lessThanOrEqualTo(area.bottom + 0.5),
+      reason: '${reason ?? ''} $rect in $area',
+    );
+    expect(rect.bottom, lessThanOrEqualTo(buttons.top), reason: reason);
+  }
+
+  void largeText(WidgetTester tester) {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  }
+
+  String amPm(String language) => switch (language) {
+    'ca' => 'A les 5 del matí o de la tarda?',
+    _ => '¿A las 5 de la mañana o de la tarde?',
+  };
+
+  /// One task the assistant asks AM or PM about, as the preview's
+  /// `capture/result.question`.
+  CaptureDraft carAsking(String language, {String id = 'car'}) => CaptureDraft(
+    id: id,
+    task: Task(
+      title: 'Recoger el coche del taller',
+      priority: 1,
+      dueDate: nextWeekday(DateTime.thursday).add(const Duration(hours: 17)),
+      hasTime: true,
+    ),
+    confirmed: false,
+    clarifications: [
+      CaptureClarification(
+        question: amPm(language),
+        field: 'schedule',
+        times: const ['05:00', '17:00'],
+      ),
+    ],
+  );
+
+  /// The three chips that answer the AM/PM question in [card]'s draft.
+  List<Finder> answers(WidgetTester tester, AppLocalizations l, String card) {
+    final sheet = tester.element(find.byType(CaptureResult));
+    return [
+      for (final label in [
+        sheet.clockTime(DateTime(2026, 1, 1, 5)),
+        sheet.clockTime(DateTime(2026, 1, 1, 17)),
+        l.reviewNoTime,
+      ])
+        find.descendant(
+          of: find.byKey(ValueKey(card)),
+          matching: find.widgetWithText(ActionChip, label),
+        ),
+    ];
+  }
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1302: ${language.toUpperCase()}, 2x on 360x800, a result whose one task asks AM/PM shows 05:00, 17:00 and Sin hora entirely inside the visible scroll area, above the pinned buttons, on arrival',
+      (tester) async {
+        largeText(tester);
+        final l = lookupAppLocalizations(Locale(language));
+        await openResultIn(
+          tester,
+          [carAsking(language)],
+          language: language,
+          size: phone,
+        );
+        expect(find.text(amPm(language)), findsOneWidget);
+        for (final chip in answers(tester, l, 'car')) {
+          expect(chip, findsOneWidget);
+          expectInView(tester, chip, reason: '$chip');
+          expect(chip.hitTestable(), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1302: a two-task result where both tasks ask: after tapping 17:00 on the first, the second question’s chips are in view (ES, 2x, 360x800)',
+    (tester) async {
+      largeText(tester);
+      await openResultIn(tester, [
+        carAsking('es', id: 'car'),
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(
+            title: 'Llamar al médico',
+            priority: 1,
+            dueDate: nextWeekday(
+              DateTime.friday,
+            ).add(const Duration(hours: 17)),
+            hasTime: true,
+          ),
+          confirmed: false,
+          clarifications: const [
+            CaptureClarification(
+              question: '¿A las 5 de la mañana o de la tarde?',
+              field: 'schedule',
+              times: ['05:00', '17:00'],
+            ),
+          ],
+        ),
+      ], size: phone);
+      final first = answers(tester, es, 'car');
+      expectInView(tester, first[1], reason: 'the first question on arrival');
+      await tester.tap(first[1]);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('car')), findsOneWidget);
+      for (final chip in answers(tester, es, 'doctor')) {
+        expect(chip, findsOneWidget);
+        expectInView(tester, chip, reason: '$chip');
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1302: the pinned footer holds only the filled button and Cancelar / Volver a decirlo; Ver lo que dije is the last item in the scrolling cards and still opens the words',
+    (tester) async {
+      await openResultIn(
+        tester,
+        [
+          CaptureDraft.fromAI(
+            TaskDraft.fromJson({
+              'title': 'Comprar pan',
+              'due_date': null,
+              'scheduled_date': Task.dateKey(nextWeekday(DateTime.friday)),
+              'priority': 1,
+              'notes': '',
+              'transcript': 'Comprar pan el viernes',
+              'questions': [],
+            }),
+          ),
+        ],
+        transcript: 'Comprar pan el viernes',
+        size: phone,
+      );
+      final words = find.text(es.reviewOriginal);
+      expect(words, findsOneWidget);
+      expect(
+        find.descendant(of: resultScroll(), matching: words),
+        findsOneWidget,
+        reason: 'in the scrolling cards',
+      );
+      expect(
+        find.descendant(of: resultScroll(), matching: button()),
+        findsNothing,
+        reason: 'the button stays pinned',
+      );
+      // The pinned footer: everything under the scroll area.
+      final area = tester.getRect(resultScroll());
+      final pinned = <String>[
+        for (final element in find
+            .descendant(
+              of: find.byType(CaptureResult),
+              matching: find.byWidgetPredicate(
+                (widget) => widget is ButtonStyleButton || widget is ListTile,
+              ),
+            )
+            .evaluate())
+          if (tester.getRect(find.byWidget(element.widget)).top >=
+              area.bottom - 0.5)
+            find
+                .descendant(
+                  of: find.byWidget(element.widget),
+                  matching: find.byType(Text),
+                )
+                .evaluate()
+                .map((text) => (text.widget as Text).data ?? '')
+                .join(' '),
+      ];
+      expect(pinned, isNotEmpty);
+      expect(pinned.first, es.captureAddToCalendar);
+      expect(
+        pinned.skip(1).toSet().difference({es.cancel, es.captureSayAgain}),
+        isEmpty,
+        reason: 'pinned: $pinned',
+      );
+      expect(pinned, contains(es.cancel));
+      expect(pinned.where((label) => label.contains(es.reviewOriginal)), isEmpty);
+      // The last item inside the cards: under the task's card.
+      final tile = find.ancestor(
+        of: words,
+        matching: find.byType(ExpansionTile),
+      );
+      expect(
+        tester.getRect(tile).top,
+        greaterThanOrEqualTo(
+          tester.getRect(find.byType(CaptureReviewEditor)).bottom,
+        ),
+      );
+      await tester.ensureVisible(words);
+      await tester.pumpAndSettle();
+      await tester.tap(words);
+      await tester.pumpAndSettle();
+      expect(find.text('Comprar pan el viernes'), findsWidgets);
+      expect(
+        find.descendant(
+          of: tile,
+          matching: find.widgetWithText(SelectableText, 'Comprar pan el viernes'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final still in [true, false]) {
+    testWidgets(
+      'UX-1302: ${still ? 'with animations off, the reveal jumps: no scroll offset between the top and the end' : 'with animations on, the reveal scrolls (control)'} (ES, 2x, 360x800)',
+      (tester) async {
+        largeText(tester);
+        if (still) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(disableAnimations: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+        }
+        await openResultIn(
+          tester,
+          [carAsking('es')],
+          size: phone,
+          settle: false,
+        );
+        final offsets = <double>[];
+        for (var frame = 0; frame < 60; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final scroll = resultScroll();
+          if (scroll.evaluate().isEmpty) continue;
+          final pixels = tester.state<ScrollableState>(scroll).position.pixels;
+          if (offsets.isEmpty || offsets.last != pixels) offsets.add(pixels);
+        }
+        await tester.pumpAndSettle();
+        final end = tester.state<ScrollableState>(resultScroll()).position.pixels;
+        expect(end, greaterThan(0), reason: 'the answers needed a scroll');
+        final between = offsets.where((p) => p > 0 && p < end).toList();
+        if (still) {
+          expect(between, isEmpty, reason: 'offsets: $offsets');
+        } else {
+          expect(between, isNotEmpty, reason: 'offsets: $offsets');
+        }
+        for (final chip in answers(tester, es, 'car')) {
+          expectInView(tester, chip);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1302: with nothing open, the scroll stays at the top (ES, 2x, 360x800)',
+    (tester) async {
+      largeText(tester);
+      await openResultIn(tester, [
+        for (final (id, title) in [
+          ('bread', 'Comprar pan y leche'),
+          ('doctor', 'Llamar al médico'),
+          ('kids', 'Recoger a los niños del colegio'),
+        ])
+          CaptureDraft(
+            id: id,
+            task: Task(
+              title: title,
+              priority: 1,
+              dueDate: nextWeekday(DateTime.friday),
+            ),
+          ),
+      ], size: phone);
+      expect(
+        tester.state<ScrollableState>(resultScroll()).position.pixels,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1312: ES, a three-task result at 1x: each compact card’s day line is at least 48 dp tall and shows a chevron',
+    (tester) async {
+      await openResultIn(tester, [
+        for (final (id, title, day) in [
+          ('bread', 'Comprar pan y leche', DateTime.now()),
+          ('doctor', 'Llamar al médico', nextWeekday(DateTime.friday)),
+          ('kids', 'Recoger a los niños del colegio', DateTime.now()),
+        ])
+          CaptureDraft(
+            id: id,
+            task: Task(title: title, priority: 1, dueDate: day),
+          ),
+      ], size: phone);
+      for (final id in ['bread', 'doctor', 'kids']) {
+        final line = find.byKey(ValueKey('draft-schedule-$id'));
+        await tester.ensureVisible(line);
+        await tester.pumpAndSettle();
+        expect(line, findsOneWidget, reason: id);
+        expect(
+          tester.getSize(line).height,
+          greaterThanOrEqualTo(48),
+          reason: id,
+        );
+        expect(
+          find.descendant(
+            of: line,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          ),
+          findsOneWidget,
+          reason: id,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // UX-1308: what TalkBack hears when the result shows.
+
+  List<String> heard(WidgetTester tester) =>
+      tester.takeAnnouncements().map((a) => a.message).toList();
+
+  /// The result's main date line for [id], as the card shows it.
+  String dayLineOf(WidgetTester tester, String id) {
+    final tile = tester.widget<ListTile>(
+      find.byKey(ValueKey('draft-schedule-$id')),
+    );
+    return (tile.title! as Text).data!;
+  }
+
+  testWidgets(
+    'UX-1308: a one-task result sends one polite announcement with the title and the date line as the card shows it, without moving focus',
+    (tester) async {
+      final friday = nextWeekday(DateTime.friday);
+      await openResultIn(tester, [
+        CaptureDraft(
+          id: 'doctor',
+          task: Task(
+            title: 'Llamar al médico',
+            priority: 1,
+            dueDate: friday.add(const Duration(hours: 10)),
+            hasTime: true,
+          ),
+        ),
+      ], size: phone);
+      final messages = heard(tester)
+          .where((message) => message.contains('Llamar al médico'))
+          .toList();
+      final line = dayLineOf(tester, 'doctor');
+      expect(line, contains('10:00'));
+      expect(messages, ['Llamar al médico, $line']);
+      // Nothing inside the result took the focus.
+      final focused = FocusManager.instance.primaryFocus?.context;
+      if (focused != null) {
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('draft-schedule-doctor')),
+            matching: find.byElementPredicate((e) => e == focused),
+          ),
+          findsNothing,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1308: a three-task result sends 3 cosas para añadir once',
+    (tester) async {
+      await openResultIn(tester, [
+        for (final (id, title) in [
+          ('bread', 'Comprar pan y leche'),
+          ('doctor', 'Llamar al médico'),
+          ('kids', 'Recoger a los niños del colegio'),
+        ])
+          CaptureDraft(
+            id: id,
+            task: Task(
+              title: title,
+              priority: 1,
+              dueDate: nextWeekday(DateTime.friday),
+            ),
+          ),
+      ], size: phone);
+      expect(es.captureThingsToAdd(3), '3 cosas para añadir');
+      expect(
+        heard(tester).where((m) => m.startsWith(es.captureThingsToAdd(3))),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1308: an AM/PM result’s announcement has the title and date line and ends with the question',
+    (tester) async {
+      await openResultIn(tester, [carAsking('es')], size: phone);
+      final messages = heard(tester)
+          .where((m) => m.contains('Recoger el coche del taller'))
+          .toList();
+      expect(messages, hasLength(1));
+      expect(messages.single, endsWith(amPm('es')));
+      expect(
+        messages.single,
+        startsWith('Recoger el coche del taller, ${dayLineOf(tester, 'car')}'),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX loop 2026-10-19-app, round 2 · P198 (UX-1626): «Ver lo que dije»
+  // set apart from the last card ----
+
+  /// The words' row: the ExpansionTile's header holding [label].
+  Finder wordsTile(String label) =>
+      find.ancestor(of: find.text(label), matching: find.byType(ExpansionTile));
+  Finder wordsRow(String label) => find
+      .ancestor(of: find.text(label), matching: find.byType(ListTile))
+      .first;
+
+  /// The words' row reads quieter than a card's own rows: bodySmall, in
+  /// onSurfaceVariant for the text, the leading icon and the chevron.
+  void expectQuiet(WidgetTester tester, String label) {
+    final context = tester.element(find.text(label));
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(of: wordsRow(label), matching: find.byType(RichText)).at(
+        // The leading icon's glyph comes first.
+        find
+            .descendant(of: wordsRow(label), matching: find.byType(RichText))
+            .evaluate()
+            .toList()
+            .indexWhere(
+              (e) => (e.widget as RichText).text.toPlainText() == label,
+            ),
+      ),
+    );
+    final style = paragraph.text.style!;
+    expect(
+      style.fontSize,
+      theme.textTheme.bodySmall!.fontSize,
+      reason: '$label in bodySmall',
+    );
+    expect(style.color, muted, reason: '$label in onSurfaceVariant');
+    final icons = find.descendant(
+      of: wordsRow(label),
+      matching: find.byType(Icon),
+    );
+    expect(icons, findsNWidgets(2), reason: 'the leading icon and the chevron');
+    for (final icon in icons.evaluate()) {
+      final glyph = tester.widget<RichText>(
+        find.descendant(
+          of: find.byWidget(icon.widget),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(
+        glyph.text.style?.color,
+        muted,
+        reason: '${(icon.widget as Icon).icon} in onSurfaceVariant',
+      );
+    }
+  }
+
+  CaptureDraft oneTask() => CaptureDraft.fromAI(
+    TaskDraft.fromJson({
+      'title': 'Comprar pan',
+      'due_date': null,
+      'scheduled_date': Task.dateKey(nextWeekday(DateTime.friday)),
+      'priority': 1,
+      'notes': '',
+      'transcript': 'Comprar pan el viernes',
+      'questions': [],
+    }),
+  );
+
+  testWidgets(
+    'UX-1626: ES, 1x on 360x800, a one-task result: Ver lo que dije is in bodySmall and onSurfaceVariant (text, icon and chevron), at least 16 dp under Más opciones, at least 48 dp tall, and a tap still shows the words',
+    (tester) async {
+      await openResultIn(
+        tester,
+        [oneTask()],
+        transcript: 'Comprar pan el viernes',
+        size: phone,
+      );
+      expect(es.reviewOriginal, 'Ver lo que dije');
+      final label = es.reviewOriginal;
+      await tester.ensureVisible(wordsTile(label));
+      await tester.pumpAndSettle();
+      expectQuiet(tester, label);
+      final options = find.ancestor(
+        of: find.text(es.reviewOptions),
+        matching: find.byType(ListTile),
+      );
+      expect(options, findsOneWidget);
+      final row = tester.getRect(wordsRow(label));
+      expect(
+        row.top - tester.getRect(options).bottom,
+        greaterThanOrEqualTo(16 - 0.5),
+        reason: 'set apart from the task’s own Más opciones row',
+      );
+      expect(row.height, greaterThanOrEqualTo(48));
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: wordsTile(label),
+          matching: find.widgetWithText(
+            SelectableText,
+            'Comprar pan el viernes',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  List<CaptureDraft> threeTasks() => [
+    for (final (id, title) in [
+      ('bread', 'Comprar pan y leche'),
+      ('doctor', 'Llamar al médico'),
+      ('kids', 'Recoger a los niños del colegio'),
+    ])
+      CaptureDraft(
+        id: id,
+        task: Task(
+          title: title,
+          priority: 1,
+          dueDate: nextWeekday(DateTime.friday),
+        ),
+      ),
+  ];
+
+  for (final (source, label) in [
+    ('speech', es.reviewOriginal),
+    ('typed', es.reviewOriginalText),
+  ]) {
+    testWidgets(
+      'UX-1626: ES, 1x on 360x800, a three-task ${source == 'speech' ? 'spoken' : 'typed'} result: $label sits 16 dp (±1) below the last card, in the same quiet style',
+      (tester) async {
+        await openResultIn(
+          tester,
+          threeTasks(),
+          source: source,
+          transcript: 'Comprar pan y leche, llamar al médico y recoger a los niños',
+          size: phone,
+        );
+        await tester.ensureVisible(wordsTile(label));
+        await tester.pumpAndSettle();
+        final last = find.byKey(const ValueKey('kids'));
+        expect(last, findsOneWidget);
+        final gap =
+            tester.getRect(wordsRow(label)).top - tester.getRect(last).bottom;
+        expect(gap, moreOrLessEquals(16, epsilon: 1), reason: 'gap $gap');
+        expectQuiet(tester, label);
+        expect(
+          tester.getRect(wordsRow(label)).height,
+          greaterThanOrEqualTo(48),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 /// A capture store in memory: saving marks drafts saved and, given [tasks],

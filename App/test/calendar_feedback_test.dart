@@ -2895,8 +2895,7 @@ void main() {
           captures: pro ? null : MemoryCaptures(),
         );
         final l = tester.element(find.byType(CalendarScreen)).l10n;
-        expect(l.breathingRoom, 'Un momento de calma.');
-        expect(l.noScheduledTasks, 'No hay tareas de TaskFlow programadas');
+        expect(l.noScheduledTasks, 'No hay tareas para este día.');
         expect(find.text(l.todayAgenda), findsOneWidget);
         expect(
           find.descendant(
@@ -2913,7 +2912,6 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.text(l.breathingRoom), findsNothing);
         expect(find.text(l.noScheduledTasks), findsNothing);
         expect(
           find.descendant(of: emptyState(), matching: find.byType(Icon)),
@@ -2925,7 +2923,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-702: with phone calendars on, first run has no No hay tareas de TaskFlow programadas line; once the account has had a task it does',
+    'UX-702 / UX-1404: with phone calendars on, first run has no No hay tareas para este día. line; once the account has had a task it does, with no icon tile',
     (tester) async {
       for (final hadTask in [false, true]) {
         await tester.pumpWidget(const SizedBox());
@@ -2947,13 +2945,12 @@ void main() {
           hadTask ? findsOneWidget : findsNothing,
           reason: hadTask ? 'had a task' : 'first run',
         );
-        expect(find.text(l.breathingRoom), findsNothing);
         expect(
           find.descendant(
             of: emptyState(),
             matching: find.byIcon(Icons.event_available_outlined),
           ),
-          hadTask ? findsOneWidget : findsNothing,
+          findsNothing,
         );
         expect(tester.takeException(), isNull);
       }
@@ -2961,7 +2958,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-702: an account that has had a task, on an empty day, still shows Un momento de calma. under the title and the icon tile',
+    'UX-1404: an account that has had a task, on an empty day, shows only Nada previsto para este día., with no line under the title and no icon tile',
     (tester) async {
       await openCalendar(
         tester,
@@ -2973,24 +2970,15 @@ void main() {
         ],
       );
       final l = tester.element(find.byType(CalendarScreen)).l10n;
-      final title = find.text(l.todayAgenda);
-      final calm = find.text(l.breathingRoom);
-      expect(title, findsOneWidget);
-      expect(calm, findsOneWidget);
-      expect(
-        tester.getRect(calm).top,
-        greaterThanOrEqualTo(tester.getRect(title).bottom),
-      );
+      expect(find.text(l.todayAgenda), findsOneWidget);
       expect(
         find.descendant(of: emptyState(), matching: find.text(l.calendarEmpty)),
         findsOneWidget,
       );
+      expect(find.text(l.rememberPrompt), findsNothing);
       expect(
-        find.descendant(
-          of: emptyState(),
-          matching: find.byIcon(Icons.event_available_outlined),
-        ),
-        findsOneWidget,
+        find.descendant(of: emptyState(), matching: find.byType(Icon)),
+        findsNothing,
       );
       expect(find.text(l.calendarTrySaying), findsNothing);
       expect(tester.takeException(), isNull);
@@ -3048,6 +3036,109 @@ void main() {
       expect(find.byType(Icon), findsNothing);
       expect(find.text('Título'), findsOneWidget);
       expect(find.text('Mensaje'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX loop 2026-10-19-app, round 1 · P169 (UX-1404): an empty day is
+  // said once ----
+
+  /// Every line of text the empty state shows.
+  List<String> emptyLines(WidgetTester tester) => [
+    for (final text in find
+        .descendant(of: emptyState(), matching: find.byType(Text))
+        .evaluate())
+      (text.widget as Text).data ?? '',
+  ];
+
+  testWidgets(
+    'UX-1404: ES, 2x on 360x800, an empty day after the first run with no phone calendars shows only Nada previsto para este día. under Agenda de hoy, with no tile, above Añadir tarea',
+    (tester) async {
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+      await openCalendar(
+        tester,
+        const [],
+        size: const Size(360, 800),
+        textScale: 2,
+        overrides: [
+          firstTaskStoreProvider.overrideWithValue(
+            MemoryFirstTaskStore([MemoryTasks().ownerKey]),
+          ),
+        ],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      final title = find.text(l.todayAgenda);
+      expect(title, findsOneWidget);
+      expect(emptyLines(tester), [l.calendarEmpty]);
+      expect(
+        find.descendant(of: emptyState(), matching: find.byType(Icon)),
+        findsNothing,
+      );
+      expect(find.text(l.rememberPrompt), findsNothing);
+      expect(find.text('Un momento de calma.'), findsNothing);
+      // Nothing between the title and the agenda's one line.
+      final line = tester.getRect(
+        find.descendant(of: emptyState(), matching: find.text(l.calendarEmpty)),
+      );
+      expect(line.top, greaterThanOrEqualTo(tester.getRect(title).bottom));
+      final actions = tester.getRect(
+        find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.byType(TaskActions),
+        ),
+      );
+      expect(
+        line.bottom,
+        lessThanOrEqualTo(actions.top),
+        reason: 'the line ends ${line.bottom - actions.top} dp under Añadir tarea',
+      );
+      expect(line.top, greaterThanOrEqualTo(0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1404: ES, phone calendars on, an empty day with events shows No hay tareas para este día. then the events line, and nothing else',
+    (tester) async {
+      final now = DateTime.now();
+      final bridge = _FlakyCalendars()
+        ..data = [
+          DeviceCalendarEvent(
+            id: '31',
+            calendarId: workCalendar.id,
+            title: 'Dentista',
+            start: DateTime(now.year, now.month, now.day, 9),
+            end: DateTime(now.year, now.month, now.day, 10),
+            allDay: false,
+          ),
+        ];
+      addTearDown(bridge.close);
+      await openCalendar(
+        tester,
+        const [],
+        overrides: [
+          ...phoneCalendar(bridge),
+          firstTaskStoreProvider.overrideWithValue(
+            MemoryFirstTaskStore([MemoryTasks().ownerKey]),
+          ),
+        ],
+      );
+      final l = tester.element(find.byType(CalendarScreen)).l10n;
+      expect(find.text(l.todayAgenda), findsOneWidget);
+      expect(emptyLines(tester), [l.noScheduledTasks]);
+      expect(
+        find.descendant(of: emptyState(), matching: find.byType(Icon)),
+        findsNothing,
+      );
+      final events = find.byKey(const ValueKey('calendar-events-line'));
+      await reveal(tester, events);
+      expect(events, findsOneWidget);
+      expect(
+        tester.getRect(find.text(l.noScheduledTasks)).bottom,
+        lessThanOrEqualTo(tester.getRect(events).top),
+        reason: 'the tasks line, then the events line',
+      );
+      expect(find.text(l.calendarEmpty), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

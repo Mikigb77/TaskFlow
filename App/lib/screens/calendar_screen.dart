@@ -41,6 +41,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   bool _picked = false;
   // The day that was today when Calendar last checked the date.
   late DateTime _today;
+  // When the app last went to the background, while it's away.
+  DateTime? _leftAt;
   Timer? _midnight;
   CalendarFormat _format = CalendarFormat.week;
   PageController? _calendarPage;
@@ -56,11 +58,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   bool _landingInbox = false;
   bool _landedInbox = false;
   bool _highlight = false;
-  Timer? _highlightTimer;
-  final _landedRow = GlobalKey();
-  // The gap after the last row. A task saved without a date lands on the
-  // last row, so it grows to the save message's height while that landing
-  // lasts, letting the row scroll clear of the message.
+  // The lit rows, by task occurrence, in the order they show; the no-date
+  // row is 'inbox'. Each fades 1.5 s after it is first seen whole.
+  final _litRows = <String, GlobalKey>{};
+  final _inboxRow = GlobalKey();
+  List<String> _litOrder = const [];
+  final _seen = <String>{};
+  final _faded = <String>{};
+  final _fades = <Timer>[];
+  Timer? _recheck;
+  bool _revealing = false;
+  bool _watchQueued = false;
+  // The gap after the last row. It grows to the save message's height while
+  // a landing lasts, so the last rows can scroll clear of the message.
   double _end = 20;
 
   DateTime _now() => ref.read(calendarClockProvider)();
@@ -73,13 +83,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     _today = Task.day(_selectedDay);
     _scheduleMidnight();
     WidgetsBinding.instance.addObserver(this);
+    _scroll.addListener(_scrolled);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _midnight?.cancel();
-    _highlightTimer?.cancel();
+    _stopFading();
     _scroll.dispose();
     super.dispose();
   }
@@ -92,6 +103,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       _landingInbox = false;
       _landedInbox = false;
       _end = 20;
+      _stopFading();
     }
     _selectedDay = day;
     _focusedDay = focused ?? day;
@@ -151,49 +163,76 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       _landedInbox = false;
       _end = 20;
       _highlight = false;
-      _highlightTimer?.cancel();
+      _stopFading();
+      _litRows.clear();
     });
   }
 
-  /// Brings the new task's row (the first, for several) into view, clear of the save message, then
-  /// lets its highlight fade.
+  /// Brings the new tasks' rows into view, clear of the save message: all
+  /// of them when they fit, or else the first. Then each fades once seen.
   Future<void> _reveal() async {
-    // The no-date row is the last one: make room under it for the save
-    // message, which shows a moment after the landing.
-    if (_inboxOnly) {
-      for (var i = 0; i < 60 && mounted; i++) {
-        final clearance = _messageClearance();
-        if (clearance != null) {
-          if (clearance > _end) setState(() => _end = clearance);
-          break;
-        }
-        await WidgetsBinding.instance.endOfFrame;
-      }
+    _revealing = true;
+    try {
+      await _scrollToLit();
+    } finally {
+      _revealing = false;
+    }
+    _watchLit();
+  }
+
+  Future<void> _scrollToLit() async {
+    // The save message shows a moment after the landing: wait for it, and
+    // make room under the last row for it, as a new row may be that one.
+    double? clearance;
+    for (var i = 0; i < 60 && mounted; i++) {
+      clearance = _messageClearance();
+      if (clearance != null) break;
       await WidgetsBinding.instance.endOfFrame;
     }
+    if (!mounted) return;
+    final room = clearance ?? 88;
+    if (room > _end) setState(() => _end = room);
+    await WidgetsBinding.instance.endOfFrame;
+    var looked = false;
     for (var i = 0; i < 20 && mounted && _scroll.hasClients; i++) {
-      final row = _landedRow.currentContext?.findRenderObject();
+      GlobalKey? find(String? row) => _inboxOnly
+          ? _inboxRow
+          : row == null
+          ? null
+          : _litRows[row];
+      final first = find(
+        _litOrder.firstOrNull,
+      )?.currentContext?.findRenderObject();
+      final last = find(
+        _litOrder.lastOrNull,
+      )?.currentContext?.findRenderObject();
       final position = _scroll.position;
-      if (row == null) {
-        // Rows far below are only built once scrolled near.
-        if (position.pixels >= position.maxScrollExtent) break;
+      if (first == null) {
+        // Rows out of view are only built once scrolled near: start from the
+        // top, then move down a screen at a time.
+        if (i > 0 && position.pixels >= position.maxScrollExtent) break;
         _scroll.jumpTo(
-          math.min(
-            position.pixels + position.viewportDimension,
-            position.maxScrollExtent,
-          ),
+          i == 0
+              ? position.minScrollExtent
+              : math.min(
+                  position.pixels + position.viewportDimension,
+                  position.maxScrollExtent,
+                ),
         );
         await WidgetsBinding.instance.endOfFrame;
         continue;
       }
-      final viewport = RenderAbstractViewport.of(row);
-      final top = viewport.getOffsetToReveal(row, 0).offset;
-      final bottom =
-          viewport.getOffsetToReveal(row, 1).offset + math.max(88, _end);
+      final viewport = RenderAbstractViewport.of(first);
+      final top = viewport.getOffsetToReveal(first, 0).offset;
+      final firstEnd = viewport.getOffsetToReveal(first, 1).offset + room;
+      final lastEnd = last == null
+          ? null
+          : viewport.getOffsetToReveal(last, 1).offset + room;
+      final end = lastEnd != null && lastEnd <= top ? lastEnd : firstEnd;
       final target = position.pixels > top
           ? top
-          : position.pixels < bottom
-          ? math.min(bottom, top)
+          : position.pixels < end
+          ? math.min(end, top)
           : position.pixels;
       final offset = target.clamp(
         position.minScrollExtent,
@@ -210,13 +249,77 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           );
         }
       }
+      // The last new row wasn't built yet: look again from here, once.
+      if (last == null && !_inboxOnly && _litOrder.length > 1 && !looked) {
+        looked = true;
+        await WidgetsBinding.instance.endOfFrame;
+        continue;
+      }
       break;
     }
-    if (!mounted) return;
-    _highlightTimer?.cancel();
-    _highlightTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) setState(() => _highlight = false);
+  }
+
+  bool _lit(String row) => _highlight && !_faded.contains(row);
+
+  void _stopFading() {
+    for (final fade in _fades) {
+      fade.cancel();
+    }
+    _fades.clear();
+    _recheck?.cancel();
+    _seen.clear();
+    _faded.clear();
+  }
+
+  /// A scroll can bring a lit row into view: look once it's laid out.
+  void _scrolled() {
+    if (!_highlight || _revealing || _watchQueued) return;
+    _watchQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _watchQueued = false;
+      _watchLit();
     });
+  }
+
+  /// Starts the 1.5 s fade of each lit row now seen whole: on screen and
+  /// above the save message. A row out of view stays lit until it shows.
+  void _watchLit() {
+    if (!mounted || !_highlight || _revealing) return;
+    _recheck?.cancel();
+    final rows = [
+      for (final row in _litOrder) (row, _litRows[row]),
+      if (_landedInbox) ('inbox', _inboxRow),
+    ];
+    final message = _messageClearance() ?? 0;
+    final seen = <String>[];
+    var covered = false;
+    for (final (row, key) in rows) {
+      if (_seen.contains(row)) continue;
+      final box = key?.currentContext?.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      final RenderObject? viewport = RenderAbstractViewport.maybeOf(box);
+      if (viewport is! RenderBox || !viewport.hasSize) continue;
+      final area = viewport.localToGlobal(Offset.zero) & viewport.size;
+      final rect = box.localToGlobal(Offset.zero) & box.size;
+      if (rect.top < area.top - 0.5 || rect.top >= area.bottom) continue;
+      if (rect.bottom <= area.bottom - message + 0.5) {
+        seen.add(row);
+      } else if (rect.bottom <= area.bottom + 0.5) {
+        // On screen, under the message: seen once the message goes.
+        covered = true;
+      }
+    }
+    if (seen.isNotEmpty) {
+      _seen.addAll(seen);
+      _fades.add(
+        Timer(const Duration(milliseconds: 1500), () {
+          if (mounted) setState(() => _faded.addAll(seen));
+        }),
+      );
+    }
+    if (covered && message > 0) {
+      _recheck = Timer(const Duration(milliseconds: 500), _watchLit);
+    }
   }
 
   /// The week or month arrows; with animations off the page just changes.
@@ -267,13 +370,39 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      setState(_followToday);
+      final left = _leftAt;
+      _leftAt = null;
+      setState(() {
+        if (left != null) _comeBack(left);
+        _followToday();
+      });
       _scheduleMidnight();
       ref.read(taskProvider.notifier).loadTasks();
       ref.read(deviceCalendarProvider.notifier).refresh();
     } else {
+      _leftAt ??= _now();
       ref.read(deviceCalendarProvider.notifier).suspend();
     }
+  }
+
+  /// Back after a while away, or on another day, Calendar opens on today,
+  /// whichever day a landing or the person had chosen. A short return keeps
+  /// the day, and a chosen day still goes to the next capture. Today opens
+  /// at the top, with the week strip and its header in view.
+  void _comeBack(DateTime left) {
+    final now = _now();
+    if (now.difference(left) < const Duration(minutes: 30) &&
+        Task.day(now) == Task.day(left)) {
+      return;
+    }
+    _picked = false;
+    _select(Task.day(now));
+    // Jump, never animate: the person wasn't looking.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.minScrollExtent);
+      }
+    });
   }
 
   Future<void> _refresh() => Future.wait([
@@ -348,11 +477,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       _landedInbox = _landingInbox && inbox > 0;
       _landingInbox = false;
       _highlight = true;
+      _stopFading();
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
     }
-    final landedIndex = events.indexWhere(
-      (task) => _landedIds.contains(task.id),
-    );
+    _litOrder = [
+      for (final task in events)
+        if (_landedIds.contains(task.id)) key(task),
+    ];
     final instant = MediaQuery.disableAnimationsOf(context);
     final now = _now();
     final today = isSameDay(_selectedDay, now);
@@ -387,6 +518,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       _landingInbox = false;
       _landedInbox = true;
       _highlight = true;
+      _stopFading();
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
     }
     final phoneCalendars = ref
@@ -679,17 +811,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             ).format(_selectedDay),
                       style: text.titleLarge,
                     ),
-                    if (!firstRun) ...[
+                    // An empty day says so once, in the agenda below.
+                    if (total > 0) ...[
                       const SizedBox(height: 4),
                       Text(
-                        total == 0
-                            ? phoneCalendars
-                                  ? context.l10n.noScheduledTasks
-                                  : context.l10n.breathingRoom
-                            : context.l10n.agendaCounts(
-                                total - completed,
-                                completed,
-                              ),
+                        context.l10n.agendaCounts(total - completed, completed),
                         style: TextStyle(
                           color: colors.onSurfaceVariant,
                           fontSize: 12,
@@ -718,13 +844,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
             else if (total == 0)
               SliverToBoxAdapter(
                 child: EmptyState(
-                  title: context.l10n.rememberPrompt,
-                  icon: firstRun ? null : Icons.event_available_outlined,
                   // An account that has never had a task or note is told what
                   // to try, as Añadir tarea will open it. Once it has had one,
-                  // the instruction never comes back.
-                  message: hasAny || hadTask.valueOrNull == true
-                      ? context.l10n.calendarEmpty
+                  // the instruction never comes back, and an empty day is one
+                  // line: about tasks only when the phone's events follow.
+                  title: firstRun ? context.l10n.rememberPrompt : null,
+                  icon: null,
+                  message: !firstRun
+                      ? phoneCalendars
+                            ? context.l10n.noScheduledTasks
+                            : context.l10n.calendarEmpty
                       : ref.watch(voiceAvailableProvider)
                       ? context.l10n.calendarTrySaying
                       // Nueva tarea opens the form, which reads no dates
@@ -777,14 +906,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         task.displayDate != null &&
                         Task.dateKey(task.displayDate!) !=
                             Task.dateKey(_selectedDay);
+                    final landed = _landedIds.contains(task.id);
                     return Padding(
-                      key: index == landedIndex ? _landedRow : null,
+                      key: landed
+                          ? _litRows.putIfAbsent(key(task), GlobalKey.new)
+                          : null,
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _landedIds.contains(task.id)
+                      child: landed
                           ? LandedTaskTile(
                               task: task,
                               showDate: showDate,
-                              lit: _highlight,
+                              lit: _lit(key(task)),
                             )
                           : TaskTile(task: task, showDate: showDate),
                     );
@@ -798,12 +930,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverToBoxAdapter(
                   child: Align(
-                    key: _inboxOnly ? _landedRow : null,
+                    key: _inboxRow,
                     alignment: AlignmentDirectional.centerStart,
                     // A task saved without a date lights this row up.
                     child: TweenAnimationBuilder<Color?>(
                       tween: ColorTween(
-                        end: _landedInbox && _highlight
+                        end: _landedInbox && _lit('inbox')
                             ? colors.primaryContainer
                             : colors.primaryContainer.withValues(alpha: 0),
                       ),

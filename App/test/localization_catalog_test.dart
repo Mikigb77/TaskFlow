@@ -871,4 +871,206 @@ void main() {
       expect(catalog.containsKey('deleteAccountLinkError'), isFalse);
     }
   });
+
+  // ---- UX loop 2026-10-19-app, round 1: P166, P167, P169, P170 ----
+
+  Map<String, dynamic> catalogOf(String language) => jsonDecode(
+        File('${directory.path}/app_$language.arb').readAsStringSync(),
+      ) as Map<String, dynamic>;
+
+  /// Every message value of a catalog, without its @ descriptions.
+  Iterable<String> valuesOf(String language) => catalogOf(language)
+      .entries
+      .where((entry) => !entry.key.startsWith('@'))
+      .map((entry) => '${entry.value}');
+
+  test('UX-1303 / UX-1305 / UX-1306: the microphone and listening lines read '
+      'as the plan wrote them, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      [
+        en.captureMicrophoneBlocked,
+        es.captureMicrophoneBlocked,
+        ca.captureMicrophoneBlocked,
+      ],
+      [
+        'To dictate again, open Settings and tap Permissions › Microphone › Allow.',
+        'Para volver a dictar, abre Ajustes y toca Permisos › Micrófono › Permitir.',
+        'Per tornar a dictar, obre Configuració i toca Permisos › Micròfon › Permet.',
+      ],
+    );
+    expect(
+      [en.captureMicrophoneWhy, es.captureMicrophoneWhy, ca.captureMicrophoneWhy],
+      [
+        'Allow the microphone to dictate your tasks. It only listens while you dictate.',
+        'Permite el micrófono para dictar tus tareas. Solo escucha mientras dictas.',
+        'Permet el micròfon per dictar les tasques. Només escolta mentre dictes.',
+      ],
+    );
+    expect(
+      [en.captureMicrophone, es.captureMicrophone, ca.captureMicrophone],
+      [
+        'Without the microphone I can’t hear you. Tap Start talking to allow it, or Type instead.',
+        'Sin micrófono no puedo escucharte. Toca Empezar a hablar para permitirlo, o Escribir.',
+        'Sense micròfon no et puc escoltar. Toca Comença a parlar per permetre-ho, o Escriu.',
+      ],
+    );
+    expect(
+      [en.captureCantListen, es.captureCantListen, ca.captureCantListen],
+      [
+        'I can’t listen on this phone right now. Tap Type instead.',
+        'Ahora no puedo escucharte en este teléfono. Toca Escribir.',
+        'Ara no et puc escoltar en aquest telèfon. Toca Escriu.',
+      ],
+    );
+    // The buttons the lines name are the ones on the sheet.
+    expect(es.captureStartTalking, 'Empezar a hablar');
+    expect(es.captureTypeInstead, 'Escribir');
+    expect(ca.captureStartTalking, 'Comença a parlar');
+    expect(ca.captureTypeInstead, 'Escriu');
+    expect(ca.captureOpenSettings, 'Obre Configuració');
+    for (final language in ['en', 'es', 'ca']) {
+      final catalog = catalogOf(language);
+      // UX-1306: one line replaces both.
+      expect(catalog.containsKey('captureSpeechLanguage'), isFalse,
+          reason: language);
+      expect(catalog.containsKey('captureSpeechUnavailable'), isFalse,
+          reason: language);
+      // UX-1305: there is no field below to type in.
+      for (final value in valuesOf(language)) {
+        final lower = value.toLowerCase();
+        for (final gone in ['escribe abajo', 'type below', 'escriu a sota']) {
+          expect(lower.contains(gone), isFalse,
+              reason: '$language: «$value» contains «$gone»');
+        }
+      }
+    }
+  });
+
+  test('UX-1301 / UX-1304: nothing found, nothing heard, listening online and '
+      'the countdown read as the plan wrote them, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      [en.captureNoTasks, es.captureNoTasks, ca.captureNoTasks],
+      [
+        'I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”',
+        'No he encontrado ninguna tarea. Di qué y cuándo, por ejemplo: «Mañana, llamar al dentista».',
+        'No he trobat cap tasca. Digues què i quan, per exemple: «Demà, trucar al dentista».',
+      ],
+    );
+    expect(
+      [
+        en.captureNothingHeardYet,
+        es.captureNothingHeardYet,
+        ca.captureNothingHeardYet,
+      ],
+      [
+        'Nothing heard yet. Speak when you’re ready, or tap Type instead.',
+        'Aún no he oído nada. Habla cuando quieras o toca Escribir.',
+        'Encara no he sentit res. Parla quan vulguis o toca Escriu.',
+      ],
+    );
+    expect(
+      [
+        en.captureListeningOnline,
+        es.captureListeningOnline,
+        ca.captureListeningOnline,
+      ],
+      [
+        'I’m listening. You’ll see your words when you tap Done.',
+        'Te escucho. Verás tus palabras al tocar Listo.',
+        'T’escolto. Veuràs les paraules quan toquis Fet.',
+      ],
+    );
+    expect(
+      [en.captureTimeLeft(3), en.captureTimeLeft(1), en.captureTimeLeft(10)],
+      ['3 seconds left', '1 second left', '10 seconds left'],
+    );
+    expect(
+      [es.captureTimeLeft(3), es.captureTimeLeft(1), es.captureTimeLeft(10)],
+      ['Quedan 3 segundos', 'Queda 1 segundo', 'Quedan 10 segundos'],
+    );
+    expect(
+      [ca.captureTimeLeft(3), ca.captureTimeLeft(1), ca.captureTimeLeft(10)],
+      ['Queden 3 segons', 'Queda 1 segon', 'Queden 10 segons'],
+    );
+    // Unchanged: once words are heard, and a silent 60 s.
+    expect(es.captureStillListening, 'Sigo escuchando. Toca Listo cuando termines.');
+    expect(es.captureNoSpeech, 'No te he entendido. Vuelve a intentarlo o escríbelo.');
+  });
+
+  test('UX-1404: an empty day’s line with the phone’s calendars reads No tasks '
+      'for this day., without the brand; Un momento de calma. is gone', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      [en.noScheduledTasks, es.noScheduledTasks, ca.noScheduledTasks],
+      [
+        'No tasks for this day.',
+        'No hay tareas para este día.',
+        'No hi ha tasques per a aquest dia.',
+      ],
+    );
+    for (final language in ['en', 'es', 'ca']) {
+      expect(catalogOf(language).containsKey('breathingRoom'), isFalse,
+          reason: language);
+      for (final value in valuesOf(language)) {
+        expect(value.contains('tareas de TaskFlow programadas'), isFalse,
+            reason: '$language: «$value»');
+      }
+    }
+  });
+
+  test('UX-1602 / UX-1617 / UX-1507: the sign-in lines read as the plan wrote '
+      'them, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    const address = 'maria.lopez@example.com';
+    expect(
+      [
+        en.recoveryEmailRequested(address),
+        es.recoveryEmailRequested(address),
+        ca.recoveryEmailRequested(address),
+      ],
+      [
+        'If maria.lopez@example.com has an account, an email with a code is on its way. Type it here.',
+        'Si maria.lopez@example.com tiene cuenta, te llegará un correo con un código. Escríbelo aquí.',
+        'Si maria.lopez@example.com té compte, t’arribarà un correu amb un codi. Escriu-lo aquí.',
+      ],
+    );
+    final placeholders = (template['@recoveryEmailRequested']
+        as Map<String, dynamic>)['placeholders'] as Map<String, dynamic>;
+    expect((placeholders['email'] as Map)['type'], 'String');
+    expect([en.email, es.email, ca.email], ['Email', 'Correo', 'Correu']);
+    expect(
+      [
+        en.requestError('emailUsed'),
+        es.requestError('emailUsed'),
+        ca.requestError('emailUsed'),
+      ],
+      [
+        'This email already has an account.',
+        'Este correo ya tiene una cuenta.',
+        'Aquest correu ja té un compte.',
+      ],
+    );
+    expect(
+      [
+        en.invitationWaitingSignIn,
+        es.invitationWaitingSignIn,
+        ca.invitationWaitingSignIn,
+      ],
+      [
+        'You have an invitation. Sign in with the email address it was sent to.',
+        'Tienes una invitación. Entra con el correo en el que la recibiste.',
+        'Tens una invitació. Entra amb el correu on l’has rebuda.',
+      ],
+    );
+  });
 }

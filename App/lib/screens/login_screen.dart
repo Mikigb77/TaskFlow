@@ -11,6 +11,7 @@ import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/screens/verify_email_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/services/development_login.dart';
 import 'package:agenda/services/pending_verification.dart';
 import 'package:agenda/services/site_links.dart';
@@ -50,6 +51,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _register = false;
   bool _recover = false;
   bool _hasRecoveryCode = false;
+  // Where recovery just sent its code: said above the code field.
+  String? _sentTo;
   bool _busy = false;
   bool _showPassword = false;
   // Reached sign-in from create's email-in-use answer, so this email has an
@@ -64,6 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailFocus = FocusNode();
   final _passwordField = GlobalKey();
   final _outcome = GlobalKey();
+  final _sent = GlobalKey();
 
   @override
   void initState() {
@@ -110,6 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _recover = recover;
       _accountExists = accountExists;
       _hasRecoveryCode = false;
+      _sentTo = null;
       _code.clear();
       _message = null;
       _replaced = false;
@@ -161,11 +166,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// text.
   void _reveal() {
     final error = _error ?? ref.read(authProvider).error;
-    if (error == null && _message == null) return;
+    if (error == null && _message == null && _sentTo == null) return;
     final key = switch (_fieldFor(error)) {
       _Field.email => _emailField,
       _Field.password => _passwordField,
-      null => _outcome,
+      null => error == null && _message == null ? _sent : _outcome,
     };
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
@@ -228,8 +233,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (password != null) {
       unawaited(ref.read(pendingVerificationProvider).remember(email));
     }
-    Widget screen(BuildContext _) =>
-        VerifyEmailScreen(email: email, password: password, sentAt: resumedFrom);
+    Widget screen(BuildContext _) => VerifyEmailScreen(
+      email: email,
+      password: password,
+      sentAt: resumedFrom,
+    );
     final back = await Navigator.of(context).push<VerifyEmailReturn>(
       resumedFrom == null
           ? MaterialPageRoute(builder: screen)
@@ -257,6 +265,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     final password = _password.text;
+    // Recovery's email in the app's language, as sign-in's.
+    final language = Localizations.localeOf(context).languageCode;
     String? unconfirmed;
     await _run(() async {
       final api = ref.read(apiClientProvider);
@@ -269,7 +279,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           authenticated: false,
           data: confirming
               ? {'code': _code.text.trim(), 'password': _password.text}
-              : {'email': _email.text.trim()},
+              : {'email': _email.text.trim(), 'language': language},
         );
         if (!mounted) return;
         if (confirming) {
@@ -281,7 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         } else {
           setState(() {
             _hasRecoveryCode = true;
-            _message = context.l10n.recoveryEmailRequested;
+            _sentTo = _email.text.trim();
           });
         }
         return;
@@ -304,10 +314,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
     });
     if (unconfirmed != null && mounted) {
-      await _confirmEmail(
-        unconfirmed!,
-        password: DevelopmentLogin.password,
-      );
+      await _confirmEmail(unconfirmed!, password: DevelopmentLogin.password);
     }
   }
 
@@ -352,6 +359,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final strings = context.l10n;
     final auth = ref.watch(authProvider);
     final google = ref.watch(googleSignInServiceProvider);
+    // An invitation link opened while signed out waits for its address.
+    final invitation =
+        !widget.signInAgain && ref.watch(invitationLinkProvider) != null;
     final colors = Theme.of(context).colorScheme;
     final busy = _busy || auth.loading;
     // Sign-in again already says why it appeared; the expiry's own error
@@ -419,12 +429,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 32),
                     // Right after deleting the account; gone on the next try.
                     if (auth.deleted) ...[
-                      Semantics(
+                      MessageBanner(
+                        strings.accountDeleted,
+                        key: const ValueKey('account-deleted'),
                         liveRegion: true,
-                        child: MessageBanner(
-                          strings.accountDeleted,
-                          key: const ValueKey('account-deleted'),
-                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -443,18 +451,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   : strings.signInHeading,
                             ),
                             const SizedBox(height: 10),
-                            Text(
-                              _recover
-                                  ? strings.recoveryHelp
-                                  : widget.signInAgain
-                                  ? strings.signInAgainReason
-                                  : strings.authPitch,
-                              style: TextStyle(
-                                color: colors.onSurfaceVariant,
-                                height: 1.55,
+                            // Its own node, read after the heading.
+                            Semantics(
+                              container: true,
+                              child: Text(
+                                _recover
+                                    ? strings.recoveryHelp
+                                    : widget.signInAgain
+                                    ? strings.signInAgainReason
+                                    : strings.authPitch,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                  height: 1.55,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 24),
+                            if (invitation && !_recover) ...[
+                              MessageBanner(
+                                strings.invitationWaitingSignIn,
+                                key: const ValueKey('invitation-waiting'),
+                                icon: Icons.mail_outline_rounded,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             if (!_recover && google.supported) ...[
                               GoogleLoginButton(
                                 key: const ValueKey('google-sign-in'),
@@ -476,23 +496,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                 ),
                               const SizedBox(height: 20),
-                              Row(
-                                children: [
-                                  const Expanded(child: Divider()),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                    ),
-                                    child: Text(
-                                      strings.authOr,
-                                      style: TextStyle(
-                                        color: colors.onSurfaceVariant,
-                                        fontSize: 12,
+                              // Seen, not read: «o» alone means nothing.
+                              ExcludeSemantics(
+                                child: Row(
+                                  children: [
+                                    const Expanded(child: Divider()),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      child: Text(
+                                        strings.authOr,
+                                        style: TextStyle(
+                                          color: colors.onSurfaceVariant,
+                                          fontSize: 12,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const Expanded(child: Divider()),
-                                ],
+                                    const Expanded(child: Divider()),
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 20),
                             ],
@@ -542,6 +565,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               },
                                               decoration: InputDecoration(
                                                 labelText: strings.email,
+                                                // Above the field, at its
+                                                // smaller size: whole at 2×.
+                                                floatingLabelBehavior:
+                                                    FloatingLabelBehavior
+                                                        .always,
                                                 errorText: emailError,
                                                 errorMaxLines: 4,
                                               ),
@@ -574,6 +602,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       const SizedBox(height: 16),
                                     ],
                                     if (_recover && _hasRecoveryCode) ...[
+                                      if (_sentTo case final sentTo?) ...[
+                                        MessageBanner(
+                                          strings.recoveryEmailRequested(
+                                            sentTo,
+                                          ),
+                                          key: _sent,
+                                          icon: Icons.mail_outline_rounded,
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
                                       TextFormField(
                                         key: const ValueKey(
                                           'account-recovery-code',
@@ -583,7 +621,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         autocorrect: false,
                                         textInputAction: TextInputAction.next,
                                         decoration: InputDecoration(
-                                          labelText: strings.recoveryCode,
+                                          // On the border like the other
+                                          // fields. At large text it is the
+                                          // longest label: it shrinks to
+                                          // stay whole rather than cut.
+                                          label: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: AlignmentDirectional
+                                                .centerStart,
+                                            child: Text(strings.recoveryCode),
+                                          ),
+                                          floatingLabelBehavior:
+                                              FloatingLabelBehavior.always,
                                           errorMaxLines: 3,
                                         ),
                                         validator: (value) =>
@@ -622,6 +671,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             labelText: _recover
                                                 ? strings.newPassword
                                                 : strings.password,
+                                            floatingLabelBehavior:
+                                                FloatingLabelBehavior.always,
                                             errorText: passwordError,
                                             errorMaxLines: 6,
                                             helperMaxLines: 3,
@@ -665,15 +716,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     if (!_recover &&
                                         !_register &&
                                         !(unknownAccount && _accountExists))
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: TextButton(
-                                          onPressed: busy
-                                              ? null
-                                              : () => _mode(recover: true),
-                                          child: Text(
-                                            strings.forgotPassword,
-                                            textAlign: TextAlign.end,
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.centerRight,
+                                          child: TextButton(
+                                            onPressed: busy
+                                                ? null
+                                                : () => _mode(recover: true),
+                                            child: Text(
+                                              strings.forgotPassword,
+                                              textAlign: TextAlign.end,
+                                            ),
                                           ),
                                         ),
                                       )
@@ -724,17 +780,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    // Its own node: only the line is read.
                                     if (_replaced && error == null)
-                                      Semantics(
-                                        container: true,
+                                      MessageBanner(
+                                        _message!,
+                                        key: const ValueKey('signup-replaced'),
                                         liveRegion: true,
-                                        child: MessageBanner(
-                                          _message!,
-                                          key: const ValueKey(
-                                            'signup-replaced',
-                                          ),
-                                        ),
                                       )
                                     else
                                       MessageBanner(
@@ -791,7 +841,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 onPressed: busy ? null : () => _mode(),
                                 child: Text(strings.backToSignIn),
                               ),
-                            ] else
+                            ] else if (!unknownAccount || _accountExists)
+                              // Hidden while the banner offers the same
+                              // create as a button.
                               TextButton(
                                 onPressed: busy
                                     ? null

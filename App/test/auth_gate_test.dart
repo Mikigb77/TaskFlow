@@ -11,6 +11,7 @@ import 'package:agenda/screens/main_shell.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/services/site_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -19,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
+import 'support/reading_order.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/widgets/app_components.dart';
 
@@ -57,6 +59,8 @@ Future<(ProviderContainer, _Auth)> _open(
   String language = 'en',
   Size size = const Size(390, 844),
   Future<bool> Function(Uri)? openPage,
+  // Invitation links opened before signing in, without Android's channel.
+  InvitationLinks? invitations,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -77,6 +81,10 @@ Future<(ProviderContainer, _Auth)> _open(
         MemoryRegionalStore(RegionalPreferences(language: language)),
       ),
       if (openPage != null) openWebPageProvider.overrideWithValue(openPage),
+      // Never Android's app_links channel, which a test has no plugin for.
+      invitationLinkProvider.overrideWith(
+        (ref) => invitations ?? InvitationLinks(listen: false),
+      ),
     ],
   );
   addTearDown(container.dispose);
@@ -480,7 +488,7 @@ void main() {
       await tapVisible(tester, submit);
       expect(api.requests.last, [
         'auth/password-reset/',
-        {'email': 'ana@example.invalid'},
+        {'email': 'ana@example.invalid', 'language': 'es'},
       ]);
       expect(
         find.descendant(of: submit, matching: find.text(es.saveNewPassword)),
@@ -1190,6 +1198,419 @@ void main() {
           final paragraph = tester.renderObject<RenderParagraph>(text);
           expect(paragraph.didExceedMaxLines, isFalse, reason: label);
         }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // ---- UX loop 2026-10-19-app, round 1 · P170 (UX-1602, UX-1604, UX-1617,
+  // UX-1507): sign-in ----
+
+  final recoveryCode = find.byKey(const ValueKey('account-recovery-code'));
+
+  /// Sign-in in [language] on [size], with the server answering through
+  /// [api] and invitation links kept by [invitations].
+  Future<_LoginApi> openIn(
+    WidgetTester tester, {
+    String language = 'es',
+    _LoginApi? api,
+    Size size = const Size(360, 800),
+    InvitationLinks? invitations,
+  }) async {
+    final client = api ?? _LoginApi();
+    final (_, auth) = await _open(
+      tester,
+      client: client,
+      language: language,
+      size: size,
+      invitations: invitations,
+    );
+    auth.finish();
+    await tester.pumpAndSettle();
+    return client;
+  }
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1602: ${language.toUpperCase()}, 1x on 360x800, after Enviar código for maria.lopez@example.com the line naming the address sits above the recovery code, and the request carries language $language',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final api = await openIn(tester, language: language);
+        await tapVisible(tester, find.text(l.forgotPassword));
+        await tester.enterText(email, 'maria.lopez@example.com');
+        await tapVisible(tester, submit);
+        expect(api.requests.last, [
+          'auth/password-reset/',
+          {'email': 'maria.lopez@example.com', 'language': language},
+        ]);
+        final sent = find.text(
+          l.recoveryEmailRequested('maria.lopez@example.com'),
+        );
+        expect(sent, findsOneWidget);
+        expect(recoveryCode, findsOneWidget);
+        expect(
+          tester.getRect(sent).bottom,
+          lessThanOrEqualTo(tester.getRect(recoveryCode).top),
+          reason: 'the sent line, then «${l.recoveryCode}»',
+        );
+        // Not under the new password's button.
+        expect(
+          tester.getRect(sent).bottom,
+          lessThan(tester.getRect(submit).top),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1602: the recovery code field still accepts a 45-character uid:token value',
+    (tester) async {
+      final api = await openIn(tester);
+      await tapVisible(tester, find.text(es.forgotPassword));
+      await tester.enterText(email, 'maria.lopez@example.com');
+      await tapVisible(tester, submit);
+      const code = 'MTI3:cz9k2v-4f7e1b0a9c8d7e6f5a4b3c2d1e0f9a8b7';
+      expect(code.length, 45);
+      await tester.enterText(recoveryCode, code);
+      await tester.pumpAndSettle();
+      expect(typed(tester, recoveryCode), code);
+      await tester.enterText(password, 'clave-nueva-2026-larga');
+      await tapVisible(tester, submit);
+      expect(api.requests.last, [
+        'auth/password-reset/confirm/',
+        {'code': code, 'password': 'clave-nueva-2026-larga'},
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- UX loop 2026-10-19-app, round 2 · P199 (UX-1629): the recovery
+  // code's label on the border ----
+
+  /// Sign-in in [l]'s language, on to the recovery form with the code sent.
+  Future<void> openRecoverySent(WidgetTester tester, AppLocalizations l) async {
+    await openIn(tester, language: l.localeName);
+    await tapVisible(tester, find.text(l.forgotPassword));
+    await tester.enterText(email, 'maria.lopez@example.com');
+    await tapVisible(tester, submit);
+    expect(recoveryCode, findsOneWidget);
+    expect(password, findsOneWidget);
+  }
+
+  /// [label]'s text inside [field], its decorator and its typing area.
+  ({Rect label, Rect box, Rect typing}) fieldParts(
+    WidgetTester tester,
+    Finder field,
+    String label,
+  ) => (
+    label: tester.getRect(
+      find.descendant(of: field, matching: find.text(label)),
+    ),
+    box: tester.getRect(
+      find.descendant(of: field, matching: find.byType(InputDecorator)),
+    ),
+    typing: tester.getRect(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    ),
+  );
+
+  testWidgets(
+    'UX-1629: ES, 1x on 360x800, recovery sent: Código de recuperación and Nueva contraseña both sit on their fields’ borders, above the empty fields',
+    (tester) async {
+      await openRecoverySent(tester, es);
+      expect(es.recoveryCode, 'Código de recuperación');
+      expect(es.newPassword, 'Nueva contraseña');
+      final offsets = <double>[];
+      for (final (field, label) in [
+        (recoveryCode, es.recoveryCode),
+        (password, es.newPassword),
+      ]) {
+        expect(typed(tester, field), isEmpty, reason: 'the field is empty');
+        final decoration = tester
+            .widget<TextField>(
+              find.descendant(of: field, matching: find.byType(TextField)),
+            )
+            .decoration!;
+        expect(
+          decoration.floatingLabelBehavior,
+          FloatingLabelBehavior.always,
+          reason: label,
+        );
+        final parts = fieldParts(tester, field, label);
+        // Above where the words go, not inside the empty field.
+        expect(
+          parts.label.bottom,
+          lessThanOrEqualTo(parts.typing.top + 0.5),
+          reason: '$label ${parts.label} over ${parts.typing}',
+        );
+        expect(
+          parts.label.center.dy,
+          lessThan(parts.box.center.dy),
+          reason: '$label in the top half of ${parts.box}',
+        );
+        offsets.add(parts.label.center.dy - parts.box.top);
+      }
+      // Both labels sit the same way on their borders.
+      expect(offsets.first, moreOrLessEquals(offsets.last, epsilon: 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1629: ${language.toUpperCase()}, 2x on 360x800, recovery sent: ${language == 'es' ? 'Código de recuperación and Nueva contraseña' : 'Codi de recuperació and Contrasenya nova'} show whole on their borders, not cut',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await openRecoverySent(tester, l);
+        if (language == 'ca') {
+          expect(l.recoveryCode, 'Codi de recuperació');
+          expect(l.newPassword, 'Contrasenya nova');
+        }
+        for (final (field, label) in [
+          (recoveryCode, l.recoveryCode),
+          (password, l.newPassword),
+        ]) {
+          await tester.ensureVisible(field);
+          await tester.pumpAndSettle();
+          final text = find.descendant(of: field, matching: find.text(label));
+          expect(text, findsOneWidget, reason: label);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: text, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+          final parts = fieldParts(tester, field, label);
+          expect(parts.label.left, greaterThanOrEqualTo(parts.box.left - 0.5));
+          expect(
+            parts.label.right,
+            lessThanOrEqualTo(parts.box.right + 0.5),
+            reason: '$label ${parts.label} in ${parts.box}',
+          );
+          expect(parts.label.left, greaterThanOrEqualTo(-0.5));
+          expect(parts.label.right, lessThanOrEqualTo(360.5));
+          expect(
+            parts.label.bottom,
+            lessThanOrEqualTo(parts.typing.top + 0.5),
+            reason: '$label above the empty field',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1604: TalkBack on sign-in (ES) reads Inicia sesión, then the pitch, then Continuar con Google; no stop ends with a lone «o»',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openIn(tester);
+      final stops = readingOrder(tester);
+      final heading = readAt(stops, (label) => label == es.signInHeading);
+      final pitch = readAt(stops, (label) => label == es.authPitch);
+      final google = readAt(
+        stops,
+        (label) => label.contains(es.continueWithGoogle),
+      );
+      expect(heading, isNot(-1), reason: '$stops');
+      expect(pitch, isNot(-1), reason: 'the pitch is a stop of its own: $stops');
+      expect(google, isNot(-1), reason: '$stops');
+      expect(heading, lessThan(pitch));
+      expect(pitch, lessThan(google));
+      for (final stop in stops) {
+        expect(
+          RegExp(r'(^|\s)o$').hasMatch(stop.label),
+          isFalse,
+          reason: '«${stop.label}»',
+        );
+      }
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'UX-1604: after a wrong password (ES), the live region’s label is exactly the error line, not the pitch',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openIn(
+        tester,
+        api: _LoginApi(
+          signInError: ApiException(
+            401,
+            'No active account found with the given credentials',
+          ),
+        ),
+      );
+      await tester.enterText(email, 'ana@example.invalid');
+      await tester.enterText(password, 'una-clave-larga-2026');
+      await tapVisible(tester, submit);
+      final error = es.requestError('credentials');
+      expect(find.text(error), findsOneWidget);
+      final stops = readingOrder(tester);
+      final live = [
+        for (final stop in stops)
+          if (stop.live) stop.label,
+      ];
+      final withError = live.where((label) => label.contains(error)).toList();
+      expect(withError, [error], reason: 'live regions: $live');
+      for (final label in live) {
+        expect(label.contains(es.authPitch), isFalse, reason: label);
+      }
+      semantics.dispose();
+    },
+  );
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1617: ${language.toUpperCase()}, the email field reads ${language == 'es' ? 'Correo' : 'Correu'}, and its label and the password’s show above the fields at 2x on 360x800',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await openIn(tester, language: language);
+        for (final (field, label) in [(email, l.email), (password, l.password)]) {
+          final decoration = tester
+              .widget<TextField>(
+                find.descendant(of: field, matching: find.byType(TextField)),
+              )
+              .decoration!;
+          expect(decoration.labelText, label);
+          expect(
+            decoration.floatingLabelBehavior,
+            FloatingLabelBehavior.always,
+          );
+        }
+        expect(l.email, language == 'es' ? 'Correo' : 'Correu');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1617: ES, creating an account with an email in use says Este correo ya tiene una cuenta., whole at 2x on 360x800',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await openIn(
+        tester,
+        api: _LoginApi(
+          signInError: ApiException(
+            400,
+            'An account with this email already exists.',
+          ),
+        ),
+      );
+      await tapVisible(tester, find.text(es.createAnAccount));
+      await tester.enterText(email, 'ana@example.invalid');
+      await tester.enterText(password, 'una-clave-larga-2026');
+      await tapVisible(tester, submit);
+      final used = es.requestError('emailUsed');
+      final line = find.descendant(of: email, matching: find.text(used));
+      expect(line, findsOneWidget);
+      expect(
+        tester.renderObject<RenderParagraph>(line).didExceedMaxLines,
+        isFalse,
+      );
+      final rect = tester.getRect(line);
+      expect(rect.right, lessThanOrEqualTo(360.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1617: ES, at least 8 dp between ¿Has olvidado tu contraseña? and the password field, and between it and Iniciar sesión',
+    (tester) async {
+      await openIn(tester);
+      final forgot = find.widgetWithText(TextButton, es.forgotPassword);
+      expect(forgot, findsOneWidget);
+      final link = tester.getRect(forgot);
+      final field = tester.getRect(
+        find.descendant(of: password, matching: find.byType(TextField)),
+      );
+      final button = tester.getRect(submit);
+      expect(link.top - field.bottom, greaterThanOrEqualTo(8));
+      expect(button.top - link.bottom, greaterThanOrEqualTo(8));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1617: ES, a wrong password for an unknown account leaves exactly one control that opens create: Crear una cuenta con este correo',
+    (tester) async {
+      await openIn(
+        tester,
+        api: _LoginApi(
+          signInError: ApiException(
+            401,
+            'No active account found with the given credentials',
+          ),
+        ),
+      );
+      await tester.enterText(email, 'nueva@example.invalid');
+      await tester.enterText(password, 'una-clave-larga-2026');
+      await tapVisible(tester, submit);
+      expect(find.text(es.requestError('credentials')), findsOneWidget);
+      final creates = find.byWidgetPredicate(
+        (widget) =>
+            widget is ButtonStyleButton &&
+            find
+                .descendant(
+                  of: find.byWidget(widget),
+                  matching: find.byWidgetPredicate(
+                    (text) =>
+                        text is Text &&
+                        (text.data ?? '').startsWith(es.createAnAccount),
+                  ),
+                )
+                .evaluate()
+                .isNotEmpty,
+      );
+      expect(creates, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('create-account-with-email')),
+          matching: find.text(es.createAccountWithEmail),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(es.createAnAccount), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-1507: ${language.toUpperCase()}, signed out with a stored invitation link, the line naming its address shows above Continuar con Google; without a link it doesn’t; once cleared it goes',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final invitations = InvitationLinks(listen: false);
+        await openIn(tester, language: language, invitations: invitations);
+        final line = find.text(l.invitationWaitingSignIn);
+        expect(line, findsNothing, reason: 'no link yet');
+        invitations.receive(
+          Uri.parse(
+            'taskflow://invite?kind=list'
+            '&id=6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60'
+            '&code=test-invitation-code',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(invitations.state, isNotNull);
+        expect(line, findsOneWidget);
+        expect(
+          tester.getRect(line).bottom,
+          lessThanOrEqualTo(tester.getRect(google).top),
+        );
+        // Google stays the first way in.
+        expect(
+          tester.getRect(google).top,
+          lessThan(tester.getRect(email).top),
+        );
+        invitations.clear(invitations.state!);
+        await tester.pumpAndSettle();
+        expect(invitations.state, isNull);
+        expect(line, findsNothing);
         expect(tester.takeException(), isNull);
       },
     );

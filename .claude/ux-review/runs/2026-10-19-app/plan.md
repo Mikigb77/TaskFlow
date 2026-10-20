@@ -322,3 +322,39 @@ They run one at a time, P166–P189 first, as planned.
   - after b6: `reminder-ask.*` after 9:00, `share.landing` and `share.after-back`, `first-run.sign-in.*` folded and open, and Cuenta;
   - after b7: `launcher.home-icon.*` with themed icons, `notification.shade.*`, the launch splash, and `screen-settings.list.ca.light.2.0` with a 360 dp variant;
   - the review emulator has no calendar account: add one before re-capturing P188's `permission-calendar.allowed`.
+
+## Round 2 (b1)
+
+Round 1 (P166–P170) fixed 15 of its 17 findings. The round check failed only on the two UX-1309 1× landing tests, which fail on purpose: the fixture can't meet the check. Round 2 re-plans the two partial fixes and the four regressions, in three small packages, written to `plan-b1-r2.json`. Nothing has failed twice, so nothing is escalated. One new owner question, D11, holds no package back.
+
+### Question for you
+- **D11 · UX-1309, a second new task far down the same day.** When two tasks saved for one day are far apart in it, only the first can be shown above the save message. The second stays lit lower down, with nothing pointing to it. Should a lit row below the fold get a cue, which would be a new element with new copy? **Recommendation:** no cue. The message already counts every saved task, the lit row stays lit until it's scrolled into view, and most dictations hold one task. P197 doesn't wait for this answer.
+
+### P197 · S3 · B · S · Calendar: the landing preview without its duplicate task, and a return to today starts at the top
+- **UX-1309 (S3), partly, failed once:** P169's rules (a)–(c) stand as built. The failing check came from the fixture: the preview day already holds its own «Recoger a los niños del colegio» at 17:00, so the two lit rows can't fit together at 1×. The `calendar/agenda.added` preview drops that duplicate, and the fit check moves to 393×852. The 2× no-fit check stays.
+- **UX-1628 (S2), R1B-1 from P169:** after 30 minutes or more away, or on a new day, Calendar jumps its list to the top, so the week strip and «Agenda de hoy» show. A short return keeps the scroll.
+- **Settled here:** review B left a choice between changing the fixture and changing the check. The organizer drops the duplicate, which no real day holds, and keeps rule (b). Whether to add a cue is D11.
+
+### P198 · S2 · A · M · Capture result: every result spoken once, «Ver lo que dije» set apart; the microphone reason only when Android asks
+- **UX-1308 (S2), partly, failed once:** some results were still silent: a single change, delete or project card, a search, and a mixed result. Now one command card speaks its headline as shown, followed by the button's label when the headline is only the task's title. A mixed result speaks the filled button's label («Añadir, cambiar y eliminar»). No new strings.
+- **UX-1626 (S1), R1A-1 from P168:** «Ver lo que dije» becomes bodySmall in onSurfaceVariant, 16 dp below the cards, so it no longer copies the «Más opciones» row. P171 keeps these 16 dp instead of its 8 dp.
+- **UX-1627 (S1), R1A-2 from P166:** the microphone reason line waits 300 ms with the request unanswered, so a blocked answer never flashes it. Inferred from code; the emulator lane confirms.
+
+### P199 · S1 · D · S · Recovery: the code field's label sits on the border like the other fields
+- **UX-1629 (S1), R1D-1 from P170:** `floatingLabelBehavior: always` on «Código de recuperación», as on the email and password fields. The recovery-sent preview gains es 2× and ca 2×.
+
+### Order
+P197, P198, P199, one at a time, before b2. P171 (b2) builds on P198: it keeps the 16 dp above «Ver lo que dije».
+
+### Skipped
+Nothing.
+
+### Noted, not planned (review A's notes, not regressions)
+- At 2× the result's reveal cuts the task title's first line under the drag handle. Review A judged this acceptable; a top-edge fade would be an addition.
+- The «nothing found» banner keeps the red error style. Review A called it a candidate for the neutral style but didn't raise a finding; the next review of the capture sheet can rate it.
+- Pro accounts see an unlabelled keyboard icon while three lines name «Escribir». P171 (UX-1310) labels it.
+
+### Phone checks added
+- P197: with the largest font, reopen the app the morning after saving a task for Friday: the week strip and «Agenda de hoy» are at the top.
+- P198: on the emulator lane, `permission-mic.blocked` (ES and CA, both paths) shows no frame of «Permite el micrófono…» before the banner, and `permission-mic.dialog.es` still shows the line under Android's dialog. With TalkBack, a deletion-only dictation and a mixed one are each spoken once.
+- P199: at the largest font, the recovery form's labels sit whole on their borders.

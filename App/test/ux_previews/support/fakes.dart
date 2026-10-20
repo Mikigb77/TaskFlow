@@ -346,7 +346,8 @@ class PreviewCaptures extends CaptureStore {
 }
 
 /// The phone's on-device recognizer, ready in the app's language; the
-/// preview sends what it hears. [access] is the microphone permission.
+/// preview sends what it hears. [access] is the microphone permission;
+/// while [asking] is set, Android's question is open until it completes.
 class PreviewSpeech extends NativeSpeech {
   PreviewSpeech({
     this.access = SpeechPermission.granted,
@@ -354,6 +355,7 @@ class PreviewSpeech extends NativeSpeech {
     this.installed = true,
   });
   SpeechPermission access;
+  Completer<SpeechPermission>? asking;
   final String language;
 
   /// The language's on-device speech pack is on the phone.
@@ -374,7 +376,8 @@ class PreviewSpeech extends NativeSpeech {
   Stream<SpeechEvent> get events => _events.stream;
 
   @override
-  Future<SpeechPermission> permission() async => access;
+  Future<SpeechPermission> permission() =>
+      asking?.future ?? Future.value(access);
 
   @override
   Future<void> start(

@@ -122,8 +122,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'https': 'Usa una dirección de servidor HTTPS en esta versión.',
       'serverAddress':
           'Introduce una dirección de servidor válida, como https://tu-servidor.example.',
-      'emailUsed':
-          'Ya existe una cuenta con este correo. Inicia sesión o recupera tu contraseña.',
+      'emailUsed': 'Este correo ya tiene una cuenta.',
       'email': 'Introduce una dirección de correo válida.',
       'credentials':
           'No encontramos esa cuenta o la contraseña no es correcta.',
@@ -436,7 +435,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Este evento ya no está disponible en los calendarios seleccionados.';
 
   @override
-  String get noScheduledTasks => 'No hay tareas de TaskFlow programadas';
+  String get noScheduledTasks => 'No hay tareas para este día.';
 
   @override
   String get calendar => 'Calendario';
@@ -718,9 +717,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get todayAgenda => 'Agenda de hoy';
-
-  @override
-  String get breathingRoom => 'Un momento de calma.';
 
   @override
   String get loadTasksError => 'No se pudieron cargar tus tareas';
@@ -1463,7 +1459,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Solicita un correo de recuperación y usa el código para elegir una nueva contraseña.';
 
   @override
-  String get email => 'Correo electrónico';
+  String get email => 'Correo';
 
   @override
   String get enterEmail => 'Introduce tu correo electrónico';
@@ -1540,8 +1536,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Emulador: http://10.0.2.2:8088\nTeléfono: la IP local de tu ordenador en la misma red wifi.';
 
   @override
-  String get recoveryEmailRequested =>
-      'Si la cuenta existe, se ha enviado un correo de recuperación.';
+  String recoveryEmailRequested(String email) {
+    return 'Si $email tiene cuenta, te llegará un correo con un código. Escríbelo aquí.';
+  }
 
   @override
   String get passwordResetComplete =>
@@ -2693,7 +2690,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureNoTasks =>
-      'No se encontraron tareas. Tus palabras se conservan.';
+      'No he encontrado ninguna tarea. Di qué y cuándo, por ejemplo: «Mañana, llamar al dentista».';
 
   @override
   String get captureUnsupportedKind =>
@@ -2729,14 +2726,18 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureMicrophone =>
-      'Permite el acceso al micrófono para grabar o escribe abajo.';
+      'Sin micrófono no puedo escucharte. Toca Empezar a hablar para permitirlo, o Escribir.';
 
   @override
   String get captureMicrophoneBlocked =>
-      'El micrófono está desactivado para TaskFlow. Actívalo en Ajustes o escribe.';
+      'Para volver a dictar, abre Ajustes y toca Permisos › Micrófono › Permitir.';
 
   @override
   String get captureOpenSettings => 'Abrir Ajustes';
+
+  @override
+  String get captureMicrophoneWhy =>
+      'Permite el micrófono para dictar tus tareas. Solo escucha mientras dictas.';
 
   @override
   String get captureStarting => 'Un momento…';
@@ -2761,7 +2762,23 @@ class AppLocalizationsEs extends AppLocalizations {
       'Sigo escuchando. Toca Listo cuando termines.';
 
   @override
-  String get captureTimeLeft => 'Quedan 10 segundos';
+  String get captureNothingHeardYet =>
+      'Aún no he oído nada. Habla cuando quieras o toca Escribir.';
+
+  @override
+  String get captureListeningOnline =>
+      'Te escucho. Verás tus palabras al tocar Listo.';
+
+  @override
+  String captureTimeLeft(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: 'Quedan $seconds segundos',
+      one: 'Queda 1 segundo',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get captureKeepQuestion =>
@@ -2787,12 +2804,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'No te he entendido. Vuelve a intentarlo o escríbelo.';
 
   @override
-  String get captureSpeechLanguage =>
-      'El reconocimiento local no está instalado para este idioma. Elige otro idioma, graba audio o escribe.';
-
-  @override
-  String get captureSpeechUnavailable =>
-      'El reconocimiento local no está disponible. Graba audio o escribe.';
+  String get captureCantListen =>
+      'Ahora no puedo escucharte en este teléfono. Toca Escribir.';
 
   @override
   String get captureSpeechBusy =>
@@ -3248,6 +3261,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get continueWithGoogle => 'Continuar con Google';
+
+  @override
+  String get invitationWaitingSignIn =>
+      'Tienes una invitación. Entra con el correo en el que la recibiste.';
 
   @override
   String get linkGoogleAccount => 'Vincular cuenta de Google';

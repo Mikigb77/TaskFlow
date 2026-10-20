@@ -43,8 +43,9 @@ String captureProblemText(
   CaptureProblem.empty => l.captureEmptyInput,
   CaptureProblem.speechStopped => l.captureSpeechStopped,
   CaptureProblem.noSpeech => l.captureNoSpeech,
-  CaptureProblem.speechLanguage => l.captureSpeechLanguage,
-  CaptureProblem.speechUnavailable => l.captureSpeechUnavailable,
+  // The phone's own recognizer failed, and listening online did too.
+  CaptureProblem.speechLanguage ||
+  CaptureProblem.speechUnavailable => l.captureCantListen,
   CaptureProblem.speechBusy => l.captureSpeechBusy,
   CaptureProblem.incompleteAudio => l.captureIncompleteAudio,
   CaptureProblem.writeFailed => l.captureWriteFailed,

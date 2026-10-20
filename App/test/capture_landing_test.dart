@@ -11,6 +11,7 @@ import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -977,6 +978,582 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-19-app, round 1 · P169 (UX-1309, UX-1405): lit rows
+  // clear the message, and today after a while away ----
+
+  group('P169: Calendar after a save and on return', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    DateTime at(int days, int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day + days, hour, minute);
+
+    /// Today as the preview suite's `normalDay()` has it, with its own
+    /// «Recoger a los niños del colegio» at 17:00.
+    List<Task> normalDay() => [
+      Task(
+        id: 1,
+        title: 'Paseo por el parque',
+        dueDate: at(0, 8, 30),
+        priority: 1,
+        isCompleted: true,
+      ),
+      Task(
+        id: 2,
+        title: 'Llamar al médico para pedir cita',
+        dueDate: at(0, 10),
+        priority: 2,
+        notes: 'Preguntar por los resultados de los análisis.',
+      ),
+      Task(id: 3, title: 'Comer con Ana', dueDate: at(0, 13, 30), priority: 1),
+      Task(
+        id: 4,
+        title: 'Recoger a los niños del colegio',
+        dueDate: at(0, 17),
+        priority: 3,
+        reminderMinutes: 30,
+      ),
+      Task(
+        id: 5,
+        title: 'Clase de yoga',
+        dueDate: at(0, 19, 30),
+        priority: 1,
+        recurrence: 'weekly',
+      ),
+      Task(id: 6, title: 'Comprar pilas para el mando', priority: 1),
+    ];
+
+    /// The preview suite's three-task answer: two for today, one for Friday.
+    List<Map<String, dynamic>> threeTasks() {
+      final fri = friday();
+      return [
+        found('Comprar pan y leche', on: inDays(0)),
+        found(
+          'Llamar al médico',
+          at: DateTime(fri.year, fri.month, fri.day, 10),
+        ),
+        found('Recoger a los niños del colegio', at: at(0, 17)),
+      ];
+    }
+
+    /// The lit row of the saved task [title].
+    Finder litRow(String title) => find.byWidgetPredicate(
+      (widget) => widget is LandedTaskTile && widget.task.title == title,
+    );
+
+    bool isLit(WidgetTester tester, String title) =>
+        tester.widget<LandedTaskTile>(litRow(title)).lit;
+
+    Finder agenda() => find
+        .descendant(
+          of: find.descendant(
+            of: find.byType(CalendarScreen),
+            matching: find.byType(CustomScrollView),
+          ),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+
+    /// The agenda's visible area, under the app bar and the week.
+    Rect agendaArea(WidgetTester tester) => tester.getRect(agenda());
+
+    /// [title]'s lit row is entirely in the agenda, above the save message.
+    void expectClear(WidgetTester tester, String title) {
+      final row = litRow(title);
+      // Rows far out of view aren't built.
+      expect(row, findsOneWidget, reason: '$title is on screen');
+      final rect = tester.getRect(row);
+      final message = tester.getRect(find.byType(SnackBar));
+      final area = agendaArea(tester);
+      expect(
+        rect.top,
+        greaterThanOrEqualTo(area.top - 0.5),
+        reason: '$title $rect, agenda $area',
+      );
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(message.top),
+        reason: '$title $rect, message $message',
+      );
+      expect(isLit(tester, title), isTrue, reason: '$title is lit');
+    }
+
+    /// Saves the three tasks from Calendar on today, and waits as a phone
+    /// would: past the message's entrance and the scroll, inside the 1.5 s
+    /// highlight.
+    Future<_App> saveThree(
+      WidgetTester tester, {
+      required List<Task> day,
+      double textScale = 1,
+      Size size = const Size(360, 800),
+      DateTime Function()? clock,
+    }) async {
+      final app = await _App.open(
+        tester,
+        day,
+        size: size,
+        textScale: textScale,
+        clock: clock,
+      );
+      expect(find.text(es.todayAgenda), findsOneWidget);
+      app.api.found = threeTasks();
+      await app.say(tester, 'Comprar pan y leche, llamar al médico el viernes '
+          'a las diez y recoger a los niños a las cinco');
+      expect(find.text(es.captureAddTasks(3)), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      for (var frame = 0; frame < 48; frame++) {
+        await tester.pump(const Duration(milliseconds: 25));
+      }
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text(es.todayAgenda), findsOneWidget);
+      return app;
+    }
+
+    void stillAnimations(WidgetTester tester) {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    }
+
+    /// Today without its own 17:00 «Recoger a los niños del colegio»: a day
+    /// doesn't hold the same task twice at the same time (P197).
+    List<Task> dayWithoutPickUp() =>
+        normalDay().where((task) => task.id != 4).toList();
+
+    // P197 (UX-1309, round 2): acceptance 1 replaces round 1's 1x pair on
+    // 360x800, whose fixture held the same 17:00 task twice.
+    for (final still in [false, true]) {
+      final how = still ? ', animations off' : '';
+      testWidgets(
+        'UX-1309: ES 1x on 393x852$how, after saving the three-task fixture from Calendar on today (no 17:00 Recoger of its own), Comprar pan y leche and the new Recoger a los niños del colegio are both entirely above the save message',
+        (tester) async {
+          if (still) stillAnimations(tester);
+          await saveThree(
+            tester,
+            day: dayWithoutPickUp(),
+            size: const Size(393, 852),
+          );
+          expect(
+            litRow('Recoger a los niños del colegio'),
+            findsOneWidget,
+            reason: 'one row with that title',
+          );
+          expectClear(tester, 'Comprar pan y leche');
+          expectClear(tester, 'Recoger a los niños del colegio');
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final still in [false, true]) {
+      final how = still ? ', animations off' : '';
+      for (final (name, day) in [
+        ('normalDay', normalDay),
+        ('normalDay minus id 4', dayWithoutPickUp),
+      ]) {
+        testWidgets(
+          'UX-1309: ES 2x on 360x800$how ($name), after the same save, Comprar pan y leche and its time line are entirely above the save message',
+          (tester) async {
+            if (still) stillAnimations(tester);
+            await saveThree(tester, day: day(), textScale: 2);
+            expectClear(tester, 'Comprar pan y leche');
+            final line = find.descendant(
+              of: litRow('Comprar pan y leche'),
+              matching: find.textContaining(es.anyTime),
+            );
+            expect(line, findsWidgets, reason: 'its «${es.anyTime}» line');
+            expect(
+              tester.getRect(line.first).bottom,
+              lessThanOrEqualTo(tester.getRect(find.byType(SnackBar)).top),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'UX-1309 (b): when the lit block fits (a day with nothing else, 1x, 360x800), both lit rows are revealed above the save message',
+      (tester) async {
+        await saveThree(tester, day: const []);
+        expectClear(tester, 'Comprar pan y leche');
+        expectClear(tester, 'Recoger a los niños del colegio');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1309 (c): at 2x the block doesn’t fit: the first lit row is in view; the one below the fold is still lit 3 s later, and is no longer lit 2 s after it has been scrolled into view',
+      (tester) async {
+        await saveThree(tester, day: normalDay(), textScale: 2);
+        expectClear(tester, 'Comprar pan y leche');
+        const later = 'Recoger a los niños del colegio';
+        // The second lit row is out of view (or under the message).
+        final area = agendaArea(tester);
+        final message = tester.getRect(find.byType(SnackBar));
+        final built = litRow(later).evaluate().isNotEmpty;
+        if (built) {
+          final rect = tester.getRect(litRow(later));
+          expect(
+            rect.top >= area.bottom || rect.bottom > message.top,
+            isTrue,
+            reason: 'out of view or under the message: $rect',
+          );
+        }
+        for (var step = 0; step < 30; step++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        // The first row, seen at once, has faded.
+        expect(isLit(tester, 'Comprar pan y leche'), isFalse);
+        // Scrolled into view, under the app bar: still lit 3 s on.
+        await tester.scrollUntilVisible(
+          litRow(later),
+          120,
+          scrollable: agenda(),
+          duration: const Duration(milliseconds: 16),
+        );
+        await tester.ensureVisible(litRow(later));
+        await tester.pump();
+        expect(isLit(tester, later), isTrue, reason: 'lit until it was seen');
+        final rect = tester.getRect(litRow(later));
+        expect(rect.top, greaterThanOrEqualTo(area.top - 0.5));
+        expect(rect.bottom, lessThanOrEqualTo(message.top));
+        for (var step = 0; step < 20; step++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        expect(isLit(tester, later), isFalse, reason: 'faded 1.5 s after');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- UX-1405 ----
+
+    /// The app leaves for the background, and comes back after [away].
+    Future<void> awayFor(
+      WidgetTester tester,
+      Duration away,
+      void Function(Duration) advance,
+    ) async {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pump();
+      advance(away);
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    /// Lands «Llevar el coche al taller» on Friday from Calendar.
+    Future<_App> landOnFriday(WidgetTester tester, DateTime Function() clock) async {
+      final day = friday();
+      final app = await _App.open(tester, [], clock: clock);
+      app.api.found = [
+        found(
+          'Llevar el coche al taller',
+          at: DateTime(day.year, day.month, day.day, 17),
+        ),
+      ];
+      await app.say(tester, 'Llevar el coche al taller el viernes a las 17');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.text(DateFormat.MMMMEEEEd('es').format(day)), findsOneWidget);
+      expect(find.text(es.todayAgenda), findsNothing);
+      // The message goes.
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      return app;
+    }
+
+    testWidgets(
+      'UX-1405: after a landing on Friday, resuming 31 minutes later shows Agenda de hoy with today selected',
+      (tester) async {
+        var clock = DateTime.now();
+        await landOnFriday(tester, () => clock);
+        await awayFor(
+          tester,
+          const Duration(minutes: 31),
+          (away) => clock = clock.add(away),
+        );
+        expect(find.text(es.todayAgenda), findsOneWidget);
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(friday())),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1405: after a landing on Friday, resuming 5 minutes later keeps Friday',
+      (tester) async {
+        var clock = DateTime.now();
+        await landOnFriday(tester, () => clock);
+        await awayFor(
+          tester,
+          const Duration(minutes: 5),
+          (away) => clock = clock.add(away),
+        );
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(friday())),
+          findsOneWidget,
+        );
+        expect(find.text(es.todayAgenda), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1405 / D9: a day the person picked, 5 minutes away and back, still goes to the next capture',
+      (tester) async {
+        var clock = DateTime.now();
+        final app = await _App.open(tester, [], clock: () => clock);
+        // A day in the week shown, other than today.
+        final picked = inDays(now.weekday == DateTime.sunday ? -1 : 1);
+        await tester.tap(
+          find
+              .descendant(
+                of: find.byType(CalendarScreen),
+                matching: find.text('${picked.day}'),
+              )
+              .hitTestable()
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(picked)),
+          findsOneWidget,
+        );
+        await awayFor(
+          tester,
+          const Duration(minutes: 5),
+          (away) => clock = clock.add(away),
+        );
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(picked)),
+          findsOneWidget,
+        );
+        await app.say(tester, 'Comprar pan', submit: false);
+        final day = app.store.current?.day;
+        expect(day, isNotNull, reason: 'the capture got the picked day');
+        expect(Task.dateKey(day!), Task.dateKey(picked));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(VoiceTaskScreen),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1405: after midnight, resuming shows today even though a landing had chosen another day',
+      (tester) async {
+        // 23:50 tonight; back at 00:10, 20 minutes later, on a new day.
+        var clock = at(0, 23, 50);
+        await landOnFriday(tester, () => clock);
+        await awayFor(
+          tester,
+          const Duration(minutes: 20),
+          (away) => clock = clock.add(away),
+        );
+        expect(Task.day(clock), Task.day(inDays(1)));
+        expect(find.text(es.todayAgenda), findsOneWidget);
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(friday())),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- P197 (UX-1628, round 2): back to today, at the top ----
+
+    ScrollPosition agendaScroll(WidgetTester tester) =>
+        tester.state<ScrollableState>(agenda()).position;
+
+    /// The titles of the agenda's rows built now, on screen or near it.
+    List<String> rows(WidgetTester tester) => [
+      for (final element in find
+          .descendant(
+            of: find.byType(CalendarScreen),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is TaskTile || widget is LandedTaskTile,
+            ),
+          )
+          .evaluate())
+        switch (element.widget) {
+          TaskTile(:final task) => task.title,
+          LandedTaskTile(:final task) => task.title,
+          _ => '',
+        },
+    ];
+
+    /// Eight tasks on [date] before 17:00, so a 17:00 landing scrolls at 2x.
+    List<Task> busy(DateTime date, int firstId) => [
+      for (var hour = 8; hour < 16; hour++)
+        Task(
+          id: firstId + hour,
+          title: 'Tarea de las $hour',
+          dueDate: DateTime(date.year, date.month, date.day, hour),
+          priority: 1,
+        ),
+    ];
+
+    /// The «Agenda de hoy» header is entirely inside the agenda's viewport,
+    /// not just built.
+    void expectTodayAtTop(WidgetTester tester) {
+      final header = find.text(es.todayAgenda);
+      expect(header, findsOneWidget);
+      final position = agendaScroll(tester);
+      expect(
+        position.pixels,
+        moreOrLessEquals(position.minScrollExtent, epsilon: 0.5),
+        reason: 'the agenda starts at the top',
+      );
+      final rect = tester.getRect(header);
+      final area = agendaArea(tester);
+      expect(rect.top, greaterThanOrEqualTo(area.top - 0.5), reason: '$rect in $area');
+      expect(rect.bottom, lessThanOrEqualTo(area.bottom + 0.5), reason: '$rect in $area');
+    }
+
+    /// At 2x on 360x800, lands «Llevar el coche al taller» at 17:00 on a busy
+    /// Friday, waits for the message to go, and returns the agenda's offset,
+    /// which the landing left above its minimum.
+    Future<double> landLowOnFriday(
+      WidgetTester tester,
+      DateTime Function() clock,
+    ) async {
+      final day = friday();
+      final app = await _App.open(
+        tester,
+        [...normalDay(), ...busy(day, 100)],
+        clock: clock,
+        size: const Size(360, 800),
+        textScale: 2,
+      );
+      app.api.found = [
+        found(
+          'Llevar el coche al taller',
+          at: DateTime(day.year, day.month, day.day, 17),
+        ),
+      ];
+      await app.say(tester, 'Llevar el coche al taller el viernes a las 17');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      // Friday is shown: its rows, not today's.
+      expect(rows(tester), contains('Llevar el coche al taller'));
+      expect(rows(tester), isNot(contains('Comer con Ana')));
+      final position = agendaScroll(tester);
+      expect(
+        position.pixels,
+        greaterThan(position.minScrollExtent),
+        reason: 'the landing scrolled the agenda',
+      );
+      return position.pixels;
+    }
+
+    testWidgets(
+      'UX-1628: ES 2x on 360x800, after a landing on Friday that scrolled the agenda, resuming 31 minutes later selects today with the agenda at its minimum offset and Agenda de hoy inside the viewport',
+      (tester) async {
+        var clock = DateTime.now();
+        await landLowOnFriday(tester, () => clock);
+        await awayFor(
+          tester,
+          const Duration(minutes: 31),
+          (away) => clock = clock.add(away),
+        );
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(friday())),
+          findsNothing,
+        );
+        expect(rows(tester), contains('Llamar al médico para pedir cita'));
+        expect(rows(tester), isNot(contains('Llevar el coche al taller')));
+        // Today is long enough at 2x that a kept offset would show.
+        expect(agendaScroll(tester).maxScrollExtent, greaterThan(0));
+        expectTodayAtTop(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1628: ES 2x on 360x800, after a landing on today that scrolled the agenda, resuming after midnight shows the new day with the agenda at its minimum offset',
+      (tester) async {
+        // 23:50 tonight; back at 00:10, 20 minutes later, on a new day.
+        var clock = at(0, 23, 50);
+        await saveThree(
+          tester,
+          day: [...normalDay(), ...busy(inDays(1), 200)],
+          textScale: 2,
+          clock: () => clock,
+        );
+        await tester.pump(const Duration(seconds: 11));
+        await tester.pumpAndSettle();
+        final before = agendaScroll(tester);
+        expect(
+          before.pixels,
+          greaterThan(before.minScrollExtent),
+          reason: 'the landing scrolled the agenda',
+        );
+        await awayFor(
+          tester,
+          const Duration(minutes: 20),
+          (away) => clock = clock.add(away),
+        );
+        expect(Task.day(clock), Task.day(inDays(1)));
+        // The new day: yesterday's open tasks are now overdue, at its top.
+        expect(
+          find.textContaining(es.overdueCount(2).split(' · ').first),
+          findsOneWidget,
+        );
+        expect(agendaScroll(tester).maxScrollExtent, greaterThan(0));
+        expectTodayAtTop(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1628: ES 2x on 360x800, resuming 5 minutes after the Friday landing keeps Friday selected and the scroll offset unchanged',
+      (tester) async {
+        var clock = DateTime.now();
+        final offset = await landLowOnFriday(tester, () => clock);
+        await awayFor(
+          tester,
+          const Duration(minutes: 5),
+          (away) => clock = clock.add(away),
+        );
+        expect(rows(tester), contains('Llevar el coche al taller'));
+        expect(rows(tester), isNot(contains('Comer con Ana')));
+        expect(find.text(es.todayAgenda), findsNothing);
+        expect(agendaScroll(tester).pixels, moreOrLessEquals(offset, epsilon: 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The app in Spanish with a 24-hour clock, on Calendar, with capture
@@ -996,10 +1573,17 @@ class _App {
     List<Task> initial, {
     Size size = const Size(390, 844),
     _SlowCloud? cloud,
+    // The app's clock (calendarClockProvider), read each time it is asked.
+    DateTime Function()? clock,
+    double textScale = 1,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    if (textScale != 1) {
+      tester.platformDispatcher.textScaleFactorTestValue = textScale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
     final store = _Captures()..cloud = cloud;
     final api = _Api();
     final tasks = _Tasks(initial);
@@ -1031,6 +1615,7 @@ class _App {
         captureStoreProvider.overrideWithValue(store),
         nativeSpeechProvider.overrideWithValue(speech),
         captureRecorderFactoryProvider.overrideWithValue(SilentRecorder.new),
+        if (clock != null) calendarClockProvider.overrideWithValue(clock),
       ],
     );
     store.tasks = tasks;
