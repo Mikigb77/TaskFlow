@@ -2,6 +2,24 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-20 — The owner approves the whole-app plan 2026-10-19-app, with D1–D10 as recommended
+**The owner:** "go, as recommended". He is back, so the normal flow applies again: new product questions go to him.
+
+The plan's packages P166–P189 run as planned. The answers below, from that run's `plan.md`, become fixes:
+- **D1 (UX-1601), the reminder question:**
+  - ask it only after a save whose reminder can still fire, with no new copy;
+  - a date-only task for today saved after 9:00 gets no reminder, and its chip stops promising «9:00»;
+  - one default, no new rule (TA-5).
+- **D2 (UX-1603), sign-in's first screen:** the email fields fold behind «Continuar con mi correo», under «Continuar con Google». That's 5 tap targets instead of 10, and one decision instead of two.
+- **D3 (UX-1623), shared text:** the day and time in shared text are read, as D2 of 2026-10-18 does for dictated words. Otherwise the form opens with no day, as before.
+- **D4 (UX-1624), empty dictations:** a dictation with no task and no command doesn't use a free dictation. This is a server change, made by the main session.
+- **D5 (UX-1515), changing your name:** one row in Cuenta, «Nombre · María» or «Añadir tu nombre», opening the existing name sheet.
+- **D6 (UX-1513), group invitations:** no role step. Everyone joins as editor, and the role, Administrador included, changes on the person's row (SH-5).
+- **D7 (UX-1611), phone calendars:** every calendar shows by default after connecting, with «Conectado. Los eventos se ven en Calendario.» (CO-6).
+- **D8 (UX-1608), the launcher icon:** redrawn from the in-app mark (the teal square with the double tick) as an adaptive icon, with a monochrome layer for Android 13's themed icons.
+- **D9 (UX-421), the Catalan «Configuració» tab label:** the stopgap for narrow phones is extended to any width where the label doesn't fit, until U13.
+- **D10 (UX-1625), the lock screen:** reminder titles stay visible on it; Android's own setting can hide them.
+
 ## 2026-10-18 (night) — The owner is away: the main session decides, records and moves on
 **The owner, before leaving:** "whatever question you have for me, whatever decisions, even if it concerns the product, just for now, record what decision you made, what was your recommendation, and you move forward with your recommendation… you are on your own… prioritize completing everything to the best degree possible." Earlier the same evening: "if you have to do something, don't ask me for permission, just go ahead and do it."
 
