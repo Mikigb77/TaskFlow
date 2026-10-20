@@ -13,7 +13,7 @@ Evidence level: **emulator**. Not a physical phone, and no real voice.
   - The script checks that `adb -s emulator-5590 emu avd name` answers `TaskFlow_Review` before it touches the device at all, before each section, and before each install, stop, kill, data clear, permission change or density change. If it doesn't, it stops and touches nothing more.
 - **What it may change, on `TaskFlow_Review` only:**
   - app permissions: `pm revoke`, `pm grant`, `pm clear-permission-flags`, `appops`;
-  - the app itself: `adb install -r`, stop and restart;
+  - the app itself: `adb install -r -d` (`-d` because a build from another checkout can have a lower version code), stop and restart;
   - system settings: language, theme, text size, screen density, time zone, TalkBack.
   - It also sets these test conveniences:
     - Android's error dialogs hidden, so an "isn't responding" dialog can't block a run;

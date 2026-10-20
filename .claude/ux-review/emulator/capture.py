@@ -859,8 +859,11 @@ def apk_facts(apk: Path, source: str) -> dict:
 
 def install(apk: Path) -> None:
     verify()
-    log("installing the APK (adb install -r)")
-    out = adb("install", "-r", str(apk), timeout=300)
+    log("installing the APK (adb install -r -d)")
+    # -d: a build from another checkout or worktree can carry a lower version code (the
+    # pubspec's build number), which Android refuses as a downgrade. It's allowed for debug
+    # builds, and the data stays, as with -r.
+    out = adb("install", "-r", "-d", str(apk), timeout=300)
     if "Success" not in out:
         raise RuntimeError(f"install failed: {out.strip()[-300:]}")
 
