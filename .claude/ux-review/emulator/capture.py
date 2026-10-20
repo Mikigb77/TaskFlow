@@ -1061,7 +1061,8 @@ class Lane:
         key("KEYCODE_ENTER", 4)
 
     def tab(self, name: str) -> None:
-        must_tap(self.L.rx(name), f"the {self.L[name]} tab", wait=1.5)
+        # The tab itself, not the heading that names the open tab (UX-1411).
+        must_tap(self.L.rx(name), f"the {self.L[name]} tab", wait=1.5, clickable=True)
 
     def open_other_settings(self) -> None:
         self.tab("settings")
@@ -1908,7 +1909,12 @@ class Lane:
         root = ui()
         found = {}
         for name in names:
-            node = find(root, self.L.rx(name))
+            # A tappable control first: since UX-1411 each tab's heading carries the tab's name
+            # too ('Calendario'), and the heading comes first in the tree.
+            # (`is None`, not `or`: an Element with no children is falsy.)
+            node = find(root, self.L.rx(name), clickable=True)
+            if node is None:
+                node = find(root, self.L.rx(name))
             if node is not None:
                 found[name] = center(node)
             else:
