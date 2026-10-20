@@ -1553,6 +1553,113 @@ void main() {
   );
 
   testWidgets(
+    'UX-1633: on Thursday’s timeline with a full «Sin hora» area and a task at 08:30, comprar pan saved lights its row inside the pinned «Sin hora» area, wholly on screen',
+    (tester) async {
+      final start = monday();
+      final thursday = plus(start, 3);
+      final app = await openTyping(tester, clock: start);
+      app.tasks.add(
+        Task(
+          title: 'Paseo por el parque',
+          priority: 1,
+          dueDate: DateTime(thursday.year, thursday.month, thursday.day, 8, 30),
+        ),
+      );
+      for (final title in [
+        'Pagar la factura de la luz',
+        'Llamar a la abuela',
+        'Devolver el libro',
+        'Regar las plantas',
+        'Sacar la basura',
+        'Escribir a Paul',
+      ]) {
+        app.tasks.add(
+          Task(title: title, priority: 1, dueDate: thursday, hasTime: false),
+        );
+      }
+      await tester.pumpAndSettle();
+      await openTimeline(tester, thursday);
+      await typeAndSave(tester, 'comprar pan');
+      final saved = app.tasks.state.requireValue.firstWhere(
+        (task) => task.title == 'Comprar pan',
+      );
+      expect(Task.day(saved.dueDate!), thursday);
+      expect(saved.hasTime, isFalse);
+      final timeline = find.byType(DayTimelineScreen);
+      final area = find.descendant(
+        of: timeline,
+        matching: find.byKey(const ValueKey('timeline-untimed')),
+      );
+      expect(area, findsOneWidget);
+      // The area is full: it scrolls by itself.
+      final scroll = tester
+          .state<ScrollableState>(
+            find.descendant(of: area, matching: find.byType(Scrollable)).first,
+          )
+          .position;
+      expect(scroll.maxScrollExtent, greaterThan(0));
+      final row = find.descendant(
+        of: area,
+        matching: find.widgetWithText(TaskTile, 'Comprar pan'),
+      );
+      expect(row, findsOneWidget, reason: 'in the «Sin hora» area');
+      final rect = tester.getRect(row);
+      final view = tester.getRect(area);
+      expect(rect.top, greaterThanOrEqualTo(view.top - 0.5));
+      expect(rect.bottom, lessThanOrEqualTo(view.bottom + 0.5));
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(tester.view.physicalSize.height),
+      );
+      expect(row.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(row).color, litColor(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1639: on Thursday’s timeline, comprar pan saved still lights its row inside «Sin hora», on screen, and the row leaves out the day the header names',
+    (tester) async {
+      final start = monday();
+      final thursday = plus(start, 3);
+      final app = await openTyping(tester, clock: start);
+      await openTimeline(tester, thursday);
+      await typeAndSave(tester, 'comprar pan');
+      final saved = app.tasks.state.requireValue.single;
+      expect(Task.day(saved.dueDate!), thursday);
+      expect(saved.hasTime, isFalse);
+      final area = find.descendant(
+        of: find.byType(DayTimelineScreen),
+        matching: find.byKey(const ValueKey('timeline-untimed')),
+      );
+      final row = find.descendant(
+        of: area,
+        matching: find.widgetWithText(TaskTile, 'Comprar pan'),
+      );
+      expect(row, findsOneWidget, reason: 'in the «Sin hora» area');
+      final rect = tester.getRect(row);
+      final view = tester.getRect(area);
+      expect(rect.top, greaterThanOrEqualTo(view.top - 0.5));
+      expect(rect.bottom, lessThanOrEqualTo(view.bottom + 0.5));
+      expect(row.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(row).color, litColor(tester));
+      final day = tester.element(row).dayLabel(thursday);
+      expect(
+        find.descendant(of: row, matching: find.textContaining(day)),
+        findsNothing,
+        reason: 'the header already names «$day»',
+      );
+      expect(
+        find.descendant(of: row, matching: find.byIcon(Icons.schedule_rounded)),
+        findsNothing,
+        reason: 'no date line',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'UX-466: on Thursday’s timeline, comprar pan el viernes saved returns to Calendar with Friday selected and the new row highlighted',
     (tester) async {
       final start = monday();

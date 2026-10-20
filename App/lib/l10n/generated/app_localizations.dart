@@ -118,11 +118,23 @@ abstract class AppLocalizations {
   /// **'Choose AM or PM.'**
   String get chooseAmPm;
 
-  /// No description provided for @reviewInvalidTime.
+  /// Under the hour field of Change date, on a 24-hour clock, when the hour typed is not a valid one.
   ///
   /// In en, this message translates to:
-  /// **'Check this value'**
-  String get reviewInvalidTime;
+  /// **'Hour from 0 to 23'**
+  String get scheduleHourRange24;
+
+  /// Under the hour field of Change date, on a 12-hour clock, when the hour typed is not a valid one.
+  ///
+  /// In en, this message translates to:
+  /// **'Hour from 1 to 12'**
+  String get scheduleHourRange12;
+
+  /// Under the minutes field of Change date, when the minutes typed are not valid.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes from 0 to 59'**
+  String get scheduleMinuteRange;
 
   /// No description provided for @reviewOptions.
   ///
@@ -364,10 +376,10 @@ abstract class AppLocalizations {
   /// **'All notes'**
   String get allNotes;
 
-  /// No description provided for @viewOnlyNote.
+  /// Banner on a note in a project the person can only view: who to ask to make changes.
   ///
   /// In en, this message translates to:
-  /// **'View-only note. The project owner manages editing access.'**
+  /// **'View-only note. To make changes, ask the project’s owner.'**
   String get viewOnlyNote;
 
   /// No description provided for @linkOpenError.
@@ -463,7 +475,7 @@ abstract class AppLocalizations {
   /// No description provided for @deadlineRecurringHelp.
   ///
   /// In en, this message translates to:
-  /// **'This deadline repeats with each original occurrence. Moving one planned occurrence keeps its deadline; changing the series start keeps the first deadline and changes the gap for later ones.'**
+  /// **'Each repeat has its own deadline.'**
   String get deadlineRecurringHelp;
 
   /// No description provided for @deadlineLatePlan.
@@ -487,14 +499,8 @@ abstract class AppLocalizations {
   /// No description provided for @reminderAnchor.
   ///
   /// In en, this message translates to:
-  /// **'Remind me relative to'**
+  /// **'Remind before'**
   String get reminderAnchor;
-
-  /// No description provided for @reminderAnchorHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'One reminder per occurrence, using the date selected here.'**
-  String get reminderAnchorHelp;
 
   /// No description provided for @dayTimeline.
   ///
@@ -502,35 +508,23 @@ abstract class AppLocalizations {
   /// **'Day timeline'**
   String get dayTimeline;
 
-  /// No description provided for @timelineFirstPlan.
-  ///
-  /// In en, this message translates to:
-  /// **'Jump to first timed item'**
-  String get timelineFirstPlan;
-
   /// No description provided for @timelineLimit.
   ///
   /// In en, this message translates to:
   /// **'Showing the first 200 timed items. Use the agenda to see every task.'**
   String get timelineLimit;
 
-  /// No description provided for @timelineUnblocked.
+  /// Day timeline: heading above the day's tasks and all-day calendar events that have no time, so they are not drawn on the hours. The same words the task rows use for a task with no time.
   ///
   /// In en, this message translates to:
-  /// **'Without a time block'**
+  /// **'No time'**
   String get timelineUnblocked;
 
-  /// No description provided for @timelineNoBlocks.
+  /// Day timeline: shown when the shown day has no task, deadline or calendar event with a time.
   ///
   /// In en, this message translates to:
-  /// **'No timed plans for this day. Add a start time and duration to reserve a block.'**
+  /// **'Nothing with a time on this day.'**
   String get timelineNoBlocks;
-
-  /// No description provided for @timelinePoint.
-  ///
-  /// In en, this message translates to:
-  /// **'No duration · time only'**
-  String get timelinePoint;
 
   /// No description provided for @timelineHours.
   ///
@@ -808,11 +802,11 @@ abstract class AppLocalizations {
   /// **'Edit task'**
   String get editTask;
 
-  /// No description provided for @taskDetails.
+  /// The app bar title of a task’s own page. A note’s page says Note instead.
   ///
   /// In en, this message translates to:
-  /// **'Task details'**
-  String get taskDetails;
+  /// **'Task'**
+  String get taskScreenTitle;
 
   /// The one button that adds a task: it opens the capture sheet.
   ///
@@ -879,12 +873,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'High'**
   String get high;
-
-  /// No description provided for @schedule.
-  ///
-  /// In en, this message translates to:
-  /// **'Schedule'**
-  String get schedule;
 
   /// No description provided for @date.
   ///
@@ -1846,11 +1834,29 @@ abstract class AppLocalizations {
   /// **'I’ve checked this task'**
   String get confirmedDetails;
 
-  /// No description provided for @agendaCounts.
+  /// The day's count under its heading on Calendar. With nothing completed it is the open count alone.
   ///
   /// In en, this message translates to:
-  /// **'{remaining} to do · {done} completed'**
+  /// **'{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}'**
   String agendaCounts(int remaining, int done);
+
+  /// Date line of an open task whose day has passed, in Tareas and on project pages. {date} is the row's date, such as Sat, 17 Oct.
+  ///
+  /// In en, this message translates to:
+  /// **'{date} · Overdue'**
+  String overdueDate(String date);
+
+  /// What TalkBack reads for who a task in a shared project is for, on a task row and on the assignment chip. {name} is a person, Me or Everyone.
+  ///
+  /// In en, this message translates to:
+  /// **'Assignee: {name}'**
+  String assigneeLabel(String name);
+
+  /// What TalkBack reads for the project chip on a task's details and in the form. {name} is the project's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Project: {name}'**
+  String projectLabel(String name);
 
   /// Header above unfinished tasks from earlier days, shown first on Today.
   ///
@@ -2005,13 +2011,13 @@ abstract class AppLocalizations {
   /// No description provided for @scheduleChangedAgain.
   ///
   /// In en, this message translates to:
-  /// **'The schedule changed again. Open the task to review it.'**
+  /// **'The date changed again. Open the task to check it.'**
   String get scheduleChangedAgain;
 
   /// No description provided for @scheduleError.
   ///
   /// In en, this message translates to:
-  /// **'Could not change the schedule. Please try again.'**
+  /// **'Couldn’t change the date. Try again.'**
   String get scheduleError;
 
   /// No description provided for @rescheduleRepeating.
@@ -2056,11 +2062,11 @@ abstract class AppLocalizations {
   /// **'Every task you finish will find a home here.'**
   String get completedEmpty;
 
-  /// No description provided for @progressHeading.
+  /// Text button on the Tasks tab, beside Projects, that opens the completed tasks. Short: it shares a row with Projects.
   ///
   /// In en, this message translates to:
-  /// **'Look how far you’ve come.'**
-  String get progressHeading;
+  /// **'Completed'**
+  String get completedButton;
 
   /// No description provided for @completedLoadError.
   ///
@@ -2074,16 +2080,16 @@ abstract class AppLocalizations {
   /// **'Please try again in a moment.'**
   String get tryLater;
 
-  /// No description provided for @changeSeriesQuestion.
+  /// Title of the dialog when a repeating task's repeat changes while some of its dates were moved or skipped.
   ///
   /// In en, this message translates to:
-  /// **'Change the repeating schedule?'**
+  /// **'Change how it repeats?'**
   String get changeSeriesQuestion;
 
-  /// No description provided for @changeSeriesHelp.
+  /// Text of the dialog titled changeSeriesQuestion: moved or skipped dates follow the new repeat; completed ones stay in the history.
   ///
   /// In en, this message translates to:
-  /// **'This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.'**
+  /// **'Dates you moved or skipped will follow the new repeat. Completed dates stay in the history.'**
   String get changeSeriesHelp;
 
   /// No description provided for @keepEditing.
@@ -2236,12 +2242,6 @@ abstract class AppLocalizations {
   /// **'Checklist, {done} of {total} steps completed'**
   String checklistSemantics(int done, int total);
 
-  /// No description provided for @useDefault.
-  ///
-  /// In en, this message translates to:
-  /// **'Use default'**
-  String get useDefault;
-
   /// No description provided for @atScheduledTime.
   ///
   /// In en, this message translates to:
@@ -2277,6 +2277,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reminder: {value}'**
   String reminderValue(String value);
+
+  /// Reminder chip and form row on a shared task assigned to someone else: the reminder rings on that person's phone, not this one. name is the assignee's name; value is the reminder the task sets itself, e.g. '10 minutes before'. A task that follows the default uses reminderForPersonOnly instead.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder for {name}: {value}'**
+  String reminderForPerson(String name, String value);
+
+  /// The reminder line on a task given to someone else that follows the reminder default. Their phone uses their own default, which this phone doesn't know, so no time is said. {name} is the person's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder for {name}'**
+  String reminderForPersonOnly(String name);
+
+  /// Reminder chip and form row when the task's project is muted, so this phone gives no reminder. Tapping it opens the project's updates setting.
+  ///
+  /// In en, this message translates to:
+  /// **'No reminder: project muted'**
+  String get noReminderProjectMuted;
+
+  /// Reminder chip and form row when the task's project (or its group) is archived, so this phone gives no reminder.
+  ///
+  /// In en, this message translates to:
+  /// **'No reminder: project archived'**
+  String get noReminderProjectArchived;
 
   /// No description provided for @fileLocal.
   ///
@@ -2332,10 +2356,10 @@ abstract class AppLocalizations {
   /// **'Open'**
   String get fileOpen;
 
-  /// No description provided for @fileRetry.
+  /// Button on a file whose upload failed or is waiting: sends the file again.
   ///
   /// In en, this message translates to:
-  /// **'Retry transfer'**
+  /// **'Upload again'**
   String get fileRetry;
 
   /// No description provided for @fileRemove.
@@ -3556,16 +3580,16 @@ abstract class AppLocalizations {
   /// **'Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.'**
   String get scheduledAlertHelp;
 
-  /// No description provided for @androidAlertRefreshHelp.
+  /// Reminders › Details on Android: when the list of upcoming alerts set on the phone is updated.
   ///
   /// In en, this message translates to:
-  /// **'The window refreshes on app use and through an hourly background job when Android permits.'**
+  /// **'Upcoming alerts update when you open the app and, when Android allows it, every hour.'**
   String get androidAlertRefreshHelp;
 
-  /// No description provided for @backgroundAlertRefreshHelp.
+  /// Reminders › Details on other systems: when the list of upcoming alerts set on the phone is updated.
   ///
   /// In en, this message translates to:
-  /// **'The window refreshes on app use and when the system allows background refresh.'**
+  /// **'Upcoming alerts update when you open the app and when your phone allows it.'**
   String get backgroundAlertRefreshHelp;
 
   /// No description provided for @noUpcomingAlerts.
@@ -3766,10 +3790,10 @@ abstract class AppLocalizations {
   /// **'Todoist project CSV'**
   String get todoistCsvSource;
 
-  /// No description provided for @deferredAlerts.
+  /// Reminders › Details: how many later alerts are not set on the phone yet, because only the nearest ones fit; the next update sets them.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 later alert is} other{{count} later alerts are}} outside the current window. The next refresh adds the earliest ones that fit.'**
+  /// **'{count, plural, =1{1 later alert isn’t set yet.} other{{count} later alerts aren’t set yet.}} The next update sets the nearest ones.'**
   String deferredAlerts(int count);
 
   /// No description provided for @turnOffReminder.
@@ -4762,10 +4786,10 @@ abstract class AppLocalizations {
   /// **'This project is read-only'**
   String get readOnlyList;
 
-  /// No description provided for @listEditingAccessHelp.
+  /// Under «This project is read-only», in a shared project the person can only view: who to ask to make changes.
   ///
   /// In en, this message translates to:
-  /// **'The project owner manages editing access.'**
+  /// **'To make changes, ask the project’s owner.'**
   String get listEditingAccessHelp;
 
   /// No description provided for @loadTaskError.
@@ -4783,7 +4807,7 @@ abstract class AppLocalizations {
   /// No description provided for @viewOnlyTask.
   ///
   /// In en, this message translates to:
-  /// **'View-only shared task. The project owner manages editing access.'**
+  /// **'You can only view this task.'**
   String get viewOnlyTask;
 
   /// No description provided for @stepUpdateError.
@@ -4791,12 +4815,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not update this step. Please retry.'**
   String get stepUpdateError;
-
-  /// No description provided for @checklistCompletionHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Completing the checklist does not complete the task. Use Complete when you are finished.'**
-  String get checklistCompletionHelp;
 
   /// No description provided for @diagnosticsPrivacy.
   ///
@@ -5614,10 +5632,10 @@ abstract class AppLocalizations {
   /// **'Files: {used} of {limit} MB used'**
   String storageUsage(int used, int limit);
 
-  /// Under an attachment the server refused because the user's own free file space is full. Followed by the Explore Pro button. {limit} is the free cap in whole megabytes.
+  /// Under an attachment the server refused because the user's own free file space is full. The card's buttons below it offer Pro and the list of tasks with files. {limit} is the free cap in whole megabytes.
   ///
   /// In en, this message translates to:
-  /// **'Your file space is full ({limit} MB). Remove files from other tasks to make room, or get Pro for unlimited space.'**
+  /// **'Your file space is full ({limit} MB).'**
   String storageFull(int limit);
 
   /// Under an attachment the server refused because the file space of the shared project's owner is full.

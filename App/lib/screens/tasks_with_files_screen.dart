@@ -95,7 +95,10 @@ class TasksWithFilesScreen extends ConsumerWidget {
                           context,
                           MaterialPageRoute<void>(
                             settings: const RouteSettings(name: '/taskDetails'),
-                            builder: (_) => TaskDetailScreen(taskId: task.id!),
+                            builder: (_) => TaskDetailScreen(
+                              taskId: task.id!,
+                              showFiles: true,
+                            ),
                           ),
                         );
                         // Files may have been removed there.

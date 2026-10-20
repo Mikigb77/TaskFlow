@@ -133,11 +133,9 @@ class _ProjectNameDialog extends StatefulWidget {
 
 class _ProjectNameDialogState extends State<_ProjectNameDialog> {
   // Selected, so typing replaces a misheard name.
-  late final _name = TextEditingController(text: widget.name)
-    ..selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: widget.name.length,
-    );
+  late final _name = TextEditingController(
+    text: widget.name,
+  )..selection = TextSelection(baseOffset: 0, extentOffset: widget.name.length);
 
   @override
   void dispose() {
@@ -173,6 +171,11 @@ class _ProjectNameDialogState extends State<_ProjectNameDialog> {
     ],
   );
 }
+
+/// [child], which TalkBack reads as [label] when there is one.
+Widget spokenAs(String? label, Widget child) => label == null
+    ? child
+    : Semantics(label: label, excludeSemantics: true, child: child);
 
 class TaskListPicker extends ConsumerWidget {
   const TaskListPicker({
@@ -255,6 +258,8 @@ class TaskListPicker extends ConsumerWidget {
             : listId == null
             ? context.l10n.noList
             : context.l10n.listUnavailable);
+    // TalkBack hears «Proyecto: Casa», not a bare name.
+    final spoken = selected == null ? null : context.l10n.projectLabel(name);
     final VoidCallback? onPressed = locked
         ? () => showFeedback(
             ScaffoldMessenger.of(context),
@@ -272,7 +277,7 @@ class TaskListPicker extends ConsumerWidget {
       return ListTile(
         contentPadding: EdgeInsets.zero,
         leading: avatar,
-        title: Text(name),
+        title: spokenAs(spoken, Text(name)),
         trailing: locked
             ? null
             : const Icon(Icons.chevron_right_rounded, size: 20),
@@ -287,7 +292,12 @@ class TaskListPicker extends ConsumerWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(child: Text(name, overflow: TextOverflow.ellipsis)),
+            Flexible(
+              child: spokenAs(
+                spoken,
+                Text(name, overflow: TextOverflow.ellipsis),
+              ),
+            ),
             if (!locked && onChanged != null)
               const Icon(Icons.arrow_drop_down_rounded, size: 18),
           ],

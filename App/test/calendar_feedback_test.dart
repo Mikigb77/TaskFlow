@@ -963,7 +963,13 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('schedule-hour')),
-          matching: find.text(l.reviewInvalidTime),
+          // The hour's range, on the test's 12- or 24-hour clock.
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                (widget.data == l.scheduleHourRange24 ||
+                    widget.data == l.scheduleHourRange12),
+          ),
         ),
         findsOneWidget,
       );

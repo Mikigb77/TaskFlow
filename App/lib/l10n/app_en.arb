@@ -2,7 +2,18 @@
   "reviewSchedule": "Date and time",
   "reviewChooseDate": "Choose a date before adding a time.",
   "chooseAmPm": "Choose AM or PM.",
-  "reviewInvalidTime": "Check this value",
+  "scheduleHourRange24": "Hour from 0 to 23",
+  "@scheduleHourRange24": {
+    "description": "Under the hour field of Change date, on a 24-hour clock, when the hour typed is not a valid one."
+  },
+  "scheduleHourRange12": "Hour from 1 to 12",
+  "@scheduleHourRange12": {
+    "description": "Under the hour field of Change date, on a 12-hour clock, when the hour typed is not a valid one."
+  },
+  "scheduleMinuteRange": "Minutes from 0 to 59",
+  "@scheduleMinuteRange": {
+    "description": "Under the minutes field of Change date, when the minutes typed are not valid."
+  },
   "reviewOptions": "More options",
   "reviewOriginal": "See what I said",
   "reviewOriginalText": "Original text",
@@ -90,7 +101,10 @@
   "@allNotes": {
     "description": "Option of the Notes project filter that shows the notes of every project."
   },
-  "viewOnlyNote": "View-only note. The project owner manages editing access.",
+  "viewOnlyNote": "View-only note. To make changes, ask the project’s owner.",
+  "@viewOnlyNote": {
+    "description": "Banner on a note in a project the person can only view: who to ask to make changes."
+  },
   "linkOpenError": "Could not open this link. You can copy it from the note.",
   "noteLinks": "Links",
   "plannedFor": "Planned for",
@@ -113,7 +127,7 @@
   "deadlineTime": "Deadline time",
   "deadlineEndDay": "By the end of the day",
   "removeDeadline": "Remove deadline",
-  "deadlineRecurringHelp": "This deadline repeats with each original occurrence. Moving one planned occurrence keeps its deadline; changing the series start keeps the first deadline and changes the gap for later ones.",
+  "deadlineRecurringHelp": "Each repeat has its own deadline.",
   "deadlineLatePlan": "This plan finishes after the deadline. Check the start or duration.",
   "deadlineOverdue": "Deadline passed",
   "deadlineLabel": "Due {date}",
@@ -124,14 +138,17 @@
       }
     }
   },
-  "reminderAnchor": "Remind me relative to",
-  "reminderAnchorHelp": "One reminder per occurrence, using the date selected here.",
+  "reminderAnchor": "Remind before",
   "dayTimeline": "Day timeline",
-  "timelineFirstPlan": "Jump to first timed item",
   "timelineLimit": "Showing the first 200 timed items. Use the agenda to see every task.",
-  "timelineUnblocked": "Without a time block",
-  "timelineNoBlocks": "No timed plans for this day. Add a start time and duration to reserve a block.",
-  "timelinePoint": "No duration · time only",
+  "timelineUnblocked": "No time",
+  "@timelineUnblocked": {
+    "description": "Day timeline: heading above the day's tasks and all-day calendar events that have no time, so they are not drawn on the hours. The same words the task rows use for a task with no time."
+  },
+  "timelineNoBlocks": "Nothing with a time on this day.",
+  "@timelineNoBlocks": {
+    "description": "Day timeline: shown when the shown day has no task, deadline or calendar event with a time."
+  },
   "timelineHours": "{hours} hours in this day",
   "@timelineHours": {
     "placeholders": {
@@ -207,7 +224,10 @@
   "addTime": "Add time",
   "removeDate": "Remove date",
   "editTask": "Edit task",
-  "taskDetails": "Task details",
+  "taskScreenTitle": "Task",
+  "@taskScreenTitle": {
+    "description": "The app bar title of a task’s own page. A note’s page says Note instead."
+  },
   "addTask": "Add a task",
   "@addTask": {
     "description": "The one button that adds a task: it opens the capture sheet."
@@ -222,7 +242,6 @@
   "low": "Low",
   "medium": "Medium",
   "high": "High",
-  "schedule": "Schedule",
   "date": "Date",
   "time": "Time",
   "repeat": "Repeat",
@@ -479,8 +498,9 @@
   "changePriority": "Change priority",
   "changeRepeat": "Change repeat",
   "confirmedDetails": "I’ve checked this task",
-  "agendaCounts": "{remaining} to do · {done} completed",
+  "agendaCounts": "{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}",
   "@agendaCounts": {
+    "description": "The day's count under its heading on Calendar. With nothing completed it is the open count alone.",
     "placeholders": {
       "remaining": {
         "type": "int"
@@ -490,7 +510,34 @@
       }
     }
   },
-  "overdueCount": "{count, plural, other{Overdue · {count}}}",
+  "overdueDate": "{date} · Overdue",
+  "@overdueDate": {
+    "description": "Date line of an open task whose day has passed, in Tareas and on project pages. {date} is the row's date, such as Sat, 17 Oct.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "assigneeLabel": "Assignee: {name}",
+  "@assigneeLabel": {
+    "description": "What TalkBack reads for who a task in a shared project is for, on a task row and on the assignment chip. {name} is a person, Me or Everyone.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectLabel": "Project: {name}",
+  "@projectLabel": {
+    "description": "What TalkBack reads for the project chip on a task's details and in the form. {name} is the project's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+"overdueCount": "{count, plural, other{Overdue · {count}}}",
   "@overdueCount": {
     "description": "Header above unfinished tasks from earlier days, shown first on Today.",
     "placeholders": {
@@ -572,8 +619,8 @@
   "occurrenceSkippedNotice": "Occurrence skipped",
   "originalRestored": "Original date restored",
   "movedInbox": "Date removed",
-  "scheduleChangedAgain": "The schedule changed again. Open the task to review it.",
-  "scheduleError": "Could not change the schedule. Please try again.",
+  "scheduleChangedAgain": "The date changed again. Open the task to check it.",
+  "scheduleError": "Couldn’t change the date. Try again.",
   "rescheduleRepeating": "Reschedule repeating task",
   "rescheduleTask": "Reschedule task",
   "seriesRescheduleHelp": "Changes the start of the series and resets moved or skipped dates. No date stops the repeat.",
@@ -581,11 +628,20 @@
   "restoreOriginal": "Restore original date",
   "progressSmall": "Progress starts small",
   "completedEmpty": "Every task you finish will find a home here.",
-  "progressHeading": "Look how far you’ve come.",
+  "completedButton": "Completed",
+  "@completedButton": {
+    "description": "Text button on the Tasks tab, beside Projects, that opens the completed tasks. Short: it shares a row with Projects."
+  },
   "completedLoadError": "Couldn’t load completed tasks",
   "tryLater": "Please try again in a moment.",
-  "changeSeriesQuestion": "Change the repeating schedule?",
-  "changeSeriesHelp": "This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.",
+  "changeSeriesQuestion": "Change how it repeats?",
+  "@changeSeriesQuestion": {
+    "description": "Title of the dialog when a repeating task's repeat changes while some of its dates were moved or skipped."
+  },
+  "changeSeriesHelp": "Dates you moved or skipped will follow the new repeat. Completed dates stay in the history.",
+  "@changeSeriesHelp": {
+    "description": "Text of the dialog titled changeSeriesQuestion: moved or skipped dates follow the new repeat; completed ones stay in the history."
+  },
   "keepEditing": "Keep editing",
   "resetSave": "Reset and save",
   "taskSavedInbox": "Added with no date",
@@ -653,7 +709,6 @@
       }
     }
   },
-  "useDefault": "Use default",
   "atScheduledTime": "At the scheduled time",
   "hourBefore": "1 hour before",
   "dayBefore": "1 day before",
@@ -667,6 +722,35 @@
     }
   },
   "reminderValue": "Reminder: {value}",
+  "reminderForPerson": "Reminder for {name}: {value}",
+  "@reminderForPerson": {
+    "description": "Reminder chip and form row on a shared task assigned to someone else: the reminder rings on that person's phone, not this one. name is the assignee's name; value is the reminder the task sets itself, e.g. '10 minutes before'. A task that follows the default uses reminderForPersonOnly instead.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderForPersonOnly": "Reminder for {name}",
+  "@reminderForPersonOnly": {
+    "description": "The reminder line on a task given to someone else that follows the reminder default. Their phone uses their own default, which this phone doesn't know, so no time is said. {name} is the person's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noReminderProjectMuted": "No reminder: project muted",
+  "@noReminderProjectMuted": {
+    "description": "Reminder chip and form row when the task's project is muted, so this phone gives no reminder. Tapping it opens the project's updates setting."
+  },
+  "noReminderProjectArchived": "No reminder: project archived",
+  "@noReminderProjectArchived": {
+    "description": "Reminder chip and form row when the task's project (or its group) is archived, so this phone gives no reminder."
+  },
   "fileLocal": "Only on this device",
   "fileQueued": "Upload queued",
   "fileBackedUp": "Backed up to your account",
@@ -676,7 +760,10 @@
   "fileUpload": "Upload",
   "fileDownload": "Download",
   "fileOpen": "Open",
-  "fileRetry": "Retry transfer",
+  "fileRetry": "Upload again",
+  "@fileRetry": {
+    "description": "Button on a file whose upload failed or is waiting: sends the file again."
+  },
   "fileRemove": "Remove attachment",
   "removeFileNamed": "Remove {file}",
   "@removeFileNamed": {
@@ -1152,8 +1239,14 @@
   "eveningCheckIn": "Evening",
   "upcomingAlerts": "Upcoming alerts",
   "scheduledAlertHelp": "Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.",
-  "androidAlertRefreshHelp": "The window refreshes on app use and through an hourly background job when Android permits.",
-  "backgroundAlertRefreshHelp": "The window refreshes on app use and when the system allows background refresh.",
+  "androidAlertRefreshHelp": "Upcoming alerts update when you open the app and, when Android allows it, every hour.",
+  "@androidAlertRefreshHelp": {
+    "description": "Reminders › Details on Android: when the list of upcoming alerts set on the phone is updated."
+  },
+  "backgroundAlertRefreshHelp": "Upcoming alerts update when you open the app and when your phone allows it.",
+  "@backgroundAlertRefreshHelp": {
+    "description": "Reminders › Details on other systems: when the list of upcoming alerts set on the phone is updated."
+  },
   "noUpcomingAlerts": "No upcoming alerts. Choose a reminder on a scheduled task.",
   "repeatsDaily": "repeats daily",
   "retryScheduling": "Refresh and retry scheduling",
@@ -1187,8 +1280,9 @@
   "alreadyImported": "Already imported on this phone",
   "taskFlowExportSource": "TaskFlow export",
   "todoistCsvSource": "Todoist project CSV",
-  "deferredAlerts": "{count, plural, =1{1 later alert is} other{{count} later alerts are}} outside the current window. The next refresh adds the earliest ones that fit.",
+  "deferredAlerts": "{count, plural, =1{1 later alert isn’t set yet.} other{{count} later alerts aren’t set yet.}} The next update sets the nearest ones.",
   "@deferredAlerts": {
+    "description": "Reminders › Details: how many later alerts are not set on the phone yet, because only the nearest ones fit; the next update sets them.",
     "placeholders": {
       "count": {
         "type": "int"
@@ -1745,12 +1839,14 @@
   "completeNamedTask": "Complete {title}",
   "viewOnlyTaskTitle": "View-only task",
   "readOnlyList": "This project is read-only",
-  "listEditingAccessHelp": "The project owner manages editing access.",
+  "listEditingAccessHelp": "To make changes, ask the project’s owner.",
+  "@listEditingAccessHelp": {
+    "description": "Under «This project is read-only», in a shared project the person can only view: who to ask to make changes."
+  },
   "loadTaskError": "Couldn’t load this task",
   "deleteSeriesHelp": "“{title}” and all its occurrences will be removed.",
-  "viewOnlyTask": "View-only shared task. The project owner manages editing access.",
+  "viewOnlyTask": "You can only view this task.",
   "stepUpdateError": "Could not update this step. Please retry.",
-  "checklistCompletionHelp": "Completing the checklist does not complete the task. Use Complete when you are finished.",
   "diagnosticsPrivacy": "Local counts and timing from the last 1,000 events. No task titles, words, recordings or account identifiers are included. Nothing here is uploaded.",
   "diagnosticsPercentiles": "Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.",
   "diagnosticsMeasurementHelp": "Keeping a capture for later is not a failure. Counts can include several visits to the same draft; they are not a user conversion rate. Correction time covers open editing dialogs, including cancelled ones. Local save timing excludes cloud sync. Audio transcription excludes typed and on-device input.",
@@ -2140,9 +2236,9 @@
       }
     }
   },
-  "storageFull": "Your file space is full ({limit} MB). Remove files from other tasks to make room, or get Pro for unlimited space.",
+  "storageFull": "Your file space is full ({limit} MB).",
   "@storageFull": {
-    "description": "Under an attachment the server refused because the user's own free file space is full. Followed by the Explore Pro button. {limit} is the free cap in whole megabytes.",
+    "description": "Under an attachment the server refused because the user's own free file space is full. The card's buttons below it offer Pro and the list of tasks with files. {limit} is the free cap in whole megabytes.",
     "placeholders": {
       "limit": {
         "type": "int"

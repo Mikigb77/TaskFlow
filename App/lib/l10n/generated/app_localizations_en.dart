@@ -18,7 +18,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chooseAmPm => 'Choose AM or PM.';
 
   @override
-  String get reviewInvalidTime => 'Check this value';
+  String get scheduleHourRange24 => 'Hour from 0 to 23';
+
+  @override
+  String get scheduleHourRange12 => 'Hour from 1 to 12';
+
+  @override
+  String get scheduleMinuteRange => 'Minutes from 0 to 59';
 
   @override
   String get reviewOptions => 'More options';
@@ -221,7 +227,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewOnlyNote =>
-      'View-only note. The project owner manages editing access.';
+      'View-only note. To make changes, ask the project’s owner.';
 
   @override
   String get linkOpenError =>
@@ -273,8 +279,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeDeadline => 'Remove deadline';
 
   @override
-  String get deadlineRecurringHelp =>
-      'This deadline repeats with each original occurrence. Moving one planned occurrence keeps its deadline; changing the series start keeps the first deadline and changes the gap for later ones.';
+  String get deadlineRecurringHelp => 'Each repeat has its own deadline.';
 
   @override
   String get deadlineLatePlan =>
@@ -289,31 +294,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get reminderAnchor => 'Remind me relative to';
-
-  @override
-  String get reminderAnchorHelp =>
-      'One reminder per occurrence, using the date selected here.';
+  String get reminderAnchor => 'Remind before';
 
   @override
   String get dayTimeline => 'Day timeline';
-
-  @override
-  String get timelineFirstPlan => 'Jump to first timed item';
 
   @override
   String get timelineLimit =>
       'Showing the first 200 timed items. Use the agenda to see every task.';
 
   @override
-  String get timelineUnblocked => 'Without a time block';
+  String get timelineUnblocked => 'No time';
 
   @override
-  String get timelineNoBlocks =>
-      'No timed plans for this day. Add a start time and duration to reserve a block.';
-
-  @override
-  String get timelinePoint => 'No duration · time only';
+  String get timelineNoBlocks => 'Nothing with a time on this day.';
 
   @override
   String timelineHours(int hours) {
@@ -479,7 +473,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editTask => 'Edit task';
 
   @override
-  String get taskDetails => 'Task details';
+  String get taskScreenTitle => 'Task';
 
   @override
   String get addTask => 'Add a task';
@@ -513,9 +507,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get high => 'High';
-
-  @override
-  String get schedule => 'Schedule';
 
   @override
   String get date => 'Date';
@@ -1032,7 +1023,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String agendaCounts(int remaining, int done) {
-    return '$remaining to do · $done completed';
+    String _temp0 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '$remaining to do · $done completed',
+      zero: '$remaining to do',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String overdueDate(String date) {
+    return '$date · Overdue';
+  }
+
+  @override
+  String assigneeLabel(String name) {
+    return 'Assignee: $name';
+  }
+
+  @override
+  String projectLabel(String name) {
+    return 'Project: $name';
   }
 
   @override
@@ -1163,11 +1175,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduleChangedAgain =>
-      'The schedule changed again. Open the task to review it.';
+      'The date changed again. Open the task to check it.';
 
   @override
-  String get scheduleError =>
-      'Could not change the schedule. Please try again.';
+  String get scheduleError => 'Couldn’t change the date. Try again.';
 
   @override
   String get rescheduleRepeating => 'Reschedule repeating task';
@@ -1193,7 +1204,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get completedEmpty => 'Every task you finish will find a home here.';
 
   @override
-  String get progressHeading => 'Look how far you’ve come.';
+  String get completedButton => 'Completed';
 
   @override
   String get completedLoadError => 'Couldn’t load completed tasks';
@@ -1202,11 +1213,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tryLater => 'Please try again in a moment.';
 
   @override
-  String get changeSeriesQuestion => 'Change the repeating schedule?';
+  String get changeSeriesQuestion => 'Change how it repeats?';
 
   @override
   String get changeSeriesHelp =>
-      'This resets individual moved or skipped dates to the new schedule. Your completed dates remain in history.';
+      'Dates you moved or skipped will follow the new repeat. Completed dates stay in the history.';
 
   @override
   String get keepEditing => 'Keep editing';
@@ -1293,9 +1304,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get useDefault => 'Use default';
-
-  @override
   String get atScheduledTime => 'At the scheduled time';
 
   @override
@@ -1316,6 +1324,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String reminderValue(String value) {
     return 'Reminder: $value';
   }
+
+  @override
+  String reminderForPerson(String name, String value) {
+    return 'Reminder for $name: $value';
+  }
+
+  @override
+  String reminderForPersonOnly(String name) {
+    return 'Reminder for $name';
+  }
+
+  @override
+  String get noReminderProjectMuted => 'No reminder: project muted';
+
+  @override
+  String get noReminderProjectArchived => 'No reminder: project archived';
 
   @override
   String get fileLocal => 'Only on this device';
@@ -1345,7 +1369,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileOpen => 'Open';
 
   @override
-  String get fileRetry => 'Retry transfer';
+  String get fileRetry => 'Upload again';
 
   @override
   String get fileRemove => 'Remove attachment';
@@ -2090,11 +2114,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get androidAlertRefreshHelp =>
-      'The window refreshes on app use and through an hourly background job when Android permits.';
+      'Upcoming alerts update when you open the app and, when Android allows it, every hour.';
 
   @override
   String get backgroundAlertRefreshHelp =>
-      'The window refreshes on app use and when the system allows background refresh.';
+      'Upcoming alerts update when you open the app and when your phone allows it.';
 
   @override
   String get noUpcomingAlerts =>
@@ -2213,10 +2237,10 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count later alerts are',
-      one: '1 later alert is',
+      other: '$count later alerts aren’t set yet.',
+      one: '1 later alert isn’t set yet.',
     );
-    return '$_temp0 outside the current window. The next refresh adds the earliest ones that fit.';
+    return '$_temp0 The next update sets the nearest ones.';
   }
 
   @override
@@ -2979,7 +3003,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get listEditingAccessHelp =>
-      'The project owner manages editing access.';
+      'To make changes, ask the project’s owner.';
 
   @override
   String get loadTaskError => 'Couldn’t load this task';
@@ -2990,15 +3014,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get viewOnlyTask =>
-      'View-only shared task. The project owner manages editing access.';
+  String get viewOnlyTask => 'You can only view this task.';
 
   @override
   String get stepUpdateError => 'Could not update this step. Please retry.';
-
-  @override
-  String get checklistCompletionHelp =>
-      'Completing the checklist does not complete the task. Use Complete when you are finished.';
 
   @override
   String get diagnosticsPrivacy =>
@@ -3618,7 +3637,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String storageFull(int limit) {
-    return 'Your file space is full ($limit MB). Remove files from other tasks to make room, or get Pro for unlimited space.';
+    return 'Your file space is full ($limit MB).';
   }
 
   @override

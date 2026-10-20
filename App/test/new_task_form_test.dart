@@ -538,23 +538,27 @@ void main() {
   // ---- Landing ----
 
   testWidgets(
-    'from Tareas filtered to Prioridad alta, the new task lands there: Todas chosen again and its row lit, with Añadida sin fecha',
+    'from Tareas filtered to Prioridad alta, the new task lands there: the filter cleared and its row lit, with Añadida sin fecha',
     (tester) async {
       await _App.open(
         tester,
         tasks: [Task(id: 1, title: 'Renovar el pasaporte', priority: 3)],
       );
       await openTasksTab(tester);
-      ChoiceChip filter(String label) =>
-          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
-      await tester.tap(find.widgetWithText(ChoiceChip, es.highPriority));
+      FilterChip filter(String label) =>
+          tester.widget<FilterChip>(find.widgetWithText(FilterChip, label));
+      // The chips scroll sideways when they don't fit.
+      final high = find.widgetWithText(FilterChip, es.highPriority);
+      await tester.ensureVisible(high);
+      await tester.pumpAndSettle();
+      await tester.tap(high);
       await tester.pumpAndSettle();
       expect(filter(es.highPriority).selected, isTrue);
       await openForm(tester);
       await typeTitle(tester, 'Comprar bombillas');
       await tapSave(tester);
       expect(find.byType(HomeScreen).hitTestable(), findsWidgets);
-      expect(filter(es.allTasks).selected, isTrue);
+      expect(filter(es.highPriority).selected, isFalse);
       expect(row('Comprar bombillas').hitTestable(), findsOneWidget);
       expect(
         tester.widget<TaskTile>(row('Comprar bombillas')).color,
@@ -751,6 +755,77 @@ void main() {
       );
       expect(timelineRow.hitTestable(), findsOneWidget);
       expect(tester.widget<TaskTile>(timelineRow).color, lit(tester));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1639: at 2x on 360×800, a date-only task saved from Thursday’s Día view, below another «Sin hora» row, lights whole inside «Sin hora», on screen, with Thursday’s 08:30 task still showing',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final start = monday();
+      final thursday = plus(start, 3);
+      await _App.open(
+        tester,
+        clock: start,
+        size: const Size(360, 800),
+        tasks: [
+          Task(
+            id: 1,
+            title: 'Paseo por el parque',
+            dueDate: DateTime(thursday.year, thursday.month, thursday.day, 8, 30),
+            priority: 1,
+          ),
+          Task(
+            id: 2,
+            title: 'Pagar la factura de la luz',
+            dueDate: thursday,
+            hasTime: false,
+            priority: 2,
+          ),
+        ],
+      );
+      unawaited(
+        Navigator.of(
+          tester.element(find.byType(CalendarScreen)),
+        ).pushNamed('/timeline', arguments: thursday),
+      );
+      await tester.pumpAndSettle();
+      final timeline = find.byType(DayTimelineScreen);
+      expect(timeline, findsOneWidget);
+      await openForm(tester);
+      expect(selected(tester, 'new-task-pick-day'), isTrue);
+      await typeTitle(tester, 'Regar las plantas');
+      await tapSave(tester);
+
+      expect(timeline.hitTestable(), findsWidgets);
+      final untimed = find.byKey(const ValueKey('timeline-untimed'));
+      final saved = find.descendant(
+        of: untimed,
+        matching: row('Regar las plantas'),
+      );
+      expect(saved, findsOneWidget, reason: 'listed under «Sin hora»');
+      expect(tester.widget<TaskTile>(saved).color, lit(tester));
+      final area = tester.getRect(untimed);
+      final rect = tester.getRect(saved);
+      expect(
+        rect.top >= area.top - 0.5 && rect.bottom <= area.bottom + 0.5,
+        isTrue,
+        reason: 'the whole lit row inside «Sin hora»: row $rect, area $area',
+      );
+      final actions = tester.getRect(
+        find.descendant(of: timeline, matching: find.byType(TaskActions)),
+      );
+      expect(rect.bottom, lessThanOrEqualTo(actions.top + 0.5),
+          reason: 'above the add button');
+      final walk = find.byTooltip('Paseo por el parque, 08:30');
+      expect(walk, findsOneWidget);
+      final hours = tester.getRect(find.byKey(const ValueKey('timeline-scroll')));
+      final block = tester.getRect(walk);
+      expect(block.top >= hours.top - 0.5 && block.bottom <= hours.bottom + 0.5,
+          isTrue,
+          reason: 'the 08:30 task still shows: block $block, hours $hours');
       expect(tester.takeException(), isNull);
     },
   );

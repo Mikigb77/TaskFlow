@@ -185,7 +185,7 @@ void main() {
   }
 
   testWidgets(
-    'completion undo works after the task row leaves the active list',
+    'completion undo works on Tasks, where the ticked row stays until the list changes',
     (tester) async {
       final container = await _pump(tester);
       await tester.tap(find.text('Tasks'));
@@ -195,7 +195,8 @@ void main() {
         find.descendant(of: row, matching: find.byType(Checkbox)),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Review the new designs'), findsNothing);
+      // Ticked here, it keeps its place, struck through (UX-1406).
+      expect(find.text('Review the new designs'), findsOneWidget);
       await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
       expect(
@@ -258,7 +259,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Doctor appointment'), findsOneWidget);
     expect(find.text('Review the new designs'), findsNothing);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'High priority'));
+    await tester.tap(find.widgetWithText(FilterChip, 'High priority'));
     await tester.pumpAndSettle();
     expect(find.text('Doctor appointment'), findsOneWidget);
   });

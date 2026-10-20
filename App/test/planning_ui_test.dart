@@ -120,7 +120,9 @@ void main() {
       final container =
           designContainer(store: MemoryThemeStore(dark ? 'dark' : 'light'));
       await container.read(taskProvider.notifier).loadTasks();
-      final now = DateTime.now();
+      // Tomorrow, so the block is still ahead whatever the time now.
+      final today = DateTime.now();
+      final now = DateTime(today.year, today.month, today.day + 1);
       await container.read(taskProvider.notifier).addTask(Task(
           title: 'Timed block',
           priority: 1,
@@ -140,20 +142,11 @@ void main() {
                   child: child!),
               home: DayTimelineScreen(day: now))));
       await tester.pumpAndSettle();
-      final jump = find.text('Jump to first timed item');
-      await tester.scrollUntilVisible(jump, 150,
-          scrollable: find
-              .descendant(
-                  of: find.byKey(const ValueKey('timeline-scroll')),
-                  matching: find.byType(Scrollable))
-              .first);
-      await tester.pumpAndSettle();
-      await tester.tap(jump);
-      await tester.pumpAndSettle();
+      // The day opens on its first timed item.
       expect(find.text('Timed block').hitTestable(), findsOneWidget);
       await tester.tap(find.text('Timed block'));
       await tester.pumpAndSettle();
-      expect(find.text('Task details'), findsOneWidget);
+      expect(find.text('Task'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       container.dispose();

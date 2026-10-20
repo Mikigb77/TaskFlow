@@ -25,48 +25,57 @@ class AttachmentEntry {
 
 final attachmentEntriesProvider = FutureProvider.autoDispose
     .family<List<AttachmentEntry>, int>((ref, taskId) async {
-  final repository = ref.watch(taskRepositoryProvider);
-  final tasks =
-      ref.watch(taskProvider).valueOrNull ?? await repository.getAllTasks();
-  final task = tasks.where((task) => task.id == taskId).firstOrNull;
-  if (task == null) return [];
-  final items = await repository.attachments.forTask(taskId);
-  final entries = <AttachmentEntry>[];
-  Future<bool> exists(String? path) async {
-    if (path == null) return false;
-    try {
-      return await File(path).exists();
-    } on FileSystemException {
-      return false;
-    }
-  }
+      final repository = ref.watch(taskRepositoryProvider);
+      final tasks =
+          ref.watch(taskProvider).valueOrNull ?? await repository.getAllTasks();
+      final task = tasks.where((task) => task.id == taskId).firstOrNull;
+      if (task == null) return [];
+      final items = await repository.attachments.forTask(taskId);
+      final entries = <AttachmentEntry>[];
+      Future<bool> exists(String? path) async {
+        if (path == null) return false;
+        try {
+          return await File(path).exists();
+        } on FileSystemException {
+          return false;
+        }
+      }
 
-  for (final item in items) {
-    entries.add(
-      AttachmentEntry(
-        item.name,
-        item.localPath,
-        await exists(item.localPath),
-        item: item,
-      ),
-    );
-  }
-  final known = items.map((item) => item.sourcePath).toSet();
-  for (final path in {
-    ...task.filePaths,
-    ...task.imagePaths,
-  }.difference(known)) {
-    entries.add(
-      AttachmentEntry(p.basename(path), path, await exists(path)),
-    );
-  }
-  return entries;
-});
+      for (final item in items) {
+        entries.add(
+          AttachmentEntry(
+            item.name,
+            item.localPath,
+            await exists(item.localPath),
+            item: item,
+          ),
+        );
+      }
+      final known = items.map((item) => item.sourcePath).toSet();
+      for (final path in {
+        ...task.filePaths,
+        ...task.imagePaths,
+      }.difference(known)) {
+        entries.add(
+          AttachmentEntry(p.basename(path), path, await exists(path)),
+        );
+      }
+      return entries;
+    });
 
 class AttachmentPanel extends ConsumerStatefulWidget {
-  const AttachmentPanel({super.key, required this.task, this.openFile});
+  const AttachmentPanel({
+    super.key,
+    required this.task,
+    this.openFile,
+    this.reveal = false,
+  });
   final Task task;
   final Future<void> Function(String)? openFile;
+
+  /// Scrolls the section into view once its files show, for a task opened
+  /// to free file space.
+  final bool reveal;
   @override
   ConsumerState<AttachmentPanel> createState() => _AttachmentPanelState();
 }
@@ -74,6 +83,25 @@ class AttachmentPanel extends ConsumerStatefulWidget {
 class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
   bool _busy = false;
   String? _error;
+  final _heading = GlobalKey();
+  bool _revealed = false;
+
+  /// Once, after the first frame that shows files.
+  void _reveal() {
+    if (!widget.reveal || _revealed) return;
+    _revealed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final heading = _heading.currentContext;
+      if (!mounted || heading == null) return;
+      Scrollable.ensureVisible(
+        heading,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -94,15 +122,15 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
   }
 
   Future<void> _open(String path) => _run(() async {
-        if (widget.openFile != null) {
-          await widget.openFile!(path);
-          return;
-        }
-        final result = await OpenFile.open(path);
-        if (result.type.name != 'done') {
-          throw StateError('No file viewer available.');
-        }
-      });
+    if (widget.openFile != null) {
+      await widget.openFile!(path);
+      return;
+    }
+    final result = await OpenFile.open(path);
+    if (result.type.name != 'done') {
+      throw StateError('No file viewer available.');
+    }
+  });
 
   Future<void> _remove(AttachmentEntry entry) async {
     final repository = ref.read(taskRepositoryProvider);
@@ -117,6 +145,10 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
             child: Text(context.l10n.cancel),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(context.l10n.fileRemove),
           ),
@@ -201,11 +233,16 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
         (attachments.valueOrNull?.isEmpty ?? true)) {
       return const SizedBox.shrink();
     }
+    if (attachments.valueOrNull?.isNotEmpty == true) _reveal();
+    final canEdit = ref.watch(listCanEditProvider(widget.task.listId));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 28),
-        SectionLabel(context.l10n.attachments),
+        KeyedSubtree(
+          key: _heading,
+          child: SectionLabel(context.l10n.attachments),
+        ),
         if (_busy) const LinearProgressIndicator(),
         if (_error != null) MessageBanner(_error!, isError: true),
         if (usage != null)
@@ -217,208 +254,206 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
             ),
           ),
         attachments.when(
-              // A sync reloads the list; keep the cards so the screen doesn't jump.
-              skipLoadingOnReload: true,
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(context.l10n.fileLoadError),
-                  TextButton(
-                    onPressed: () => ref.invalidate(
-                      attachmentEntriesProvider(widget.task.id!),
-                    ),
-                    child: Text(context.l10n.fileRetry),
-                  ),
-                ],
+          // A sync reloads the list; keep the cards so the screen doesn't jump.
+          skipLoadingOnReload: true,
+          loading: () => const LinearProgressIndicator(),
+          error: (_, __) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(context.l10n.fileLoadError),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(attachmentEntriesProvider(widget.task.id!)),
+                child: Text(context.l10n.tryAgain),
               ),
-              data: (entries) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final entry in entries)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: AppSurface(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+          data: (entries) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final entry in entries)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AppSurface(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  entry.item?.remote == true
-                                      ? Icons.cloud_done_outlined
-                                      : Icons.attach_file_rounded,
-                                  color: colors.primary,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    entry.name,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                ),
-                              ],
+                            Icon(
+                              entry.item?.remote == true
+                                  ? Icons.cloud_done_outlined
+                                  : Icons.attach_file_rounded,
+                              color: colors.primary,
                             ),
-                            const SizedBox(height: 8),
-                            // A refused file says why instead of "queued".
-                            if (entry.item?.refused == true)
-                              Text(
-                                _refused(entry.item!),
-                                style: TextStyle(color: colors.error),
-                              )
-                            else
-                              Text(_status(entry)),
-                            if (entry.item?.error != null &&
-                                entry.item?.refused != true)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  requestProblemText(
-                                    context.l10n,
-                                    entry.item!.error!,
-                                  ),
-                                  style: TextStyle(color: colors.error),
-                                ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                entry.name,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                if (entry.exists && entry.item?.deleted != true)
-                                  TextButton.icon(
-                                    onPressed:
-                                        _busy ? null : () => _open(entry.path!),
-                                    icon: const Icon(
-                                      Icons.open_in_new_rounded,
-                                      size: 18,
-                                    ),
-                                    label: Text(context.l10n.fileOpen),
-                                  ),
-                                if (entry.item == null &&
-                                    entry.exists &&
-                                    !local &&
-                                    ref.watch(
-                                      listCanEditProvider(widget.task.listId),
-                                    ))
-                                  TextButton.icon(
-                                    onPressed: _busy
-                                        ? null
-                                        : () => _run(() async {
-                                              await repository.attachments
-                                                  .enqueue(
-                                                widget.task.id!,
-                                                entry.path!,
-                                              );
-                                              if (mounted) {
-                                                ref.invalidate(
-                                                  attachmentEntriesProvider(
-                                                    widget.task.id!,
-                                                  ),
-                                                );
-                                                await ref
-                                                    .read(taskProvider.notifier)
-                                                    .loadTasks();
-                                              }
-                                            }),
-                                    icon: const Icon(
-                                      Icons.cloud_upload_outlined,
-                                      size: 18,
-                                    ),
-                                    label: Text(context.l10n.fileUpload),
-                                  ),
-                                if (entry.item?.remote == true &&
-                                    !entry.exists &&
-                                    entry.item?.deleted != true)
-                                  TextButton.icon(
-                                    onPressed: _busy
-                                        ? null
-                                        : () => _run(() async {
-                                              final api = ref.read(
-                                                apiClientProvider,
-                                              );
-                                              final account = ref
-                                                  .read(authProvider)
-                                                  .account;
-                                              if (account == null) {
-                                                throw StateError(
-                                                  'Sign in first.',
-                                                );
-                                              }
-                                              await repository.attachments
-                                                  .download(
-                                                entry.item!.id,
-                                                api,
-                                                account.id,
-                                              );
-                                            }),
-                                    icon: const Icon(
-                                      Icons.download_outlined,
-                                      size: 18,
-                                    ),
-                                    label: Text(context.l10n.fileDownload),
-                                  ),
-                                if (entry.item?.uploadPending == true ||
-                                    entry.item?.deletePending == true)
-                                  TextButton(
-                                    onPressed: _busy
-                                        ? null
-                                        : () => _run(() async {
-                                              if (entry.item!.refused) {
-                                                await repository.attachments
-                                                    .retryRefused(
-                                                  entry.item!.id,
-                                                );
-                                              }
-                                              await ref
-                                                  .read(taskProvider.notifier)
-                                                  .loadTasks();
-                                            }),
-                                    child: Text(context.l10n.fileRetry),
-                                  ),
-                                if (entry.item?.error ==
-                                        TaskAttachment.storageFull &&
-                                    !ref.watch(hasProProvider)) ...[
-                                  TextButton(
-                                    onPressed: () => Navigator.pushNamed(
-                                      context,
-                                      '/subscription',
-                                    ),
-                                    child: Text(context.l10n.voiceProAction),
-                                  ),
-                                  // Which tasks use the space, to make room.
-                                  TextButton(
-                                    onPressed: () =>
-                                        TasksWithFilesScreen.open(context),
-                                    child: Text(context.l10n.storageSeeTasks),
-                                  ),
-                                ],
-                                if (entry.item?.deleted != true &&
-                                    ref.watch(
-                                      listCanEditProvider(widget.task.listId),
-                                    ))
-                                  TextButton(
-                                    onPressed:
-                                        _busy ? null : () => _remove(entry),
-                                    child: Text(context.l10n.fileRemove),
-                                  ),
-                              ],
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        // A refused file says why instead of "queued".
+                        if (entry.item?.refused == true)
+                          Text(
+                            _refused(entry.item!),
+                            style: TextStyle(color: colors.error),
+                          )
+                        else
+                          Text(_status(entry)),
+                        if (entry.item?.error != null &&
+                            entry.item?.refused != true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              requestProblemText(
+                                context.l10n,
+                                entry.item!.error!,
+                              ),
+                              style: TextStyle(color: colors.error),
+                            ),
+                          ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (entry.exists && entry.item?.deleted != true)
+                              TextButton.icon(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _open(entry.path!),
+                                icon: const Icon(
+                                  Icons.open_in_new_rounded,
+                                  size: 18,
+                                ),
+                                label: Text(context.l10n.fileOpen),
+                              ),
+                            if (entry.item == null &&
+                                entry.exists &&
+                                !local &&
+                                canEdit)
+                              TextButton.icon(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _run(() async {
+                                        await repository.attachments.enqueue(
+                                          widget.task.id!,
+                                          entry.path!,
+                                        );
+                                        if (mounted) {
+                                          ref.invalidate(
+                                            attachmentEntriesProvider(
+                                              widget.task.id!,
+                                            ),
+                                          );
+                                          await ref
+                                              .read(taskProvider.notifier)
+                                              .loadTasks();
+                                        }
+                                      }),
+                                icon: const Icon(
+                                  Icons.cloud_upload_outlined,
+                                  size: 18,
+                                ),
+                                label: Text(context.l10n.fileUpload),
+                              ),
+                            if (entry.item?.remote == true &&
+                                !entry.exists &&
+                                entry.item?.deleted != true)
+                              TextButton.icon(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _run(() async {
+                                        final api = ref.read(apiClientProvider);
+                                        final account = ref
+                                            .read(authProvider)
+                                            .account;
+                                        if (account == null) {
+                                          throw StateError('Sign in first.');
+                                        }
+                                        await repository.attachments.download(
+                                          entry.item!.id,
+                                          api,
+                                          account.id,
+                                        );
+                                      }),
+                                icon: const Icon(
+                                  Icons.download_outlined,
+                                  size: 18,
+                                ),
+                                label: Text(context.l10n.fileDownload),
+                              ),
+                            // A full file space of one's own: a removal
+                            // or Pro sends the file again, not a retry.
+                            if ((entry.item?.uploadPending == true ||
+                                    entry.item?.deletePending == true) &&
+                                entry.item?.error != TaskAttachment.storageFull)
+                              TextButton(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _run(() async {
+                                        if (entry.item!.refused) {
+                                          await repository.attachments
+                                              .retryRefused(entry.item!.id);
+                                        }
+                                        await ref
+                                            .read(taskProvider.notifier)
+                                            .loadTasks();
+                                      }),
+                                child: Text(
+                                  entry.item?.deletePending == true
+                                      ? context.l10n.tryAgain
+                                      : context.l10n.fileRetry,
+                                ),
+                              ),
+                            if (entry.item?.error ==
+                                    TaskAttachment.storageFull &&
+                                !ref.watch(hasProProvider)) ...[
+                              TextButton(
+                                onPressed: () => Navigator.pushNamed(
+                                  context,
+                                  '/subscription',
+                                ),
+                                child: Text(context.l10n.voiceProAction),
+                              ),
+                              // Which tasks use the space, to make room.
+                              TextButton(
+                                onPressed: () =>
+                                    TasksWithFilesScreen.open(context),
+                                child: Text(context.l10n.storageSeeTasks),
+                              ),
+                            ],
+                          ],
+                        ),
+                        // Last and apart from the others: it deletes.
+                        if (entry.item?.deleted != true && canEdit)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: colors.error,
+                              ),
+                              onPressed: _busy ? null : () => _remove(entry),
+                              child: Text(context.l10n.fileRemove),
+                            ),
+                          ),
+                      ],
                     ),
-                  if (local && entries.isNotEmpty)
-                    Text(
-                      context.l10n.fileSignInHelp,
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                ],
-              ),
-            ),
+                  ),
+                ),
+              if (local && entries.isNotEmpty)
+                Text(
+                  context.l10n.fileSignInHelp,
+                  style: TextStyle(color: colors.onSurfaceVariant),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }

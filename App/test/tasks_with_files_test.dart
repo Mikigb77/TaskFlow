@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task_attachment.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -453,6 +454,77 @@ void main() {
       );
     }
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P179 (UX-1414) ----
+
+  testWidgets(
+    'UX-1414: a task with notes and steps opened from «Tareas con archivos» at 1× on 360×800 opens with its Archivos heading on screen, without scrolling',
+    (tester) async {
+      final app = await _FilesApp.open(tester, size: const Size(360, 800));
+      final notifier = app.container.read(taskProvider.notifier);
+      final trip = app.container
+          .read(taskProvider)
+          .requireValue
+          .firstWhere((task) => task.id == _FilesApp.trip);
+      await notifier.updateTask(
+        trip.copyWith(
+          dueDate: DateTime.now().add(const Duration(days: 3)),
+          notes:
+              'Llevar el pasaporte y el cargador.\nReservar el traslado al hotel.\nCambiar dinero en el aeropuerto.\nLlamar a la abuela al llegar.',
+          checklist: [
+            for (final (i, step) in [
+              'Facturar la maleta',
+              'Cambiar dinero',
+              'Imprimir la reserva',
+              'Comprar el adaptador',
+              'Avisar al vecino',
+            ].indexed)
+              ChecklistItem(id: 's$i', title: step),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        TasksWithFilesScreen.open(tester.element(find.byType(Scaffold).first)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Viaje'));
+      await tester.pumpAndSettle();
+      final detail = find.byType(TaskDetailScreen);
+      expect(detail, findsOneWidget);
+      final heading = find.descendant(
+        of: detail,
+        matching: find.text(es.attachments.toUpperCase()),
+      );
+      expect(heading, findsOneWidget);
+      final scaffold = tester.widget<Scaffold>(
+        find.descendant(of: detail, matching: find.byType(Scaffold)).first,
+      );
+      final top = tester
+          .getRect(find.descendant(of: detail, matching: find.byType(AppBar)))
+          .bottom;
+      final bottom = scaffold.bottomNavigationBar == null
+          ? 800.0
+          : tester.getRect(find.byWidget(scaffold.bottomNavigationBar!)).top;
+      final rect = tester.getRect(heading);
+      expect(rect.top, greaterThanOrEqualTo(top), reason: 'below the app bar');
+      expect(rect.bottom, lessThanOrEqualTo(bottom), reason: 'above the bar');
+      expect(tester.takeException(), isNull);
+
+      // Opened any other way it starts at its top: the files are further
+      // down, so the check above is the list's doing.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await app.details(tester, _FilesApp.trip);
+      expect(
+        tester.getRect(heading).top,
+        greaterThan(bottom),
+        reason: 'opened from elsewhere, the files sit below the fold',
+      );
+    },
+  );
 }
 
 /// A file, already uploaded, of [megabytes].

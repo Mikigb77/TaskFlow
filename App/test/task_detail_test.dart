@@ -16,8 +16,10 @@ import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_editor.dart';
+import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/widgets/reminder_control.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -735,6 +737,193 @@ void main() {
             Locale(language),
           ).createdBy('Maria Antònia Ferrer i Puigdollers'),
         );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  // ---- Run 2026-10-19-app, round 1 · P179 (UX-1415, UX-1417) ----
+
+  Task withNotesAndSteps() => Task(
+    id: 76,
+    title: 'Ir al médico',
+    dueDate: friday,
+    priority: 1,
+    reminderMinutes: 60,
+    notes: 'Ir en ayunas. Llevar la tarjeta sanitaria y el volante.',
+    checklist: [
+      ChecklistItem(id: 's1', title: 'Pedir el volante'),
+      ChecklistItem(id: 's2', title: 'Cenar ligero la noche antes'),
+      ChecklistItem(id: 's3', title: 'Recoger los resultados'),
+    ],
+  );
+
+  /// The detail of [task], with one file attached.
+  Future<void> openWithFile(
+    WidgetTester tester,
+    Task task, {
+    Size size = const Size(390, 2400),
+  }) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = designContainer(
+      regionalStore: MemoryRegionalStore(
+        const RegionalPreferences(language: 'es'),
+      ),
+      tasks: () => TaskNotifier(_Repository([task])),
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: ProviderScope(
+          overrides: [
+            attachmentEntriesProvider.overrideWith(
+              (ref, id) async => [
+                const AttachmentEntry('Volante.pdf', '/local/volante.pdf', true),
+              ],
+            ),
+          ],
+          child: const MyApp(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _App.detail(tester, task.id!);
+  }
+
+  testWidgets(
+    'UX-1415: the detail reads title, date card, Notas, reminder, Pasos, Archivos, with no «Marcar todos los pasos…» line',
+    (tester) async {
+      final task = withNotesAndSteps();
+      await openWithFile(tester, task);
+      final detail = find.byType(TaskDetailScreen);
+      Finder inDetail(Finder finder) =>
+          find.descendant(of: detail, matching: finder);
+      double top(Finder finder) {
+        expect(finder, findsWidgets);
+        return tester.getRect(finder.first).top;
+      }
+
+      final order = [
+        ('title', top(inDetail(find.text('Ir al médico')))),
+        ('date card', top(inDetail(find.text(es.plannedFor)))),
+        ('Notas', top(inDetail(find.text(es.notes.toUpperCase())))),
+        ('reminder', top(inDetail(find.byType(ReminderChip)))),
+        (
+          'Pasos',
+          top(inDetail(find.text(es.checklistCount(0, 3).toUpperCase()))),
+        ),
+        ('Archivos', top(inDetail(find.text(es.attachments.toUpperCase())))),
+      ];
+      for (var i = 1; i < order.length; i++) {
+        expect(
+          order[i].$2,
+          greaterThan(order[i - 1].$2),
+          reason: '${order[i].$1} comes after ${order[i - 1].$1}',
+        );
+      }
+      expect(anyText('Marcar todos los pasos'), findsNothing);
+      expect(anyText('Mark all steps'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1415: at 1.3× on 360×800 (tasks/detail.notes-steps) a task’s notes show above the fold',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _App.open(
+        tester,
+        [withNotesAndSteps()],
+        size: const Size(360, 800),
+      );
+      await _App.detail(tester, 76);
+      final detail = find.byType(TaskDetailScreen);
+      final scaffold = tester.widget<Scaffold>(
+        find.descendant(of: detail, matching: find.byType(Scaffold)).first,
+      );
+      final fold = scaffold.bottomNavigationBar == null
+          ? 800.0
+          : tester.getRect(find.byWidget(scaffold.bottomNavigationBar!)).top;
+      final notes = find.descendant(
+        of: detail,
+        matching: find.textContaining('Ir en ayunas', findRichText: true),
+      );
+      expect(notes, findsWidgets);
+      expect(
+        tester.getRect(notes.first).top,
+        lessThan(fold - 16),
+        reason: 'the notes start above the Completar bar',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UX-1417: the task page’s title reads Task / Tarea / Tasca', () {
+    expect(lookupAppLocalizations(const Locale('en')).taskScreenTitle, 'Task');
+    expect(es.taskScreenTitle, 'Tarea');
+    expect(lookupAppLocalizations(const Locale('ca')).taskScreenTitle, 'Tasca');
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'UX-1417: at ${scale}x on 360×800 a task’s app bar reads «Tarea», not cut; a note’s reads «Nota»; ✏ and 🗑 are at least 8 dp apart',
+      (tester) async {
+        if (scale != 1) {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        }
+        await _App.open(tester, [
+          plain(),
+          Task(
+            id: 2,
+            title: 'Recetas',
+            kind: 'note',
+            priority: 1,
+            notes: 'Tarta de queso',
+          ),
+        ], size: const Size(360, 800));
+        await _App.detail(tester, 1);
+        final bar = find.byType(AppBar);
+        final title = find.descendant(
+          of: bar,
+          matching: find.text(es.taskScreenTitle),
+        );
+        expect(title, findsOneWidget);
+        expect(anyText('Detalles de la tarea'), findsNothing);
+        final paragraph = tester.renderObject<RenderParagraph>(title);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final whole = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout();
+        expect(
+          paragraph.size.width,
+          greaterThanOrEqualTo(whole.width - 0.5),
+          reason: '«Tarea» shows whole',
+        );
+        whole.dispose();
+        final edit = tester.getRect(
+          find.widgetWithIcon(IconButton, Icons.edit_outlined),
+        );
+        final delete = tester.getRect(
+          find.widgetWithIcon(IconButton, Icons.delete_outline_rounded),
+        );
+        expect(delete.left - edit.right, greaterThanOrEqualTo(8 - 0.5));
+        expect(tester.takeException(), isNull);
+
+        tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+        await tester.pumpAndSettle();
+        await _App.detail(tester, 2);
+        expect(
+          find.descendant(of: find.byType(AppBar), matching: find.text(es.note)),
+          findsOneWidget,
+        );
+        expect(es.note, 'Nota');
         expect(tester.takeException(), isNull);
       },
     );

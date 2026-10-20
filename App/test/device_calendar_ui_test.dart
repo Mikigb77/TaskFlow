@@ -102,4 +102,47 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P179 (UX-1421) ----
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+        'UX-1421: the phone events sheet’s rows don’t say «Evento del calendario · solo lectura» ($language)',
+        (tester) async {
+      final l = lookupAppLocalizations(Locale(language));
+      final bridge = FakeDeviceCalendars();
+      final container = ProviderContainer(overrides: [
+        deviceCalendarsProvider.overrideWithValue(bridge),
+        calendarPreferenceStoreProvider.overrideWithValue(
+            MemoryCalendarPreferences(CalendarPreferences(
+                enabled: true, selected: {workCalendar.selectionKey}))),
+      ]);
+      addTearDown(() {
+        container.dispose();
+        bridge.close();
+      });
+      await container.read(deviceCalendarProvider.notifier).ready;
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: Scaffold(
+                  body: DeviceCalendarEvents(day: DateTime(2026, 9, 22))))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('calendar-events-line')));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(sheet, findsOneWidget);
+      final row = find.descendant(
+          of: sheet, matching: find.widgetWithText(ListTile, 'Calendar appointment'));
+      expect(row, findsOneWidget);
+      expect(find.descendant(of: sheet, matching: find.textContaining(l.calendarReadOnly)),
+          findsNothing);
+      expect(find.textContaining('solo lectura'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 }

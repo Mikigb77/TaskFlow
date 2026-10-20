@@ -6,6 +6,7 @@ import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/providers/invitations_provider.dart';
+import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/services/reminder_preferences.dart';
@@ -52,7 +53,11 @@ const completedTasks = Screen(
   'calendar',
   'completed',
   'Completed tasks (`/completedTasks`)',
-  sources: ['lib/screens/completed_tasks_screen.dart', 'lib/widgets/task_tile.dart'],
+  sources: [
+    'lib/screens/completed_tasks_screen.dart',
+    'lib/screens/home_screen.dart',
+    'lib/widgets/task_tile.dart',
+  ],
 );
 
 /// Tasks on other days only: today is free.
@@ -280,7 +285,7 @@ void calendarPreviews() {
       agenda,
       'added',
       'Three dictated tasks just added: Calendar shows them lit, with the message and Deshacer.',
-      [es1, es2, ca2, es1Wide],
+      [es1, es2, ca2, es1Wide, esDark],
       (p) async {
         // A day doesn't hold the same task twice at the same time: leave out
         // the day's own 17:00 «Recoger…», which the answer adds again.
@@ -374,9 +379,33 @@ void calendarPreviews() {
       timeline,
       'normal',
       'Today hour by hour.',
-      everywhere,
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.push('/timeline', arguments: previewToday);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      timeline,
+      'untimed',
+      'Today with a task that has no time: «Sin hora» stays above the hours, with the first timed task.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 30,
+              title: 'Pagar la factura de la luz',
+              dueDate: day(0),
+              hasTime: false,
+              priority: 2,
+            ),
+          ],
+        );
         await app.push('/timeline', arguments: previewToday);
         await p.shoot();
       },
@@ -410,6 +439,70 @@ void calendarPreviews() {
           projects: allProjects,
         );
         await app.push('/completedTasks');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      completedTasks,
+      'project',
+      'From the ✓ on «Matemáticas»: only its completed tasks, its name under the title.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            ...sharedProjectTasks().where((t) => t.isCompleted),
+          ],
+          projects: allProjects,
+        );
+        await app.tab(p.l.tasks);
+        await app.pushPage(
+          const HomeScreen(isRoot: false, listId: 'matematicas'),
+        );
+        await p.tester.tap(find.byTooltip(p.l.completedTasks));
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      completedTasks,
+      'project-person',
+      'From the ✓ on «Matemáticas» with «Ana» on: only what Ana finished there, «Matemáticas · Ana» under the title.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            ...sharedProjectTasks(),
+            Task(
+              id: 35,
+              title: 'Corregir el examen del tema 3',
+              dueDate: day(-2),
+              hasTime: false,
+              priority: 2,
+              listId: 'matematicas',
+              assignment: 'member',
+              assigneeId: ana,
+              assigneeName: 'Ana',
+              createdBy: paul,
+              createdByName: 'Paul',
+              isCompleted: true,
+            ),
+          ],
+          projects: allProjects,
+        );
+        await app.tab(p.l.tasks);
+        await app.pushPage(
+          const HomeScreen(isRoot: false, listId: 'matematicas'),
+        );
+        await p.tester.tap(find.widgetWithText(ChoiceChip, 'Ana').first);
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(find.byTooltip(p.l.completedTasks));
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

@@ -175,10 +175,6 @@ class TaskPlanningControl extends StatelessWidget {
                 ? null
                 : (value) => onChanged!(task.copyWith(reminderAnchor: value)),
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(l.reminderAnchorHelp),
-          ),
         ],
         if (task.plannedAfterDeadline)
           MessageBanner(l.deadlineLatePlan, icon: Icons.info_outline),

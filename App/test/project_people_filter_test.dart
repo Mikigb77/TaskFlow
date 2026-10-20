@@ -664,10 +664,10 @@ void main() {
   );
 
   testWidgets(
-    'UX-1101: on the root Tareas page Tareas completadas is still beside «Proyectos», not in the app bar',
+    'UX-1101: on the root Tareas page «Completadas» is still beside «Proyectos», not in the app bar',
     (tester) async {
       await openProject(tester, home: const HomeScreen());
-      final completed = find.byTooltip(es.completedTasks);
+      final completed = find.widgetWithText(TextButton, es.completedButton);
       expect(completed, findsOneWidget);
       expect(
         find.ancestor(of: completed, matching: find.byType(AppBar)),

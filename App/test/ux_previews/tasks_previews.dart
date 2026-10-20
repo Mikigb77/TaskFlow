@@ -41,6 +41,7 @@ const projectPage = Screen(
     'lib/widgets/project_scope_control.dart',
     'lib/widgets/project_preferences.dart',
     'lib/widgets/task_tile.dart',
+    'lib/widgets/task_list.dart',
     'lib/widgets/task_actions.dart',
   ],
 );
@@ -56,6 +57,7 @@ const detail = Screen(
     'lib/widgets/checklist_editor.dart',
     'lib/widgets/attachment_panel.dart',
     'lib/widgets/task_assignment_picker.dart',
+    'lib/widgets/task_list_picker.dart',
   ],
 );
 
@@ -107,6 +109,21 @@ final _choir = TaskListInfo(
   version: 1,
   role: 'editor',
   shared: true,
+);
+
+/// Ana's shared project, which this account can only view.
+final _choirToView = TaskListInfo(
+  id: 'coro',
+  name: 'Coro',
+  color: 'rose',
+  version: 1,
+  role: 'viewer',
+  shared: true,
+  ownerId: ana,
+  people: const [
+    ProjectMember(id: ana, name: 'Ana', role: 'owner'),
+    ProjectMember(id: me, name: 'María', role: 'viewer'),
+  ],
 );
 
 /// Tasks and a note holding files; the choir's isn't this account's.
@@ -201,23 +218,21 @@ void tasksPreviews() {
       'Today\'s filter on an ordinary day with projects shared and not.',
       [...mainScreen, ca2],
       (p) async {
-        final app = await PreviewApp.open(p, tasks: busyDay(), projects: allProjects);
+        final app = await PreviewApp.open(
+          p,
+          tasks: busyDay(),
+          projects: allProjects,
+        );
         await app.tab(p.l.tasks);
         await p.shoot();
       },
     );
 
-    preview(
-      tasksTab,
-      'empty',
-      'No tasks at all.',
-      everywhere,
-      (p) async {
-        final app = await PreviewApp.open(p);
-        await app.tab(p.l.tasks);
-        await p.shoot();
-      },
-    );
+    preview(tasksTab, 'empty', 'No tasks at all.', everywhere, (p) async {
+      final app = await PreviewApp.open(p);
+      await app.tab(p.l.tasks);
+      await p.shoot();
+    });
 
     preview(
       tasksTab,
@@ -225,7 +240,11 @@ void tasksPreviews() {
       'The tasks with no date (`/inbox`, Tareas filtered to Sin fecha).',
       [es1],
       (p) async {
-        final app = await PreviewApp.open(p, tasks: busyDay(), projects: allProjects);
+        final app = await PreviewApp.open(
+          p,
+          tasks: busyDay(),
+          projects: allProjects,
+        );
         await app.push('/inbox');
         await p.shoot();
       },
@@ -328,6 +347,42 @@ void tasksPreviews() {
       },
     );
 
+    preview(
+      projectPage,
+      'viewer',
+      'Ana’s «Coro», which this account can only view: rows with no circle, each one button that opens the task.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 76,
+              title: 'Comer con Ana',
+              dueDate: day(0, 13, 30),
+              priority: 1,
+              listId: 'coro',
+              assignment: 'group',
+            ),
+            Task(
+              id: 77,
+              title: 'Ensayo general del concierto',
+              dueDate: day(3, 19),
+              priority: 2,
+              listId: 'coro',
+              assignment: 'member',
+              assigneeId: ana,
+              assigneeName: 'Ana',
+            ),
+          ],
+          projects: [...allProjects, _choirToView],
+        );
+        await _openProject(app, 'coro');
+        await p.shoot();
+      },
+    );
+
     // ------------------------------------------------------------ detail
     preview(
       detail,
@@ -363,9 +418,7 @@ void tasksPreviews() {
               recurrence: 'daily',
               reminderMinutes: 0,
               notes: 'Después de cenar, con un vaso de agua.',
-              checklist: [
-                ChecklistItem(id: 'p1', title: 'Apuntar la tensión'),
-              ],
+              checklist: [ChecklistItem(id: 'p1', title: 'Apuntar la tensión')],
             ),
           ],
           projects: allProjects,
@@ -411,13 +464,99 @@ void tasksPreviews() {
           ],
         );
         await app.push('/taskDetails', arguments: 80);
-        // The file's message and its buttons, further down the details.
+        // The file's message and its buttons, the removal last.
         await p.tester.scrollUntilVisible(
-          find.text(p.l.storageSeeTasks),
+          find.text(p.l.fileRemove),
           200,
           scrollable: app.mainScroll(),
         );
         await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
+      'from-files-list',
+      'Opened from «Tareas con archivos»: a task with notes and steps opens with its Archivos section in view.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            for (final task in _fileTasks())
+              task.id == 80
+                  ? task.copyWith(
+                      notes:
+                          'Llevar el pasaporte y el cargador.\nReservar el traslado al hotel.',
+                      checklist: [
+                        ChecklistItem(id: 'l1', title: 'Facturar la maleta'),
+                        ChecklistItem(id: 'l2', title: 'Cambiar dinero'),
+                        ChecklistItem(id: 'l3', title: 'Imprimir la reserva'),
+                      ],
+                    )
+                  : task,
+          ],
+          projects: [...allProjects, _choir],
+          pro: false,
+          user: account(storageMb: 100),
+          overrides: [
+            taskRepositoryProvider.overrideWithValue(_FileTasks(_fileUsage)),
+            attachmentEntriesProvider.overrideWith(
+              (ref, taskId) async => [
+                if (taskId == 80)
+                  const AttachmentEntry(
+                    'Billetes de avión.pdf',
+                    '/preview/billetes.pdf',
+                    true,
+                    item: TaskAttachment(
+                      id: 'refused',
+                      taskId: 'viaje',
+                      name: 'Billetes de avión.pdf',
+                      size: 2 * _megabyte,
+                      sha256: '',
+                      uploadPending: true,
+                      error: TaskAttachment.storageFull,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        );
+        await app.pushPage(const TasksWithFilesScreen());
+        await app.tap('Viaje a Lisboa');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
+      'notes-steps',
+      'A task with notes, a reminder and three steps: the notes come right after the date.',
+      [es1, es13, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 76,
+              title: 'Ir al médico',
+              dueDate: day(1, 9),
+              priority: 1,
+              reminderMinutes: 60,
+              notes: 'Ir en ayunas. Llevar la tarjeta sanitaria y el volante.',
+              checklist: [
+                ChecklistItem(id: 's1', title: 'Pedir el volante'),
+                ChecklistItem(id: 's2', title: 'Cenar ligero la noche antes'),
+                ChecklistItem(id: 's3', title: 'Recoger los resultados'),
+              ],
+            ),
+          ],
+          projects: allProjects,
+        );
+        await app.push('/taskDetails', arguments: 76);
         await p.shoot();
       },
     );
@@ -470,7 +609,11 @@ void tasksPreviews() {
       (p) async {
         final app = await PreviewApp.open(
           p,
-          tasks: [...normalDay(), ...sharedProjectTasks(), ..._excursionTasks()],
+          tasks: [
+            ...normalDay(),
+            ...sharedProjectTasks(),
+            ..._excursionTasks(),
+          ],
           projects: allProjects,
         );
         await app.push('/lists');
@@ -478,16 +621,10 @@ void tasksPreviews() {
       },
     );
 
-    preview(
-      projects,
-      'empty',
-      'No projects yet.',
-      [es1],
-      (p) async {
-        final app = await PreviewApp.open(p, tasks: normalDay());
-        await app.push('/lists');
-        await p.shoot();
-      },
-    );
+    preview(projects, 'empty', 'No projects yet.', [es1], (p) async {
+      final app = await PreviewApp.open(p, tasks: normalDay());
+      await app.push('/lists');
+      await p.shoot();
+    });
   });
 }

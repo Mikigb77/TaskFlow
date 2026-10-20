@@ -7,7 +7,9 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
+import 'package:agenda/providers/shell_tab_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -69,6 +71,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // Room under the last row, grown to the save message's height so a new
   // task at the end can still scroll clear of it.
   double _listEnd = 100;
+  // Rows seen open on this page, by task occurrence. One ticked here keeps
+  // its place, struck through, until the person leaves the tab or the page,
+  // or changes the search or a filter: Calendar's rule.
+  final _openHere = <String>{};
 
   @override
   void initState() {
@@ -154,6 +160,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .toList();
   }
 
+  static final _sideButton = TextButton.styleFrom(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+  );
+
+  static String _row(Task task) => '${task.id}:${task.occurrenceId}';
+
+  /// The rows this page shows: [open], and the tasks ticked here since the
+  /// list last changed, struck through where they were. A repeating task's
+  /// next occurrence waits until its ticked one goes.
+  List<Task> _rows(List<Task> all, List<Task> open) {
+    final ticked = <Task>[];
+    for (final task in all) {
+      if (task.isNote) continue;
+      if (task.isRecurring) {
+        for (final key in task.completedDates) {
+          if (!_openHere.contains('${task.id}:$key')) continue;
+          final done = task.completedOccurrence(key);
+          if (done != null) ticked.add(done);
+        }
+      } else if (task.isCompleted && _openHere.contains(_row(task))) {
+        ticked.add(task);
+      }
+    }
+    final waiting = {for (final task in ticked) task.id};
+    final shown = open
+        .where(
+          (task) =>
+              !waiting.contains(task.id) || _openHere.contains(_row(task)),
+        )
+        .toList();
+    _openHere.addAll(shown.map(_row));
+    // In the tasks' own order, so a ticked row keeps its place among rows
+    // the list's sort ranks the same, as undated ones.
+    final at = {for (final (i, task) in all.indexed) task.id: i};
+    final rows = [...shown, ...ticked].indexed.toList()
+      ..sort((a, b) {
+        final order = at[a.$2.id]!.compareTo(at[b.$2.id]!);
+        return order != 0 ? order : a.$1.compareTo(b.$1);
+      });
+    return [for (final (_, task) in rows) task];
+  }
+
+  /// Changes the search or a filter: a row ticked before then goes.
+  void _refilter(VoidCallback change) => setState(() {
+    change();
+    _openHere.clear();
+  });
+
   /// What this page lists: its own project and `Para mí` choice, or else
   /// the app-wide ones.
   ProjectScope _scope(ProjectScope global) => widget.listId == null
@@ -207,10 +261,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _query = '';
             _label = null;
             if (widget.isRoot) _filter = 0;
+            _openHere.clear();
           }
           if (everyone) {
             _team = true;
             _person = null;
+            _openHere.clear();
           }
           if (widen) scope = wider;
           break;
@@ -351,6 +407,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
       if (focus != null && identical(focus.page, this)) _land(focus);
     });
+    // Another tab, or another project chosen: a row ticked before goes.
+    ref.listen<int>(shellTabSwitchesProvider, (_, __) {
+      setState(_openHere.clear);
+    });
+    ref.listen<ProjectScope>(projectScopeProvider, (_, __) {
+      setState(_openHere.clear);
+    });
+    // The page is covered by another screen: the person has left it.
+    if (!TickerMode.valuesOf(context).enabled) _openHere.clear();
     final tasks = ref.watch(taskProvider);
     final scope = _scope(ref.watch(projectScopeProvider));
     // The list below filters by the account; watching it keeps it current.
@@ -368,9 +433,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final labels =
         (tasks.valueOrNull ?? []).expand((task) => task.labels).toSet().toList()
           ..sort();
+    final all = tasks.valueOrNull;
+    final rows = all == null
+        ? null
+        : _rows(
+            all,
+            _visible(all, filter: _filter, query: _query, label: _label),
+          );
+    final filtering =
+        _query.isNotEmpty ||
+        _label != null ||
+        (widget.isRoot && _filter != 0) ||
+        (widget.listId != null && (!_team || _personShown != null));
+    // Nothing to search or filter yet: the empty state says what to do. A
+    // row ticked moments ago still counts, so the header doesn't jump.
+    final quiet = widget.isRoot && !filtering && rows?.isEmpty != false;
+    // «Prioridad alta» only while it would find something, or is chosen.
+    final urgent =
+        _filter == 2 ||
+        (all != null &&
+            [
+              ..._visible(all, filter: 0, query: '', label: null),
+              ...?rows,
+            ].any((task) => task.priority == 3));
+    // A project page's ✓ lists what was done there, for the person shown.
     final completed = IconButton(
       tooltip: context.l10n.completedTasks,
-      onPressed: () => Navigator.pushNamed(context, '/completedTasks'),
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => CompletedTasksScreen(
+            listId: widget.listId,
+            team: _team,
+            person: _personShown,
+          ),
+        ),
+      ),
       icon: const Icon(Icons.task_alt_rounded),
     );
     // A project the user can only view, or one that's gone, gets the read-only
@@ -388,7 +486,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: CustomAppBar(
         title: title,
         isRoot: widget.isRoot,
-        actions: [if (!widget.isRoot) completed],
+        actions: [if (widget.listId != null) completed],
       ),
       body: NestedScrollView(
         key: _nested,
@@ -409,21 +507,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           fixedProjectId: widget.listId,
                           team: _team,
-                          onTeamChanged: (team) => setState(() => _team = team),
+                          onTeamChanged: (team) =>
+                              _refilter(() => _team = team),
                           person: _person,
-                          onPeopleChanged: (team, person) => setState(() {
+                          onPeopleChanged: (team, person) => _refilter(() {
                             _team = team;
                             _person = person;
                           }),
                         ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 12),
+                        SizedBox(height: widget.isRoot ? 8 : 12),
                         // The app bar names a project or the Inbox: no headline
                         // repeats it.
+                        // Narrower than a TextButton's own 12 dp sides, so both
+                        // fit beside the headline at 1× in Spanish.
                         if (widget.isRoot)
                           Wrap(
                             alignment: WrapAlignment.spaceBetween,
@@ -431,31 +532,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             children: [
                               Text(
                                 context.l10n.yourTasks,
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineLarge,
+                                style: Theme.of(context).textTheme.titleLarge,
                               ),
                               Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
                                 crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   TextButton(
+                                    style: _sideButton,
                                     onPressed: () =>
                                         Navigator.pushNamed(context, '/lists'),
                                     child: Text(context.l10n.lists),
                                   ),
-                                  completed,
+                                  TextButton(
+                                    style: _sideButton,
+                                    onPressed: () => Navigator.pushNamed(
+                                      context,
+                                      '/completedTasks',
+                                    ),
+                                    child: Text(context.l10n.completedButton),
+                                  ),
                                 ],
                               ),
                             ],
                           ),
-                        // Elsewhere ✓ is in the app bar.
                         if (widget.isRoot || list?.inactive == true) ...[
                           if (!widget.isRoot)
                             Text(
                               context.l10n.archivedList,
                               style: TextStyle(color: colors.onSurfaceVariant),
                             ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: widget.isRoot ? 8 : 16),
                         ],
                         // The owner can share a project of their own from here.
                         if (list != null &&
@@ -506,38 +614,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                           ),
-                        TextField(
-                          controller: _search,
-                          onChanged: (value) =>
-                              setState(() => _query = value.trim()),
-                          decoration: InputDecoration(
-                            hintText: context.l10n.findTask,
-                            prefixIcon: const Icon(Icons.search_rounded),
-                            isDense: true,
+                        if (!quiet) ...[
+                          TextField(
+                            controller: _search,
+                            onChanged: (value) =>
+                                _refilter(() => _query = value.trim()),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.findTask,
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              isDense: true,
+                              // 48 dp at 1×: a line above the tasks, not a form.
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 12,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (widget.isRoot)
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              for (final entry in [
-                                (0, context.l10n.allTasks),
-                                (3, context.l10n.inbox),
-                                (1, context.l10n.today),
-                                (2, context.l10n.highPriority),
-                              ])
-                                ChoiceChip(
-                                  label: Text(entry.$2),
-                                  selected: _filter == entry.$1,
-                                  onSelected: (_) =>
-                                      setState(() => _filter = entry.$1),
-                                ),
-                            ],
-                          ),
-                        if (labels.isNotEmpty)
-                          DropdownButton<String>(
+                          SizedBox(height: widget.isRoot ? 8 : 12),
+                        ],
+                      ],
+                    ),
+                  ),
+                  // One row, full width: when the chips don't fit, it
+                  // scrolls sideways and the next chip shows cut at the
+                  // screen's edge. None chosen lists everything.
+                  if (widget.isRoot && !quiet)
+                    SingleChildScrollView(
+                      key: const ValueKey('task-filters'),
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final (filter, name) in [
+                            (3, context.l10n.inbox),
+                            (1, context.l10n.today),
+                            if (urgent) (2, context.l10n.highPriority),
+                          ])
+                            FilterChip(
+                              label: Text(name),
+                              selected: _filter == filter,
+                              onSelected: (on) =>
+                                  _refilter(() => _filter = on ? filter : 0),
+                            ),
+                        ],
+                      ),
+                    ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      0,
+                      24,
+                      widget.isRoot ? 12 : 20,
+                    ),
+                    child: labels.isEmpty
+                        ? null
+                        : DropdownButton<String>(
                             hint: Text(context.l10n.filterLabel),
                             value: labels.contains(_label) ? _label : null,
                             isExpanded: true,
@@ -552,12 +684,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   child: Text('#$label'),
                                 ),
                             ],
-                            onChanged: (value) => setState(
+                            onChanged: (value) => _refilter(
                               () => _label = value == '' ? null : value,
                             ),
                           ),
-                      ],
-                    ),
                   ),
                 ],
               ),
@@ -565,13 +695,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
         body: tasks.when(
-          data: (all) {
-            final filtered = _visible(
-              all,
-              filter: _filter,
-              query: _query,
-              label: _label,
-            );
+          data: (_) {
+            final filtered = rows ?? const <Task>[];
             if (_landingIds.isNotEmpty &&
                 filtered.any((task) => _landingIds.contains(task.id))) {
               _landedIds = _landingIds;
@@ -580,11 +705,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
             }
             if (filtered.isEmpty) {
-              final filtering =
-                  _query.isNotEmpty ||
-                  _label != null ||
-                  (widget.isRoot && _filter != 0) ||
-                  (widget.listId != null && (!_team || _personShown != null));
               // Only a person's chip on: nothing was searched, so it says
               // whose tasks are missing.
               final person =
@@ -631,6 +751,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 lit: _highlight,
                 landedRow: _landedRow,
                 bottomPadding: _listEnd,
+                project: widget.listId,
+                // Under Sin fecha, as a page or a filter, rows don't each
+                // say so.
+                showUndated: _filter != 3,
               ),
             );
           },

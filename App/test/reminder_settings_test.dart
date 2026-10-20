@@ -17,6 +17,8 @@ import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
+import 'package:agenda/models/task_list_info.dart';
 import 'support/design_fixtures.dart';
 import 'support/reminder_fixtures.dart';
 
@@ -365,17 +367,14 @@ void main() {
       },
     );
 
-    test(
-      'UX-435 / UX-436 / UX-438: the new copy in English and Catalan',
-      () {
-        final en = lookupAppLocalizations(const Locale('en'));
-        final ca = lookupAppLocalizations(const Locale('ca'));
-        expect(en.allowPreciseAlarms, 'Allow “Alarms & reminders”');
-        expect(en.remindersOnConfirmation, 'Done. Reminders are on.');
-        expect(ca.allowPreciseAlarms, 'Permet «Alarmes i recordatoris»');
-        expect(ca.remindersOnConfirmation, 'Fet. Recordatoris activats.');
-      },
-    );
+    test('UX-435 / UX-436 / UX-438: the new copy in English and Catalan', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(en.allowPreciseAlarms, 'Allow “Alarms & reminders”');
+      expect(en.remindersOnConfirmation, 'Done. Reminders are on.');
+      expect(ca.allowPreciseAlarms, 'Permet «Alarmes i recordatoris»');
+      expect(ca.remindersOnConfirmation, 'Fet. Recordatoris activats.');
+    });
 
     testWidgets(
       'UX-210: chip → 1 hora antes applies, closes the list and the chip reads it',
@@ -640,6 +639,648 @@ void main() {
         );
         expect(planned, hasLength(1));
         expect(planned.single.when, DateTime(2026, 10, 14, 9));
+      },
+    );
+  });
+
+  // ---- Run 2026-10-19-app, round 1 · P177: when a reminder won't come ----
+  group('P177', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final at10 = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10);
+    final dateOnly = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+    const on = ReminderPreferences(enabled: true, asked: true);
+
+    // María (account 1) owns «Matemáticas»; Ana (2) is in it.
+    TaskListInfo project({
+      String notifications = 'all',
+      bool archived = false,
+    }) => TaskListInfo(
+      id: 'matematicas',
+      name: 'Matemáticas',
+      version: 3,
+      role: 'owner',
+      shared: true,
+      ownerId: 1,
+      notifications: notifications,
+      archived: archived,
+      people: const [
+        ProjectMember(id: 1, name: 'María', role: 'owner'),
+        ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+      ],
+    );
+    final anas = Task(
+      id: 31,
+      title: 'Corregir los ejercicios del tema 4',
+      dueDate: at10,
+      priority: 2,
+      listId: 'matematicas',
+      assignment: 'member',
+      assigneeId: 2,
+      assigneeName: 'Ana',
+    );
+    final mine = Task(
+      id: 32,
+      title: 'Preparar el examen',
+      dueDate: at10,
+      priority: 1,
+      listId: 'matematicas',
+      assignment: 'member',
+      assigneeId: 1,
+      assigneeName: 'María',
+    );
+
+    ProviderContainer container({
+      List<TaskListInfo> projects = const [],
+      ReminderPreferences preferences = on,
+      String language = 'es',
+    }) {
+      final made = designContainer(
+        projects: projects,
+        regionalStore: MemoryRegionalStore(
+          RegionalPreferences(
+            language: language,
+            clock: ClockFormat.twentyFour,
+            weekStart: 1,
+          ),
+        ),
+        overrides: reminderOverrides(
+          MemoryReminderStore(preferences),
+          FakeReminderAccess(allowed: true),
+        ),
+      );
+      addTearDown(made.dispose);
+      return made;
+    }
+
+    Future<ValueNotifier<Task>> pumpChip(
+      WidgetTester tester,
+      Task task, {
+      List<TaskListInfo> projects = const [],
+      ReminderPreferences preferences = on,
+      String language = 'es',
+    }) async {
+      final value = ValueNotifier(task);
+      addTearDown(value.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container(
+            projects: projects,
+            preferences: preferences,
+            language: language,
+          ),
+          child: MaterialApp(
+            locale: Locale(language),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(alwaysUse24HourFormat: true),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ValueListenableBuilder<Task>(
+                  valueListenable: value,
+                  builder: (context, task, _) => ReminderChip(
+                    task: task,
+                    onChanged: (changed) => value.value = changed,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return value;
+    }
+
+    String chipLabel(WidgetTester tester) {
+      final texts = tester.widgetList<Text>(
+        find.descendant(
+          of: find.byType(ReminderChip),
+          matching: find.byType(Text),
+        ),
+      );
+      return texts.map((text) => text.data ?? '').join();
+    }
+
+    test('UX-1505: the three readings in EN, ES and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        en.reminderForPerson('Ana', '10 minutes before'),
+        'Reminder for Ana: 10 minutes before',
+      );
+      expect(
+        es.reminderForPerson('Ana', '10 minutos antes'),
+        'Recordatorio para Ana: 10 minutos antes',
+      );
+      expect(
+        ca.reminderForPerson('Ana', '10 minuts abans'),
+        'Recordatori per a Ana: 10 minuts abans',
+      );
+      expect(en.noReminderProjectMuted, 'No reminder: project muted');
+      expect(
+        es.noReminderProjectMuted,
+        'Sin recordatorio: proyecto silenciado',
+      );
+      expect(
+        ca.noReminderProjectMuted,
+        'Sense recordatori: projecte silenciat',
+      );
+      expect(en.noReminderProjectArchived, 'No reminder: project archived');
+      expect(
+        es.noReminderProjectArchived,
+        'Sin recordatorio: proyecto archivado',
+      );
+      expect(
+        ca.noReminderProjectArchived,
+        'Sense recordatori: projecte arxivat',
+      );
+    });
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-1505, UX-1634: Ana’s task viewed by María, following the default, reads «Recordatorio para Ana» ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await pumpChip(
+            tester,
+            anas,
+            projects: [project()],
+            language: language,
+          );
+          expect(chipLabel(tester), l.reminderForPersonOnly('Ana'));
+          expect(
+            chipLabel(tester),
+            isNot(l.reminderValue(l.minutesBefore(10))),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1505: a task in a muted project reads «Sin recordatorio: proyecto silenciado», and a tap opens that project’s «Novedades del proyecto»',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await pumpChip(
+          tester,
+          mine,
+          projects: [project(notifications: 'muted')],
+        );
+        expect(chipLabel(tester), es.noReminderProjectMuted);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.text(es.projectNotifications),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: sheet, matching: find.text('Matemáticas')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.updatesMuted)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1505: a task in an archived project reads «Sin recordatorio: proyecto archivado», and a tap does nothing',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        final task = await pumpChip(
+          tester,
+          mine,
+          projects: [project(archived: true)],
+        );
+        expect(chipLabel(tester), es.noReminderProjectArchived);
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(task.value.reminderMinutes, mine.reminderMinutes);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (name, task) in [
+      ('a task of this account in an active, unmuted project', mine),
+      (
+        'a personal task',
+        Task(id: 9, title: 'Médico', priority: 1, dueDate: at10),
+      ),
+    ]) {
+      testWidgets('UX-1505: $name reads as before', (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await pumpChip(tester, task, projects: [project()]);
+        expect(chipLabel(tester), es.reminderValue(es.minutesBefore(10)));
+        expect(
+          find.descendant(
+            of: find.byType(ReminderChip),
+            matching: find.byIcon(Icons.notifications_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    /// The edit form for [task], with its Recordatorio row in view.
+    Future<Finder> pumpForm(
+      WidgetTester tester,
+      Task task, {
+      List<TaskListInfo> projects = const [],
+    }) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container(projects: projects),
+          child: const MyApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator).first)
+            .push(
+              MaterialPageRoute<void>(builder: (_) => TaskEditor(task: task)),
+            ),
+      );
+      await tester.pumpAndSettle();
+      final more = find.byKey(const ValueKey('task-more-details'));
+      if (more.evaluate().isNotEmpty) {
+        await tester.ensureVisible(more);
+        await tester.pumpAndSettle();
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+      }
+      final es = lookupAppLocalizations(const Locale('es'));
+      final row = find.widgetWithText(ListTile, es.reminder);
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      return row;
+    }
+
+    for (final (name, task, projects, reading) in [
+      (
+        'Ana’s task viewed by María',
+        anas,
+        [project()],
+        // Ana's phone uses her own default, which this phone doesn't know.
+        (AppLocalizations l) => l.reminderForPersonOnly('Ana'),
+      ),
+      (
+        'a task in a muted project',
+        mine,
+        [project(notifications: 'muted')],
+        (AppLocalizations l) => l.noReminderProjectMuted,
+      ),
+      (
+        'a task in an archived project',
+        mine,
+        [project(archived: true)],
+        (AppLocalizations l) => l.noReminderProjectArchived,
+      ),
+    ]) {
+      testWidgets(
+        'UX-1505: the edit form’s Recordatorio row says the same for $name',
+        (tester) async {
+          final es = lookupAppLocalizations(const Locale('es'));
+          final row = await pumpForm(tester, task, projects: projects);
+          final subtitle =
+              (tester.widget<ListTile>(row).subtitle! as Text).data;
+          expect(subtitle, reading(es));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ---- Run 2026-10-19-app, round 2 · P203 (UX-1634): someone else's
+    // reminder names a time only when the task sets its own ----
+
+    test('UX-1634: «Recordatorio para {name}» reads as the plan wrote it', () {
+      expect(
+        lookupAppLocalizations(const Locale('en')).reminderForPersonOnly('Ana'),
+        'Reminder for Ana',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('es')).reminderForPersonOnly('Ana'),
+        'Recordatorio para Ana',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('ca')).reminderForPersonOnly('Ana'),
+        'Recordatori per a Ana',
+      );
+    });
+
+    for (final (language, followsDefault, ownLead) in [
+      ('es', 'Recordatorio para Ana', 'Recordatorio para Ana: 30 minutos antes'),
+      ('en', 'Reminder for Ana', 'Reminder for Ana: 30 minutes before'),
+      ('ca', 'Recordatori per a Ana', 'Recordatori per a Ana: 30 minuts abans'),
+    ]) {
+      testWidgets(
+        'UX-1634: Ana’s timed task viewed by María reads «$followsDefault» with no reminder of its own, and «$ownLead» with 30 minutes set ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await pumpChip(
+            tester,
+            anas,
+            projects: [project()],
+            language: language,
+          );
+          expect(chipLabel(tester), followsDefault);
+          expect(chipLabel(tester), l.reminderForPersonOnly('Ana'));
+          expect(chipLabel(tester), isNot(contains(l.minutesBefore(10))));
+          await pumpChip(
+            tester,
+            anas.copyWith(reminderMinutes: 30),
+            projects: [project()],
+            language: language,
+          );
+          expect(chipLabel(tester), ownLead);
+          expect(
+            chipLabel(tester),
+            l.reminderForPerson('Ana', l.minutesBefore(30)),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    final anasDateOnly = Task(
+      id: 33,
+      title: 'Traer el material de geometría',
+      dueDate: dateOnly,
+      hasTime: false,
+      priority: 1,
+      listId: 'matematicas',
+      assignment: 'member',
+      assigneeId: 2,
+      assigneeName: 'Ana',
+    );
+
+    testWidgets(
+      'UX-1634: Ana’s date-only task reads «Recordatorio para Ana» with no time of its own, and «Recordatorio para Ana: 8:00» with 8:00 set',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await pumpChip(tester, anasDateOnly, projects: [project()]);
+        expect(chipLabel(tester), 'Recordatorio para Ana');
+        expect(chipLabel(tester), isNot(contains('9:00')));
+        await pumpChip(
+          tester,
+          anasDateOnly.copyWith(reminderTime: 8 * 60),
+          projects: [project()],
+        );
+        // 8:00 as this phone writes the time.
+        final eight = tester
+            .element(find.byType(ReminderChip))
+            .clockTime(DateTime(2000, 1, 1, 8));
+        expect(eight, anyOf('8:00', '08:00'));
+        expect(chipLabel(tester), 'Recordatorio para Ana: $eight');
+        // Off on the task itself is the task's own: it still says so.
+        await pumpChip(
+          tester,
+          anasDateOnly.copyWith(reminderMinutes: -1),
+          projects: [project()],
+        );
+        expect(chipLabel(tester), es.reminderForPerson('Ana', es.off));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (name, task, reading) in [
+      (
+        'Ana’s timed task with no reminder of its own',
+        anas,
+        'Recordatorio para Ana',
+      ),
+      (
+        'Ana’s timed task with 30 minutes set',
+        anas.copyWith(reminderMinutes: 30),
+        'Recordatorio para Ana: 30 minutos antes',
+      ),
+      (
+        'Ana’s date-only task with no time of its own',
+        anasDateOnly,
+        'Recordatorio para Ana',
+      ),
+      (
+        'Ana’s date-only task with 8:00 set',
+        anasDateOnly.copyWith(reminderTime: 8 * 60),
+        'Recordatorio para Ana: 8:00',
+      ),
+    ]) {
+      testWidgets(
+        'UX-1634: the edit form’s Recordatorio row reads «$reading» for $name, with no «predeterminado»',
+        (tester) async {
+          final es = lookupAppLocalizations(const Locale('es'));
+          final row = await pumpForm(tester, task, projects: [project()]);
+          final subtitle =
+              (tester.widget<ListTile>(row).subtitle! as Text).data!;
+          // 8:00 as this phone writes the time.
+          final eight = tester
+              .element(row)
+              .clockTime(DateTime(2000, 1, 1, 8));
+          expect(subtitle, reading.replaceFirst('8:00', eight));
+          expect(subtitle, isNot(contains(es.defaultChoice)));
+          expect(subtitle.toLowerCase(), isNot(contains('predeterminado')));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1634: a task of this account still reads «Recordatorio: 10 minutos antes» with a 10-minute default',
+      (tester) async {
+        await pumpChip(tester, mine, projects: [project()]);
+        expect(chipLabel(tester), 'Recordatorio: 10 minutos antes');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1413: the chooser for a timed task with a 10-minute default lists 6 rows, the first «10 minutos antes · predeterminado» and selected, no other «10 minutos antes», no «Usar valor predeterminado»',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await pumpChip(
+          tester,
+          Task(id: 9, title: 'Médico', priority: 1, dueDate: at10),
+        );
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        final rows = tester
+            .widgetList<ListTile>(
+              find.descendant(of: sheet, matching: find.byType(ListTile)),
+            )
+            .toList();
+        expect(rows, hasLength(6));
+        final first = rows.first;
+        expect(
+          (first.title! as Text).data,
+          '${es.minutesBefore(10)} · ${es.defaultChoice}',
+        );
+        expect(first.selected, isTrue);
+        expect(
+          rows.skip(1).where((row) => row.selected),
+          isEmpty,
+          reason: 'only the default is selected',
+        );
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.minutesBefore(10))),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.text('Usar valor predeterminado'),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.textContaining('Usar valor'),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1413: the chooser for a date-only task with reminders on lists «9:00 · predeterminado»; with no default time set it has no default row',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        final task = Task(
+          id: 9,
+          title: 'Comprar pan',
+          priority: 1,
+          dueDate: dateOnly,
+          hasTime: false,
+        );
+        await pumpChip(
+          tester,
+          task,
+          preferences: const ReminderPreferences(
+            enabled: true,
+            asked: true,
+            dateOnlyTime: 540,
+          ),
+        );
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        var sheet = find.byType(BottomSheet);
+        var titles = tester
+            .widgetList<ListTile>(
+              find.descendant(of: sheet, matching: find.byType(ListTile)),
+            )
+            .map((row) => (row.title! as Text).data)
+            .toList();
+        expect(titles.first, '9:00 · ${es.defaultChoice}');
+        expect(titles, contains(es.chooseAlertTime));
+
+        await tester.pumpWidget(const SizedBox());
+        await pumpChip(
+          tester,
+          task,
+          preferences: const ReminderPreferences(enabled: true, asked: true),
+        );
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        sheet = find.byType(BottomSheet);
+        titles = tester
+            .widgetList<ListTile>(
+              find.descendant(of: sheet, matching: find.byType(ListTile)),
+            )
+            .map((row) => (row.title! as Text).data)
+            .toList();
+        expect(
+          titles.where((title) => title!.contains(es.defaultChoice)),
+          isEmpty,
+        );
+        expect(titles, isNot(contains('Usar valor predeterminado')));
+        expect(titles, contains(es.chooseAlertTime));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1413: «Elegir hora del aviso» opens a time picker in input mode',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await pumpChip(
+          tester,
+          Task(
+            id: 9,
+            title: 'Comprar pan',
+            priority: 1,
+            dueDate: dateOnly,
+            hasTime: false,
+          ),
+          preferences: const ReminderPreferences(
+            enabled: true,
+            asked: true,
+            dateOnlyTime: 540,
+          ),
+        );
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(es.chooseAlertTime));
+        await tester.pumpAndSettle();
+        final picker = find.byType(TimePickerDialog);
+        expect(picker, findsOneWidget);
+        expect(
+          tester.widget<TimePickerDialog>(picker).initialEntryMode,
+          TimePickerEntryMode.input,
+        );
+        // Typing fields, not the dial.
+        expect(
+          find.descendant(of: picker, matching: find.byType(TextField)),
+          findsWidgets,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1413: the form’s Recordatorio row shows the › chevron when it can be tapped',
+      (tester) async {
+        final row = await pumpForm(
+          tester,
+          Task(id: 9, title: 'Médico', priority: 1, dueDate: at10),
+        );
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
       },
     );
   });

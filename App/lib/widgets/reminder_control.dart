@@ -2,11 +2,16 @@ import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/reminder_preferences.dart';
+import 'package:agenda/services/task_database.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/project_preferences.dart';
 
 final reminderCapabilityProvider = FutureProvider.autoDispose<bool>((
   ref,
@@ -31,6 +36,82 @@ bool _cannotFire(
   if (!hasTime && (time ?? settings.dateOnlyTime) == null) return false;
   return !settings.enabled || !permission;
 }
+
+/// Why the reminder line can't simply read «Recordatorio: …» on this phone:
+/// the task rings only on someone else's phone, or its project gives none.
+/// The chip and the form both read it, so each reason is said in one place.
+class _Reason {
+  const _Reason(this.block, {this.project, this.person});
+  final ReminderBlock block;
+  final TaskListInfo? project;
+
+  /// Whose phone rings, for [ReminderBlock.notForAccount].
+  final String? person;
+
+  /// False when the reminder still rings, on [person]'s phone.
+  bool get silent => block != ReminderBlock.notForAccount;
+
+  /// What the line says, around the reminder's own [value]. [value] is null
+  /// when the task follows the default: [person]'s phone uses their own,
+  /// which this phone doesn't know, so only the person is named.
+  String text(BuildContext context, String? value) => switch (block) {
+    ReminderBlock.archived => context.l10n.noReminderProjectArchived,
+    ReminderBlock.muted => context.l10n.noReminderProjectMuted,
+    ReminderBlock.notForAccount =>
+      value == null
+          ? context.l10n.reminderForPersonOnly(person!)
+          : context.l10n.reminderForPerson(person!, value),
+  };
+
+  /// What a tap does on a [silent] line: a muted project opens its
+  /// «Novedades del proyecto», where muting is undone; an archived one
+  /// offers nothing.
+  VoidCallback? action(BuildContext context, WidgetRef ref) => switch (block) {
+    ReminderBlock.muted => () => showProjectPreferences(context, ref, project!),
+    _ => null,
+  };
+}
+
+/// The reason, by the rule the reminder engine schedules with
+/// ([TaskDatabase.reminderBlock]), or null when [task] reads as usual. Only
+/// a task given to someone named says whose it is; other tasks that aren't
+/// this account's read as before.
+_Reason? _reasonFor(WidgetRef ref, Task? task) {
+  if (task == null) return null;
+  final project = task.listId == null
+      ? null
+      : (ref.watch(taskListsProvider).valueOrNull ?? const <TaskListInfo>[])
+            .where((p) => p.id == task.listId)
+            .firstOrNull;
+  final accountId =
+      task.assignment == 'member' || task.assignment == 'unassigned'
+      ? ref.watch(authProvider).account?.id
+      : null;
+  final block = TaskDatabase.reminderBlock(
+    task,
+    accountId,
+    archived: project?.inactive == true,
+    muted: project?.notifications == 'muted',
+    role: project?.role,
+  );
+  if (block == null) return null;
+  if (block == ReminderBlock.notForAccount &&
+      (task.assignment != 'member' || task.assigneeName == null)) {
+    return null;
+  }
+  return _Reason(block, project: project, person: task.assigneeName);
+}
+
+/// True when the reminder is the default one: a timed task with no lead of
+/// its own, or a date-only task with no time of its own that isn't off.
+bool _followsDefault({
+  required bool hasTime,
+  required int? minutes,
+  required int? time,
+}) => hasTime ? minutes == null : time == null && minutes != -1;
+
+String _clock(BuildContext context, int minute) =>
+    TimeOfDay(hour: minute ~/ 60, minute: minute % 60).format(context);
 
 /// The one way to turn reminders on: the phone's permission, the switch,
 /// exact alarms when Android needs them, then a confirmation.
@@ -110,25 +191,43 @@ Future<void> turnOnReminders(BuildContext context) async {
 }
 
 /// The reminder choices in one list. Picking one applies it and closes.
+/// The default comes first, named by its value: [defaultLead] for a timed
+/// task, [defaultTime] for a date-only one, which has no default row without
+/// a default time.
 Future<void> _chooseReminder(
   BuildContext context, {
   required bool hasTime,
   required int? minutes,
   required int? time,
+  required int defaultLead,
   required int? defaultTime,
   required void Function(int? minutes, int? time) onChosen,
 }) async {
+  const useDefault = -2;
   const pickTime = -3;
   final values = hasTime
-      ? <int>{-2, -1, 0, 10, 30, 60, 1440, if (minutes != null) minutes}
-      : <int>{-2, -1, pickTime};
-  final current = minutes == -1
+      ? (<int>{
+          useDefault,
+          -1,
+          0,
+          10,
+          30,
+          60,
+          1440,
+          if (minutes != null) minutes,
+        }..remove(defaultLead))
+      : <int>{if (defaultTime != null) useDefault, -1, pickTime};
+  final current = hasTime
+      ? minutes == null || minutes == defaultLead
+            ? useDefault
+            : minutes
+      : minutes == -1
       ? -1
-      : hasTime
-      ? minutes ?? -2
-      : time == null
-      ? -2
-      : pickTime;
+      : time != null
+      ? pickTime
+      : defaultTime != null
+      ? useDefault
+      : -1;
   final value = await showModalBottomSheet<int>(
     context: context,
     isScrollControlled: true,
@@ -152,15 +251,12 @@ Future<void> _chooseReminder(
                 title: Text(
                   value == pickTime
                       ? context.l10n.chooseAlertTime
-                      : context.reminderLead(value == -2 ? null : value),
+                      : value == useDefault
+                      ? '${hasTime ? context.reminderLead(defaultLead) : _clock(context, defaultTime!)} · ${context.l10n.defaultChoice}'
+                      : context.reminderLead(value),
                 ),
                 subtitle: value == pickTime && time != null
-                    ? Text(
-                        TimeOfDay(
-                          hour: time ~/ 60,
-                          minute: time % 60,
-                        ).format(context),
-                      )
+                    ? Text(_clock(context, time))
                     : null,
                 selected: value == current,
                 trailing: value == current
@@ -179,9 +275,10 @@ Future<void> _chooseReminder(
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: initial ~/ 60, minute: initial % 60),
+      initialEntryMode: TimePickerEntryMode.input,
     );
     if (picked != null) onChosen(null, picked.hour * 60 + picked.minute);
-  } else if (value == -2) {
+  } else if (value == useDefault) {
     // For a date-only task the default also means the default time.
     onChosen(null, hasTime ? time : null);
   } else {
@@ -198,13 +295,16 @@ class ReminderChip extends ConsumerWidget {
     final preferences =
         ref.watch(reminderPreferencesProvider).valueOrNull ??
         const ReminderPreferences();
-    final blocked = _cannotFire(
-      ref,
-      hasDate: task.reminderDate != null,
-      hasTime: task.reminderHasTime,
-      minutes: task.reminderMinutes,
-      time: task.reminderTime,
-    );
+    final reason = _reasonFor(ref, task);
+    final blocked =
+        reason == null &&
+        _cannotFire(
+          ref,
+          hasDate: task.reminderDate != null,
+          hasTime: task.reminderHasTime,
+          minutes: task.reminderMinutes,
+          time: task.reminderTime,
+        );
     final minute = task.reminderTime ?? preferences.dateOnlyTime;
     final label = task.reminderMinutes == -1
         ? context.l10n.off
@@ -212,11 +312,13 @@ class ReminderChip extends ConsumerWidget {
         ? context.reminderLead(task.reminderMinutes ?? preferences.leadMinutes)
         : minute == null
         ? context.l10n.off
-        : TimeOfDay(hour: minute ~/ 60, minute: minute % 60).format(context);
+        : _clock(context, minute);
+    final value =
+        '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label';
     return LayoutBuilder(
       builder: (context, constraints) => ActionChip(
         avatar: Icon(
-          blocked
+          blocked || reason?.silent == true
               ? Icons.notifications_off_outlined
               : Icons.notifications_outlined,
           size: 16,
@@ -231,16 +333,27 @@ class ReminderChip extends ConsumerWidget {
                     .clamp(0, double.infinity),
           ),
           child: Text(
-            blocked
+            reason != null
+                ? reason.text(
+                    context,
+                    _followsDefault(
+                          hasTime: task.reminderHasTime,
+                          minutes: task.reminderMinutes,
+                          time: task.reminderTime,
+                        )
+                        ? null
+                        : value,
+                  )
+                : blocked
                 ? context.l10n.noReminderTurnOn
-                : context.l10n.reminderValue(
-                    '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label',
-                  ),
+                : context.l10n.reminderValue(value),
             softWrap: true,
             maxLines: 10,
           ),
         ),
-        onPressed: blocked
+        onPressed: reason?.silent == true
+            ? reason!.action(context, ref)
+            : blocked
             ? () => turnOnReminders(context)
             : onChanged == null
             ? null
@@ -249,6 +362,7 @@ class ReminderChip extends ConsumerWidget {
                 hasTime: task.reminderHasTime,
                 minutes: task.reminderMinutes,
                 time: task.reminderTime,
+                defaultLead: preferences.leadMinutes,
                 defaultTime: preferences.dateOnlyTime,
                 onChosen: (minutes, time) => onChanged?.call(
                   task.copyWith(reminderMinutes: minutes, reminderTime: time),
@@ -264,6 +378,9 @@ class ReminderControl extends ConsumerWidget {
   final bool hasTime;
   final int? minutes;
   final int? time;
+
+  /// The task's project and person, which decide whether this phone rings.
+  final Task? task;
   final ValueChanged<int?> onMinutes;
   final ValueChanged<int?> onTime;
   const ReminderControl({
@@ -272,6 +389,7 @@ class ReminderControl extends ConsumerWidget {
     required this.hasTime,
     this.minutes,
     this.time,
+    this.task,
     required this.onMinutes,
     required this.onTime,
   });
@@ -279,14 +397,29 @@ class ReminderControl extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final preferences = ref.watch(reminderPreferencesProvider);
     final settings = preferences.valueOrNull ?? const ReminderPreferences();
+    final reason = hasDate ? _reasonFor(ref, task) : null;
     final minute = time ?? settings.dateOnlyTime;
-    final label = !hasDate
-        ? context.l10n.dateForReminder
-        : hasTime
+    final value = hasTime
         ? '${context.reminderLead(minutes ?? settings.leadMinutes)}${minutes == null ? ' · ${context.l10n.defaultChoice}' : ''}'
         : minutes == -1 || minute == null
         ? context.l10n.off
-        : TimeOfDay(hour: minute ~/ 60, minute: minute % 60).format(context);
+        : _clock(context, minute);
+    final onTap = !hasDate
+        ? null
+        : reason?.silent == true
+        ? reason!.action(context, ref)
+        : () => _chooseReminder(
+            context,
+            hasTime: hasTime,
+            minutes: minutes,
+            time: time,
+            defaultLead: settings.leadMinutes,
+            defaultTime: settings.dateOnlyTime,
+            onChosen: (value, chosenTime) {
+              if (value != minutes) onMinutes(value);
+              if (chosenTime != time) onTime(chosenTime);
+            },
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -294,30 +427,36 @@ class ReminderControl extends ConsumerWidget {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.notifications_outlined),
           title: Text(context.l10n.reminder),
-          subtitle: Text(label),
-          onTap: !hasDate
+          subtitle: Text(
+            !hasDate
+                ? context.l10n.dateForReminder
+                : reason?.text(
+                        context,
+                        _followsDefault(
+                              hasTime: hasTime,
+                              minutes: minutes,
+                              time: time,
+                            )
+                            ? null
+                            : value,
+                      ) ??
+                      value,
+          ),
+          trailing: onTap == null
               ? null
-              : () => _chooseReminder(
-                  context,
-                  hasTime: hasTime,
-                  minutes: minutes,
-                  time: time,
-                  defaultTime: settings.dateOnlyTime,
-                  onChosen: (value, chosenTime) {
-                    if (value != minutes) onMinutes(value);
-                    if (chosenTime != time) onTime(chosenTime);
-                  },
-                ),
+              : const Icon(Icons.chevron_right_rounded),
+          onTap: onTap,
         ),
         if (preferences.hasError) Text(context.l10n.reminderDefaultsError),
         if (preferences.isLoading) Text(context.l10n.loadingReminders),
-        if (_cannotFire(
-          ref,
-          hasDate: hasDate,
-          hasTime: hasTime,
-          minutes: minutes,
-          time: time,
-        ))
+        if (reason == null &&
+            _cannotFire(
+              ref,
+              hasDate: hasDate,
+              hasTime: hasTime,
+              minutes: minutes,
+              time: time,
+            ))
           TextButton.icon(
             onPressed: () => turnOnReminders(context),
             icon: const Icon(Icons.notifications_off_outlined, size: 18),

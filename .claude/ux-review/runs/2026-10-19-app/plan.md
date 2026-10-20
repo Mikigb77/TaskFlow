@@ -385,3 +385,73 @@ Nothing.
 ### Phone checks added
 - P200: on staging, with an account at its daily limit and online speech on, a refused recording shows only «Cerrar» and stays in Capturas pendientes. Reopened the next day, «Reintentar» works.
 - P201: with TalkBack and an overdue task, today's day and the count line say the same number.
+
+## Round 2 (b3)
+
+Round 1 of b3 (P176–P180) fixed 15 of its 17 findings. UX-1403 and UX-1421 came back partly fixed. UX-1414's code was right, but its catalog check also caught two ownership strings. Round 2 plans those, plus the six regressions review B found, in five small packages written to `plan-b3-r2.json`. Nothing has failed twice, so nothing is escalated. One new owner question, D12, takes what's left of UX-1403, and no package waits for it.
+
+### Question for you
+- **D12 · UX-1403, Tareas at large text.** Round 1 made every change the reviewers asked for. At the preview's 2× on a 360 dp phone with a shared project, the header still fills the screen: the project filter (two rows), «Tus tareas», «Proyectos» and «Completadas» (a row each), the search and the chips. Only part of the first task shows above «Añadir tarea». Fitting a whole task means moving or hiding something you built: (a) wait for the two tabs (U13); (b) move «Completadas» to the end of the list; (c) put the search behind an icon; (d) make the project filter one control. **Recommendation:** (a), after one measurement. The main session captures the emulator at Android's real 2.0 on 393 dp first. If a whole task shows and «Tus tareas» / «Les teves tasques» is on one line, UX-1403 closes as fixed. If not, it joins U13's evidence for the test with your father. The header scrolls away, so the tasks are one swipe up.
+
+### P202 · S2 · B · M · Día view: the banners and «Sin hora» stay above the hours, in view on arrival
+- **UX-1633 (S2), R1B-1 from P180:** the error banners, the calendar-access button and the limit notices move out of the scroll, under the day's header, so they never scroll away. «Sin hora» (date-only tasks, all-day events) sits pinned above the hours, as in the phone's own calendar. It takes at most a third of the screen and scrolls by itself past that. The opening scroll stays as P180 built it. No new copy. New preview `calendar/timeline.untimed`.
+- **Settled here:** review B offered two places for «Sin hora»: above the timeline, where it scrolls away, or below it, where nobody reaches it. The organizer pinned it above the hours instead.
+
+### P203 · S2 · B · S · Someone else's reminder: the time only when the task sets its own
+- **UX-1634 (S2), R1B-2 from P177:** a task given to Ana that follows the default reads «Recordatorio para Ana», because Ana's phone uses Ana's default, which this phone doesn't know. With its own value it keeps «Recordatorio para Ana: 30 minutos antes». One new string, in EN, ES and CA.
+
+### P204 · S2 · B · S · Scoped Completed page: names the person filter; rows leave out the project
+- **UX-1635 (S2), R1B-3 from P176:** under the title, «Matemáticas · Ana» or «Matemáticas · Para mí», using existing strings. With «Todas» on, only «Matemáticas».
+- **UX-1636 (S1), R1B-4 from P176:** its rows no longer repeat «Matemáticas».
+
+### P205 · S2 · B · S · Catalog: plain words in the task's rarer corners; «(100 MB)» on one line; the transfer check covers files only
+- **UX-1414 (S2), partly, failed once:** no app change. The check now exempts “Transfer ownership” and the CSV import's ownership line, where “transfer” is the right word, as review B asked.
+- **UX-1421 (S1), partly, failed once:** the organizer's copy for the keys round 1 had none for: the repeat-change dialog («¿Cambiar cómo se repite?»), the read-only project line («Si quieres hacer cambios, pídeselo al propietario del proyecto.»), the view-only note, and the three Recordatorios › Detalles lines («Los próximos avisos se actualizan al abrir la app…»). It also removes the unused `schedule` key («Programación»). `retryScheduling` is left for P187, which replaces it with «Reintentar». The Catalan is the organizer's, so a native read is noted.
+- **UX-1638 (S1), R1B-6 from P179:** «(100 MB)» with a non-breaking space, in all three languages.
+
+### P206 · S1 · B · S · View-only rows line up with the others
+- **UX-1637 (S1), R1B-5 from P178:** a view-only row keeps an empty space where the circle was, so its title lines up with the rest. No icon.
+
+### Order
+P202, P203, P204, P205, P206, one at a time.
+
+### Skipped
+Nothing.
+
+### Notes for the main session
+- The two UX-1403 tests at linear 2× (`home_screen_test.dart`, es and ca) will keep failing until D12 is answered. Have ux-tester mark them `skip: 'D12 (UX-1403): judged on the emulator lane at non-linear 2.0'` so the round check reads clean, and run the emulator capture D12 asks for.
+- ux-tester's catalog checks for UX-1414 and UX-1421 change to P205's acceptance: two EN keys exempt for “transfer”, and `retryScheduling` exempt for “scheduling” until P187.
+- P177's follow-up from its implementer, `task: task` on the dictation review's `ReminderControl` (`capture_review_editor.dart`), isn't planned. No reviewer raised it; the next review of the capture sheet can rate it.
+
+### Phone checks added
+- P202: on the emulator lane at 2.0, the Día view of today with one date-only task shows «Sin hora», that task and the first timed task together on arrival.
+- P203: with two accounts and Ana's default at 1 hour, María's phone reads «Recordatorio para Ana», and Ana's phone rings an hour before.
+- D12: `screen-tasks.list.es.light.2.0` and its CA twin, on the emulator lane at 393 dp.
+
+## Round 3 (b3)
+
+Round 2 of b3 (P202–P206) fixed all eight of its findings, according to review B's notes (`verify-b3-r2-B.md`), and the round check passed. One regression came back: at 2× the only «Sin hora» row is cut (R2B-1, now UX-1639). Round 3 fixes it in one small package and adds a re-check with no code change, both written to `plan-b3-r3.json`. Nothing has failed twice, so nothing is escalated. There's no new question for you.
+
+### P207 · S2 · B · S · Día view: the one «Sin hora» row fits whole at 2×, with a line under the area
+- **UX-1639 (S1), R2B-1 from P202:** a row under «Sin hora» whose day is the one on screen loses its «Hoy» line, which the day header already says. The row then fits in the pinned third at 2×. A thin line under the area means a cut row reads as an edge. A row listed there for another day's task keeps its date. No new copy.
+- **UX-1633 (S2), fixed in round 2:** re-checked here, because P207 changes its pinned area. The banners, the third cap, the scrollbar and the opening scroll stay as P202 built them.
+
+### P208 · S2 · B · S · Re-check only: round 2's reminder, Completed, catalog and row fixes (no code change)
+- **UX-1634, UX-1635, UX-1636, UX-1414, UX-1421, UX-1638, UX-1637:** the workflow listed these as not checked, but review B's round 2 notes record each one as fixed, with evidence. The implementer changes nothing. The reviewer confirms each one against P203–P206's acceptance, so the result reaches the record.
+
+### Order
+P207, then P208.
+
+### Skipped
+Nothing.
+
+### Noted, not planned
+- Review B's note: the banners above the hours have no height cap. At 2×, with «No se pudieron cargar tus tareas», the calendar-access button and a full «Sin hora» third all showing, little room may be left for the hours. It's inferred from code only, the reviewer didn't count it, and the brief asked for the banners to be pinned. P202's implementer raised the same risk for short screens.
+- P202's implementer measured "a third" from the header's bottom to the screen's bottom, using `extendBody`, and added the app's first `Scrollbar`. Review B accepted both, and P207 keeps them.
+
+### Notes for the main session
+- P208 exists only because the round 2 results in `verify-b3-r2-B.md` didn't reach the workflow. If the workflow can take those results from that file, P208 can be dropped and its seven findings closed as verified from round 2.
+- Round 2's implementers each reported two failing UX-1403 tests in `home_screen_test.dart` (es and ca). Round 2's notes said to skip them for D12. The round check passed, so they appear to be skipped already. D12 is still open.
+
+### Phone checks added
+- P207: on the emulator lane at 2.0 on 393 dp, the Día view of today with one date-only task at priority Media shows «Sin hora», the whole row, a line under it, then the first timed task.

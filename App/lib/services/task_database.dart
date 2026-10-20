@@ -6,6 +6,9 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/android_database_factory.dart';
 
+/// Why this phone gives no reminder for a task ([TaskDatabase.reminderBlock]).
+enum ReminderBlock { archived, muted, notForAccount }
+
 class TaskDatabase {
   static const schemaVersion = 18;
   static final TaskDatabase _instance = TaskDatabase._internal();
@@ -381,16 +384,39 @@ class TaskDatabase {
     );
     return tasks.where((task) {
       final project = projects.where((p) => p['id'] == task.listId).firstOrNull;
-      if (project?['archived'] == 1 ||
-          project?['group_archived'] == 1 ||
-          project?['notifications'] == 'muted') {
-        return false;
-      }
-      return task.isForAccount(
-        id,
-        managesProject: ['owner', 'admin'].contains(project?['role']),
-      );
+      return reminderBlock(
+            task,
+            id,
+            archived:
+                project?['archived'] == 1 || project?['group_archived'] == 1,
+            muted: project?['notifications'] == 'muted',
+            role: project?['role'] as String?,
+          ) ==
+          null;
     }).toList();
+  }
+
+  /// Why this phone won't remind about [task], or null when it will: its
+  /// project, or the project's group, is [archived]; the project is [muted];
+  /// or the task isn't for account [accountId], whose [role] in the project
+  /// decides whether an unassigned task is. The reminder engine
+  /// ([reminderTasks]) and the reminder chip both apply this rule.
+  static ReminderBlock? reminderBlock(
+    Task task,
+    int? accountId, {
+    bool archived = false,
+    bool muted = false,
+    String? role,
+  }) {
+    if (archived) return ReminderBlock.archived;
+    if (muted) return ReminderBlock.muted;
+    if (!task.isForAccount(
+      accountId,
+      managesProject: ['owner', 'admin'].contains(role),
+    )) {
+      return ReminderBlock.notForAccount;
+    }
+    return null;
   }
 
   static Future<void> createReminderTables(Database db) async {

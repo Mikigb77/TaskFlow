@@ -226,7 +226,7 @@ void main() {
   );
 
   testWidgets(
-    'U5: on Tareas filtered to Prioridad alta, saving a normal-priority task selects Todas and highlights the new row',
+    'U5: on Tareas filtered to Prioridad alta, saving a normal-priority task clears the filter and highlights the new row',
     (tester) async {
       final app = await _App.open(tester, [
         Task(id: 1, title: 'Renovar el pasaporte', priority: 3),
@@ -239,9 +239,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      ChoiceChip chip(String label) =>
-          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
-      await tester.tap(find.widgetWithText(ChoiceChip, es.highPriority));
+      FilterChip chip(String label) =>
+          tester.widget<FilterChip>(find.widgetWithText(FilterChip, label));
+      // The chips scroll sideways when they don't fit.
+      final high = find.widgetWithText(FilterChip, es.highPriority);
+      await tester.ensureVisible(high);
+      await tester.pumpAndSettle();
+      await tester.tap(high);
       await tester.pumpAndSettle();
       expect(chip(es.highPriority).selected, isTrue);
       expect(row('Ordenar el trastero'), findsNothing);
@@ -261,7 +265,9 @@ void main() {
 
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.byType(HomeScreen).hitTestable(), findsWidgets);
-      expect(chip(es.allTasks).selected, isTrue);
+      // No filter chosen: every task shows.
+      expect(chip(es.inbox).selected, isFalse);
+      expect(chip(es.today).selected, isFalse);
       expect(chip(es.highPriority).selected, isFalse);
       final saved = row('Comprar bombillas');
       // In view on the page, clear of the message under it.
@@ -343,7 +349,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ChoiceChip, es.highPriority));
+    await tester.tap(find.widgetWithText(FilterChip, es.highPriority));
     await tester.pumpAndSettle();
   }
 
@@ -390,12 +396,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final high = find.widgetWithText(ChoiceChip, es.highPriority);
+      final high = find.widgetWithText(FilterChip, es.highPriority);
       await tester.ensureVisible(high);
       await tester.pumpAndSettle();
       await tester.tap(high);
       await tester.pumpAndSettle();
-      expect(tester.widget<ChoiceChip>(high).selected, isTrue);
+      expect(tester.widget<FilterChip>(high).selected, isTrue);
       expect(row('Tarea número 9'), findsNothing);
       app.api.found = [found('Comprar bombillas')];
       await app.say(tester, 'Comprar bombillas');
@@ -1160,19 +1166,19 @@ void main() {
         ('normalDay minus id 4', dayWithoutPickUp),
       ]) {
         testWidgets(
-          'UX-1309: ES 2x on 360x800$how ($name), after the same save, Comprar pan y leche and its time line are entirely above the save message',
+          'UX-1309: ES 2x on 360x800$how ($name), after the same save, Comprar pan y leche is entirely above the save message, with no «Sin hora» line (UX-1418)',
           (tester) async {
             if (still) stillAnimations(tester);
             await saveThree(tester, day: day(), textScale: 2);
+            // The whole row, to its last line, is above the message.
             expectClear(tester, 'Comprar pan y leche');
-            final line = find.descendant(
-              of: litRow('Comprar pan y leche'),
-              matching: find.textContaining(es.anyTime),
-            );
-            expect(line, findsWidgets, reason: 'its «${es.anyTime}» line');
             expect(
-              tester.getRect(line.first).bottom,
-              lessThanOrEqualTo(tester.getRect(find.byType(SnackBar)).top),
+              find.descendant(
+                of: litRow('Comprar pan y leche'),
+                matching: find.textContaining(es.anyTime),
+              ),
+              findsNothing,
+              reason: 'a date-only row on Calendar has no time line',
             );
             await tester.pumpAndSettle();
             expect(tester.takeException(), isNull);

@@ -106,9 +106,21 @@ class TaskAssignmentPicker extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(
-                        child: Text(
-                          responsibilityLabel(context, task, account?.id),
-                          overflow: TextOverflow.ellipsis,
+                        // «Responsable: Ana»; «Necesita responsable» as is.
+                        child: spokenAs(
+                          task.assignment == 'unassigned'
+                              ? null
+                              : context.l10n.assigneeLabel(
+                                  responsibilityLabel(
+                                    context,
+                                    task,
+                                    account?.id,
+                                  ),
+                                ),
+                          Text(
+                            responsibilityLabel(context, task, account?.id),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
                       if (changeable)

@@ -1411,6 +1411,42 @@
    "dependsOn": [
     "P175"
    ]
+  },
+  {
+   "id": "P209",
+   "title": "Día view: «Sin hora» grows to fit its first whole row, never past half the space",
+   "area": "B",
+   "size": "M",
+   "severity": 1,
+   "findings": [
+    "UX-1639",
+    "UX-1633"
+   ],
+   "files": [
+    "App/lib/screens/day_timeline_screen.dart",
+    "App/test/day_timeline_test.dart",
+    "App/test/ux_previews/calendar_previews.dart"
+   ],
+   "brief": [
+    "Batch b3's follow-up (main session, 2026-10-20). UX-1639 (S1) failed once: P207, verify-b3-r3-B.md. At 2× on 360×800, the «Sin hora» label and the area's only row, «Pagar la factura de la luz» at priority 2, need about 226 dp, but the area's cap, a third of the space under the day header, gives about 197 dp. So about 29 dp is cut through «Prioridad Media». Review B gave the fix, and the main session takes it: not a product decision. Cap the area at the larger of a third and the label plus the first whole row, and never more than half the space. That gives 226 of 296 dp at 2×, and the 08:30 block still shows on arrival. UX-1633 (S2, verified) rides along, so review B re-checks its arrival on the changed code.",
+    "What P202 and P207 built, and what stays (`App/lib/screens/day_timeline_screen.dart`, about :240-345): the banners' Column under the day header; the pinned area (a `Scrollbar(thumbVisibility: true)` on `_untimed`, a `SingleChildScrollView` keyed `timeline-untimed` with 4 dp top padding, `SectionLabel(l.timelineUnblocked)`, the all-day `ListTile`s, then the task rows with `showDate: otherDay(task)` and 8 dp gaps); the 1 dp outlineVariant `Divider` right under it; `extendBody: true`; and the bottom padding. `space` is the height from the day header's bottom to the screen's bottom (the `LayoutBuilder`).",
+    "Do: replace the fixed `BoxConstraints(maxHeight: space.maxHeight / 3)` with a cap of min(space / 2, max(space / 3, h)). Here h is the height of the area's own content from its top through the end of its first item: the 4 dp top padding, the «Sin hora» label, and the first item (the first all-day event if there is one, else the first task row) with its 8 dp gap. When the content is shorter than the cap, the area keeps its content's height, as now. Measure h during layout, not after a frame. Arrival (`_opening`, `_place` and the hours' first scroll to the first timed item) must see the final size on the very first frame: no post-frame `setState` that resizes the area, and no fixed dp guess. A small custom render object, or a `MultiChildRenderObjectWidget` with the head (padding, label, first item) and the rest as two children, is fine; that's your call. The whole area still scrolls as one under one scrollbar when the content is longer than the cap, so the first row may scroll away, as rows do now. If splitting head and rest makes that impossible, keep one scroll view and measure the head inside it instead.",
+    "No new strings, no ARB change. Tests in `App/test/day_timeline_test.dart`: (1) make the UX-1639 tests (about :626-760) pass at 1× and 2×; (2) the UX-1633 test that says five date-only tasks keep «Sin hora» to a third (about :556) now checks the new rule: the area is the larger of a third and the label plus the first whole row, within 1 dp, and never more than half; it scrolls by itself, and the 08:30 task is on screen on arrival; (3) keep every other UX-1633 and UX-1639 test passing as they are. Re-render `calendar/timeline.untimed` and `calendar/timeline.normal` (es 1× and 2×, ca 2×), and add the ca 2× variant if it's missing.",
+    "Don't touch: `App/lib/widgets/task_tile.dart` and the rows' widgets; the fixture (`App/test/ux_previews/support/fixtures.dart`); the banners; the scrollbar; the 4 dp top padding and the 8 dp gaps; the `Divider`; `_landedRow`, `_reveal`, `_opening`, `_place`; pull-to-refresh; the hours' drawing; every other screen."
+   ],
+   "acceptance": [
+    "ES, 2× text on 360×800, Día view of today at 09:41 with `normalDay()` plus the date-only «Pagar la factura de la luz» at priority 2 (`calendar/timeline.untimed`): on arrival the whole row, title and «Prioridad Media» line, lies inside `timeline-untimed`, with no «Hoy»; and the 08:30 «Paseo por el parque» block is on screen.",
+    "CA, 2× on 360×800, the same state: the whole row lies inside the area on arrival, and the 08:30 block is on screen.",
+    "ES, 1× on 360×800, the same state: the area is its content's height; «Sin hora», the whole row and the 08:30 block are on screen on arrival.",
+    "ES, 2× on 360×800, five date-only tasks and a task at 08:30: the area's height is the larger of a third of the space and the label plus the first whole row (within 1 dp), and never more than half; the first row is whole on arrival; the area scrolls by itself to show the rest; and the 08:30 task is on screen on arrival.",
+    "ES, 1× and 2×: the 1 dp outlineVariant line spans the screen right under the area, and it stays in the same place after the hours are scrolled to 20:00.",
+    "ES, 1× and 2×, `calendar/timeline.normal` (nothing untimed): no «Sin hora» label and no line; the 08:30 block is on screen on arrival.",
+    "Saving a date-only task from the Día view still lights its row in the area, on screen."
+   ],
+   "deviceChecks": [
+    "Emulator lane at Android font size 2.0 on 393 dp: the Día view of today with one date-only task at priority Media shows «Sin hora», the whole row, a line under it, then the first timed task, on arrival."
+   ],
+   "dependsOn": []
   }
  ],
  "decisions": [
@@ -1652,7 +1688,8 @@
   "Emulator lane after each batch: re-capture what the batch's deviceChecks name — for b1, `permission-mic.*` and `capture.listening-*`; the shortcuts, the widget and the share toasts come with b5 (P186). Re-plan: after b6, `reminder-ask.*` after 9:00, `share.landing` and `share.after-back`, `first-run.sign-in.*` folded and open, and Cuenta; after b7, `launcher.home-icon.*` with themed icons, `notification.shade.*`, the launch splash, and `screen-settings.list.ca.light.2.0` with a 360 dp variant. The review emulator has no calendar account: add one before re-capturing P188's `permission-calendar.allowed`.",
   "Phone checks from the reviews, not tied to a package: SEEN #2 (a server-added task's reminder minutes late; review D suggests the 2-minute reminder lease in reminder_engine.dart:255-277 after a killed refresh); SEEN #14 (the text shortcut started with launcher flags while the app is open; not reproduced with real taps); UX-424's cold start from a reminder; UX-702's check should add a 360 dp phone. Re-plan: D4 on staging, «Hola, ¿esto funciona?» leaves the free-dictation count as it was.",
   "Noted, not planned (re-plan 2026-10-20): review B's optional «Añadir sin fecha» on the form's button (not part of D3's answer); a phone with no calendar account still shows Calendar's «Elige calendarios para mostrar tus compromisos existentes.» after connecting (review B's cross-slice note; D7 fixes phones that have calendars, and nobody gave copy for this one).",
-  "After the run, regenerate PHONE_CHECKS.md with phone_checks.py."
+  "After the run, regenerate PHONE_CHECKS.md with phone_checks.py.",
+  "2026-10-20, main session: P209 added after batch b3 ended with UX-1639 open (failed once). It takes review B's option from verify-b3-r3-B.md, and it runs as batch b3x before b4."
  ],
  "updated": "2026-10-20",
  "replans": [

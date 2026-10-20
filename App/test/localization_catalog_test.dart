@@ -1345,4 +1345,334 @@ void main() {
     expect(description, isA<String>());
     expect((description as String).trim(), isNotEmpty);
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P179 (UX-1414, UX-1421), P180 ----
+
+  Map<String, String> values(String language) {
+    final catalog =
+        jsonDecode(
+              File('${directory.path}/app_$language.arb').readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+    return {
+      for (final entry in catalog.entries)
+        if (!entry.key.startsWith('@')) entry.key: entry.value as String,
+    };
+  }
+
+  /// The keys of [language]'s catalog, other than [except], whose value holds
+  /// any of [words], in any case.
+  List<String> holding(
+    String language,
+    List<String> words, {
+    Set<String> except = const {},
+  }) => [
+    for (final MapEntry(:key, :value) in values(language).entries)
+      if (!except.contains(key) &&
+          words.any(
+        (word) => value.toLowerCase().contains(word.toLowerCase()),
+      ))
+        '$key: $value',
+  ];
+
+  // Handing a project or its owner's copies over is a transfer of ownership,
+  // the right word there; only the file-upload jargon goes.
+  for (final (language, words, except) in [
+    ('es', ['transferencia'], <String>{}),
+    ('en', ['transfer'], {'groupTransfer', 'archiveCsvPersonalCopies'}),
+    ('ca', ['transferència'], <String>{}),
+  ]) {
+    test(
+      'UX-1414: no $language catalog value says ${words.join(', ')} (a file upload isn’t a bank transfer)',
+      () {
+        expect(holding(language, words, except: except), isEmpty);
+      },
+    );
+  }
+
+  // P187 (UX-1606 c) replaces retryScheduling with tryAgain.
+  for (final (language, words, except) in [
+    (
+      'es',
+      ['instancia', 'programación', 'Revisa este valor', 'permisos de edición'],
+      <String>{},
+    ),
+    (
+      'en',
+      ['instance', 'scheduling', 'Check this value', 'edit permissions'],
+      {'retryScheduling'},
+    ),
+    ('ca', ['instància', 'programació', 'permisos d’edició'], <String>{}),
+  ]) {
+    test(
+      'UX-1421: no $language catalog value says ${words.join(', ')}',
+      () {
+        expect(holding(language, words, except: except), isEmpty);
+      },
+    );
+  }
+
+  test('UX-1421: the plain-words copy reads as the plan wrote it', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.deadlineRecurringHelp, 'Each repeat has its own deadline.');
+    expect(
+      es.deadlineRecurringHelp,
+      'Cada repetición tiene su propia fecha límite.',
+    );
+    expect(ca.deadlineRecurringHelp, 'Cada repetició té el seu propi termini.');
+    expect(en.reminderAnchor, 'Remind before');
+    expect(es.reminderAnchor, 'Recordar antes de');
+    expect(ca.reminderAnchor, 'Recorda-m’ho abans de');
+    expect(en.scheduleError, 'Couldn’t change the date. Try again.');
+    expect(
+      es.scheduleError,
+      'No se pudo cambiar la fecha. Inténtalo de nuevo.',
+    );
+    expect(
+      ca.scheduleError,
+      'No s’ha pogut canviar la data. Torna-ho a provar.',
+    );
+    expect(
+      en.scheduleChangedAgain,
+      'The date changed again. Open the task to check it.',
+    );
+    expect(
+      es.scheduleChangedAgain,
+      'La fecha ha vuelto a cambiar. Abre la tarea para revisarla.',
+    );
+    expect(
+      ca.scheduleChangedAgain,
+      'La data ha tornat a canviar. Obre la tasca per revisar-la.',
+    );
+    expect(en.viewOnlyTask, 'You can only view this task.');
+    expect(es.viewOnlyTask, 'Solo puedes ver esta tarea.');
+    expect(ca.viewOnlyTask, 'Només pots veure aquesta tasca.');
+  });
+
+  test(
+    'UX-1415 / UX-1417 / UX-1421 / UX-1402 / UX-1407 / UX-1413: the dropped keys are in no catalog',
+    () {
+      for (final language in ['en', 'es', 'ca']) {
+        final keys = values(language).keys.toSet();
+        for (final gone in [
+          'reminderAnchorHelp',
+          'reviewInvalidTime',
+          'checklistCompletionHelp',
+          'taskDetails',
+          'timelineFirstPlan',
+          'timelinePoint',
+          'progressHeading',
+          'useDefault',
+        ]) {
+          expect(keys, isNot(contains(gone)), reason: '$language: $gone');
+        }
+      }
+    },
+  );
+
+  test('UX-1402: the Día view’s words read as the plan wrote them', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.timelineUnblocked, 'No time');
+    expect(es.timelineUnblocked, 'Sin hora');
+    expect(ca.timelineUnblocked, 'Sense hora');
+    expect(en.timelineNoBlocks, 'Nothing with a time on this day.');
+    expect(es.timelineNoBlocks, 'No hay nada con hora este día.');
+    expect(ca.timelineNoBlocks, 'No hi ha res amb hora aquest dia.');
+  });
+
+  // ---- Run 2026-10-19-app, round 2 · P205 (UX-1414, UX-1421, UX-1638) ----
+
+  test(
+    'UX-1414: the only EN values saying “transfer” are groupTransfer and archiveCsvPersonalCopies (ownership, not files)',
+    () {
+      final keys = {
+        for (final MapEntry(:key, :value) in values('en').entries)
+          if (value.toLowerCase().contains('transfer')) key,
+      };
+      expect(keys, {'groupTransfer', 'archiveCsvPersonalCopies'});
+    },
+  );
+
+  test(
+    'UX-1638: storageFull keeps «(100 MB).» together with a non-breaking space, in EN, ES and CA',
+    () {
+      for (final language in ['en', 'es', 'ca']) {
+        expect(
+          values(language)['storageFull'],
+          contains('{limit} MB'),
+          reason: language,
+        );
+        expect(
+          values(language)['storageFull'],
+          isNot(contains('{limit} MB')),
+          reason: language,
+        );
+      }
+      expect(
+        lookupAppLocalizations(const Locale('en')).storageFull(100),
+        'Your file space is full (100 MB).',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('es')).storageFull(100),
+        'Tu espacio para archivos está lleno (100 MB).',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('ca')).storageFull(100),
+        'El teu espai per a fitxers és ple (100 MB).',
+      );
+    },
+  );
+
+  test(
+    'UX-1638: at every width «100» and «MB» land on the same line (ES, EN, CA; 1× and 2×)',
+    () {
+      for (final language in ['en', 'es', 'ca']) {
+        final text = lookupAppLocalizations(Locale(language)).storageFull(100);
+        final number = text.indexOf('100');
+        final unit = text.indexOf('MB');
+        for (final scale in [1.0, 2.0]) {
+          // From the narrowest width that holds «(100 MB).» whole: narrower,
+          // any word breaks inside itself.
+          final group = TextPainter(
+            text: const TextSpan(
+              text: '(100 MB).',
+              style: TextStyle(fontSize: 14),
+            ),
+            textDirection: TextDirection.ltr,
+            textScaler: TextScaler.linear(scale),
+          )..layout();
+          final narrowest = group.width.ceilToDouble();
+          group.dispose();
+          for (var width = narrowest; width <= 600; width += 1) {
+            final painter = TextPainter(
+              text: TextSpan(text: text, style: const TextStyle(fontSize: 14)),
+              textDirection: TextDirection.ltr,
+              textScaler: TextScaler.linear(scale),
+            )..layout(maxWidth: width);
+            final line = painter.getLineBoundary(TextPosition(offset: number));
+            expect(
+              unit >= line.start && unit + 2 <= line.end,
+              isTrue,
+              reason: '$language at ${scale}x, $width wide: ${text.substring(line.start, line.end)}',
+            );
+            painter.dispose();
+          }
+        }
+      }
+    },
+  );
+
+  test(
+    'UX-1421: the repeat, view-only and alert-refresh words read as the plan wrote them, in EN, ES and CA',
+    () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(en.changeSeriesQuestion, 'Change how it repeats?');
+      expect(es.changeSeriesQuestion, '¿Cambiar cómo se repite?');
+      expect(ca.changeSeriesQuestion, 'Vols canviar com es repeteix?');
+      expect(
+        en.changeSeriesHelp,
+        'Dates you moved or skipped will follow the new repeat. Completed dates stay in the history.',
+      );
+      expect(
+        es.changeSeriesHelp,
+        'Las fechas que cambiaste u omitiste seguirán la nueva repetición. Las fechas completadas se quedan en el historial.',
+      );
+      expect(
+        ca.changeSeriesHelp,
+        'Les dates que vas moure o ometre seguiran la repetició nova. Les dates completades es queden a l’historial.',
+      );
+      expect(
+        en.listEditingAccessHelp,
+        'To make changes, ask the project’s owner.',
+      );
+      expect(
+        es.listEditingAccessHelp,
+        'Si quieres hacer cambios, pídeselo al propietario del proyecto.',
+      );
+      expect(
+        ca.listEditingAccessHelp,
+        'Si vols fer canvis, demana-ho al propietari del projecte.',
+      );
+      expect(
+        en.viewOnlyNote,
+        'View-only note. To make changes, ask the project’s owner.',
+      );
+      expect(
+        es.viewOnlyNote,
+        'Nota de solo lectura. Si quieres hacer cambios, pídeselo al propietario del proyecto.',
+      );
+      expect(
+        ca.viewOnlyNote,
+        'Nota de només lectura. Si vols fer canvis, demana-ho al propietari del projecte.',
+      );
+      expect(
+        en.androidAlertRefreshHelp,
+        'Upcoming alerts update when you open the app and, when Android allows it, every hour.',
+      );
+      expect(
+        es.androidAlertRefreshHelp,
+        'Los próximos avisos se actualizan al abrir la app y, cuando Android lo permite, cada hora.',
+      );
+      expect(
+        ca.androidAlertRefreshHelp,
+        'Els avisos propers s’actualitzen quan obres l’aplicació i, quan Android ho permet, cada hora.',
+      );
+      expect(
+        en.backgroundAlertRefreshHelp,
+        'Upcoming alerts update when you open the app and when your phone allows it.',
+      );
+      expect(
+        es.backgroundAlertRefreshHelp,
+        'Los próximos avisos se actualizan al abrir la app y cuando el teléfono lo permite.',
+      );
+      expect(
+        ca.backgroundAlertRefreshHelp,
+        'Els avisos propers s’actualitzen quan obres l’aplicació i quan el telèfon ho permet.',
+      );
+      expect(
+        en.deferredAlerts(1),
+        '1 later alert isn’t set yet. The next update sets the nearest ones.',
+      );
+      expect(
+        en.deferredAlerts(3),
+        '3 later alerts aren’t set yet. The next update sets the nearest ones.',
+      );
+      expect(
+        es.deferredAlerts(1),
+        '1 aviso posterior aún no está activado. La próxima actualización activará los más cercanos.',
+      );
+      expect(
+        es.deferredAlerts(3),
+        '3 avisos posteriores aún no están activados. La próxima actualización activará los más cercanos.',
+      );
+      expect(
+        ca.deferredAlerts(1),
+        '1 avís posterior encara no està activat. La pròxima actualització activarà els més propers.',
+      );
+      expect(
+        ca.deferredAlerts(3),
+        '3 avisos posteriors encara no estan activats. La pròxima actualització activarà els més propers.',
+      );
+    },
+  );
+
+  test('UX-1421: the unused «schedule» key is in no catalog', () {
+    for (final language in ['en', 'es', 'ca']) {
+      final catalog =
+          jsonDecode(
+                File(
+                  '${directory.path}/app_$language.arb',
+                ).readAsStringSync(),
+              )
+              as Map<String, dynamic>;
+      expect(catalog.keys, isNot(contains('schedule')), reason: language);
+      expect(catalog.keys, isNot(contains('@schedule')), reason: language);
+    }
+  });
 }

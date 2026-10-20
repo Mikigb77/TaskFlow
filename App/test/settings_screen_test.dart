@@ -274,7 +274,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byTooltip(es.completedTasks).hitTestable(), findsOneWidget);
+    expect(
+      find.widgetWithText(TextButton, es.completedButton).hitTestable(),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -769,7 +772,9 @@ void main() {
         final licenses = find.widgetWithText(ListTile, l.licenses);
         final privacy = find.widgetWithText(ListTile, l.privacyPolicy);
         final terms = find.widgetWithText(ListTile, l.termsAndConditions);
-        final tiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+        final tiles = tester
+            .widgetList<ListTile>(find.byType(ListTile))
+            .toList();
         final at = tiles.indexOf(tester.widget<ListTile>(licenses));
         expect(tiles[at + 1], same(tester.widget<ListTile>(privacy)));
         expect(tiles[at + 2], same(tester.widget<ListTile>(terms)));

@@ -11,6 +11,8 @@ class TaskList extends StatelessWidget {
     this.lit = false,
     this.landedRow,
     this.bottomPadding = 100,
+    this.project,
+    this.showUndated = true,
   });
   final List<Task> tasks;
 
@@ -25,6 +27,13 @@ class TaskList extends StatelessWidget {
 
   /// Empty space after the last row.
   final double bottomPadding;
+
+  /// The page's project, which its rows don't repeat.
+  final String? project;
+
+  /// Whether a row with no date says so; the Sin fecha page's rows don't.
+  final bool showUndated;
+
   @override
   Widget build(BuildContext context) {
     final sorted = [...tasks]
@@ -49,8 +58,17 @@ class TaskList extends StatelessWidget {
                 task: task,
                 lit: lit,
                 showDate: true,
+                project: project,
+                showUndated: showUndated,
+                markOverdue: true,
               )
-            : TaskTile(task: task, showDate: true);
+            : TaskTile(
+                task: task,
+                showDate: true,
+                project: project,
+                showUndated: showUndated,
+                markOverdue: true,
+              );
       },
     );
   }

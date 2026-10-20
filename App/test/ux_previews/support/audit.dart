@@ -150,9 +150,16 @@ class _Node {
     ui.SemanticsAction.collapse: 'collapse',
   };
 
+  /// Custom actions by name, as TalkBack's actions menu lists them.
   List<String> get actions => [
     for (final entry in _actions.entries)
-      if (data.hasAction(entry.key)) entry.value,
+      if (data.hasAction(entry.key))
+        if (entry.key == ui.SemanticsAction.customAction &&
+            (data.customSemanticsActionIds?.isNotEmpty ?? false))
+          for (final id in data.customSemanticsActionIds!)
+            '«${CustomSemanticsAction.getAction(id)?.label ?? '?'}»'
+        else
+          entry.value,
   ];
 }
 

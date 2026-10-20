@@ -358,13 +358,16 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                                   ],
                                   decoration: InputDecoration(
                                     labelText: material.timePickerHourLabel,
+                                    errorMaxLines: 3,
                                   ),
                                   validator: (value) {
                                     final number = int.tryParse(value ?? '');
                                     return number == null ||
                                             number < (_clock24! ? 0 : 1) ||
                                             number > (_clock24! ? 23 : 12)
-                                        ? l.reviewInvalidTime
+                                        ? (_clock24!
+                                              ? l.scheduleHourRange24
+                                              : l.scheduleHourRange12)
                                         : null;
                                   },
                                 ),
@@ -381,6 +384,7 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                                   ],
                                   decoration: InputDecoration(
                                     labelText: material.timePickerMinuteLabel,
+                                    errorMaxLines: 3,
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
@@ -390,7 +394,7 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                                     return number == null ||
                                             number < 0 ||
                                             number > 59
-                                        ? l.reviewInvalidTime
+                                        ? l.scheduleMinuteRange
                                         : null;
                                   },
                                 ),

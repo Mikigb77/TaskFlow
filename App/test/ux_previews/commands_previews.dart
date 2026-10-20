@@ -527,7 +527,7 @@ void commandPreviews() {
       landed,
       'mixed-applied',
       'All three applied: Calendar says what was added, moved and deleted, with one Deshacer.',
-      [es1, ca2],
+      [es1, ca2, esDark],
       (p) async {
         final app = await PreviewApp.open(
           p,

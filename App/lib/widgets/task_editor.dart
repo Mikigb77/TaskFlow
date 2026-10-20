@@ -1246,6 +1246,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     hasTime: _planningTask.reminderHasTime,
     minutes: _reminderMinutes,
     time: _reminderTime,
+    task: _responsibility,
     onMinutes: (value) => setState(() => _reminderMinutes = value),
     onTime: (value) => setState(() => _reminderTime = value),
   );

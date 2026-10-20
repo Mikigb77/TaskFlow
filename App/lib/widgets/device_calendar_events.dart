@@ -182,7 +182,7 @@ class _EventTile extends ConsumerWidget {
                 title:
                     Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                    '${deviceEventTime(context, event, day)}\n${event.sources.map((c) => c.name).join(' · ')} · ${l.calendarReadOnly}'),
+                    '${deviceEventTime(context, event, day)}\n${event.sources.map((c) => c.name).join(' · ')}'),
                 onTap: () => showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,

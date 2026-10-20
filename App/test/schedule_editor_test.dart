@@ -266,7 +266,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('schedule-done')));
     await tester.pumpAndSettle();
     final l = lookupAppLocalizations(const Locale('es'));
-    expect(find.text(l.reviewInvalidTime), findsNothing);
+    expect(find.text(l.scheduleHourRange24), findsNothing);
+    expect(find.text(l.scheduleHourRange12), findsNothing);
+    expect(find.text(l.scheduleMinuteRange), findsNothing);
     expect(result, isNotNull);
     expect(result!.date, DateTime(2026, 10, 13, 9));
     expect(result!.hasTime, isTrue);
@@ -515,4 +517,70 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-19-app, round 1 · P179 (UX-1421): each field says its range ----
+
+  test('UX-1421: the time fields’ messages read as the plan wrote them', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.scheduleHourRange24, 'Hour from 0 to 23');
+    expect(es.scheduleHourRange24, 'Hora del 0 al 23');
+    expect(ca.scheduleHourRange24, 'Hora del 0 al 23');
+    expect(en.scheduleHourRange12, 'Hour from 1 to 12');
+    expect(es.scheduleHourRange12, 'Hora del 1 al 12');
+    expect(ca.scheduleHourRange12, 'Hora de l’1 al 12');
+    expect(en.scheduleMinuteRange, 'Minutes from 0 to 59');
+    expect(es.scheduleMinuteRange, 'Minutos del 0 al 59');
+    expect(ca.scheduleMinuteRange, 'Minuts del 0 al 59');
+  });
+
+  for (final (hour, minute, clock24, expected) in [
+    ('25', '30', true, 'hour24'),
+    ('10', '75', true, 'minute'),
+    ('13', '30', false, 'hour12'),
+  ]) {
+    testWidgets(
+      'UX-1421: $hour:$minute on a ${clock24 ? 24 : 12}-hour clock says which field is wrong and its range, never «Revisa este valor»',
+      (tester) async {
+        final l = lookupAppLocalizations(const Locale('es'));
+        ScheduleChoice? result;
+        var done = false;
+        await openSchedule(
+          tester,
+          date: DateTime(2026, 10, 13),
+          language: 'es',
+          clock24: clock24,
+          onResult: (value) {
+            done = true;
+            result = value;
+          },
+        );
+        await chooseTime(tester, hour, minute);
+        if (!clock24) {
+          final pm = find.text(
+            MaterialLocalizations.of(
+              tester.element(find.byKey(const ValueKey('schedule-hour'))),
+            ).postMeridiemAbbreviation,
+          );
+          await tester.ensureVisible(pm);
+          await tester.pumpAndSettle();
+          await tester.tap(pm);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byKey(const ValueKey('schedule-done')));
+        await tester.pumpAndSettle();
+        final message = switch (expected) {
+          'hour24' => l.scheduleHourRange24,
+          'hour12' => l.scheduleHourRange12,
+          _ => l.scheduleMinuteRange,
+        };
+        expect(find.text(message), findsOneWidget);
+        expect(find.text('Revisa este valor'), findsNothing);
+        expect(done, isFalse, reason: 'the sheet stays open');
+        expect(result, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

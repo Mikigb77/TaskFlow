@@ -66,8 +66,7 @@ extension TaskFlowLocale on BuildContext {
     'rose' => l10n.colorRose,
     _ => color,
   };
-  String reminderLead(int? minutes) => switch (minutes) {
-    null => l10n.useDefault,
+  String reminderLead(int minutes) => switch (minutes) {
     -1 => l10n.off,
     0 => l10n.atScheduledTime,
     60 => l10n.hourBefore,

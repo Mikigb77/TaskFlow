@@ -18,7 +18,13 @@ class AppLocalizationsCa extends AppLocalizations {
   String get chooseAmPm => 'Tria a. m. o p. m.';
 
   @override
-  String get reviewInvalidTime => 'Revisa aquest valor';
+  String get scheduleHourRange24 => 'Hora del 0 al 23';
+
+  @override
+  String get scheduleHourRange12 => 'Hora de l’1 al 12';
+
+  @override
+  String get scheduleMinuteRange => 'Minuts del 0 al 59';
 
   @override
   String get reviewOptions => 'Més opcions';
@@ -225,7 +231,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get viewOnlyNote =>
-      'Nota de només lectura. El propietari del projecte gestiona els permisos d’edició.';
+      'Nota de només lectura. Si vols fer canvis, demana-ho al propietari del projecte.';
 
   @override
   String get linkOpenError =>
@@ -277,8 +283,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get removeDeadline => 'Treu el termini';
 
   @override
-  String get deadlineRecurringHelp =>
-      'Aquest termini es repeteix amb cada repetició original. Moure una repetició manté el seu termini; canviar l’inici de la sèrie manté el primer termini i modifica l’interval dels següents.';
+  String get deadlineRecurringHelp => 'Cada repetició té el seu propi termini.';
 
   @override
   String get deadlineLatePlan =>
@@ -293,31 +298,20 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get reminderAnchor => 'Recorda-m’ho respecte de';
-
-  @override
-  String get reminderAnchorHelp =>
-      'Un recordatori per repetició, segons la data seleccionada aquí.';
+  String get reminderAnchor => 'Recorda-m’ho abans de';
 
   @override
   String get dayTimeline => 'Horari del dia';
-
-  @override
-  String get timelineFirstPlan => 'Ves al primer element amb hora';
 
   @override
   String get timelineLimit =>
       'Es mostren els primers 200 elements amb hora. Utilitza l’agenda per veure totes les tasques.';
 
   @override
-  String get timelineUnblocked => 'Sense franja horària';
+  String get timelineUnblocked => 'Sense hora';
 
   @override
-  String get timelineNoBlocks =>
-      'No hi ha cap pla amb hora per a aquest dia. Afegeix una hora d’inici i una durada per reservar una franja.';
-
-  @override
-  String get timelinePoint => 'Sense durada · només hora';
+  String get timelineNoBlocks => 'No hi ha res amb hora aquest dia.';
 
   @override
   String timelineHours(int hours) {
@@ -485,7 +479,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get editTask => 'Edita la tasca';
 
   @override
-  String get taskDetails => 'Detalls de la tasca';
+  String get taskScreenTitle => 'Tasca';
 
   @override
   String get addTask => 'Afegeix una tasca';
@@ -519,9 +513,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get high => 'Alta';
-
-  @override
-  String get schedule => 'Planificació';
 
   @override
   String get date => 'Data';
@@ -1051,10 +1042,26 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$done completades',
-      one: '1 completada',
+      other: '$remaining per fer · $done completades',
+      one: '$remaining per fer · 1 completada',
+      zero: '$remaining per fer',
     );
-    return '$remaining per fer · $_temp0';
+    return '$_temp0';
+  }
+
+  @override
+  String overdueDate(String date) {
+    return '$date · Endarrerida';
+  }
+
+  @override
+  String assigneeLabel(String name) {
+    return 'Responsable: $name';
+  }
+
+  @override
+  String projectLabel(String name) {
+    return 'Projecte: $name';
   }
 
   @override
@@ -1187,11 +1194,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get scheduleChangedAgain =>
-      'La planificació ha tornat a canviar. Obre la tasca per revisar-la.';
+      'La data ha tornat a canviar. Obre la tasca per revisar-la.';
 
   @override
   String get scheduleError =>
-      'No s’ha pogut canviar la planificació. Torna-ho a provar.';
+      'No s’ha pogut canviar la data. Torna-ho a provar.';
 
   @override
   String get rescheduleRepeating => 'Canvia la data de la tasca periòdica';
@@ -1217,7 +1224,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get completedEmpty => 'Cada tasca que acabis tindrà un lloc aquí.';
 
   @override
-  String get progressHeading => 'Mira tot el que has fet.';
+  String get completedButton => 'Completades';
 
   @override
   String get completedLoadError =>
@@ -1227,11 +1234,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get tryLater => 'Torna-ho a provar d’aquí a un moment.';
 
   @override
-  String get changeSeriesQuestion => 'Vols canviar la planificació periòdica?';
+  String get changeSeriesQuestion => 'Vols canviar com es repeteix?';
 
   @override
   String get changeSeriesHelp =>
-      'Les dates mogudes o omeses es restabliran segons la planificació nova. Les dates completades es conservaran a l’historial.';
+      'Les dates que vas moure o ometre seguiran la repetició nova. Les dates completades es queden a l’historial.';
 
   @override
   String get keepEditing => 'Continua editant';
@@ -1322,9 +1329,6 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get useDefault => 'Utilitza el valor per defecte';
-
-  @override
   String get atScheduledTime => 'A l’hora planificada';
 
   @override
@@ -1345,6 +1349,22 @@ class AppLocalizationsCa extends AppLocalizations {
   String reminderValue(String value) {
     return 'Recordatori: $value';
   }
+
+  @override
+  String reminderForPerson(String name, String value) {
+    return 'Recordatori per a $name: $value';
+  }
+
+  @override
+  String reminderForPersonOnly(String name) {
+    return 'Recordatori per a $name';
+  }
+
+  @override
+  String get noReminderProjectMuted => 'Sense recordatori: projecte silenciat';
+
+  @override
+  String get noReminderProjectArchived => 'Sense recordatori: projecte arxivat';
 
   @override
   String get fileLocal => 'Només en aquest dispositiu';
@@ -1374,7 +1394,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get fileOpen => 'Obre';
 
   @override
-  String get fileRetry => 'Torna a provar la transferència';
+  String get fileRetry => 'Torna a pujar';
 
   @override
   String get fileRemove => 'Treu el fitxer adjunt';
@@ -2128,11 +2148,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get androidAlertRefreshHelp =>
-      'El període s’actualitza en utilitzar l’aplicació i amb una tasca en segon pla cada hora, quan Android ho permet.';
+      'Els avisos propers s’actualitzen quan obres l’aplicació i, quan Android ho permet, cada hora.';
 
   @override
   String get backgroundAlertRefreshHelp =>
-      'El període s’actualitza en utilitzar l’aplicació i quan el sistema permet l’actualització en segon pla.';
+      'Els avisos propers s’actualitzen quan obres l’aplicació i quan el telèfon ho permet.';
 
   @override
   String get noUpcomingAlerts =>
@@ -2252,10 +2272,10 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Hi ha $count avisos posteriors',
-      one: 'Hi ha 1 avís posterior',
+      other: '$count avisos posteriors encara no estan activats.',
+      one: '1 avís posterior encara no està activat.',
     );
-    return '$_temp0 fora del període actual. La pròxima actualització afegirà els primers que hi càpiguen.';
+    return '$_temp0 La pròxima actualització activarà els més propers.';
   }
 
   @override
@@ -3048,7 +3068,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get listEditingAccessHelp =>
-      'El propietari del projecte gestiona els permisos d’edició.';
+      'Si vols fer canvis, demana-ho al propietari del projecte.';
 
   @override
   String get loadTaskError => 'No s’ha pogut carregar aquesta tasca';
@@ -3059,16 +3079,11 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get viewOnlyTask =>
-      'Tasca compartida de només lectura. El propietari del projecte gestiona els permisos d’edició.';
+  String get viewOnlyTask => 'Només pots veure aquesta tasca.';
 
   @override
   String get stepUpdateError =>
       'No s’ha pogut actualitzar aquest pas. Torna-ho a provar.';
-
-  @override
-  String get checklistCompletionHelp =>
-      'Completar tots els passos no completa la tasca. Utilitza Completa quan hagis acabat.';
 
   @override
   String get diagnosticsPrivacy =>
@@ -3700,7 +3715,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String storageFull(int limit) {
-    return 'El teu espai per a fitxers és ple ($limit MB). Treu fitxers d’altres tasques per fer lloc o fes-te Pro per tenir espai il·limitat.';
+    return 'El teu espai per a fitxers és ple ($limit MB).';
   }
 
   @override

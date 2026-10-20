@@ -18,7 +18,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chooseAmPm => 'Elige a. m. o p. m.';
 
   @override
-  String get reviewInvalidTime => 'Revisa este valor';
+  String get scheduleHourRange24 => 'Hora del 0 al 23';
+
+  @override
+  String get scheduleHourRange12 => 'Hora del 1 al 12';
+
+  @override
+  String get scheduleMinuteRange => 'Minutos del 0 al 59';
 
   @override
   String get reviewOptions => 'Más opciones';
@@ -225,7 +231,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get viewOnlyNote =>
-      'Nota de solo lectura. El propietario del proyecto gestiona el permiso de edición.';
+      'Nota de solo lectura. Si quieres hacer cambios, pídeselo al propietario del proyecto.';
 
   @override
   String get linkOpenError =>
@@ -278,7 +284,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get deadlineRecurringHelp =>
-      'La fecha límite se repite con cada instancia original. Mover una instancia mantiene su fecha límite; cambiar el inicio de la serie mantiene la primera fecha límite y cambia el margen de las siguientes.';
+      'Cada repetición tiene su propia fecha límite.';
 
   @override
   String get deadlineLatePlan =>
@@ -293,31 +299,20 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get reminderAnchor => 'Recordar con respecto a';
-
-  @override
-  String get reminderAnchorHelp =>
-      'Un recordatorio por instancia, según la fecha elegida aquí.';
+  String get reminderAnchor => 'Recordar antes de';
 
   @override
   String get dayTimeline => 'Horario del día';
-
-  @override
-  String get timelineFirstPlan => 'Ir al primer elemento con hora';
 
   @override
   String get timelineLimit =>
       'Se muestran los primeros 200 elementos con hora. Usa la agenda para ver todas las tareas.';
 
   @override
-  String get timelineUnblocked => 'Sin bloque de tiempo';
+  String get timelineUnblocked => 'Sin hora';
 
   @override
-  String get timelineNoBlocks =>
-      'No hay planes con hora para este día. Añade hora de inicio y duración para reservar un bloque.';
-
-  @override
-  String get timelinePoint => 'Sin duración · solo hora';
+  String get timelineNoBlocks => 'No hay nada con hora este día.';
 
   @override
   String timelineHours(int hours) {
@@ -485,7 +480,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get editTask => 'Editar tarea';
 
   @override
-  String get taskDetails => 'Detalles de la tarea';
+  String get taskScreenTitle => 'Tarea';
 
   @override
   String get addTask => 'Añadir tarea';
@@ -519,9 +514,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get high => 'Alta';
-
-  @override
-  String get schedule => 'Programación';
 
   @override
   String get date => 'Fecha';
@@ -1053,12 +1045,40 @@ class AppLocalizationsEs extends AppLocalizations {
       one: '1 pendiente',
     );
     String _temp1 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$remaining pendientes',
+      one: '1 pendiente',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$remaining pendientes',
+      one: '1 pendiente',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$done completadas',
-      one: '1 completada',
+      other: '$_temp0 · $done completadas',
+      one: '$_temp1 · 1 completada',
+      zero: '$_temp2',
     );
-    return '$_temp0 · $_temp1';
+    return '$_temp3';
+  }
+
+  @override
+  String overdueDate(String date) {
+    return '$date · Atrasada';
+  }
+
+  @override
+  String assigneeLabel(String name) {
+    return 'Responsable: $name';
+  }
+
+  @override
+  String projectLabel(String name) {
+    return 'Proyecto: $name';
   }
 
   @override
@@ -1191,11 +1211,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get scheduleChangedAgain =>
-      'La programación ha vuelto a cambiar. Abre la tarea para revisarla.';
+      'La fecha ha vuelto a cambiar. Abre la tarea para revisarla.';
 
   @override
   String get scheduleError =>
-      'No se pudo cambiar la programación. Inténtalo de nuevo.';
+      'No se pudo cambiar la fecha. Inténtalo de nuevo.';
 
   @override
   String get rescheduleRepeating => 'Cambiar la fecha de una tarea recurrente';
@@ -1222,7 +1242,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Aquí encontrarás todas las tareas que termines.';
 
   @override
-  String get progressHeading => 'Mira todo lo que has avanzado.';
+  String get completedButton => 'Completadas';
 
   @override
   String get completedLoadError =>
@@ -1232,11 +1252,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tryLater => 'Inténtalo de nuevo en un momento.';
 
   @override
-  String get changeSeriesQuestion => '¿Cambiar la programación recurrente?';
+  String get changeSeriesQuestion => '¿Cambiar cómo se repite?';
 
   @override
   String get changeSeriesHelp =>
-      'Esto restablece las fechas modificadas u omitidas según la nueva programación. Las fechas completadas permanecen en el historial.';
+      'Las fechas que cambiaste u omitiste seguirán la nueva repetición. Las fechas completadas se quedan en el historial.';
 
   @override
   String get keepEditing => 'Seguir editando';
@@ -1326,9 +1346,6 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get useDefault => 'Usar valor predeterminado';
-
-  @override
   String get atScheduledTime => 'A la hora programada';
 
   @override
@@ -1349,6 +1366,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String reminderValue(String value) {
     return 'Recordatorio: $value';
   }
+
+  @override
+  String reminderForPerson(String name, String value) {
+    return 'Recordatorio para $name: $value';
+  }
+
+  @override
+  String reminderForPersonOnly(String name) {
+    return 'Recordatorio para $name';
+  }
+
+  @override
+  String get noReminderProjectMuted => 'Sin recordatorio: proyecto silenciado';
+
+  @override
+  String get noReminderProjectArchived =>
+      'Sin recordatorio: proyecto archivado';
 
   @override
   String get fileLocal => 'Solo en este dispositivo';
@@ -1378,7 +1412,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fileOpen => 'Abrir';
 
   @override
-  String get fileRetry => 'Reintentar transferencia';
+  String get fileRetry => 'Volver a subir';
 
   @override
   String get fileRemove => 'Eliminar archivo adjunto';
@@ -2126,11 +2160,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get androidAlertRefreshHelp =>
-      'La programación se actualiza al usar la app y mediante una tarea cada hora en segundo plano, cuando Android lo permite.';
+      'Los próximos avisos se actualizan al abrir la app y, cuando Android lo permite, cada hora.';
 
   @override
   String get backgroundAlertRefreshHelp =>
-      'La programación se actualiza al usar la app y cuando el sistema permite actualizar en segundo plano.';
+      'Los próximos avisos se actualizan al abrir la app y cuando el teléfono lo permite.';
 
   @override
   String get noUpcomingAlerts =>
@@ -2249,10 +2283,10 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Hay $count avisos posteriores fuera de la programación actual.',
-      one: 'Hay 1 aviso posterior fuera de la programación actual.',
+      other: '$count avisos posteriores aún no están activados.',
+      one: '1 aviso posterior aún no está activado.',
     );
-    return '$_temp0 La próxima actualización añadirá los primeros que quepan.';
+    return '$_temp0 La próxima actualización activará los más cercanos.';
   }
 
   @override
@@ -3056,7 +3090,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get listEditingAccessHelp =>
-      'El propietario del proyecto gestiona los permisos de edición.';
+      'Si quieres hacer cambios, pídeselo al propietario del proyecto.';
 
   @override
   String get loadTaskError => 'No se ha podido cargar esta tarea';
@@ -3067,16 +3101,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get viewOnlyTask =>
-      'Tarea compartida de solo lectura. El propietario del proyecto gestiona los permisos de edición.';
+  String get viewOnlyTask => 'Solo puedes ver esta tarea.';
 
   @override
   String get stepUpdateError =>
       'No se ha podido actualizar este paso. Inténtalo de nuevo.';
-
-  @override
-  String get checklistCompletionHelp =>
-      'Marcar todos los pasos no completa la tarea. Pulsa Completar cuando hayas terminado.';
 
   @override
   String get diagnosticsPrivacy =>
@@ -3706,7 +3735,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String storageFull(int limit) {
-    return 'Tu espacio para archivos está lleno ($limit MB). Elimina archivos de otras tareas para hacer sitio o hazte Pro para tener espacio ilimitado.';
+    return 'Tu espacio para archivos está lleno ($limit MB).';
   }
 
   @override

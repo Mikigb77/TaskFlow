@@ -305,7 +305,7 @@ void main() {
     // The screen's own list, the outermost one.
     final scrollable = find
         .descendant(
-            of: find.byType(ListView).first,
+            of: find.byType(SingleChildScrollView).first,
             matching: find.byType(Scrollable))
         .first;
     expect(find.descendant(of: scrollable, matching: find.text('Doctor')),
@@ -360,7 +360,7 @@ void main() {
           reason: 'no spinner replaces the screen $when');
       expect(find.byType(CustomAppBar), findsOneWidget,
           reason: 'the app bar stays $when');
-      expect(find.text(en.taskDetails), findsOneWidget, reason: when);
+      expect(find.text(en.taskScreenTitle), findsOneWidget, reason: when);
     });
     final c = screen.container;
     expect(api.meRequests, 1);
@@ -383,10 +383,17 @@ void main() {
       (tester) async {
     final screen = await openScrolledToFiles(tester);
     await finishUpload(tester, (when) {
+      // Unchanged; or, where the file's card got shorter under the end of
+      // the page (one button fewer), resting at the new end.
+      final position =
+          tester.state<ScrollableState>(screen.scrollable).position;
       expect(
-          tester.state<ScrollableState>(screen.scrollable).position.pixels,
-          screen.offset,
-          reason: 'the scroll offset is unchanged $when');
+          position.pixels == screen.offset ||
+              (position.pixels == position.maxScrollExtent &&
+                  position.pixels > screen.offset - 48),
+          isTrue,
+          reason: 'the scroll offset is unchanged $when '
+              '(${position.pixels}, was ${screen.offset})');
       expect(find.text('scan.pdf'), findsOneWidget,
           reason: 'the file stays on screen $when');
     });

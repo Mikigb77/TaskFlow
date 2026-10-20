@@ -1,5 +1,7 @@
 // P91 (UX-500, round 1 of 2026-10-13-app): the file-space usage line and the
 // refused-file messages.
+import 'dart:math' as math;
+
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/main.dart';
@@ -19,6 +21,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_editor.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -228,7 +231,7 @@ void main() {
 
   for (final shared in [false, true]) {
     testWidgets(
-        'UX-500: a file refused for ${shared ? 'a shared project owner’s' : 'the user’s own'} full space says so${shared ? ' without' : ' with'} Ver Pro, never a recovery-code error, and its Retry sends it again',
+        'UX-500: a file refused for ${shared ? 'a shared project owner’s' : 'the user’s own'} full space says so${shared ? ' without' : ' with'} Ver Pro, never a recovery-code error, and ${shared ? 'its Retry sends it again' : 'offers no Retry (UX-1414)'}',
         (tester) async {
       final item = refused(shared: shared);
       for (final language in ['es', 'ca', 'en']) {
@@ -247,6 +250,12 @@ void main() {
         expect(find.textContaining('attachment_problem'), findsNothing);
         expect(find.text(l.fileQueued), findsNothing);
         final retry = find.widgetWithText(TextButton, l.fileRetry);
+        if (!shared) {
+          // A removal or Pro sends it again; a retry can't help.
+          expect(retry, findsNothing);
+          expect(tester.takeException(), isNull);
+          continue;
+        }
         await tester.ensureVisible(retry);
         await tester.pumpAndSettle();
         await tester.tap(retry);
@@ -364,16 +373,15 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  test('UX-506: storageFull points to other tasks, in EN, ES and CA', () {
+  test('UX-1414: storageFull is one sentence, in EN, ES and CA', () {
     final en = lookupAppLocalizations(const Locale('en'));
     final es = lookupAppLocalizations(const Locale('es'));
     final ca = lookupAppLocalizations(const Locale('ca'));
     expect(es.storageFull(100),
-        'Tu espacio para archivos está lleno (100 MB). Elimina archivos de otras tareas para hacer sitio o hazte Pro para tener espacio ilimitado.');
-    expect(en.storageFull(100),
-        'Your file space is full (100 MB). Remove files from other tasks to make room, or get Pro for unlimited space.');
+        'Tu espacio para archivos está lleno (100\u00a0MB).');
+    expect(en.storageFull(100), 'Your file space is full (100\u00a0MB).');
     expect(ca.storageFull(100),
-        'El teu espai per a fitxers és ple (100 MB). Treu fitxers d’altres tasques per fer lloc o fes-te Pro per tenir espai il·limitat.');
+        'El teu espai per a fitxers és ple (100\u00a0MB).');
     for (final l in [en, es, ca]) {
       expect(l.storageFull(100), isNot(contains('Remove a file')));
     }
@@ -614,6 +622,132 @@ void main() {
         expect(find.text(es.fileUploadHelp), findsNothing);
       }
       expect(shown, isNot(contains('MiB')));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  // ---- Run 2026-10-19-app, round 1 · P179 (UX-1414) ----
+
+  /// The card of the file named [name].
+  Finder card(String name) => find
+      .ancestor(of: find.text(name), matching: find.byType(AppSurface))
+      .first;
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+        'UX-1414: a file refused for the account’s own full space (tasks/detail.file-space-full, es, ${scale}x on 360 dp) says one sentence and shows exactly 4 buttons, with no «Reintentar transferencia»; «Eliminar archivo adjunto» is last, in the error colour, at least 12 dp below the others, and no two buttons are under 8 dp apart',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final es = lookupAppLocalizations(const Locale('es'));
+      await pumpPanel(tester,
+          language: 'es',
+          usedMb: 100,
+          textScale: scale,
+          entries: [
+            AttachmentEntry('Billetes de avión.pdf', '/local/billetes.pdf', true,
+                item: refused())
+          ]);
+      final file = card('Billetes de avión.pdf');
+      expect(
+          find.descendant(
+              of: file,
+              matching:
+                  find.text('Tu espacio para archivos está lleno (100\u00a0MB).')),
+          findsOneWidget);
+      final buttons = find.descendant(
+          of: file,
+          matching: find.byWidgetPredicate((widget) => widget is ButtonStyleButton));
+      final labels = [
+        for (final element in buttons.evaluate())
+          tester
+              .widgetList<Text>(find.descendant(
+                  of: find.byWidget(element.widget),
+                  matching: find.byType(Text)))
+              .map((text) => text.data)
+              .join(),
+      ];
+      expect(labels, [
+        es.fileOpen,
+        es.voiceProAction,
+        es.storageSeeTasks,
+        es.fileRemove,
+      ]);
+      expect(find.descendant(of: file, matching: find.text(es.fileRetry)),
+          findsNothing);
+      expect(find.textContaining('transferencia'), findsNothing);
+      final rects = [
+        for (final element in buttons.evaluate())
+          tester.getRect(find.byWidget(element.widget)),
+      ];
+      final remove = rects.last;
+      final others = rects.sublist(0, rects.length - 1);
+      final lowest = others.map((rect) => rect.bottom).reduce(math.max);
+      expect(remove.top - lowest, greaterThanOrEqualTo(12 - 0.5),
+          reason: 'apart from the others');
+      final removeButton = tester.widget<ButtonStyleButton>(
+          find.byWidget(buttons.evaluate().last.widget));
+      final context = tester.element(file);
+      expect(removeButton.style?.foregroundColor?.resolve({}),
+          Theme.of(context).colorScheme.error);
+      for (var i = 0; i < rects.length; i++) {
+        for (var j = i + 1; j < rects.length; j++) {
+          final a = rects[i], b = rects[j];
+          final apart = math.max(
+            math.max(b.left - a.right, a.left - b.right),
+            math.max(b.top - a.bottom, a.top - b.bottom),
+          );
+          expect(apart, greaterThanOrEqualTo(8 - 0.5),
+              reason: '«${labels[i]}» and «${labels[j]}» are $apart dp apart');
+        }
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets(
+      'UX-1414: the removal’s confirm button uses the error colour, like other deletions',
+      (tester) async {
+    final es = lookupAppLocalizations(const Locale('es'));
+    await pumpPanel(tester, language: 'es', usedMb: 100, entries: [
+      AttachmentEntry('Scan.pdf', '/local/scan.pdf', true, item: refused())
+    ]);
+    final remove = find.widgetWithText(TextButton, es.fileRemove);
+    await tester.ensureVisible(remove);
+    await tester.pumpAndSettle();
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    final confirm = find.descendant(
+        of: dialog, matching: find.widgetWithText(FilledButton, es.fileRemove));
+    expect(confirm, findsOneWidget);
+    final colors = Theme.of(tester.element(dialog)).colorScheme;
+    final style = tester.widget<FilledButton>(confirm).style;
+    expect(style?.backgroundColor?.resolve({}), colors.error);
+    expect(style?.foregroundColor?.resolve({}), colors.onError);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+        'UX-1414: a file that failed for another reason offers «Volver a subir» ($language)',
+        (tester) async {
+      final l = lookupAppLocalizations(Locale(language));
+      expect(
+          l.fileRetry,
+          switch (language) {
+            'es' => 'Volver a subir',
+            'en' => 'Upload again',
+            _ => 'Torna a pujar',
+          });
+      await pumpPanel(tester, language: language, entries: [
+        const AttachmentEntry('Blood test results.pdf', '/local/file', true,
+            item: pending)
+      ]);
+      expect(find.widgetWithText(TextButton, l.fileRetry), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
