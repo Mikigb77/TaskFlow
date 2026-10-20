@@ -1,0 +1,105 @@
+{
+ "runId": "2026-10-18-site",
+ "mode": "replan",
+ "round": "b4-r3",
+ "created": "2026-10-19",
+ "conventions": [
+  "Paths are relative to the website root, C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb; app-repo paths start with `App/`, `Backend/` or `.claude/`. Line numbers in this round's packages (WP43, WP44) are today's, read from the files after WP29–WP32 ran and from `verify-b4-r1-*.md`. Search for the code a line number points at before you edit.",
+  "Copy is shown between backticks as EN / ES / CA and is exact; the backticks aren't part of it. Apostrophes are ’ in English and Catalan; quotations use “ ” in English and « » in Spanish and Catalan; Catalan «l·l» uses the middle dot U+00B7. On the home, in the frame and in the live demo, Catalan says «l’aplicació», as the app does; the legal documents keep their own «l’app». Copy marked (organizer's) wasn't written by a reviewer: write it as given and list its Catalan in your notes for a native read.",
+  "Every visible string, alt text, accessible name, title, metadata field and message a package adds or touches exists in English, Spanish and Catalan. English is at `/`, Spanish at `/es/…`, Catalan at `/ca/…`, as the legal pages already are. Home, frame, 404 and demo strings live in `src/content/site/` (WP15 creates it): one object per language with the same TypeScript type, so a missing string fails `npm run check`. The page's language comes from the URL through `useSiteLanguage()` (WP15), never from the browser's language. Dates, times and numbers use `Intl` with the page's language. Developer-only text shown with `?developer=1` may stay English.",
+  "Use the app's own words (`App/lib/l10n/app_{en,es,ca}.arb`): `Add a task` / `Añadir tarea` / `Afegeix una tasca`; `Done` / `Listo` / `Fet`; `Listening · 0:12` / `Escuchando · 0:12` / `S’està escoltant · 0:12`; `Understanding…` / `Entendiendo…` / `Entenent…`; `{n} things to add` / `{n} cosas para añadir` / `{n} coses per afegir`; `Say it again` / `Volver a decirlo` / `Torna-ho a dir`; `See what I said` / `Ver lo que dije` / `Mostra què he dit`; `No date` / `Sin fecha` / `Sense data`; `Check this detail` / `Revisa este dato` / `Revisa aquesta dada`; `Type instead` / `Escribir` / `Escriu`; `One moment…` / `Un momento…` / `Un moment…`; `Try again` / `Reintentar` / `Torna-ho a provar`; `Undo` / `Deshacer` / `Desfés`; `Projects` / `Proyectos` / `Projectes`; `Share` / `Compartir` / `Comparteix`; `Add a note` / `Añadir nota` / `Afegeix una nota`; `Continue with Google` / `Continuar con Google` / `Continua amb Google`; `Settings → Account → Delete account` / `Ajustes → Cuenta → Eliminar cuenta` / `Configuració → Compte → Suprimeix el compte`; dictation / dictado / dictat; `TaskFlow Pro`. The app's teaching example is `Tomorrow, call the dentist and buy bread.` / `Mañana, llamar al dentista y comprar pan.` / `Demà, trucar al dentista i comprar pa.` Visible text never says draft, voice-to-task, allowance, transcript, sync, or list for a project.",
+  "One label per destination, in the header, the phone menu, the footer and in-page links: `#voice` `Try it with your voice` / `Pruébalo con tu voz` / `Prova-ho amb la teva veu`; `#features` `What it does` / `Qué hace` / `Què fa`; `#questions` `Questions` / `Preguntas` / `Preguntes`; `#get-taskflow` (phone menu only) `Coming soon to Android` / `Muy pronto en Android` / `Molt aviat a Android`. Links from the frame keep the page's language prefix (`/es/#voice`, `/ca/#questions`). No link points at `#demo`: WD1 removed the sample walkthrough.",
+  "TaskFlow isn't on Google Play yet (WD9, WD13). Say it's coming soon in plain text. Never a Google Play badge, logo, store link or `play.google.com` URL, never a price, never `100 MB`, and no label that promises a download or an app to explore. TaskFlow is for Android phones only (WD7): the first ‘Android’ in a page's main content carries ™, and the footer says ‘Android is a trademark of Google LLC.’ (WP23). WD2's free-plan line is fixed wording (WP18, WP28); don't rephrase it.",
+  "Type floor for any text a package adds or restyles: sizes in rem, with the root at 100%; body text and paragraphs 1rem (16 px) or more; button labels 1rem or more; small print 0.875rem where it fits; nothing visible under 0.75rem (12 px). Contrast: text 4.5:1 or more; controls, states, field edges and focus rings 3:1 or more; in light and dark. Targets 44 px or more (48 px for the header's controls). Use the site's tokens in `src/styles/global.css` (`--green`, `--ink`, `--muted`, `--paper`, `--surface`, `--mint`, `--lime` and the rest), its `.button` and `.text-link` styles, and `Icon` for every arrow or symbol: no ↗ ↑ ← text glyphs (Manrope lacks some). Keep reduced motion and the demo's focus-to-stage-heading behaviour working.",
+  "Subtract first. Removing something means its markup, its CSS (with the responsive blocks at `@media (max-width: 1100px)`, `800px`, `580px` and `360px`), its images, strings and tests: leave no dead code. Don't add sections, pages, forms, sign-ups, tracking, settings or features that a brief doesn't name.",
+  "Another session's uncommitted work is in TaskFlowWeb; never stage, commit, revert or reformat it. Untracked (theirs): `docs/`, `scripts/check-legal.mjs`, `src/app/[language]/[document]/`, `src/app/terms/`, `src/app/legal/`, `src/app/delete-account/`, `src/components/LegalPage.tsx`, `src/content/legal/`, `src/styles/legal.css`, `tests/legal.spec.ts`. Their uncommitted lines: `src/app/layout.tsx:8` (the legal.css import), `src/components/Footer.tsx` lines 2, 18, 26–32 and 34–36, `src/components/VoiceDemo.tsx:396` (the privacy link), the body of `src/app/sitemap.ts`, `src/app/privacy/page.tsx`, `Dockerfile`, `README.md`, `package.json`, `scripts/deploy-cloud-run.ps1`. Packages marked held in their `commit` field change those files where their brief says, and those changes stay uncommitted for the owner. New files you create (in `src/content/site/`, `src/components/`, `src/app/[language]/` next to `[document]/`) are this run's own and can be committed.",
+  "Committed files must never depend on a held change: they don't import from `src/content/legal/` or `src/components/LegalPage.tsx`, don't pass new props to `VoiceDemo.tsx` or `Footer.tsx`, and leave today's `layout.tsx` working. Held files may use committed ones. When a held package breaks an assertion in a committed test file (`tests/website.spec.ts`), make that assertion independent of the held change (for example, go to `/privacy/` directly instead of through a footer label). Acceptance tests for held packages go in their own files, so they can stay uncommitted with them: `tests/ux-web-voice.spec.ts` (WP26–WP29), `tests/ux-web-frame.spec.ts` (WP22, WP23), `tests/ux-web-legal.spec.ts` (WP24, WP30–WP32); the rest in `tests/ux-web-site.spec.ts`. Held with `VoiceDemo.tsx`: `src/styles/voice.css`, and the demo packages' changes to `tests/voice.spec.ts` and `tests/support/ux-voice.ts`.",
+  "Checks run in WSL from the website root: `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command>'`, with `npm run check`, `npm run legal:check`, `npm run build` (with `SITE_URL=https://taskflow.garbar.tech` whenever canonical, hreflang or og:url matter; before any Playwright run; stop anything listening on port 3000 first), `npm test`, `npm run test:unit`, and the renders `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert \"perf \"` (lab performance: `--workers=1 --grep \"perf \"`). Git runs on Windows. Keep every check passing, and update the existing tests that pin text or flows you change. Keep `PAGES` in `tests/ux-renders.spec.ts` current. Never call the real voice API: tests and renders stub it.",
+  "Today is 2026-10-19. Sample content in the site's own text never names a fixed month or year; anything date-dependent is relative to today. The WD4 hero images are the app's own render and show its date; they're exempt.",
+  "Owner decisions in force: WD1–WD13 in `.claude/ux-web/DECISIONS.md` (2026-10-18, night) are decided, and each brief carries what it needs from them. A part marked ‘waits on WD#’ stays exactly as it is today: don't build it; the tester and the verifier leave it out.",
+  "Every claim must be true of the app on `dev` today (`.claude/ux-review/DECISIONS.md`, the ARB files, `Backend/docs/`). If a brief's copy seems to contradict the app, keep the brief's copy and say so in your notes; don't improvise.",
+  "Round 2 of batch 4 (2026-10-19). Two packages, WP43 (H) then WP44 (L), after WP29–WP32. Every file either package touches holds another session's or this run's held work and stays uncommitted for the owner, as in WP29–WP32: `src/components/VoiceDemo.tsx`, `src/content/site/{types,en,es,ca}.ts` (WP29's new strings commit only together with b3's held ones), `tests/voice.spec.ts`, `tests/support/ux-voice.ts`, `tests/ux-web-voice.spec.ts`; `src/components/LegalPage.tsx`, `src/styles/legal.css`, `src/content/legal/*.ts`, `tests/legal.spec.ts` (the other session's untracked files) and `tests/ux-web-legal.spec.ts`. Change only what the brief names; keep each file's line endings; reformat nothing. Everything else WP29–WP32 did came back fixed: don't undo it."
+ ],
+ "packages": [
+  {
+   "id": "WP45",
+   "title": "Delete page: the support address wraps at ‘@’, not inside the domain",
+   "area": "L",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "WEB-728",
+    "WEB-205",
+    "WEB-204"
+   ],
+   "aliases": {
+    "WEB-728": [
+     "R2L-1"
+    ]
+   },
+   "commit": "Held: `src/components/LegalPage.tsx` is the other session's untracked file, and `tests/ux-web-legal.spec.ts` holds this run's held legal tests. Nothing from this package commits; it goes with WP30–WP32 and WP44 to the owner's WD3 sign-off.",
+   "files": [
+    "src/components/LegalPage.tsx:81-90 (`Contact`, the deletion branch's `.legal-mail-details`; the recipient value `<dd>{company.contactEmail}</dd>` at :84) (held: the other session's untracked file)",
+    "tests/ux-web-legal.spec.ts (one new WEB-728 test, next to the WEB-205 tests at :462-620) (held)"
+   ],
+   "brief": [
+    "WEB-728 (R2L-1, S2) is a regression of WP44, found by the L verifier (`verify-b4-r2-L.md`, ‘Regressions’). WP44's five findings came back fixed: keep everything it did (the 52ch body column, the 1rem values, the hidden h2 on phones, the language switch under the request box, the 360 px block, the shorter version line, the copy fixes).",
+    "What happens today: on /delete-account/, /es/delete-account/ and /ca/delete-account/ at 320 × 568, light and dark, the request box's ‘Send to’ / «Destinatario» / «Destinatari» value breaks inside the domain: ‘taskflow.support@garbar.t’ over ‘ech’ (renders `delete-account.{en,ca}.mobile-w320.light.full.png`, screen 2). WP44 raised `.legal-mail-details dd` from 0.875rem to 1rem (WEB-205), so the 28-character address is about 234 px wide against about 214 px of room, and `.legal-mail-details`' `overflow-wrap: anywhere` (`legal.css:113`) splits it wherever it runs out. A leaver whose mail app didn't open, copying the address by hand, reads ‘garbar.t’ and ‘ech’.",
+    "Fix, from the reviewer: give the address a sensible break point instead of shrinking it. In `LegalPage.tsx:84`, render the recipient value split at the ‘@’ with a `<wbr />` before it, so a narrow box wraps it as ‘taskflow.support’ over ‘@garbar.tech’ and a wide one keeps it on one line. Split the value of `company.contactEmail` (don't hard-code the address), for example `const at = company.contactEmail.indexOf(\"@\");` and `<dd>{at > 0 ? (<>{company.contactEmail.slice(0, at)}<wbr />{company.contactEmail.slice(at)}</>) : company.contactEmail}</dd>`. `<wbr>` adds no character, so the dd's text, a selection and a copy stay exactly `taskflow.support@garbar.tech`; `tests/legal.spec.ts:109` (`toContainText(mail.pathname)`) keeps passing.",
+    "Keep `.legal-mail-details dd` at `1rem` (WEB-205's acceptance needs it) and keep `overflow-wrap: anywhere` on `.legal-mail-details`: it stays the last resort for the subject line and for very large text. No CSS change.",
+    "WEB-205 and WEB-204 are listed only so the tester and the L verifier re-check them next to this change; both came back fixed in round 2. Change nothing for them. The email button sits above the mail details, so a taller ‘Send to’ value can't push it down; confirm the existing WEB-204 test still passes.",
+    "Test (held), in `tests/ux-web-legal.spec.ts` next to the WEB-205 tests: ‘WEB-728: on the delete pages the support address wraps only at the @’. For /delete-account/, /es/delete-account/ and /ca/delete-account/, light and dark: read the address from the request box's `a.button` `mailto:` href (its pathname); take the first `.legal-mail-details dd`; assert that its `textContent` and, after selecting its contents, `window.getSelection().toString()` both equal that address; then group the dd's characters into rendered lines with one `Range` per character (`getClientRects()`, grouped by top). At 320 × 568 there are one or two lines, and with two they are exactly `taskflow.support` and `@garbar.tech`; at 390 × 664 and 1440 × 1000 there is one line. Use `page.setViewportSize` for 320 × 568, as the WEB-204 test does. Edit with exact-match replacements that keep the file's LF line endings.",
+    "Don't touch: `src/styles/legal.css`, the company card's mailto links on /legal/ (`LegalPage.tsx:36`; the verifier found they fit at 320 px), the plain address on the privacy and withdrawal contacts (`LegalPage.tsx:93`, 0.875rem, fits), the subject line, any copy, `src/content/legal/`, the header, the footer, and any file outside `files`."
+   ],
+   "acceptance": [
+    "On /delete-account/, /es/delete-account/ and /ca/delete-account/ at 320 × 568, light and dark: the request box's recipient value (the first `.legal-mail-details dd`, under ‘Send to’ / «Destinatario» / «Destinatari») computes to 16 px, and its rendered lines are either one line or exactly two, `taskflow.support` and `@garbar.tech`; no line break falls inside `taskflow.support` or `garbar.tech`.",
+    "On the same three pages at 390 × 664 and 1440 × 1000: the recipient value is on one line.",
+    "On the same three pages at both projects' viewports: the recipient value's `textContent`, and the text of a selection of it, equal `taskflow.support@garbar.tech`, the address of the email button's `mailto:` link.",
+    "On the same three pages at 320 × 568 and 390 × 664, light and dark: the email button (`.legal-request a.button`) is still fully inside the first screen (WEB-204's existing test passes unchanged), and nothing scrolls sideways at 320 px.",
+    "On the 12 legal pages: `.legal-mail-details dd` and `.legal-company dd` still compute to 16 px or more, and WEB-205's existing tests (52ch, no line over 80 characters at 1440 px, text at 200%) pass unchanged.",
+    "axe reports no violations on the three delete pages, light and dark, at both viewports; `npm run check`, `npm run legal:check` and `npm test` pass."
+   ],
+   "deviceChecks": [
+    "A real 320 px phone (an iPhone SE first generation or a small Android) on /es/delete-account/: the address under «Destinatario» wraps, if at all, as ‘taskflow.support’ over ‘@garbar.tech’, and a long-press copy pastes exactly taskflow.support@garbar.tech.",
+    "Carried from WP44: TalkBack or VoiceOver announcing the request box's hidden heading «Desde la app o por correo»; Android Chrome at its largest text size on a legal page; a native Catalan read of WP30–WP32's Catalan."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": [
+  {
+   "id": "WEB-721",
+   "reason": "Fixed in round 2 (WP43): `verify-b4-r2-H.md` marks it ‘fixed’ (errors.offlineOpening when opening, errors.offline when sending; render and AUDIT §13 cited) and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note."
+  },
+  {
+   "id": "WEB-722",
+   "reason": "Fixed in round 2 (WP43): `verify-b4-r2-H.md` marks it ‘fixed’ (the badge reads ‘Live demo’ in the off and unverified stages; tests :2053, :2061, :2069) and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note."
+  },
+  {
+   "id": "WEB-723",
+   "reason": "Fixed in round 2 (WP43): `verify-b4-r2-H.md` marks it ‘fixed’ (a focused errors.unverified alert under the example, the hand-over below; AUDIT §13: 0 axe violations) and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note. Device: a native Catalan read."
+  },
+  {
+   "id": "WEB-724",
+   "reason": "Fixed in round 2 (WP43): `verify-b4-r2-H.md` marks it ‘fixed’ (errors.processing as the focused alert, the same X-Request-Id on Try again) and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note."
+  },
+  {
+   "id": "WEB-726",
+   "reason": "Fixed in round 2 (WP44): `verify-b4-r2-L.md`'s table marks it ‘fixed’ (the version line reads only ‘In force since 19 October 2026’; `tests/legal.spec.ts:28-31`) and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note."
+  },
+  {
+   "id": "WEB-727",
+   "reason": "Fixed in round 2 (WP44): `verify-b4-r2-L.md`'s table marks it ‘fixed’ (‘We don’t keep your photo.’ / «No guardamos tu foto.» / «No desem la foto.») and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note."
+  },
+  {
+   "id": "WEB-725",
+   "reason": "Fixed in round 2 (WP44): `verify-b4-r2-L.md`'s table marks it ‘fixed’ (the three spaces; the grep has no copy hits) and no test failed. The round's ‘not checked’ list misread the note's format. Not re-planned; close records it from that note."
+  }
+ ],
+ "escalated": [],
+ "notes": [
+  "WEB-205 and WEB-204 came back ‘fixed’ in round 2 (`verify-b4-r2-L.md`). They are in WP45 only to be re-checked next to the address change; they count as a second failure only if WP45 breaks them.",
+  "WEB-721 to WEB-727 came back ‘fixed’ in round 2; see `skipped`. The round's ‘not checked’ list misread the verify notes' formats (the H note's bold ‘· fixed’ lines and the L note's table)."
+ ]
+}

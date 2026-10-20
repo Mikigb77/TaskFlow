@@ -395,3 +395,52 @@ This is the re-plan after batch 3's second round (WP39–WP41), made on 2026-10-
 - WP29 runs after WP42. Tell its implementer to keep the `!retryPending` exclusion in `listening` when it extends `.voice-retry`, and to look at the non-JSON 5xx case above.
 - For a native Catalan read (unchanged from round 2): «Hi podràs tornar a provar avui a les {time}.», «… a la {time}.», «… {weekday} a la {time}.», and `tryAgain` «Torna-ho a provar».
 - If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Round 2 (b4)
+
+This is the re-plan after batch 4's first round (WP29–WP32), made on 2026-10-19. The round check failed on two site tests, WEB-205's line length and WEB-204 at 320 × 568; no existing test broke. Every finding in WP29–WP32 came back fixed except two, which came back partly fixed: WEB-205 and WEB-204 (first failure each). The verifiers reported seven regressions, now WEB-721 to WEB-727. This round has two packages, no new decisions and no escalations. Full briefs: `plan-b4-r2.json`.
+
+### WP43 · Live demo: honest messages when opening fails, the check gives up, or you stop waiting · H · M · **held** (with VoiceDemo.tsx) · S2
+- WEB-721 (R1H-1), a regression of WP29: opening the demo with no connection says only ‘No connection. Check Wi-Fi or mobile data and try again.’ (new `errors.offlineOpening`, EN/ES/CA), not the sending message that promises a kept recording. Sending offline keeps the full message.
+- WEB-722 (R1H-2), a regression of WP29: when the demo is off or the security check has given up, the header badge says ‘Live demo’ / «Demo en directo» / «Demo en directe» instead of ‘3 of 3 tries left’.
+- WEB-723 (R1H-3), a regression of WP29: after the security check fails twice, a focused alert under the example says why: ‘The security check didn’t load, so the live demo can’t run here. The example above shows what TaskFlow does.’ (EN/ES/CA; Catalan for a native read). The hand-over stays under it.
+- WEB-724 (R1H-4), a regression of WP29: after Stop waiting, the existing ‘Still understanding. Try again in a moment; it won’t use another try.’ shows as a focused alert, so the visitor knows Try again is free.
+
+### WP44 · Legal pages: 80-character lines, the delete button above a small phone's fold, three copy fixes · L · M · **held** (legal files) · S2
+- WEB-205, partly fixed by WP30: 68ch held about 93 characters in Manrope, so the body column becomes 58ch (lower in 2ch steps, not under 52ch, if a line still passes 80). The company card's and the mail details' values go from 14 px to 16 px.
+- WEB-204, partly fixed by WP32: at 320 × 568 the email button ended at 682–740 px. My layout decision, subtract first: the version line loses the company name (WEB-726); on phones the box's heading ‘In the app or by email’ is hidden visually but stays its accessible name; on the delete page only, the language switch moves to just under the request box (the header, Menu and footer keep theirs); and under 360 px the delete page's top padding and box padding shrink a little. Estimated: the Catalan button ends near 555 px. If you'd rather keep the language switch at the top, say so; the button then stays below the fold at 320 px in Catalan and Spanish.
+- WEB-726 (R1L-2), a regression of WP30: the version line reads only ‘In force since 19 October 2026’; no company name, no dangling ‘·’. The footer and the legal notice still name GARBAR, IN-TEC, S.L.
+- WEB-727 (R1L-3), a regression of WP31: privacy §2 says ‘We don’t keep your photo.’ / «No guardamos tu foto.» / «No desem la foto.» The surname promise goes, because `Backend/core/google_auth.py` falls back to Google's full name when the first name is missing.
+- WEB-725 (R1L-1), a regression of WP32: the missing space on the delete page §4: ‘Backups expire on their own. Restricted…’ in all three languages.
+
+### Noted, not planned
+- WEB-720 (WP42's held Try again: its focus ring fades with `opacity: 0.55`) is still open and touches the same files as WP43. It didn't fail in this round, so it isn't re-planned; it's a two-line fix the main session can add to WP43's implementer notes if you want it in this batch.
+- The English terms description still says ‘AI drafts’ (`src/content/legal/en.ts:144`) and now also travels as the link preview's description (L verifier, not a regression). It needs an ID at the next legal review: EN `Terms and Conditions for using TaskFlow, including accounts, shared projects, dictation and subscriptions.`
+- Privacy §2 and §4 still say ‘drafts’, ‘allowances’, ‘transcript’ and ‘AI Studio/Gemini API route’, outside WEB-209's list (L verifier). Same: an ID at the next legal review.
+- The hand-over says ‘Coming soon to Google Play’ (WP28's string), while the conventions say ‘Coming soon to Android’; and the privacy line says ‘Google’s AI’ (H verifier, outside WP29). Worth a look at the next home review.
+- `hyphens: auto` splits ‘com-pany’ in the English legal-notice h1 at 390 px (WP30 implementer). The verifier didn't flag it.
+
+### For the main session
+- WP43 and WP44 change only held files; nothing from this round commits. WP43's two new strings sit with WP29's held `errors` strings.
+- For the owner's WD3 sign-off: WP44 removes the company name from the version line on every legal page and moves the delete page's language switch under the request box.
+- For a native Catalan read: WP43's «La comprovació de seguretat no s’ha carregat, així que la demo en directe no pot funcionar aquí. L’exemple de dalt mostra què fa TaskFlow.», plus WP29's strings (‘Encara ho estic entenent. Pot trigar fins a mig minut.’, ‘Deixa d’esperar’, ‘Torna’l a gravar; no ha comptat com un intent.’) and WP30–WP32's Catalan.
+- If WEB-205 or WEB-204 fails again, it's escalated, not re-planned.
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Round 3 (b4)
+
+This is the re-plan after batch 4's second round (WP43, WP44), made on 2026-10-19. The round check passed and the tester reported no failures. Both verifiers marked every finding fixed: WEB-721 to WEB-724 (WP43) and WEB-205, WEB-204, WEB-725 to WEB-727 (WP44). The L verifier found one regression, now WEB-728. This round has one package, no new decisions and no escalations. Full brief: `plan-b4-r3.json`.
+
+### WP45 · Delete page: the support address wraps at ‘@’, not inside the domain · L · S · **held** (LegalPage.tsx) · S2
+- WEB-728 (R2L-1), a regression of WP44: at 16 px the ‘Send to’ address on the three delete pages breaks as ‘taskflow.support@garbar.t’ / ‘ech’ on a 320 px phone. A `<wbr />` before the ‘@’ makes it wrap as ‘taskflow.support’ / ‘@garbar.tech’; the text stays 16 px and copies exactly.
+- WEB-205 and WEB-204: re-checked only, next to this change. Both came back fixed in round 2 and nothing changes for them.
+
+### Noted, not planned
+- WEB-721 to WEB-727 were handed to this re-plan as ‘not checked by the reviewer’, but `verify-b4-r2-H.md` and `verify-b4-r2-L.md` mark each of them ‘fixed’ with evidence, and no test failed. The round's list misread the notes' formats. They aren't re-planned; close should record them from those notes.
+- The L verifier's notes, not regressions: the 52ch desktop column leaves a wide empty band beside the prose; the desktop delete page shows two language switches in the first screen; the company card's registry line runs to about 95 characters at 1440 px. All three follow from the briefs. They're polish at most.
+- WEB-720 (WP42's held Try again: its focus ring fades) is still open, as in round 2.
+
+### For the main session
+- WP45 changes only held files (`src/components/LegalPage.tsx`, `tests/ux-web-legal.spec.ts`); nothing from this round commits.
+- Round 3 is batch 4's last. If WEB-728 fails, it's escalated. If WP45 breaks WEB-205 or WEB-204, that's their second failure, so they're escalated too.
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
