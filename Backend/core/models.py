@@ -74,6 +74,20 @@ class EmailVerification(models.Model):
     delivery_id = models.UUIDField(null=True, blank=True)
 
 
+class PasswordReset(models.Model):
+    # The live password-recovery code of an account (docs/PASSWORD_RECOVERY.md): only a salted
+    # digest, never the code. Its own table, apart from sign-up codes, so neither code can stand
+    # in for the other. A new code replaces the last one; the row goes once the password is set.
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="password_reset")
+    code_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)  # wrong guesses at this code
+    sent_at = models.DateTimeField()  # the latest code; one a minute at most
+    hour_started_at = models.DateTimeField()  # with sent_this_hour: five codes an hour at most
+    sent_this_hour = models.PositiveSmallIntegerField(default=0)
+    delivery_id = models.UUIDField(null=True, blank=True)  # as EmailVerification.delivery_id
+
+
 class GoogleIdentity(models.Model):
     # Google's stable subject, never email, is the external account identifier.
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="google_identity")

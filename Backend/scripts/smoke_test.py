@@ -83,8 +83,10 @@ def main():
     matching = [m for m in inbox["messages"] if any(to["Address"] == email for to in m["To"])]
     assert matching, "Recovery email was not delivered to Mailpit"
     message = requests.get("http://mailpit:8025/api/v1/message/" + matching[0]["ID"], timeout=10).json()
-    code = message["Text"].replace("\r\n", "\n").split("recovery code in the app:\n", 1)[1].splitlines()[0]
-    call("auth/password-reset/confirm/", {"code": code, "password": secrets.token_urlsafe(24)})
+    # The 6-digit code is in the subject, «Your TaskFlow recovery code: 123456» (docs/PASSWORD_RECOVERY.md).
+    code = message["Subject"].rsplit(":", 1)[1].strip()
+    assert code.isdigit() and len(code) == 6, "Recovery email has no 6-digit code"
+    call("auth/password-reset/confirm/", {"email": email, "code": code, "password": secrets.token_urlsafe(24)})
     call("auth/me/", token=token, method="GET", expected=401)
     print("PASS recovery email delivery, reset and session revocation")
     call("auth/logout/", {}, other["access"], expected=204)

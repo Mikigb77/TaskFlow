@@ -339,9 +339,9 @@ class EmailVerificationTests(VerificationTestCase):
     def test_a_password_reset_confirms_the_address(self):
         self.register()
         self.assertEqual(self.client.post("/api/auth/password-reset/", {"email": EMAIL}, format="json").status_code, 200)
-        recovery = re.search(r"recovery code in the app:\n(\S+)", mail.outbox[1].body).group(1)
+        recovery = code_in(mail.outbox[1])  # the 6-digit recovery code (docs/PASSWORD_RECOVERY.md)
         response = self.client.post("/api/auth/password-reset/confirm/",
-                                    {"code": recovery, "password": OTHER_PASSWORD}, format="json")
+                                    {"email": EMAIL, "code": recovery, "password": OTHER_PASSWORD}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
         self.assertTrue(User.objects.get().email_verified)
         self.assertFalse(EmailVerification.objects.exists())

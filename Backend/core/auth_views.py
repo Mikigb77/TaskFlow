@@ -1,9 +1,7 @@
 import hashlib
 import re
 from datetime import timedelta
-from urllib.parse import urlencode
 
-from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
@@ -11,8 +9,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed, Throttled, ValidationError
 from rest_framework.permissions import AllowAny
@@ -26,7 +23,8 @@ from rest_framework_simplejwt.utils import get_md5_hash_password
 from .email_verification import (MAX_WRONG_ATTEMPTS, code_matches, email_language, has_live_code, issue_code,
                                  mark_verified, resend_code, send_code, send_new_code, take_over_unconfirmed, unconfirmed,
                                  verification_required)
-from .models import EmailVerification, User, LoginSession
+from .models import EmailVerification, PasswordReset, User, LoginSession
+from .password_reset import code_matches as reset_code_matches, request_reset, set_new_password
 from .serializers import EMAIL_EXISTS, RegistrationSerializer, UserSerializer
 from .staging import ensure_registration_allowed
 
@@ -241,36 +239,65 @@ class MeView(APIView):
         return Response(UserSerializer(request.user).data)
 
 
+RECOVERY_REQUESTED = {"detail": "If that account exists, a recovery email has been sent."}
+PASSWORD_UPDATED = {"detail": "Password updated. Sign in with your new password."}
+
+
 class ResetRequestView(PublicAuthView):
+    """Email a 6-digit recovery code (docs/PASSWORD_RECOVERY.md)."""
     throttle_scope = "recovery"
 
     def post(self, request):
         email = serializers.EmailField().run_validation(request.data.get("email"))
-        user = User.objects.filter(email__iexact=email.strip(), is_active=True).first()
-        if user:
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            link = settings.PASSWORD_RESET_BASE_URL + "#" + urlencode({"uid": uid, "token": token})
-            from .models import EmailDelivery
-            from .email_delivery import reserve_email, deliver_email
-            from rest_framework.exceptions import Throttled
-            try:
-                reserve_email(user.email)
-            except Throttled:
-                # Never reveal whether a mailbox has an account or is quota-limited.
-                return Response({"detail": "If that account exists, a recovery email has been sent."})
-            message = EmailDelivery.objects.create(
-                recipient=user.email, subject="Reset your TaskFlow password",
-                body=f"Use this link within 30 minutes:\n{link}\n\nOr paste this recovery code in the app:\n{uid}:{token}\n\nIf you did not request this, ignore this email.",
-                expires_at=timezone.now() + timedelta(minutes=30))
-            deliver_email(message.pk)
-        return Response({"detail": "If that account exists, a recovery email has been sent."})
+        request_reset(email, email_language(request.data.get("language")) or "en")
+        # The same answer whether or not the account exists, and whether or not a code went out.
+        return Response(RECOVERY_REQUESTED)
 
 
 class ResetConfirmView(PublicAuthView):
+    """Set a new password with the emailed code (docs/PASSWORD_RECOVERY.md).
+
+    {"email", "code": "123456", "password"}. The long uid:token code of the emails sent before
+    6-digit codes still works without the email, for older app builds and reset.html."""
+
     def post(self, request):
-        code = serializers.CharField(max_length=300).run_validation(request.data.get("code"))
         password = serializers.CharField(max_length=128, trim_whitespace=False).run_validation(request.data.get("password"))
+        raw = request.data.get("code")
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            raw = f"{raw:06d}"  # a code sent as a JSON number loses its leading zeros
+        code = serializers.CharField(max_length=300).run_validation(raw)
+        if ":" in code:
+            return self.confirm_link_code(code, password)
+        code = re.sub(r"[\s-]", "", code)
+        if not re.fullmatch(r"[0-9]{6}", code):
+            return Response(CODE_INVALID, status=400)
+        if not request.data.get("email"):
+            # Without an address there's no account to check the code against: as for an unknown one.
+            return Response(CODE_EXPIRED, status=400)
+        email = serializers.EmailField(max_length=254).run_validation(request.data.get("email")).strip().casefold()
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(email__iexact=email, is_active=True).first()
+            row = PasswordReset.objects.select_for_update().filter(user=user).first() if user else None
+            # Unknown, expired and locked after 5 wrong tries look the same.
+            if row is None or row.expires_at <= timezone.now() or row.attempts >= MAX_WRONG_ATTEMPTS:
+                return Response(CODE_EXPIRED, status=400)
+            if not reset_code_matches(row, code):
+                row.attempts += 1
+                row.save(update_fields=["attempts"])
+                # Returned, not raised, so the wrong try is still counted when the block commits.
+                return Response(CODE_INVALID, status=400)
+            try:
+                validate_password(password, user)
+            except DjangoValidationError as error:
+                # The code stays good, untried: the person picks another password and sends it again.
+                raise ValidationError({"password": error.messages})
+            set_new_password(user, password)
+        # The person proved the mailbox, so a lock from earlier wrong passwords doesn't keep them out.
+        cache.delete(login_fail_key(email))
+        return Response(PASSWORD_UPDATED)
+
+    def confirm_link_code(self, code, password):
+        """The uid:token code, checked by Django's token generator, as before."""
         try:
             uid, token = code.split(":", 1)
             user_id = urlsafe_base64_decode(uid).decode()
@@ -279,13 +306,10 @@ class ResetConfirmView(PublicAuthView):
                 if not default_token_generator.check_token(user, token):
                     raise ValueError()
                 validate_password(password, user)
-                user.set_password(password)
-                user.save(update_fields=["password"])
-                # The recovery email proved the address, which confirms an unconfirmed sign-up.
-                mark_verified(user)
-                LoginSession.objects.filter(user=user).update(revoked=True)
+                set_new_password(user, password)
         except DjangoValidationError as error:
             raise ValidationError({"password": error.messages})
         except (ValueError, TypeError, OverflowError, UnicodeError, User.DoesNotExist):
-            raise ValidationError({"code": "This recovery code is invalid or expired."})
-        return Response({"detail": "Password updated. Sign in with your new password."})
+            return Response(CODE_EXPIRED, status=400)
+        cache.delete(login_fail_key(user.email))
+        return Response(PASSWORD_UPDATED)

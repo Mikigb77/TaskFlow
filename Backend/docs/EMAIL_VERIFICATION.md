@@ -90,7 +90,7 @@ These count as confirmed:
 - every account that existed before this feature (data migration `0020_email_verification`);
 - Google sign-in, whose token must say the email is verified;
 - linking Google to an account with the same email;
-- completing a password reset, because the reset email proves the address;
+- completing a password reset, because the reset email proves the address (`docs/PASSWORD_RECOVERY.md`);
 - the local test account (`seed_test_user`), which also confirms one that signed up in the app and never entered the code;
 - `createsuperuser`;
 - sign-ups while verification is off, so turning it on later never locks them out or lets anyone replace them.

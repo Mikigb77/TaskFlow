@@ -68,11 +68,11 @@ def has_live_code(user):
         user=user, expires_at__gt=timezone.now(), attempts__lt=MAX_WRONG_ATTEMPTS).exists()
 
 
-def _scrub_delivery(delivery_id, *, cancel):
+def _scrub_delivery(delivery_id, *, cancel, subject=SCRUBBED_SUBJECT):
     """Take the code out of an outbox row; with cancel, an unsent one is also cancelled."""
     if delivery_id is None:
         return
-    changes = {"subject": SCRUBBED_SUBJECT}
+    changes = {"subject": subject}
     if cancel:
         changes.update(body="", state=Case(When(state="pending", then=Value("cancelled")), default=F("state")))
     EmailDelivery.objects.filter(pk=delivery_id).update(**changes)

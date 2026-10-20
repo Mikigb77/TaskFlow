@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from core.email_delivery import deliver_email
-from core.models import EmailDelivery, RuntimeState
+from core.models import EmailDelivery, PasswordReset, RuntimeState
 
 
 class Command(BaseCommand):
@@ -19,4 +19,6 @@ class Command(BaseCommand):
         RuntimeState.objects.filter(expires_at__lt=now - timedelta(days=1)).delete()
         EmailDelivery.objects.filter(expires_at__lte=now).delete()
         OutstandingToken.objects.filter(expires_at__lt=now).delete()
+        # Recovery codes that expired over an hour ago: past their sending limits' hour too.
+        PasswordReset.objects.filter(expires_at__lt=now - timedelta(hours=1)).delete()
         self.stdout.write(f"Maintenance complete; {processed} pending messages processed.")
