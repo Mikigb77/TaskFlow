@@ -40,6 +40,8 @@ class InvitationCard extends StatelessWidget {
 }
 
 /// Every pending invitation, one card each; [kind] keeps only that kind.
+/// When they can't load, offline for example, it shows nothing, as Calendar
+/// does: they load again on the next refresh.
 class PendingInvitations extends ConsumerWidget {
   const PendingInvitations({super.key, this.kind});
   final String? kind;
@@ -49,10 +51,7 @@ class PendingInvitations extends ConsumerWidget {
       .watch(pendingInvitationsProvider)
       .when(
         loading: () => const SizedBox.shrink(),
-        error: (_, __) => TextButton(
-          onPressed: () => ref.invalidate(pendingInvitationsProvider),
-          child: Text(context.l10n.retryInvitations),
-        ),
+        error: (_, __) => const SizedBox.shrink(),
         data: (invitations) => Column(
           children: [
             for (final invitation in invitations.where(
@@ -358,13 +357,35 @@ void showJoined({
   } else if (replace) {
     navigator.pop(true);
   }
-  if (messenger.mounted) showFeedback(messenger, strings.joinedInvitation(name));
+  // The page the person lands on; pops nothing.
+  Route<Object?>? joined;
+  navigator.popUntil((top) {
+    joined = top;
+    return true;
+  });
+  final feedback = messenger.mounted
+      ? showFeedback(messenger, strings.joinedInvitation(name))
+      : null;
   // An account without a name is asked for one, once, over what it joined.
   final account = ProviderScope.containerOf(
     navigator.context,
     listen: false,
   ).read(authProvider).account;
   if (account != null) {
-    unawaited(askForNameOnce(navigator, accountId: account.id));
+    unawaited(_askForNameAfter(navigator, feedback, joined, account.id));
   }
+}
+
+/// Asks the name only once «Te has unido a…» has closed, and only while the
+/// person is still on [joined].
+Future<void> _askForNameAfter(
+  NavigatorState navigator,
+  Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>? feedback,
+  Route<Object?>? joined,
+  int accountId,
+) async {
+  final bar = await feedback;
+  if (bar != null) await bar.closed;
+  if (joined != null && !joined.isCurrent) return;
+  await askForNameOnce(navigator, accountId: accountId);
 }

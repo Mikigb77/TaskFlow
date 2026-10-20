@@ -455,3 +455,65 @@ Nothing.
 
 ### Phone checks added
 - P207: on the emulator lane at 2.0 on 393 dp, the Día view of today with one date-only task at priority Media shows «Sin hora», the whole row, a line under it, then the first timed task.
+
+## Round 2 (b4)
+
+Round 1 of b4 (P181–P185) fixed all 18 of its findings, according to review C's notes (`verify-b4-r1-C.md`), and the round check passed. Six regressions came back: one major (Activity), one minor (the archived project bar) and four polish items, now UX-1640 to UX-1645. Round 2 fixes them in three small packages, written to `plan-b4-r2.json`. Nothing has failed twice, so nothing is escalated. There's no new question for you.
+
+### P210 · S3 · C · S · Activity: a task not on the phone yet waits for the sync before saying it may be deleted
+- **UX-1640 (S3), R1C-1 from P183:** a task the phone already has still opens at once. When the phone doesn't have it yet, the row shows a spinner while the sync it already started finishes, and then opens the task. Only a task still missing after that sync gets «Es posible que esta tarea se haya eliminado.». A «ha eliminado» entry says so at once. If the person has meanwhile opened something else or left Activity, the late result is dropped quietly. No new copy.
+
+### P211 · S2 · C · S · Archived project bar: say «Restáuralo» only to someone who has the button
+- **UX-1641 (S2), R1C-2 from P184:** a reader of an archived project, or anyone on a project archived with its group, reads «Proyecto archivado.» (new key `archivedListNoAdd`; EN “Archived project.”, CA «Projecte arxivat.»). «Proyecto archivado. Restáuralo para añadir tareas.» shows only above the «Restaurar proyecto» button. This corrects the round 1 brief, which gave the group case the line without the button.
+
+### P212 · S1 · C · S · Sharing polish: «Miembros» named once and the same everywhere, «(tú)» on the group, one invite wording
+- **UX-1642 (S1), R1C-3 from P181:** the Proyectos ⋮ item reads «Miembros» for any shared project, and «Compartir» only for an unshared project of your own, as the project page's button does.
+- **UX-1643 (S1), R1C-4:** the owner's members page drops the «MIEMBROS» section label when the app bar already reads «Miembros». It keeps the label under «Compartir proyecto».
+- **UX-1644 (S1), R1C-5:** the group's members list marks your own row «María (tú)», as the project's list does. The group preview fixture stops using the role 'member', which the server never sends.
+- **UX-1645 (S1), R1C-6:** the group invite help becomes «Esa persona verá todos los proyectos de este grupo. Le enviaremos una invitación por correo.» (EN “They’ll see every project in this group. We’ll email them an invitation.”; CA «Aquesta persona veurà tots els projectes d’aquest grup. Li enviarem una invitació per correu.»).
+
+### Order
+P210, then P211, then P212. None depends on another. P211 and P212 both edit the three ARB files.
+
+### Skipped
+Nothing.
+
+### Noted, not planned
+Review C noted these and didn't count them. Each was there before round 1, or lies outside its brief:
+- The archived project page still offers «Compartir» (P184's implementer said the same).
+- On the unavailable-invitation screen, the app bar's and the system Back still postpone the dead link instead of clearing it (`main.dart:254`).
+- A read-only note (viewer) still reads in TalkBack as an unnamed SelectableText.
+- The preview audit records no tap hints (`test/ux_previews/support/audit.dart:203`), so «Editar nota» can't be seen in AUDIT.md (P185's note).
+- AUDIT.md shows a 0 dp gap between «Aceptar invitación» / «Reintentar» and «Ahora no» (P182's note).
+- Deleting a project from its own sharing page still waits for the sync before closing (P183's note).
+
+The next review of area C can raise any of these as findings.
+
+### Notes for the main session
+- UX-1514's server half (`assignee_name`, `assignee_is_you`) and its staging check stay with you.
+- Catalan still needing a native read: «{actor} ha assignat {name}: {title}» and «Com funciona compartir» (UX-1524).
+
+### Phone checks added
+- P210: on a phone with two accounts, Lucía creates a task in a shared project. On the other phone, open Activity before any other sync and tap «Lucía ha creado…»: a spinner shows on the row, then the task opens.
+
+## Round 3 (b4)
+
+Round 2 of b4 (P210–P212) fixed all 6 of its findings, according to review C (`verify-b4-r2-C.md`), and the tests and the round check passed. Two small regressions came back, both on P210's new waiting row in Activity. They are now UX-1646 and UX-1647. Round 3 fixes them in one small package, written to `plan-b4-r3.json`. Nothing has failed twice, so nothing is escalated, and there's no new question for you.
+
+### P213 · S2 · C · S · Activity waiting row: TalkBack hears «Buscando la tarea…», and the text stays where it was
+- **UX-1646 (S2), R2C-1 from P210:** while a tapped entry waits for its task, TalkBack says «Buscando la tarea…» once, and the row reads that way. New key `activityFindingTask`: EN “Finding the task…” / ES «Buscando la tarea…» / CA «S’està cercant la tasca…». It doesn't reuse «Sincronizando».
+- **UX-1647 (S1), R2C-2 from P210:** the spinner at the row's end goes. A 2 dp bar along the row's bottom edge shows the wait instead, so the entry's words keep their width and nothing below moves under the finger. A second tap still does nothing.
+
+### Skipped
+Nothing.
+
+### Noted, not planned
+Review C noted these and didn't count them:
+- If the tasks sync itself fails (the connection drops after Activity loaded), the waiting row still ends with «Es posible que esta tarea se haya eliminado.» rather than «No se ha podido cargar. Revisa la conexión.». It's rare, because Activity needs the network to list entries, and the check needs care, because the repository's sync error is also set for list conflicts.
+- The Projects delete spinner (`task_lists_screen.dart:365-374`) has the same TalkBack gap as UX-1646.
+- The group invite dialog at 2× scrolls its title out of view, cuts «0/254» and wraps «Enviar invitación» to two lines (there before P212; P212's implementer saw it too). AUDIT.md also gives the counter 4.3:1 contrast. Emails still break mid-word at 2× on the group and project members pages, and «Transferir propiedad» measures 15 dp tall.
+
+The next review of area C can raise any of these as findings.
+
+### Phone checks added
+- P213 (emulator lane with TalkBack, then the phone): double-tap an entry whose task the phone hasn't synced yet. TalkBack says «Buscando la tarea…» once, then the task opens. At the largest text, the entry's words don't move when the bar appears.

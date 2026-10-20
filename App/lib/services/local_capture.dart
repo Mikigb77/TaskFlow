@@ -39,6 +39,37 @@ const noteTitleLength = 60;
   return (title: title.trim(), rest: words.substring(end).trim());
 }
 
+/// Short linking words a note's title never ends on, in Spanish, Catalan
+/// and English: «…preguntar por el comedor y por la» loses «y por la».
+const _linkingWords = {
+  'y', 'o', 'de', 'del', 'la', 'el', 'los', 'las', 'por', 'para', 'a', 'en',
+  'con', 'que', 'i', 'els', 'les', 'per', 'amb', 'and', 'or', 'of', 'the',
+  'to', 'for', 'with',
+};
+
+/// A note's title: [leadingTitle] at [noteTitleLength], ended at a «:» or
+/// «;» with at least 3 words before it, and never on a short linking word.
+/// «Para la reunión del cole: preguntar por…» is titled «Para la reunión del
+/// cole».
+String noteLeadingTitle(String text) {
+  var title = leadingTitle(text, noteTitleLength).title;
+  final colon = RegExp(r'[:;](?=\s|$)').firstMatch(title);
+  if (colon != null) {
+    final before = title.substring(0, colon.start).trim();
+    if (before.split(RegExp(r'\s+')).length >= 3) title = before;
+  }
+  final trailing = RegExp(r'[\s,;:\-–—]+$');
+  title = title.replaceFirst(trailing, '');
+  while (true) {
+    final space = title.lastIndexOf(RegExp(r'\s'));
+    if (space < 0 ||
+        !_linkingWords.contains(title.substring(space + 1).toLowerCase())) {
+      return title;
+    }
+    title = title.substring(0, space).replaceFirst(trailing, '');
+  }
+}
+
 /// A capture's result built on the phone, with no network: typing without
 /// Pro, and saving the words as written.
 ///
@@ -62,7 +93,7 @@ List<CaptureDraft> localDrafts(
         task: Task(
           kind: 'note',
           listId: projectId,
-          title: leadingTitle(words, noteTitleLength).title,
+          title: noteLeadingTitle(words),
           priority: 1,
           notes: words,
         ),

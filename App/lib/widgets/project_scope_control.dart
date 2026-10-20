@@ -96,20 +96,25 @@ class ProjectScopeControl extends ConsumerWidget {
         children: [
           if (showScope)
             ActionChip(
+              // As wide as the row allows. The icon keeps its own room at
+              // any text size, and the padding is the other chips', so
+              // «Todos los proyectos» fits whole at 2× on 360 dp.
+              padding: _chipPadding,
+              avatarBoxConstraints: const BoxConstraints.tightFor(
+                width: 20,
+                height: 20,
+              ),
               avatar: Icon(
                 Icons.folder_outlined,
                 size: 18,
                 color: selected == null ? null : taskListColor(selected.color),
               ),
-              label: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 200),
-                child: Text(
-                  selected?.name ??
-                      (selectedId == null
-                          ? context.l10n.projectsAll
-                          : context.l10n.listUnavailable),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              label: Text(
+                selected?.name ??
+                    (selectedId == null
+                        ? context.l10n.projectsAll
+                        : context.l10n.listUnavailable),
+                overflow: TextOverflow.ellipsis,
               ),
               onPressed: () async {
                 var query = '';
@@ -134,19 +139,23 @@ class ProjectScopeControl extends ConsumerWidget {
                             ),
                             child: Column(
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                  ),
-                                  child: TextField(
-                                    decoration: InputDecoration(
-                                      hintText: context.l10n.projectsFind,
-                                      prefixIcon: const Icon(Icons.search),
+                                // Worth searching only once there are many
+                                // projects, as in Proyectos.
+                                if (projects.where((p) => !p.inactive).length >=
+                                    8)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
                                     ),
-                                    onChanged: (s) =>
-                                        change(() => query = s.trim()),
+                                    child: TextField(
+                                      decoration: InputDecoration(
+                                        hintText: context.l10n.projectsFind,
+                                        prefixIcon: const Icon(Icons.search),
+                                      ),
+                                      onChanged: (s) =>
+                                          change(() => query = s.trim()),
+                                    ),
                                   ),
-                                ),
                                 Expanded(
                                   child: ListView(
                                     // Rows scroll together, so a match

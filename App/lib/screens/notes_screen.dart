@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/text_search.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
@@ -14,6 +15,7 @@ import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:agenda/services/capture_store.dart';
 
 class NotesScreen extends ConsumerStatefulWidget {
@@ -28,6 +30,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   String _query = '';
   late String? _listId = widget.listId;
   final _scroll = ScrollController();
+  // Kept while the search is hidden, so its words and the filter agree.
+  final _search = TextEditingController();
 
   // While a note is being added: the newest note id before it. A newer note
   // is the one just saved; it is brought into view and highlighted.
@@ -47,6 +51,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   void dispose() {
     _highlightTimer?.cancel();
     _scroll.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -137,9 +142,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     });
     final lists = ref.watch(taskListsProvider).valueOrNull ?? [];
     final content = ref.watch(taskProvider);
-    // The note-versus-task help is for a Notes tab with no notes yet.
-    final noNotes =
-        content.valueOrNull?.every((item) => !item.isNote) ?? false;
+    // The search waits for a first note.
+    final hasNotes =
+        content.valueOrNull?.any((item) => item.isNote) ?? false;
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.notes, isRoot: widget.isRoot),
       body: RefreshIndicator(
@@ -149,13 +154,6 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              if (noNotes) ...[
-                Text(context.l10n.notesHelp,
-                    style: TextStyle(
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 20),
-              ],
               ref.watch(pendingCapturesProvider).when(
                   data: (captures) {
                     final count = captures
@@ -176,13 +174,17 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       onPressed: () =>
                           Navigator.pushNamed(context, '/captures'),
                       child: Text(context.l10n.checkCaptures))),
-              TextField(
-                  key: const ValueKey('note-search'),
-                  onChanged: (value) => setState(() => _query = value.trim()),
-                  decoration: InputDecoration(
-                      hintText: context.l10n.findNote,
-                      prefixIcon: const Icon(Icons.search_rounded))),
-              const SizedBox(height: 12),
+              if (hasNotes) ...[
+                TextField(
+                    key: const ValueKey('note-search'),
+                    controller: _search,
+                    onChanged: (value) =>
+                        setState(() => _query = value.trim()),
+                    decoration: InputDecoration(
+                        hintText: context.l10n.findNote,
+                        prefixIcon: const Icon(Icons.search_rounded))),
+                const SizedBox(height: 12),
+              ],
               if (lists.isNotEmpty)
                 DropdownButtonFormField<String>(
                     isExpanded: true,
@@ -213,10 +215,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     if (notes.isEmpty) {
                       return <Widget>[
                         EmptyState(
-                            title: _query.isEmpty
+                            title: _query.isEmpty || !hasNotes
                                 ? context.l10n.notesEmpty
                                 : context.l10n.noteNoMatches,
-                            message: _query.isEmpty
+                            message: _query.isEmpty || !hasNotes
                                 ? context.l10n.notesEmptyHelp
                                 : context.l10n.differentFilter,
                             icon: Icons.description_outlined)
@@ -224,10 +226,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     }
                     final colors = Theme.of(context).colorScheme;
                     final instant = MediaQuery.disableAnimationsOf(context);
-                    String? projectName(Task note) => lists
+                    TaskListInfo? project(Task note) => lists
                         .where((list) => list.id == note.listId)
-                        .firstOrNull
-                        ?.name;
+                        .firstOrNull;
                     return notes
                         .map<Widget>((note) => note.id == _landedId
                             ? TweenAnimationBuilder<Color?>(
@@ -240,9 +241,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                                     ? Duration.zero
                                     : const Duration(milliseconds: 600),
                                 builder: (context, color, _) => _tile(
-                                    context, note, projectName(note),
+                                    context, note, project(note),
                                     color: color))
-                            : _tile(context, note, projectName(note)))
+                            : _tile(context, note, project(note)))
                         .toList();
                   },
                   loading: () => <Widget>[
@@ -269,40 +270,62 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     );
   }
 
-  Widget _tile(BuildContext context, Task note, String? listName,
-          {Color? color}) =>
-      Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: AppSurface(
-              padding: EdgeInsets.zero,
-              color: color,
-              child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                  leading: const Icon(Icons.description_outlined),
-                  title: Text(note.title,
-                      maxLines: 3, overflow: TextOverflow.ellipsis),
-                  subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_preview(note).isNotEmpty)
-                          Text(_preview(note),
-                              maxLines: 3, overflow: TextOverflow.ellipsis),
-                        if (note.checklist.isNotEmpty)
-                          Text(
-                              '${note.checklistDone}/${note.checklist.length} · ${context.l10n.checklist}'),
-                        if (listName != null) Text(listName),
-                      ]),
-                  onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                          builder: (_) =>
-                              TaskDetailScreen(taskId: note.id!))))));
+  Widget _tile(BuildContext context, Task note, TaskListInfo? project,
+          {Color? color}) {
+    final preview = _preview(note);
+    return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: AppSurface(
+            padding: EdgeInsets.zero,
+            color: color,
+            child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                leading: const Icon(Icons.description_outlined),
+                title: Text(note.title,
+                    maxLines: 3, overflow: TextOverflow.ellipsis),
+                subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (preview.isNotEmpty)
+                        Text(preview,
+                            maxLines: 3, overflow: TextOverflow.ellipsis),
+                      if (note.checklist.isNotEmpty)
+                        Text(context.l10n.checklistCount(
+                            note.checklistDone, note.checklist.length)),
+                      // The project after its folder, as on task rows.
+                      if (project != null)
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.folder_outlined,
+                              size: 16, color: taskListColor(project.color)),
+                          const SizedBox(width: 4),
+                          Flexible(
+                              child: Text(project.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis)),
+                        ]),
+                    ]),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                        builder: (_) =>
+                            TaskDetailScreen(taskId: note.id!))))));
+  }
 
+  /// The note's words after its title. A note made in the capture sheet is
+  /// titled by the start of its words, so they aren't shown twice; with
+  /// nothing after the title, there is no preview.
   String _preview(Task note) {
-    final lines = (note.notes ?? '').split('\n');
-    return lines.first.trim() == note.title.trim()
-        ? lines.skip(1).join('\n')
-        : lines.join('\n');
+    final body = (note.notes ?? '').trim();
+    final title = note.title.trim();
+    if (title.isEmpty ||
+        body.length < title.length ||
+        body.substring(0, title.length).toLowerCase() != title.toLowerCase()) {
+      return body;
+    }
+    final rest = body.substring(title.length);
+    // The title ends inside a word: the words don't start with it.
+    if (rest.startsWith(RegExp(r'[\p{L}\p{N}]', unicode: true))) return body;
+    return rest.replaceFirst(RegExp(r'^[\s.,;:!?…\-–—]+'), '');
   }
 }

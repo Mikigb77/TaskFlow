@@ -298,22 +298,16 @@ abstract class AppLocalizations {
   /// **'Your note'**
   String get noteBody;
 
-  /// No description provided for @notesHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep information, ideas and reference material. Use a task for something you need to do.'**
-  String get notesHelp;
-
   /// No description provided for @notesEmpty.
   ///
   /// In en, this message translates to:
   /// **'A place for your thoughts'**
   String get notesEmpty;
 
-  /// No description provided for @notesEmptyHelp.
+  /// Under «A place for your thoughts», the only help on an empty Notes tab: what a note is for, and that something to do is a task.
   ///
   /// In en, this message translates to:
-  /// **'Write or dictate a note. Add links or a checklist when useful.'**
+  /// **'Keep ideas and things to remember. For something to do, use a task.'**
   String get notesEmptyHelp;
 
   /// No description provided for @findNote.
@@ -952,12 +946,6 @@ abstract class AppLocalizations {
   /// **'Files'**
   String get attachments;
 
-  /// No description provided for @checklist.
-  ///
-  /// In en, this message translates to:
-  /// **'Checklist'**
-  String get checklist;
-
   /// No description provided for @complete.
   ///
   /// In en, this message translates to:
@@ -1354,11 +1342,17 @@ abstract class AppLocalizations {
   /// **'Project'**
   String get list;
 
-  /// No description provided for @archivedList.
+  /// Bar at the bottom of an archived project's page, in place of «Add task», for someone who can restore it. Shows only with the «Restore project» button under it.
   ///
   /// In en, this message translates to:
-  /// **'Archived project'**
-  String get archivedList;
+  /// **'Archived project. Restore it to add tasks.'**
+  String get archivedListAddHelp;
+
+  /// Bar at the bottom of an archived project's page, in place of «Add task», for someone who can't restore it (a reader, or a project archived with its group). No button follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived project.'**
+  String get archivedListNoAdd;
 
   /// No description provided for @yourTasks.
   ///
@@ -2842,6 +2836,12 @@ abstract class AppLocalizations {
   /// **'Save project'**
   String get saveList;
 
+  /// Button of the new-project dialog that creates the project. Editing a project says «Save project».
+  ///
+  /// In en, this message translates to:
+  /// **'Create project'**
+  String get createList;
+
   /// No description provided for @listSaveError.
   ///
   /// In en, this message translates to:
@@ -2992,12 +2992,6 @@ abstract class AppLocalizations {
   /// **'Invitation code'**
   String get invitationCode;
 
-  /// No description provided for @invitationCodeHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'This code and the invited TaskFlow account are both needed to join. Share it only with the intended person. Replacing an invitation invalidates its previous code.'**
-  String get invitationCodeHelp;
-
   /// No description provided for @accountChanged.
   ///
   /// In en, this message translates to:
@@ -3034,18 +3028,6 @@ abstract class AppLocalizations {
   /// **'Members · {count}'**
   String projectMembersCount(int count);
 
-  /// No description provided for @shareProjectTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Share {project}'**
-  String shareProjectTitle(String project);
-
-  /// No description provided for @theirEmail.
-  ///
-  /// In en, this message translates to:
-  /// **'Their email'**
-  String get theirEmail;
-
   /// No description provided for @shareProjectHelp.
   ///
   /// In en, this message translates to:
@@ -3057,6 +3039,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send invitation'**
   String get sendInvitation;
+
+  /// Title of the email dialog that invites a person to a project or a group. {name} is the project’s or group’s name.
+  ///
+  /// In en, this message translates to:
+  /// **'Who are you inviting to {name}?'**
+  String inviteWho(String name);
+
+  /// Shown under the invite dialog’s email field when the person typed their own account’s address; nothing is sent.
+  ///
+  /// In en, this message translates to:
+  /// **'That’s your own email. Type the other person’s.'**
+  String get inviteOwnEmail;
+
+  /// The signed-in account’s own row in a project’s or a group’s member list. {name} is their name.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (you)'**
+  String personYou(String name);
 
   /// No description provided for @invitationSent.
   ///
@@ -3088,23 +3088,11 @@ abstract class AppLocalizations {
   /// **'Cancel invitation'**
   String get cancelInvitation;
 
-  /// No description provided for @inviteeEmail.
-  ///
-  /// In en, this message translates to:
-  /// **'Their account email'**
-  String get inviteeEmail;
-
   /// No description provided for @enterEmailAddress.
   ///
   /// In en, this message translates to:
   /// **'Enter an email address.'**
   String get enterEmailAddress;
-
-  /// No description provided for @access.
-  ///
-  /// In en, this message translates to:
-  /// **'Access'**
-  String get access;
 
   /// No description provided for @sharingRolesHelp.
   ///
@@ -3129,18 +3117,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
-
-  /// No description provided for @yourRole.
-  ///
-  /// In en, this message translates to:
-  /// **'Your role: {role}'**
-  String yourRole(String role);
-
-  /// No description provided for @sharingHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Share shopping and chores. Changes sync when the app connects or you refresh.'**
-  String get sharingHelp;
 
   /// No description provided for @invitePerson.
   ///
@@ -3195,12 +3171,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} · pending'**
   String pendingRole(String role);
-
-  /// No description provided for @revokeInvitation.
-  ///
-  /// In en, this message translates to:
-  /// **'Revoke invitation'**
-  String get revokeInvitation;
 
   /// No description provided for @howSharingWorks.
   ///
@@ -3291,12 +3261,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not respond. Retry when connected.'**
   String get invitationResponseError;
-
-  /// No description provided for @retryInvitations.
-  ///
-  /// In en, this message translates to:
-  /// **'Retry invitations'**
-  String get retryInvitations;
 
   /// No description provided for @acceptInvitation.
   ///
@@ -5152,11 +5116,11 @@ abstract class AppLocalizations {
   /// **'Only you can see this.'**
   String get audiencePersonal;
 
-  /// No description provided for @audienceShared.
+  /// Under the assignee chip of a task in a shared project: who can see the task. The pair of «Only you can see this.».
   ///
   /// In en, this message translates to:
-  /// **'Visible to everyone in {name}'**
-  String audienceShared(Object name);
+  /// **'All members can see it.'**
+  String get audienceShared;
 
   /// Asked before a personal task moves into a shared project. {name} is the group, or the project when it has no group.
   ///
@@ -5221,7 +5185,7 @@ abstract class AppLocalizations {
   /// No description provided for @groupHelp.
   ///
   /// In en, this message translates to:
-  /// **'Invite people once, work together across projects.'**
+  /// **'Invite people once and share several projects with them.'**
   String get groupHelp;
 
   /// No description provided for @groupMembers.
@@ -5242,10 +5206,10 @@ abstract class AppLocalizations {
   /// **'Group projects'**
   String get groupProjects;
 
-  /// No description provided for @groupInviteHelp.
+  /// Help under the group invite dialog’s title, above the email field.
   ///
   /// In en, this message translates to:
-  /// **'They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.'**
+  /// **'They’ll see every project in this group. We’ll email them an invitation.'**
   String get groupInviteHelp;
 
   /// No description provided for @groupLeave.
@@ -5319,12 +5283,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create group'**
   String get createGroup;
-
-  /// No description provided for @nextStep.
-  ///
-  /// In en, this message translates to:
-  /// **'Next'**
-  String get nextStep;
 
   /// No description provided for @enterName.
   ///
@@ -5446,16 +5404,22 @@ abstract class AppLocalizations {
   /// **'Deleted a task'**
   String get activityDeleted;
 
+  /// A task’s history (task details, Activity section): the entry for someone taking the task’s assignee off, so it has nobody. The person’s name and the date show under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed the assignee'**
+  String get activityUnassigned;
+
   /// No description provided for @activitySystem.
   ///
   /// In en, this message translates to:
   /// **'TaskFlow'**
   String get activitySystem;
 
-  /// Tooltip of the header button (people icon) that opens activity from shared projects and groups.
+  /// Title of the screen that lists what others did in every shared project, and the tooltip of the header button (people icon) that opens it.
   ///
   /// In en, this message translates to:
-  /// **'Group activity'**
+  /// **'Updates'**
   String get groupActivity;
 
   /// Spoken by TalkBack before an unread activity row.
@@ -5464,11 +5428,29 @@ abstract class AppLocalizations {
   /// **'Unread'**
   String get activityUnread;
 
+  /// Activity: read by TalkBack, and the label of the thin progress bar, on an entry whose task isn’t on the phone yet, while the app fetches it. Keep it short.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding the task…'**
+  String get activityFindingTask;
+
   /// One activity row: who did what to which task. action is an internal code; actor is a person’s name; title is the task title.
   ///
   /// In en, this message translates to:
   /// **'{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}'**
   String activityEntry(String action, String actor, String title);
+
+  /// An Updates row when someone made the reader responsible for a task. actor is that person’s name; title is the task title.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor} assigned you: {title}'**
+  String activityAssignedYou(String actor, String title);
+
+  /// An Updates row when someone made another person responsible for a task; the previous assignee reads it too. actor is who did it; name is the new assignee’s name; title is the task title.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor} assigned {name}: {title}'**
+  String activityAssignedTo(String actor, String name, String title);
 
   /// Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead.
   ///
@@ -5506,18 +5488,6 @@ abstract class AppLocalizations {
   /// **'Pinned projects'**
   String get projectsPinned;
 
-  /// No description provided for @invitationEmailSent.
-  ///
-  /// In en, this message translates to:
-  /// **'Invitation sent by email. You can also share the code below.'**
-  String get invitationEmailSent;
-
-  /// No description provided for @invitationEmailPending.
-  ///
-  /// In en, this message translates to:
-  /// **'Your invitation is ready. Email delivery is pending and will retry automatically. You can share this code now.'**
-  String get invitationEmailPending;
-
   /// No description provided for @invitationReview.
   ///
   /// In en, this message translates to:
@@ -5541,6 +5511,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.'**
   String get invitationUnavailable;
+
+  /// On the invitation screen, under the help line, only when the invitation gives view-only access to the project or group
+  ///
+  /// In en, this message translates to:
+  /// **'You’ll be able to see it, not change it.'**
+  String get invitationViewerAccess;
+
+  /// On the invitation screen, under the help line, only when the invitation makes the person an administrator of the group
+  ///
+  /// In en, this message translates to:
+  /// **'You’ll be able to manage the group.'**
+  String get invitationAdminAccess;
+
+  /// General button that closes the current screen. On the invitation screen, the only button when the invitation is no longer available; it also forgets the invitation link
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
 
   /// No description provided for @stagingInviteOnly.
   ///
@@ -5680,7 +5668,7 @@ abstract class AppLocalizations {
   /// **'Pinned'**
   String get projectPinned;
 
-  /// Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor.
+  /// Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor; for the project's owner, its count of open tasks and notes, such as «5 tasks and notes».
   ///
   /// In en, this message translates to:
   /// **'Shared · {role}'**

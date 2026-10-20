@@ -5,6 +5,8 @@ import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agenda/models/task.dart';
@@ -26,6 +28,12 @@ void main() {
                 TaskListInfo(id: 'school', name: 'Col·legi'),
                 TaskListInfo(id: 'doctor', name: 'Médico'),
                 TaskListInfo(id: 'food', name: 'Compras'),
+                // From 8 projects the sheet has a search (UX-1522).
+                TaskListInfo(id: 'home', name: 'Casa'),
+                TaskListInfo(id: 'work', name: 'Trabajo'),
+                TaskListInfo(id: 'trip', name: 'Viaje'),
+                TaskListInfo(id: 'garden', name: 'Huerto'),
+                TaskListInfo(id: 'gym', name: 'Gimnasio'),
               ]),
         ]);
         await tester.pumpWidget(UncontrolledProviderScope(
@@ -250,4 +258,81 @@ void main() {
       });
     }
   }
+
+  // ---- Run 2026-10-19-app, round 1 · P184 (UX-1522 f, g) ----
+
+  /// Todos los proyectos in Spanish over [projects], at [scale] on 360×800.
+  Future<void> openScope(WidgetTester tester, List<TaskListInfo> projects,
+      {double scale = 1}) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(ProviderScope(
+        overrides: [taskListsProvider.overrideWith((ref) async => projects)],
+        child: MaterialApp(
+            locale: const Locale('es'),
+            theme: AppTheme.light,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!),
+            home: const Scaffold(
+                body: SafeArea(child: ProjectScopeControl())))));
+    await tester.pumpAndSettle();
+  }
+
+  for (final (count, search) in [(3, false), (7, false), (8, true)]) {
+    testWidgets(
+        'UX-1522: the Todos los proyectos sheet with $count projects ${search ? 'has a search' : 'has no search'}',
+        (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      await openScope(tester, [
+        for (var i = 1; i <= count; i++)
+          TaskListInfo(id: 'p$i', name: 'Proyecto $i'),
+      ]);
+      await tester.tap(find.widgetWithText(ActionChip, es.projectsAll));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(sheet, findsOneWidget);
+      expect(
+          find.descendant(of: sheet, matching: find.byType(TextField)),
+          search ? findsOneWidget : findsNothing);
+      expect(
+          find.descendant(
+              of: sheet, matching: find.widgetWithText(ListTile, 'Proyecto 1')),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+      'UX-1522: at 2× on 360×800 in Spanish, with a shared project, the chip reads Todos los proyectos whole',
+      (tester) async {
+    // The app's own font, so the label measures as on the phone.
+    await tester.runAsync(() async {
+      await (FontLoader('Manrope')
+            ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+          .load();
+    });
+    final es = lookupAppLocalizations(const Locale('es'));
+    expect(es.projectsAll, 'Todos los proyectos');
+    await openScope(tester, [shared, TaskListInfo(id: 'huerto', name: 'Huerto')],
+        scale: 2);
+    final label = find.descendant(
+        of: find.byType(ActionChip), matching: find.text(es.projectsAll));
+    expect(label, findsOneWidget);
+    final paragraph = tester.renderObject<RenderParagraph>(find.descendant(
+        of: label, matching: find.byType(RichText), matchRoot: true));
+    expect(paragraph.didExceedMaxLines, isFalse,
+        reason: '«Todos los proyectos» is not cut');
+    expect(paragraph.getMaxIntrinsicWidth(double.infinity),
+        lessThanOrEqualTo(paragraph.size.width + 0.5),
+        reason: 'it fits its line');
+    final rect = tester.getRect(label);
+    expect(rect.left, greaterThanOrEqualTo(0));
+    expect(rect.right, lessThanOrEqualTo(360));
+    expect(tester.takeException(), isNull, reason: 'no overflow');
+  });
 }

@@ -2086,7 +2086,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     final sayAgain =
         nothingFound && !_typing && _voice && ref.watch(voiceAvailableProvider);
     final typeFirst = nothingFound && !_typing && !sayAgain;
-    final usedUpLine = usedUp && (!_voice || refused || typeFirst)
+    // A note typed with none left isn't told about dictations: only once
+    // the person tried to speak.
+    final typesNote = _kind == 'note' && !widget.askedToSpeak;
+    final usedUpLine =
+        usedUp && ((!_voice && !typesNote) || refused || typeFirst)
         ? freeVoiceUsedUpText(
             l10n,
             ref.watch(freeVoiceResetsProvider),

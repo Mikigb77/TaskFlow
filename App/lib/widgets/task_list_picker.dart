@@ -91,8 +91,8 @@ Future<TaskListChoice?> chooseTaskList(
               selected: listId == list.id,
               onTap: () => Navigator.pop(context, list.id),
             ),
-          // The dictated project is already the new one.
-          if (choices.isEmpty && !creating)
+          // Last, unless the dictated project is already the new one.
+          if (!creating)
             ListTile(
               leading: const Icon(Icons.add_rounded),
               title: Text(context.l10n.newList),

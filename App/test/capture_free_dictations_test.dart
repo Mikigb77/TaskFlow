@@ -31,6 +31,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
+import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/api_client.dart';
@@ -3143,6 +3144,61 @@ void main() {
       await answered(tester, app, 2);
       expect(inSheet(find.text(es.captureAllowanceRecording)), findsOneWidget);
       expect(sheetButtons(tester), [es.captureClose]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-19-app, round 1 · P185 (UX-1518): a typed note isn't
+  // told about dictations ----
+
+  testWidgets(
+    'UX-1518: a free account with 0 dictations left: Notas’ «Añadir nota» opens typing with no «Sin dictados gratis…» line and no «Ver Pro»; trying to dictate a note shows the used-up line',
+    (tester) async {
+      final resets = nextReset();
+      final app = await _FreeApp.open(
+        tester,
+        freeVoice: freeVoice(0, resets: resets),
+        noticeSeen: true,
+      );
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(es.notes),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final add = find.widgetWithText(FilledButton, es.addNote).hitTestable();
+      expect(add, findsOneWidget);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      expect(words(), findsOneWidget, reason: 'it types');
+      expect(app.recorders, 0);
+      expect(usedUp(), findsNothing);
+      expect(find.textContaining('Sin dictados gratis'), findsNothing);
+      expect(find.text(es.voiceProAction), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(VoiceTaskScreen), findsNothing);
+
+      // A way in that asks to speak, for a note: now the limit is told.
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(NotesScreen)),
+          kind: 'note',
+          askedToSpeak: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      expect(usedUp(), findsOneWidget);
+      expect(
+        tester.widget<Text>(usedUp()).data,
+        es.freeVoiceUsedUp(resetDay(tester, resets)),
+      );
+      expect(find.text(es.voiceProAction), findsOneWidget);
+      expect(app.recorders, 0);
       expect(tester.takeException(), isNull);
     },
   );

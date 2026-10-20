@@ -626,7 +626,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-1101: an archived project still says «Proyecto archivado» as text under the people filter, with ✓ in the app bar',
+    'UX-1101: an archived project still says it is archived, outside the app bar, with ✓ in the app bar',
     (tester) async {
       await openProject(
         tester,
@@ -643,11 +643,14 @@ void main() {
           ),
         ],
       );
-      expect(find.text(es.archivedList), findsOneWidget);
-      expect(es.archivedList, 'Proyecto archivado');
+      expect(find.text(es.archivedListAddHelp), findsOneWidget);
+      expect(
+        es.archivedListAddHelp,
+        'Proyecto archivado. Restáuralo para añadir tareas.',
+      );
       expect(
         find.ancestor(
-          of: find.text(es.archivedList),
+          of: find.text(es.archivedListAddHelp),
           matching: find.byType(AppBar),
         ),
         findsNothing,

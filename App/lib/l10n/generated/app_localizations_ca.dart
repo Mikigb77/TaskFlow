@@ -189,15 +189,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get noteBody => 'La teva nota';
 
   @override
-  String get notesHelp =>
-      'Desa informació, idees i material de consulta. Utilitza una tasca per a allò que hagis de fer.';
-
-  @override
   String get notesEmpty => 'Un espai per a les teves idees';
 
   @override
   String get notesEmptyHelp =>
-      'Escriu o dicta una nota. Afegeix-hi enllaços o una llista de passos si et cal.';
+      'Desa idees i dades que vulguis recordar. Per a una cosa per fer, fes servir una tasca.';
 
   @override
   String get findNote => 'Cerca notes';
@@ -554,9 +550,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get attachments => 'Fitxers adjunts';
 
   @override
-  String get checklist => 'Llista de passos';
-
-  @override
   String get complete => 'Completa';
 
   @override
@@ -778,7 +771,11 @@ class AppLocalizationsCa extends AppLocalizations {
   String get list => 'Projecte';
 
   @override
-  String get archivedList => 'Projecte arxivat';
+  String get archivedListAddHelp =>
+      'Projecte arxivat. Restaura’l per afegir-hi tasques.';
+
+  @override
+  String get archivedListNoAdd => 'Projecte arxivat.';
 
   @override
   String get yourTasks => 'Les teves tasques';
@@ -1699,6 +1696,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get saveList => 'Desa el projecte';
 
   @override
+  String get createList => 'Crea el projecte';
+
+  @override
   String get listSaveError =>
       'No s’ha pogut desar aquest projecte. Torna-ho a provar.';
 
@@ -1797,10 +1797,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get invitationCode => 'Codi d’invitació';
 
   @override
-  String get invitationCodeHelp =>
-      'Per unir-se calen aquest codi i el compte de TaskFlow convidat. Comparteix-lo només amb la persona destinatària. Substituir una invitació invalida el codi anterior.';
-
-  @override
   String get accountChanged => 'El compte ha canviat.';
 
   @override
@@ -1822,20 +1818,26 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String shareProjectTitle(String project) {
-    return 'Comparteix $project';
-  }
-
-  @override
-  String get theirEmail => 'El seu correu';
-
-  @override
   String shareProjectHelp(String project) {
-    return 'Veurà tot el que hi ha a $project.';
+    return 'Aquesta persona veurà tot el que hi ha a $project.';
   }
 
   @override
   String get sendInvitation => 'Envia la invitació';
+
+  @override
+  String inviteWho(String name) {
+    return 'A qui convides a $name?';
+  }
+
+  @override
+  String get inviteOwnEmail =>
+      'Aquest és el teu correu. Escriu el de la persona que convides.';
+
+  @override
+  String personYou(String name) {
+    return '$name (tu)';
+  }
 
   @override
   String get invitationSent => 'Invitació enviada';
@@ -1854,35 +1856,20 @@ class AppLocalizationsCa extends AppLocalizations {
   String get cancelInvitation => 'Anul·la la invitació';
 
   @override
-  String get inviteeEmail => 'Correu del seu compte';
-
-  @override
   String get enterEmailAddress => 'Introdueix una adreça de correu electrònic.';
-
-  @override
-  String get access => 'Accés';
 
   @override
   String get sharingRolesHelp =>
       'Els editors poden afegir, modificar, completar i suprimir tasques i fitxers. Només el propietari gestiona el projecte i les persones. Les tasques compartides es queden en aquest projecte; exportar-les crea una còpia personal.';
 
   @override
-  String get listSharing => 'Ús compartit del projecte';
+  String get listSharing => 'Comparteix el projecte';
 
   @override
   String get sharingLoadError => 'No s’ha pogut carregar l’ús compartit.';
 
   @override
   String get retry => 'Torna-ho a provar';
-
-  @override
-  String yourRole(String role) {
-    return 'El teu rol: $role';
-  }
-
-  @override
-  String get sharingHelp =>
-      'Comparteix compres i tasques de casa. Els canvis se sincronitzen quan l’aplicació es connecta o quan actualitzes.';
 
   @override
   String get invitePerson => 'Convida una persona';
@@ -1915,10 +1902,7 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get revokeInvitation => 'Revoca la invitació';
-
-  @override
-  String get howSharingWorks => 'Com funciona l’ús compartit';
+  String get howSharingWorks => 'Com funciona compartir';
 
   @override
   String get sharedDataHelp =>
@@ -1971,9 +1955,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get invitationResponseError =>
       'No s’ha pogut respondre. Torna-ho a provar quan tinguis connexió.';
-
-  @override
-  String get retryInvitations => 'Torna a carregar les invitacions';
 
   @override
   String get acceptInvitation => 'Accepta la invitació';
@@ -3395,9 +3376,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get audiencePersonal => 'Només tu ho pots veure.';
 
   @override
-  String audienceShared(Object name) {
-    return 'Visible per a tothom a $name';
-  }
+  String get audienceShared => 'Ho veuen tots els membres.';
 
   @override
   String shareTaskConfirm(String name) {
@@ -3434,7 +3413,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get groupHelp =>
-      'Convida les persones una vegada i col·laboreu en diversos projectes.';
+      'Convida les persones una vegada i comparteix amb elles diversos projectes.';
 
   @override
   String get groupMembers => 'Membres';
@@ -3447,7 +3426,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get groupInviteHelp =>
-      'Veuran tots els projectes d’aquest grup, incloses les tasques, notes i fitxers. Els enviarem un correu per revisar la invitació i unir-s’hi.';
+      'Aquesta persona veurà tots els projectes d’aquest grup. Li enviarem una invitació per correu.';
 
   @override
   String get groupLeave => 'Surt del grup';
@@ -3491,9 +3470,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get createGroup => 'Crea el grup';
-
-  @override
-  String get nextStep => 'Següent';
 
   @override
   String get enterName => 'Escriu un nom.';
@@ -3559,13 +3535,19 @@ class AppLocalizationsCa extends AppLocalizations {
   String get activityDeleted => 'Ha suprimit una tasca';
 
   @override
+  String get activityUnassigned => 'Ha tret el responsable';
+
+  @override
   String get activitySystem => 'TaskFlow';
 
   @override
-  String get groupActivity => 'Activitat del grup';
+  String get groupActivity => 'Novetats';
 
   @override
   String get activityUnread => 'No llegida';
+
+  @override
+  String get activityFindingTask => 'S’està cercant la tasca…';
 
   @override
   String activityEntry(String action, String actor, String title) {
@@ -3580,6 +3562,16 @@ class AppLocalizationsCa extends AppLocalizations {
       'other': '$actor ha actualitzat: $title',
     });
     return '$_temp0';
+  }
+
+  @override
+  String activityAssignedYou(String actor, String title) {
+    return '$actor t’ha assignat: $title';
+  }
+
+  @override
+  String activityAssignedTo(String actor, String name, String title) {
+    return '$actor ha assignat $name: $title';
   }
 
   @override
@@ -3603,14 +3595,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get projectsPinned => 'Projectes fixats';
 
   @override
-  String get invitationEmailSent =>
-      'Invitació enviada per correu. També pots compartir el codi de sota.';
-
-  @override
-  String get invitationEmailPending =>
-      'La invitació està preparada. El correu està pendent i es tornarà a intentar automàticament. Pots compartir aquest codi ara.';
-
-  @override
   String get invitationReview => 'Revisa la invitació';
 
   @override
@@ -3625,6 +3609,15 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get invitationUnavailable =>
       'Aquesta invitació no està disponible per a aquest compte. Comprova que hagis iniciat sessió amb el correu que l’ha rebuda o demana una invitació nova.';
+
+  @override
+  String get invitationViewerAccess => 'Només el podràs veure, no canviar.';
+
+  @override
+  String get invitationAdminAccess => 'Podràs gestionar el grup.';
+
+  @override
+  String get close => 'Tanca';
 
   @override
   String get stagingInviteOnly =>

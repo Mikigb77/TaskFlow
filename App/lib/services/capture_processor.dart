@@ -25,12 +25,12 @@ class CaptureProcessor {
   final ApiClient api;
   CaptureProcessor(this.store, this.api);
 
-  /// A note's title is its first line's first sentence, or about
-  /// [noteTitleLength] characters cut at a word. Speech has no line breaks,
+  /// A note's title is its first line's first sentence, up to a «:» or «;»
+  /// after at least 3 words, or about [noteTitleLength] characters cut at a
+  /// word, never ending on a short linking word. Speech has no line breaks,
   /// so without this the whole transcript would become the title. The full
   /// text stays in the note's body.
-  static String noteTitle(String text) =>
-      leadingTitle(text, noteTitleLength).title;
+  static String noteTitle(String text) => noteLeadingTitle(text);
 
   /// Understands the capture's words. [local] builds the result on the phone,
   /// with no network, as typing without Pro does. A task understood with no

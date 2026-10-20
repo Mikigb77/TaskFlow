@@ -97,7 +97,7 @@ void main() {
         'Ajusta tu plan.',
         'Ponle un nombre. Añade una fecha cuando quieras.',
         'Revisa los detalles antes de añadirla al calendario.',
-        es.notesHelp,
+        'Guarda información, ideas y material de referencia. Usa una tarea para algo que tengas que hacer.',
         es.seriesEdits,
       ]) {
         expect(find.text(gone), findsNothing, reason: gone);
@@ -136,7 +136,7 @@ void main() {
         tester,
         Task(id: 2, title: 'Ideas', priority: 1, kind: 'note'),
       );
-      expect(find.text(es.notesHelp), findsNothing);
+      expect(find.text('Guarda información, ideas y material de referencia. Usa una tarea para algo que tengas que hacer.'), findsNothing);
       expect(find.text('Ajusta tu plan.'), findsNothing);
       for (final element in find.text(es.noteTitle).evaluate()) {
         expect(

@@ -79,9 +79,11 @@
   "editNote": "Edit note",
   "noteTitle": "Note title",
   "noteBody": "Your note",
-  "notesHelp": "Keep information, ideas and reference material. Use a task for something you need to do.",
   "notesEmpty": "A place for your thoughts",
-  "notesEmptyHelp": "Write or dictate a note. Add links or a checklist when useful.",
+  "notesEmptyHelp": "Keep ideas and things to remember. For something to do, use a task.",
+  "@notesEmptyHelp": {
+    "description": "Under «A place for your thoughts», the only help on an empty Notes tab: what a note is for, and that something to do is a task."
+  },
   "findNote": "Search notes",
   "saveNote": "Save note",
   "noteSaved": "Note saved",
@@ -255,7 +257,6 @@
   "notes": "Notes",
   "addNotes": "Add notes",
   "attachments": "Files",
-  "checklist": "Checklist",
   "complete": "Complete",
   "reopen": "Reopen",
   "reschedule": "Reschedule",
@@ -383,7 +384,14 @@
   "widgetPickerHelp": "Add the TaskFlow widget from your launcher’s widget picker.",
   "appearanceError": "Could not save your appearance preference.",
   "list": "Project",
-  "archivedList": "Archived project",
+  "archivedListAddHelp": "Archived project. Restore it to add tasks.",
+  "@archivedListAddHelp": {
+    "description": "Bar at the bottom of an archived project's page, in place of «Add task», for someone who can restore it. Shows only with the «Restore project» button under it."
+  },
+  "archivedListNoAdd": "Archived project.",
+  "@archivedListNoAdd": {
+    "description": "Bar at the bottom of an archived project's page, in place of «Add task», for someone who can't restore it (a reader, or a project archived with its group). No button follows."
+  },
   "yourTasks": "Your tasks",
   "findTask": "Find a task…",
   "allTasks": "All tasks",
@@ -948,6 +956,10 @@
   "colorAmber": "Amber",
   "colorRose": "Rose",
   "saveList": "Save project",
+  "createList": "Create project",
+  "@createList": {
+    "description": "Button of the new-project dialog that creates the project. Editing a project says «Save project»."
+  },
   "listSaveError": "Could not save this project. Please retry.",
   "listRestored": "Project restored",
   "projectArchivedNoReminders": "{name} archived — hidden from your calendar, no reminders.",
@@ -1011,7 +1023,6 @@
   "archiveList": "Archive project",
   "chooseDetails": "Choose details",
   "invitationCode": "Invitation code",
-  "invitationCodeHelp": "This code and the invited TaskFlow account are both needed to join. Share it only with the intended person. Replacing an invitation invalidates its previous code.",
   "accountChanged": "The account changed.",
   "copyCode": "Copy code",
   "done": "Done",
@@ -1029,15 +1040,6 @@
       }
     }
   },
-  "shareProjectTitle": "Share {project}",
-  "@shareProjectTitle": {
-    "placeholders": {
-      "project": {
-        "type": "String"
-      }
-    }
-  },
-  "theirEmail": "Their email",
   "shareProjectHelp": "They’ll see everything in {project}.",
   "@shareProjectHelp": {
     "placeholders": {
@@ -1047,27 +1049,38 @@
     }
   },
   "sendInvitation": "Send invitation",
+  "inviteWho": "Who are you inviting to {name}?",
+  "@inviteWho": {
+    "description": "Title of the email dialog that invites a person to a project or a group. {name} is the project’s or group’s name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteOwnEmail": "That’s your own email. Type the other person’s.",
+  "@inviteOwnEmail": {
+    "description": "Shown under the invite dialog’s email field when the person typed their own account’s address; nothing is sent."
+  },
+  "personYou": "{name} (you)",
+  "@personYou": {
+    "description": "The signed-in account’s own row in a project’s or a group’s member list. {name} is their name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "invitationSent": "Invitation sent",
   "invitationCodeFallback": "If the email doesn’t arrive, send them this code:",
   "connectToShare": "Connect to the internet to share.",
   "sendInvitationAgain": "Send again",
   "cancelInvitation": "Cancel invitation",
-  "inviteeEmail": "Their account email",
   "enterEmailAddress": "Enter an email address.",
-  "access": "Access",
   "sharingRolesHelp": "Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.",
   "listSharing": "Project sharing",
   "sharingLoadError": "Could not load sharing.",
   "retry": "Retry",
-  "yourRole": "Your role: {role}",
-  "@yourRole": {
-    "placeholders": {
-      "role": {
-        "type": "String"
-      }
-    }
-  },
-  "sharingHelp": "Share shopping and chores. Changes sync when the app connects or you refresh.",
   "invitePerson": "Invite a person",
   "people": "Members",
   "noOtherMembers": "Only you have accepted access so far.",
@@ -1084,7 +1097,6 @@
       }
     }
   },
-  "revokeInvitation": "Revoke invitation",
   "howSharingWorks": "How sharing works",
   "sharedDataHelp": "Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.",
   "sharingRemovalHelp": "Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.",
@@ -1114,7 +1126,6 @@
   "invitationCodeRequired": "Paste the full invitation code.",
   "invitationCodeWrong": "Ask the person who invited you for the current code.",
   "invitationResponseError": "Could not respond. Retry when connected.",
-  "retryInvitations": "Retry invitations",
   "acceptInvitation": "Accept invitation",
   "decline": "Decline",
   "invitedTo": "You’re invited to {name} · View",
@@ -2006,7 +2017,10 @@
   "assignmentGroupHelp": "One shared task. A member completes it for everyone.",
   "assignmentHeard": "You mentioned: {names}",
   "audiencePersonal": "Only you can see this.",
-  "audienceShared": "Visible to everyone in {name}",
+  "audienceShared": "All members can see it.",
+  "@audienceShared": {
+    "description": "Under the assignee chip of a task in a shared project: who can see the task. The pair of «Only you can see this.»."
+  },
   "shareTaskConfirm": "Share with {name}? Everyone there will see this task. It can’t be made private again.",
   "@shareTaskConfirm": {
     "description": "Asked before a personal task moves into a shared project. {name} is the group, or the project when it has no group.",
@@ -2025,11 +2039,14 @@
   "groups": "Groups",
   "newGroup": "New group",
   "groupName": "Group name",
-  "groupHelp": "Invite people once, work together across projects.",
+  "groupHelp": "Invite people once and share several projects with them.",
   "groupMembers": "Members",
   "groupAdmin": "Administrator",
   "groupProjects": "Group projects",
-  "groupInviteHelp": "They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.",
+  "groupInviteHelp": "They’ll see every project in this group. We’ll email them an invitation.",
+  "@groupInviteHelp": {
+    "description": "Help under the group invite dialog’s title, above the email field."
+  },
   "groupLeave": "Leave group",
   "groupLeaveHelp": "You will lose access to this group’s projects and files. Your tasks stay in the group for reassignment.",
   "groupTransfer": "Transfer ownership",
@@ -2049,7 +2066,6 @@
   "groupVoiceName": "Name for voice assignments",
   "groupVoiceHelp": "An optional name others can use when assigning tasks by voice.",
   "createGroup": "Create group",
-  "nextStep": "Next",
   "enterName": "Enter a name.",
   "groupRoleQuestion": "What can {name} do?",
   "@groupRoleQuestion": {
@@ -2077,14 +2093,22 @@
   "activityCompleted": "Completed a task",
   "activityReopened": "Reopened a task",
   "activityDeleted": "Deleted a task",
+  "activityUnassigned": "Removed the assignee",
+  "@activityUnassigned": {
+    "description": "A task’s history (task details, Activity section): the entry for someone taking the task’s assignee off, so it has nobody. The person’s name and the date show under it."
+  },
   "activitySystem": "TaskFlow",
-  "groupActivity": "Group activity",
+  "groupActivity": "Updates",
   "@groupActivity": {
-    "description": "Tooltip of the header button (people icon) that opens activity from shared projects and groups."
+    "description": "Title of the screen that lists what others did in every shared project, and the tooltip of the header button (people icon) that opens it."
   },
   "activityUnread": "Unread",
   "@activityUnread": {
     "description": "Spoken by TalkBack before an unread activity row."
+  },
+  "activityFindingTask": "Finding the task…",
+  "@activityFindingTask": {
+    "description": "Activity: read by TalkBack, and the label of the thin progress bar, on an entry whose task isn’t on the phone yet, while the app fetches it. Keep it short."
   },
   "activityEntry": "{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}",
   "@activityEntry": {
@@ -2101,6 +2125,33 @@
       }
     }
   },
+  "activityAssignedYou": "{actor} assigned you: {title}",
+  "@activityAssignedYou": {
+    "description": "An Updates row when someone made the reader responsible for a task. actor is that person’s name; title is the task title.",
+    "placeholders": {
+      "actor": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "activityAssignedTo": "{actor} assigned {name}: {title}",
+  "@activityAssignedTo": {
+    "description": "An Updates row when someone made another person responsible for a task; the previous assignee reads it too. actor is who did it; name is the new assignee’s name; title is the task title.",
+    "placeholders": {
+      "actor": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "captureSpeakingIsPro": "Speaking a task is part of TaskFlow Pro. You can type it here.",
   "@captureSpeakingIsPro": {
     "description": "Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead."
@@ -2110,8 +2161,6 @@
   "groupRename": "Rename group",
   "groupRemoveHelp": "Removing this member ends their access to every project in this group. Their tasks stay and will need reassignment.",
   "projectsPinned": "Pinned projects",
-  "invitationEmailSent": "Invitation sent by email. You can also share the code below.",
-  "invitationEmailPending": "Your invitation is ready. Email delivery is pending and will retry automatically. You can share this code now.",
   "invitationReview": "Review invitation",
   "invitationFrom": "{sender} invited you to “{name}”",
   "@invitationFrom": {
@@ -2127,6 +2176,18 @@
   },
   "invitationReviewHelp": "You’ll see its tasks, notes and files.",
   "invitationUnavailable": "This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.",
+  "invitationViewerAccess": "You’ll be able to see it, not change it.",
+  "@invitationViewerAccess": {
+    "description": "On the invitation screen, under the help line, only when the invitation gives view-only access to the project or group"
+  },
+  "invitationAdminAccess": "You’ll be able to manage the group.",
+  "@invitationAdminAccess": {
+    "description": "On the invitation screen, under the help line, only when the invitation makes the person an administrator of the group"
+  },
+  "close": "Close",
+  "@close": {
+    "description": "General button that closes the current screen. On the invitation screen, the only button when the invitation is no longer available; it also forgets the invitation link"
+  },
   "stagingInviteOnly": "This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.",
   "freeVoiceLeft": "{count, plural, =0{No free dictations left this month} =1{1 free dictation left this month} other{{count} free dictations left this month}}",
   "@freeVoiceLeft": {
@@ -2283,7 +2344,7 @@
   },
   "projectSharedRole": "Shared · {role}",
   "@projectSharedRole": {
-    "description": "Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor.",
+    "description": "Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor; for the project's owner, its count of open tasks and notes, such as «5 tasks and notes».",
     "placeholders": {
       "role": {
         "type": "String"

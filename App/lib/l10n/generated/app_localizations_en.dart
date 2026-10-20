@@ -185,15 +185,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noteBody => 'Your note';
 
   @override
-  String get notesHelp =>
-      'Keep information, ideas and reference material. Use a task for something you need to do.';
-
-  @override
   String get notesEmpty => 'A place for your thoughts';
 
   @override
   String get notesEmptyHelp =>
-      'Write or dictate a note. Add links or a checklist when useful.';
+      'Keep ideas and things to remember. For something to do, use a task.';
 
   @override
   String get findNote => 'Search notes';
@@ -548,9 +544,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attachments => 'Files';
 
   @override
-  String get checklist => 'Checklist';
-
-  @override
   String get complete => 'Complete';
 
   @override
@@ -770,7 +763,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get list => 'Project';
 
   @override
-  String get archivedList => 'Archived project';
+  String get archivedListAddHelp =>
+      'Archived project. Restore it to add tasks.';
+
+  @override
+  String get archivedListNoAdd => 'Archived project.';
 
   @override
   String get yourTasks => 'Your tasks';
@@ -1672,6 +1669,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveList => 'Save project';
 
   @override
+  String get createList => 'Create project';
+
+  @override
   String get listSaveError => 'Could not save this project. Please retry.';
 
   @override
@@ -1766,10 +1766,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invitationCode => 'Invitation code';
 
   @override
-  String get invitationCodeHelp =>
-      'This code and the invited TaskFlow account are both needed to join. Share it only with the intended person. Replacing an invitation invalidates its previous code.';
-
-  @override
   String get accountChanged => 'The account changed.';
 
   @override
@@ -1791,20 +1787,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String shareProjectTitle(String project) {
-    return 'Share $project';
-  }
-
-  @override
-  String get theirEmail => 'Their email';
-
-  @override
   String shareProjectHelp(String project) {
     return 'They’ll see everything in $project.';
   }
 
   @override
   String get sendInvitation => 'Send invitation';
+
+  @override
+  String inviteWho(String name) {
+    return 'Who are you inviting to $name?';
+  }
+
+  @override
+  String get inviteOwnEmail =>
+      'That’s your own email. Type the other person’s.';
+
+  @override
+  String personYou(String name) {
+    return '$name (you)';
+  }
 
   @override
   String get invitationSent => 'Invitation sent';
@@ -1823,13 +1825,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancelInvitation => 'Cancel invitation';
 
   @override
-  String get inviteeEmail => 'Their account email';
-
-  @override
   String get enterEmailAddress => 'Enter an email address.';
-
-  @override
-  String get access => 'Access';
 
   @override
   String get sharingRolesHelp =>
@@ -1843,15 +1839,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
-
-  @override
-  String yourRole(String role) {
-    return 'Your role: $role';
-  }
-
-  @override
-  String get sharingHelp =>
-      'Share shopping and chores. Changes sync when the app connects or you refresh.';
 
   @override
   String get invitePerson => 'Invite a person';
@@ -1882,9 +1869,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String pendingRole(String role) {
     return '$role · pending';
   }
-
-  @override
-  String get revokeInvitation => 'Revoke invitation';
 
   @override
   String get howSharingWorks => 'How sharing works';
@@ -1940,9 +1924,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get invitationResponseError =>
       'Could not respond. Retry when connected.';
-
-  @override
-  String get retryInvitations => 'Retry invitations';
 
   @override
   String get acceptInvitation => 'Accept invitation';
@@ -3326,9 +3307,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audiencePersonal => 'Only you can see this.';
 
   @override
-  String audienceShared(Object name) {
-    return 'Visible to everyone in $name';
-  }
+  String get audienceShared => 'All members can see it.';
 
   @override
   String shareTaskConfirm(String name) {
@@ -3363,7 +3342,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get groupName => 'Group name';
 
   @override
-  String get groupHelp => 'Invite people once, work together across projects.';
+  String get groupHelp =>
+      'Invite people once and share several projects with them.';
 
   @override
   String get groupMembers => 'Members';
@@ -3376,7 +3356,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get groupInviteHelp =>
-      'They will see every project in this group, including tasks, notes and files. We will send an email inviting them to review and join.';
+      'They’ll see every project in this group. We’ll email them an invitation.';
 
   @override
   String get groupLeave => 'Leave group';
@@ -3420,9 +3400,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createGroup => 'Create group';
-
-  @override
-  String get nextStep => 'Next';
 
   @override
   String get enterName => 'Enter a name.';
@@ -3488,13 +3465,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activityDeleted => 'Deleted a task';
 
   @override
+  String get activityUnassigned => 'Removed the assignee';
+
+  @override
   String get activitySystem => 'TaskFlow';
 
   @override
-  String get groupActivity => 'Group activity';
+  String get groupActivity => 'Updates';
 
   @override
   String get activityUnread => 'Unread';
+
+  @override
+  String get activityFindingTask => 'Finding the task…';
 
   @override
   String activityEntry(String action, String actor, String title) {
@@ -3509,6 +3492,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'other': '$actor updated: $title',
     });
     return '$_temp0';
+  }
+
+  @override
+  String activityAssignedYou(String actor, String title) {
+    return '$actor assigned you: $title';
+  }
+
+  @override
+  String activityAssignedTo(String actor, String name, String title) {
+    return '$actor assigned $name: $title';
   }
 
   @override
@@ -3532,14 +3525,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get projectsPinned => 'Pinned projects';
 
   @override
-  String get invitationEmailSent =>
-      'Invitation sent by email. You can also share the code below.';
-
-  @override
-  String get invitationEmailPending =>
-      'Your invitation is ready. Email delivery is pending and will retry automatically. You can share this code now.';
-
-  @override
   String get invitationReview => 'Review invitation';
 
   @override
@@ -3553,6 +3538,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get invitationUnavailable =>
       'This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.';
+
+  @override
+  String get invitationViewerAccess =>
+      'You’ll be able to see it, not change it.';
+
+  @override
+  String get invitationAdminAccess => 'You’ll be able to manage the group.';
+
+  @override
+  String get close => 'Close';
 
   @override
   String get stagingInviteOnly =>

@@ -1,8 +1,11 @@
 // Sharing a project and its invitations, groups, and the activity of
 // shared projects.
+import 'dart:io';
+
 import 'package:agenda/models/task_group.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/groups_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/activity_screen.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/screens/invitation_review_screen.dart';
@@ -12,7 +15,9 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../support/hanging_sync.dart';
 import 'support/app.dart';
 import 'support/fixtures.dart';
 import 'support/preview.dart';
@@ -94,6 +99,7 @@ final _club = TaskListInfo(
   people: const [
     ProjectMember(id: lucia, name: 'Lucía', role: 'owner'),
     ProjectMember(id: me, name: 'María', role: 'viewer'),
+    ProjectMember(id: jordi, name: 'Jordi', role: 'editor'),
   ],
 );
 
@@ -107,7 +113,7 @@ const _familia = TaskGroupInfo(
   people: [
     ProjectMember(id: me, name: 'María', role: 'owner'),
     ProjectMember(id: paul, name: 'Paul', role: 'admin'),
-    ProjectMember(id: lucia, name: 'Lucía', role: 'member'),
+    ProjectMember(id: lucia, name: 'Lucía', role: 'editor'),
   ],
 );
 
@@ -116,13 +122,35 @@ const _colegio = TaskGroupInfo(
   name: 'Profesores de 4.º B',
   ownerId: ana,
   version: 1,
-  role: 'member',
+  role: 'editor',
   projectCount: 1,
   people: [
     ProjectMember(id: ana, name: 'Ana', role: 'owner'),
-    ProjectMember(id: me, name: 'María', role: 'member'),
+    ProjectMember(id: me, name: 'María', role: 'editor'),
   ],
 );
+
+/// «Familia López», opened as its owner María, with one pending invitation.
+Future<PreviewApp> _openFamilia(Preview p) async {
+  final app = await PreviewApp.open(
+    p,
+    tasks: normalDay(),
+    projects: allProjects,
+    groups: const [_familia, _colegio],
+    overrides: [
+      groupDetailsProvider('familia').overrideWith(
+        (ref) async => {
+          'group': _groupJson(_familia),
+          'invitations': [
+            {'id': 'gi-1', 'email': 'carmen.lopez@example.com'},
+          ],
+        },
+      ),
+    ],
+  );
+  await app.pushPage(const GroupScreen(groupId: 'familia'));
+  return app;
+}
 
 Map<String, dynamic> _groupJson(TaskGroupInfo group) => {
   'id': group.id,
@@ -142,7 +170,7 @@ void sharingPreviews() {
     preview(
       sharing,
       'owner',
-      'Your shared project: Invitar a una persona, its people, a pending invitation.',
+      'Your shared project, titled «Miembros»: Invitar a una persona, its people with yours first, a pending invitation.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(
@@ -219,7 +247,7 @@ void sharingPreviews() {
     preview(
       sharing,
       'reader',
-      'A project shared with you as a reader: your access, and what it means.',
+      '«Miembros · 3» of a project shared with you as a reader: the three people, you marked «(tú)», each with their role.',
       [es2],
       (p) async {
         final app = await PreviewApp.open(
@@ -335,26 +363,22 @@ void sharingPreviews() {
     preview(
       groupDetail,
       'owner',
-      '«Familia López»: its people, a pending invitation, Invitar a una persona.',
+      '«Familia López» as its owner: its people, yours marked «(tú)», a pending invitation, Invitar a una persona.',
       everywhere,
       (p) async {
-        final app = await PreviewApp.open(
-          p,
-          tasks: normalDay(),
-          projects: allProjects,
-          groups: const [_familia, _colegio],
-          overrides: [
-            groupDetailsProvider('familia').overrideWith(
-              (ref) async => {
-                'group': _groupJson(_familia),
-                'invitations': [
-                  {'id': 'gi-1', 'email': 'carmen.lopez@example.com'},
-                ],
-              },
-            ),
-          ],
-        );
-        await app.pushPage(const GroupScreen(groupId: 'familia'));
+        await _openFamilia(p);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      groupDetail,
+      'invite',
+      'Invitar a una persona on «Familia López»: «¿A quién invitas a Familia López?», what they will see, the email field.',
+      everywhere,
+      (p) async {
+        final app = await _openFamilia(p);
+        await app.tap(p.l.invitePerson);
         await p.shoot();
       },
     );
@@ -389,6 +413,9 @@ void sharingPreviews() {
               'project_name': 'Excursión de fin de curso',
               'created_at': previewNow.subtract(const Duration(hours: 3)).toUtc().toIso8601String(),
               'read_at': null,
+              // The server says who has it now (UX-1514): the reader.
+              'assignee_name': 'María',
+              'assignee_is_you': true,
             },
             {
               'id': 'a3',
@@ -402,6 +429,86 @@ void sharingPreviews() {
           ],
         );
         await app.pushPage(const ActivityScreen());
+        await p.shoot();
+      },
+    );
+
+    preview(
+      activity,
+      'waiting',
+      'Paul’s two-line entry tapped, its task not on the phone yet and the '
+          'sync still running: a thin bar along the bottom of the row, which '
+          'TalkBack reads as «Buscando la tarea…»; the words stay where they were.',
+      everywhere,
+      (p) async {
+        final tester = p.tester;
+        // The phone's tasks, in a temporary folder: the task isn't there.
+        sqfliteFfiInit();
+        final before = databaseFactoryOrNull;
+        databaseFactory = databaseFactoryFfi;
+        final directory = await tester.runAsync(
+          () => Directory.systemTemp.createTemp('taskflow-preview-activity-'),
+        );
+        await tester.runAsync(
+          () => databaseFactory.setDatabasesPath(directory!.path),
+        );
+        p.onTearDown(() async {
+          await tester.runAsync(() async {
+            await TaskDatabase().close();
+            await directory!.delete(recursive: true);
+          });
+          databaseFactoryOrNull = before;
+        });
+        final entry = p.l.activityAssignedYou(
+          'Paul',
+          'Llamar al fontanero por lo de la cocina',
+        );
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+          unread: 1,
+          activity: [
+            {
+              'id': 'a1',
+              'action': 'assigned',
+              'actor_name': 'Paul',
+              'task_id': 'srv-fontanero',
+              'task_title': 'Llamar al fontanero por lo de la cocina',
+              'project_name': 'Casa',
+              'created_at': previewNow.subtract(const Duration(minutes: 10)).toUtc().toIso8601String(),
+              'read_at': null,
+              'assignee_name': 'María',
+              'assignee_is_you': true,
+            },
+            {
+              'id': 'a2',
+              'action': 'created',
+              'actor_name': 'Lucía',
+              'task_id': 'srv-autorizaciones',
+              'task_title': 'Recoger las autorizaciones firmadas',
+              'project_name': 'Excursión de fin de curso',
+              'created_at': previewNow.subtract(const Duration(days: 1)).toUtc().toIso8601String(),
+              'read_at': previewNow.subtract(const Duration(hours: 20)).toUtc().toIso8601String(),
+            },
+          ],
+          // The sync that would bring the task never completes.
+          overrides: [
+            taskProvider.overrideWith((ref) => HangingSyncTasks(normalDay())),
+          ],
+        );
+        await app.pushPage(const ActivityScreen());
+        await tester.tap(find.text(entry));
+        final bar = find.byType(LinearProgressIndicator);
+        // Real time for the phone's database to answer.
+        for (var i = 0; i < 50 && bar.evaluate().isEmpty; i++) {
+          await tester.pump();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+        }
+        // The tap's ripple has faded; the bar keeps moving.
+        await p.frames(20, const Duration(milliseconds: 100));
         await p.shoot();
       },
     );

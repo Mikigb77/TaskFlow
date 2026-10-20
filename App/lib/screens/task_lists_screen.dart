@@ -30,6 +30,11 @@ class TaskListsScreen extends ConsumerStatefulWidget {
 class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
   String _query = '';
 
+  /// Projects whose DELETE is on its way (their row shows a spinner), and
+  /// those the server deleted, gone from the list before the sync catches up.
+  final _deleting = <String>{};
+  final _deleted = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -55,10 +60,11 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
     WidgetRef ref,
     TaskListInfo list,
   ) async {
+    if (list.archived) return restoreProject(context, ref, list);
     final store = ref.read(taskListStoreProvider);
     final tasks = ref.read(taskProvider.notifier);
     try {
-      await store.update(list.copyWith(archived: !list.archived));
+      await store.update(list.copyWith(archived: true));
       if (context.mounted) {
         ref.invalidate(taskListsProvider);
         tasks.loadTasks();
@@ -66,10 +72,8 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
         final strings = context.l10n;
         showFeedback(
           messenger,
-          list.archived
-              ? strings.listRestored
-              : strings.projectArchivedNoReminders(list.name),
-          actionLabel: list.archived ? null : strings.undo,
+          strings.projectArchivedNoReminders(list.name),
+          actionLabel: strings.undo,
           onAction: () async {
             try {
               await store.update(list);
@@ -109,6 +113,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
     }
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.l10n;
+    setState(() => _deleting.add(list.id));
     try {
       await ref
           .read(apiClientProvider)
@@ -119,12 +124,15 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
             accountId: account.id,
           );
       if (!mounted) return;
-      await ref.read(taskProvider.notifier).loadTasks();
-      if (!mounted) return;
-      ref.invalidate(taskListsProvider);
+      // The row goes now; the sync takes the project's tasks off this phone
+      // behind it.
+      setState(() => _deleted.add(list.id));
       showFeedback(messenger, strings.projectDeleted);
+      unawaited(_refresh());
     } catch (error) {
       showFeedback(messenger, requestProblemText(strings, error));
+    } finally {
+      if (mounted) setState(() => _deleting.remove(list.id));
     }
   }
 
@@ -214,7 +222,8 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                 child: Text(context.l10n.retryLists),
               ),
             ),
-            data: (lists) {
+            data: (all) {
+              final lists = all.where((p) => !_deleted.contains(p.id)).toList();
               final shown = lists
                   .where(
                     (p) =>
@@ -226,20 +235,6 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => const GroupsScreen(),
-                          ),
-                        ),
-                        icon: const Icon(Icons.groups_outlined),
-                        label: Text(context.l10n.groups),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     // Worth searching only once there are many projects.
                     if (lists.length >= 8 || _query.isNotEmpty) ...[
                       TextField(
@@ -257,6 +252,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                       EmptyState(
                         title: context.l10n.listsEmptyTitle,
                         message: context.l10n.listsEmptyHelp,
+                        icon: Icons.folder_outlined,
                       )
                     else if (shown.isEmpty)
                       ListTile(
@@ -267,6 +263,21 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                       _projectRow(context, list),
                       const Divider(),
                     ],
+                    // Groups come after the projects they hold.
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => const GroupsScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.groups_outlined),
+                        label: Text(context.l10n.groups),
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -286,6 +297,20 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       ),
     );
   }
+
+  /// What's open in [list]: «3 tareas y notas».
+  String _itemCount(BuildContext context, TaskListInfo list) =>
+      context.l10n.listItemCount(
+        (ref.watch(taskProvider).valueOrNull ?? [])
+            .where((task) => task.listId == list.id && !task.isCompleted)
+            .length,
+      );
+
+  /// A shared project's detail: its count for the owner, a member's role.
+  String _sharedDetail(BuildContext context, TaskListInfo list) =>
+      list.role == 'owner'
+      ? _itemCount(context, list)
+      : context.listRole(list.role);
 
   Widget _projectRow(BuildContext context, TaskListInfo list) => ListTile(
     contentPadding: EdgeInsets.zero,
@@ -314,101 +339,145 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
       list.shared
           ? [
               // A group project names its group; a direct share says so.
+              // The owner reads how much is in it; members, their role.
               list.groupName == null
-                  ? context.l10n.projectSharedRole(context.listRole(list.role))
-                  : '${list.groupName} · ${context.listRole(list.role)}',
+                  ? context.l10n.projectSharedRole(_sharedDetail(context, list))
+                  : '${list.groupName} · ${_sharedDetail(context, list)}',
               if (list.archived) context.l10n.archived,
             ].join(' · ')
           : list.conflict != null
           ? context.l10n.listConflict
           : list.archived
           ? context.l10n.archivedListHelp
-          : context.l10n.listItemCount(
-              (ref.watch(taskProvider).valueOrNull ?? [])
-                  .where((task) => task.listId == list.id && !task.isCompleted)
-                  .length,
-            ),
+          : _itemCount(context, list),
     ),
-    onTap: () => list.conflict != null
-        ? _resolve(context, ref, list)
-        : Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) => HomeScreen(isRoot: false, listId: list.id),
+    onTap: _deleting.contains(list.id)
+        ? null
+        : () => list.conflict != null
+              ? _resolve(context, ref, list)
+              : Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => HomeScreen(isRoot: false, listId: list.id),
+                  ),
+                ),
+    trailing: _deleting.contains(list.id)
+        ? const SizedBox.square(
+            dimension: 48,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
             ),
+          )
+        : PopupMenuButton<String>(
+            tooltip: context.l10n.manageItem(list.name),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'pin',
+                child: Text(
+                  list.pinned
+                      ? context.l10n.unpinProject
+                      : context.l10n.pinProject,
+                ),
+              ),
+              if (list.shared)
+                PopupMenuItem(
+                  value: 'notifications',
+                  child: Text(context.l10n.projectNotifications),
+                ),
+              if (list.canManage)
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Text(context.l10n.editList),
+                ),
+              if (list.canManage)
+                PopupMenuItem(
+                  value: 'archive',
+                  child: Text(
+                    list.archived
+                        ? context.l10n.restoreList
+                        : context.l10n.archiveList,
+                  ),
+                ),
+              if (ref.read(authProvider).account != null)
+                // Everyone can see the members and leave here. As on the
+                // project page, only the owner of an unshared personal
+                // project is told “Share”; the page it opens is “Members”
+                // in every other case.
+                PopupMenuItem(
+                  value: 'sharing',
+                  child: Text(
+                    !list.shared &&
+                            list.groupId == null &&
+                            list.role == 'owner'
+                        ? context.l10n.shareProject
+                        : context.l10n.people,
+                  ),
+                ),
+              if (list.conflict != null && list.canManage)
+                PopupMenuItem(
+                  value: 'resolve',
+                  child: Text(context.l10n.chooseDetails),
+                ),
+              // The server deletes it, so only a project it knows.
+              if (list.groupId == null &&
+                  list.role == 'owner' &&
+                  list.version > 0 &&
+                  ref.read(authProvider).account != null)
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    list.shared
+                        ? context.l10n.deleteListForEveryone
+                        : context.l10n.deleteList,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+            ],
+            onSelected: (action) => switch (action) {
+              'pin' => _pin(list),
+              'notifications' => showProjectPreferences(context, ref, list),
+              'edit' => _edit(context, ref, list),
+              'resolve' => _resolve(context, ref, list),
+              'delete' => _delete(list),
+              'sharing' => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => list.groupId == null
+                      ? ListSharingScreen(listId: list.id)
+                      : GroupScreen(groupId: list.groupId!),
+                ),
+              ),
+              _ => _archive(context, ref, list),
+            },
           ),
-    trailing: PopupMenuButton<String>(
-      tooltip: context.l10n.manageItem(list.name),
-      itemBuilder: (_) => [
-        PopupMenuItem(
-          value: 'pin',
-          child: Text(
-            list.pinned ? context.l10n.unpinProject : context.l10n.pinProject,
-          ),
-        ),
-        if (list.shared)
-          PopupMenuItem(
-            value: 'notifications',
-            child: Text(context.l10n.projectNotifications),
-          ),
-        if (list.canManage)
-          PopupMenuItem(value: 'edit', child: Text(context.l10n.editList)),
-        if (list.canManage)
-          PopupMenuItem(
-            value: 'archive',
-            child: Text(
-              list.archived
-                  ? context.l10n.restoreList
-                  : context.l10n.archiveList,
-            ),
-          ),
-        if (ref.read(authProvider).account != null)
-          // Everyone can see the members and leave here;
-          // only those who can invite are told “Share”.
-          PopupMenuItem(
-            value: 'sharing',
-            child: Text(
-              list.canManage ? context.l10n.shareProject : context.l10n.people,
-            ),
-          ),
-        if (list.conflict != null && list.canManage)
-          PopupMenuItem(
-            value: 'resolve',
-            child: Text(context.l10n.chooseDetails),
-          ),
-        // The server deletes it, so only a project it knows.
-        if (list.groupId == null &&
-            list.role == 'owner' &&
-            list.version > 0 &&
-            ref.read(authProvider).account != null)
-          PopupMenuItem(
-            value: 'delete',
-            child: Text(
-              list.shared
-                  ? context.l10n.deleteListForEveryone
-                  : context.l10n.deleteList,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-      ],
-      onSelected: (action) => switch (action) {
-        'pin' => _pin(list),
-        'notifications' => showProjectPreferences(context, ref, list),
-        'edit' => _edit(context, ref, list),
-        'resolve' => _resolve(context, ref, list),
-        'delete' => _delete(list),
-        'sharing' => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => list.groupId == null
-                ? ListSharingScreen(listId: list.id)
-                : GroupScreen(groupId: list.groupId!),
-          ),
-        ),
-        _ => _archive(context, ref, list),
-      },
-    ),
   );
+}
+
+/// Restores the archived [list], as Proyectos ⋮ does, and says so. Loading
+/// the tasks again reschedules the project's reminders.
+Future<void> restoreProject(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list,
+) async {
+  try {
+    await ref
+        .read(taskListStoreProvider)
+        .update(list.copyWith(archived: false));
+    if (!context.mounted) return;
+    ref.invalidate(taskListsProvider);
+    ref.read(taskProvider.notifier).loadTasks();
+    showFeedback(ScaffoldMessenger.of(context), context.l10n.listRestored);
+  } catch (_) {
+    if (context.mounted) {
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.listUpdateError);
+    }
+  }
 }
 
 /// Asks for a new project's name, then opens the saved project's page, whose
@@ -548,7 +617,9 @@ Future<TaskListInfo?> editTaskList(
                 Navigator.pop(context, true);
               }
             },
-            child: Text(context.l10n.saveList),
+            child: Text(
+              list == null ? context.l10n.createList : context.l10n.saveList,
+            ),
           ),
         ],
       ),

@@ -362,9 +362,7 @@ void main() {
   test('UX-225: Lista de pasos is the one Spanish name for a checklist', () {
     final es = lookupAppLocalizations(const Locale('es'));
     final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(es.checklist, 'Lista de pasos');
     expect(es.checklistSemantics(1, 3), 'Lista de pasos, 1 de 3 completados');
-    expect(ca.checklist, 'Llista de passos');
     expect(ca.checklistSemantics(1, 3), startsWith('Llista de passos'));
     expect(es.notesEmptyHelp, isNot(contains('verificación')));
   });
@@ -599,13 +597,12 @@ void main() {
         (
           en,
           [
-            'Group activity',
+            'Updates',
             'Unread',
             'Pinned',
             'Shared · Editor',
             'Everyone in Máster will see it.',
             'Create group',
-            'Next',
             'Enter a name.',
             'What can Ana do?',
             "Couldn't load. Check your connection.",
@@ -617,13 +614,12 @@ void main() {
         (
           es,
           [
-            'Actividad del grupo',
+            'Novedades',
             'No leída',
             'Fijado',
             'Compartido · Editor',
             'Todos en Máster lo verán.',
             'Crear grupo',
-            'Siguiente',
             'Escribe un nombre.',
             '¿Qué puede hacer Ana?',
             'No se ha podido cargar. Revisa la conexión.',
@@ -635,13 +631,12 @@ void main() {
         (
           ca,
           [
-            'Activitat del grup',
+            'Novetats',
             'No llegida',
             'Fixat',
             'Compartit · Editor',
             'Tothom a Máster el veurà.',
             'Crea el grup',
-            'Següent',
             'Escriu un nom.',
             'Què pot fer Ana?',
             "No s'ha pogut carregar. Revisa la connexió.",
@@ -658,7 +653,6 @@ void main() {
           l.projectSharedRole('Editor'),
           l.projectGroupSees('Máster'),
           l.createGroup,
-          l.nextStep,
           l.enterName,
           l.groupRoleQuestion('Ana'),
           l.loadFailed,
@@ -1674,5 +1668,98 @@ void main() {
       expect(catalog.keys, isNot(contains('schedule')), reason: language);
       expect(catalog.keys, isNot(contains('@schedule')), reason: language);
     }
+  });
+
+  // ---- Run 2026-10-19-app, round 1 (P181–P185) ----
+
+  test('UX-1513, UX-1503, UX-1506, UX-1504, UX-1520: the retired strings are '
+      'gone from all three catalogs: no Revocar invitación, no Siguiente step, '
+      'no formal email labels, no Tu rol or sharing help, no lone «Proyecto '
+      'archivado» line, no second notes help', () {
+    const retired = [
+      'revokeInvitation',
+      'nextStep',
+      'invitationEmailSent',
+      'invitationEmailPending',
+      'invitationCodeHelp',
+      'theirEmail',
+      'inviteeEmail',
+      'yourRole',
+      'sharingHelp',
+      'archivedList',
+      'notesHelp',
+    ];
+    for (final language in ['en', 'es', 'ca']) {
+      final catalog = catalogOf(language);
+      for (final key in retired) {
+        expect(catalog.keys, isNot(contains(key)), reason: '$language $key');
+        expect(catalog.keys, isNot(contains('@$key')),
+            reason: '$language @$key');
+      }
+      final values = [
+        for (final entry in catalog.entries)
+          if (!entry.key.startsWith('@') && entry.value is String)
+            entry.value as String,
+      ];
+      for (final gone in [
+        'Revocar invitación',
+        'Revoca la invitació',
+        'Revoke invitation',
+        'Su correo',
+        'El seu correu',
+        'Correo de su cuenta',
+        'Correu del seu compte',
+        'Reemplazar una invitación invalida',
+      ]) {
+        expect(values.where((value) => value.contains(gone)), isEmpty,
+            reason: '$language: $gone');
+      }
+    }
+  });
+
+  test('UX-1524: Grupos’ help ends the tú/vosotros mix, Activity is Novedades, '
+      'and the Catalan sharing names read plainly', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.groupHelp,
+        'Invite people once and share several projects with them.');
+    expect(es.groupHelp,
+        'Invita a las personas una vez y comparte con ellas varios proyectos.');
+    expect(ca.groupHelp,
+        'Convida les persones una vegada i comparteix amb elles diversos projectes.');
+    expect(es.groupHelp, isNot(contains('colaborad')));
+    expect(ca.groupHelp, isNot(contains('col·laboreu')));
+    expect(en.groupActivity, 'Updates');
+    expect(es.groupActivity, 'Novedades');
+    expect(ca.groupActivity, 'Novetats');
+    expect(ca.listSharing, 'Comparteix el projecte');
+    expect(ca.howSharingWorks, 'Com funciona compartir');
+    // EN and ES keep theirs.
+    expect(es.listSharing, 'Compartir proyecto');
+    expect(en.listSharing, 'Project sharing');
+  });
+
+  test('UX-1503: the invite reads as a question with a plain label, in EN, ES '
+      'and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.inviteWho('Casa'), 'Who are you inviting to Casa?');
+    expect(es.inviteWho('Casa'), '¿A quién invitas a Casa?');
+    expect(ca.inviteWho('Casa'), 'A qui convides a Casa?');
+    expect([en.email, es.email, ca.email], ['Email', 'Correo', 'Correu']);
+    expect(en.inviteOwnEmail, 'That’s your own email. Type the other person’s.');
+    expect(es.inviteOwnEmail,
+        'Ese es tu correo. Escribe el de la persona que invitas.');
+    expect(ca.inviteOwnEmail,
+        'Aquest és el teu correu. Escriu el de la persona que convides.');
+    expect(es.shareProjectHelp('Casa'),
+        'Esa persona verá todo lo que hay en Casa.');
+    expect(ca.shareProjectHelp('Casa'),
+        'Aquesta persona veurà tot el que hi ha a Casa.');
+    expect(en.sendInvitation, 'Send invitation');
+    expect(es.sendInvitation, 'Enviar invitación');
+    expect(ca.sendInvitation, 'Envia la invitació');
   });
 }

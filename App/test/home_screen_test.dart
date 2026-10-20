@@ -20,6 +20,8 @@ import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/captures_screen.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/main.dart';
+import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/task_list_store.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
@@ -552,15 +554,15 @@ void main() {
   }
 
   testWidgets(
-    'UX-333: an archived project’s page says Proyecto archivado as a plain subtitle, not an uppercase eyebrow',
+    'UX-333: an archived project’s page says so in plain text, not an uppercase eyebrow',
     (tester) async {
       await open(
         tester,
         const HomeScreen(listId: 'casa', isRoot: false),
         projects: [TaskListInfo(id: 'casa', name: 'Casa', archived: true)],
       );
-      expect(find.text(es.archivedList), findsOneWidget);
-      expect(find.text(es.archivedList.toUpperCase()), findsNothing);
+      expect(find.text(es.archivedListAddHelp), findsOneWidget);
+      expect(find.text(es.archivedListAddHelp.toUpperCase()), findsNothing);
       expect(find.byType(SectionLabel), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -1918,6 +1920,307 @@ void main() {
       },
     );
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P184 (UX-1504, UX-1523) ----
+
+  /// [listId]'s page in Spanish at [size], over [lists] kept in a store the
+  /// page can restore them in.
+  Future<_MemoryLists> openStoredProject(
+    WidgetTester tester,
+    String listId,
+    List<TaskListInfo> lists, {
+    List<Task> tasks = const [],
+    Size size = const Size(360, 800),
+    double scale = 1,
+  }) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // Messages stay 10 s, as with the phone's accessibility timeout.
+    const timeout = MethodChannel('taskflow/accessibility');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(timeout, (_) async => 10000);
+    addTearDown(() => messenger.setMockMethodCallHandler(timeout, null));
+    final store = _MemoryLists()..lists = lists;
+    final container = designContainer(
+      tasks: () => _GivenTasks(tasks),
+      loadProjects: () => store.all(),
+      overrides: [taskListStoreProvider.overrideWithValue(store)],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: HomeScreen(listId: listId, isRoot: false),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return store;
+  }
+
+  testWidgets(
+    'UX-1504: an archived project’s page has no Añadir tarea: its bar reads Proyecto archivado. Restáuralo para añadir tareas. with Restaurar proyecto for the owner, which restores it and brings Añadir tarea back',
+    (tester) async {
+      expect(
+        es.archivedListAddHelp,
+        'Proyecto archivado. Restáuralo para añadir tareas.',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('en')).archivedListAddHelp,
+        'Archived project. Restore it to add tasks.',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('ca')).archivedListAddHelp,
+        'Projecte arxivat. Restaura’l per afegir-hi tasques.',
+      );
+      expect(es.restoreList, 'Restaurar proyecto');
+      final store = await openStoredProject(
+        tester,
+        'huerto',
+        [
+          TaskListInfo(
+            id: 'huerto',
+            name: 'Huerto',
+            version: 1,
+            archived: true,
+          ),
+        ],
+        tasks: [
+          Task(
+            id: 78,
+            title: 'Plantar los tomates',
+            priority: 1,
+            listId: 'huerto',
+          ),
+        ],
+      );
+      expect(find.text(es.addTask), findsNothing);
+      expect(find.byType(TaskActions), findsNothing);
+      final line = find.text(es.archivedListAddHelp);
+      expect(line, findsOneWidget);
+      // No separate grey line above the search.
+      expect(find.text('Proyecto archivado'), findsNothing);
+      final search = find.byType(TextField).first;
+      expect(
+        tester.getRect(line).top,
+        greaterThan(tester.getRect(search).bottom),
+        reason: 'the line is in the bottom bar, not above the search',
+      );
+      final restore = find.ancestor(
+        of: find.text(es.restoreList),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      );
+      expect(restore, findsOneWidget);
+      expect(restore.hitTestable(), findsOneWidget);
+      await tester.tap(restore);
+      await tester.pumpAndSettle();
+      expect(store.lists.single.archived, isFalse);
+      expect(find.text(es.listRestored), findsOneWidget);
+      expect(find.text(es.addTask), findsOneWidget);
+      expect(find.text(es.archivedListAddHelp), findsNothing);
+      expect(find.text(es.restoreList), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1504, UX-1641: a project archived with its group shows Proyecto archivado. without Restaurar proyecto or Restáuralo; so does an archived project its viewer can’t manage',
+    (tester) async {
+      await openStoredProject(tester, 'tesis', [
+        TaskListInfo(
+          id: 'tesis',
+          name: 'Tesis',
+          version: 1,
+          shared: true,
+          role: 'admin',
+          groupId: 'master',
+          groupName: 'Máster',
+          groupArchived: true,
+        ),
+      ]);
+      expect(find.text(es.archivedListNoAdd), findsOneWidget);
+      expect(find.text(es.archivedListAddHelp), findsNothing);
+      expect(find.text(es.restoreList), findsNothing);
+      expect(find.text(es.addTask), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox());
+      await openStoredProject(tester, 'obra', [
+        TaskListInfo(
+          id: 'obra',
+          name: 'Obra',
+          version: 1,
+          shared: true,
+          role: 'viewer',
+          archived: true,
+        ),
+      ]);
+      expect(find.text(es.archivedListNoAdd), findsOneWidget);
+      expect(find.text(es.archivedListAddHelp), findsNothing);
+      expect(find.text(es.restoreList), findsNothing);
+      expect(find.text(es.addTask), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1523: at 360×800 and 1×, a shared project’s Miembros · 3 and Notas share one row, at least 8 dp apart and at least 8 dp above the search',
+    (tester) async {
+      await openStoredProject(tester, 'casa', [
+        TaskListInfo(
+          id: 'casa',
+          name: 'Casa',
+          version: 2,
+          shared: true,
+          ownerId: 1,
+          people: const [
+            me,
+            ana,
+            ProjectMember(id: 3, name: 'Luis', role: 'viewer'),
+          ],
+        ),
+      ]);
+      final members = find.widgetWithText(
+        TextButton,
+        es.projectMembersCount(3),
+      );
+      final notes = find.widgetWithText(TextButton, es.notes);
+      expect(members, findsOneWidget);
+      expect(notes, findsOneWidget);
+      final a = tester.getRect(members);
+      final b = tester.getRect(notes);
+      expect(
+        (a.center.dy - b.center.dy).abs(),
+        lessThan(1),
+        reason: 'one row: $a and $b',
+      );
+      expect(b.left - a.right, greaterThanOrEqualTo(8), reason: '$a $b');
+      final search = tester.getRect(find.byType(TextField).first);
+      expect(
+        search.top - (a.bottom > b.bottom ? a.bottom : b.bottom),
+        greaterThanOrEqualTo(8),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-19-app, round 2 · P211 (UX-1641): «Restáuralo» only to
+  // someone who has the button ----
+
+  test(
+    'UX-1641: the bar for someone who can’t restore reads Archived project. / Proyecto archivado. / Projecte arxivat.',
+    () {
+      expect(
+        lookupAppLocalizations(const Locale('en')).archivedListNoAdd,
+        'Archived project.',
+      );
+      expect(es.archivedListNoAdd, 'Proyecto archivado.');
+      expect(
+        lookupAppLocalizations(const Locale('ca')).archivedListNoAdd,
+        'Projecte arxivat.',
+      );
+    },
+  );
+
+  for (final (who, project) in [
+    (
+      'a viewer’s archived shared project Obra',
+      TaskListInfo(
+        id: 'obra',
+        name: 'Obra',
+        version: 1,
+        shared: true,
+        role: 'viewer',
+        archived: true,
+      ),
+    ),
+    (
+      'an admin’s group project Tesis archived with its group',
+      TaskListInfo(
+        id: 'tesis',
+        name: 'Tesis',
+        version: 1,
+        shared: true,
+        role: 'admin',
+        groupId: 'master',
+        groupName: 'Máster',
+        groupArchived: true,
+      ),
+    ),
+  ]) {
+    testWidgets(
+      'UX-1641: at 1× on 360×800, $who: the bar reads Proyecto archivado. with no Restáuralo, no Restaurar proyecto and no Añadir tarea',
+      (tester) async {
+        await openStoredProject(tester, project.id, [project]);
+        final line = find.text(es.archivedListNoAdd);
+        expect(line, findsOneWidget);
+        expect(find.textContaining('Restáuralo'), findsNothing);
+        expect(find.text(es.restoreList), findsNothing);
+        expect(find.text(es.addTask), findsNothing);
+        expect(
+          tester.getRect(line).bottom,
+          lessThanOrEqualTo(800),
+          reason: 'the bar is on screen',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'UX-1641: at ${scale.toStringAsFixed(0)}× on 360×800, an owner’s archived personal project still reads Proyecto archivado. Restáuralo para añadir tareas. with Restaurar proyecto under it',
+      (tester) async {
+        await openStoredProject(
+          tester,
+          'huerto',
+          [
+            TaskListInfo(
+              id: 'huerto',
+              name: 'Huerto',
+              version: 1,
+              archived: true,
+            ),
+          ],
+          scale: scale,
+        );
+        expect(
+          es.archivedListAddHelp,
+          'Proyecto archivado. Restáuralo para añadir tareas.',
+        );
+        final line = find.text(es.archivedListAddHelp);
+        expect(line, findsOneWidget);
+        expect(find.text(es.archivedListNoAdd), findsNothing);
+        final restore = find.ancestor(
+          of: find.text(es.restoreList),
+          matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+        );
+        expect(restore, findsOneWidget);
+        expect(restore.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(restore).top,
+          greaterThanOrEqualTo(tester.getRect(line).bottom),
+          reason: 'Restaurar proyecto sits under the line',
+        );
+        expect(tester.getRect(restore).bottom, lessThanOrEqualTo(800));
+        expect(find.text(es.addTask), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 /// Taps the tab named [label] in the navigation bar.
@@ -1941,5 +2244,19 @@ class _GivenTasks extends DesignTaskNotifier {
   @override
   Future<void> loadTasks() async {
     if (!state.hasValue) state = AsyncData(initial);
+  }
+}
+
+/// Projects kept in memory, as the phone's store keeps them.
+class _MemoryLists extends TaskListStore {
+  _MemoryLists() : super(TaskDatabase(), 'local');
+  List<TaskListInfo> lists = [];
+  @override
+  Future<List<TaskListInfo>> all() async => lists;
+  @override
+  Future<void> update(TaskListInfo list) async {
+    lists = [
+      for (final current in lists) current.id == list.id ? list : current,
+    ];
   }
 }

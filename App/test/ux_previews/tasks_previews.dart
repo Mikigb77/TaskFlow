@@ -349,6 +349,39 @@ void tasksPreviews() {
 
     preview(
       projectPage,
+      'archived',
+      'An archived personal project, «Huerto», of this account: in place of «Añadir tarea», the bar says it’s archived, with «Restaurar proyecto».',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 78,
+              title: 'Plantar los tomates',
+              priority: 1,
+              listId: 'huerto',
+            ),
+          ],
+          projects: [
+            ...allProjects,
+            TaskListInfo(
+              id: 'huerto',
+              name: 'Huerto',
+              color: 'amber',
+              version: 1,
+              archived: true,
+            ),
+          ],
+        );
+        await _openProject(app, 'huerto');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      projectPage,
       'viewer',
       'Ana’s «Coro», which this account can only view: rows with no circle, each one button that opens the task.',
       [es1, es2],

@@ -73,6 +73,16 @@ List<Task> _notes() => [
     priority: 1,
     listId: 'casa',
   ),
+  // Said in the capture sheet: titled by the start of its words.
+  Task(
+    id: 84,
+    kind: 'note',
+    title: 'Para la reunión del cole',
+    notes:
+        'Para la reunión del cole: preguntar por el comedor y por la '
+        'excursión de primavera',
+    priority: 1,
+  ),
   Task(
     id: 83,
     kind: 'note',
@@ -87,7 +97,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'empty',
-      'No notes yet: what notes are for, and Añadir nota.',
+      'No notes yet: one line on what notes are for, no search, and Añadir nota.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -99,7 +109,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'list',
-      'Four notes, one with steps and one in a project.',
+      'Five notes: one said in the sheet (its preview starts after its title), one with steps and one in a project.',
       [...mainScreen, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -152,6 +162,25 @@ void notesPreviews() {
         await p.shoot('result');
       },
       then: {'result': 'Listo: the note as it will be saved, with Guardar nota.'},
+    );
+
+    preview(
+      noteSaid,
+      'typing-free-0',
+      'A free account with no dictations left: Añadir nota (+) types, with no used-up line and no Ver Pro.',
+      everywhere,
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          pro: false,
+          freeLeft: 0,
+          tasks: [...normalDay(), ..._notes()],
+        );
+        await app.tab(p.l.notes);
+        await p.tester.tap(find.text(p.l.addNote).hitTestable());
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
     );
   });
 }

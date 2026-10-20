@@ -22,6 +22,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/notes_screen.dart';
+import 'package:agenda/screens/task_lists_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({
@@ -477,6 +478,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final readOnly =
         widget.listId != null &&
         (list == null ? !lists.isLoading && lists.hasValue : !list.canEdit);
+    // An archived project, or one archived with its group, takes no new
+    // tasks: they'd show nowhere else and never remind.
+    final archived = widget.listId != null && list?.inactive == true;
+    // Restoring the project alone can't bring back one archived with its
+    // group; only who can manage it gets the button and the hint to use it.
+    final canRestore =
+        archived && list!.archived && !list.groupArchived && list.canManage;
     // The project a new task goes to, when the user can add to it.
     final addTo = ref.watch(listCanEditProvider(scope.projectId))
         ? scope.projectId
@@ -520,7 +528,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: widget.isRoot ? 8 : 12),
+                        // 8 dp: a project page's buttons keep their place
+                        // under the people row when they wrap at large text.
+                        const SizedBox(height: 8),
                         // The app bar names a project or the Inbox: no headline
                         // repeats it.
                         // Narrower than a TextButton's own 12 dp sides, so both
@@ -557,63 +567,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ],
                           ),
-                        if (widget.isRoot || list?.inactive == true) ...[
-                          if (!widget.isRoot)
-                            Text(
-                              context.l10n.archivedList,
-                              style: TextStyle(color: colors.onSurfaceVariant),
-                            ),
-                          SizedBox(height: widget.isRoot ? 8 : 16),
-                        ],
-                        // The owner can share a project of their own from here.
-                        if (list != null &&
-                            (list.shared ||
-                                (list.groupId == null && list.role == 'owner')))
-                          Align(
-                            alignment: AlignmentDirectional.centerStart,
-                            child: TextButton.icon(
-                              icon: Icon(
-                                list.shared
-                                    ? Icons.group_outlined
-                                    : Icons.person_add_outlined,
-                              ),
-                              label: Text(
-                                list.shared
-                                    ? context.l10n.projectMembersCount(
-                                        list.people.length,
-                                      )
-                                    : context.l10n.shareProject,
-                              ),
-                              onPressed: () async {
-                                final gone = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute<bool>(
-                                    builder: (_) => list.groupId == null
-                                        ? ListSharingScreen(listId: list.id)
-                                        : GroupScreen(groupId: list.groupId!),
+                        if (widget.isRoot) const SizedBox(height: 8),
+                        // Side by side, apart, wrapping only when they must.
+                        if (widget.listId != null) ...[
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              // The owner can share a project of their own
+                              // from here.
+                              if (list != null &&
+                                  (list.shared ||
+                                      (list.groupId == null &&
+                                          list.role == 'owner')))
+                                TextButton.icon(
+                                  icon: Icon(
+                                    list.shared
+                                        ? Icons.group_outlined
+                                        : Icons.person_add_outlined,
                                   ),
-                                );
-                                // Deleted or left: this page has nothing to show.
-                                if (gone == true && context.mounted) {
-                                  Navigator.pop(context);
-                                }
-                              },
-                            ),
-                          ),
-                        if (widget.listId != null)
-                          TextButton.icon(
-                            icon: const Icon(Icons.description_outlined),
-                            label: Text(context.l10n.notes),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => NotesScreen(
-                                  listId: widget.listId,
-                                  isRoot: false,
+                                  label: Text(
+                                    list.shared
+                                        ? context.l10n.projectMembersCount(
+                                            list.people.length,
+                                          )
+                                        : context.l10n.shareProject,
+                                  ),
+                                  onPressed: () async {
+                                    final gone = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute<bool>(
+                                        builder: (_) => list.groupId == null
+                                            ? ListSharingScreen(listId: list.id)
+                                            : GroupScreen(
+                                                groupId: list.groupId!,
+                                              ),
+                                      ),
+                                    );
+                                    // Deleted or left: this page has nothing
+                                    // to show.
+                                    if (gone == true && context.mounted) {
+                                      Navigator.pop(context);
+                                    }
+                                  },
+                                ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.description_outlined),
+                                label: Text(context.l10n.notes),
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => NotesScreen(
+                                      listId: widget.listId,
+                                      isRoot: false,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
+                          const SizedBox(height: 8),
+                        ],
                         if (!quiet) ...[
                           TextField(
                             controller: _search,
@@ -725,7 +739,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ? context.l10n.personNothingOpenHelp
                         : filtering
                         ? context.l10n.differentFilter
-                        : readOnly
+                        : readOnly || archived
                         ? context.l10n.readOnlyListEmpty
                         : widget.listId != null
                         ? context.l10n.listEmpty
@@ -772,7 +786,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: readOnly
+      bottomNavigationBar: archived
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.inventory_2_outlined),
+                      title: Text(
+                        canRestore
+                            ? context.l10n.archivedListAddHelp
+                            : context.l10n.archivedListNoAdd,
+                      ),
+                    ),
+                    if (canRestore)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.unarchive_outlined),
+                            label: Text(context.l10n.restoreList),
+                            onPressed: () => restoreProject(context, ref, list),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            )
+          : readOnly
           ? SafeArea(
               top: false,
               child: Padding(

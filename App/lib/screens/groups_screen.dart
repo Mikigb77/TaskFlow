@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,20 +22,73 @@ import 'package:agenda/widgets/name_ask_sheet.dart';
 String groupRoleLabel(BuildContext context, String role) =>
     role == 'admin' ? context.l10n.groupAdmin : context.listRole(role);
 
-/// One text step of a group flow. [action] names the button: what the step
-/// does (`Crear grupo`), or `Siguiente` when another step follows; `Guardar`
-/// by default. With [submit], the dialog stays open while it runs and shows
-/// its error inside, so a failed request keeps what was typed. It closes
-/// once [submit] returns true; false leaves it open without an error.
+/// The line under an invite's email field when [typed] is the account's own
+/// address ([own]); null otherwise.
+String? ownEmailProblem(BuildContext context, String? own, String typed) =>
+    own != null && typed.trim().toLowerCase() == own.trim().toLowerCase()
+    ? context.l10n.inviteOwnEmail
+    : null;
+
+/// What follows an invitation to a project or a group: the code to send
+/// if the email doesn't arrive.
+Future<void> showInvitationSent(
+  BuildContext context, {
+  required int accountId,
+  required String code,
+}) => showDialog<void>(
+  context: context,
+  builder: (context) => Consumer(
+    builder: (context, dialogRef, _) {
+      final sameAccount =
+          dialogRef.watch(authProvider).account?.id == accountId;
+      return AlertDialog(
+        scrollable: true,
+        title: Text(context.l10n.invitationSent),
+        content: sameAccount
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(context.l10n.invitationCodeFallback),
+                  const SizedBox(height: 16),
+                  SelectableText(code, key: const ValueKey('invitation-code')),
+                ],
+              )
+            : Text(context.l10n.accountChanged),
+        actions: [
+          if (sameAccount)
+            TextButton(
+              onPressed: () => Clipboard.setData(ClipboardData(text: code)),
+              child: Text(context.l10n.copyCode),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.done),
+          ),
+        ],
+      );
+    },
+  ),
+);
+
+/// One text step of a group flow. [title] heads the dialog and, without a
+/// [label], names the field. [action] names the button: what the step does
+/// (`Crear grupo`); `Guardar` by default. [check] can refuse a valid value
+/// with a line under the field. With [submit], the dialog stays open while
+/// it runs and shows its error inside, so a failed request keeps what was
+/// typed. It closes once [submit] returns true; false leaves it open
+/// without an error.
 Future<String?> groupTextDialog(
   BuildContext context,
   String title, {
+  String? label,
   String value = '',
   String? help,
   bool email = false,
   bool allowEmpty = false,
   int maxLength = 80,
   String? action,
+  String? Function(String value)? check,
   Future<bool> Function(String value)? submit,
 }) async {
   final form = GlobalKey<FormState>();
@@ -99,23 +154,22 @@ Future<String?> groupTextDialog(
                       : TextInputType.text,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
-                    labelText: title,
-                    errorMaxLines: 3,
+                    labelText: label ?? title,
+                    // Room for the own-address line at large text.
+                    errorMaxLines: 6,
                   ),
                   onChanged: (s) => value = s,
                   onFieldSubmitted: (_) => send(),
                   validator: (s) {
                     final text = s?.trim() ?? '';
-                    if (email) {
-                      return RegExp(
-                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                          ).hasMatch(text)
-                          ? null
-                          : context.l10n.enterEmailAddress;
+                    if (email &&
+                        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(text)) {
+                      return context.l10n.enterEmailAddress;
                     }
-                    return allowEmpty || text.isNotEmpty
-                        ? null
-                        : context.l10n.enterName;
+                    if (!email && !allowEmpty && text.isEmpty) {
+                      return context.l10n.enterName;
+                    }
+                    return check?.call(text);
                   },
                 ),
                 if (busy) const LinearProgressIndicator(),
@@ -365,9 +419,22 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
     if (!mounted || ref.read(authProvider).account?.id != accountId) return;
     ref.invalidate(groupsProvider);
     ref.invalidate(groupDetailsProvider(widget.groupId));
-    await ref.read(taskProvider.notifier).loadTasks();
-    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-    ref.invalidate(taskListsProvider);
+    final synced = ref.read(taskProvider.notifier).loadTasks().then((_) {
+      if (mounted && ref.read(authProvider).account?.id == accountId) {
+        ref.invalidate(taskListsProvider);
+      }
+    });
+    final code = result is Map && result['code'] is String
+        ? result['code'] as String
+        : null;
+    // An invitation's code shows as soon as the server answers; the sync
+    // runs behind it.
+    if (code == null) {
+      await synced;
+      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    } else {
+      unawaited(synced);
+    }
     final messenger = ScaffoldMessenger.of(context);
     if (leave) {
       Navigator.pop(context);
@@ -382,52 +449,10 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
         onAction: undo == null ? null : () => undo(result),
       );
     }
-    if (result is Map && result['code'] is String) {
-      final code = result['code'] as String;
-      await showDialog<void>(
-        context: context,
-        builder: (context) => Consumer(
-          builder: (context, dialogRef, _) {
-            final sameAccount =
-                dialogRef.watch(authProvider).account?.id == accountId;
-            return AlertDialog(
-              scrollable: true,
-              title: Text(context.l10n.invitationCode),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (result['email_status'] != null) ...[
-                    Text(
-                      result['email_status'] == 'sent'
-                          ? context.l10n.invitationEmailSent
-                          : context.l10n.invitationEmailPending,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Text(context.l10n.invitationCodeHelp),
-                  const SizedBox(height: 16),
-                  SelectableText(
-                    sameAccount ? code : context.l10n.accountChanged,
-                    key: const ValueKey('group-invitation-code'),
-                  ),
-                ],
-              ),
-              actions: [
-                if (sameAccount)
-                  TextButton(
-                    onPressed: () =>
-                        Clipboard.setData(ClipboardData(text: code)),
-                    child: Text(context.l10n.copyCode),
-                  ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(context.l10n.done),
-                ),
-              ],
-            );
-          },
-        ),
-      );
+    if (code != null) {
+      // The work is done: no progress bar under “Invitation sent”.
+      setState(() => _busy = false);
+      await showInvitationSent(context, accountId: accountId, code: code);
       // An account without a name is asked for one, once.
       if (mounted) {
         await askForNameOnce(Navigator.of(context), accountId: accountId);
@@ -435,31 +460,32 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
     }
   }
 
-  /// Email, then role; the email dialog stays open until the invitation is
-  /// sent, so a refused or offline invite keeps the typed address.
+  /// Everyone joins as an editor; the role changes on the person's row. The
+  /// email dialog stays open until the invitation is sent, so a refused or
+  /// offline invite keeps the typed address.
   Future<void> _invite(TaskGroupInfo group) async {
-    final accountId = ref.read(authProvider).account?.id;
-    if (_busy || accountId == null) return;
+    final account = ref.read(authProvider).account;
+    if (_busy || account == null) return;
     Object? result;
     final email = await groupTextDialog(
       context,
-      context.l10n.inviteeEmail,
+      context.l10n.inviteWho(group.name),
+      label: context.l10n.email,
       email: true,
       maxLength: 254,
       help: context.l10n.groupInviteHelp,
-      action: context.l10n.nextStep,
+      action: context.l10n.sendInvitation,
+      check: (email) => ownEmailProblem(context, account.email, email),
       submit: (email) async {
-        final role = await _chooseRole(group, name: email, canRemove: false);
-        if (role == null) return false;
-        result = await _request(accountId, 'invite/', {
+        result = await _request(account.id, 'invite/', {
           'email': email,
-          'role': role,
+          'role': 'editor',
         });
         return true;
       },
     );
     if (email == null || !mounted) return;
-    await _guard(() => _applied(accountId, result));
+    await _guard(() => _applied(account.id, result));
   }
 
   /// Asks what [name] can do, with their [current] role marked.
@@ -467,7 +493,6 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
     TaskGroupInfo group, {
     required String name,
     String? current,
-    required bool canRemove,
   }) => showModalBottomSheet<String>(
     context: context,
     showDragHandle: true,
@@ -499,12 +524,11 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                 trailing: role == current ? const Icon(Icons.check) : null,
                 onTap: () => Navigator.pop(context, role),
               ),
-            if (canRemove)
-              ListTile(
-                textColor: Theme.of(context).colorScheme.error,
-                title: Text(context.l10n.removeAccess),
-                onTap: () => Navigator.pop(context, 'remove'),
-              ),
+            ListTile(
+              textColor: Theme.of(context).colorScheme.error,
+              title: Text(context.l10n.removeAccess),
+              onTap: () => Navigator.pop(context, 'remove'),
+            ),
           ],
         ),
       ),
@@ -516,7 +540,6 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
       group,
       name: person.name,
       current: person.role,
-      canRemove: true,
     );
     if (role == null || role == person.role || !mounted) return;
     if (role == 'remove' &&
@@ -644,7 +667,11 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.person_outline),
-                      title: Text(person.name),
+                      title: Text(
+                        person.id == me
+                            ? context.l10n.personYou(person.name)
+                            : person.name,
+                      ),
                       subtitle: Text(groupRoleLabel(context, person.role)),
                       trailing: person.id == me && person.id != group.ownerId
                           ? PopupMenuButton<String>(
@@ -683,13 +710,32 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                         leading: const Icon(Icons.schedule_send_outlined),
                         title: Text(invitation['email']),
                         subtitle: Text(context.l10n.invitationPending),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close),
-                          color: Theme.of(context).colorScheme.error,
-                          tooltip: context.l10n.revokeInvitation,
-                          onPressed: _busy
-                              ? null
-                              : () => _run('revoke_invite/', {
+                        trailing: PopupMenuButton<String>(
+                          enabled: !_busy,
+                          tooltip: context.l10n.manageItem(
+                            invitation['email'] as String,
+                          ),
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'again',
+                              child: Text(context.l10n.sendInvitationAgain),
+                            ),
+                            PopupMenuItem(
+                              value: 'cancel',
+                              child: Text(
+                                context.l10n.cancelInvitation,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                          onSelected: (action) => action == 'again'
+                              ? _run('invite/', {
+                                  'email': invitation['email'],
+                                  'role': invitation['role'] ?? 'editor',
+                                })
+                              : _run('revoke_invite/', {
                                   'invitation_id': invitation['id'],
                                 }),
                         ),

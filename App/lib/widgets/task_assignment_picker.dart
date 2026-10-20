@@ -197,9 +197,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
             padding: const EdgeInsets.only(top: 4, bottom: 8),
             child: Text(
               shared
-                  ? context.l10n.audienceShared(
-                      project!.groupName ?? project.name,
-                    )
+                  ? context.l10n.audienceShared
                   : context.l10n.audiencePersonal,
               style: Theme.of(context).textTheme.bodySmall,
             ),

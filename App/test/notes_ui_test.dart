@@ -3,6 +3,8 @@ import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
+import 'package:flutter/semantics.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -573,7 +575,7 @@ void main() {
   });
 
   testWidgets(
-      'UX-337: the note-versus-task help shows only when there are no notes',
+      'UX-337, UX-1520: the note-versus-task help shows only when there are no notes, once',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -581,14 +583,14 @@ void main() {
     final none = designContainer(tasks: _NoNotes.new);
     await tester.pumpWidget(app(none, const NotesScreen(), language: 'es'));
     await tester.pumpAndSettle();
-    expect(find.text(l10n.notesHelp), findsOneWidget);
+    expect(find.text(l10n.notesEmptyHelp), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     none.dispose();
     // Tasks only, still no notes.
     final tasksOnly = designContainer();
     await tester.pumpWidget(app(tasksOnly, const NotesScreen(), language: 'es'));
     await tester.pumpAndSettle();
-    expect(find.text(l10n.notesHelp), findsOneWidget);
+    expect(find.text(l10n.notesEmptyHelp), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     tasksOnly.dispose();
     final some = designContainer(tasks: _AccentNotes.new);
@@ -596,7 +598,7 @@ void main() {
     await tester.pumpWidget(app(some, const NotesScreen(), language: 'es'));
     await tester.pumpAndSettle();
     expect(find.text('Médico'), findsOneWidget);
-    expect(find.text(l10n.notesHelp, skipOffstage: false), findsNothing);
+    expect(find.text(l10n.notesEmptyHelp, skipOffstage: false), findsNothing);
   });
 
   // ---- P38 (UX-118) and P10 (UX-309) ----
@@ -696,6 +698,190 @@ void main() {
     expect(find.byType(TaskEditor), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P185 (UX-1517, UX-1520, UX-1521) ----
+
+  final es = lookupAppLocalizations(const Locale('es'));
+
+  /// Notas in Spanish at 1× on 360×800, with [notes] and [projects].
+  Future<void> openNotes(WidgetTester tester, List<Task> notes,
+      {List<TaskListInfo> projects = const []}) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container =
+        designContainer(tasks: () => _Given(notes), projects: projects);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+            theme: AppTheme.light,
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: const NotesScreen())));
+    await tester.pumpAndSettle();
+  }
+
+  Finder noteRow(String title) => find.ancestor(
+      of: find.text(title), matching: find.byType(ListTile));
+
+  testWidgets(
+      'UX-1517: a note said in the sheet shows only the words after its title: preguntar por el comedor y por la excursión de primavera, with no leading «:» or space; a note whose words are its title has no preview line',
+      (tester) async {
+    await openNotes(tester, [
+      Task(
+          id: 1,
+          kind: 'note',
+          title: 'Para la reunión del cole',
+          priority: 1,
+          notes: 'Para la reunión del cole: preguntar por el comedor y por la '
+              'excursión de primavera'),
+      Task(
+          id: 2,
+          kind: 'note',
+          title: 'Comprar pan',
+          priority: 1,
+          notes: 'Comprar pan'),
+    ]);
+    final school = noteRow('Para la reunión del cole');
+    expect(school, findsOneWidget);
+    final texts = tester
+        .widgetList<Text>(find.descendant(of: school, matching: find.byType(Text)))
+        .map((text) => text.data)
+        .toList();
+    expect(texts, [
+      'Para la reunión del cole',
+      'preguntar por el comedor y por la excursión de primavera',
+    ]);
+    final bread = noteRow('Comprar pan');
+    expect(
+        tester
+            .widgetList<Text>(
+                find.descendant(of: bread, matching: find.byType(Text)))
+            .map((text) => text.data)
+            .toList(),
+        ['Comprar pan'],
+        reason: 'no preview line repeating the title');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1520: at 1× an empty Notas shows one help text, Guarda ideas y datos que quieras recordar. Para algo que hacer, usa una tarea., and no search; with one note the search shows',
+      (tester) async {
+    expect(es.notesEmptyHelp,
+        'Guarda ideas y datos que quieras recordar. Para algo que hacer, usa una tarea.');
+    expect(lookupAppLocalizations(const Locale('en')).notesEmptyHelp,
+        'Keep ideas and things to remember. For something to do, use a task.');
+    expect(lookupAppLocalizations(const Locale('ca')).notesEmptyHelp,
+        'Desa idees i dades que vulguis recordar. Per a una cosa per fer, fes servir una tasca.');
+    await openNotes(tester, []);
+    expect(find.text(es.notesEmptyHelp), findsOneWidget);
+    expect(find.textContaining('Guarda información'), findsNothing);
+    expect(find.textContaining('Escribe o dicta una nota'), findsNothing);
+    // One explanation only: besides the empty state's title and line, and
+    // Añadir nota, nothing else is written on the page.
+    final words = tester
+        .widgetList<Text>(find.descendant(
+            of: find.byType(ListView), matching: find.byType(Text)))
+        .map((text) => text.data)
+        .whereType<String>()
+        .where((text) =>
+            text != es.notes && text != es.notesEmpty && text != es.addNote)
+        .toList();
+    expect(words, [es.notesEmptyHelp]);
+    expect(find.byKey(const ValueKey('note-search')), findsNothing);
+    expect(find.byType(TextField), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox());
+    await openNotes(tester, [
+      Task(id: 1, kind: 'note', title: 'Médico', priority: 1),
+    ]);
+    expect(find.byKey(const ValueKey('note-search')), findsOneWidget);
+    expect(find.text(es.notesEmptyHelp), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1520: a note row with 1 of 3 steps done reads Pasos · 1/3; a note in Casa shows the folder icon before Casa',
+      (tester) async {
+    expect(es.checklistCount(1, 3), 'Pasos · 1/3');
+    await openNotes(tester, [
+      Task(
+          id: 1,
+          kind: 'note',
+          title: 'Mudanza',
+          priority: 1,
+          listId: 'casa',
+          checklist: [
+            ChecklistItem(title: 'Cajas', completed: true),
+            ChecklistItem(title: 'Cinta'),
+            ChecklistItem(title: 'Furgoneta'),
+          ]),
+    ], projects: [
+      TaskListInfo(id: 'casa', name: 'Casa', color: 'blue')
+    ]);
+    final row = noteRow('Mudanza');
+    expect(find.descendant(of: row, matching: find.text('Pasos · 1/3')),
+        findsOneWidget);
+    expect(find.descendant(of: row, matching: find.textContaining('Lista de pasos')),
+        findsNothing);
+    expect(find.descendant(of: row, matching: find.text('1/3 · Lista de pasos')),
+        findsNothing);
+    final casa = find.descendant(of: row, matching: find.text('Casa'));
+    final folder =
+        find.descendant(of: row, matching: find.byIcon(Icons.folder_outlined));
+    expect(casa, findsOneWidget);
+    expect(folder, findsOneWidget);
+    final icon = tester.getRect(folder);
+    final name = tester.getRect(casa);
+    expect(icon.right, lessThanOrEqualTo(name.left), reason: 'before Casa');
+    expect(icon.center.dy, closeTo(name.center.dy, 4), reason: 'same line');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1521: a note’s body is one button for TalkBack, «Tu nota» with its words and the hint Editar nota, and no unnamed text field',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    expect(es.noteBody, 'Tu nota');
+    await openNote(tester);
+    final body = find.semantics.byLabel(es.noteBody);
+    expect(body, findsOne);
+    final data = body.evaluate().single.getSemanticsData();
+    expect(data.flagsCollection.isButton, isTrue);
+    expect(data.hasAction(SemanticsAction.tap), isTrue);
+    expect(data.value, contains('Abre de 9 a 14'));
+    expect(body.evaluate().single.hintOverrides?.onTapHint, es.editNote);
+    expect(
+        find.semantics.byPredicate(
+            (node) => node.getSemanticsData().flagsCollection.isTextField),
+        findsNothing,
+        reason: 'no «text field (no label)»');
+    // Its tap opens the editor, as a finger's does.
+    tester.semantics.tap(body);
+    await tester.pumpAndSettle();
+    expect(find.byType(TaskEditor), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    handle.dispose();
+  });
+
+  testWidgets(
+      'UX-1521: a long press on a note’s words still selects them',
+      (tester) async {
+    await openNote(tester);
+    final words = find.textContaining('Abre de 9 a 14');
+    // On «Abre», the first word.
+    await tester.longPressAt(tester.getTopLeft(words) + const Offset(12, 10));
+    await tester.pumpAndSettle();
+    final selectable = tester.state<EditableTextState>(find.descendant(
+        of: find.byType(SelectableText), matching: find.byType(EditableText)));
+    expect(selectable.textEditingValue.selection.isCollapsed, isFalse,
+        reason: 'a word is selected');
+    expect(find.byType(TaskEditor), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 /// Twelve notes, then each added note gets the next id, as the database does.
@@ -790,5 +976,15 @@ class _OneNote extends DesignTaskNotifier {
           priority: 1,
           notes: 'Abre de 9 a 14 entre semana.'),
     ]);
+  }
+}
+
+/// Exactly [given] on the phone.
+class _Given extends DesignTaskNotifier {
+  _Given(this.given);
+  final List<Task> given;
+  @override
+  Future<void> loadTasks() async {
+    if (!state.hasValue) state = AsyncData(given);
   }
 }

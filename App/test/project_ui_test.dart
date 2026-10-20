@@ -81,7 +81,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Visible to everyone in Master'), findsOneWidget);
+      expect(find.text('All members can see it.'), findsOneWidget);
       await tester.tap(find.text('Everyone'));
       await tester.pumpAndSettle();
       expect(find.text('Alex'), findsNothing);
@@ -89,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(task.assignment, 'member');
       expect(task.assigneeId, 2);
-      expect(find.text('Visible to everyone in Master'), findsOneWidget);
+      expect(find.text('All members can see it.'), findsOneWidget);
       await tester.tap(find.text('Physics'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('No project'));
@@ -618,4 +618,67 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-19-app, round 1 · P184 (UX-1519) ----
+
+  test('UX-1519: the shared-audience line pairs with Solo tú puedes verlo., '
+      'with no project or group name, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.audienceShared, 'All members can see it.');
+    expect(es.audienceShared, 'Lo ven todos los miembros.');
+    expect(ca.audienceShared, 'Ho veuen tots els membres.');
+    expect(es.audiencePersonal, 'Solo tú puedes verlo.');
+  });
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1519: ($language) the line under Ana’s person chip says all members see it, without naming Master',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final task = Task(
+          title: 'Ejercicio tres',
+          priority: 1,
+          listId: shared.id,
+          assignment: 'member',
+          assigneeId: 2,
+          assigneeName: 'Ana',
+        );
+        final api = OfflineApiClient();
+        addTearDown(api.close);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              apiClientProvider.overrideWithValue(api),
+              authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+              taskListsProvider.overrideWith((ref) async => [shared]),
+            ],
+            child: localized(
+              Scaffold(
+                body: TaskAssignmentPicker(task: task, onChanged: (_) {}),
+              ),
+              language: language,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final line = find.text(l.audienceShared);
+        expect(line, findsOneWidget);
+        final ana = find.widgetWithText(ActionChip, 'Ana');
+        expect(ana, findsOneWidget);
+        expect(
+          tester.getRect(line).top,
+          greaterThanOrEqualTo(tester.getRect(ana).bottom - 0.5),
+          reason: 'under the person chip',
+        );
+        expect(find.textContaining('Master'), findsNothing);
+        expect(find.textContaining('Visible'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

@@ -27,13 +27,17 @@ class NoteText extends StatelessWidget {
   const NoteText(this.text, {super.key, this.onTap});
   final String text;
 
-  /// Called for a tap on the text; long-press still selects it.
+  /// Called for a tap on the text; long-press still selects it. The caller
+  /// then names the text for TalkBack, as a button, so it isn't read as an
+  /// unnamed field.
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
     final links = noteLinks(text);
+    final words =
+        SelectableText(text, style: const TextStyle(height: 1.6), onTap: onTap);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SelectableText(text, style: const TextStyle(height: 1.6), onTap: onTap),
+      onTap == null ? words : ExcludeSemantics(child: words),
       if (links.isNotEmpty) ...[
         const SizedBox(height: 16),
         Text(context.l10n.noteLinks,

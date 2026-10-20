@@ -19,6 +19,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
+import 'support/hanging_sync.dart';
+import 'package:flutter/rendering.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
@@ -251,16 +253,17 @@ void main() {
     await tester.pumpAndSettle();
     final dialog = find.byType(AlertDialog);
     expect(dialog, findsOneWidget);
-    expect(es.shareProjectTitle('Casa'), 'Compartir Casa');
-    expect(es.theirEmail, 'Su correo');
-    expect(es.shareProjectHelp('Casa'), 'Verá todo lo que hay en Casa.');
+    expect(es.inviteWho('Casa'), '¿A quién invitas a Casa?');
+    expect(es.email, 'Correo');
+    expect(es.shareProjectHelp('Casa'),
+        'Esa persona verá todo lo que hay en Casa.');
     expect(es.sendInvitation, 'Enviar invitación');
     final fields =
         find.descendant(of: dialog, matching: find.byType(TextField));
     expect(fields, findsOneWidget);
     expect(tester.widget<TextField>(fields).autofocus, isTrue);
     expect(
-        tester.widget<TextField>(fields).decoration!.labelText, es.theirEmail);
+        tester.widget<TextField>(fields).decoration!.labelText, es.email);
     // No access choice: no dropdown, no Editor or Lector.
     expect(
         find.descendant(
@@ -284,8 +287,8 @@ void main() {
     expect(
         texts.toSet(),
         {
-          es.shareProjectTitle('Casa'),
-          es.theirEmail,
+          es.inviteWho('Casa'),
+          es.email,
           es.shareProjectHelp('Casa'),
           es.cancel,
           es.sendInvitation,
@@ -398,27 +401,46 @@ void main() {
       'members': [],
       'invitations': []
     });
-    expect(find.textContaining(es.yourRole('').trim()), findsNothing);
-    expect(find.text(es.sharingHelp), findsNothing);
+    expect(find.textContaining('Tu rol'), findsNothing);
+    expect(find.textContaining('Comparte compras'), findsNothing);
     Finder label(String text) =>
         find.byWidgetPredicate((w) => w is SectionLabel && w.text == text);
     expect(label(es.pendingInvitations), findsNothing);
     expect(es.people, 'Miembros');
-    expect(label(es.people), findsOneWidget);
+    // Shared (no local copy says otherwise): «Miembros» is the app bar's
+    // title, so no section label repeats it (UX-1643).
+    expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text(es.people)),
+        findsOneWidget);
+    expect(label(es.people), findsNothing);
     // Not empty: it says nobody else has access yet.
     expect(find.text(es.noOtherMembers), findsOneWidget);
     expect(find.textContaining('Personas'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets("UX-339: someone else's project still says their role",
+  testWidgets(
+      "UX-339 / UX-1506: someone else's project shows their role on their own row",
       (tester) async {
     await _SharingApp.open(tester, {
       'list': {'name': 'Casa', 'role': 'editor', 'version': 1},
       'members': [],
       'invitations': []
-    });
-    expect(find.text(es.yourRole(es.roleEditor)), findsOneWidget);
+    }, projects: [
+      TaskListInfo(
+          id: 'casa',
+          name: 'Casa',
+          version: 1,
+          role: 'editor',
+          shared: true,
+          people: const [
+            ProjectMember(id: 2, name: 'Ana', role: 'owner'),
+            ProjectMember(id: 1, name: 'María', role: 'editor'),
+          ])
+    ]);
+    expect(find.widgetWithText(ListTile, es.personYou('María')),
+        findsOneWidget);
+    expect(find.widgetWithText(ListTile, es.roleEditor), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -847,6 +869,427 @@ void main() {
         'luis@example.invalid');
     expect(tester.takeException(), isNull);
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P181 (UX-1503, UX-1513, UX-1506) and
+  // P183 (UX-1510) on a project's sharing page ----
+
+  const ownerData = {
+    'list': {'name': 'Matemáticas', 'role': 'owner', 'version': 1},
+    'members': [],
+    'invitations': [],
+  };
+
+  for (final language in ['es', 'ca']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+          'UX-1503: ($language, ${scale}x, 360x800) the project invite asks who you are inviting to Matemáticas, labels the field with the plain word for email, whole while it floats, and says that person sees everything',
+          (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        if (language == 'es') {
+          expect(l.inviteWho('Matemáticas'), '¿A quién invitas a Matemáticas?');
+          expect(l.email, 'Correo');
+          expect(l.shareProjectHelp('Matemáticas'),
+              'Esa persona verá todo lo que hay en Matemáticas.');
+        } else {
+          expect(l.inviteWho('Matemáticas'), 'A qui convides a Matemáticas?');
+          expect(l.email, 'Correu');
+          expect(l.shareProjectHelp('Matemáticas'),
+              'Aquesta persona veurà tot el que hi ha a Matemáticas.');
+        }
+        await _openSharing(tester,
+            data: ownerData, language: language, scale: scale);
+        final invite = find.byKey(const ValueKey('invite-person'));
+        await tester.ensureVisible(invite);
+        await tester.pumpAndSettle();
+        await tester.tap(invite);
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        expect(
+            find.descendant(
+                of: dialog, matching: find.text(l.inviteWho('Matemáticas'))),
+            findsOneWidget);
+        expect(
+            find.descendant(
+                of: dialog,
+                matching: find.text(l.shareProjectHelp('Matemáticas'))),
+            findsOneWidget);
+        // The field has focus, so its label floats above it, whole.
+        final field = find.byKey(const ValueKey('invite-email'));
+        final label = find.descendant(of: field, matching: find.text(l.email));
+        expect(label, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(find.descendant(
+            of: label, matching: find.byType(RichText), matchRoot: true));
+        expect(paragraph.didExceedMaxLines, isFalse,
+            reason: '«${l.email}» is not cut');
+        expect(paragraph.getMaxIntrinsicWidth(double.infinity),
+            lessThanOrEqualTo(paragraph.size.width + 0.5),
+            reason: '«${l.email}» fits its line');
+        // The formal wording is gone.
+        expect(find.textContaining('Su correo'), findsNothing);
+        expect(find.textContaining('El seu correu'), findsNothing);
+        expect(find.textContaining('Correo de su cuenta'), findsNothing);
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      });
+    }
+  }
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+        'UX-1503: ($language) typing your own address in the project invite, trimmed and in capitals, says it is your own email and sends nothing',
+        (tester) async {
+      final l = lookupAppLocalizations(Locale(language));
+      expect(
+          l.inviteOwnEmail,
+          switch (language) {
+            'es' => 'Ese es tu correo. Escribe el de la persona que invitas.',
+            'en' => 'That’s your own email. Type the other person’s.',
+            _ => 'Aquest és el teu correu. Escriu el de la persona que convides.',
+          });
+      final (api, _) =
+          await _openSharing(tester, data: ownerData, language: language);
+      await tester.tap(find.byKey(const ValueKey('invite-person')));
+      await tester.pumpAndSettle();
+      final dialog = find.byType(AlertDialog);
+      // The account is owner@example.invalid.
+      await tester.enterText(
+          find.byKey(const ValueKey('invite-email')), '  OWNER@Example.invalid ');
+      await tester.tap(find.widgetWithText(FilledButton, l.sendInvitation));
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: dialog, matching: find.text(l.inviteOwnEmail)),
+          findsOneWidget);
+      expect(dialog, findsOneWidget, reason: 'the dialog stays open');
+      expect(api.calls.where((call) => call.$2.endsWith('invite/')), isEmpty,
+          reason: 'no invitation is sent');
+      expect(find.text(l.invitationSent), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+      'UX-1513: on a project member’s ⋮, an editor’s menu has no Dar permiso de edición; a viewer’s has it and no Dar permiso de lectura',
+      (tester) async {
+    expect(es.makeEditor, 'Dar permiso de edición');
+    expect(es.makeViewer, 'Dar permiso de lectura');
+    await _openSharing(tester, data: {
+      'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+      'members': [
+        {'user_id': 2, 'user__email': 'ana@example.invalid', 'role': 'editor'},
+        {'user_id': 7, 'user__email': 'luis@example.invalid', 'role': 'viewer'},
+      ],
+      'invitations': [],
+    });
+    Finder inMenu(String text) => find.descendant(
+        of: find.byType(PopupMenuItem<String>), matching: find.text(text));
+    final anaMenu = find.byTooltip(es.manageItem('ana@example.invalid'));
+    await tester.ensureVisible(anaMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(anaMenu);
+    await tester.pumpAndSettle();
+    expect(inMenu(es.makeEditor), findsNothing, reason: 'Ana is an editor');
+    expect(inMenu(es.makeViewer), findsOneWidget);
+    expect(inMenu(es.removeAccess), findsOneWidget);
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    final luisMenu = find.byTooltip(es.manageItem('luis@example.invalid'));
+    await tester.ensureVisible(luisMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(luisMenu);
+    await tester.pumpAndSettle();
+    expect(inMenu(es.makeEditor), findsOneWidget);
+    expect(inMenu(es.makeViewer), findsNothing, reason: 'Luis is a viewer');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1506: a reader of a person-to-person project with 3 people sees Miembros: the three names with their roles, the owner first, María (tú); no Comparte compras and no Tu rol',
+      (tester) async {
+    expect(es.people, 'Miembros');
+    expect(es.personYou('María'), 'María (tú)');
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.personYou('María'), 'María (you)');
+    expect(ca.personYou('María'), 'María (tu)');
+    // This account (id 1) is María, a reader.
+    await _openSharing(tester, data: {
+      'list': {'name': 'Club de lectura', 'role': 'viewer', 'version': 1},
+      'members': [],
+      'invitations': [],
+    }, projects: [
+      TaskListInfo(
+          id: 'casa',
+          name: 'Club de lectura',
+          version: 1,
+          role: 'viewer',
+          shared: true,
+          ownerId: 2,
+          people: const [
+            ProjectMember(id: 2, name: 'Lucía', role: 'owner'),
+            ProjectMember(id: 1, name: 'María', role: 'viewer'),
+            ProjectMember(id: 3, name: 'Jordi', role: 'editor'),
+          ])
+    ]);
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text(es.people)),
+        findsOneWidget);
+    final rows = [
+      (es.personYou('María'), es.roleViewer),
+      ('Lucía', es.roleOwner),
+      ('Jordi', es.roleEditor),
+    ];
+    for (final (name, role) in rows) {
+      final row = find.widgetWithText(ListTile, name);
+      expect(row, findsOneWidget, reason: name);
+      expect(find.descendant(of: row, matching: find.text(role)),
+          findsOneWidget,
+          reason: '$name reads $role');
+    }
+    expect(find.text('María'), findsNothing, reason: 'marked as you');
+    double top(String name) =>
+        tester.getTopLeft(find.widgetWithText(ListTile, name)).dy;
+    expect(top('Lucía'), lessThan(top(es.personYou('María'))),
+        reason: 'the owner first');
+    expect(find.textContaining('Comparte compras'), findsNothing);
+    expect(find.textContaining('Tu rol'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1506: the owner’s Miembros · 3 opens Miembros with 3 rows, the owner’s own first, marked (tú)',
+      (tester) async {
+    const luis = ProjectMember(id: 3, name: 'Luis', role: 'viewer');
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final project = TaskListInfo(
+        id: 'casa',
+        name: 'Casa',
+        version: 3,
+        shared: true,
+        ownerId: 1,
+        people: const [owner, ana, luis]);
+    final container = designContainer(
+      projects: [project],
+      regionalStore:
+          MemoryRegionalStore(const RegionalPreferences(language: 'es')),
+      overrides: [
+        listSharingProvider.overrideWith((ref, id) async => {
+              'list': {'name': 'Casa', 'role': 'owner', 'version': 3},
+              'members': [
+                {
+                  'user_id': 2,
+                  'user__email': 'ana@example.invalid',
+                  'role': 'editor'
+                },
+                {
+                  'user_id': 3,
+                  'user__email': 'luis@example.invalid',
+                  'role': 'viewer'
+                },
+              ],
+              'invitations': [],
+            }),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()));
+    await tester.pumpAndSettle();
+    tester.state<NavigatorState>(find.byType(Navigator)).push(
+        MaterialPageRoute<void>(
+            builder: (_) => const HomeScreen(isRoot: false, listId: 'casa')));
+    await tester.pumpAndSettle();
+    final members = find.widgetWithText(TextButton, es.projectMembersCount(3));
+    expect(members, findsOneWidget);
+    await tester.ensureVisible(members);
+    await tester.tap(members);
+    await tester.pumpAndSettle();
+    expect(find.byType(ListSharingScreen), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text(es.people)),
+        findsOneWidget);
+    final names = [es.personYou('Yo'), 'Ana', 'Luis'];
+    final tops = <double>[];
+    for (final name in names) {
+      final row = find.widgetWithText(ListTile, name);
+      expect(row, findsOneWidget, reason: name);
+      tops.add(tester.getTopLeft(row).dy);
+    }
+    expect(tops, orderedEquals([...tops]..sort()),
+        reason: 'the owner’s own row first, then Ana and Luis');
+    expect(
+        find.descendant(
+            of: find.widgetWithText(ListTile, es.personYou('Yo')),
+            matching: find.text(es.roleOwner)),
+        findsOneWidget);
+    expect(find.text(es.noOtherMembers), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1506: an owner’s unshared personal project still opens Compartir proyecto',
+      (tester) async {
+    expect(es.listSharing, 'Compartir proyecto');
+    await openProjectPage(
+        tester, TaskListInfo(id: 'casa', name: 'Casa', version: 3));
+    final share = find.widgetWithText(TextButton, es.shareProject);
+    await tester.ensureVisible(share);
+    await tester.tap(share);
+    await tester.pumpAndSettle();
+    final bar = find.descendant(
+        of: find.byType(ListSharingScreen), matching: find.byType(AppBar));
+    expect(find.descendant(of: bar, matching: find.text(es.listSharing)),
+        findsOneWidget);
+    expect(find.descendant(of: bar, matching: find.text(es.people)),
+        findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---- Run 2026-10-19-app, round 2 · P212 (UX-1643): «Miembros» once ----
+
+  Finder sectionLabel(String text) =>
+      find.byWidgetPredicate((w) => w is SectionLabel && w.text == text);
+
+  testWidgets(
+      'UX-1643: at 1× on 360×800 the owner’s page of a shared project with two other members says Miembros once, in the app bar, with no MIEMBROS label, and María (tú) first',
+      (tester) async {
+    await _openSharing(tester, data: {
+      'list': {'name': 'Casa', 'role': 'owner', 'version': 3},
+      'members': [
+        {'user_id': 2, 'user__email': 'ana@example.invalid', 'role': 'editor'},
+        {'user_id': 3, 'user__email': 'luis@example.invalid', 'role': 'viewer'},
+      ],
+      'invitations': [],
+    }, projects: [
+      TaskListInfo(
+          id: 'casa',
+          name: 'Casa',
+          version: 3,
+          shared: true,
+          ownerId: 1,
+          people: const [
+            ProjectMember(id: 1, name: 'María', role: 'owner'),
+            ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+            ProjectMember(id: 3, name: 'Luis', role: 'viewer'),
+          ]),
+    ]);
+    final page = find.byType(ListSharingScreen);
+    final members = find.descendant(of: page, matching: find.text(es.people));
+    expect(members, findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.descendant(of: page, matching: find.byType(AppBar)),
+            matching: find.text(es.people)),
+        findsOneWidget);
+    expect(sectionLabel(es.people), findsNothing);
+    expect(find.text(es.people.toUpperCase()), findsNothing);
+    final tops = [
+      for (final name in [es.personYou('María'), 'Ana', 'Luis'])
+        tester.getTopLeft(find.widgetWithText(ListTile, name)).dy,
+    ];
+    expect(tops, orderedEquals([...tops]..sort()),
+        reason: 'María (tú) first, then Ana and Luis');
+    expect(es.personYou('María'), 'María (tú)');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1643: an owner’s unshared personal project’s sharing page reads Compartir proyecto and keeps the MIEMBROS label',
+      (tester) async {
+    await _openSharing(tester, data: {
+      'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+      'members': [],
+      'invitations': [],
+    }, projects: [
+      TaskListInfo(id: 'casa', name: 'Casa', version: 1),
+    ]);
+    final bar = find.descendant(
+        of: find.byType(ListSharingScreen), matching: find.byType(AppBar));
+    expect(find.descendant(of: bar, matching: find.text(es.listSharing)),
+        findsOneWidget);
+    expect(sectionLabel(es.people), findsOneWidget);
+    expect(find.text(es.people.toUpperCase()), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'UX-1510: with a sync that never completes, Invitación enviada and its code show right after the invite’s POST returns',
+      (tester) async {
+    final tasks = HangingSyncTasks();
+    final (api, _) =
+        await _openSharing(tester, data: ownerData, tasks: () => tasks);
+    await tester.tap(find.byKey(const ValueKey('invite-person')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('invite-email')), 'ana@example.invalid');
+    await tester.tap(find.widgetWithText(FilledButton, es.sendInvitation));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(api.calls.last.$2, 'lists/casa/invite/');
+    expect(tasks.syncs, greaterThan(0), reason: 'a sync is under way');
+    final sent = find.widgetWithText(AlertDialog, es.invitationSent);
+    expect(sent, findsOneWidget);
+    expect(
+        find.descendant(
+            of: sent, matching: find.byKey(const ValueKey('invitation-code'))),
+        findsOneWidget);
+    expect(find.text(_Recorder.code), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+/// The sharing screen of project `casa` with [data], in [language] at
+/// [scale] on a [size] view, opened from a page underneath. Signed in as
+/// account 1, owner@example.invalid.
+Future<(_Recorder, ProviderContainer)> _openSharing(
+  WidgetTester tester, {
+  required Map<String, dynamic> data,
+  String language = 'es',
+  double scale = 1,
+  Size size = const Size(360, 800),
+  List<TaskListInfo> projects = const [],
+  TaskNotifier Function()? tasks,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final api = _Recorder();
+  final container = ProviderContainer(overrides: [
+    apiClientProvider.overrideWithValue(api),
+    authProvider.overrideWith((ref) => _Auth(api)),
+    taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+    taskProvider.overrideWith((ref) => tasks?.call() ?? DesignTaskNotifier()),
+    themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+    taskListsProvider.overrideWith((ref) async => projects),
+    listSharingProvider.overrideWith((ref, id) async => data),
+  ]);
+  addTearDown(container.dispose);
+  addTearDown(api.close);
+  await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+          locale: Locale(language),
+          theme: AppTheme.light,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!),
+          home: Builder(
+              builder: (context) => Scaffold(
+                  body: Center(
+                      child: TextButton(
+                          onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const ListSharingScreen(
+                                      listId: 'casa'))),
+                          child: const Text('Abrir'))))))));
+  await tester.tap(find.text('Abrir'));
+  await tester.pumpAndSettle();
+  return (api, container);
 }
 
 class _Api extends OfflineApiClient {

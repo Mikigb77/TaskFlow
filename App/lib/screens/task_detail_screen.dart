@@ -564,26 +564,40 @@ class TaskDetailScreen extends ConsumerWidget {
           );
   }
 
-  Widget _body(BuildContext context, Task task, {VoidCallback? onTap}) =>
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionLabel(
-            task.isNote ? context.l10n.noteBody : context.l10n.notes,
+  Widget _body(BuildContext context, Task task, {VoidCallback? onTap}) {
+    final surface = AppSurface(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        excludeFromSemantics: onTap != null,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: SizedBox(
+            width: double.infinity,
+            child: NoteText(task.notes!, onTap: onTap),
           ),
-          AppSurface(
-            padding: EdgeInsets.zero,
-            child: InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: NoteText(task.notes!, onTap: onTap),
-                ),
-              ),
-            ),
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(task.isNote ? context.l10n.noteBody : context.l10n.notes),
+        // A note that opens the editor: one button, «Tu nota», with its
+        // words, and what a double tap does. Its links stay apart.
+        if (onTap == null)
+          surface
+        else
+          Semantics(
+            container: true,
+            button: true,
+            label: context.l10n.noteBody,
+            value: task.notes,
+            onTapHint: context.l10n.editNote,
+            onTap: onTap,
+            child: surface,
           ),
-        ],
-      );
+      ],
+    );
+  }
 }

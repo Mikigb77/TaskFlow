@@ -82,14 +82,15 @@ void main() {
         );
         if (available) {
           expect(find.text('Staging crew'), findsOneWidget);
-          expect(find.text('Editor'), findsOneWidget);
+          // Editor, the only role it can carry, goes without saying.
+          expect(find.text('Editor'), findsNothing);
           await tester.tap(find.byType(FilledButton));
           await tester.pumpAndSettle();
           expect(api.accepted, {'decision': 'accept', 'code': _link.code});
           expect(api.acceptedAccount, 1);
           expect(find.byType(InvitationReviewScreen), findsNothing);
         } else {
-          expect(find.byType(FilledButton), findsNothing);
+          expect(find.text('Accept invitation'), findsNothing);
           expect(find.textContaining('email address'), findsWidgets);
           expect(api.accepted, isNull);
         }
@@ -951,6 +952,149 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-19-app, round 1 · P182 (UX-1509): a dead invitation
+  // closes; the access line says what a role other than editor means ----
+
+  test('UX-1509: Cerrar and the two access lines read as the plan wrote them '
+      'in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect([en.close, es.close, ca.close], ['Close', 'Cerrar', 'Tanca']);
+    expect(en.invitationViewerAccess, 'You’ll be able to see it, not change it.');
+    expect(es.invitationViewerAccess, 'Solo podrás verlo, no cambiarlo.');
+    expect(ca.invitationViewerAccess, 'Només el podràs veure, no canviar.');
+    expect(en.invitationAdminAccess, 'You’ll be able to manage the group.');
+    expect(es.invitationAdminAccess, 'Podrás gestionar el grupo.');
+    expect(ca.invitationAdminAccess, 'Podràs gestionar el grup.');
+  });
+
+  Finder inReview(Finder finder) =>
+      find.descendant(of: find.byType(InvitationReviewScreen), matching: finder);
+
+  testWidgets(
+    'UX-1509: an invitation answered 404 shows no Reintentar and no Ahora no, one Cerrar, which closes the screen and clears the stored link',
+    (tester) async {
+      final storage = _MemoryStorage();
+      final container = await _openApp(
+        tester,
+        _Invitations(),
+        link: comprasLink,
+        storage: storage,
+      );
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      expect(storage.values, isNotEmpty, reason: 'the link is stored');
+      expect(inReview(find.text(es.tryAgain)), findsNothing);
+      expect(inReview(find.text(es.invitationNotNow)), findsNothing);
+      expect(inReview(find.text(es.acceptInvitation)), findsNothing);
+      final close = find.ancestor(
+        of: inReview(find.text(es.close)),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      );
+      expect(close, findsOneWidget);
+      expect(
+        inReview(
+          find.byWidgetPredicate(
+            (w) => w is FilledButton || w is OutlinedButton || w is TextButton,
+          ),
+        ),
+        findsOneWidget,
+        reason: 'one button below the message',
+      );
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+      expect(container.read(invitationLinkProvider), isNull);
+      expect(storage.values, isEmpty, reason: 'the stored link is cleared');
+      // A restart doesn't bring it back.
+      await tester.pumpWidget(const SizedBox());
+      await _openApp(tester, _Invitations(), storage: storage, restore: true);
+      expect(find.byType(InvitationReviewScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1509: an invitation that can’t load offline still offers Reintentar and Ahora no, and no Cerrar',
+    (tester) async {
+      await _openApp(tester, _OfflineInvitations(), link: comprasLink);
+      expect(find.byType(InvitationReviewScreen), findsOneWidget);
+      expect(inReview(find.text(es.tryAgain)), findsOneWidget);
+      expect(inReview(find.text(es.invitationNotNow)), findsOneWidget);
+      expect(inReview(find.text(es.close)), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+    testWidgets(
+      'UX-1509: ($language, ${scale}x, 360x800) Ana’s editor invitation to Compras has no access line',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await _openApp(
+          tester,
+          _Invitations(lists: [anaInvitation]),
+          language: language,
+          link: comprasLink,
+        );
+        tester.view.physicalSize = const Size(360, 800);
+        await tester.pumpAndSettle();
+        expect(find.byType(InvitationReviewScreen), findsOneWidget);
+        expect(inReview(find.text(l.invitationFrom('Ana', 'Compras'))),
+            findsOneWidget);
+        for (final gone in [
+          l.roleEditor,
+          l.invitationViewerAccess,
+          l.invitationAdminAccess,
+          if (language == 'es') 'Acceso' else 'Accés',
+        ]) {
+          expect(inReview(find.text(gone)), findsNothing, reason: gone);
+        }
+        expect(inReview(find.text(l.acceptInvitation)), findsOneWidget);
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  }
+
+  for (final (role, line) in [
+    ('viewer', es.invitationViewerAccess),
+    ('admin', es.invitationAdminAccess),
+  ]) {
+    testWidgets(
+      'UX-1509: a group invitation with the $role role says «$line» and not the role’s name',
+      (tester) async {
+        await _openApp(
+          tester,
+          _Invitations(groups: [{...familiaInvitation, 'role': role}]),
+          link:
+              'taskflow://invite?kind=group&id=${familiaInvitation['id']}&code=$code',
+        );
+        expect(find.byType(InvitationReviewScreen), findsOneWidget);
+        expect(inReview(find.text('Familia')), findsOneWidget);
+        expect(inReview(find.text(line)), findsOneWidget);
+        expect(inReview(find.text(es.roleViewer)), findsNothing);
+        expect(inReview(find.text(es.groupAdmin)), findsNothing);
+        expect(inReview(find.text('Acceso')), findsNothing);
+        expect(inReview(find.text(es.acceptInvitation)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+}
+
+/// The server can't be reached: every request fails as offline.
+class _OfflineInvitations extends _Invitations {
+  @override
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async => throw ApiException(0, 'Offline. Retry when connected.');
 }
 
 class _InvitationApi extends OfflineApiClient {

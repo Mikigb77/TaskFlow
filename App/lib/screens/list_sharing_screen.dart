@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
@@ -11,7 +13,6 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:agenda/widgets/project_preferences.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final listSharingProvider = FutureProvider.autoDispose
@@ -93,53 +94,28 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     String? done,
   }) async {
     if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-    await ref.read(taskProvider.notifier).loadTasks();
-    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-    ref.invalidate(taskListsProvider);
+    final synced = ref.read(taskProvider.notifier).loadTasks().then((_) {
+      if (mounted && ref.read(authProvider).account?.id == accountId) {
+        ref.invalidate(taskListsProvider);
+      }
+    });
+    final code =
+        action == 'invite/' && result is Map && result['code'] is String
+        ? result['code'] as String
+        : null;
+    // An invitation's code shows as soon as the server answers; the sync
+    // runs behind it.
+    if (code == null) {
+      await synced;
+      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    } else {
+      unawaited(synced);
+    }
     ref.invalidate(listSharingProvider(widget.listId));
-    if (action == 'invite/' && result is Map && result['code'] is String) {
-      final code = result['code'] as String;
+    if (code != null) {
       // The work is done: no progress bar under “Invitation sent”.
       setState(() => _busy = false);
-      await showDialog<void>(
-        context: context,
-        builder: (context) => Consumer(
-          builder: (context, dialogRef, _) {
-            final sameAccount =
-                dialogRef.watch(authProvider).account?.id == accountId;
-            return AlertDialog(
-              scrollable: true,
-              title: Text(context.l10n.invitationSent),
-              content: sameAccount
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(context.l10n.invitationCodeFallback),
-                        const SizedBox(height: 16),
-                        SelectableText(
-                          code,
-                          key: const ValueKey('invitation-code'),
-                        ),
-                      ],
-                    )
-                  : Text(context.l10n.accountChanged),
-              actions: [
-                if (sameAccount)
-                  TextButton(
-                    onPressed: () =>
-                        Clipboard.setData(ClipboardData(text: code)),
-                    child: Text(context.l10n.copyCode),
-                  ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(context.l10n.done),
-                ),
-              ],
-            );
-          },
-        ),
-      );
+      await showInvitationSent(context, accountId: accountId, code: code);
       // An account without a name is asked for one, once.
       if (mounted) {
         await askForNameOnce(Navigator.of(context), accountId: accountId);
@@ -198,7 +174,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
 
           return AlertDialog(
             scrollable: true,
-            title: Text(context.l10n.shareProjectTitle(project)),
+            title: Text(context.l10n.inviteWho(project)),
             content: Form(
               key: form,
               child: Column(
@@ -220,14 +196,15 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.send,
                     decoration: InputDecoration(
-                      labelText: context.l10n.theirEmail,
-                      errorMaxLines: 3,
+                      labelText: context.l10n.email,
+                      // Room for the own-address line at large text.
+                      errorMaxLines: 6,
                     ),
                     onChanged: (value) => email = value.trim(),
                     onFieldSubmitted: (_) => send(),
-                    validator: (value) => value?.contains('@') == true
-                        ? null
-                        : context.l10n.enterEmailAddress,
+                    validator: (value) => value?.contains('@') != true
+                        ? context.l10n.enterEmailAddress
+                        : ownEmailProblem(context, account.email, value!),
                   ),
                   const SizedBox(height: 12),
                   Text(context.l10n.shareProjectHelp(project)),
@@ -281,11 +258,24 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     return _sharing(context, shared: local?.shared ?? true, local: local);
   }
 
+  /// A person and their role, with nothing to manage; [you] marks the
+  /// account's own row.
+  Widget _personRow(
+    BuildContext context,
+    ProjectMember person, {
+    required bool you,
+  }) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(you ? context.l10n.personYou(person.name) : person.name),
+    subtitle: Text(context.listRole(person.role)),
+  );
+
   /// A person with access: their name first, when the project knows it,
   /// then their email and role.
   Widget _memberRow(BuildContext context, Map member, String? name) {
     final email = member['user__email'] as String;
-    final access = context.listRole(member['role'] as String);
+    final role = member['role'] as String;
+    final access = context.listRole(role);
     final danger = Theme.of(context).colorScheme.error;
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -296,9 +286,18 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
       trailing: PopupMenuButton<String>(
         enabled: !_busy,
         tooltip: context.l10n.manageItem(name ?? email),
+        // Only the role they don't have yet.
         itemBuilder: (_) => [
-          PopupMenuItem(value: 'editor', child: Text(context.l10n.makeEditor)),
-          PopupMenuItem(value: 'viewer', child: Text(context.l10n.makeViewer)),
+          if (role != 'editor')
+            PopupMenuItem(
+              value: 'editor',
+              child: Text(context.l10n.makeEditor),
+            ),
+          if (role != 'viewer')
+            PopupMenuItem(
+              value: 'viewer',
+              child: Text(context.l10n.makeViewer),
+            ),
           PopupMenuItem(
             value: 'remove',
             child: Text(
@@ -349,7 +348,10 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     required bool shared,
     TaskListInfo? local,
   }) => Scaffold(
-    appBar: CustomAppBar(title: context.l10n.listSharing),
+    // «Miembros · N» opens this page: once shared, it lists them.
+    appBar: CustomAppBar(
+      title: shared ? context.l10n.people : context.l10n.listSharing,
+    ),
     body: ref
         .watch(listSharingProvider(widget.listId))
         .when(
@@ -381,10 +383,9 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
             final updates = _updates(context, local);
             // The sharing endpoint only knows emails; the project's people
             // know names.
-            final names = {
-              for (final person in local?.people ?? const <ProjectMember>[])
-                person.id: person.name,
-            };
+            final people = local?.people ?? const <ProjectMember>[];
+            final names = {for (final person in people) person.id: person.name};
+            final account = ref.watch(authProvider).account;
             return ListView(
               padding: const EdgeInsets.all(24),
               children: [
@@ -392,16 +393,6 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                   list['name'] as String,
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                if (!owner) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    context.l10n.yourRole(
-                      context.listRole(list['role'] as String),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(context.l10n.sharingHelp),
-                ],
                 if (_error != null)
                   MessageBanner(
                     requestProblemText(context.l10n, _error!),
@@ -419,9 +410,25 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                     label: Text(context.l10n.invitePerson),
                   ),
                   const SizedBox(height: 16),
-                  SectionLabel(context.l10n.people),
+                  // Once shared, the app bar already reads «Miembros».
+                  if (!shared) SectionLabel(context.l10n.people),
                   if ((data['members'] as List).isEmpty)
-                    Text(context.l10n.noOtherMembers),
+                    Text(context.l10n.noOtherMembers)
+                  else if (account != null)
+                    // The owner first, so «Miembros · 3» shows 3 rows.
+                    _personRow(
+                      context,
+                      ProjectMember(
+                        id: account.id,
+                        name:
+                            names[account.id] ??
+                            (account.firstName.isEmpty
+                                ? account.email
+                                : account.firstName),
+                        role: 'owner',
+                      ),
+                      you: true,
+                    ),
                   for (final member in data['members'] as List)
                     _memberRow(
                       context,
@@ -513,6 +520,11 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                     ),
                   ),
                 ] else ...[
+                  // Names and roles only: the server gives emails to the
+                  // owner alone. The owner comes first.
+                  for (final person in people)
+                    _personRow(context, person, you: person.id == account?.id),
+                  const SizedBox(height: 16),
                   if (updates != null) ...[updates, const SizedBox(height: 16)],
                   OutlinedButton(
                     style: dangerButton,

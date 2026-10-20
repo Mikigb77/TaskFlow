@@ -8,6 +8,7 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/archive_store.dart';
 import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/local_capture.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/note_text.dart';
@@ -243,6 +244,73 @@ void main() {
             'La clave del wifi es TaskFlow2026. Está en la pegatina del router.'),
         'La clave del wifi es TaskFlow2026');
     expect(CaptureProcessor.noteTitle('Comprar pan'), 'Comprar pan');
+  });
+
+  // ---- Run 2026-10-19-app, round 1 · P185 (UX-1320): whole note titles ----
+
+  test('UX-1320: a note said «Para la reunión del cole: preguntar por el '
+      'comedor y por la excursión de primavera» is titled «Para la reunión del '
+      'cole», said or typed', () {
+    const said = 'Para la reunión del cole: preguntar por el comedor y por la '
+        'excursión de primavera';
+    expect(CaptureProcessor.noteTitle(said), 'Para la reunión del cole');
+    final typed = localDrafts(said, DateTime(2026, 10, 20), kind: 'note');
+    expect(typed.single.task.title, 'Para la reunión del cole');
+    expect(typed.single.task.notes, said, reason: 'the words stay whole');
+  });
+
+  test('UX-1320: «:» or «;» ends the title only after at least 3 words', () {
+    expect(CaptureProcessor.noteTitle('Lista de la compra; leche, pan y huevos'),
+        'Lista de la compra');
+    // Two words before the colon: the colon doesn't end it.
+    expect(CaptureProcessor.noteTitle('Wifi casa: TaskFlow2026'),
+        'Wifi casa: TaskFlow2026');
+  });
+
+  test('UX-1320: a title cut near 60 characters never ends on a short linking '
+      'word (ES y, de, la, por; CA i, amb; EN the, and)', () {
+    const linking = {
+      'y', 'o', 'de', 'del', 'la', 'el', 'los', 'las', 'por', 'para', 'a',
+      'en', 'con', 'que', 'i', 'els', 'les', 'per', 'amb', 'and', 'or', 'of',
+      'the', 'to', 'for', 'with',
+    };
+    const starts = {
+      'es': 'Preguntar en la reunión del colegio sobre el comedor',
+      'ca': 'Preguntar a la reunió de l’escola sobre el menjador',
+      'en': 'Ask at the school meeting about the lunch menu',
+    };
+    const ends = {
+      'es': ['y', 'de', 'la', 'por'],
+      'ca': ['i', 'amb'],
+      'en': ['the', 'and'],
+    };
+    var checked = 0;
+    for (final language in starts.keys) {
+      for (final word in ends[language]!) {
+        // Move the linking word across the 60-character cut.
+        for (var pad = 0; pad < 16; pad++) {
+          final text = '${starts[language]}${' xx' * pad} $word '
+              'resto de palabras que siguen después del corte';
+          final title = CaptureProcessor.noteTitle(text);
+          final last = title.split(RegExp(r'\s+')).last.toLowerCase();
+          expect(linking, isNot(contains(last)),
+              reason: '«$title» from «$text»');
+          expect(title, isNotEmpty);
+          expect(text.startsWith(title), isTrue, reason: title);
+          expect(title.runes.length, lessThanOrEqualTo(noteTitleLength),
+              reason: title);
+          // The phone's own titles for typed notes agree.
+          expect(
+              localDrafts(text, DateTime(2026, 10, 20), kind: 'note')
+                  .single
+                  .task
+                  .title,
+              title);
+          checked++;
+        }
+      }
+    }
+    expect(checked, greaterThan(100));
   });
 }
 

@@ -113,6 +113,13 @@ class _InvitationReviewScreenState
       _error is ApiException &&
       (_error as ApiException).status == 404;
 
+  /// What a role other than editor lets the person do, in plain words.
+  String? _accessLine(Object? role) => switch (role) {
+    'viewer' => context.l10n.invitationViewerAccess,
+    'admin' => context.l10n.invitationAdminAccess,
+    _ => null,
+  };
+
   /// The first line: who invited you to what, or just what when the
   /// server doesn't say who.
   String _headline(Map details) {
@@ -153,13 +160,11 @@ class _InvitationReviewScreenState
                       const SizedBox(height: 12),
                       Text(strings.invitationReviewHelp),
                       const SizedBox(height: 24),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(strings.access),
-                        subtitle: Text(
-                          context.listRole(_details!['role'] as String),
-                        ),
-                      ),
+                      // Editor, the usual role, goes without saying.
+                      if (_accessLine(_details!['role']) case final line?) ...[
+                        Text(line),
+                        const SizedBox(height: 16),
+                      ],
                     ],
                     if (account != null)
                       Text(
@@ -194,20 +199,27 @@ class _InvitationReviewScreenState
                             : const Icon(Icons.check),
                         label: Text(strings.acceptInvitation),
                       )
+                    else if (_unavailable)
+                      // Asking again gets the same answer: the link is
+                      // dropped.
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text(strings.close),
+                      )
                     else
                       OutlinedButton(
                         onPressed: _load,
                         child: Text(strings.tryAgain),
                       ),
                     // Keeps the link: Calendar's card offers the
-                    // invitation again. One this account can't see is
-                    // dropped.
-                    TextButton(
-                      onPressed: _accepting
-                          ? null
-                          : () => Navigator.pop(context, _unavailable),
-                      child: Text(strings.invitationNotNow),
-                    ),
+                    // invitation again.
+                    if (!_unavailable)
+                      TextButton(
+                        onPressed: _accepting
+                            ? null
+                            : () => Navigator.pop(context, false),
+                        child: Text(strings.invitationNotNow),
+                      ),
                   ],
                 ],
               ),

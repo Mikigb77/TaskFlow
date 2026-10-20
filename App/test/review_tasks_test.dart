@@ -1339,7 +1339,7 @@ void main() {
       projects: [family],
     );
     await tester.pumpAndSettle();
-    expect(find.text(es.audienceShared('Casa')), findsOneWidget);
+    expect(find.text(es.audienceShared), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(CaptureResult),

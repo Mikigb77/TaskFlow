@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
@@ -15,7 +17,7 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 String activityLabel(BuildContext context, String action) => switch (action) {
   'created' => context.l10n.activityCreated,
   'assigned' => context.l10n.activityAssigned,
-  'unassigned' => context.l10n.assignmentNeeded,
+  'unassigned' => context.l10n.activityUnassigned,
   'completed' => context.l10n.activityCompleted,
   'reopened' => context.l10n.activityReopened,
   'deleted' => context.l10n.activityDeleted,
@@ -59,41 +61,14 @@ class ActivityScreen extends ConsumerStatefulWidget {
 
 class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   bool _busy = false;
-  Future<void> _read([Map<String, dynamic>? item]) async {
+
+  /// Marks everything read.
+  Future<void> _readAll() async {
     final accountId = ref.read(authProvider).account?.id;
-    final owner = ref.read(taskRepositoryProvider).ownerKey;
     if (_busy || accountId == null) return;
     setState(() => _busy = true);
     try {
-      await ref
-          .read(apiClientProvider)
-          .request(
-            'POST',
-            item == null
-                ? 'notifications/read_all/'
-                : 'notifications/${item['id']}/read/',
-            accountId: accountId,
-          );
-      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-      ref.invalidate(collaborationActivityProvider);
-      ref.invalidate(collaborationUnreadProvider);
-      if (item == null) return;
-      await ref.read(taskProvider.notifier).loadTasks();
-      final rows = await (await TaskDatabase().database).query(
-        'tasks',
-        columns: ['id'],
-        where: 'owner_key = ? AND sync_id = ? AND is_deleted = 0',
-        whereArgs: [owner, item['task_id']],
-      );
-      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-      if (rows.isNotEmpty) {
-        Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => TaskDetailScreen(taskId: rows.single['id'] as int),
-          ),
-        );
-      }
+      await _markRead(accountId);
     } catch (error) {
       if (mounted) {
         showFeedback(
@@ -104,6 +79,84 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _markRead(int accountId, [Map<String, dynamic>? item]) async {
+    await ref
+        .read(apiClientProvider)
+        .request(
+          'POST',
+          item == null
+              ? 'notifications/read_all/'
+              : 'notifications/${item['id']}/read/',
+          accountId: accountId,
+        );
+    if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    ref.invalidate(collaborationActivityProvider);
+    ref.invalidate(collaborationUnreadProvider);
+  }
+
+  /// The entry waiting for the sync to bring its task; its row shows a bar.
+  Object? _waiting;
+
+  /// Opens the entry's task as this phone has it, at once; marking it read
+  /// and the sync run behind. A task the phone hasn't got yet waits for that
+  /// sync; only a task still missing after it may have been deleted.
+  Future<void> _open(Map<String, dynamic> item) async {
+    final accountId = ref.read(authProvider).account?.id;
+    final owner = ref.read(taskRepositoryProvider).ownerKey;
+    if (_busy || accountId == null) return;
+    unawaited(_markRead(accountId, item).catchError((_) {}));
+    final synced = ref.read(taskProvider.notifier).loadTasks();
+    Future<int?> local() async {
+      final rows = await (await TaskDatabase().database).query(
+        'tasks',
+        columns: ['id'],
+        where: 'owner_key = ? AND sync_id = ? AND is_deleted = 0',
+        whereArgs: [owner, item['task_id']],
+      );
+      return rows.isEmpty ? null : rows.single['id'] as int;
+    }
+
+    bool moved() => ref.read(authProvider).account?.id != accountId;
+    final id = await local();
+    if (!mounted || moved()) return;
+    if (id != null) return _show(id);
+    if (item['action'] == 'deleted') {
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.taskRemoved);
+      return;
+    }
+    final waiting = item['id'];
+    setState(() => _waiting = waiting);
+    // Acts only while this row is still the one waiting and Activity is on
+    // top; otherwise the person has moved on and the answer is dropped.
+    bool still() =>
+        !moved() &&
+        _waiting == waiting &&
+        ModalRoute.of(context)?.isCurrent == true;
+    try {
+      try {
+        await synced;
+      } catch (_) {}
+      if (!mounted || !still()) return;
+      final found = await local();
+      if (!mounted || !still()) return;
+      if (found != null) return _show(found);
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.taskRemoved);
+    } finally {
+      if (mounted && _waiting == waiting) setState(() => _waiting = null);
+    }
+  }
+
+  /// Opens task [id]; a row still waiting for the sync no longer will.
+  void _show(int id) {
+    if (_waiting != null) setState(() => _waiting = null);
+    unawaited(
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(builder: (_) => TaskDetailScreen(taskId: id)),
+      ),
+    );
   }
 
   @override
@@ -133,7 +186,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: _busy ? null : _read,
+                      onPressed: _busy ? null : _readAll,
                       child: Text(context.l10n.activityMarkRead),
                     ),
                   ),
@@ -145,7 +198,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                 for (final item in items)
                   _ActivityRow(
                     item: item,
-                    onTap: _busy ? null : () => _read(item),
+                    waiting: _waiting != null && _waiting == item['id'],
+                    onTap: _busy ? null : () => _open(item),
                   ),
               ],
             ),
@@ -154,12 +208,37 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   );
 }
 
+/// Who did what to which task. An assignment says who has it now, when the
+/// server says so; older entries keep the general sentence.
+String activityEntry(BuildContext context, Map<String, dynamic> item) {
+  final action = item['action'] as String? ?? '';
+  final actor = item['actor_name'] as String? ?? context.l10n.activitySystem;
+  final title = item['task_title'] as String? ?? '';
+  final assignee = item['assignee_name'] as String?;
+  if (action == 'assigned' && item['assignee_is_you'] == true) {
+    return context.l10n.activityAssignedYou(actor, title);
+  }
+  if (action == 'assigned' && assignee != null) {
+    return context.l10n.activityAssignedTo(actor, assignee, title);
+  }
+  return context.l10n.activityEntry(action, actor, title);
+}
+
 /// Who did what first, then where and when. Unread rows are bold and say so
 /// to TalkBack.
 class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.item, required this.onTap});
+  const _ActivityRow({
+    required this.item,
+    required this.onTap,
+    this.waiting = false,
+  });
   final Map<String, dynamic> item;
   final VoidCallback? onTap;
+
+  /// Waiting for the sync to bring its task: a thin bar along the bottom
+  /// that TalkBack announces once, and no second tap. The text keeps its
+  /// width, so nothing moves under the finger.
+  final bool waiting;
   @override
   Widget build(BuildContext context) {
     final unread = item['read_at'] == null;
@@ -170,18 +249,33 @@ class _ActivityRow extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         label: unread ? context.l10n.activityUnread : null,
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(vertical: 4),
-          title: Text(
-            context.l10n.activityEntry(
-              item['action'] as String? ?? '',
-              item['actor_name'] as String? ?? context.l10n.activitySystem,
-              item['task_title'] as String? ?? '',
+        child: Stack(
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              title: Text(
+                activityEntry(context, item),
+                style: unread
+                    ? const TextStyle(fontWeight: FontWeight.w700)
+                    : null,
+              ),
+              subtitle: Text(project == null ? date : '$project · $date'),
+              onTap: waiting ? null : onTap,
             ),
-            style: unread ? const TextStyle(fontWeight: FontWeight.w700) : null,
-          ),
-          subtitle: Text(project == null ? date : '$project · $date'),
-          onTap: onTap,
+            if (waiting)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Semantics(
+                  liveRegion: true,
+                  label: context.l10n.activityFindingTask,
+                  child: const ExcludeSemantics(
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -241,6 +241,11 @@ void main() {
         (widget) => widget is HomeScreen && widget.listId == 'casa',
       );
       expect(page, findsOneWidget, reason: 'the project’s page opened');
+      // «Te has unido a Casa» first; the question waits for it to close.
+      expect(find.text(es.joinedInvitation('Casa')), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
       expect(title, findsOneWidget);
       expect(typedName(tester), 'Paul');
       await tester.tap(
@@ -254,6 +259,77 @@ void main() {
       await tester.pumpAndSettle();
       await app.join(tester);
       expect(title, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-19-app, round 1 · P182 (UX-1508): the joined message
+  // first, the name question after it ----
+
+  testWidgets(
+    'UX-1508: a password account without a name joins Casa with «Unirme»: «Te has unido a Casa» shows with no bottom sheet; only once the message has closed does the name sheet show, once',
+    (tester) async {
+      final app = await _NameApp.open(tester);
+      await app.join(tester);
+      final joined = find.text(es.joinedInvitation('Casa'));
+      expect(joined, findsOneWidget);
+      expect(joined.hitTestable(), findsOneWidget, reason: 'not covered');
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(title, findsNothing);
+      // Halfway through the message's time: still no question over it.
+      await tester.pump(const Duration(seconds: 5));
+      expect(joined, findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      // The message closes; then the question, once.
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(joined, findsNothing);
+      expect(title, findsOneWidget);
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is HomeScreen && widget.listId == 'casa',
+        ),
+        findsOneWidget,
+        reason: 'asked over the joined project',
+      );
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget, reason: 'only once');
+      expect(app.asked.owners, hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1508: going back from the joined project before «Te has unido a Casa» closes shows no name sheet',
+    (tester) async {
+      final app = await _NameApp.open(tester);
+      await app.join(tester);
+      expect(find.text(es.joinedInvitation('Casa')), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      // Back, while the message still shows.
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(
+        find.text(es.joinedInvitation('Casa')),
+        findsOneWidget,
+        reason: 'the message hasn’t closed yet',
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is HomeScreen && widget.listId == 'casa',
+        ),
+        findsNothing,
+        reason: 'the person left the joined page',
+      );
+      // Long past the message's time.
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(find.text(es.joinedInvitation('Casa')), findsNothing);
+      expect(title, findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
