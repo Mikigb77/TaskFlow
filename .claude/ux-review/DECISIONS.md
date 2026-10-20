@@ -2,6 +2,16 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-21 — The owner is away again: "do not ask me anything for now"
+Until he checks in:
+- Any product question gets decided by the main session, using the plan's recommendation.
+- Each decision is recorded in this file, under this entry, with its recommendation. All of them stay reversible.
+- The normal flow returns when he's back.
+- Agents keep writing new questions into their plans as D# with a recommendation. No package waits for an answer.
+
+Decided while he's away:
+- (none yet)
+
 ## 2026-10-20 (later) — D11 of run 2026-10-19-app: no cue
 **The owner:** "no cue for D11, as recommended".
 - **D11 (UX-1309), a second new task far down the same day:** no cue for a lit row below the fold, and no new element or copy. The save message already counts every saved task, and a lit row stays lit until it's scrolled into view. UX-1309 stands as P169 and P197 built it.
