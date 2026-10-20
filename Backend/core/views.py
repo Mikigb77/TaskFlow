@@ -1,3 +1,6 @@
+import math
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
@@ -64,14 +67,23 @@ def invitation_page(request, download=False):
     return response
 
 
-def consume_budget(key, limit):
+def seconds_until_next_day(now):
+    """Until the daily AI budgets start again: their keys hold the UTC day, so 00:00 UTC.
+
+    At least 1, so the refusal always says Retry-After (DRF leaves out a wait of 0)."""
+    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, math.ceil((tomorrow - now).total_seconds()))
+
+
+def consume_budget(key, limit, wait):
+    """Count one AI call against a daily budget; past its limit, 429 with Retry-After: wait."""
     if cache.add(key, 1, 86400):
         count = 1
     else:
         count = cache.incr(key)
     if count > limit:
         cache.decr(key)
-        raise Throttled(detail="Daily AI limit reached. You can still create tasks manually.", wait=3600)
+        raise Throttled(detail="Daily AI limit reached. You can still create tasks manually.", wait=wait)
 
 
 def release_budget(key):
@@ -94,7 +106,8 @@ class DraftView(APIView):
         # Voice commands are a batch feature; a single draft ignores the flag.
         data["commands"] = self.batch and data.get("commands", False)
         data["collaboration_context"] = capture_context(request.user, data.get("project_id"), commands=data["commands"])
-        # A dictation counts once below, whatever it holds: tasks, notes or commands.
+        # A dictation counts once below, whatever it holds: tasks, notes or commands. One that
+        # holds none of them doesn't count.
         pro = has_pro(request.user)
         dictation = None
         if not pro:
@@ -118,17 +131,27 @@ class DraftView(APIView):
             if isinstance(error, ai.AIUnavailable):
                 return Response({"detail": str(error)}, status=error.status)
             raise
-        if dictation is not None and not FreeDictation.objects.filter(pk=dictation.pk, counted=False).update(counted=True):
-            # Cancelled while the AI was working: the result is discarded, so it never counts.
-            return Response({"code": "capture_cancelled", "detail": "This dictation was cancelled."}, status=409)
+        if dictation is not None:
+            pending = FreeDictation.objects.filter(pk=dictation.pk, counted=False)
+            # An answer with no task and no command has nothing to review, so it uses no free
+            # dictation (D4, 2026-10-20): its reservation is given back, and free_voice shows it.
+            if not (pending.delete()[0] if self.found_nothing(result) else pending.update(counted=True)):
+                # Cancelled while the AI was working: the result is discarded, so it never counts.
+                return Response({"code": "capture_cancelled", "detail": "This dictation was cancelled."}, status=409)
         return Response({**result, "free_voice": free_voice(request.user)})
 
+    def found_nothing(self, result):
+        # Only a batch can come back empty; a single draft always holds its one task or note.
+        return self.batch and not result.get("tasks") and not result.get("commands")
+
     def draft(self, user, data):
-        day = timezone.now().date().isoformat()
+        now = timezone.now()
+        day = now.date().isoformat()  # The UTC day: both budgets start again at 00:00 UTC.
+        wait = seconds_until_next_day(now)
         budget_key = f"ai:{day}:user:{user.pk}"
-        consume_budget(budget_key, settings.AI_REQUESTS_PER_DAY)
+        consume_budget(budget_key, settings.AI_REQUESTS_PER_DAY, wait)
         try:
-            consume_budget(f"ai:{day}:global", settings.AI_GLOBAL_REQUESTS_PER_DAY)
+            consume_budget(f"ai:{day}:global", settings.AI_GLOBAL_REQUESTS_PER_DAY, wait)
         except Throttled:
             release_budget(budget_key)
             raise

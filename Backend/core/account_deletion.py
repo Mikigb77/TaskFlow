@@ -203,7 +203,7 @@ def _scrub_activity(user):
     needles = [user.email, *names]
     # SQLite stores non-ASCII characters in JSON as \u escapes, so search both spellings.
     needles = {*needles, *(json.dumps(needle)[1:-1] for needle in needles)}
-    query = Q(actor=user) | Q(details__previous_assignee_id=user.pk)
+    query = Q(actor=user) | Q(details__previous_assignee_id=user.pk) | Q(details__assignee_id=user.pk)
     for needle in needles:
         query |= Q(details__icontains=needle)
     for event in TaskEvent.objects.filter(query).only("pk", "details"):

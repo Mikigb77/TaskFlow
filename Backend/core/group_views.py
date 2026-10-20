@@ -301,6 +301,25 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_actor_name(self, value):
         return display_name(value.event.actor) if value.event.actor_id else None
 
+    def to_representation(self, value):
+        data = super().to_representation(value)
+        details = value.event.details if isinstance(value.event.details, dict) else {}
+        # Who an assignment went to (docs/VOICE_COMMANDS.md, "Activity"). Entries from before the
+        # server recorded it have neither field, so the app keeps its older sentence for them.
+        if value.event.action == "assigned" and "assignee_id" in details:
+            assignee_id = details["assignee_id"]
+            data["assignee_name"] = self._name(assignee_id) if assignee_id else None
+            data["assignee_is_you"] = assignee_id is not None and assignee_id == self.context["request"].user.pk
+        return data
+
+    def _name(self, user_id):
+        # The name as it is now, like actor_name. Looked up once per person for the whole page.
+        names = self.context.setdefault("assignee_names", {})
+        if user_id not in names:
+            user = User.objects.filter(pk=user_id).first()
+            names[user_id] = display_name(user) if user else None
+        return names[user_id]
+
     class Meta:
         model = TaskNotification
         fields = ["id", "task_id", "task_title", "project_id", "project_name", "action", "actor_name", "read_at", "created_at"]

@@ -78,8 +78,10 @@ class CommandExtractionTests(SimpleTestCase):
         context["projects"] += [{"id": "maths", "name": "Matemáticas", "group_name": None, "shared": False, "people": []},
                                 {"id": "materials", "name": "Materiales", "group_name": None, "shared": False, "people": []}]
         result = self.extract({"commands": [{"kind": "project", "name": "Mates"}], "tasks": []}, context)
+        # The matched projects come too, closest first: «Materiales» is fewer letters from «Mates».
         self.assertEqual(result["commands"], [
-            {"kind": "project", "name": "Mates", "existing_list_id": None, "issues": ["ambiguous_project"]}])
+            {"kind": "project", "name": "Mates", "existing_list_id": None, "issues": ["ambiguous_project"],
+             "project_candidates": [{"id": "materials", "name": "Materiales"}, {"id": "maths", "name": "Matemáticas"}]}])
 
     def test_an_unknown_project_without_create_keeps_todays_issue_and_suggests_its_name(self):
         result = self.extract({"tasks": [task(project_name="Química orgánica")]})
@@ -240,7 +242,8 @@ class CommandFormatSlipTests(SimpleTestCase):
         self.assertEqual((str(command.from_date), str(command.to_date)), ("2026-10-19", "2026-10-25"))
 
     def test_what_stays_invalid(self):
-        for answer in ({"tasks": [], "commands": []}, [], {"commands": [{"kind": "project"}]},
+        # An answer with nothing in it is valid since D4: core/test_empty_dictations.py.
+        for answer in ({"commands": [{"kind": "project"}]},
                        {"commands": [{"kind": "answer", "text": "Tienes 3 tareas"}]},
                        {"commands": [{"kind": "find", "status": "maybe"}]},
                        {"commands": [{"kind": "update", "target": {"words": ["x"]}, "changes": {"priority": 7}}]},
@@ -389,7 +392,8 @@ class CommandEndpointTests(TestCase):
         self.assertIsNone(response.data["tasks"][0]["new_project"])
 
     def test_an_invalid_answer_never_counts(self):
-        response = self.dictate({"tasks": [], "commands": []}, commands=True)
+        # A kind that doesn't exist: the model answered instead of returning a command.
+        response = self.dictate({"commands": [{"kind": "answer", "text": "Tienes 3 tareas"}]}, commands=True)
         self.assertEqual(response.status_code, 502)
         self.assertFalse(FreeDictation.objects.exists())
 

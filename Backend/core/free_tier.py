@@ -1,7 +1,8 @@
 """Free dictations: a monthly ledger for accounts without Pro.
 
 A dictation counts only once the assistant has answered. Failed, refused and
-cancelled dictations are deleted; Pro dictations are never recorded.
+cancelled dictations are deleted, and so is one whose answer holds no task and no
+command (D4, 2026-10-20; core/views.py). Pro dictations are never recorded.
 """
 import hashlib
 from datetime import timedelta

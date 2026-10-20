@@ -124,7 +124,7 @@ class BillingAccessTests(TestCase):
 
     @override_settings(FREE_VOICE_CAPTURES_PER_MONTH=1)
     @patch("core.billing._customer", side_effect=BillingUnavailable())
-    @patch("core.views.ai.make_drafts", return_value={"tasks": []})
+    @patch("core.views.ai.make_drafts", return_value={"tasks": [{"title": "Test task"}]})
     def test_outage_keeps_free_voice_and_never_says_used_up(self, ai, customer):
         # A dictation left is used and charged even though Pro can't be checked.
         response = self.client.post("/api/ai/drafts/", {"text": "Test task", "timezone": "UTC"}, format="json")

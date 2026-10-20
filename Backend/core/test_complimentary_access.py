@@ -59,7 +59,7 @@ class ComplimentaryAccessTests(TestCase):
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
     @patch("core.billing._customer", return_value={"entitlements": {}})
-    @patch("core.views.ai.make_drafts", return_value={"tasks": []})
+    @patch("core.views.ai.make_drafts", return_value={"tasks": [{"title": "Task"}]})
     def test_clients_cannot_forge_grant_or_owner_identity(self, ai, customer):
         response = self.client.post("/api/ai/drafts/", {
             "text": "Task", "timezone": "UTC", "complimentary_pro": True,

@@ -95,17 +95,21 @@ def _close(spoken, name):
     return allowed > 0 and any(edit_distance(form, name, allowed) <= allowed for form in spoken)
 
 
+def _spoken_forms(spoken):
+    # As said; without articles («la lista de la compra»); without the word project too.
+    words = normalized(spoken or "").split()
+    return [form for form in dict.fromkeys((" ".join(words), _trimmed(words, FILLER_WORDS),
+                                            _trimmed(words, FILLER_WORDS | PROJECT_WORDS))) if form]
+
+
 def lenient_matches(spoken, candidates, name_of):
     """The candidates whose name matches the spoken name at the first tier that matches any:
     equal (ignoring case and accents), then a prefix or contained word, then a near spelling
     (allowed_distance). The caller treats two or more as ambiguous, so a near spelling is
     never picked when another candidate is near too."""
-    words = normalized(spoken or "").split()
-    if not words:
+    spoken_forms = _spoken_forms(spoken)
+    if not spoken_forms:
         return []
-    # As said; without articles («la lista de la compra»); without the word project too.
-    spoken_forms = [form for form in dict.fromkeys((" ".join(words), _trimmed(words, FILLER_WORDS),
-                                                    _trimmed(words, FILLER_WORDS | PROJECT_WORDS))) if form]
     named = [(candidate, normalized(name_of(candidate) or "")) for candidate in candidates]
     named = [(candidate, name) for candidate, name in named if name]
     for tier in (_same_name, _prefix_or_word):
@@ -157,37 +161,83 @@ def match_people(spoken, people):
     return unique(close)
 
 
+MAX_PROJECT_CANDIDATES = 3
+
+
+def ranked(spoken, matches, name_of):
+    """Matches of one spoken name, best first: the fewest letters to change from what was said,
+    then the shorter name, so «Mates» puts «Matemáticas» before «Matemáticas II». Ties keep
+    their order, which is the directory's (by name)."""
+    forms = _spoken_forms(spoken)
+
+    def closeness(candidate):
+        name = normalized(name_of(candidate) or "")
+        letters = max([len(name)] + [len(form) for form in forms])
+        # With the longest length as the limit, the distance is exact.
+        return min((edit_distance(form, name, letters) for form in forms), default=letters), len(name)
+    return sorted(matches, key=closeness)
+
+
+def project_candidates(projects):
+    """project_candidates, the projects behind an "ambiguous_project" (docs/VOICE_COMMANDS.md):
+    at most 3, as {"id", "name"}. A project this dictation creates has no id yet: left out."""
+    return [{"id": project["id"], "name": project["name"]} for project in projects
+            if project.get("id")][:MAX_PROJECT_CANDIDATES]
+
+
 def pick_project(project_name, group_name, projects, new_projects=()):
     """(project, None) for one match, or (None, "ambiguous_project" / "project_not_available").
 
     new_projects are the projects created in the same dictation: {"id": None, "name": …}.
     A project name that only matches a directory group still finds that group's one project."""
+    selected, issue, _ = resolve_project(project_name, group_name, projects, new_projects)
+    return selected, issue
+
+
+def resolve_project(project_name, group_name, projects, new_projects=()):
+    """pick_project, plus the candidates of an "ambiguous_project" (project_candidates), best
+    first: (project, None, []), (None, "ambiguous_project", candidates) or
+    (None, "project_not_available", [])."""
     groups = sorted({project["group_name"] for project in projects if project.get("group_name")})
+
+    def projects_of(group_names):
+        return [project for name in group_names for project in projects if project.get("group_name") == name]
+
+    def by_name(project):
+        return project["name"]
+
     if group_name:
         named = lenient_matches(group_name, groups, lambda value: value)
-        if len(named) != 1:
-            return None, "ambiguous_project" if named else "project_not_available"
+        if not named:
+            return None, "project_not_available", []
+        if len(named) > 1:
+            pool = projects_of(ranked(group_name, named, lambda value: value))
+            # A project said too narrows the candidates to the ones it matches, if any.
+            said = lenient_matches(project_name, pool, by_name) if project_name else []
+            return None, "ambiguous_project", project_candidates(ranked(project_name, said, by_name) or pool)
         pool = [project for project in projects if project.get("group_name") == named[0]]
         if not project_name:
-            return (pool[0], None) if len(pool) == 1 else (None, "ambiguous_project" if pool else "project_not_available")
+            if len(pool) == 1:
+                return pool[0], None, []
+            return (None, "ambiguous_project", project_candidates(pool)) if pool else (None, "project_not_available", [])
     else:
         pool = list(projects) + list(new_projects)
-    matches = lenient_matches(project_name, pool, lambda project: project["name"])
+    matches = lenient_matches(project_name, pool, by_name)
     if len(matches) == 1:
-        return matches[0], None
+        return matches[0], None, []
     if matches:
-        return None, "ambiguous_project"
+        return None, "ambiguous_project", project_candidates(ranked(project_name, matches, by_name))
     if not group_name:
         named = lenient_matches(project_name, groups, lambda value: value)
         if len(named) == 1:
-            in_group = [project for project in projects if project.get("group_name") == named[0]]
+            in_group = projects_of(named)
             if len(in_group) == 1:
-                return in_group[0], None
+                return in_group[0], None, []
             if in_group:
-                return None, "ambiguous_project"
+                return None, "ambiguous_project", project_candidates(in_group)
         elif named:
-            return None, "ambiguous_project"
-    return None, "project_not_available"
+            return None, "ambiguous_project", project_candidates(projects_of(ranked(project_name, named, lambda value: value)))
+    return None, "project_not_available", []
 
 
 def _directory_entry(project, people):
@@ -266,7 +316,8 @@ def resolve_targets(payload, context, new_projects=None):
 
     new_projects is None for apps without voice commands, so their drafts keep exactly
     today's fields. With commands it is the list of projects created in the same
-    dictation, and every draft also gets new_project and project_suggestion."""
+    dictation, and every draft also gets new_project and project_suggestion, and with
+    ambiguous_project its project_candidates."""
     project_name = payload.pop("project_name", None)
     group_name = payload.pop("group_name", None)
     member_name = payload.pop("member_name", None)
@@ -274,8 +325,9 @@ def resolve_targets(payload, context, new_projects=None):
     projects = context.get("projects", []) if context else []
     issues = []
     selected = None
+    candidates = []
     if project_name or group_name:
-        selected, issue = pick_project(project_name, group_name, projects, new_projects or ())
+        selected, issue, candidates = resolve_project(project_name, group_name, projects, new_projects or ())
         if issue:
             issues.append(issue)
     elif context and context.get("default_project_id"):
@@ -320,4 +372,6 @@ def resolve_targets(payload, context, new_projects=None):
     if new_projects is not None:
         payload.update(new_project=selected["name"] if created else None,
                        project_suggestion=project_name if "project_not_available" in issues else None)
+        if "ambiguous_project" in issues:
+            payload["project_candidates"] = candidates
     return payload

@@ -25,7 +25,7 @@ Everything runs in one transaction on the server. Stored files are removed only 
 | Groups the person owns | Handed to an heir: the earliest admin, then editor, then viewer, by membership order. If there's no one else, the group and its projects are deleted like personal ones. |
 | Tasks the person created in projects owned by others, or in projects being handed over | Kept for the group, and `owner` becomes the project's (new) owner. `created_by` (shown as «Creada por») becomes null in the same update, so the project's owner never appears as the creator; the version is bumped once. Any other task that still names the person as its creator loses it too. Attachments the person added to those tasks stay too, with `owner` moved to the project's owner, which is where storage is charged. |
 | Tasks assigned to the person | Kept, and unassigned (`assignee` is set to null; the existing `SET_NULL`). |
-| Activity events by the person | Kept for the group with `actor` null. Any name or email of the person in `details` is scrubbed. |
+| Activity events by the person | Kept for the group with `actor` null. Any name, email or id of the person in `details` is scrubbed, including the new assignee an `assigned` event records: that entry then shows no assignee. |
 | Pending invitations to the person's email | Deleted, together with their `EmailDelivery` rows. |
 | Invitations the person sent | They stay valid for the project or group (`invited_by` is set to null). An unsent invitation email that names them is signed «Someone», «Alguien» or «Algú» instead, in its language. |
 | Queued or old emails to the person's address (`EmailDelivery`) | Deleted. |

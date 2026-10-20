@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from .capture_context import lenient_matches, match_people, normalized, pick_project
+from .capture_context import lenient_matches, match_people, normalized, project_candidates, ranked, resolve_project
 
 COMMAND_KINDS = ("project", "find", "update", "delete")
 # Other names the model may give the same kinds. Anything else stays invalid.
@@ -199,11 +199,18 @@ def _people(projects):
 
 
 def _project_ref(name, projects):
-    """(list_id, the name when it couldn't be resolved, issues)."""
+    """(list_id, the name when it couldn't be resolved, issues, project_candidates)."""
     if not name:
-        return None, None, []
-    selected, issue = pick_project(name, None, projects)
-    return (selected["id"], None, []) if selected else (None, name, [issue])
+        return None, None, [], []
+    selected, issue, candidates = resolve_project(name, None, projects)
+    return (selected["id"], None, [], []) if selected else (None, name, [issue], candidates)
+
+
+def _with_candidates(item, issues, candidates):
+    # Only beside "ambiguous_project": the projects that matched, so the app can offer them.
+    if "ambiguous_project" in issues:
+        item["project_candidates"] = candidates
+    return item
 
 
 def _person_ref(request, name, people, user_id):
@@ -219,8 +226,9 @@ def _person_ref(request, name, people, user_id):
 
 
 def _target(target, projects):
-    list_id, project_name, issues = _project_ref(target.project_name, projects)
-    return {"words": target.words, "list_id": list_id, "project_name": project_name, "date": _iso(target.date)}, issues
+    list_id, project_name, issues, candidates = _project_ref(target.project_name, projects)
+    item = {"words": target.words, "list_id": list_id, "project_name": project_name, "date": _iso(target.date)}
+    return _with_candidates(item, issues, candidates), issues
 
 
 def _changes(changes, people, user_id, user_name):
@@ -278,16 +286,20 @@ def resolve_commands(commands, context):
                 continue  # The same project said twice is created once.
             created.add(normalized(name))
             matches = lenient_matches(name, editable, lambda project: project["name"])
-            resolved.append({"kind": "project", "name": name,
-                             "existing_list_id": matches[0]["id"] if len(matches) == 1 else None,
-                             "issues": ["ambiguous_project"] if len(matches) > 1 else []})
+            issues = ["ambiguous_project"] if len(matches) > 1 else []
+            resolved.append(_with_candidates(
+                {"kind": "project", "name": name, "existing_list_id": matches[0]["id"] if len(matches) == 1 else None,
+                 "issues": issues},
+                issues, project_candidates(ranked(name, matches, lambda project: project["name"]))))
         elif command.kind == "find":
-            list_id, project_name, issues = _project_ref(command.project_name, visible)
+            list_id, project_name, issues, candidates = _project_ref(command.project_name, visible)
             scope = [project for project in visible if project["id"] == list_id] if list_id else visible
             person_id, person_name, more = _person_ref(command.person, command.member_name, _people(scope), user_id)
-            resolved.append({"kind": "find", "words": command.words, "list_id": list_id, "project_name": project_name,
-                             "person_id": person_id, "person_name": person_name, "status": command.status,
-                             "from": _iso(command.from_date), "to": _iso(command.to_date), "issues": issues + more})
+            resolved.append(_with_candidates(
+                {"kind": "find", "words": command.words, "list_id": list_id, "project_name": project_name,
+                 "person_id": person_id, "person_name": person_name, "status": command.status,
+                 "from": _iso(command.from_date), "to": _iso(command.to_date), "issues": issues + more},
+                issues, candidates))
         else:
             target, issues = _target(command.target or CommandTarget(), visible)
             item = {"kind": command.kind, "target": target}

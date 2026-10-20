@@ -93,7 +93,10 @@ class ExtractedTasks(BaseModel):
 
 class ExtractedCapture(BaseModel):
     """What an app with voice commands gets: tasks and notes to create, and commands
-    (docs/VOICE_COMMANDS.md). Older apps get ExtractedTasks, exactly as before."""
+    (docs/VOICE_COMMANDS.md). Older apps get ExtractedTasks, exactly as before.
+
+    Both lists may be empty: words with nothing to do in them («Hola, ¿me oyes?») are an
+    answer, which the app shows as nothing found, and which uses no free dictation (D4)."""
     tasks: list[ExtractedTask] = Field(default_factory=list, max_length=12)
     commands: list[ExtractedCommand] = Field(default_factory=list, max_length=12)
 
@@ -110,12 +113,6 @@ class ExtractedCapture(BaseModel):
         return {**data,
                 "tasks": [item for item in tasks if not is_command(item)] + [item for item in commands if not is_command(item)],
                 "commands": [item for item in tasks if is_command(item)] + [item for item in commands if is_command(item)]}
-
-    @model_validator(mode="after")
-    def something_to_review(self):
-        if not self.tasks and not self.commands:
-            raise ValueError("The answer holds no task and no command.")
-        return self
 
 
 def client(timeout_ms=45000, *, vertex=False):

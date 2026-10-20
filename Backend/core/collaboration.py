@@ -4,8 +4,13 @@ from .models import Task, TaskEvent, TaskNotification, ProjectPreference
 
 
 def record_event(task, actor, action, *, details=None, previous_assignee=None):
+    details = dict(details or {})
+    if action == "assigned":
+        # Who it went to then, for the activity entry: null when it's now everyone's or nobody's.
+        # The id, never the name, so a later name shows and account deletion can scrub it.
+        details["assignee_id"] = task.assignee_id
     event = TaskEvent.objects.create(task=task, actor=actor, version=task.version,
-                                     action=action, details=details or {})
+                                     action=action, details=details)
     project = task.task_list
     if not project or not project.shared:
         return event
