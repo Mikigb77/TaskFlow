@@ -444,3 +444,77 @@ This is the re-plan after batch 4's second round (WP43, WP44), made on 2026-10-1
 - WP45 changes only held files (`src/components/LegalPage.tsx`, `tests/ux-web-legal.spec.ts`); nothing from this round commits.
 - Round 3 is batch 4's last. If WEB-728 fails, it's escalated. If WP45 breaks WEB-205 or WEB-204, that's their second failure, so they're escalated too.
 - If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
+
+## Re-plan for what's still open (2026-10-20)
+
+Seven findings are still open after b1–b4: five from before (WEB-6, WEB-9, WEB-109, WEB-707, WEB-720) and two new ones from the reviewers' notes in `report-b4.md` (WEB-729, WEB-730). Batch b5 closes them in four small packages, WP46–WP49, with no new decisions. Every website file b5 touches is held, so nothing from it commits in TaskFlowWeb.
+
+This re-plan reads the ledger, the b4 verify notes and the code as they stand; there's no new review. Full briefs: `plan.json` (WP46–WP49). WP45 is already batch 4's last package (WEB-728), so b5 starts at WP46.
+
+### Decisions
+No new decisions. Still yours from before:
+- **WD15 · WEB-701** (S2): open `/`, `/es/privacy/` and a missing page in Safari on your iPhone. If the type looks bold, WEB-701 closes; if it looks thin, a small font package follows. It isn't in b5.
+- **Earlier ones:**
+  - WD12's two facts: the backup window, and paid or free Gemini;
+  - the legal checks: WD14's wording, and the registry line's English and Spanish;
+  - Google's approval of the Android trademark line, at launch.
+
+### Packages, in run order (b5)
+Strike any line you don't want; only that package changes.
+
+#### WP46 · Verification only: WEB-6 and WEB-9's last parts, and the demo's words · H · S · **held** (tests only) · S3
+- **WEB-6** (S3): the static example whenever the live demo can't run. b4 built it, and it was verified there under WEB-403 and WEB-723. It shows without JavaScript, when the demo is off, and when the security check gives up. → Checked and closed by ID; no site change is expected.
+- **WEB-9** (S2): Turnstile shows only when it needs a tap. b4 built it (`interaction-only`, compact under 300 px, no automatic retry). → Checked by ID, with a new test of the options.
+- **WEB-109** (S2), the demo's part: the demo has used the app's words since b3–b4. → Checked by ID; the word scan also gains the Spanish and Catalan words.
+
+#### WP47 · Privacy and terms: suggested tasks and limits, not drafts, allowances, transcripts or an API route · L · M · **held** (the other session's legal files) · S2
+- **WEB-109** (S2), the legal part:
+  - the terms' description says "AI drafts", and it's also what link previews show → "accounts, shared projects, dictation and subscriptions" (Spanish and Catalan follow);
+  - the terms say "AI-generated drafts", "reviewed drafts" and "allowance(s)" → "AI suggestions", "reviewed suggestions", "limits";
+  - privacy §3 and §8 → the same words.
+- **WEB-729** (S1, new, from the L verifier's note): privacy §2 and §4 say "generated drafts", "the transcript", "transcribed" and "an AI Studio/Gemini API route" → "suggested tasks", "the text of what you said", "turned into text", and "The app can use Google's Gemini API, with Google Cloud's Vertex AI as a fallback".
+  - The facts don't change.
+  - §4's paragraph on paid and unpaid Gemini stays as it is (WD12).
+- **The legal version moves to the edit's day,** as WD3 says: every legal page will read "In force since 20 October 2026". Strike this line to keep 19 October.
+
+#### WP48 · The live demo is marked in the page's language; the FAQ's half checked · G · S · **held** (VoiceDemo.tsx) · S2
+- **WEB-707** (S2), the demo half: b1 wrapped the then-English demo in `lang="en"`. The demo is now translated, but the wrapper stayed, so on /es/ and /ca/ a screen reader reads the Spanish and Catalan demo with an English voice. → `#voice` carries the page's `lang` itself.
+  - The committed wrapper in `HomePage.tsx` stays until `VoiceDemo.tsx` is committed; removing it sooner would mark the committed English demo as Spanish.
+- **WEB-707**, the FAQ half: b2's WP19 already translated it. → Checked by ID.
+
+#### WP49 · Live demo: the held Try again keeps its full focus ring; the privacy line says "Google" · H · S · **held** (with VoiceDemo.tsx) · S1
+- **WEB-720** (S1): the focus ring on a held Try again faded to 2.4:1. → The ledger's fix is already in `voice.css`: it was added in b4 outside any package and never ruled on. It's checked and locked by a test.
+- **WEB-730** (S1, new, from the H verifier's note): the line under the record button says "goes to Google's AI" / «va a la IA de Google». → "goes to Google" / «va a Google» / «va a Google», as privacy §8 and the FAQ say, and as the app does.
+
+### Not planned, and why
+- **The hand-over's "Coming soon to Google Play"** (the H verifier's note): this isn't a mismatch.
+  - It's review H's own copy (`review-H.md:445`), and it says what the hero, the FAQ, the link preview and the app's invitation email say: statements name the store.
+  - "Coming soon to Android" is the phone menu's link label and the closing card's heading: one label per destination, which applies to links.
+  - Changing only the hand-over would set it against the hero.
+  - If you want one phrase everywhere, say which one; it's one string in each place. The conventions now spell this rule out.
+- **WEB-701** → WD15, your iPhone.
+- **The other notes in `report-b4.md`:** the 52ch legal column's empty band on desktop, two language switches on the desktop delete page, and the 95-character registry line. The briefs prescribed all three, and no reviewer asked for a change.
+
+### For the main session
+- **Running b5:**
+  - run `bash .claude/ux-web/ux-web.sh base` first;
+  - then `ux-web-fix` with `only: [WP46, WP47, WP48, WP49]` and `batch: b5` (the report is `report-b5.md`), and `recordMemory: true`, since b5 is the run's last batch;
+  - `plan.json` still lists WP14–WP32; they ran in b1–b4 (its new `batches` field records which), so don't run them again.
+- **Nothing from b5 commits in TaskFlowWeb.** Every file it touches is held:
+  - `VoiceDemo.tsx`, `voice.css`, and the `voice` block of `src/content/site/`;
+  - `src/content/legal/`, `company.json` and `docs/LEGAL_RELEASE.md`;
+  - `tests/ux-web-voice.spec.ts`, `tests/support/ux-voice.ts` and `tests/ux-web-legal.spec.ts`.
+
+  The loop's records commit in this repo.
+- **When the owner commits `VoiceDemo.tsx`:**
+  - delete `HomePage.tsx`'s `lang="en"` wrapper (`:52-55`, with its comment);
+  - delete the committed WEB-707 test's demo expectations (`tests/ux-web-global.spec.ts:163-192`: `voice: "en"` and `voiceWrapperDisplay`).
+
+  WP48's `lang` on `#voice` then does the job alone.
+- **For a native Catalan read:** WP47's Catalan lines (privacy §2–§4, the terms' description and §5). WP49 only removes «la IA de».
+- **Device checks:**
+  - TalkBack in Spanish on /es/'s demo (WEB-707);
+  - Turnstile's real look after a deploy (WEB-9);
+  - the live demo with the real AI and a microphone, in Spanish (WEB-9);
+  - a keyboard on the held Try again with the real security check (WEB-720).
+- If the tester's infrastructure fails (server, browser, port), re-run the check; it doesn't count as a site failure.
