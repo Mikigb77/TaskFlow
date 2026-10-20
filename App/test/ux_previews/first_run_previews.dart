@@ -78,7 +78,7 @@ void firstRunPreviews() {
     preview(
       reminderQuestion,
       'refused',
-      'Sí tapped, and Android\'s prompt refused: the message and the way to the system settings.',
+      'Sí tapped, and Android\'s prompt refused: the message and Permitir avisos.',
       [es2],
       (p) async {
         final app = await _firstDatedTask(p);
@@ -91,8 +91,8 @@ void firstRunPreviews() {
     preview(
       reminderQuestion,
       'exact-alarms',
-      'Sí tapped with notifications allowed but exact alarms off: why to allow «Alarmas y recordatorios».',
-      [es2],
+      'Sí tapped with notifications allowed but exact alarms off: why to allow «Alarmas y recordatorios», what to do next, and Ahora no.',
+      [es2, ca2],
       (p) async {
         final app = await _firstDatedTask(p, allowed: true);
         app.reminderAccess.exact = false;
@@ -109,6 +109,19 @@ void firstRunPreviews() {
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
         await app.push('/deviceCalendars');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      phoneCalendars,
+      'refused',
+      'Conectar, then «No permitir» in Android\'s dialog: what that means, and Conectar again.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.push('/deviceCalendars');
+        await app.tap(p.l.calendarEnable);
         await p.shoot();
       },
     );
@@ -132,8 +145,8 @@ void firstRunPreviews() {
     preview(
       phoneCalendars,
       'allowed',
-      'Allowed: choose which of the phone\'s calendars Calendar shows.',
-      [es1],
+      'Conectar, then allowed: connected, every calendar ticked, any can be unticked.',
+      [es1, es2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -141,6 +154,7 @@ void firstRunPreviews() {
           calendarAccess: CalendarAccess.granted,
         );
         await app.push('/deviceCalendars');
+        await app.tap(p.l.calendarEnable);
         await p.shoot();
       },
     );

@@ -336,8 +336,15 @@ void main() {
     (tester) async {
       final store = await openRegion(tester);
       final row = find.widgetWithText(ListTile, es.timeZone);
+      // UX-1619: «Como el teléfono (city)», the phone zone's city in the row.
+      final [before, after] = es.timeZoneSameAsPhone('|').split('|');
       expect(
-        find.descendant(of: row, matching: find.text(es.deviceDefault)),
+        find.descendant(
+          of: row,
+          matching: find.textContaining(
+            RegExp('^${RegExp.escape(before)}.+${RegExp.escape(after)}\$'),
+          ),
+        ),
         findsOneWidget,
       );
       await openZones(tester);
@@ -706,4 +713,139 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-19-app · P188 (UX-1619): Hora y región, fewer words ----
+
+  test('UX-1619: the zone row’s value reads as planned in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.timeZoneSameAsPhone('Madrid'), 'Same as phone (Madrid)');
+    expect(es.timeZoneSameAsPhone('Madrid'), 'Como el teléfono (Madrid)');
+    expect(ca.timeZoneSameAsPhone('Madrid'), 'Com el telèfon (Madrid)');
+    for (final language in ['en', 'es', 'ca']) {
+      expect(
+        File('lib/l10n/app_$language.arb').readAsStringSync(),
+        isNot(contains('"regionHelp"')),
+        reason: language,
+      );
+    }
+  });
+
+  testWidgets(
+    'UX-1619: Hora y región has no Estas preferencias se guardan… line, and the zone row reads Como el teléfono (Madrid) with no separate Madrid line',
+    (tester) async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('flutter_timezone'),
+            (_) async => 'Europe/Madrid',
+          );
+      await openRegion(tester);
+      final page = find.byType(RegionalSettingsScreen);
+      expect(
+        find.descendant(
+          of: page,
+          matching: find.textContaining('Estas preferencias se guardan'),
+        ),
+        findsNothing,
+      );
+      final row = find.widgetWithText(ListTile, es.timeZone);
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.text(es.timeZoneSameAsPhone('Madrid')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Como el teléfono (Madrid)'), findsOneWidget);
+      // The city shows once: only inside the row's value.
+      expect(
+        find.descendant(of: page, matching: find.textContaining('Madrid')),
+        findsOneWidget,
+      );
+      expect(find.descendant(of: page, matching: find.text('Madrid')),
+          findsNothing);
+      // The phone's zone was read: no fallback banner.
+      expect(
+        find.descendant(
+          of: page,
+          matching: find.textContaining(
+            'No se puede obtener la zona del dispositivo',
+          ),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (key, label, options, pick) in [
+    (
+      'regional-clock',
+      'clock',
+      [es.deviceDefault, es.clock12, es.clock24],
+      es.clock24,
+    ),
+    (
+      'regional-week',
+      'week start',
+      [es.deviceDefault, es.monday, es.sunday, es.saturday],
+      es.monday,
+    ),
+  ]) {
+    testWidgets(
+      'UX-1619: tapping the $label row opens a sheet of radio rows, and a choice saves and closes it',
+      (tester) async {
+        final store = await openRegion(tester);
+        final page = find.byType(RegionalSettingsScreen);
+        expect(
+          find.descendant(of: page, matching: find.byType(DropdownButton<int>)),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: page,
+            matching: find.byType(DropdownButton<ClockFormat>),
+          ),
+          findsNothing,
+        );
+        final row = find.byKey(ValueKey(key));
+        expect(tester.widget(row), isA<ListTile>());
+        expect(
+          find.descendant(of: row, matching: find.text(es.deviceDefault)),
+          findsOneWidget,
+        );
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        final radios = find.descendant(
+          of: sheet,
+          matching: find.byWidgetPredicate((w) => w is RadioListTile),
+        );
+        expect(radios, findsNWidgets(options.length));
+        for (final option in options) {
+          expect(
+            find.descendant(of: radios, matching: find.text(option)),
+            findsOneWidget,
+            reason: option,
+          );
+        }
+        await tester.tap(
+          find.descendant(of: radios, matching: find.text(pick)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(
+          find.descendant(of: row, matching: find.text(pick)),
+          findsOneWidget,
+        );
+        if (key == 'regional-clock') {
+          expect(store.value.clock, ClockFormat.twentyFour);
+        } else {
+          expect(store.value.weekStart, 1);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

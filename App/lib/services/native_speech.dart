@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/services/app_language.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -194,7 +195,9 @@ String captureSpeechLanguage(
 ) => speechLanguageTag(
   preferences.speechLanguage,
   app: Localizations.localeOf(context),
-  devices: WidgetsBinding.instance.platformDispatcher.locales,
+  devices: AppLanguageBridge.phoneOr(
+    WidgetsBinding.instance.platformDispatcher.locales,
+  ),
 );
 
 /// Day and time-of-day words per speech language. Recognizer vocabulary, never

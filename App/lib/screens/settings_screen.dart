@@ -21,6 +21,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   /// Whether the phone lets reminders through; null until it answers.
   bool? _allowed;
 
+  /// Whether they can come on time («Alarms & reminders»); null until known.
+  bool? _exact;
+
   @override
   void initState() {
     super.initState();
@@ -42,7 +45,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   Future<void> _readAccess() async {
     try {
       final capability = await ref.read(reminderAccessProvider).capability();
-      if (mounted) setState(() => _allowed = capability.allowed);
+      if (mounted) {
+        setState(() {
+          _allowed = capability.allowed;
+          _exact = capability.exact;
+        });
+      }
     } catch (_) {
       // Keep the last answer; the Reminders screen explains any problem.
     }
@@ -86,11 +94,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     ],
                   )
                 : Text(
-                    reminders.enabled
-                        ? context.l10n.remindersOnLead(
+                    !reminders.enabled
+                        ? context.l10n.remindersOff
+                        : _exact == false
+                        ? context.l10n.remindersOnLate
+                        : context.l10n.remindersOnLead(
                             context.reminderLead(reminders.leadMinutes),
-                          )
-                        : context.l10n.remindersOff,
+                          ),
                   ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: _openReminders,

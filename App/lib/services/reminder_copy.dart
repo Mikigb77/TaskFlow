@@ -1,12 +1,30 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/l10n/app_languages.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/generated/app_localizations_en.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/services/app_language.dart';
 import 'package:agenda/services/task_database.dart';
+
+/// The phone's languages: the bridge's answer; else, with «Como el teléfono»,
+/// Flutter's, because no per-app language is set, so they are the phone's and
+/// live, also in a background isolate; else the copy the bridge saved, needed
+/// only when Idioma names a language, because Flutter then reports the app's;
+/// else Flutter's.
+Future<List<Locale>> _phoneLocales(
+  TaskDatabase database,
+  RegionalPreferences preferences,
+) async =>
+    AppLanguageBridge.phoneLocales ??
+    (preferences.language == AppLanguages.system
+        ? PlatformDispatcher.instance.locales
+        : null) ??
+    await AppLanguageBridge.readSavedPhoneLocales(database) ??
+    PlatformDispatcher.instance.locales;
 
 Future<RegionalPreferences> _readRegional(TaskDatabase database) async {
   try {
@@ -23,7 +41,7 @@ Future<AppLocalizations> readReminderStrings(TaskDatabase database,
     {List<Locale>? deviceLocales}) async {
   final preferences = await _readRegional(database);
   final locale = preferences
-      .localeFor(deviceLocales ?? PlatformDispatcher.instance.locales);
+      .localeFor(deviceLocales ?? await _phoneLocales(database, preferences));
   return lookupAppLocalizations(Locale(locale.languageCode));
 }
 
@@ -32,7 +50,7 @@ Future<AppLocalizations> readReminderStrings(TaskDatabase database,
 Future<ReminderCopy> readReminderCopy(TaskDatabase database,
     {List<Locale>? deviceLocales, bool? system24Hour}) async {
   final preferences = await _readRegional(database);
-  final devices = deviceLocales ?? PlatformDispatcher.instance.locales;
+  final devices = deviceLocales ?? await _phoneLocales(database, preferences);
   final locale = Locale(preferences.localeFor(devices).languageCode);
   // The same phone setting main.dart reads for the app's own clock.
   final system = system24Hour ??

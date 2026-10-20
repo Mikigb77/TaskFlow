@@ -1,3 +1,4 @@
+import 'package:agenda/services/app_language.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'dart:async';
 import 'package:agenda/main.dart';
@@ -2752,6 +2753,46 @@ void main() {
       },
     );
   });
+
+  // ---- Run 2026-10-19-app · P215 (UX-1649): the recognizer's region is the phone's ----
+
+  testWidgets(
+    'UX-1649: captureSpeechLanguage takes the region from the bridge’s phone languages when they are set',
+    (tester) async {
+      addTearDown(() => AppLanguageBridge.phoneLocales = null);
+      // Under a per-app Spanish, Flutter reports es-ES; the phone is Mexican Spanish.
+      tester.platformDispatcher.localesTestValue = [const Locale('es', 'ES')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      late BuildContext context;
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: Builder(
+            builder: (c) {
+              context = c;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      const preferences = RegionalPreferences(language: 'es');
+      AppLanguageBridge.phoneLocales = null;
+      expect(captureSpeechLanguage(context, preferences), 'es-ES');
+      AppLanguageBridge.phoneLocales = [
+        const Locale('es', 'MX'),
+        const Locale('en', 'GB'),
+      ];
+      expect(captureSpeechLanguage(context, preferences), 'es-MX');
+      // Voz in English listens with the phone's English region.
+      expect(
+        captureSpeechLanguage(context, preferences.withSpeechLanguage('en')),
+        'en-GB',
+      );
+    },
+  );
+
 }
 
 /// A recognizer for opening capture: [capabilities] counts the questions,

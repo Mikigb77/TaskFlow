@@ -1,9 +1,16 @@
 <resources>
+    <!-- Launcher shortcut, long label: shown where the launcher has room. About 25 characters at most. -->
     <string name="capture_voice">Say a task</string>
+    <!-- Launcher shortcut, short label: one word, shown at large text. About 10 characters at most. -->
+    <string name="capture_voice_short">Dictate</string>
+    <!-- Launcher shortcut, long label: shown where the launcher has room. About 25 characters at most. -->
     <string name="capture_text">Type a task</string>
+    <!-- Launcher shortcut, short label: one word, shown at large text. About 10 characters at most. -->
+    <string name="capture_text_short">Type</string>
     <string name="capture_widget_description">Tap to say a task.</string>
-    <string name="share_empty">There’s no text to add. Share some text with TaskFlow.</string>
-    <string name="share_too_long">TaskFlow accepts up to 4,000 characters. Share a shorter text.</string>
-    <string name="share_queue_full">Open TaskFlow and finish what you shared before sharing more.</string>
-    <string name="share_not_saved">Couldn’t save what you shared. Please share it again.</string>
+    <!-- Share toasts: Android shows two lines of a toast. 50 characters at most, the action first. -->
+    <string name="share_empty">No text to add.</string>
+    <string name="share_too_long">That text is too long. Share a shorter one.</string>
+    <string name="share_queue_full">Open TaskFlow and finish what you shared.</string>
+    <string name="share_not_saved">Couldn’t save it. Please share it again.</string>
 </resources>

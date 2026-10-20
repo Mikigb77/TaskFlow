@@ -503,7 +503,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   /// [VerifyEmailScreen.email] stands out in its sentence: a mistyped
   /// address is the usual reason the email never comes.
   TextSpan _help(AppLocalizations l, ColorScheme colors) {
-    final email = widget.email;
+    final email = breakableAddress(widget.email);
     final help = l.verifyEmailHelp(email);
     final at = help.indexOf(email);
     if (email.isEmpty || at < 0) return TextSpan(text: help);
@@ -567,6 +567,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                               container: true,
                               child: Text.rich(
                                 _help(l, colors),
+                                // Read without the address's line breaks.
+                                semanticsLabel: l.verifyEmailHelp(widget.email),
                                 style: TextStyle(
                                   color: colors.onSurfaceVariant,
                                   height: 1.55,

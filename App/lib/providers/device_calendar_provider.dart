@@ -161,13 +161,28 @@ class DeviceCalendarController extends StateNotifier<DeviceCalendarState> {
     }
   }
 
+  /// A first connection (nothing selected yet) ticks every calendar the phone
+  /// lists, up to 50, so Calendar shows their events at once (D7). A selection
+  /// the person made before is kept as it is.
   Future<void> enable() async {
     await ready;
     final access = await bridge.status(request: true);
     if (!mounted) return;
     if (access == CalendarAccess.granted) {
-      await _change((before) =>
-          CalendarPreferences(enabled: true, selected: before.selected));
+      var listed = const <DeviceCalendar>[];
+      if (state.preferences.selected.isEmpty) {
+        try {
+          listed = (await bridge.calendars()).items;
+        } catch (_) {
+          // The refresh below reports the read error.
+        }
+        if (!mounted) return;
+      }
+      await _change((before) => CalendarPreferences(
+          enabled: true,
+          selected: before.selected.isNotEmpty
+              ? before.selected
+              : listed.take(50).map((c) => c.selectionKey).toSet()));
     }
     if (mounted) await _refresh(browse: true);
   }

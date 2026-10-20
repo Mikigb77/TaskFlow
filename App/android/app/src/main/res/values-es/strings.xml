@@ -1,9 +1,16 @@
 <resources>
+    <!-- Atajo del lanzador, etiqueta larga: unos 25 caracteres como máximo. -->
     <string name="capture_voice">Dictar una tarea</string>
+    <!-- Atajo del lanzador, etiqueta corta: una palabra, unos 10 caracteres como máximo. -->
+    <string name="capture_voice_short">Dictar</string>
+    <!-- Atajo del lanzador, etiqueta larga: unos 25 caracteres como máximo. -->
     <string name="capture_text">Escribir una tarea</string>
+    <!-- Atajo del lanzador, etiqueta corta: una palabra, unos 10 caracteres como máximo. -->
+    <string name="capture_text_short">Escribir</string>
     <string name="capture_widget_description">Toca para dictar una tarea.</string>
-    <string name="share_empty">No hay texto que añadir. Comparte un texto con TaskFlow.</string>
-    <string name="share_too_long">TaskFlow admite hasta 4000 caracteres. Comparte un texto más corto.</string>
-    <string name="share_queue_full">Abre TaskFlow y termina lo que ya has compartido antes de compartir más.</string>
-    <string name="share_not_saved">No se ha podido guardar lo que has compartido. Vuelve a compartirlo.</string>
+    <!-- Avisos al compartir: Android muestra dos líneas. 50 caracteres como máximo. -->
+    <string name="share_empty">No hay texto que añadir.</string>
+    <string name="share_too_long">Texto demasiado largo. Comparte uno más corto.</string>
+    <string name="share_queue_full">Abre TaskFlow y acaba lo que ya has compartido.</string>
+    <string name="share_not_saved">No se ha podido guardar. Vuelve a compartirlo.</string>
 </resources>

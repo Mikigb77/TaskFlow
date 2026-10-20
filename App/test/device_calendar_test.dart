@@ -142,11 +142,7 @@ void main() {
     expect(controller.state.showing, isFalse);
     await controller.enable();
     expect(bridge.permissionRequests, 1);
-    expect((await controller.events(day)).items, isEmpty);
-    await Future.wait([
-      controller.select(workCalendar.selectionKey, true),
-      controller.select(homeCalendar.selectionKey, true)
-    ]);
+    // A first connection ticks every calendar (D7).
     expect(controller.state.preferences.selected.length, 2);
     expect((await controller.events(day)).items.length, 1);
     controller.dispose();
@@ -246,5 +242,83 @@ void main() {
     expect(data, isNot(contains('Calendar appointment')));
     expect(data, isNot(contains('2026-09-22')));
     await database.close();
+  });
+
+  // ---- Run 2026-10-19-app · P188 (UX-1611 e, D7): connecting shows every
+  // phone calendar ----
+
+  test(
+      'UX-1611: with two phone calendars and nothing selected, allowing access selects both and the events show',
+      () async {
+    final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
+    final store = MemoryCalendarPreferences();
+    final controller = DeviceCalendarController(bridge, store);
+    await controller.ready;
+    expect(controller.state.showing, isFalse);
+    await controller.enable();
+    expect(controller.state.preferences.enabled, isTrue);
+    expect(controller.state.preferences.selected,
+        {workCalendar.selectionKey, homeCalendar.selectionKey});
+    expect(store.value.selected,
+        {workCalendar.selectionKey, homeCalendar.selectionKey});
+    expect(controller.state.showing, isTrue);
+    expect((await controller.events(day)).items, hasLength(1));
+    controller.dispose();
+    bridge.close();
+  });
+
+  test('UX-1611: with 60 phone calendars, the first 50 as listed are selected',
+      () async {
+    final calendars = [
+      for (var i = 0; i < 60; i++)
+        DeviceCalendar(
+            id: '$i', name: 'Calendar $i', account: 'a@example.invalid'),
+    ];
+    final bridge = FakeDeviceCalendars()
+      ..access = CalendarAccess.denied
+      ..sources = calendars;
+    final store = MemoryCalendarPreferences();
+    final controller = DeviceCalendarController(bridge, store);
+    await controller.ready;
+    await controller.enable();
+    expect(controller.state.preferences.selected,
+        calendars.take(50).map((c) => c.selectionKey).toSet());
+    expect(controller.state.showing, isTrue);
+    controller.dispose();
+    bridge.close();
+  });
+
+  test(
+      'UX-1611: reconnecting after Ocultar eventos del calendario keeps an earlier selection of one',
+      () async {
+    final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
+    final store = MemoryCalendarPreferences();
+    final controller = DeviceCalendarController(bridge, store);
+    await controller.ready;
+    await controller.enable();
+    await controller.select(homeCalendar.selectionKey, false);
+    expect(controller.state.preferences.selected, {workCalendar.selectionKey});
+    await controller.disable();
+    expect(controller.state.showing, isFalse);
+    await controller.enable();
+    expect(controller.state.preferences.selected, {workCalendar.selectionKey});
+    expect(controller.state.showing, isTrue);
+    controller.dispose();
+    bridge.close();
+  });
+
+  test(
+      'UX-1611: a selection of one saved before connecting is kept as it is',
+      () async {
+    final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
+    final store = MemoryCalendarPreferences(
+        CalendarPreferences(selected: {homeCalendar.selectionKey}));
+    final controller = DeviceCalendarController(bridge, store);
+    await controller.ready;
+    await controller.enable();
+    expect(controller.state.preferences.selected, {homeCalendar.selectionKey});
+    expect(controller.state.showing, isTrue);
+    controller.dispose();
+    bridge.close();
   });
 }

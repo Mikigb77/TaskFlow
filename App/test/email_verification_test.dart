@@ -35,6 +35,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'support/design_fixtures.dart';
+import 'support/shown_text.dart';
+import 'support/address_wrap.dart';
 
 final en = lookupAppLocalizations(const Locale('en'));
 final es = lookupAppLocalizations(const Locale('es'));
@@ -387,7 +389,7 @@ void main() {
       expect(find.text(es.verifyEmailHeading), findsOneWidget);
       // The address as the server wrote it.
       expect(
-        find.text(es.verifyEmailHelp('ana@example.invalid')),
+        findShown(es.verifyEmailHelp('ana@example.invalid')),
         findsOneWidget,
       );
       expect(app.server.bodies('auth/register/').single, {
@@ -443,7 +445,7 @@ void main() {
       expect(app.server.paths, ['auth/login/']);
       expect(screen(), findsOneWidget);
       expect(
-        find.text(es.verifyEmailHelp('ana@example.invalid')),
+        findShown(es.verifyEmailHelp('ana@example.invalid')),
         findsOneWidget,
       );
       expect(find.text('Confirm your email address first.'), findsNothing);
@@ -833,7 +835,7 @@ void main() {
       final heading = tester.getSemantics(find.text(es.verifyEmailHeading));
       expect(heading.label, es.verifyEmailHeading);
       expect(heading.getSemanticsData().flagsCollection.isHeader, isTrue);
-      expect(tester.getSemantics(find.text(help)).label, help);
+      expect(tester.getSemantics(findShown(help)).label, help);
       final field = find.bySemanticsLabel(es.verifyEmailCode);
       expect(field, findsOneWidget);
       expect(
@@ -936,7 +938,7 @@ void main() {
 
         await expectReadable(find.text(l.verifyEmailHeading));
         await expectReadable(
-          find.text(l.verifyEmailHelp('ana.garcia.lopez@example.invalid')),
+          findShown(l.verifyEmailHelp('ana.garcia.lopez@example.invalid')),
         );
         await expectReadable(code);
         await expectReadable(confirm);
@@ -1726,7 +1728,7 @@ void main() {
       expect(screen(), findsOneWidget);
       expect(find.text(es.verifyEmailHeading), findsOneWidget);
       expect(
-        find.text(es.verifyEmailHelp('ana@example.invalid')),
+        findShown(es.verifyEmailHelp('ana@example.invalid')),
         findsOneWidget,
       );
       expect(askedPassword, findsOneWidget);
@@ -2251,7 +2253,7 @@ void main() {
 
   /// The help line's spans, as drawn.
   TextSpan helpSpan(WidgetTester tester, AppLocalizations l, String address) {
-    final help = find.text(l.verifyEmailHelp(address));
+    final help = findShown(l.verifyEmailHelp(address));
     expect(help, findsOneWidget);
     return tester.widget<Text>(help).textSpan! as TextSpan;
   }
@@ -2265,13 +2267,19 @@ void main() {
         await createAccount(tester, l, address: 'ana@exmple.invalid');
         expect(screen(), findsOneWidget);
         final span = helpSpan(tester, l, 'ana@exmple.invalid');
-        expect(span.toPlainText(), l.verifyEmailHelp('ana@exmple.invalid'));
+        // Shown with the address's line breaks (UX-1618), read without.
+        expect(
+          span.toPlainText(),
+          shown(l.verifyEmailHelp('ana@exmple.invalid')),
+        );
         final parts = <TextSpan>[];
         span.visitChildren((child) {
           if (child is TextSpan && child.text != null) parts.add(child);
           return true;
         });
-        final address = parts.where((part) => part.text == 'ana@exmple.invalid');
+        final address = parts.where(
+          (part) => part.text == shown('ana@exmple.invalid'),
+        );
         expect(address, hasLength(1), reason: 'its own span');
         final colors = Theme.of(tester.element(screen())).colorScheme;
         expect(address.single.style?.fontWeight, FontWeight.w700);
@@ -2839,6 +2847,29 @@ void main() {
       // No other 429 line takes its place.
       expect(says(tester, es.verifyEmailResent), isFalse);
       expect(find.textContaining('Demasiad'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // ---- Run 2026-10-19-app · P189 (UX-1618): the address whole on «Confirma el correu» ----
+
+  testWidgets(
+    'UX-1618: CA, 2× on 360×800, the confirm-your-email line draws maria.lopez@example.com breaking only after «@» or «.», and TalkBack reads the plain address',
+    (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final l = strings('ca');
+      const address = 'maria.lopez@example.com';
+      await _App.open(tester, language: 'ca', size: const Size(360, 800));
+      await createAccount(tester, l, address: address);
+      expect(screen(), findsOneWidget);
+      final help = findShown(l.verifyEmailHelp(address));
+      expect(help, findsOneWidget);
+      await tester.ensureVisible(help);
+      await tester.pumpAndSettle();
+      expectAddressWrapsWhole(tester, help, address);
+      expect(spokenLabel(tester, help), l.verifyEmailHelp(address));
+      expect(tester.getRect(help).right, lessThanOrEqualTo(360.5));
       expect(tester.takeException(), isNull);
     },
   );

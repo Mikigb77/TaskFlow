@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -41,6 +43,53 @@ void reminderWorker() {
   });
 }
 
+/// How a reminder shows. Marked as a reminder, so Do Not Disturb lets it
+/// through when its «Reminders» exception is allowed.
+@visibleForTesting
+NotificationDetails reminderNotificationDetails(PlannedReminder reminder,
+    {bool silent = false}) {
+  final l = lookupAppLocalizations(Locale(reminder.languageCode));
+  return NotificationDetails(
+      android: AndroidNotificationDetails(
+          'taskflow_reminders', l.notificationChannel,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: 'app_notifications_icon',
+          silent: silent,
+          category: AndroidNotificationCategory.reminder,
+          actions: reminder.taskId == null
+              ? null
+              : [
+                  AndroidNotificationAction('complete', l.notificationComplete),
+                  AndroidNotificationAction('snooze', l.notificationSnooze),
+                ]),
+      iOS: DarwinNotificationDetails(
+          presentSound: silent ? false : null,
+          categoryIdentifier: reminder.taskId == null
+              ? null
+              : 'task_${reminder.languageCode}'));
+}
+
+/// The silent «Completed» line with Undo: not a reminder, so no reminder
+/// category.
+@visibleForTesting
+NotificationDetails undoNotificationDetails(
+    String languageCode, Duration timeout) {
+  final l = lookupAppLocalizations(Locale(languageCode));
+  return NotificationDetails(
+      android: AndroidNotificationDetails(
+          'taskflow_reminders', l.notificationChannel,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: 'app_notifications_icon',
+          silent: true,
+          // Gone by itself once Undo is no longer likely.
+          timeoutAfter: timeout.inMilliseconds,
+          actions: [AndroidNotificationAction('undo', l.undo)]),
+      iOS: DarwinNotificationDetails(
+          presentSound: false, categoryIdentifier: 'undo_$languageCode'));
+}
+
 class _NotificationDriver implements ReminderDriver {
   final FlutterLocalNotificationsPlugin plugin;
   _NotificationDriver(this.plugin);
@@ -65,58 +114,19 @@ class _NotificationDriver implements ReminderDriver {
       (await plugin.pendingNotificationRequests()).map((n) => n.id).toSet();
   @override
   Future<void> cancel(int id) => plugin.cancel(id);
-  NotificationDetails _details(PlannedReminder reminder,
-      {bool silent = false}) {
-    final l = lookupAppLocalizations(Locale(reminder.languageCode));
-    return NotificationDetails(
-        android: AndroidNotificationDetails(
-            'taskflow_reminders', l.notificationChannel,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: 'app_notifications_icon',
-            silent: silent,
-            actions: reminder.taskId == null
-                ? null
-                : [
-                    AndroidNotificationAction(
-                        'complete', l.notificationComplete),
-                    AndroidNotificationAction('snooze', l.notificationSnooze),
-                  ]),
-        iOS: DarwinNotificationDetails(
-            presentSound: silent ? false : null,
-            categoryIdentifier: reminder.taskId == null
-                ? null
-                : 'task_${reminder.languageCode}'));
-  }
-
   @override
   Future<void> show(int id, PlannedReminder reminder,
           {required String token}) =>
       plugin.show(id, reminder.title, reminder.body,
-          _details(reminder, silent: true),
+          reminderNotificationDetails(reminder, silent: true),
           payload: jsonEncode({'id': id, 'token': token}));
 
   @override
   Future<void> showUndo(int id, String text,
       {required String languageCode, required String token}) async {
-    final l = lookupAppLocalizations(Locale(languageCode));
     final timeout = await TaskReminders.undoTimeout();
     return plugin.show(
-        id,
-        text,
-        null,
-        NotificationDetails(
-            android: AndroidNotificationDetails(
-                'taskflow_reminders', l.notificationChannel,
-                importance: Importance.high,
-                priority: Priority.high,
-                icon: 'app_notifications_icon',
-                silent: true,
-                // Gone by itself once Undo is no longer likely.
-                timeoutAfter: timeout.inMilliseconds,
-                actions: [AndroidNotificationAction('undo', l.undo)]),
-            iOS: DarwinNotificationDetails(
-                presentSound: false, categoryIdentifier: 'undo_$languageCode')),
+        id, text, null, undoNotificationDetails(languageCode, timeout),
         payload: jsonEncode({'id': id, 'token': token}));
   }
 
@@ -128,7 +138,7 @@ class _NotificationDriver implements ReminderDriver {
         reminder.title,
         reminder.body,
         tz.TZDateTime.from(reminder.when, tz.local),
-        _details(reminder),
+        reminderNotificationDetails(reminder),
         payload: jsonEncode({'id': id, 'token': token}),
         androidScheduleMode: exact
             ? AndroidScheduleMode.exactAllowWhileIdle
@@ -415,6 +425,20 @@ class ReminderAccess {
 
   Future<bool> requestPermission() => TaskReminders.requestPermission();
   Future<void> requestExactAccess() => TaskReminders.requestExactAccess();
+
+  /// TaskFlow's own notifications page in the phone's settings, where one
+  /// switch allows them; App info when the phone has no such page.
+  Future<void> openNotificationSettings() async {
+    try {
+      await _appSettings.invokeMethod<void>('openNotificationSettings');
+    } catch (_) {
+      try {
+        await openAppSettings();
+      } catch (_) {/* Nothing more to open on this phone. */}
+    }
+  }
+
+  static const _appSettings = MethodChannel('taskflow/app-settings');
   Future<void> reconcile(String owner) async {
     if (!supported) return;
     await TaskReminders.initialize();

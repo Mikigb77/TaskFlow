@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/feedback_timeout.dart';
 
 /// Every brief message goes through here: it replaces the one on screen,
@@ -171,6 +172,8 @@ class MessageBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    // An address in it is read without its line breaks.
+    final spoken = withoutAddressBreaks(message);
     // Its own node, so only its line is read; an error is read out as soon
     // as it appears or changes.
     return Semantics(
@@ -190,6 +193,7 @@ class MessageBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                   child: Text(message,
+                      semanticsLabel: spoken == message ? null : spoken,
                       style: TextStyle(
                           color: isError
                               ? colors.onErrorContainer

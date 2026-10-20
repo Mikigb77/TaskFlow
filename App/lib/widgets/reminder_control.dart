@@ -1,11 +1,12 @@
 import 'package:agenda/l10n/region.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/models/task.dart';
@@ -114,8 +115,14 @@ String _clock(BuildContext context, int minute) =>
     TimeOfDay(hour: minute ~/ 60, minute: minute % 60).format(context);
 
 /// The one way to turn reminders on: the phone's permission, the switch,
-/// exact alarms when Android needs them, then a confirmation.
-Future<void> turnOnReminders(BuildContext context) async {
+/// exact alarms when Android needs them, then a confirmation. True when
+/// reminders ended up on; false when the phone refused or it failed.
+/// [onScheduling] gets the background setting of the alerts, which completes
+/// once they're set or a failure is recorded, for a screen that lists them.
+Future<bool> turnOnReminders(
+  BuildContext context, {
+  void Function(Future<void> scheduling)? onScheduling,
+}) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);
   final strings = context.l10n;
@@ -126,10 +133,10 @@ Future<void> turnOnReminders(BuildContext context) async {
       showFeedback(
         messenger,
         strings.notificationPermissionOff,
-        actionLabel: strings.openSystemSettings,
-        onAction: openAppSettings,
+        actionLabel: strings.allowNotifications,
+        onAction: access.openNotificationSettings,
       );
-      return;
+      return false;
     }
     final owner = container.read(taskRepositoryProvider).ownerKey;
     final store = container.read(reminderPreferenceStoreProvider);
@@ -163,10 +170,18 @@ Future<void> turnOnReminders(BuildContext context) async {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(context.l10n.exactAlarmsNeeded),
+                const SizedBox(height: 8),
+                Text(context.l10n.exactAlarmsNextScreen),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
                   child: Text(context.l10n.allowPreciseAlarms),
+                ),
+                const SizedBox(height: 8),
+                // Leaves as Back does.
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(context.l10n.reminderAskNotNow),
                 ),
               ],
             ),
@@ -176,10 +191,15 @@ Future<void> turnOnReminders(BuildContext context) async {
       if (allow == true) await access.requestExactAccess();
       exact = (await access.capability()).exact;
     }
-    await access.reconcile(owner);
+    // Setting the alerts can take seconds; the answer needn't wait for it.
+    final scheduling = access
+        .reconcile(owner)
+        .catchError((Object _) => TaskReminders.recordError('refresh_failed'));
+    unawaited(scheduling);
+    onScheduling?.call(scheduling);
   } catch (_) {
     showFeedback(messenger, strings.notificationSaveError);
-    return;
+    return false;
   } finally {
     container.invalidate(reminderCapabilityProvider);
   }
@@ -188,6 +208,7 @@ Future<void> turnOnReminders(BuildContext context) async {
     messenger,
     exact ? strings.remindersOnConfirmation : strings.exactAlarmsNeeded,
   );
+  return true;
 }
 
 /// The reminder choices in one list. Picking one applies it and closes.
@@ -228,46 +249,18 @@ Future<void> _chooseReminder(
       : defaultTime != null
       ? useDefault
       : -1;
-  final value = await showModalBottomSheet<int>(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) => SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text(
-                context.l10n.reminder,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            for (final value in values)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                title: Text(
-                  value == pickTime
-                      ? context.l10n.chooseAlertTime
-                      : value == useDefault
-                      ? '${hasTime ? context.reminderLead(defaultLead) : _clock(context, defaultTime!)} · ${context.l10n.defaultChoice}'
-                      : context.reminderLead(value),
-                ),
-                subtitle: value == pickTime && time != null
-                    ? Text(_clock(context, time))
-                    : null,
-                selected: value == current,
-                trailing: value == current
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () => Navigator.pop(context, value),
-              ),
-          ],
-        ),
-      ),
-    ),
+  final value = await _pickFrom(
+    context,
+    title: context.l10n.reminder,
+    values: values,
+    current: current,
+    label: (context, value) => value == pickTime
+        ? context.l10n.chooseAlertTime
+        : value == useDefault
+        ? '${hasTime ? context.reminderLead(defaultLead) : _clock(context, defaultTime!)} · ${context.l10n.defaultChoice}'
+        : context.reminderLead(value),
+    subtitle: (context, value) =>
+        value == pickTime && time != null ? _clock(context, time) : null,
   );
   if (value == null || !context.mounted) return;
   if (value == pickTime) {
@@ -285,6 +278,63 @@ Future<void> _chooseReminder(
     onChosen(value, time);
   }
 }
+
+/// The default lead for tasks with a time, from the chip's list of leads.
+/// This list sets the default, so it has no «default» row. Null when the
+/// person leaves without picking.
+Future<int?> chooseDefaultLead(
+  BuildContext context, {
+  required String title,
+  required int current,
+}) => _pickFrom(
+  context,
+  title: title,
+  values: <int>{-1, 0, 10, 30, 60, 1440, current},
+  current: current,
+  label: (context, value) => context.reminderLead(value),
+);
+
+/// One-tap list: picking a row closes it with that row's value.
+Future<int?> _pickFrom(
+  BuildContext context, {
+  required String title,
+  required Iterable<int> values,
+  required int current,
+  required String Function(BuildContext context, int value) label,
+  String? Function(BuildContext context, int value)? subtitle,
+}) => showModalBottomSheet<int>(
+  context: context,
+  isScrollControlled: true,
+  builder: (context) => SafeArea(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ),
+          for (final value in values)
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              title: Text(label(context, value)),
+              subtitle: switch (subtitle?.call(context, value)) {
+                final String text => Text(text),
+                null => null,
+              },
+              selected: value == current,
+              trailing: value == current
+                  ? const Icon(Icons.check_rounded)
+                  : null,
+              onTap: () => Navigator.pop(context, value),
+            ),
+        ],
+      ),
+    ),
+  ),
+);
 
 class ReminderChip extends ConsumerWidget {
   final Task task;

@@ -66,6 +66,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           (storage.limitBytes / _megabyte).round(),
         ),
     ];
+    // Without Pro, «Ver suscripción» stays in view, as the task form's button.
+    final offer = !state.hasPro && state.monthly != null;
+    final restore = !state.complimentary && !state.hasPro;
     return Scaffold(
       appBar: CustomAppBar(title: l10n.taskflowPro),
       body: ListView(
@@ -76,19 +79,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.auto_awesome_outlined,
-                  color: colors.onPrimaryContainer,
-                  size: 32,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.taskflowPro,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: colors.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                // What Pro gives; the app bar already says «TaskFlow Pro».
                 Text(
                   state.complimentary
                       ? l10n.billingComplimentary
@@ -173,7 +164,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             ),
           ],
           const SizedBox(height: 24),
-          if (!state.hasPro && state.monthly != null) ...[
+          if (offer) ...[
             Text(
               l10n.billingMonthlyPrice(state.monthly!.storeProduct.priceString),
               style: Theme.of(context).textTheme.titleLarge,
@@ -181,17 +172,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             const SizedBox(height: 8),
             Text(l10n.billingRenewalHelp),
             const SizedBox(height: 20),
-            FilledButton.icon(
-              key: const ValueKey('subscription-paywall'),
-              onPressed: state.canPurchase
-                  ? () => _run(() => controller.presentPaywall(locale))
-                  : null,
-              icon: const Icon(Icons.auto_awesome_outlined),
-              label: Text(l10n.billingViewPlans),
-            ),
             // Direct checkout is handy for Test Store diagnostics. Production uses the
             // dashboard paywall, where benefits, trial conditions and legal links live.
-            if (config.isTestStore)
+            if (config.isTestStore) ...[
               TextButton(
                 key: const ValueKey('subscription-purchase'),
                 onPressed: state.canPurchase
@@ -199,8 +182,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     : null,
                 child: Text(l10n.billingTestMonthly),
               ),
+              const SizedBox(height: 8),
+            ],
           ],
-          if (!state.complimentary)
+          // With Pro, «Gestionar suscripción» stands alone.
+          if (restore)
             OutlinedButton.icon(
               key: const ValueKey('subscription-restore'),
               onPressed: state.ready && !state.busy
@@ -211,7 +197,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             ),
           if (state.customerInfo?.allPurchasedProductIdentifiers.isNotEmpty ==
               true) ...[
-            const SizedBox(height: 8),
+            if (restore) const SizedBox(height: 8),
             OutlinedButton.icon(
               key: const ValueKey('subscription-manage'),
               onPressed: state.ready && !state.busy
@@ -221,14 +207,31 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               label: Text(l10n.billingManage),
             ),
           ],
-          const SizedBox(height: 16),
-          if (!state.complimentary)
+          if (restore) ...[
+            const SizedBox(height: 16),
             Text(
               l10n.billingRestoreHelp,
               style: TextStyle(color: colors.onSurfaceVariant),
             ),
+          ],
         ],
       ),
+      bottomNavigationBar: offer
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                child: FilledButton.icon(
+                  key: const ValueKey('subscription-paywall'),
+                  onPressed: state.canPurchase
+                      ? () => _run(() => controller.presentPaywall(locale))
+                      : null,
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: Text(l10n.billingViewPlans),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }

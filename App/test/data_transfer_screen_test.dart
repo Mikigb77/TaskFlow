@@ -1,3 +1,5 @@
+import 'package:agenda/widgets/app_components.dart';
+import 'dart:io';
 import 'dart:convert';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task.dart';
@@ -59,7 +61,8 @@ void main() {
         await tester.tap(find.text(exportLabel));
         await tester.pumpAndSettle();
         expect(files.saved, store.contents);
-        await tester.scrollUntilVisible(find.text(chooseLabel), 160);
+        // The result banner, under the help, is brought into view: back up.
+        await tester.scrollUntilVisible(find.text(chooseLabel), -160);
         await tester.pumpAndSettle();
         await tester.tap(find.text(chooseLabel));
         await tester.pumpAndSettle();
@@ -202,7 +205,7 @@ void main() {
 
   for (final language in ['es', 'en', 'ca']) {
     testWidgets(
-        'UX-423: Export opens with the one line under its heading, and no inventory of what a file holds ($language, 2x text at 320 dp)',
+        'UX-423: Export opens with its one line, and no inventory of what a file holds ($language, 2x text at 320 dp)',
         (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -228,13 +231,9 @@ void main() {
               home: const DataTransferScreen())));
       await tester.pumpAndSettle();
       final l = lookupAppLocalizations(Locale(language));
-      // At 2x text the line may start below the fold: built, in order.
-      final heading = find.text(l.keepYourTasks, skipOffstage: false);
+      // The line opens the screen; no headline above it (UX-1620).
       final intro = find.text(l.exportImportIntro, skipOffstage: false);
       expect(intro, findsOneWidget);
-      expect(heading, findsOneWidget);
-      expect(tester.getRect(intro).top,
-          greaterThanOrEqualTo(tester.getRect(heading).bottom));
       expect(tester.getRect(intro).right, lessThanOrEqualTo(320.5));
       // The old 45-word inventory (Spanish: 'proyectos de pasos') is gone.
       for (final word in ['proyectos de pasos', 'etiquetas', 'credentials']) {
@@ -252,7 +251,214 @@ void main() {
       expect(line.split(' ').length, lessThan(20), reason: line);
     }
   });
+
+  // ---- Run 2026-10-19-app · P188 (UX-1620): Exportar e importar ----
+
+  test('UX-1620: the import help reads as planned in EN, ES and CA, with no formats or limits',
+      () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.chooseImportFileHelp,
+        'Choose a TaskFlow file or a project exported from Todoist. You’ll review it before importing.');
+    expect(es.chooseImportFileHelp,
+        'Elige un archivo de TaskFlow o un proyecto exportado de Todoist. Podrás revisarlo antes de importar.');
+    expect(ca.chooseImportFileHelp,
+        'Tria un fitxer de TaskFlow o un projecte exportat de Todoist. El podràs revisar abans d’importar-lo.');
+    for (final l in [en, es, ca]) {
+      for (final word in ['JSON', 'CSV', '32 MB', '5.000', '5,000']) {
+        expect(l.chooseImportFileHelp, isNot(contains(word)));
+      }
+    }
+    for (final language in ['en', 'es', 'ca']) {
+      expect(File('lib/l10n/app_$language.arb').readAsStringSync(),
+          isNot(contains('"keepYourTasks"')),
+          reason: language);
+    }
+  });
+
+  testWidgets(
+      'UX-1620: Exportar e importar has no Llévate tus tareas., says the new help, and shows each result once, in the banner, with no snackbar',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final es = lookupAppLocalizations(const Locale('es'));
+    final files = _Files();
+    final store = _Store();
+    final parent = designContainer();
+    addTearDown(parent.dispose);
+    final container = ProviderContainer(parent: parent, overrides: [
+      archiveFilesProvider.overrideWithValue(files),
+      archiveStoreProvider.overrideWithValue(store)
+    ]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+            locale: Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: DataTransferScreen())));
+    await tester.pumpAndSettle();
+    expect(find.text('Llévate tus tareas.', skipOffstage: false), findsNothing);
+    expect(
+        find.text(
+            'Elige un archivo de TaskFlow o un proyecto exportado de Todoist. Podrás revisarlo antes de importar.',
+            skipOffstage: false),
+        findsOneWidget);
+    expect(find.text(es.chooseImportFileHelp, skipOffstage: false),
+        findsOneWidget);
+
+    Future<void> expectNoSnackBar() async {
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(find.byType(SnackBar), findsNothing, reason: 'frame $frame');
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+    }
+
+    // Export: the result in the banner only.
+    final export = find.text('Exportar archivo TaskFlow');
+    await tester.scrollUntilVisible(export, 200);
+    await tester.pumpAndSettle();
+    await tester.tap(export);
+    await expectNoSnackBar();
+    expect(files.saved, store.contents);
+    expect(find.byType(MessageBanner, skipOffstage: false), findsOneWidget);
+
+    // Import: the result in the banner only.
+    final choose = find.text('Elegir archivo para importar');
+    await tester.scrollUntilVisible(choose, -200);
+    await tester.pumpAndSettle();
+    await tester.tap(choose);
+    await tester.pumpAndSettle();
+    final confirm = find.byKey(const ValueKey('confirm-import'));
+    await tester.scrollUntilVisible(confirm, 200);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await expectNoSnackBar();
+    expect(store.calls, 1);
+    final added = find.textContaining('Se han añadido', skipOffstage: false);
+    expect(added, findsOneWidget, reason: 'said once');
+    expect(
+        find.descendant(
+            of: find.byType(MessageBanner, skipOffstage: false),
+            matching: added),
+        findsOneWidget);
+    // Brought into view.
+    final rect = tester.getRect(added);
+    expect(rect.top, greaterThanOrEqualTo(0));
+    expect(rect.bottom, lessThanOrEqualTo(800));
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---- Run 2026-10-19-app · P217 (UX-1652): the reveal jumps with animations off ----
+
+  for (final animationsOff in [true, false]) {
+    testWidgets(
+        animationsOff
+            ? 'UX-1652: with animations off, the import result banner is fully in view one frame later, with no scroll frames in between'
+            : 'UX-1652: with animations on, the import result banner still scrolls into view with an animation',
+        (tester) async {
+      // A short view, so revealing the banner needs a scroll.
+      tester.view.physicalSize = const Size(360, 450);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final es = lookupAppLocalizations(const Locale('es'));
+      final files = _Files();
+      final store = _Store();
+      final parent = designContainer();
+      addTearDown(parent.dispose);
+      final container = ProviderContainer(parent: parent, overrides: [
+        archiveFilesProvider.overrideWithValue(files),
+        archiveStoreProvider.overrideWithValue(store)
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: const Locale('es'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(disableAnimations: animationsOff),
+                  child: child!),
+              home: const DataTransferScreen())));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(es.chooseImportFile));
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(const ValueKey('confirm-import'));
+      await tester.scrollUntilVisible(confirm, 200);
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+              of: find.byType(DataTransferScreen),
+              matching: find.byType(Scrollable))
+          .first;
+      double offset() =>
+          tester.state<ScrollableState>(scrollable).position.pixels;
+      final atConfirm = offset();
+      expect(atConfirm, greaterThan(0), reason: 'scrolled down to confirm');
+
+      final banner = find.byType(MessageBanner, skipOffstage: false);
+      bool inView() {
+        if (banner.evaluate().isEmpty) return false;
+        final rect = tester.getRect(banner);
+        final viewport = tester.getRect(scrollable);
+        return rect.top >= viewport.top - 0.5 &&
+            rect.bottom <= viewport.bottom + 0.5;
+      }
+
+      await tester.tap(confirm);
+      // Frame by frame until the result's banner is built.
+      var frames = 0;
+      while (banner.evaluate().isEmpty && frames < 30) {
+        await tester.pump(const Duration(milliseconds: 16));
+        frames++;
+      }
+      expect(banner, findsOneWidget, reason: 'the result shows in a banner');
+      expect(store.calls, 1);
+      // Then every later frame's scroll position.
+      final offsets = <double>[offset()];
+      final shown = <bool>[inView()];
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        offsets.add(offset());
+        shown.add(inView());
+      }
+      await tester.pumpAndSettle();
+      expect(inView(), isTrue, reason: 'brought into view');
+      final finalOffset = offset();
+      expect((finalOffset - atConfirm).abs(), greaterThan(50),
+          reason: 'the reveal had to scroll: $atConfirm → $finalOffset');
+      if (animationsOff) {
+        // One frame after the banner is built it is fully in view, and the
+        // list doesn't move again.
+        expect(shown[1], isTrue, reason: 'offsets $offsets');
+        for (var frame = 1; frame < offsets.length; frame++) {
+          expect(offsets[frame], moreOrLessEquals(finalOffset),
+              reason: 'frame $frame of $offsets');
+        }
+      } else {
+        // The 250 ms reveal passes through positions between start and end.
+        final between = offsets
+            .where((o) =>
+                (o - offsets.first).abs() > 0.5 &&
+                (o - finalOffset).abs() > 0.5)
+            .toSet();
+        expect(between.length, greaterThanOrEqualTo(3),
+            reason: 'offsets $offsets');
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
 }
+
 
 String _fixture() {
   final data = {

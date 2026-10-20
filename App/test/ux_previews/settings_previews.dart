@@ -166,6 +166,22 @@ void settingsPreviews() {
       },
     );
 
+    preview(
+      settingsTab,
+      'exact-alarms-off',
+      'Reminders on, but «Alarmas y recordatorios» is off: they may arrive late.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          exactAlarms: false,
+        );
+        await app.tab(p.l.settings);
+        await p.shoot();
+      },
+    );
+
     // ------------------------------------------------------------ account
     preview(
       accountScreen,
@@ -174,6 +190,22 @@ void settingsPreviews() {
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.pushPage(const AccountScreen(debug: false));
+        await p.shoot();
+      },
+    );
+
+    preview(
+      accountScreen,
+      'named',
+      'An account with a first name: the name as the heading, the email under it.',
+      everywhere,
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          user: account(firstName: 'María'),
+        );
         await app.pushPage(const AccountScreen(debug: false));
         await p.shoot();
       },
@@ -327,8 +359,8 @@ void settingsPreviews() {
     preview(
       remindersScreen,
       'blocked',
-      'The phone blocks notifications: what that means and the way to the system settings.',
-      everywhere,
+      'The phone blocks notifications: one plain line, and Permitir avisos to TaskFlow\'s notifications page.',
+      [...everywhere, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -343,8 +375,8 @@ void settingsPreviews() {
     preview(
       remindersScreen,
       'exact-alarms-off',
-      'Notifications allowed, exact alarms not: reminders may come late.',
-      [es1],
+      'Notifications allowed, exact alarms not: reminders may come late; one button allows «Alarmas y recordatorios».',
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -365,6 +397,19 @@ void settingsPreviews() {
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
         await app.push('/region');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      regionScreen,
+      'clock-sheet',
+      'The time-format row tapped: a sheet of radio rows, like Idioma.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.push('/region');
+        await app.tap(p.l.clockFormat);
         await p.shoot();
       },
     );

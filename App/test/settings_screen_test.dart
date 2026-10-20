@@ -1029,6 +1029,58 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- Run 2026-10-19-app · P187 (UX-1606 e): on, but reminders may be late ----
+
+  for (final (exact, label) in [
+    (false, 'Activados · pueden llegar tarde'),
+    (true, 'Activados · 10 minutos antes'),
+  ]) {
+    testWidgets(
+      'UX-1606: reminders on and exact alarms ${exact ? 'allowed' : 'off'}: the Recordatorios row reads $label',
+      (tester) async {
+        final access = FakeReminderAccess(
+          allowed: true,
+          exact: exact,
+          grant: false,
+        );
+        await openApp(
+          tester,
+          reminders: const ReminderPreferences(enabled: true, leadMinutes: 10),
+          access: access,
+        );
+        await openSettings(tester);
+        final row = remindersRow();
+        final context = tester.element(find.byType(SettingsScreen));
+        final expected = exact
+            ? es.remindersOnLead(context.reminderLead(10))
+            : es.remindersOnLate;
+        expect(expected, label);
+        expect(
+          find.descendant(of: row, matching: find.text(expected)),
+          findsOneWidget,
+        );
+        if (!exact) {
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.text(
+                es.remindersOnLead(context.reminderLead(10)),
+              ),
+            ),
+            findsNothing,
+          );
+        }
+        expect(
+          find.descendant(of: row, matching: find.text(es.remindersBlocked)),
+          findsNothing,
+        );
+        expect(access.permissionRequests, 0);
+        expect(access.exactRequests, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 class _CountingRegionalStore extends MemoryRegionalStore {

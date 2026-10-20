@@ -605,7 +605,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       if (_sentTo case final sentTo?) ...[
                                         MessageBanner(
                                           strings.recoveryEmailRequested(
-                                            sentTo,
+                                            breakableAddress(sentTo),
                                           ),
                                           key: _sent,
                                           icon: Icons.mail_outline_rounded,

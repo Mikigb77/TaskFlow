@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/services/notification_service.dart';
@@ -32,6 +31,10 @@ class _NotificationSettingsScreenState
   String? _schedulerError;
   int _deferred = 0;
   bool _busy = false;
+
+  /// From the switch's tap until the screen has read the outcome: the switch
+  /// shows on, and no problem shows that the flow is already fixing.
+  bool _turningOn = false;
   late final String _owner;
   @override
   void initState() {
@@ -49,10 +52,23 @@ class _NotificationSettingsScreenState
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _load();
+    if (state != AppLifecycleState.resumed) return;
+    // Back from Android's settings: read the permission at once, even while
+    // turning reminders on.
+    _busy ? _readCapability() : _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _readCapability() async {
+    try {
+      final capability = await ref.read(reminderAccessProvider).capability();
+      if (mounted) setState(() => _capability = capability);
+    } catch (_) {
+      // The next full load says what's wrong.
+    }
+  }
+
+  /// Reads what the screen shows; [refresh] first sets the alerts again.
+  Future<void> _load({bool refresh = true}) async {
     if (_busy) return;
     setState(() {
       _busy = true;
@@ -62,7 +78,7 @@ class _NotificationSettingsScreenState
       final store = ref.read(reminderPreferenceStoreProvider);
       final access = ref.read(reminderAccessProvider);
       final settings = await store.read(_owner);
-      await access.reconcile(_owner);
+      if (refresh) await access.reconcile(_owner);
       final capability = await access.capability();
       final alerts = await store.upcomingAlerts(_owner);
       final meta = await store.schedulingInfo();
@@ -114,13 +130,39 @@ class _NotificationSettingsScreenState
 
   Future<void> _turnOn() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _turningOn = true;
+    });
+    var on = false;
+    Future<void>? scheduling;
     try {
-      await turnOnReminders(context);
+      on = await turnOnReminders(
+        context,
+        onScheduling: (future) => scheduling = future,
+      );
+      // Wait for the alerts being set, so Detalles lists them and a failure
+      // offers Reintentar; the switch stays on and the bar shows meanwhile.
+      final pending = scheduling;
+      if (on && pending != null) {
+        try {
+          await pending;
+        } catch (_) {
+          // The load below reads what went wrong.
+        }
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      // Refused: the switch and the problem come back at once.
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          if (!on) _turningOn = false;
+        });
+      }
     }
-    if (mounted) await _load();
+    // The alerts are set by now; this only reads the outcome.
+    if (mounted) await _load(refresh: false);
+    if (mounted) setState(() => _turningOn = false);
   }
 
   ReminderPreferences _changed(
@@ -148,7 +190,8 @@ class _NotificationSettingsScreenState
     final value = await showTimePicker(
         context: context,
         initialTime: TimeOfDay(
-            hour: (current ?? 540) ~/ 60, minute: (current ?? 540) % 60));
+            hour: (current ?? 540) ~/ 60, minute: (current ?? 540) % 60),
+        initialEntryMode: TimePickerEntryMode.input);
     if (value != null && mounted) save(value.hour * 60 + value.minute);
   }
 
@@ -157,12 +200,14 @@ class _NotificationSettingsScreenState
     final settings = _settings;
     final access = ref.read(reminderAccessProvider);
     final supported = access.supported;
-    // The status and its fixes show only when something stops reminders.
-    final problem = !supported ||
-        !_capability.allowed ||
-        !_capability.exact ||
-        _schedulerError != null ||
-        _deferred > 0;
+    // The status and its fix show only when something stops reminders, and
+    // not while the switch is already fixing it.
+    final problem = !_turningOn &&
+        (!supported ||
+            !_capability.allowed ||
+            !_capability.exact ||
+            _schedulerError != null ||
+            _deferred > 0);
     final retry = OutlinedButton(
         onPressed: _busy
             ? null
@@ -174,7 +219,30 @@ class _NotificationSettingsScreenState
                 }
                 if (mounted) _load();
               },
-        child: Text(context.l10n.retryScheduling));
+        child: Text(context.l10n.tryAgain));
+    // One line in the person's words, and the one button that fixes it.
+    final (String? line, Widget? fix) = !supported
+        ? (context.l10n.mobileNotificationsOnly, null)
+        : !_capability.allowed
+            ? (
+                context.l10n.notificationPermissionOff,
+                FilledButton(
+                    onPressed: _busy ? null : access.openNotificationSettings,
+                    child: Text(context.l10n.allowNotifications))
+              )
+            : !_capability.exact
+                ? (
+                    context.l10n.exactAlarmsNeeded,
+                    FilledButton(
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                await access.requestExactAccess();
+                                if (mounted) _load();
+                              },
+                        child: Text(context.l10n.allowPreciseAlarms))
+                  )
+                : (null, null);
     return Scaffold(
         appBar: CustomAppBar(title: context.l10n.reminders),
         body: RefreshIndicator(
@@ -193,55 +261,38 @@ class _NotificationSettingsScreenState
                 SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     title: Text(context.l10n.enableReminders),
-                    value: settings.enabled,
+                    value: settings.enabled || _turningOn,
                     onChanged: _busy || !supported
                         ? null
                         : (value) => value
                             ? _turnOn()
                             : _save(_changed(enabled: false))),
                 if (problem) ...[
-                  if (!supported || !_capability.allowed || !_capability.exact)
+                  if (line != null)
                     ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.notifications_off_outlined),
-                        title: Text(!supported
-                            ? context.l10n.mobileNotificationsOnly
-                            : !_capability.allowed
-                                ? context.l10n.notificationPermissionOff
-                                : context.l10n.exactAlarmsNeeded)),
+                        title: Text(line)),
+                  if (fix != null)
+                    Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: fix),
                   if (_deferred > 0)
                     MessageBanner(context.l10n.deferredAlerts(_deferred)),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    OutlinedButton(
-                        onPressed: supported ? openAppSettings : null,
-                        child: Text(context.l10n.openSystemSettings)),
-                    if (supported && !_capability.exact)
-                      TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () async {
-                                  await access.requestExactAccess();
-                                  if (mounted) _load();
-                                },
-                          child: Text(context.l10n.allowPreciseAlarms)),
-                    retry,
-                  ]),
+                  if (_schedulerError != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: retry),
+                  ],
                 ],
-                const SizedBox(height: 24),
-                SectionLabel(context.l10n.taskDefaults),
-                DropdownButtonFormField<int>(
-                    key: ValueKey(settings.leadMinutes),
-                    initialValue: settings.leadMinutes,
-                    isExpanded: true,
-                    decoration:
-                        InputDecoration(labelText: context.l10n.timedTasks),
-                    items: <int>{-1, 0, 10, 30, 60, 1440, settings.leadMinutes}
-                        .map((value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(context.reminderLead(value))))
-                        .toList(),
-                    onChanged:
-                        _busy ? null : (value) => _save(_changed(lead: value))),
+                const SizedBox(height: 16),
+                ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(context.l10n.timedTasks),
+                    subtitle: Text(context.reminderLead(settings.leadMinutes)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: _busy ? null : _chooseLead),
                 _timeRow(context.l10n.dateOnlyTasks, settings.dateOnlyTime,
                     (value) => _save(_changed(dateOnly: value))),
                 const SizedBox(height: 8),
@@ -291,6 +342,14 @@ class _NotificationSettingsScreenState
               ],
               if (settings == null && _error != null) retry,
             ])));
+  }
+
+  Future<void> _chooseLead() async {
+    final lead = await chooseDefaultLead(context,
+        title: context.l10n.timedTasks, current: _settings!.leadMinutes);
+    if (lead != null && mounted && lead != _settings!.leadMinutes) {
+      await _save(_changed(lead: lead));
+    }
   }
 
   String _alertDate(Map<String, Object?> alert) {

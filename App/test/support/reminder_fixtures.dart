@@ -41,6 +41,9 @@ class FakeReminderAccess extends ReminderAccess {
   bool grant;
   int permissionRequests = 0;
   int exactRequests = 0;
+
+  /// Times TaskFlow's notifications page in the phone's settings was opened.
+  int notificationSettingsOpened = 0;
   @override
   bool get supported => true;
   @override
@@ -57,6 +60,11 @@ class FakeReminderAccess extends ReminderAccess {
   Future<void> requestExactAccess() async {
     exactRequests++;
     exact = true;
+  }
+
+  @override
+  Future<void> openNotificationSettings() async {
+    notificationSettingsOpened++;
   }
 
   @override

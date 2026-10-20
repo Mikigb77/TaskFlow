@@ -161,19 +161,28 @@
   },
   "@@locale": "en",
   "deviceCalendars": "Phone calendars",
-  "deviceCalendarHelp": "See events from calendars connected to this phone beside your tasks.",
-  "deviceCalendarPrivacy": "Choose which calendars to display. Events are read-only in TaskFlow and stay on this device; they are not uploaded or sent to AI. Manage their reminders in your calendar app.",
+  "deviceCalendarIntro": "You’ll see your phone’s events in Calendar. They’re only read here, never uploaded.",
+  "@deviceCalendarIntro": {
+    "description": "Phone calendars, before access: the one line above «Connect phone calendars». Says what connecting does and that events stay on the phone."
+  },
   "calendarEnable": "Connect phone calendars",
   "calendarDisable": "Hide calendar events",
+  "calendarConnected": "Connected. Events show in Calendar.",
+  "@calendarConnected": {
+    "description": "Phone calendars: the first line while the phone’s events show in Calendar (access allowed and at least one calendar ticked)."
+  },
   "calendarChoose": "Choose calendars",
   "calendarChooseHelp": "Select up to 50 calendars. Calendar times follow your device; all-day dates stay on their original days.",
   "calendarDenied": "Allow calendar access to display your events. Your tasks still work without it.",
+  "calendarRefused": "Without permission, TaskFlow can’t see your events.",
+  "@calendarRefused": {
+    "description": "Phone calendars, after the person refused calendar access: the one line above «Connect phone calendars»."
+  },
   "calendarBlocked": "Calendar access is off. You can enable it in the phone’s app settings.",
   "calendarUnsupported": "Phone calendar display is currently available on Android.",
   "calendarSettings": "Open app settings",
   "calendarEmptySources": "No visible calendars are synced to this phone. Connect an account in your calendar app, then refresh here.",
   "calendarRefresh": "Refresh calendars",
-  "calendarClear": "Clear selection",
   "calendarReadError": "Calendar events could not be read. Refresh to try again; this view may be missing commitments.",
   "calendarReadRetry": "Couldn’t read your events. Tap to try again.",
   "changeView": "Change view",
@@ -287,6 +296,10 @@
   "@remindersBlocked": {
     "description": "Subtitle of the Reminders row in Settings when reminders are on but the phone does not allow TaskFlow's notifications."
   },
+  "remindersOnLate": "On · may arrive late",
+  "@remindersOnLate": {
+    "description": "Subtitle of the Reminders row in Settings when reminders are on and notifications allowed, but “Alarms & reminders” is off, so reminders may come late."
+  },
   "otherSettings": "Other settings",
   "appVersion": "TaskFlow {version}",
   "@appVersion": {
@@ -309,9 +322,17 @@
   "sunday": "Sunday",
   "saturday": "Saturday",
   "timeZone": "Time zone",
+  "timeZoneSameAsPhone": "Same as phone ({city})",
+  "@timeZoneSameAsPhone": {
+    "description": "Time & region: the time-zone row’s value while it follows the phone. city is the phone zone’s city, such as Madrid.",
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
   "timezoneHelp": "New tasks use this time zone to read dates.",
   "searchTimezone": "Find a timezone",
-  "regionHelp": "These preferences stay on this device. Changing them does not change stored task dates or times.",
   "preferenceError": "Could not save this preference. Please try again.",
   "timezoneFallback": "The device timezone is unavailable. New tasks will use {zone}.",
   "@timezoneFallback": {
@@ -785,7 +806,6 @@
   "fileRemoveQuestion": "Remove this attachment?",
   "fileRemoveHelp": "This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.",
   "yourAccount": "Your account",
-  "accountHeading": "Your own little space.",
   "accountSaved": "Saved to your account",
   "syncNow": "Sync now",
   "accountSyncing": "Syncing",
@@ -1211,6 +1231,10 @@
   "enableReminders": "Enable reminders",
   "noReminderTurnOn": "No reminder · Turn on",
   "exactAlarmsNeeded": "To get reminders on time, allow “Alarms & reminders”.",
+  "exactAlarmsNextScreen": "On the next screen, turn on the switch, then come back.",
+  "@exactAlarmsNextScreen": {
+    "description": "Second line of the sheet that asks for “Alarms & reminders”, under exactAlarmsNeeded: what to do on Android's page the button opens, which has a switch and no Done button."
+  },
   "remindersOnConfirmation": "Done. Reminders are on.",
   "reminderAskQuestion": "Want a reminder before it?",
   "@reminderAskQuestion": {
@@ -1236,12 +1260,17 @@
   },
   "details": "Details",
   "mobileNotificationsOnly": "Mobile notifications only",
-  "notificationPermissionOff": "System permission is off",
+  "notificationPermissionOff": "Your phone isn’t letting TaskFlow notify you.",
+  "@notificationPermissionOff": {
+    "description": "Reminders: the phone does not allow TaskFlow's notifications. Shown on the Reminders screen and as a message after the person refuses Android's prompt."
+  },
+  "allowNotifications": "Allow notifications",
+  "@allowNotifications": {
+    "description": "Button under notificationPermissionOff, and that message's action: opens TaskFlow's notifications page in the phone's settings."
+  },
   "preciseAlarmsAvailable": "Precise alarm access available",
   "approximateAlarmsHelp": "Alerts are approximate until precise alarm access is enabled",
-  "openSystemSettings": "Open system settings",
   "allowPreciseAlarms": "Allow “Alarms & reminders”",
-  "taskDefaults": "Task defaults",
   "timedTasks": "Timed tasks",
   "dateOnlyTasks": "Date-only tasks",
   "dailyCheckIns": "Daily check-ins",
@@ -1260,7 +1289,6 @@
   },
   "noUpcomingAlerts": "No upcoming alerts. Choose a reminder on a scheduled task.",
   "repeatsDaily": "repeats daily",
-  "retryScheduling": "Refresh and retry scheduling",
   "alertPending": "pending",
   "alertScheduled": "scheduled",
   "alertApproximate": "approximate",
@@ -1278,11 +1306,10 @@
   "reminderRefreshError": "Reminders could not refresh. Your tasks are saved; retry from notification settings.",
   "transferError": "Could not finish. Your existing tasks and notes are unchanged. Please retry.",
   "exportSaved": "Export saved. Keep the file somewhere private.",
-  "keepYourTasks": "Keep your tasks with you.",
   "exportImportIntro": "Save a copy of your tasks to a file, or bring tasks from Todoist.",
   "exportTaskFlowFile": "Export TaskFlow file",
   "chooseImportFile": "Choose import file",
-  "chooseImportFileHelp": "Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.",
+  "chooseImportFileHelp": "Choose a TaskFlow file or a project exported from Todoist. You’ll review it before importing.",
   "importPreview": "Import preview",
   "importCopiesHelp": "Selected tasks, notes and the file’s projects are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.",
   "listsIncluded": "Projects included",
@@ -1924,7 +1951,10 @@
   },
   "taskflowPro": "TaskFlow Pro",
   "billingSettingsHelp": "Subscription, purchases and billing",
-  "billingIntro": "Your subscription, in one place.",
+  "billingIntro": "Unlimited dictations, and room for all your files.",
+  "@billingIntro": {
+    "description": "The Pro screen's first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro."
+  },
   "billingComplimentary": "Complimentary Pro access. All Pro features are included, with no payment or renewal.",
   "billingStatus": "{status, select, active{Pro is active} inactive{No active Pro subscription} other{Subscription status unavailable}}",
   "billingUntil": "{kind, select, renews{Renews on {date}} other{Access until {date}}}",
@@ -1939,7 +1969,7 @@
   "billingRestore": "Restore purchases",
   "billingManage": "Manage subscription",
   "billingRestoreHelp": "Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.",
-  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}",
+  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store didn’t answer. Open this screen again.} other{The store didn’t answer. Open this screen again.}}",
   "billingResult": "{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}",
   "@billingStatus": {
     "placeholders": {

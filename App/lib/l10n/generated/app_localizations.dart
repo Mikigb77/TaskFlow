@@ -532,17 +532,11 @@ abstract class AppLocalizations {
   /// **'Phone calendars'**
   String get deviceCalendars;
 
-  /// No description provided for @deviceCalendarHelp.
+  /// Phone calendars, before access: the one line above «Connect phone calendars». Says what connecting does and that events stay on the phone.
   ///
   /// In en, this message translates to:
-  /// **'See events from calendars connected to this phone beside your tasks.'**
-  String get deviceCalendarHelp;
-
-  /// No description provided for @deviceCalendarPrivacy.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose which calendars to display. Events are read-only in TaskFlow and stay on this device; they are not uploaded or sent to AI. Manage their reminders in your calendar app.'**
-  String get deviceCalendarPrivacy;
+  /// **'You’ll see your phone’s events in Calendar. They’re only read here, never uploaded.'**
+  String get deviceCalendarIntro;
 
   /// No description provided for @calendarEnable.
   ///
@@ -555,6 +549,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide calendar events'**
   String get calendarDisable;
+
+  /// Phone calendars: the first line while the phone’s events show in Calendar (access allowed and at least one calendar ticked).
+  ///
+  /// In en, this message translates to:
+  /// **'Connected. Events show in Calendar.'**
+  String get calendarConnected;
 
   /// No description provided for @calendarChoose.
   ///
@@ -573,6 +573,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow calendar access to display your events. Your tasks still work without it.'**
   String get calendarDenied;
+
+  /// Phone calendars, after the person refused calendar access: the one line above «Connect phone calendars».
+  ///
+  /// In en, this message translates to:
+  /// **'Without permission, TaskFlow can’t see your events.'**
+  String get calendarRefused;
 
   /// No description provided for @calendarBlocked.
   ///
@@ -603,12 +609,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh calendars'**
   String get calendarRefresh;
-
-  /// No description provided for @calendarClear.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear selection'**
-  String get calendarClear;
 
   /// No description provided for @calendarReadError.
   ///
@@ -1060,6 +1060,12 @@ abstract class AppLocalizations {
   /// **'Blocked by your phone'**
   String get remindersBlocked;
 
+  /// Subtitle of the Reminders row in Settings when reminders are on and notifications allowed, but “Alarms & reminders” is off, so reminders may come late.
+  ///
+  /// In en, this message translates to:
+  /// **'On · may arrive late'**
+  String get remindersOnLate;
+
   /// No description provided for @otherSettings.
   ///
   /// In en, this message translates to:
@@ -1144,6 +1150,12 @@ abstract class AppLocalizations {
   /// **'Time zone'**
   String get timeZone;
 
+  /// Time & region: the time-zone row’s value while it follows the phone. city is the phone zone’s city, such as Madrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as phone ({city})'**
+  String timeZoneSameAsPhone(String city);
+
   /// No description provided for @timezoneHelp.
   ///
   /// In en, this message translates to:
@@ -1155,12 +1167,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Find a timezone'**
   String get searchTimezone;
-
-  /// No description provided for @regionHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'These preferences stay on this device. Changing them does not change stored task dates or times.'**
-  String get regionHelp;
 
   /// No description provided for @preferenceError.
   ///
@@ -2386,12 +2392,6 @@ abstract class AppLocalizations {
   /// **'Your account'**
   String get yourAccount;
 
-  /// No description provided for @accountHeading.
-  ///
-  /// In en, this message translates to:
-  /// **'Your own little space.'**
-  String get accountHeading;
-
   /// No description provided for @accountSaved.
   ///
   /// In en, this message translates to:
@@ -3400,6 +3400,12 @@ abstract class AppLocalizations {
   /// **'To get reminders on time, allow “Alarms & reminders”.'**
   String get exactAlarmsNeeded;
 
+  /// Second line of the sheet that asks for “Alarms & reminders”, under exactAlarmsNeeded: what to do on Android's page the button opens, which has a switch and no Done button.
+  ///
+  /// In en, this message translates to:
+  /// **'On the next screen, turn on the switch, then come back.'**
+  String get exactAlarmsNextScreen;
+
   /// No description provided for @remindersOnConfirmation.
   ///
   /// In en, this message translates to:
@@ -3460,11 +3466,17 @@ abstract class AppLocalizations {
   /// **'Mobile notifications only'**
   String get mobileNotificationsOnly;
 
-  /// No description provided for @notificationPermissionOff.
+  /// Reminders: the phone does not allow TaskFlow's notifications. Shown on the Reminders screen and as a message after the person refuses Android's prompt.
   ///
   /// In en, this message translates to:
-  /// **'System permission is off'**
+  /// **'Your phone isn’t letting TaskFlow notify you.'**
   String get notificationPermissionOff;
+
+  /// Button under notificationPermissionOff, and that message's action: opens TaskFlow's notifications page in the phone's settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications'**
+  String get allowNotifications;
 
   /// No description provided for @preciseAlarmsAvailable.
   ///
@@ -3478,23 +3490,11 @@ abstract class AppLocalizations {
   /// **'Alerts are approximate until precise alarm access is enabled'**
   String get approximateAlarmsHelp;
 
-  /// No description provided for @openSystemSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Open system settings'**
-  String get openSystemSettings;
-
   /// No description provided for @allowPreciseAlarms.
   ///
   /// In en, this message translates to:
   /// **'Allow “Alarms & reminders”'**
   String get allowPreciseAlarms;
-
-  /// No description provided for @taskDefaults.
-  ///
-  /// In en, this message translates to:
-  /// **'Task defaults'**
-  String get taskDefaults;
 
   /// No description provided for @timedTasks.
   ///
@@ -3567,12 +3567,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'repeats daily'**
   String get repeatsDaily;
-
-  /// No description provided for @retryScheduling.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh and retry scheduling'**
-  String get retryScheduling;
 
   /// No description provided for @alertPending.
   ///
@@ -3676,12 +3670,6 @@ abstract class AppLocalizations {
   /// **'Export saved. Keep the file somewhere private.'**
   String get exportSaved;
 
-  /// No description provided for @keepYourTasks.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep your tasks with you.'**
-  String get keepYourTasks;
-
   /// No description provided for @exportImportIntro.
   ///
   /// In en, this message translates to:
@@ -3703,7 +3691,7 @@ abstract class AppLocalizations {
   /// No description provided for @chooseImportFileHelp.
   ///
   /// In en, this message translates to:
-  /// **'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.'**
+  /// **'Choose a TaskFlow file or a project exported from Todoist. You’ll review it before importing.'**
   String get chooseImportFileHelp;
 
   /// No description provided for @importPreview.
@@ -4846,10 +4834,10 @@ abstract class AppLocalizations {
   /// **'Subscription, purchases and billing'**
   String get billingSettingsHelp;
 
-  /// No description provided for @billingIntro.
+  /// The Pro screen's first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro.
   ///
   /// In en, this message translates to:
-  /// **'Your subscription, in one place.'**
+  /// **'Unlimited dictations, and room for all your files.'**
   String get billingIntro;
 
   /// No description provided for @billingComplimentary.
@@ -4939,7 +4927,7 @@ abstract class AppLocalizations {
   /// No description provided for @billingError.
   ///
   /// In en, this message translates to:
-  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store could not complete the request. Please try again.} other{Could not update your subscription. Please try again.}}'**
+  /// **'{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store didn’t answer. Open this screen again.} other{The store didn’t answer. Open this screen again.}}'**
   String billingError(String reason);
 
   /// No description provided for @billingResult.

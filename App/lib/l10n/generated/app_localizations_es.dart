@@ -319,18 +319,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deviceCalendars => 'Calendarios del teléfono';
 
   @override
-  String get deviceCalendarHelp =>
-      'Consulta los eventos de los calendarios conectados a este teléfono junto a tus tareas.';
-
-  @override
-  String get deviceCalendarPrivacy =>
-      'Elige qué calendarios mostrar. Los eventos son de solo lectura en TaskFlow y permanecen en este dispositivo; no se suben ni se envían a la IA. Gestiona sus recordatorios en tu aplicación de calendario.';
+  String get deviceCalendarIntro =>
+      'Verás los eventos de tu teléfono en Calendario. Solo se leen aquí; no se suben.';
 
   @override
   String get calendarEnable => 'Conectar calendarios del teléfono';
 
   @override
   String get calendarDisable => 'Ocultar eventos del calendario';
+
+  @override
+  String get calendarConnected =>
+      'Conectado. Los eventos se ven en Calendario.';
 
   @override
   String get calendarChoose => 'Elegir calendarios';
@@ -342,6 +342,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get calendarDenied =>
       'Permite el acceso al calendario para mostrar tus eventos. Tus tareas siguen funcionando sin él.';
+
+  @override
+  String get calendarRefused =>
+      'Sin permiso, TaskFlow no puede ver tus eventos.';
 
   @override
   String get calendarBlocked =>
@@ -360,9 +364,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Actualizar calendarios';
-
-  @override
-  String get calendarClear => 'Borrar selección';
 
   @override
   String get calendarReadError =>
@@ -610,6 +611,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get remindersBlocked => 'Bloqueados por el teléfono';
 
   @override
+  String get remindersOnLate => 'Activados · pueden llegar tarde';
+
+  @override
   String get otherSettings => 'Otros ajustes';
 
   @override
@@ -654,15 +658,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get timeZone => 'Zona horaria';
 
   @override
+  String timeZoneSameAsPhone(String city) {
+    return 'Como el teléfono ($city)';
+  }
+
+  @override
   String get timezoneHelp =>
       'Las tareas nuevas usan esta zona para entender las fechas.';
 
   @override
   String get searchTimezone => 'Buscar una zona horaria';
-
-  @override
-  String get regionHelp =>
-      'Estas preferencias se guardan en este dispositivo. Cambiarlas no modifica las fechas ni las horas guardadas de tus tareas.';
 
   @override
   String get preferenceError =>
@@ -1430,9 +1435,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get yourAccount => 'Tu cuenta';
 
   @override
-  String get accountHeading => 'Tu propio espacio.';
-
-  @override
   String get accountSaved => 'Guardado en tu cuenta';
 
   @override
@@ -2064,6 +2066,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Para que el aviso llegue a su hora, permite «Alarmas y recordatorios».';
 
   @override
+  String get exactAlarmsNextScreen =>
+      'En la siguiente pantalla, activa el interruptor y vuelve.';
+
+  @override
   String get remindersOnConfirmation => 'Listo. Recordatorios activados.';
 
   @override
@@ -2096,7 +2102,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'Notificaciones solo en dispositivos móviles';
 
   @override
-  String get notificationPermissionOff => 'Permiso del sistema desactivado';
+  String get notificationPermissionOff =>
+      'El teléfono no deja que TaskFlow te avise.';
+
+  @override
+  String get allowNotifications => 'Permitir avisos';
 
   @override
   String get preciseAlarmsAvailable => 'Acceso a alarmas exactas disponible';
@@ -2106,13 +2116,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Los avisos son aproximados hasta que actives el acceso a alarmas exactas';
 
   @override
-  String get openSystemSettings => 'Abrir ajustes del sistema';
-
-  @override
   String get allowPreciseAlarms => 'Permitir «Alarmas y recordatorios»';
-
-  @override
-  String get taskDefaults => 'Opciones predeterminadas';
 
   @override
   String get timedTasks => 'Tareas con hora';
@@ -2153,9 +2157,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get repeatsDaily => 'se repite cada día';
-
-  @override
-  String get retryScheduling => 'Actualizar y reintentar';
 
   @override
   String get alertPending => 'pendiente';
@@ -2218,9 +2219,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get exportSaved => 'Archivo exportado. Guárdalo en un lugar privado.';
 
   @override
-  String get keepYourTasks => 'Llévate tus tareas.';
-
-  @override
   String get exportImportIntro =>
       'Guarda una copia de tus tareas en un archivo o trae tareas de Todoist.';
 
@@ -2232,7 +2230,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get chooseImportFileHelp =>
-      'Elige una exportación JSON de TaskFlow o un CSV de proyecto de Todoist (hasta 32 MB y 5.000 tareas y notas). Podrás revisarlo antes de importar.';
+      'Elige un archivo de TaskFlow o un proyecto exportado de Todoist. Podrás revisarlo antes de importar.';
 
   @override
   String get importPreview => 'Vista previa de importación';
@@ -3181,7 +3179,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get billingSettingsHelp => 'Suscripción, compras y facturación';
 
   @override
-  String get billingIntro => 'Tu suscripción, en un solo lugar.';
+  String get billingIntro =>
+      'Dictados sin límite y espacio para todos tus archivos.';
 
   @override
   String get billingComplimentary =>
@@ -3260,8 +3259,8 @@ class AppLocalizationsEs extends AppLocalizations {
           'Las compras están restringidas para esta cuenta o dispositivo.',
       'otherAccount':
           'Esta compra pertenece a otra cuenta. Inicia sesión en la cuenta original para restaurarla.',
-      'store': 'La tienda no pudo completar la solicitud. Inténtalo de nuevo.',
-      'other': 'No se pudo actualizar tu suscripción. Inténtalo de nuevo.',
+      'store': 'La tienda no respondió. Vuelve a abrir esta pantalla.',
+      'other': 'La tienda no respondió. Vuelve a abrir esta pantalla.',
     });
     return '$_temp0';
   }

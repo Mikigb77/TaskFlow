@@ -1,6 +1,10 @@
 // P44 (UX-408), round 1 of 2026-10-13-app: Account in one line, sign-out
 // asked first, connection details only in debug builds.
 // P96 (UX-508), round 2: sign-out shows progress in its button.
+import 'package:agenda/services/api_client.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
+import 'dart:io';
 import 'dart:async';
 
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -14,6 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
+import 'support/shown_text.dart';
+import 'support/address_wrap.dart';
 
 void main() {
   for (final dark in [false, true]) {
@@ -66,7 +72,7 @@ void main() {
       expect(api.requests.single.$1, 'auth/password-reset/');
       expect(api.requests.single.$2,
           {'email': 'recovery@example.invalid', 'language': 'es'});
-      await reveal(find.text('Si recovery@example.invalid tiene cuenta, te '
+      await reveal(findShown('Si recovery@example.invalid tiene cuenta, te '
           'llegará un correo con un código. Escríbelo aquí.'));
       expect(tester.takeException(), isNull);
 
@@ -420,6 +426,186 @@ void main() {
       expect(l.signOutQuestion, contains(word));
     }
   });
+
+  // ---- Run 2026-10-19-app · P189 (UX-1612 slogan half, UX-1618) ----
+
+  group('P189', () {
+    setUpAll(() async {
+      await (FontLoader('Manrope')
+            ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+          .load();
+    });
+
+    /// Cuenta for an account with [firstName] and [email].
+    Future<void> openNamed(WidgetTester tester,
+        {String firstName = '',
+        String email = 'maria.lopez@example.com',
+        String language = 'es',
+        double textScale = 1,
+        Size size = const Size(390, 1600)}) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final api = OfflineApiClient();
+      final container = ProviderContainer(overrides: [
+        apiClientProvider.overrideWithValue(api),
+        authProvider.overrideWith(
+            (ref) => _NamedAuth(api, firstName: firstName, email: email)),
+        taskRepositoryProvider.overrideWithValue(_LocalItems(0)),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ]);
+      addTearDown(container.dispose);
+      addTearDown(api.close);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              theme: AppTheme.light,
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(textScale)),
+                  child: child!),
+              home: const AccountScreen())));
+      await tester.pumpAndSettle();
+    }
+
+    /// The texts in Cuenta's list, top to bottom.
+    List<String> listTexts(WidgetTester tester) {
+      final texts = tester
+          .widgetList<Text>(find.descendant(
+              of: find.byType(ListView), matching: find.byType(Text)))
+          .map((t) => (t, tester.getRect(find.byWidget(t)).top))
+          .toList()
+        ..sort((a, b) => a.$2.compareTo(b.$2));
+      return [for (final (t, _) in texts) t.data ?? t.textSpan!.toPlainText()];
+    }
+
+    test('UX-1612: no catalog has «Tu propio espacio.» or accountHeading', () {
+      for (final language in ['en', 'es', 'ca']) {
+        final arb = File('lib/l10n/app_$language.arb').readAsStringSync();
+        expect(arb, isNot(contains('"accountHeading"')), reason: language);
+        expect(arb, isNot(contains('Tu propio espacio')), reason: language);
+      }
+    });
+
+    testWidgets(
+        'UX-1612: Cuenta for an account named María: the heading reads María, with the email under it',
+        (tester) async {
+      await openNamed(tester, firstName: 'María');
+      final heading = find.text('María');
+      expect(heading, findsOneWidget);
+      final email = findShown('maria.lopez@example.com');
+      expect(email, findsOneWidget);
+      expect(tester.getRect(email).top,
+          greaterThanOrEqualTo(tester.getRect(heading).bottom));
+      // A heading, larger than the email under it.
+      expect(tester.widget<Text>(heading).style?.fontSize,
+          greaterThan(tester.renderObject<RenderParagraph>(
+            find.descendant(of: email, matching: find.byType(RichText)),
+          ).text.style?.fontSize ?? 14));
+      final texts = listTexts(tester);
+      expect(texts.indexOf('María'), lessThan(texts.indexOf(shown('maria.lopez@example.com'))));
+      expect(find.text('Tu propio espacio.'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-1612: Cuenta for an account without a name: no heading, and the email comes first',
+        (tester) async {
+      await openNamed(tester);
+      expect(find.text('Tu propio espacio.'), findsNothing);
+      final texts = listTexts(tester);
+      expect(texts.first, shown('maria.lopez@example.com'));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-1618: ES, 2× on 360×800, Cuenta draws maria.lopez@example.com breaking only after «@» or «.», and TalkBack reads the plain address',
+        (tester) async {
+      await openNamed(tester,
+          textScale: 2, size: const Size(360, 800), firstName: 'María');
+      final email = findShown('maria.lopez@example.com');
+      expect(email, findsOneWidget);
+      // At 2× it takes two lines (measured with Manrope): the break falls
+      // after «@» or «.».
+      expectAddressWrapsWhole(tester, email, 'maria.lopez@example.com');
+      expect(spokenLabel(tester, email), 'maria.lopez@example.com');
+      expect(tester.getRect(email).right, lessThanOrEqualTo(360.5));
+      expect(tester.takeException(), isNull);
+    });
+
+    // ---- Run 2026-10-19-app · P217 (UX-1612): the name is read as a heading ----
+
+    /// The labels of the semantics nodes flagged as headers in the screen's
+    /// body: the app bar's title aside.
+    List<String> bodyHeaders(WidgetTester tester) {
+      final title = tester
+          .widgetList<Text>(find.descendant(
+              of: find.byType(AppBar), matching: find.byType(Text)))
+          .map((t) => t.data)
+          .toSet();
+      return [
+        for (final node in find.semantics
+            .byPredicate((node) =>
+                node.getSemanticsData().flagsCollection.isHeader)
+            .evaluate())
+          if (!title.contains(node.label)) node.label,
+      ];
+    }
+
+    testWidgets(
+        'UX-1612: Cuenta for an account named María: TalkBack hears «María» as a heading',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openNamed(tester, firstName: 'María');
+      final name = tester.getSemantics(find.text('María'));
+      expect(name.label, 'María');
+      expect(name.getSemanticsData().flagsCollection.isHeader, isTrue);
+      expect(bodyHeaders(tester), ['María']);
+      // The email under it isn't a heading.
+      expect(
+          tester
+              .getSemantics(findShown('maria.lopez@example.com'))
+              .getSemanticsData()
+              .flagsCollection
+              .isHeader,
+          isFalse);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets(
+        'UX-1612: Cuenta for an account without a name: no node in the body is a heading',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openNamed(tester);
+      expect(bodyHeaders(tester), isEmpty);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+  });
+}
+
+/// P189: a signed-in account with a first name, or none.
+class _NamedAuth extends AuthNotifier {
+  _NamedAuth(super.api, {required this.firstName, required this.email});
+  final String firstName;
+  final String email;
+  @override
+  Future<void> restore() async {
+    state = AuthState(
+      account: Account.fromJson({
+        'id': 1,
+        'email': email,
+        'timezone': 'Europe/Madrid',
+        if (firstName.isNotEmpty) 'first_name': firstName,
+      }),
+    );
+  }
 }
 
 final es = lookupAppLocalizations(const Locale('es'));

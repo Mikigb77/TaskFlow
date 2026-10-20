@@ -44,6 +44,8 @@ import 'package:purchases_flutter/purchases_flutter.dart' show CustomerInfo;
 import 'support/billing_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'support/reading_order.dart';
+import 'support/shown_text.dart';
+import 'support/address_wrap.dart';
 
 final es = lookupAppLocalizations(const Locale('es'));
 const password = 'synthetic-only-password';
@@ -434,7 +436,7 @@ void main() {
       await open(tester);
       final order = [
         find.text(es.deleteAccountQuestion),
-        find.text('ana@example.invalid'),
+        findShown('ana@example.invalid'),
         find.text(
           'Se eliminarán tu cuenta de TaskFlow y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.',
         ),
@@ -721,7 +723,7 @@ void main() {
       final phone = await open(tester, preview: previewJson(reauth: 'google'));
       expect(passwordField, findsNothing);
       expect(
-        find.text(
+        findShown(
           'Para confirmar, elige ana@example.invalid cuando Google te lo pida. Tu cuenta de Google no se elimina.',
         ),
         findsOneWidget,
@@ -797,7 +799,7 @@ void main() {
       });
       await tapVisible(tester, confirm);
       await tester.pumpAndSettle();
-      final message = find.text(
+      final message = findShown(
         'Elige ana@example.invalid, la cuenta de Google con la que entras en TaskFlow.',
       );
       expect(message, findsOneWidget);
@@ -826,7 +828,7 @@ void main() {
     (tester) async {
       await open(tester, email: linkedEmail, googleLinked: true);
       final help = find.text(es.deleteAccountPasswordHelp);
-      final instead = find.text(es.deleteAccountGoogleInstead(linkedEmail));
+      final instead = findShown(es.deleteAccountGoogleInstead(linkedEmail));
       var top = double.negativeInfinity;
       for (final item in [help, passwordField, instead, googleButton, confirm]) {
         expect(item, findsOneWidget, reason: '$item');
@@ -846,7 +848,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text(es.deleteAccountGoogleHelp(linkedEmail)), findsNothing);
+      expect(findShown(es.deleteAccountGoogleHelp(linkedEmail)), findsNothing);
       expect(find.text(es.deleteAccountGoogleConfirmed), findsNothing);
       expect(enabled(tester), isFalse, reason: 'neither way confirmed yet');
       expect(tester.takeException(), isNull);
@@ -943,7 +945,7 @@ void main() {
       await tapVisible(tester, confirm);
       await tester.pumpAndSettle();
       expect(
-        find.text(es.deleteAccountOtherGoogle(linkedEmail)),
+        findShown(es.deleteAccountOtherGoogle(linkedEmail)),
         findsOneWidget,
       );
       expect(find.text(es.deleteAccountGoogleConfirmed), findsNothing);
@@ -974,7 +976,7 @@ void main() {
       expect(googleButton, findsNothing);
       expect(find.byType(GoogleLoginButton), findsNothing);
       expect(
-        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findShown(es.deleteAccountGoogleInstead(linkedEmail)),
         findsNothing,
       );
 
@@ -987,11 +989,11 @@ void main() {
       expect(passwordField, findsNothing);
       expect(find.text(es.deleteAccountPasswordHelp), findsNothing);
       expect(
-        find.text(es.deleteAccountGoogleHelp(linkedEmail)),
+        findShown(es.deleteAccountGoogleHelp(linkedEmail)),
         findsOneWidget,
       );
       expect(
-        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findShown(es.deleteAccountGoogleInstead(linkedEmail)),
         findsNothing,
       );
       expect(googleButton, findsOneWidget);
@@ -1045,11 +1047,11 @@ void main() {
       expect(find.text(es.deleteAccountPasswordHelp), findsOneWidget);
       expect(passwordField, findsOneWidget);
       expect(
-        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findShown(es.deleteAccountGoogleInstead(linkedEmail)),
         findsOneWidget,
       );
       expect(
-        find.text(
+        findShown(
           'O confirma con Google y elige ana@example.com. Tu cuenta de Google no se elimina.',
         ),
         findsOneWidget,
@@ -1084,7 +1086,7 @@ void main() {
       expect(passwordField, findsNothing);
       expect(find.text(es.deleteAccountPasswordHelp), findsNothing);
       expect(
-        find.text(es.deleteAccountGoogleHelp(linkedEmail)),
+        findShown(es.deleteAccountGoogleHelp(linkedEmail)),
         findsNothing,
         reason: 'no other Google help line takes its place',
       );
@@ -1114,16 +1116,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(es.deleteAccountGoogleInstead(linkedEmail)),
+        findShown(es.deleteAccountGoogleInstead(linkedEmail)),
         findsOneWidget,
       );
       expect(passwordField, findsOneWidget);
       expect(
-        find.text(es.deleteAccountOtherGoogle(linkedEmail)),
+        findShown(es.deleteAccountOtherGoogle(linkedEmail)),
         findsOneWidget,
       );
       expect(
-        find.text(
+        findShown(
           'Elige ana@example.com, la cuenta de Google con la que entras en TaskFlow.',
         ),
         findsOneWidget,
@@ -1143,10 +1145,10 @@ void main() {
         googleLinked: true,
         preview: previewJson(reauth: 'google'),
       );
-      final help = find.text(es.deleteAccountGoogleHelp(linkedEmail));
+      final help = findShown(es.deleteAccountGoogleHelp(linkedEmail));
       expect(help, findsOneWidget);
       expect(
-        find.text(
+        findShown(
           'Para confirmar, elige ana@example.com cuando Google te lo pida. Tu cuenta de Google no se elimina.',
         ),
         findsOneWidget,
@@ -1440,7 +1442,7 @@ void main() {
             l.deleteAccountPasswordHelp,
             l.deleteAccountButton,
           ]) {
-            await fits(find.text(text));
+            await fits(findShown(text));
           }
           await fits(passwordField);
           expect(tester.takeException(), isNull);
@@ -1479,7 +1481,7 @@ void main() {
             preview: previewJson(reauth: 'google'),
           );
           await fits(
-            find.text(l.deleteAccountGoogleHelp('ana@example.invalid')),
+            findShown(l.deleteAccountGoogleHelp('ana@example.invalid')),
           );
           await fits(find.text(l.deleteAccountConfirmGoogle));
           google.google.answers.add('fresh-google-id-token');
@@ -1492,7 +1494,7 @@ void main() {
           await tapVisible(tester, confirm);
           await tester.pumpAndSettle();
           await fits(
-            find.text(l.deleteAccountOtherGoogle('ana@example.invalid')),
+            findShown(l.deleteAccountOtherGoogle('ana@example.invalid')),
           );
           await fits(find.text(l.deleteAccountConfirmGoogle));
           expect(tester.takeException(), isNull);
@@ -2528,7 +2530,7 @@ void main() {
     (tester) async {
       await open(tester);
       final heading = find.text('¿Eliminar tu cuenta?');
-      final email = find.text('ana@example.invalid');
+      final email = findShown('ana@example.invalid');
       final intro = find.text(
         'Se eliminarán tu cuenta de TaskFlow y tus tareas, notas y archivos en todos tus dispositivos. No se puede deshacer.',
       );
@@ -2554,7 +2556,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('ana@example.invalid'), findsOneWidget);
+      expect(findShown('ana@example.invalid'), findsOneWidget);
       await open(tester, language: 'ca');
       expect(
         find.text(
@@ -2562,7 +2564,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('ana@example.invalid'), findsOneWidget);
+      expect(findShown('ana@example.invalid'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2592,7 +2594,7 @@ void main() {
           language: language,
           preview: previewJson(reauth: 'google'),
         );
-        final helpLine = find.text(help);
+        final helpLine = findShown(help);
         expect(helpLine, findsOneWidget);
         expect(
           tester.getBottomLeft(helpLine).dy,
@@ -2607,7 +2609,7 @@ void main() {
         });
         await tapVisible(tester, confirm);
         await tester.pumpAndSettle();
-        final otherLine = find.text(other);
+        final otherLine = findShown(other);
         expect(otherLine, findsOneWidget);
         expect(googleButton, findsOneWidget);
         expect(
@@ -2636,11 +2638,11 @@ void main() {
           preview: previewJson(reauth: 'google'),
         );
         await fitsWidth(tester, find.text(l.deleteAccountQuestion));
-        await fitsWidth(tester, find.text(longEmail));
+        await fitsWidth(tester, findShown(longEmail));
         await fitsWidth(tester, find.text(l.deleteAccountIntro));
         await fitsWidth(
           tester,
-          find.text(l.deleteAccountGoogleHelp(longEmail)),
+          findShown(l.deleteAccountGoogleHelp(longEmail)),
         );
         expect(tester.takeException(), isNull);
 
@@ -2654,7 +2656,7 @@ void main() {
         await tester.pumpAndSettle();
         await fitsWidth(
           tester,
-          find.text(l.deleteAccountOtherGoogle(longEmail)),
+          findShown(l.deleteAccountOtherGoogle(longEmail)),
         );
         expect(tester.takeException(), isNull);
       },
@@ -3801,7 +3803,7 @@ void main() {
           );
           await whole(find.text(l.deleteAccountPasswordHelp));
           await fromTop(passwordField);
-          await whole(find.text(l.deleteAccountGoogleInstead(email)));
+          await whole(findShown(l.deleteAccountGoogleInstead(email)));
           await whole(find.text(l.deleteAccountConfirmGoogle));
           await whole(find.text(l.deleteAccountButton));
           expect(tester.takeException(), isNull);
@@ -3824,7 +3826,7 @@ void main() {
           await whole(find.text(l.deleteAccountGoogleConfirmed));
           await whole(find.text(l.deleteAccountButton));
           // Confirmed: the «O confirma con Google» line goes with the password.
-          expect(find.text(l.deleteAccountGoogleInstead(email)), findsNothing);
+          expect(findShown(l.deleteAccountGoogleInstead(email)), findsNothing);
           expect(passwordField, findsNothing);
           expect(enabled(tester), isTrue);
 
@@ -3833,7 +3835,7 @@ void main() {
           });
           await tapVisible(tester, confirm);
           await tester.pumpAndSettle();
-          await whole(find.text(l.deleteAccountOtherGoogle(email)));
+          await whole(findShown(l.deleteAccountOtherGoogle(email)));
           await fromTop(passwordField);
           await whole(find.text(l.deleteAccountButton));
           expect(tester.takeException(), isNull);
@@ -3896,7 +3898,61 @@ void main() {
       semantics.dispose();
     },
   );
+  // ---- Run 2026-10-19-app · P189 (UX-1618): whole addresses on the delete page ----
+
+  group('UX-1618 with Manrope', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+    const address = 'maria.lopez@example.com';
+
+    testWidgets(
+      'UX-1618: ES, 2× on 360×800, the delete page draws maria.lopez@example.com breaking only after «@» or «.», and TalkBack reads the plain address',
+      (tester) async {
+        await open(
+          tester,
+          textScale: 2,
+          size: const Size(360, 800),
+          email: address,
+        );
+        final line = findShown(address);
+        expect(line, findsOneWidget);
+        expectAddressWrapsWhole(tester, line, address);
+        expect(spokenLabel(tester, line), address);
+        expect(tester.getRect(line).right, lessThanOrEqualTo(360.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1618: ES, 2× on 360×800, the Google confirmation line names the address whole, and TalkBack reads it plain',
+      (tester) async {
+        final l = lookupAppLocalizations(const Locale('es'));
+        await open(
+          tester,
+          textScale: 2,
+          size: const Size(360, 800),
+          email: address,
+          preview: previewJson(reauth: 'google'),
+        );
+        final help = findShown(l.deleteAccountGoogleHelp(address));
+        await tester.scrollUntilVisible(
+          help,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(help, findsOneWidget);
+        expectAddressWrapsWhole(tester, help, address);
+        expect(spokenLabel(tester, help), l.deleteAccountGoogleHelp(address));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
+
 
 /// Sign-in right after the account was deleted.
 class _DeletedAuth extends AuthNotifier {

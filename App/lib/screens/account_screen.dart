@@ -144,6 +144,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final google = ref.watch(googleSignInServiceProvider);
     ref.watch(taskProvider);
     final syncError = ref.read(taskRepositoryProvider).syncError;
+    final name = auth.account!.firstName.trim();
+    final email = auth.account!.email;
     // In-button progress names what is happening, so TalkBack says it.
     Widget progress(String label, {Color? color}) => SizedBox(
       width: 18,
@@ -179,13 +181,18 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              // The person's name, when the account has one; then the email.
+              if (name.isNotEmpty) ...[
+                Semantics(
+                  header: true,
+                  child: Text(name,
+                      style: Theme.of(context).textTheme.headlineMedium),
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(
-                context.l10n.accountHeading,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                auth.account!.email,
+                breakableAddress(email),
+                semanticsLabel: email,
                 style: TextStyle(color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 28),

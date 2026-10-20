@@ -600,6 +600,59 @@ void main() {
       },
     );
   }
+
+  // ---- Run 2026-10-19-app · P189 (UX-1615): outlined buttons show their border ----
+
+  double contrast(Color a, Color b) {
+    final la = a.computeLuminance(), lb = b.computeLuminance();
+    final (hi, lo) = la > lb ? (la, lb) : (lb, la);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  for (final (name, theme) in [
+    ('light', AppTheme.light),
+    ('dark', AppTheme.dark),
+  ]) {
+    testWidgets(
+      'UX-1615: in the $name theme, outlined buttons draw their border in scheme.outline, at least 3:1 on the background',
+      (tester) async {
+        final scheme = theme.colorScheme;
+        final side = theme.outlinedButtonTheme.style!.side!.resolve(
+          <WidgetState>{},
+        );
+        expect(side!.color, scheme.outline);
+        expect(side.color, isNot(scheme.outlineVariant));
+        expect(
+          contrast(scheme.outline, theme.scaffoldBackgroundColor),
+          greaterThanOrEqualTo(3),
+        );
+        // As drawn: «Restaurar compras» and the like.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: Center(
+                child: OutlinedButton(
+                  onPressed: () {},
+                  child: const Text('Restaurar compras'),
+                ),
+              ),
+            ),
+          ),
+        );
+        final material = tester.widget<Material>(
+          find.descendant(
+            of: find.byType(OutlinedButton),
+            matching: find.byType(Material),
+          ),
+        );
+        final shape = material.shape! as OutlinedBorder;
+        expect(shape.side.color, scheme.outline);
+        expect(shape.side.style, BorderStyle.solid);
+        expect(shape.side.width, greaterThan(0));
+      },
+    );
+  }
 }
 
 Future<ProviderContainer> _pump(

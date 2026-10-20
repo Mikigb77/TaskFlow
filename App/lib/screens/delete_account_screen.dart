@@ -381,7 +381,8 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   const SizedBox(height: 8),
                   // Which account goes, as Account names it.
                   Text(
-                    _email,
+                    breakableAddress(_email),
+                    semanticsLabel: _email,
                     style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ],
@@ -401,7 +402,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   if (preview.google)
                     _googleConfirmation(
                       context,
-                      strings.deleteAccountGoogleHelp(_email),
+                      strings.deleteAccountGoogleHelp(breakableAddress(_email)),
                     )
                   else ...[
                     // Confirmed with Google, the password isn't needed.
@@ -411,7 +412,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                       _googleConfirmation(
                         context,
                         _googleToken == null
-                            ? strings.deleteAccountGoogleInstead(_email)
+                            ? strings.deleteAccountGoogleInstead(breakableAddress(_email))
                             : null,
                       ),
                     ],
@@ -724,7 +725,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     final strings = context.l10n;
     final colors = Theme.of(context).colorScheme;
     final error = _problem == _Problem.otherGoogleAccount
-        ? strings.deleteAccountOtherGoogle(_email)
+        ? strings.deleteAccountOtherGoogle(breakableAddress(_email))
         : _googleError == null
         ? null
         : requestProblemText(strings, _googleError!, onSignIn: true);
@@ -733,7 +734,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (help != null) ...[Text(help), const SizedBox(height: 12)],
+          if (help != null) ...[
+            Text(help, semanticsLabel: withoutAddressBreaks(help)),
+            const SizedBox(height: 12),
+          ],
           if (_googleToken == null)
             GoogleLoginButton(
               key: const ValueKey('delete-account-google'),
@@ -760,7 +764,11 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Semantics(
                 liveRegion: true,
-                child: Text(error, style: TextStyle(color: colors.error)),
+                child: Text(
+                  error,
+                  semanticsLabel: withoutAddressBreaks(error),
+                  style: TextStyle(color: colors.error),
+                ),
               ),
             ),
         ],

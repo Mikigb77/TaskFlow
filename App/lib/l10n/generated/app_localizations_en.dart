@@ -314,18 +314,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deviceCalendars => 'Phone calendars';
 
   @override
-  String get deviceCalendarHelp =>
-      'See events from calendars connected to this phone beside your tasks.';
-
-  @override
-  String get deviceCalendarPrivacy =>
-      'Choose which calendars to display. Events are read-only in TaskFlow and stay on this device; they are not uploaded or sent to AI. Manage their reminders in your calendar app.';
+  String get deviceCalendarIntro =>
+      'You’ll see your phone’s events in Calendar. They’re only read here, never uploaded.';
 
   @override
   String get calendarEnable => 'Connect phone calendars';
 
   @override
   String get calendarDisable => 'Hide calendar events';
+
+  @override
+  String get calendarConnected => 'Connected. Events show in Calendar.';
 
   @override
   String get calendarChoose => 'Choose calendars';
@@ -337,6 +336,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get calendarDenied =>
       'Allow calendar access to display your events. Your tasks still work without it.';
+
+  @override
+  String get calendarRefused =>
+      'Without permission, TaskFlow can’t see your events.';
 
   @override
   String get calendarBlocked =>
@@ -355,9 +358,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Refresh calendars';
-
-  @override
-  String get calendarClear => 'Clear selection';
 
   @override
   String get calendarReadError =>
@@ -603,6 +603,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get remindersBlocked => 'Blocked by your phone';
 
   @override
+  String get remindersOnLate => 'On · may arrive late';
+
+  @override
   String get otherSettings => 'Other settings';
 
   @override
@@ -647,14 +650,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get timeZone => 'Time zone';
 
   @override
+  String timeZoneSameAsPhone(String city) {
+    return 'Same as phone ($city)';
+  }
+
+  @override
   String get timezoneHelp => 'New tasks use this time zone to read dates.';
 
   @override
   String get searchTimezone => 'Find a timezone';
-
-  @override
-  String get regionHelp =>
-      'These preferences stay on this device. Changing them does not change stored task dates or times.';
 
   @override
   String get preferenceError =>
@@ -1387,9 +1391,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get yourAccount => 'Your account';
 
   @override
-  String get accountHeading => 'Your own little space.';
-
-  @override
   String get accountSaved => 'Saved to your account';
 
   @override
@@ -2018,6 +2019,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'To get reminders on time, allow “Alarms & reminders”.';
 
   @override
+  String get exactAlarmsNextScreen =>
+      'On the next screen, turn on the switch, then come back.';
+
+  @override
   String get remindersOnConfirmation => 'Done. Reminders are on.';
 
   @override
@@ -2049,7 +2054,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mobileNotificationsOnly => 'Mobile notifications only';
 
   @override
-  String get notificationPermissionOff => 'System permission is off';
+  String get notificationPermissionOff =>
+      'Your phone isn’t letting TaskFlow notify you.';
+
+  @override
+  String get allowNotifications => 'Allow notifications';
 
   @override
   String get preciseAlarmsAvailable => 'Precise alarm access available';
@@ -2059,13 +2068,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Alerts are approximate until precise alarm access is enabled';
 
   @override
-  String get openSystemSettings => 'Open system settings';
-
-  @override
   String get allowPreciseAlarms => 'Allow “Alarms & reminders”';
-
-  @override
-  String get taskDefaults => 'Task defaults';
 
   @override
   String get timedTasks => 'Timed tasks';
@@ -2107,9 +2110,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get repeatsDaily => 'repeats daily';
-
-  @override
-  String get retryScheduling => 'Refresh and retry scheduling';
 
   @override
   String get alertPending => 'pending';
@@ -2172,9 +2172,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exportSaved => 'Export saved. Keep the file somewhere private.';
 
   @override
-  String get keepYourTasks => 'Keep your tasks with you.';
-
-  @override
   String get exportImportIntro =>
       'Save a copy of your tasks to a file, or bring tasks from Todoist.';
 
@@ -2186,7 +2183,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chooseImportFileHelp =>
-      'Choose a TaskFlow JSON export or Todoist project CSV (up to 32 MB / 5,000 tasks and notes). You will review it before importing.';
+      'Choose a TaskFlow file or a project exported from Todoist. You’ll review it before importing.';
 
   @override
   String get importPreview => 'Import preview';
@@ -3092,7 +3089,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get billingSettingsHelp => 'Subscription, purchases and billing';
 
   @override
-  String get billingIntro => 'Your subscription, in one place.';
+  String get billingIntro =>
+      'Unlimited dictations, and room for all your files.';
 
   @override
   String get billingComplimentary =>
@@ -3170,8 +3168,8 @@ class AppLocalizationsEn extends AppLocalizations {
           'Purchases are restricted for this store account or device.',
       'otherAccount':
           'This purchase belongs to another account. Sign in to the original account to restore it.',
-      'store': 'The store could not complete the request. Please try again.',
-      'other': 'Could not update your subscription. Please try again.',
+      'store': 'The store didn’t answer. Open this screen again.',
+      'other': 'The store didn’t answer. Open this screen again.',
     });
     return '$_temp0';
   }

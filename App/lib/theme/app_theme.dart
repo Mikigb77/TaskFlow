@@ -110,7 +110,8 @@ abstract final class AppTheme {
           style: OutlinedButton.styleFrom(
               minimumSize: const Size(48, 52),
               shape: shape,
-              side: BorderSide(color: scheme.outlineVariant))),
+              // `outline`, as chips and fields: a border that shows (3:1).
+              side: BorderSide(color: scheme.outline))),
       textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(minimumSize: const Size(48, 48))),
       iconButtonTheme: IconButtonThemeData(

@@ -16,6 +16,7 @@ class DeviceCalendarsScreen extends ConsumerStatefulWidget {
 class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
     with WidgetsBindingObserver {
   bool _busy = false;
+  bool _refused = false;
   @override
   void initState() {
     super.initState();
@@ -43,6 +44,15 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
     }
   }
 
+  /// Asks for access; a refusal is said on the screen.
+  Future<void> _connect() async {
+    await ref.read(deviceCalendarProvider.notifier).enable();
+    if (mounted) {
+      setState(() => _refused =
+          ref.read(deviceCalendarProvider).access != CalendarAccess.granted);
+    }
+  }
+
   Future<void> _run(Future<void> Function() operation) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -63,43 +73,40 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
     final state = ref.watch(deviceCalendarProvider);
     final controller = ref.read(deviceCalendarProvider.notifier);
     final l = context.l10n;
+    final enabled = state.preferences.enabled;
+    // One line says where things stand: before access, after a refusal, or
+    // connected. None while an earlier connection is being checked.
+    final String? lead = switch (state.access) {
+      CalendarAccess.unavailable => l.calendarUnsupported,
+      CalendarAccess.blocked => l.calendarBlocked,
+      CalendarAccess.denied when enabled || _refused => l.calendarRefused,
+      CalendarAccess.granted when state.showing => l.calendarConnected,
+      CalendarAccess.granted || CalendarAccess.checking when enabled => null,
+      _ => l.deviceCalendarIntro,
+    };
     return Scaffold(
         appBar: CustomAppBar(title: l.deviceCalendars),
         body: ListView(padding: const EdgeInsets.all(24), children: [
-          Text(l.deviceCalendarHelp,
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          Text(l.deviceCalendarPrivacy),
-          const SizedBox(height: 20),
+          if (lead != null) ...[Text(lead), const SizedBox(height: 16)],
           if (_busy || state.access == CalendarAccess.checking)
             const LinearProgressIndicator(),
           if (state.error) MessageBanner(l.calendarReadError, isError: true),
-          if (state.access == CalendarAccess.unavailable)
-            Text(l.calendarUnsupported)
-          else ...[
-            if (state.access == CalendarAccess.denied) Text(l.calendarDenied),
-            if (state.access == CalendarAccess.blocked) Text(l.calendarBlocked),
+          if (state.access != CalendarAccess.unavailable) ...[
             if (state.access == CalendarAccess.blocked)
               OutlinedButton(
                   onPressed: _busy
                       ? null
                       : () => _run(ref.read(deviceCalendarsProvider).settings),
                   child: Text(l.calendarSettings))
-            else if (!state.preferences.enabled ||
-                state.access == CalendarAccess.denied)
+            else if (!enabled || state.access == CalendarAccess.denied)
               FilledButton.icon(
                   key: const ValueKey('calendar-connect'),
                   onPressed: _busy || state.access == CalendarAccess.checking
                       ? null
-                      : () => _run(controller.enable),
+                      : () => _run(_connect),
                   icon: const Icon(Icons.calendar_month_outlined),
                   label: Text(l.calendarEnable)),
-            if (state.preferences.enabled)
-              TextButton(
-                  onPressed: _busy ? null : () => _run(controller.disable),
-                  child: Text(l.calendarDisable)),
-            if (state.access == CalendarAccess.granted &&
-                state.preferences.enabled) ...[
+            if (state.access == CalendarAccess.granted && enabled) ...[
               const SizedBox(height: 20),
               SectionLabel(l.calendarChoose),
               Text(l.calendarChooseHelp),
@@ -124,19 +131,22 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
                         ? null
                         : (selected) => _run(() => controller.select(
                             calendar.selectionKey, selected == true))),
-              if (state.preferences.selected.isNotEmpty)
-                TextButton(
-                    onPressed:
-                        _busy ? null : () => _run(controller.clearSelection),
-                    child: Text(l.calendarClear)),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => _run(() => controller.refresh(browse: true)),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text(l.calendarRefresh)),
             ],
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () => _run(() => controller.refresh(browse: true)),
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(l.calendarRefresh)),
+            // The off switch sits below the list, never where «Conectar» was.
+            if (enabled) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                  key: const ValueKey('calendar-disable'),
+                  onPressed: _busy ? null : () => _run(controller.disable),
+                  child: Text(l.calendarDisable)),
+            ],
           ],
         ]));
   }

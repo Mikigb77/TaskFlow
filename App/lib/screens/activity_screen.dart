@@ -248,7 +248,9 @@ class _ActivityRow extends StatelessWidget {
     final project = item['project_name'] as String?;
     return MergeSemantics(
       child: Semantics(
-        label: unread ? context.l10n.activityUnread : null,
+        // A waiting row drops «unread» as its wait starts, so marking it
+        // read mid-wait doesn't change what TalkBack hears.
+        label: unread && !waiting ? context.l10n.activityUnread : null,
         child: Stack(
           children: [
             ListTile(

@@ -1086,6 +1086,139 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    // ---- Run 2026-10-19-app, b5 · P214 (UX-1648): an unread row's spoken
+    // label holds still while it waits ----
+
+    /// Activity at 360×800 with «Lucía ha creado: Comprar pan» unread and
+    /// [others]; marking it read completes when the test completes
+    /// [_GatedReadApi.release], and every later fetch of the list returns it
+    /// read, as the server would.
+    Future<(HangingSyncTasks, _GatedReadApi, List<int>)> openReloading(
+      WidgetTester tester, {
+      List<Map<String, dynamic>> others = const [],
+    }) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await insert(tester, id: 2, syncId: 'srv-2');
+      final tasks = HangingSyncTasks();
+      final api = _GatedReadApi();
+      final fetches = <int>[0];
+      final container = designContainer(
+        tasks: () => tasks,
+        api: api,
+        overrides: [
+          collaborationActivityProvider.overrideWith((ref) async {
+            final first = fetches[0]++ == 0;
+            return [
+              {
+                ...lucia(),
+                if (!first) 'read_at': created.toIso8601String(),
+              },
+              ...others,
+            ];
+          }),
+          collaborationUnreadProvider.overrideWith((ref) async => 1),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(app(container, const ActivityScreen()));
+      await tester.pumpAndSettle();
+      return (tasks, api, fetches);
+    }
+
+    bool bold(WidgetTester tester, String row) =>
+        tester.widget<Text>(find.text(row)).style?.fontWeight ==
+        FontWeight.w700;
+
+    testWidgets(
+      'UX-1648: ES, from the start of the wait until it ends, the waiting row’s spoken label holds one value without «No leída», even when the list reloads with the item read',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final (tasks, api, fetches) = await openReloading(tester);
+        expect(fetches.single, 1);
+        // Unread, before the tap: bold, and «No leída» in its label.
+        expect(bold(tester, luciaRow), isTrue);
+        expect(spoken(tester, luciaRow), contains(es.activityUnread));
+
+        await tester.tap(find.text(luciaRow));
+        await settleUntil(
+          tester,
+          () => spinnerOn(luciaRow).evaluate().isNotEmpty,
+        );
+        expect(spinnerOn(luciaRow), findsOneWidget);
+        expect(api.reads, ['notifications/n-lucia/read/']);
+        final label = spoken(tester, luciaRow);
+        expect(label, contains(luciaRow));
+        expect(label, contains(es.activityFindingTask));
+        expect(label, isNot(contains(es.activityUnread)));
+
+        final heard = <String>{};
+        void listen() {
+          if (spinnerOn(luciaRow).evaluate().isEmpty) return;
+          heard.add(spoken(tester, luciaRow));
+        }
+
+        // Marking it read lands mid-wait: the list reloads with it read.
+        api.release.complete();
+        for (var frame = 0; frame < 40; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          listen();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 5)),
+          );
+          listen();
+        }
+        expect(fetches.single, greaterThanOrEqualTo(2), reason: 'reloaded');
+        expect(spinnerOn(luciaRow), findsOneWidget, reason: 'still waiting');
+        // Read now: its title isn't bold any more.
+        expect(bold(tester, luciaRow), isFalse);
+        expect(heard, {label}, reason: 'one label through the reload');
+
+        // The wait ends: the sync completes without the task.
+        tasks.finishSync();
+        final message = find.text(es.taskRemoved);
+        for (var i = 0; i < 50 && message.evaluate().isEmpty; i++) {
+          listen();
+          await tester.pump();
+          listen();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+        }
+        await tester.pump();
+        expect(message, findsOneWidget);
+        expect(spinnerOn(luciaRow), findsNothing);
+        expect(heard, {label}, reason: 'one label until the wait ended');
+        // Read, after the wait: never «No leída» again.
+        expect(spoken(tester, luciaRow), isNot(contains(es.activityUnread)));
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-1648: ES, an unread row that isn’t waiting still reads «No leída», in bold; a read row never does',
+      (tester) async {
+        const anaRow = 'Ana ha completado: Review the new designs';
+        final semantics = tester.ensureSemantics();
+        await openReloading(
+          tester,
+          others: [
+            {...completed('srv-2'), 'read_at': created.toIso8601String()},
+          ],
+        );
+        expect(spoken(tester, luciaRow), contains(es.activityUnread));
+        expect(bold(tester, luciaRow), isTrue);
+        expect(spoken(tester, anaRow), isNot(contains(es.activityUnread)));
+        expect(bold(tester, anaRow), isFalse);
+        expect(spinnerOn(luciaRow), findsNothing);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
   });
 
   testWidgets('UX-628: a task’s own history keeps the word Actividad', (
@@ -1117,6 +1250,28 @@ class _HangingApi extends OfflineApiClient {
     int? accountId,
   }) {
     if (path.startsWith('notifications/')) reads.add(path);
+    return Completer<dynamic>().future;
+  }
+}
+
+/// P214: marking an entry read completes when the test completes [release].
+class _GatedReadApi extends OfflineApiClient {
+  final reads = <String>[];
+  final release = Completer<void>();
+  @override
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
+    if (path.startsWith('notifications/')) {
+      reads.add(path);
+      await release.future;
+      return null;
+    }
     return Completer<dynamic>().future;
   }
 }

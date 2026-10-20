@@ -49,10 +49,9 @@ class RegionalSettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text(s.regionHelp),
-          const SizedBox(height: 24),
           _choice<ClockFormat>(
             key: const ValueKey('regional-clock'),
+            context: context,
             label: s.clockFormat,
             value: p.clock,
             values: {
@@ -64,6 +63,7 @@ class RegionalSettingsScreen extends ConsumerWidget {
           ),
           _choice<int>(
             key: const ValueKey('regional-week'),
+            context: context,
             label: s.weekStart,
             value: p.weekStart ?? -1,
             values: {
@@ -79,9 +79,11 @@ class RegionalSettingsScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: Text(s.timeZone),
             subtitle: Text(
-              p.captureTimezone == null
-                  ? s.deviceDefault
-                  : timeZoneName(p.captureTimezone!),
+              p.captureTimezone != null
+                  ? timeZoneName(p.captureTimezone!)
+                  : zone != null && !zone.fallback
+                  ? s.timeZoneSameAsPhone(timeZoneName(zone.identifier))
+                  : s.deviceDefault,
             ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () async {
@@ -101,45 +103,77 @@ class RegionalSettingsScreen extends ConsumerWidget {
             },
           ),
           Text(s.timezoneHelp),
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: zone == null
-                ? const SizedBox.shrink()
-                : zone.fallback
-                ? MessageBanner(
-                    s.timezoneFallback(timeZoneName(zone.identifier)),
-                  )
-                : Text(timeZoneName(zone.identifier)),
-          ),
+          if (zone != null && zone.fallback)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: MessageBanner(
+                s.timezoneFallback(timeZoneName(zone.identifier)),
+              ),
+            ),
         ],
       ),
     );
   }
 
+  /// A row with its current value; tapping it opens a sheet of radio rows,
+  /// like Idioma and Apariencia.
   Widget _choice<T>({
     required Key key,
+    required BuildContext context,
     required String label,
     required T value,
     required Map<T, String> values,
     required ValueChanged<T> changed,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        DropdownButton<T>(
-          key: key,
-          isExpanded: true,
-          value: value,
-          items: values.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-              .toList(),
-          onChanged: (v) {
-            if (v != null) changed(v);
-          },
+  }) => ListTile(
+    key: key,
+    contentPadding: EdgeInsets.zero,
+    title: Text(label),
+    subtitle: Text(values[value] ?? ''),
+    trailing: const Icon(Icons.chevron_right_rounded),
+    onTap: () => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(
+                  label,
+                  style: Theme.of(sheet).textTheme.headlineSmall,
+                ),
+              ),
+              RadioGroup<T>(
+                groupValue: value,
+                onChanged: (v) {
+                  Navigator.pop(sheet);
+                  if (v != null && v != value) changed(v);
+                },
+                child: Column(
+                  children: [
+                    for (final e in values.entries)
+                      RadioListTile<T>(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                        ),
+                        value: e.key,
+                        toggleable: true,
+                        title: Text(e.value),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     ),
   );
 }

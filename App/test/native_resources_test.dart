@@ -75,40 +75,40 @@ void main() {
       }
       expect(
         en['share_too_long'],
-        'TaskFlow accepts up to 4,000 characters. Share a shorter text.',
+        'That text is too long. Share a shorter one.',
       );
       expect(
         es['share_too_long'],
-        'TaskFlow admite hasta 4000 caracteres. Comparte un texto más corto.',
+        'Texto demasiado largo. Comparte uno más corto.',
       );
       expect(
         ca['share_too_long'],
-        'TaskFlow admet fins a 4.000 caràcters. Comparteix un text més curt.',
+        'Text massa llarg. Comparteix-ne un de més curt.',
       );
       expect(
         en['share_queue_full'],
-        'Open TaskFlow and finish what you shared before sharing more.',
+        'Open TaskFlow and finish what you shared.',
       );
       expect(
         es['share_queue_full'],
-        'Abre TaskFlow y termina lo que ya has compartido antes de compartir más.',
+        'Abre TaskFlow y acaba lo que ya has compartido.',
       );
       expect(
         ca['share_queue_full'],
-        'Obre TaskFlow i acaba el que ja has compartit abans de compartir-ne més.',
+        'Obre TaskFlow i acaba el que ja has compartit.',
       );
       // The catalogs write the apostrophe as ’.
       expect(
         en['share_not_saved']!.replaceAll('’', "'"),
-        "Couldn't save what you shared. Please share it again.",
+        "Couldn't save it. Please share it again.",
       );
       expect(
         es['share_not_saved'],
-        'No se ha podido guardar lo que has compartido. Vuelve a compartirlo.',
+        'No se ha podido guardar. Vuelve a compartirlo.',
       );
       expect(
         ca['share_not_saved'],
-        'No s’ha pogut desar el que has compartit. Torna-ho a compartir.',
+        'No s’ha pogut desar. Torna-ho a compartir.',
       );
     },
   );
@@ -148,7 +148,7 @@ void main() {
         'android/app/src/main/kotlin/com/example/agenda/CaptureShortcuts.kt',
       ).readAsStringSync();
       String iconOf(String id) => RegExp(
-        '"$id", R\\.string\\.[a-z_]+, R\\.drawable\\.([a-z_]+)',
+        '"$id",(?:\\s*R\\.string\\.[a-z_]+,)+\\s*R\\.drawable\\.([a-z_]+)',
       ).firstMatch(shortcuts)![1]!;
       expect(iconOf('capture_voice'), 'capture_shortcut_voice');
       expect(iconOf('capture_text'), 'capture_shortcut_text');
@@ -227,18 +227,9 @@ void main() {
   test(
     'UX-494: share_empty exists in values, values-es and values-ca with the agreed copy',
     () {
-      expect(
-        en['share_empty'],
-        'There’s no text to add. Share some text with TaskFlow.',
-      );
-      expect(
-        es['share_empty'],
-        'No hay texto que añadir. Comparte un texto con TaskFlow.',
-      );
-      expect(
-        ca['share_empty'],
-        'No hi ha cap text per afegir. Comparteix un text amb TaskFlow.',
-      );
+      expect(en['share_empty'], 'No text to add.');
+      expect(es['share_empty'], 'No hay texto que añadir.');
+      expect(ca['share_empty'], 'No hi ha cap text per afegir.');
       // Not the too-long message, in any language.
       for (final strings in [en, es, ca]) {
         expect(strings['share_empty'], isNot(strings['share_too_long']));
@@ -282,6 +273,145 @@ void main() {
         RegExp(r'R\.string\.share_too_long').allMatches(kotlin),
         hasLength(1),
       );
+    },
+  );
+
+  // ---- P186 (UX-1316, UX-1319, UX-1621): whole words at large text, short
+  // share messages, the app's language ----
+
+  test(
+    'UX-1316: the shortcuts have one-word short labels Dictar / Escribir, at most 10 characters',
+    () {
+      expect(en['capture_voice_short'], 'Dictate');
+      expect(en['capture_text_short'], 'Type');
+      expect(es['capture_voice_short'], 'Dictar');
+      expect(es['capture_text_short'], 'Escribir');
+      expect(ca['capture_voice_short'], 'Dicta');
+      expect(ca['capture_text_short'], 'Escriu');
+      for (final strings in [en, es, ca]) {
+        for (final name in ['capture_voice_short', 'capture_text_short']) {
+          final label = strings[name]!;
+          expect(label.length, lessThanOrEqualTo(10), reason: name);
+          expect(label, isNot(contains(' ')), reason: '$name is one word');
+        }
+        // The long labels stay as they were.
+        expect(strings['capture_voice'], isNotEmpty);
+        expect(strings['capture_text'], isNotEmpty);
+      }
+      // Translators are told the limits (PL-9).
+      for (final folder in ['values', 'values-es', 'values-ca']) {
+        final xml = File('$_res/$folder/strings.xml').readAsStringSync();
+        for (final name in ['capture_voice_short', 'capture_text_short']) {
+          expect(
+            RegExp(
+              '<!--[^>]*10[^>]*-->${r'\s*'}<string name="$name"',
+            ).hasMatch(xml),
+            isTrue,
+            reason: '$folder $name has a translator comment with its limit',
+          );
+        }
+      }
+    },
+  );
+
+  test(
+    'UX-1316: CaptureShortcuts sets the short label and the long label on both shortcuts',
+    () {
+      final kotlin = File(
+        'android/app/src/main/kotlin/com/example/agenda/CaptureShortcuts.kt',
+      ).readAsStringSync();
+      final calls = {
+        for (final match in RegExp(
+          r'"(capture_voice|capture_text)",\s*R\.string\.(\w+),\s*R\.string\.(\w+),',
+        ).allMatches(kotlin))
+          match[1]!: [match[2]!, match[3]!],
+      };
+      expect(calls['capture_voice'], ['capture_voice_short', 'capture_voice']);
+      expect(calls['capture_text'], ['capture_text_short', 'capture_text']);
+      expect(
+        RegExp(r'\.setShortLabel\(\s*context\.getString\(\s*shortLabel\s*\)\s*\)')
+            .hasMatch(kotlin),
+        isTrue,
+      );
+      expect(
+        RegExp(r'\.setLongLabel\(\s*context\.getString\(\s*longLabel\s*\)\s*\)')
+            .hasMatch(kotlin),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'UX-1316: the widget has a 24 dp mic, 6 dp padding and a label that auto-sizes from 9 to 12 sp on at most 2 lines',
+    () {
+      final xml = File('$_res/layout/capture_widget.xml').readAsStringSync();
+      final root = RegExp(r'<LinearLayout\b[^>]*>').firstMatch(xml)![0]!;
+      expect(root, contains('android:orientation="vertical"'));
+      expect(root, contains('android:padding="6dp"'));
+      final image = RegExp(r'<ImageView\b[^>]*/>').firstMatch(xml)![0]!;
+      expect(image, contains('android:layout_width="24dp"'));
+      expect(image, contains('android:layout_height="24dp"'));
+      final label = RegExp(r'<TextView\b[^>]*/>').firstMatch(xml)![0]!;
+      expect(label, contains('android:text="@string/capture_voice"'));
+      expect(label, contains('android:layout_width="match_parent"'));
+      expect(label, contains('android:layout_height="0dp"'));
+      expect(label, contains('android:layout_weight="1"'));
+      expect(label, contains('android:autoSizeTextType="uniform"'));
+      expect(label, contains('android:autoSizeMinTextSize="9sp"'));
+      expect(label, contains('android:autoSizeMaxTextSize="12sp"'));
+      expect(label, contains('android:maxLines="2"'));
+      // API 24-25 keep today's 12 sp.
+      expect(label, contains('android:textSize="12sp"'));
+    },
+  );
+
+  test(
+    'UX-1319: the four share messages are at most 50 characters in EN, ES and CA',
+    () {
+      for (final entry in {'en': en, 'es': es, 'ca': ca}.entries) {
+        for (final name in [
+          'share_too_long',
+          'share_empty',
+          'share_queue_full',
+          'share_not_saved',
+        ]) {
+          final text = entry.value[name];
+          expect(text, isNotNull, reason: '${entry.key} $name');
+          expect(
+            text!.length,
+            lessThanOrEqualTo(50),
+            reason: '${entry.key} $name: "$text"',
+          );
+        }
+      }
+    },
+  );
+
+  test(
+    'UX-1621: the activity keeps locale in configChanges, and a language change republishes the shortcuts and redraws the widget',
+    () {
+      final manifest = File(
+        'android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+      final changes = RegExp(
+        r'android:configChanges="([^"]+)"',
+      ).firstMatch(manifest)![1]!.split('|');
+      expect(changes, contains('locale'));
+      final activity = File(
+        'android/app/src/main/kotlin/com/example/agenda/MainActivity.kt',
+      ).readAsStringSync();
+      final onChange = RegExp(
+        r'override fun onConfigurationChanged\([^)]*\)\s*\{([\s\S]*?)\n    \}',
+      ).firstMatch(activity);
+      expect(onChange, isNotNull);
+      expect(onChange![1], contains('CaptureShortcuts.publish(this)'));
+      expect(onChange[1], contains('CaptureWidget.refresh(this)'));
+      final bridge = File(
+        'android/app/src/main/kotlin/com/example/agenda/AppLanguageBridge.kt',
+      ).readAsStringSync();
+      expect(bridge, contains('"taskflow/app-language"'));
+      expect(bridge, contains('applicationLocales'));
+      expect(bridge, contains('Build.VERSION_CODES.TIRAMISU'));
     },
   );
 }

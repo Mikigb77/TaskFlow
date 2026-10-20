@@ -318,18 +318,18 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deviceCalendars => 'Calendaris del telèfon';
 
   @override
-  String get deviceCalendarHelp =>
-      'Mostra els esdeveniments dels calendaris del telèfon al costat de les tasques.';
-
-  @override
-  String get deviceCalendarPrivacy =>
-      'Tria quins calendaris vols mostrar. Els esdeveniments són de només lectura a TaskFlow i es queden en aquest dispositiu; no es pugen ni s’envien a la IA. Gestiona’n els recordatoris a l’aplicació de calendari.';
+  String get deviceCalendarIntro =>
+      'Veuràs els esdeveniments del telèfon a Calendari. Només es llegeixen aquí; no es pugen.';
 
   @override
   String get calendarEnable => 'Connecta els calendaris del telèfon';
 
   @override
   String get calendarDisable => 'Amaga els esdeveniments';
+
+  @override
+  String get calendarConnected =>
+      'Connectat. Els esdeveniments es veuen a Calendari.';
 
   @override
   String get calendarChoose => 'Tria els calendaris';
@@ -341,6 +341,10 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get calendarDenied =>
       'Permet l’accés al calendari per mostrar els esdeveniments. Les tasques continuen funcionant sense aquest permís.';
+
+  @override
+  String get calendarRefused =>
+      'Sense permís, TaskFlow no pot veure els esdeveniments.';
 
   @override
   String get calendarBlocked =>
@@ -359,9 +363,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Actualitza els calendaris';
-
-  @override
-  String get calendarClear => 'Esborra la selecció';
 
   @override
   String get calendarReadError =>
@@ -609,6 +610,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get remindersBlocked => 'Bloquejats pel telèfon';
 
   @override
+  String get remindersOnLate => 'Activats · poden arribar tard';
+
+  @override
   String get otherSettings => 'Altres opcions';
 
   @override
@@ -653,15 +657,16 @@ class AppLocalizationsCa extends AppLocalizations {
   String get timeZone => 'Fus horari';
 
   @override
+  String timeZoneSameAsPhone(String city) {
+    return 'Com el telèfon ($city)';
+  }
+
+  @override
   String get timezoneHelp =>
       'Les tasques noves fan servir aquest fus horari per entendre les dates.';
 
   @override
   String get searchTimezone => 'Cerca un fus horari';
-
-  @override
-  String get regionHelp =>
-      'Aquestes preferències es queden en aquest dispositiu. Canviar-les no modifica les dates ni les hores desades de les tasques.';
 
   @override
   String get preferenceError =>
@@ -1412,9 +1417,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get yourAccount => 'El teu compte';
 
   @override
-  String get accountHeading => 'El teu petit espai.';
-
-  @override
   String get accountSaved => 'Desat al teu compte';
 
   @override
@@ -2050,6 +2052,10 @@ class AppLocalizationsCa extends AppLocalizations {
       'Perquè l’avís arribi a l’hora, permet «Alarmes i recordatoris».';
 
   @override
+  String get exactAlarmsNextScreen =>
+      'A la pantalla següent, activa l’interruptor i torna.';
+
+  @override
   String get remindersOnConfirmation => 'Fet. Recordatoris activats.';
 
   @override
@@ -2082,7 +2088,10 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get notificationPermissionOff =>
-      'El permís del sistema està desactivat';
+      'El telèfon no deixa que TaskFlow t’avisi.';
+
+  @override
+  String get allowNotifications => 'Permet els avisos';
 
   @override
   String get preciseAlarmsAvailable =>
@@ -2093,13 +2102,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'Els avisos són aproximats fins que s’activa l’accés a alarmes exactes';
 
   @override
-  String get openSystemSettings => 'Obre la configuració del sistema';
-
-  @override
   String get allowPreciseAlarms => 'Permet «Alarmes i recordatoris»';
-
-  @override
-  String get taskDefaults => 'Valors per defecte de les tasques';
 
   @override
   String get timedTasks => 'Tasques amb hora';
@@ -2141,9 +2144,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get repeatsDaily => 'es repeteix cada dia';
-
-  @override
-  String get retryScheduling => 'Actualitza i torna a programar';
 
   @override
   String get alertPending => 'pendent';
@@ -2207,9 +2207,6 @@ class AppLocalizationsCa extends AppLocalizations {
       'Exportació desada. Conserva el fitxer en un lloc privat.';
 
   @override
-  String get keepYourTasks => 'Porta les tasques amb tu.';
-
-  @override
   String get exportImportIntro =>
       'Desa una còpia de les tasques en un fitxer o porta tasques de Todoist.';
 
@@ -2221,7 +2218,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get chooseImportFileHelp =>
-      'Tria una exportació JSON de TaskFlow o un CSV de projecte de Todoist (fins a 32 MB i 5.000 tasques i notes). El podràs revisar abans d’importar-lo.';
+      'Tria un fitxer de TaskFlow o un projecte exportat de Todoist. El podràs revisar abans d’importar-lo.';
 
   @override
   String get importPreview => 'Previsualització de la importació';
@@ -3159,7 +3156,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get billingSettingsHelp => 'Subscripció, compres i facturació';
 
   @override
-  String get billingIntro => 'La teva subscripció, en un sol lloc.';
+  String get billingIntro =>
+      'Dictats sense límit i espai per a tots els fitxers.';
 
   @override
   String get billingComplimentary =>
@@ -3238,8 +3236,8 @@ class AppLocalizationsCa extends AppLocalizations {
           'Les compres estan restringides per a aquest compte de la botiga o dispositiu.',
       'otherAccount':
           'Aquesta compra pertany a un altre compte. Inicia la sessió amb el compte original per restaurar-la.',
-      'store': 'La botiga no ha pogut completar la petició. Torna-ho a provar.',
-      'other': 'No s’ha pogut actualitzar la subscripció. Torna-ho a provar.',
+      'store': 'La botiga no ha respost. Torna a obrir aquesta pantalla.',
+      'other': 'La botiga no ha respost. Torna a obrir aquesta pantalla.',
     });
     return '$_temp0';
   }

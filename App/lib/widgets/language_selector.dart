@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/l10n/app_languages.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/services/app_language.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,6 +61,8 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
       await ref
           .read(regionalProvider.notifier)
           .set(ref.read(regionalProvider).withLanguage(language));
+      // The widget, the shortcuts and the share messages follow (Android 13+).
+      unawaited(AppLanguageBridge.apply(language));
       await TaskReminders.refreshLanguage();
       if (mounted) Navigator.pop(context);
     } catch (_) {
@@ -76,10 +81,13 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
   Widget build(BuildContext context) {
     final preferences = ref.watch(regionalProvider);
     final strings = context.l10n;
+    // Under a per-app language, Flutter's locales are the app's, not the phone's.
     final automatic = AppLanguages.nativeName(
       AppLanguages.resolve(
         AppLanguages.system,
-        WidgetsBinding.instance.platformDispatcher.locales,
+        AppLanguageBridge.phoneOr(
+          WidgetsBinding.instance.platformDispatcher.locales,
+        ),
       ).languageCode,
     );
     return SafeArea(

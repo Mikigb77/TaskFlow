@@ -2,6 +2,7 @@ import 'package:agenda/models/archive_diagnostic.dart';
 import 'package:agenda/l10n/archive_locale.dart';
 import 'package:agenda/l10n/region.dart';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task_archive.dart';
@@ -31,6 +32,48 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
   bool _busy = false;
   String Function(BuildContext)? _message;
   bool _error = false;
+  final _bannerKey = GlobalKey();
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Each result shows once, in the banner: bring it into view, such as after
+  /// «Importar» at the end of a long preview, where the banner isn't built
+  /// yet. Then go back to the top, and down until it is.
+  void _revealMessage() {
+    var steps = 0;
+    Future<void> reveal(Duration _) async {
+      if (!mounted) return;
+      final banner = _bannerKey.currentContext;
+      if (banner == null) {
+        if (!_scroll.hasClients || steps++ > 8) return;
+        final position = _scroll.position;
+        _scroll.jumpTo(steps == 1
+            ? 0
+            : min(position.pixels + position.viewportDimension,
+                position.maxScrollExtent));
+        WidgetsBinding.instance.addPostFrameCallback(reveal);
+        return;
+      }
+      for (final policy in [
+        ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        ScrollPositionAlignmentPolicy.keepVisibleAtEnd
+      ]) {
+        if (!banner.mounted) return;
+        await Scrollable.ensureVisible(banner,
+            duration: MediaQuery.disableAnimationsOf(banner)
+                ? Duration.zero
+                : const Duration(milliseconds: 250),
+            alignmentPolicy: policy);
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback(reveal);
+  }
 
   Future<void> _run(
       Future<String Function(BuildContext)?> Function(ArchiveStore)
@@ -47,9 +90,6 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
       final message = await operation(store);
       if (mounted && identical(store, ref.read(archiveStoreProvider))) {
         setState(() => _message = message);
-        if (message != null) {
-          showFeedback(ScaffoldMessenger.of(context), message(context));
-        }
       }
     } on FormatException catch (error) {
       if (mounted) {
@@ -69,7 +109,10 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (_message != null) _revealMessage();
+      }
     }
   }
 
@@ -144,10 +187,10 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
         canPop: !_busy,
         child: Scaffold(
           appBar: CustomAppBar(title: context.l10n.exportImport),
-          body: ListView(padding: const EdgeInsets.all(24), children: [
-            Text(context.l10n.keepYourTasks,
-                style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 12),
+          body: ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.all(24),
+              children: [
             Text(context.l10n.exportImportIntro),
             const SizedBox(height: 16),
             Wrap(spacing: 8, runSpacing: 8, children: [
@@ -169,7 +212,9 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
             if (_message != null)
               Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: MessageBanner(_message!(context), isError: _error)),
+                  // Read out as it appears: no snackbar repeats it.
+                  child: MessageBanner(_message!(context),
+                      key: _bannerKey, isError: _error, liveRegion: true)),
             if (archive != null) ...[
               const SizedBox(height: 24),
               Text(context.l10n.importPreview,

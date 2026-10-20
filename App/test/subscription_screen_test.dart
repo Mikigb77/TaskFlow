@@ -196,7 +196,7 @@ void main() {
 
   for (final (purchased, active) in [(true, false), (true, true), (false, false)]) {
     testWidgets(
-      'UX-423: the Pro screen ${active ? 'for an active subscriber' : purchased ? 'for someone who bought Pro before' : 'for someone who never bought Pro'} shows ${purchased ? 'Gestionar suscripción' : 'no Gestionar suscripción'}, Restaurar compras${active ? '' : ' and Ver suscripción'}, and no Abrir suscripciones de la tienda or Actualizar estado',
+      'UX-423: the Pro screen ${active ? 'for an active subscriber' : purchased ? 'for someone who bought Pro before' : 'for someone who never bought Pro'} shows ${purchased ? 'Gestionar suscripción' : 'no Gestionar suscripción'}${active ? ', no Restaurar compras (UX-1614)' : ', Restaurar compras and Ver suscripción'}, and no Abrir suscripciones de la tienda or Actualizar estado',
       (tester) async {
         // Tall enough for every button to be built.
         tester.view.physicalSize = const Size(390, 1600);
@@ -212,7 +212,10 @@ void main() {
           labelled(l.billingViewPlans),
           active ? findsNothing : findsOneWidget,
         );
-        expect(labelled(l.billingRestore), findsOneWidget);
+        expect(
+          labelled(l.billingRestore),
+          active ? findsNothing : findsOneWidget,
+        );
         expect(
           labelled(l.billingManage),
           purchased ? findsOneWidget : findsNothing,
@@ -508,6 +511,197 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('actualiza'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  // ---- Run 2026-10-19-app · P189 (UX-1613, UX-1614): what Pro gives, buttons apart ----
+
+  final freeUser = {
+    'free_voice': {
+      'limit': 10,
+      'left': 4,
+      'resets_at': resets.toIso8601String(),
+    },
+    'storage': {'used_bytes': 42 * megabyte, 'limit_bytes': 100 * megabyte},
+  };
+
+  test('UX-1613 / UX-1614: the Pro copy reads as planned in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(en.billingIntro, 'Unlimited dictations, and room for all your files.');
+    expect(es.billingIntro,
+        'Dictados sin límite y espacio para todos tus archivos.');
+    expect(ca.billingIntro,
+        'Dictats sense límit i espai per a tots els fitxers.');
+    for (final reason in ['store', 'other']) {
+      expect(en.billingError(reason),
+          'The store didn’t answer. Open this screen again.');
+      expect(es.billingError(reason),
+          'La tienda no respondió. Vuelve a abrir esta pantalla.');
+      expect(ca.billingError(reason),
+          'La botiga no ha respost. Torna a obrir aquesta pantalla.');
+    }
+  });
+
+  for (final language in ['es', 'ca']) {
+    testWidgets(
+      'UX-1613: $language at 2× on 360×800, a free account sees what Pro gives and Ver suscripción without scrolling, and no second TaskFlow Pro heading or sparkle in the card',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final l = lookupAppLocalizations(Locale(language));
+        await openPro(
+          tester,
+          sdk: _CountingRevenueCat(),
+          language: language,
+          user: freeUser,
+          textScale: 2,
+        );
+        final body = find.byType(ListView);
+        final viewport = tester.getRect(body);
+        final intro = find.text(l.billingIntro);
+        expect(intro, findsOneWidget);
+        final introRect = tester.getRect(intro);
+        expect(introRect.top, greaterThanOrEqualTo(viewport.top));
+        expect(introRect.bottom, lessThanOrEqualTo(viewport.bottom));
+        final offer = find.byKey(const ValueKey('subscription-paywall'));
+        expect(offer, findsOneWidget);
+        expect(
+          find.descendant(of: offer, matching: find.text(l.billingViewPlans)),
+          findsOneWidget,
+        );
+        // Pinned under the list, not inside it.
+        expect(find.descendant(of: body, matching: offer), findsNothing);
+        final offerRect = tester.getRect(offer);
+        expect(offerRect.top, greaterThanOrEqualTo(0));
+        expect(offerRect.bottom, lessThanOrEqualTo(800));
+        expect(tester.widget<FilledButton>(offer).onPressed, isNotNull);
+        // The app bar says «TaskFlow Pro»; the card doesn't again.
+        expect(
+          find.descendant(of: body, matching: find.text(l.taskflowPro)),
+          findsNothing,
+        );
+        for (final sparkle in [
+          Icons.auto_awesome,
+          Icons.auto_awesome_outlined,
+          Icons.auto_awesome_rounded,
+        ]) {
+          expect(
+            find.descendant(of: body, matching: find.byIcon(sparkle)),
+            findsNothing,
+          );
+        }
+        expect(find.text('Tu suscripción, en un solo lugar.'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1614: a free account’s Pro screen keeps at least 8 dp between adjacent buttons, scrolled to the top and to the end',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await openPro(
+        tester,
+        sdk: _CountingRevenueCat()..info = billingInfo(purchased: true),
+        user: freeUser,
+      );
+      // [at]: how many buttons are on screen at least.
+      void expectApart(String where, {required int at}) {
+        final buttons = tester
+            .widgetList(find.byWidgetPredicate((w) => w is ButtonStyleButton))
+            .map((w) => tester.getRect(find.byWidget(w)))
+            .where((r) => r.bottom > 0 && r.top < 800)
+            .toList()
+          ..sort((a, b) => a.top.compareTo(b.top));
+        expect(buttons.length, greaterThanOrEqualTo(at), reason: where);
+        for (var i = 1; i < buttons.length; i++) {
+          final above = buttons[i - 1], below = buttons[i];
+          final sideBySide =
+              below.top < above.bottom && below.left >= above.right;
+          if (sideBySide) continue;
+          expect(
+            below.top - above.bottom,
+            greaterThanOrEqualTo(8),
+            reason: '$where: buttons $above and $below',
+          );
+        }
+      }
+
+      expectApart('top', at: 1);
+      await tester.drag(find.byType(ListView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      expectApart('end', at: 3);
+      // «Restaurar compras» stays in the list, apart from the pinned button.
+      expect(
+        find.descendant(
+          of: find.byType(ListView),
+          matching: find.byKey(const ValueKey('subscription-restore')),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'UX-1614: while Pro is active, Gestionar suscripción stands alone: no Restaurar compras and no restore help',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final l = lookupAppLocalizations(const Locale('es'));
+      await openPro(
+        tester,
+        sdk: _CountingRevenueCat()..info = billingInfo(active: true),
+      );
+      expect(find.byKey(const ValueKey('subscription-restore')), findsNothing);
+      expect(find.textContaining(l.billingRestore), findsNothing);
+      expect(find.text(l.billingRestoreHelp), findsNothing);
+      final manage = find.byKey(const ValueKey('subscription-manage'));
+      await tester.scrollUntilVisible(manage, 200);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: manage, matching: find.text(l.billingManage)),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('subscription-paywall')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'UX-1614: when the store fails, the line reads La tienda no respondió. Vuelve a abrir esta pantalla.',
+    (tester) async {
+      final l = lookupAppLocalizations(const Locale('es'));
+      await openPro(
+        tester,
+        sdk: _CountingRevenueCat()
+          ..offeringsError = PlatformException(
+            code: '${PurchasesErrorCode.storeProblemError.index}',
+          ),
+        user: freeUser,
+      );
+      final error = find.byKey(const ValueKey('subscription-error'));
+      expect(error, findsOneWidget);
+      expect(tester.widget<Text>(error).data, l.billingError('store'));
+      expect(
+        tester.widget<Text>(error).data,
+        'La tienda no respondió. Vuelve a abrir esta pantalla.',
+      );
+      expect(
+        find.text('La tienda no pudo completar la solicitud. Inténtalo de nuevo.'),
+        findsNothing,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

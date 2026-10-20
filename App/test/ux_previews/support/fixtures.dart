@@ -46,6 +46,7 @@ const me = 1, ana = 2, paul = 3, lucia = 4, jordi = 5, marta = 6, carlos = 7;
 /// The signed-in account.
 Map<String, dynamic> account({
   int? freeLeft,
+  String? firstName,
   bool google = false,
   bool complimentary = false,
   int? storageMb,
@@ -53,6 +54,7 @@ Map<String, dynamic> account({
   'id': me,
   'email': 'maria.lopez@example.com',
   'timezone': 'Europe/Madrid',
+  if (firstName != null) 'first_name': firstName,
   if (google) 'google_linked': true,
   if (complimentary) 'complimentary_pro': true,
   if (storageMb != null)

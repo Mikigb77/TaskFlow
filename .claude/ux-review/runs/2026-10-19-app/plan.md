@@ -517,3 +517,49 @@ The next review of area C can raise any of these as findings.
 
 ### Phone checks added
 - P213 (emulator lane with TalkBack, then the phone): double-tap an entry whose task the phone hasn't synced yet. TalkBack says «Buscando la tarea…» once, then the task opens. At the largest text, the entry's words don't move when the bar appears.
+
+## Round 2 (b5)
+
+Round 1 of b5 (P186–P189 and P214) fixed 16 of its 17 findings, according to reviews C and D (`verify-b5-r1-C.md`, `verify-b5-r1-D.md`), and the tests and the round check passed. UX-1612 came back partly fixed: the slogan is gone and the name is the heading, but TalkBack doesn't hear it as one. Four regressions came back, three minor and one polish item, now UX-1649 to UX-1652. Round 2 fixes all five in three packages, written to `plan-b5-r2.json`. Nothing has failed twice, so nothing is escalated, and there's no new question for you.
+
+### P215 · S2 · D · M · «Como el teléfono» reads the phone again, not the app's language
+- **UX-1649 (S2), R1D-1 from P186:** with the phone in Spanish and Idioma in English, «Primer día de la semana: Como el teléfono» starts the week on Sunday, because on Android 13+ the app now sees the app's language where it asks for the phone's. The week start, the recognizer's region and background reminders read the phone's languages that P186's bridge already returns. A copy is kept on the phone, so the first screen and background reminders have them too. Inferred from code; the emulator confirms it.
+
+### P216 · S2 · D · S · Recordatorios: after turning on, Detalles waits for the alerts and shows a failed refresh
+- **UX-1650 (S2), R1D-2 from P187:** after turning reminders on, Detalles said «No hay próximos avisos» because it read the list before the alerts were set. The screen now waits for that same setting-up, with the progress bar and the switch on, and then lists the alerts. If the setting-up fails, «Reintentar» shows at once. «Listo. Recordatorios activados.» still comes right away.
+
+### P217 · S2 · D · S · Follow-ups on three settings screens
+- **UX-1651 (S2), R1D-3 from P188:** «Borrar selección» goes from Calendarios del teléfono. It looked like «Ocultar eventos del calendario» right under it and did the same thing; each calendar's tick box still turns one off. That leaves 2 controls below the list instead of 3.
+- **UX-1612 (S2), second attempt:** Cuenta's name is announced as a heading. The name row stays UX-1515's (P194, D5).
+- **UX-1652 (S1), R1D-4 from P188:** with Android's «Quitar animaciones» on, the import result jumps into view instead of scrolling.
+
+### Skipped
+Nothing.
+
+### Noted, not planned
+Review D noted these as already there before this round, outside the findings it checked:
+- At 2× the account under each phone calendar still breaks mid-word («maria.lopez@exam / ple.com», `phone-calendars.allowed.es.light.2x`), and so does the Ajustes «Cuenta» row's address. The fix is the same as UX-1618's: `breakableAddress` with a plain `semanticsLabel`. Together with round 3 of b4's group and project member pages, they are the last places an address breaks mid-word.
+- On Recordatorios, «Tareas con hora» ends in a chevron and «Tareas sin hora» in «+», though both open a list of choices. UX-1616 only converted the first row.
+
+The next review of area D can raise any of these as findings.
+
+### Phone checks added
+- P215 (emulator lane, Android 13+): phone in Spanish (Spain), Idioma English, week start «Como el teléfono»: Calendar's week starts on Monday. A background reminder reads in English, with its time as the app shows it.
+- P216 (emulator lane): after allowing reminders, Detalles lists the upcoming alerts once the bar ends.
+- P217 (emulator lane): with TalkBack, Cuenta announces the name as a heading. With «Quitar animaciones» on, the import result jumps into view.
+
+## Round 3 (b5)
+
+Round 2 of b5 (P215–P217) fixed all five of its findings, according to review D (`verify-b5-r2-D.md`), and the tests and the round check passed. One regression came back from P215, now UX-1653. Round 3 fixes it in one small package, written to `plan-b5-r3.json`. Nothing has failed twice, so nothing is escalated, and there's no new question for you.
+
+### P218 · S2 · D · S · «Como el teléfono» follows a phone-language change while the app runs
+- **UX-1653 (S2), R2D-1 from P215:** with Idioma «Como el teléfono» (the default), if the phone's language changes while TaskFlow is still running in the background, the app, and its reminders, stay in the old language until it is closed for good. The app now asks Android for the phone's languages again on every language change, and only then rewrites the reminders; background reminders read the phone's language directly. Last round avoided this for fear of a loop; Android only changes the app's language when it differs, so there's none. Verified in code; whether Android keeps the app running across a language change needs the emulator.
+
+### Skipped
+Nothing.
+
+### Note for the main session
+- P215's implementer saw `capture_landing_test.dart` UX-1628 ('resuming 31 minutes later') fail near midnight with and without its change; it reads `DateTime.now()`. Re-run it at another time of day before treating it as a regression.
+
+### Phone checks added
+- P218 (emulator lane, Android 13+): Idioma «Como el teléfono», app in the background, phone switched to Català: back in TaskFlow, it's in Catalan without a restart, and a reminder fired after swiping it away is in Catalan. Idioma English with the phone's region changed: the app stays English, the week start follows the phone, and the screen settles at once.

@@ -24,6 +24,7 @@ import 'package:agenda/screens/capture_diagnostics_screen.dart';
 import 'package:agenda/screens/notification_settings_screen.dart';
 import 'package:agenda/screens/task_lists_screen.dart';
 import 'package:agenda/screens/data_transfer_screen.dart';
+import 'package:agenda/services/app_language.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/models/capture_session.dart';
@@ -50,7 +51,11 @@ Future<void> main() async {
   });
   final appearance = ThemeController(ThemePreferenceStore());
   final regional = RegionalController(RegionalPreferenceStore());
-  await Future.wait([appearance.ready, regional.ready]);
+  // The phone's languages as last reported, so the first frame already
+  // reads the phone's week start; AppLanguageBridge.apply refreshes them.
+  final phone = AppLanguageBridge.readSavedPhoneLocales();
+  await Future.wait([appearance.ready, regional.ready, phone]);
+  AppLanguageBridge.phoneLocales ??= await phone;
   runApp(
     ProviderScope(
       overrides: [
@@ -90,6 +95,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // «Como el teléfono» reads the phone's languages once Android reports them.
+    AppLanguageBridge.phone.addListener(_phoneLocalesChanged);
+    // Idioma's choice for the widget, the shortcuts and the share messages too.
+    unawaited(AppLanguageBridge.apply(ref.read(regionalProvider).language));
     ref.read(invitationLinkProvider);
     // Read with the session restore, so a waiting address opens at once.
     ref.read(pendingVerificationLoadProvider);
@@ -112,16 +121,25 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     TaskReminders.openRequest.removeListener(_openReminder);
+    AppLanguageBridge.phone.removeListener(_phoneLocalesChanged);
     WidgetsBinding.instance.removeObserver(this);
     _actions?.cancel();
     _entries?.cancel();
     super.dispose();
   }
 
+  void _phoneLocalesChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void didChangeLocales(List<Locale>? locales) {
     if (mounted) setState(() {});
-    unawaited(TaskReminders.refreshLanguage());
+    // Ask Android for the phone's new languages first, then rewrite the
+    // reminders in them. Re-asking can't loop: the bridge sets the per-app
+    // language only when it differs.
+    unawaited(AppLanguageBridge.apply(ref.read(regionalProvider).language)
+        .then((_) => TaskReminders.refreshLanguage()));
   }
 
   @override
@@ -416,6 +434,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             ].contains(defaultTargetPlatform)
         ? WidgetsBinding.instance.platformDispatcher.alwaysUse24HourFormat
         : null;
+    // Under a per-app language Flutter's locales are the app's; «Como el
+    // teléfono» means the phone's.
+    final phone = AppLanguageBridge.phoneOr(
+      WidgetsBinding.instance.platformDispatcher.locales,
+    );
     return MaterialApp(
       // Clear forms and navigation when accounts change; never show another account's task.
       key: ValueKey(session),
@@ -423,16 +446,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       title: 'TaskFlow',
       debugShowCheckedModeBanner: false,
       supportedLocales: AppLocalizations.supportedLocales,
-      locale: regional.localeFor(
-        WidgetsBinding.instance.platformDispatcher.locales,
-      ),
+      locale: regional.localeFor(phone),
       localeListResolutionCallback: (devices, supported) =>
           regional.localeFor(devices),
       localizationsDelegates: [
         RegionalMaterialDelegate(
           regional,
-          WidgetsBinding.instance.platformDispatcher.locales.firstOrNull ??
-              const Locale('en'),
+          phone.firstOrNull ?? const Locale('en'),
           system24Hour: system24Hour,
         ),
         ...AppLocalizations.localizationsDelegates,

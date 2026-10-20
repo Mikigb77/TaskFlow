@@ -23,6 +23,7 @@ import 'support/design_fixtures.dart';
 import 'support/reading_order.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'support/shown_text.dart';
 
 class _Auth extends AuthNotifier {
   _Auth(super.api);
@@ -1243,7 +1244,7 @@ void main() {
           'auth/password-reset/',
           {'email': 'maria.lopez@example.com', 'language': language},
         ]);
-        final sent = find.text(
+        final sent = findShown(
           l.recoveryEmailRequested('maria.lopez@example.com'),
         );
         expect(sent, findsOneWidget);

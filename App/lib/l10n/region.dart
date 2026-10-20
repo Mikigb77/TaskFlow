@@ -97,6 +97,18 @@ extension TaskFlowLocale on BuildContext {
 /// `America/Argentina/Buenos_Aires`. The IANA id is still what's stored.
 String timeZoneName(String id) => id.split('/').last.replaceAll('_', ' ');
 
+/// Zero-width space: where [breakableAddress] lets a line wrap.
+const _addressBreak = '​';
+
+/// An email address as shown: at large text it wraps only after «@» or «.»,
+/// never mid-word. Give TalkBack [withoutAddressBreaks] of the shown text.
+String breakableAddress(String address) =>
+    address.replaceAllMapped(RegExp('[@.]'), (m) => '${m[0]}$_addressBreak');
+
+/// [shown] without [breakableAddress]'s breaks: the plain text to read out.
+String withoutAddressBreaks(String shown) =>
+    shown.replaceAll(_addressBreak, '');
+
 /// Regional formats stay separate from UI language. Explicit clock and week
 /// preferences apply to Material date/time pickers as well as task labels.
 class RegionalMaterialDelegate

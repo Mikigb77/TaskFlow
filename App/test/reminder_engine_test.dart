@@ -6,10 +6,13 @@ import 'package:agenda/models/occurrence_exception.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/reminder_copy.dart';
+import 'package:agenda/services/app_language.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/notification_service.dart' show TaskReminders;
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride, TargetPlatform;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -976,6 +979,122 @@ void main() {
           await engine.action(alert.id, 'snooze', token: alert.token), isTrue);
       expect(driver.shown, isEmpty);
       expect(driver.pending[alert.id], isNotNull);
+    });
+  });
+
+  // ---- Run 2026-10-19-app · P215 (UX-1649): «Como el teléfono» in the background ----
+
+  group('P215', () {
+    Future<void> savePhoneLocales(List<String> tags) async =>
+        (await database.database).insert(
+            'app_preferences', {'scope': 'phone-locales', 'data': jsonEncode(tags)},
+            conflictAlgorithm: ConflictAlgorithm.replace);
+    setUp(() => AppLanguageBridge.phoneLocales = null);
+    tearDown(() => AppLanguageBridge.phoneLocales = null);
+
+    for (final tag in ['es-ES', 'ca-ES']) {
+      test(
+          'UX-1653: a background reminder with Idioma «Como el teléfono» reads Flutter’s live locales, not a stale saved row ($tag)',
+          () async {
+        // With no per-app language set, Flutter's locales are the phone's and
+        // live, also in a background isolate; the saved row may be stale.
+        expect(AppLanguageBridge.phoneLocales, isNull);
+        await RegionalPreferenceStore(database)
+            .write(const RegionalPreferences());
+        await savePhoneLocales([tag]);
+        final language = const RegionalPreferences()
+            .localeFor(PlatformDispatcher.instance.locales)
+            .languageCode;
+        expect(language, isNot(tag.split('-').first));
+        final copy = await readReminderCopy(database, system24Hour: true);
+        final expected = lookupAppLocalizations(Locale(language));
+        expect(copy.languageCode, language);
+        expect(copy.strings.notificationToday, expected.notificationToday);
+        final strings = await readReminderStrings(database);
+        expect(strings.localeName, language);
+      });
+    }
+
+    test(
+        'UX-1649: the bridge’s fresh answer wins over the saved row; deviceLocales still wins over both',
+        () async {
+      await RegionalPreferenceStore(database)
+          .write(const RegionalPreferences());
+      await savePhoneLocales(['es-ES']);
+      AppLanguageBridge.phoneLocales = [const Locale('ca', 'ES')];
+      expect((await readReminderCopy(database, system24Hour: true)).languageCode,
+          'ca');
+      expect(
+          (await readReminderCopy(database,
+                  deviceLocales: [const Locale('en', 'GB')], system24Hour: true))
+              .languageCode,
+          'en');
+    });
+
+    // ---- Run 2026-10-19-app · P218 (UX-1653): the live locales come first ----
+
+    // A supported language the test runner's live locales are not in, so a
+    // reminder that read the saved row would show it.
+    String staleLanguage() {
+      final live = const RegionalPreferences()
+          .localeFor(PlatformDispatcher.instance.locales)
+          .languageCode;
+      return live == 'ca' ? 'es' : 'ca';
+    }
+
+    test(
+        'UX-1653: background isolate, Idioma «Como el teléfono», a stale saved phone-locales row: readReminderStrings and readReminderCopy follow Flutter’s live locales',
+        () async {
+      await RegionalPreferenceStore(database)
+          .write(const RegionalPreferences());
+      final stale = staleLanguage();
+      await savePhoneLocales(['$stale-ES']);
+      // A background isolate: the bridge has not answered there.
+      expect(AppLanguageBridge.phoneLocales, isNull);
+      final live = const RegionalPreferences()
+          .localeFor(PlatformDispatcher.instance.locales)
+          .languageCode;
+      expect(live, isNot(stale));
+      final strings = await readReminderStrings(database);
+      expect(strings.localeName, live);
+      expect(strings.notificationToday,
+          lookupAppLocalizations(Locale(live)).notificationToday);
+      final copy = await readReminderCopy(database, system24Hour: true);
+      expect(copy.languageCode, live);
+      expect(copy.languageCode, isNot(stale));
+    });
+
+    test(
+        'UX-1653: Idioma English, week start «Como el teléfono», the row saved as es-ES and no bridge answer: readReminderCopy still takes the phone’s es-ES as its device locale',
+        () async {
+      // Off the phone's 24-hour setting, so the clock follows the device
+      // locale: Spanish writes 17:00, English 5:00 PM.
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      try {
+        await RegionalPreferenceStore(database)
+            .write(const RegionalPreferences(language: 'en'));
+        await savePhoneLocales(['es-ES']);
+        expect(AppLanguageBridge.phoneLocales, isNull);
+        final task = Task(
+            title: 'Cita',
+            priority: 1,
+            dueDate: DateTime(2026, 9, 22, 17),
+            reminderMinutes: 10);
+        final when = DateTime(2026, 9, 22, 16, 50);
+        final copy = await readReminderCopy(database);
+        // The app's language stays English.
+        expect(copy.languageCode, 'en');
+        final asSpanishPhone = await readReminderCopy(database,
+            deviceLocales: [const Locale('es', 'ES')]);
+        final asEnglishPhone = await readReminderCopy(database,
+            deviceLocales: [const Locale('en', 'US')]);
+        expect(asSpanishPhone.body(task, when, 10),
+            isNot(asEnglishPhone.body(task, when, 10)));
+        expect(copy.body(task, when, 10), asSpanishPhone.body(task, when, 10));
+        expect(copy.body(task, when, 10), contains('17:00'));
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 }

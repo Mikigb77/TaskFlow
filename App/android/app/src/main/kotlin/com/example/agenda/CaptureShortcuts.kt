@@ -13,22 +13,27 @@ import androidx.core.graphics.drawable.IconCompat
  * there is never resolved, so both shortcuts pointed nowhere and the launcher refused to
  * start them. The staging build has its own package, and the package is due to change
  * before the Play upload (App/docs/PACKAGE_ID.md). An intent built from this context names
- * the right one in every build. Republishing each start keeps the labels in the phone's
- * language.
+ * the right one in every build. Republishing each start, and whenever the language changes,
+ * keeps the labels in the app's language (the per-app language on Android 13+, see
+ * AppLanguageBridge).
+ *
+ * The short label is one word: at large text the launcher shows it whole, where the long
+ * one was cut to «Dictar un…». The launcher shows the long label wherever it fits.
  */
 object CaptureShortcuts {
     fun publish(context: Context) {
         val shortcuts = listOf(
-            shortcut(context, "capture_voice", R.string.capture_voice, R.drawable.capture_shortcut_voice, CaptureEntryBridge.VOICE),
-            shortcut(context, "capture_text", R.string.capture_text, R.drawable.capture_shortcut_text, CaptureEntryBridge.TEXT),
+            shortcut(context, "capture_voice", R.string.capture_voice_short, R.string.capture_voice, R.drawable.capture_shortcut_voice, CaptureEntryBridge.VOICE),
+            shortcut(context, "capture_text", R.string.capture_text_short, R.string.capture_text, R.drawable.capture_shortcut_text, CaptureEntryBridge.TEXT),
         )
         // The launcher's rate limit, or a launcher without shortcuts, must never stop the app.
         try { ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts) } catch (_: Exception) { }
     }
 
-    private fun shortcut(context: Context, id: String, label: Int, icon: Int, action: String) =
+    private fun shortcut(context: Context, id: String, shortLabel: Int, longLabel: Int, icon: Int, action: String) =
         ShortcutInfoCompat.Builder(context, id)
-            .setShortLabel(context.getString(label))
+            .setShortLabel(context.getString(shortLabel))
+            .setLongLabel(context.getString(longLabel))
             .setIcon(IconCompat.createWithResource(context, icon))
             .setIntent(Intent(context, MainActivity::class.java).setAction(action))
             .build()
