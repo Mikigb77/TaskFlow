@@ -1476,6 +1476,38 @@
     "Emulator with TalkBack, in Spanish: double-tap an unread Activity row whose task isn't on the phone yet. «Buscando la tarea…» is heard once, and the row isn't read a second time."
    ],
    "dependsOn": []
+  },
+  {
+   "id": "P221",
+   "title": "English launcher shortcuts fall back to their one-word labels at large text",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1656"
+   ],
+   "files": [
+    "App/android/app/src/main/res/values/strings.xml",
+    "App/test/native_resources_test.dart"
+   ],
+   "brief": [
+    "Main session, 2026-10-21, from the emulator lane (`.claude/ux-review/runs/2026-10-19-app/device-b5.md`, capture `App/build/ux/device/launcher.shortcuts.en.light.2.0.png`). P186 gave each launcher shortcut a one-word short label and a longer one (`CaptureShortcuts.kt` sets both). The Pixel Launcher shows the long label whenever it judges it fits, and at Android's 2.0 that judgment is a few characters too generous. Spanish and Catalan long labels, 15-18 characters («Dictar una tarea», «Escribir una tarea», «Dicta una tasca», «Escriu una tasca»), are clearly too long, so the launcher falls back to «Dictar», «Escribir», «Dicta» and «Escriu», all whole. The English long labels «Say a task» and «Type a task» (10-11) pass its check and are cut to «Say a ta…» and «Type a t…». At 1.0 they show whole, with room to spare. The English widget is whole at 2.0.",
+    "Do: change only the English long labels, `capture_voice` and `capture_text` in `App/android/app/src/main/res/values/strings.xml`, so the launcher falls back to the short labels at 2.0 as it does in Spanish and Catalan, while they still read naturally, and whole, at 1.0. Constraint from what the emulator showed: each English long label at least 15 characters, the shortest length seen falling back. Main session's suggestion: «Dictate a new task» and «Type a new task»; better wording at that length is welcome. Keep the short labels («Dictate», «Type»), the string comments, the widget's label and description, and every Spanish and Catalan string.",
+    "If you judge that no natural English long label of at least 15 characters exists, set that shortcut's English long label to its short label instead, so it reads the same at every size. Record which, and why, in your notes. The owner is away, and the main session decides by recommendation.",
+    "Tests: `App/test/native_resources_test.dart` reads the strings; add a check that each English long label is at least 15 characters, or equal to its short label, and that the short labels are one word. The main session re-captures `launcher.shortcuts.en.*` on the emulator after the batch.",
+    "Don't touch: `CaptureShortcuts.kt`, `CaptureWidget.kt` and the widget layout; values-es and values-ca; any ARB file."
+   ],
+   "acceptance": [
+    "`values/strings.xml`: `capture_voice` and `capture_text` are each at least 15 characters (or equal to their short labels), natural English; `capture_voice_short` is «Dictate» and `capture_text_short` is «Type».",
+    "values-es and values-ca are unchanged; the widget's label and description are unchanged.",
+    "`native_resources_test.dart` checks the length rule and the one-word short labels."
+   ],
+   "deviceChecks": [
+    "Emulator lane, English at Android's 2.0: the shortcuts read «Dictate» and «Type» whole (`launcher.shortcuts.en.light.2.0`), and at 1.0 the long labels read whole (`launcher.shortcuts.en.light.1.0`)."
+   ],
+   "dependsOn": [
+    "P186"
+   ]
   }
  ],
  "decisions": [
@@ -1719,7 +1751,8 @@
   "Noted, not planned (re-plan 2026-10-20): review B's optional «Añadir sin fecha» on the form's button (not part of D3's answer); a phone with no calendar account still shows Calendar's «Elige calendarios para mostrar tus compromisos existentes.» after connecting (review B's cross-slice note; D7 fixes phones that have calendars, and nobody gave copy for this one).",
   "After the run, regenerate PHONE_CHECKS.md with phone_checks.py.",
   "2026-10-20, main session: P209 added after batch b3 ended with UX-1639 open (failed once). It takes review B's option from verify-b3-r3-B.md, and it runs as batch b3x before b4.",
-  "2026-10-20, main session: P214 added for UX-1648, which batch b4 raised in its last round; it runs in batch b5 with P186-P189."
+  "2026-10-20, main session: P214 added for UX-1648, which batch b4 raised in its last round; it runs in batch b5 with P186-P189.",
+  "2026-10-21, main session: P221 added for UX-1656 (the English launcher shortcuts at 2.0, found on the emulator lane, device-b5.md); it runs in batch b7 with P195 and P196."
  ],
  "updated": "2026-10-20",
  "replans": [
