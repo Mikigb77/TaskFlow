@@ -126,10 +126,10 @@ How the app should search its own copy:
 | Key | Value | Meaning |
 |---|---|---|
 | `title` | string, 1–160 | The new title. |
-| `date` | `"YYYY-MM-DD"` | Move the task to that day. Keep its time unless `time` is present too. |
+| `date` | `"YYYY-MM-DD"` | Move the task to that day. Keep its time unless `time` is present too. A task with only a deadline moves its deadline instead, as with `shift_days` (the owner's D1, 2026-10-21). |
 | `date` | `null` | Remove the day: the task goes to the Inbox. `time` is then `null` too. |
 | `shift_days` | integer, −366 to 366, never 0 | Move the task by that many days instead («retrasa dos días la cita del médico»). Never together with `date`. See [Bulk commands](#bulk-commands). |
-| `time` | `"HH:MM"` (24-hour) | Set the time and keep the day. On a task with no day, ask for one. |
+| `time` | `"HH:MM"` (24-hour) | Set the time and keep the day. On a task with only a deadline, set the deadline's time (D1). On a task with no day at all, ask for one. |
 | `time` | `null` | Remove the time and keep the day. |
 | `deadline_date` | `"YYYY-MM-DD"` | Set the deadline's day. Keep its time unless `deadline_time` is present too. |
 | `deadline_date` | `null` | Remove the deadline. `deadline_time` is then `null` too. |
@@ -205,17 +205,19 @@ The person, the project and their issues are resolved as for `find`: the person 
 - The person's own tasks, and the tasks assigned to them in shared projects. Other people's tasks are included only when the person names their project (`list_id`) or names them (`person_id`).
 - Only tasks the person can edit, never deleted ones.
 - `status` as above: pending ones by default.
+- **«Hoy»:** a set whose period is exactly today (`from` = `to` = today) also takes the open tasks Today lists under «Atrasadas», listed first with «Atrasada» and ticked, so any can be unticked (the owner's D2, 2026-10-21). This applies to pending sets only, so it never adds to «las completadas de hoy».
 - **Repeating tasks** are never moved, changed or deleted in bulk; the card says how many were left out. A bulk `complete` whose period is one day (`from` = `to`) completes each repeating task's occurrence that day. With a longer period, it leaves them out too.
 - **Assigning** reaches only tasks in shared projects where the person named can edit. The others are left as they are and counted.
 
 **The card** (app):
 - **The heading:** the action, with the count and the target: «Mover 5 tareas a mañana, jue 22», «Mover 3 tareas una semana después», «Asignar 4 tareas a Paul», «Marcar 4 tareas como hechas», «Eliminar 6 tareas».
+  - The day in a move's heading is a chip («mañana, jue 22 ▾») that opens «Elegir día», so a misheard day is fixed by touch, without dictating again. One task's change card has the same chip for its new day (the owner's D3, 2026-10-21).
 - **The list:** the matched tasks, each with its current day and ticked; untick one to leave it out. A long list scrolls inside the card.
 - **What was left out:** one line, for example «2 tareas que se repiten no cambian».
 - **One filled button with the live count:** «Mover 5 tareas». Deleting uses the delete style: «Eliminar 6 tareas». Nothing changes before that tap.
-- **After the tap:** «5 tareas movidas · Deshacer». «Deshacer» puts every task back as it was, deleted ones included.
+- **After the tap:** the message names where the tasks went: «5 tareas movidas al jue, 22 oct · Deshacer», adding «· también en otros 4 días» when they land on several days. An assignment names the person: «2 tareas asignadas a Paul». «Deshacer» puts every task back as it was, deleted ones included.
 - **No match:** say what was looked for: «No hay tareas pendientes de ayer».
-- **More than 200 matches:** no list. Instead: «Son 230 tareas. Dilo con menos, por ejemplo un día o un proyecto.»
+- **More than 200 matches:** no list. Instead: «Son 230 tareas, demasiadas. Vuelve a decirlo con un día o un proyecto.»
 - **Counting:** a bulk command is part of its dictation, which counts once, as any dictation does.
 
 ### Issues
