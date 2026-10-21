@@ -10,7 +10,12 @@ Until he checks in:
 - Agents keep writing new questions into their plans as D# with a recommendation. No package waits for an answer.
 
 Decided while he's away:
-- (none yet)
+- **English launcher shortcuts and widget wording (UX-1656, UX-1657; batch b7, P221-P223):**
+  - At Android's 2.0 the launcher cut «Say a task» to «Say a ta…», found on the emulator lane. So the English long labels became «Dictate a new task» and «Type a new task». They're long enough that the launcher falls back to the one-word «Dictate» and «Type» at large text, as it already does in Spanish and Catalan.
+  - The reviewer then asked for one name per action, so the English widget and its help now say «Dictate a task» instead of «Say a task».
+  - Spanish and Catalan are unchanged.
+  - Recommendation and decision: as built. Reversible with a strings change, if «Say a task» matters more than one name.
+- **D12 (UX-1403), Tareas at large text:** closed by its own measure-first rule, not by a choice. On the emulator at Android's 2.0, Tareas shows its title on one line and a whole task (`runs/2026-10-19-app/device-b3.md`). A shared project's filter rows stay with U13's evidence.
 
 ## 2026-10-20 (later) — D11 of run 2026-10-19-app: no cue
 **The owner:** "no cue for D11, as recommended".
