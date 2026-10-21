@@ -141,7 +141,11 @@ When it returns:
 1. **Make the starting point.**
    - If this session made website changes of its own before the run (the work being reviewed), commit them first in the website repo, as in step 3's website commit: `ux-web.sh ran` lists them if a `base` was taken before that work began (CLAUDE.md asks for one). Message: `Changes reviewed by the UX web loop (<run id>)`, plus the attribution line. If no `base` was taken, commit only files that `git -C ../TaskFlowWeb status` shows as changed by this session alone, and leave the rest for the owner.
    - Then run `bash .claude/ux-web/ux-web.sh base`. It records the website's whole working tree, including the other session's uncommitted work, so the run's own changes can be told apart from it afterwards.
-2. **Run the workflow.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-web-fix.js`, and args `{ runId, runDir, date, webDir, skip, only, batch, recordMemory, notes }`. For `/ux-web fix`, the run folder is the newest one under `.claude/ux-web/runs/` that has a `plan.json` but no `report.md`.
+2. **Run the workflow.** First:
+   - Keep the PC awake while it runs. In the desktop app, call `mcp__ccd_host__request_keep_awake` with `until: "session_idle"`. The longest runs so far each lost 2–4 hours to a sleeping or restarting laptop.
+   - It may run while a `ux-fix` run is going (owner, 2026-10-21). Each loop runs up to 12 packages side by side, and each limits its own heavy commands: the website's builds in WSL, the app's Flutter on Windows.
+
+   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-web-fix.js`, and args `{ runId, runDir, date, webDir, skip, only, batch, recordMemory, notes }`. For `/ux-web fix`, the run folder is the newest one under `.claude/ux-web/runs/` that has a `plan.json` but no `report.md`.
 3. **When it returns:**
    - **Save the reports.** Write `close.report` to `<runDir>/<reportName>`, and each of `inlineNotes` to its `path`. Subagents may not write report files, so the agents return the text.
    - **`testsPassed` is true:** commit, one commit in each repo.

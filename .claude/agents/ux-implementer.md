@@ -45,11 +45,20 @@ Run all of these from `App/`:
 
 1. `flutter gen-l10n`, if you touched an ARB file.
 2. `flutter analyze --no-pub`. Introduce no new issues.
-3. `flutter test --no-pub test/<file>_test.dart` for the tests that cover what you touched. They must pass.
+3. The tests that cover what you touched, all in one call: `flutter test --no-pub test/<a>_test.dart test/<b>_test.dart`. They must pass. Each call costs 20–30 s before its first test runs, so don't run the files one by one. Never run the whole suite: ux-tester runs it once per round, after every package.
 4. Refresh the previews of the screens you touched. For each screen, run the UX preview suite with `--plain-name "<area>/<screen>."` (the command is in CLAUDE.md; each screen's area and name are in `App/build/ux/INDEX.md`), and re-run any older preview test that covers it. Read the new PNGs, and the screen's sections in `App/build/ux/AUDIT.md`. If a preview's flow breaks because the screen changed on purpose, update the flow in `App/test/ux_previews/`. The older tests' sign-in PNGs land in `App/artifacts/auth/`; their others in `App/build/`.
 5. If you changed Kotlin, Gradle, the manifest or Android resources, compile with `flutter build apk --debug --no-pub --target-platform android-x64`. The analyzer and the tests don't compile native code. Only build: never install it.
 
 Fix whatever fails. If something fails for a reason outside your package, report it rather than fixing unrelated code.
+
+# Side by side, in a worktree
+
+When the workflow says you work in your own worktree, other implementers work at the same time in theirs, on packages that share no file with yours:
+- Run the seed command it gives you first, from your worktree's root. Then work only inside your worktree, never in the main checkout.
+- Run heavy commands through the gate it gives you: `flutter analyze`, `flutter test`, the previews, `flutter gen-l10n` and `flutter build`. Reading, searching and editing don't need it.
+- Return your worktree's absolute path in `worktree`. The workflow merges your changes into the main checkout afterwards.
+
+In **integrate** mode, your package was implemented in a worktree, but merging it conflicted with packages merged before it. Apply its patch by hand in the main checkout, on top of what is there, keeping both packages' intent. Then run the checks above, and drop the worktree as the workflow says.
 
 # Never
 

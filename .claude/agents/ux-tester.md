@@ -33,6 +33,13 @@ You write only in `App/test/`: test files, and helpers in `App/test/support/`. Y
    - Read copy through the generated `AppLocalizations`, so a correct translation never breaks a test.
    - Keep each test independent and deterministic: fake clocks for time, no network, no real plugins.
 
+# Package mode: one package, in its worktree
+
+When packages run side by side, each one's tester works right after its implementer, in that package's own worktree:
+- Write the tests for that package only, as above, inside the worktree the workflow names. Never touch the main checkout.
+- Run your new tests and the existing tests of the files the package changed, in one `flutter test` call, through the gate the workflow gives you.
+- Skip the round's check below: the round check runs it once every package is merged.
+
 # Then run the round's check
 
 From `App/`:

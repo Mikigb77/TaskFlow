@@ -132,7 +132,14 @@ When it returns:
 ## 6. Fix and verify — workflow `ux-fix`
 
 1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the round's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
-2. **Run the workflow.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, skip, only, batch, notes }`. Set `batch` (for example `trial`, then `main`) when a plan runs in several batches, so each batch keeps its own report and verify files. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
+2. **Run the workflow.** First:
+   - Keep the PC awake while it runs. In the desktop app, call `mcp__ccd_host__request_keep_awake` with `until: "session_idle"`. The longest runs so far each lost 2–4 hours to a sleeping or restarting laptop.
+   - Packages that share no file run side by side, each in its own worktree: up to 12 at once, even while a `ux-web-fix` run is going (owner, 2026-10-21). The machine is protected by the gate, not by the agent count: heavy commands run 3 at a time. How waves work: `.claude/ux-review/README.md`, step 5.
+
+   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, repoRoot, maxParallel, heavySlots, skip, only, batch, notes }`:
+   - `repoRoot` is `git rev-parse --show-toplevel`, with forward slashes. Without it, every package runs in the main checkout, one at a time.
+   - `maxParallel` is 12. `heavySlots` is 3.
+   - Set `batch` (for example `trial`, then `main`) when a plan runs in several batches, so each batch keeps its own report and verify files. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
 3. **When it returns:**
    - **Save the report.** Write `close.report` to `<runDir>/<reportName>`. Subagents may not write report files, so the organizer returns the text.
    - **`testsPassed` is true:** commit the round.
@@ -147,14 +154,14 @@ Never push. Never commit on `main`. Never skip hooks.
 
 ### Big plans run in batches
 
-A plan with more than about 6 packages runs in batches of about 5, in plan order.
+A plan with more than about 16 packages runs in batches of about 12, in plan order. Waves make a batch's width, not its length, the cost, so batches are bigger than before 2026-10-21 (they were 5).
 - Each batch is one `ux-fix` run, with `only` set to the batch's packages and `batch` set to `b1`, `b2`, and so on.
 - Set `recordMemory: false` on every batch except the last, so the reviewer updates its memory once per plan.
 - After each batch: save its report, commit, run `ux.sh save`, then start the next batch.
 - Don't wait for the owner between batches.
 - Stop and tell the owner if a batch's tests fail, or if it escalates more than two findings.
 
-Batching keeps each tester and verifier focused on a handful of packages. It catches regressions while they're still small, and it gives one commit per batch.
+Batching catches regressions while they're still small, and it gives one commit per batch. Testers and verifiers stay focused anyway: packages done side by side get a tester each, and a verifier checks at most 4 packages.
 
 The first real `ux-fix` run (2026-10-13, 2 small packages, 3 rounds) took about 110 minutes and 1.9M tokens. Expect a batch of 5 to take a few hours.
 

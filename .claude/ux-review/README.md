@@ -35,10 +35,14 @@ After user-facing work, the main session runs `/ux` by itself; CLAUDE.md asks it
    - merges duplicates;
    - sends product decisions to you;
    - groups the fixes into work packages, each with an exact brief.
-5. **Fix.** `ux-implementer` (Opus, high effort) works through the packages one at a time. Each one changes the code, the copy in all three languages, and the tests, then checks its own work and refreshes the previews of the screens it touched.
-6. **Test.** `ux-tester` (Opus, high effort) runs once per round.
-   - It writes a test for every acceptance check a test can prove, working from the plan rather than the code, so the fix and its proof come from different hands.
-   - It then runs the analyzer, the whole suite, and the previews of the screens the round changed.
+5. **Fix.** `ux-implementer` (Opus, high effort) changes the code, the copy in all three languages, and the tests, then checks its own work and refreshes the previews of the screens it touched.
+   - **Waves (2026-10-21):** packages that share no file run side by side, up to 12 at once, even while the website loop runs too. Each gets its own git worktree, and its tester follows it there. The ARB catalogs and test files don't count as shared.
+   - Afterwards `.claude/ux-review/waves.py merge` brings each worktree back into the main checkout, like a pull request: ARB keys one by one, other files with a three-way merge. A package that conflicts goes to an implementer, who integrates it by hand.
+   - Heavy commands (Flutter, builds) go through `waves.py gate`, so only 3 run at once and the machine doesn't swap.
+   - A package that shares a file with another, or has no file list, runs alone in the main checkout.
+6. **Test.** `ux-tester` (Opus, high effort).
+   - It writes a test for every acceptance check a test can prove, working from the plan rather than the code, so the fix and its proof come from different hands. Packages done side by side get their own tester, in their worktree.
+   - Once per round, after the merge, it runs the analyzer, the whole suite, and the previews of the screens the round changed.
    - If a test fails because the app falls short, that finding counts as not fixed, whatever the reviewer says.
    - Every fix that passes stays protected by its test.
 7. **Verify.** The reviewer checks only the findings just fixed and the files just changed.
