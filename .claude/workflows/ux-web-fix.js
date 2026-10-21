@@ -46,10 +46,15 @@ const WAVES = `MSYS_NO_PATHCONV=1 python -I -X utf8 "${APP}/.claude/ux-review/wa
 // Every npm, npx and Playwright command runs on WSL's own disk, in a mirror of the checkout or
 // copy, on its own port (webrun.py), and through the web pool's gate.
 const MAIN_PORT = 3100
-function webrun(src, name, port) {
-  return `${WAVES} gate --pool web --slots ${SLOTS} -- wsl -e python3 ${toWsl(APP)}/.claude/ux-web/webrun.py --src ${src} --name ${name} --port ${port} --`
+function webrun(src, name, port, serve) {
+  return `${WAVES} gate --pool web --slots ${SLOTS} -- wsl -e python3 ${toWsl(APP)}/.claude/ux-web/webrun.py --src ${src} --name ${name} --port ${port}${serve ? ' --serve' : ''} --`
 }
 const MAIN_RUN = webrun(WSL, 'main', MAIN_PORT)
+// The build served once, so the whole suite and the renders run side by side against it, each
+// Playwright run with its own output folder.
+const MAIN_SERVED = webrun(WSL, 'main', MAIN_PORT, true)
+const SIDE_BY_SIDE = `${MAIN_SERVED} 'npx playwright test --reporter=dot > /tmp/ux-suite.log 2>&1 & s=$!; (rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=4 --grep-invert "perf " --reporter=dot --output=test-results-renders > /tmp/ux-renders.log 2>&1) & r=$!; wait $s; se=$?; wait $r; re=$?; tail -n 40 /tmp/ux-suite.log; tail -n 15 /tmp/ux-renders.log; echo "suite exit $se, renders exit $re"'`
+const PERF = `${MAIN_RUN} 'UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf " --reporter=dot'`
 // A verifier checks at most this many packages, so a wide wave still gets focused checks.
 const VERIFY_CHUNK = 4
 
@@ -369,7 +374,25 @@ function mergePrompt(items) {
   ].join('\n')
 }
 
-function roundTestPrompt(round, impl, files, locked, unlocked) {
+// The whole check: the type and legal checks, a production build, then the whole suite and the
+// renders side by side against that one build, the unit tests, and lab performance on its own.
+const FULL_CHECK = [
+  `The check, in order: ${MAIN_RUN} 'npm run check'; then 'npm run legal:check'; then 'SITE_URL=https://taskflow.garbar.tech npm run build'.`,
+  `Then the whole suite and the renders side by side, against that build, as exactly this one command: ${SIDE_BY_SIDE}`,
+  `Then ${MAIN_RUN} 'npm run test:unit', and lab performance on its own: ${PERF}`,
+  'Then check the acceptance checks that artifacts/ux-web/AUDIT.md measures against its rows.',
+].join('\n')
+
+function finalPrompt(round, files, findings) {
+  return [
+    `UX web loop run ${a.runId}. Mode: final check, after round ${round}. The redo rounds are done, and their checks passed on what they changed. Now run the whole check once. Write no new tests. Website repo: ${WEB}.`,
+    `Files changed in this run: ${files.length ? files.join(', ') : 'none reported'}.`,
+    FULL_CHECK,
+    `Report every failing test against its finding (the run's findings: ${findings.join(', ')}), or with no finding if it proves none, and class each as the site's or the infrastructure's. Return the structured result.`,
+  ].join('\n')
+}
+
+function roundTestPrompt(round, impl, files, locked, unlocked, targeted) {
   const lines = [
     `UX web loop run ${a.runId}, round ${round}. Lock this round's fixes with Playwright tests, then run the round's check. Website repo: ${WEB}.`,
     'Packages implemented this round:',
@@ -388,7 +411,9 @@ function roundTestPrompt(round, impl, files, locked, unlocked) {
       : 'No package needs new tests from you: run the round\'s check.',
     LEAN,
     `Run every npm, npx and Playwright command as: ${MAIN_RUN} '<command>'`,
-    'The round check, in order: npm run check; npm run legal:check; SITE_URL=https://taskflow.garbar.tech npm run build; the new tests; npm test -- --reporter=dot (only failures print in detail); npm run test:unit; rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert "perf " --reporter=dot && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf " --reporter=dot; then check the acceptance checks that artifacts/ux-web/AUDIT.md measures against its rows.',
+    targeted
+      ? 'This is a redo round, so the check covers what changed: npm run check; npm run legal:check if legal content changed; SITE_URL=https://taskflow.garbar.tech npm run build; your new tests and the specs of the pages this round changed; and the renders of those pages only (UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --reporter=dot -g "<page> "). No whole suite, unit tests, full renders or lab performance: the final check runs them once, when the redo rounds are done.'
+      : FULL_CHECK,
     'Parts of a package marked "waits on WD#" were left out on purpose; do not test them.',
     'Class every failure as the site\'s or the infrastructure\'s, including tests the package testers wrote. Return the structured result. In "findings", cover every package of the round: copy what the package testers proved, unless your run shows otherwise.',
   )
@@ -591,7 +616,9 @@ for (let round = 1; ; round++) {
   const roundFiles = [...new Set(impl.flatMap(r => r.filesChanged))]
   const lockedIds = new Set(locked.map(t => t.id))
   const unlocked = impl.filter(r => !lockedIds.has(r.id))
-  tested = (await agent(roundTestPrompt(round, impl, roundFiles, locked, unlocked), {
+  // Round 1 runs the whole check; redo rounds check what they changed, and the final check
+  // runs the whole check once at the end.
+  tested = (await agent(roundTestPrompt(round, impl, roundFiles, locked, unlocked, round > 1), {
     agentType: 'web-ux-tester',
     label: `test · round ${round}`,
     phase: 'Test',
@@ -633,16 +660,46 @@ for (let round = 1; ; round++) {
   const regressions = checked.flatMap(v => v.regressions)
   const seen = new Set(results.map(x => x.id))
   const unchecked = impl.flatMap(r => r.findings).filter(id => !seen.has(id))
-  // A failing acceptance test overrides a "fixed" verdict.
-  const testFailed = {}
-  tested.failures.filter(f => f.owner === 'site' && f.finding).forEach(f => { testFailed[f.finding] = f })
-  const failing = results
-    .filter(x => x.result !== 'fixed' || testFailed[x.id])
-    .map(x => (x.result === 'fixed'
-      ? { ...x, result: 'partly', evidence: `${x.evidence} But a test fails: ${testFailed[x.id].test}: ${testFailed[x.id].evidence}` }
-      : x))
+  // A failing acceptance test overrides a "fixed" verdict, here or from an earlier round.
+  const judge = () => {
+    const testFailed = {}
+    tested.failures.filter(f => f.owner === 'site' && f.finding).forEach(f => { testFailed[f.finding] = f })
+    const list = results
+      .filter(x => x.result !== 'fixed' || testFailed[x.id])
+      .map(x => (x.result === 'fixed'
+        ? { ...x, result: 'partly', evidence: `${x.evidence} But a test fails: ${testFailed[x.id].test}: ${testFailed[x.id].evidence}` }
+        : x))
+    const here = new Set(results.map(x => x.id))
+    Object.values(testFailed).filter(f => !here.has(f.finding)).forEach(f => {
+      list.push({ id: f.finding, result: 'partly', evidence: `Fixed in an earlier round, but a test fails now: ${f.test}: ${f.evidence}` })
+    })
+    return { list, stray: tested.failures.filter(f => f.owner === 'site' && !f.finding) }
+  }
+  let { list: failing, stray: strayTestFailures } = judge()
+  let clean = !failing.length && !regressions.length && !strayTestFailures.length && !unchecked.length && tested.passed
+  // Redo rounds checked only what they changed: the whole check runs once, now.
+  if (clean && round > 1) {
+    phase('Test')
+    const findings = [...new Set([...rounds.flatMap(r => r.results.map(x => x.id)), ...results.map(x => x.id)])]
+    const fin = (await agent(finalPrompt(round, [...changedAll], findings), {
+      agentType: 'web-ux-tester',
+      label: `final check · round ${round}`,
+      phase: 'Test',
+      schema: TESTED,
+    })) || { passed: false, checks: [], findings: [], failures: [], filesChanged: [], notes: 'The final check did not return a result.' }
+    fin.filesChanged.map(rel).forEach(f => changedAll.add(f))
+    tested = {
+      ...tested,
+      passed: fin.passed,
+      checks: [...tested.checks, ...fin.checks],
+      failures: [...tested.failures, ...fin.failures],
+      notes: [tested.notes, fin.notes].filter(Boolean).join(' '),
+    }
+    ;({ list: failing, stray: strayTestFailures } = judge())
+    clean = !failing.length && !strayTestFailures.length && tested.passed
+    log(`Final check after round ${round}: ${fin.passed ? 'passed' : 'failed'}; ${fin.failures.length} failure(s).`)
+  }
   failing.forEach(f => { failures[f.id] = (failures[f.id] || 0) + 1 })
-  const strayTestFailures = tested.failures.filter(f => f.owner === 'site' && !f.finding)
   rounds.push({
     round,
     planFile,
@@ -657,7 +714,7 @@ for (let round = 1; ; round++) {
   })
   log(`Round ${round}: ${results.length - failing.length} fixed, ${failing.length} not yet, ${regressions.length + strayTestFailures.length} regression(s), ${unchecked.length} unchecked.`)
 
-  if (!failing.length && !regressions.length && !strayTestFailures.length && !unchecked.length && tested.passed) break
+  if (clean) break
   if (round > EXTRA_ROUNDS) {
     log(`Stopping after ${round} rounds; what's left goes to the owner.`)
     break

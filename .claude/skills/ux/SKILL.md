@@ -36,13 +36,20 @@ Invoking this skill is the owner's opt-in to running the `ux-review` and `ux-fix
 2. Run `bash .claude/ux-review/ux.sh keys` to get the changed ARB keys.
    - Find where each key is shown: `grep -rln "l10n.<key>\b" App/lib`.
    - Add those files' areas.
-3. Map every file to an area using the table below. Each area touched gets one reviewer. Its scope is its changed files, "and the flows and states they touch".
+3. Map every file to an area using the table below. Each area touched gets one reviewer. Its scope is its changed files, "and the flows and states they touch". An area with more than about 10 changed files gets two reviewers instead (keys `A1` and `A2`, and so on), each with half its files, grouped by screen.
 
 ### screens
 Map the named screens or flows to areas with the table. The scope is those screens and flows, in every state.
 
 ### app
-Use all four areas, with the full scope from the table.
+Use all four areas, with the full scope from the table. The two largest get two reviewers each (owner, 2026-10-21), so the review takes about half as long. That makes six reviewers side by side:
+- **A1 · Ways in and listening:** every way in (buttons, widget, launcher shortcuts, share), mic permission, listening, waiting (slow or failed AI, offline), interrupted and unfinished captures.
+- **A2 · The result:** clarifications, single and batch review, voice notes, voice commands, save, undo, where the user lands.
+- **B1 · Today and the calendar:** understand today, the calendar and the day timeline, overdue and undated tasks, phone-calendar events, completed tasks.
+- **B2 · One task:** find a task, complete and undo, move, edit, reminder, repeat, checklist, attachment, delete and undo, typed creation.
+- **C** and **D** as in the table.
+
+Each half reads the files of its flows. Packages still take the area's letter; the workflow tells the organizer.
 
 ### Areas
 

@@ -49,14 +49,19 @@ MSYS_NO_PATHCONV=1 wsl -e python3 /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/Ta
 1. Run `bash .claude/ux-web/ux-web.sh changed` (website files) and `bash .claude/ux-web/ux-web.sh app` (the app-repo files the site's claims rest on: `App/docs/`, the app's English ARB, `Backend/docs/`, the app loop's DECISIONS and approved plans).
    - Either prints `NO_SNAPSHOT`: tell the owner there's no baseline yet, suggest `/ux-web site`, and stop.
    - Both print nothing: say "Nothing on the website changed since the last web review, and nothing in the app it describes" (the date comes from `ux-web.sh status`), and stop.
-2. Map every website file to an area with the table below. Each area touched gets one reviewer. Its scope is its changed files, "and the pages, journeys and states they touch".
+2. Map every website file to an area with the table below. Each area touched gets one reviewer. Its scope is its changed files, "and the pages, journeys and states they touch". An area with more than about 10 changed files gets two reviewers instead (keys `H1` and `H2`, and so on), each with half its files, grouped by page.
 3. App-side changes add area **F** (if it isn't there already), with the scope "the site's claims about what these app-repo files changed: <list>". Add area **L** too when `Backend/docs/ACCOUNT_DELETION.md`, or a decision about data, privacy or deletion, changed. Pass the list as `appChanged`. If the app-side changes are clearly only wording the site never quotes, you may drop them; say so to the owner.
 
 ### pages
 Map the named pages, journeys or areas to areas with the table. The scope is those pages and journeys, in every state, language, viewport and theme.
 
 ### site
-Use all four areas, with the full scope from the table.
+Use all four areas, with the full scope from the table. The largest, H, gets two reviewers (owner, 2026-10-21), so five review side by side:
+- **H1 · The pitch:** the hero, the "at a glance" bar, the appearance section, the closing call to action, and every call to action and where it leads.
+- **H2 · The demos:** both demos in every state (idle, recording, microphone denied, waiting, result, error, allowance used, no JavaScript).
+- **F**, **L** and **G** as in the table.
+
+Packages still take the letter H; the workflow tells the organizer.
 
 ### Areas
 

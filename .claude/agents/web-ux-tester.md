@@ -64,6 +64,8 @@ When packages run side by side, each one's tester works right after its implemen
 
 # Then run the round's check
 
+Round 1 and the run's final check run all of it. The workflow gives you one command that serves the build once and runs the whole suite and the renders side by side against it. A redo round (round 2 or later) checks only what it changed, as the workflow says; the whole suite and the full renders then run once, in the final check.
+
 Through the command prefix, in this order:
 1. `npm run check`.
 2. `npm run legal:check`.

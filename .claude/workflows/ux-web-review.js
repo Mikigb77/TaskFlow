@@ -162,7 +162,13 @@ const organize = [
 ]
 if (Array.isArray(a.appChanged) && a.appChanged.length) organize.push(`App-repo files that changed what the site should say: ${a.appChanged.join(', ')}.`)
 if (a.notes) organize.push(`From the owner, this session: ${a.notes}`)
-organize.push(`Write ${a.runDir}/plan.json and ${a.runDir}/plan.md, update .claude/ux-web/ISSUES.md, then return the structured result.`)
+if (reports.some(r => /\d$/.test(r.key))) {
+  organize.push('Some areas were split between two reviewers (H1 and H2, and so on). Each is still one area: give packages its letter, and merge findings the two halves share.')
+}
+organize.push(
+  'Give every package its "files", the paths relative to the website root it will change: packages that share no file are implemented side by side.',
+  `Write ${a.runDir}/plan.json and ${a.runDir}/plan.md, update .claude/ux-web/ISSUES.md, then return the structured result.`,
+)
 for (const r of reports.filter(x => x.reportText)) {
   organize.push('', `===== Report for area ${r.key} =====`, r.reportText)
 }

@@ -42,6 +42,8 @@ When packages run side by side, each one's tester works right after its implemen
 
 # Then run the round's check
 
+Round 1 and the run's final check run all of it, with the whole suite and the previews side by side as the workflow shows. A redo round (round 2 or later) checks only what it changed, as the workflow says; the whole suite then runs once, in the final check.
+
 From `App/`:
 1. `flutter gen-l10n`, if any ARB file changed this round.
 2. `flutter analyze --no-pub`.

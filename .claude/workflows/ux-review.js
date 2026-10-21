@@ -151,7 +151,13 @@ const organize = [
     : 'Scoped run: your plan goes straight to the implementers. Keep packages tight.',
 ]
 if (a.notes) organize.push(`From the owner, this session: ${a.notes}`)
-organize.push(`Write ${a.runDir}/plan.json and ${a.runDir}/plan.md, update .claude/ux-review/ISSUES.md, then return the structured result.`)
+if (reports.some(r => /\d$/.test(r.key))) {
+  organize.push('Some areas were split between two reviewers (A1 and A2, and so on). Each is still one area: give packages its letter, and merge findings the two halves share.')
+}
+organize.push(
+  'Give every package its "files", the repo-relative paths it will change: packages that share no file are implemented side by side.',
+  `Write ${a.runDir}/plan.json and ${a.runDir}/plan.md, update .claude/ux-review/ISSUES.md, then return the structured result.`,
+)
 for (const r of reports.filter(x => x.reportText)) {
   organize.push('', `===== Report for area ${r.key} =====`, r.reportText)
 }

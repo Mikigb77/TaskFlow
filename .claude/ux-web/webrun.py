@@ -33,9 +33,11 @@ from pathlib import Path
 
 HOME = Path.home() / "twb"
 # Never synced either way: built or installed on each side, or not the site's.
-SKIP = {"node_modules", ".next", "artifacts", "test-results", "playwright-report", ".git", "out", "dist",
-        ".turbo", ".wrangler", ".astro", ".deps", ".env", ".dev.vars"}
-BACK = ["artifacts", "test-results"]
+SKIP = {"node_modules", ".next", "artifacts", "test-results", "test-results-renders", "playwright-report", ".git",
+        "out", "dist", ".turbo", ".wrangler", ".astro", ".deps", ".env", ".dev.vars"}
+# test-results-renders: a second Playwright run's output folder, when the suite and the renders run
+# side by side (each run empties its own output folder when it starts).
+BACK = ["artifacts", "test-results", "test-results-renders"]
 
 
 def say(message):
@@ -147,12 +149,33 @@ def free_port(port):
     time.sleep(0.5 if out.strip() else 0)
 
 
+def serve(mirror, port, env):
+    """Starts the mirror's last build on its port and waits until it answers, so several Playwright
+    runs in one command share it (the config reuses a server that already answers)."""
+    import urllib.request
+    server = subprocess.Popen(["bash", "-lc", f"source ~/.nvm/nvm.sh && cd {shlex.quote(str(mirror))} && exec npm run start"],
+                              env=env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    for _ in range(120):
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2)
+            say(f"serving the build on :{port}")
+            return server
+        except Exception:
+            if server.poll() is not None:
+                raise SystemExit("the server stopped before answering: build first (npm run build)")
+            time.sleep(0.5)
+    os.killpg(server.pid, 15)
+    raise SystemExit(f"the server on :{port} didn't answer within 60 s")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--src", help="the checkout or worktree, as a WSL path (/mnt/c/...)")
     parser.add_argument("--name", help="the mirror's name under ~/twb: main, or the worktree's name")
     parser.add_argument("--port", type=int, default=3100)
     parser.add_argument("--no-back", action="store_true", help="don't copy artifacts and test results back")
+    parser.add_argument("--serve", action="store_true",
+                        help="serve the last build while the command runs, so Playwright runs side by side share it")
     parser.add_argument("--remove", metavar="NAME", help="delete the mirror ~/twb/NAME and stop")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -176,7 +199,13 @@ def main():
     say(f"{mirror.name} on :{args.port}: {copied} file(s) synced, {removed} removed, node_modules {note}, {time.monotonic() - started:.1f} s")
     line = command[0] if len(command) == 1 else shlex.join(command)
     env = dict(os.environ, PORT=str(args.port))
-    code = subprocess.run(["bash", "-lc", f"source ~/.nvm/nvm.sh && cd {shlex.quote(str(mirror))} && {line}"], env=env).returncode
+    server = serve(mirror, args.port, env) if args.serve else None
+    try:
+        code = subprocess.run(["bash", "-lc", f"source ~/.nvm/nvm.sh && cd {shlex.quote(str(mirror))} && {line}"], env=env).returncode
+    finally:
+        if server:
+            os.killpg(server.pid, 15)
+            say(f"stopped the server on :{args.port}")
     if not args.no_back:
         back = 0
         for folder in BACK:

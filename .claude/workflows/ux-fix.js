@@ -322,7 +322,17 @@ function mergePrompt(items) {
   ].join('\n')
 }
 
-function roundTestPrompt(round, impl, files, locked, unlocked) {
+// The slow checks side by side: the whole suite in one gate slot, the previews in another.
+function sideBySide(previews) {
+  const gate = GATE ? `${GATE} ` : ''
+  return [
+    'Run the slow checks side by side, in one shell command from App/, and wait for both:',
+    `mkdir -p build/round-check && ( ${gate}flutter test --no-pub --reporter failures-only > build/round-check/suite.log 2>&1; echo "suite exit $?" ) & ( ${previews} > build/round-check/previews.log 2>&1; echo "previews exit $?" ) & wait`,
+    'Then read the tails of build/round-check/suite.log and previews.log. Run the previews one after another inside their group, each through the gate.',
+  ].join('\n')
+}
+
+function roundTestPrompt(round, impl, files, locked, unlocked, targeted) {
   const lines = [
     `UX loop run ${a.runId}, round ${round}. Lock this round's fixes with tests, then run the round's check, in the main checkout.`,
     'Packages implemented this round:',
@@ -340,7 +350,10 @@ function roundTestPrompt(round, impl, files, locked, unlocked) {
       ? `Write tests for these packages only: ${unlocked.map(r => r.id).join(', ')}.`
       : 'No package needs new tests from you: run the round\'s check.',
     LEAN,
-    'Run the whole suite with --reporter failures-only so only failures print. Report every failing test against its finding, including tests the package testers wrote.',
+    targeted
+      ? 'This is a redo round, so the check covers what changed: flutter gen-l10n if an ARB file changed; flutter analyze --no-pub; one flutter test call with the new tests, the tests of every file this round changed and the tests that cover its findings; and the previews of the screens this round changed. Don\'t run the whole suite or the three older preview commands: the final check runs them once, when the redo rounds are done.'
+      : sideBySide('the UX preview suite for the screens this round changed, then the three older preview commands'),
+    'Report every failing test against its finding, including tests the package testers wrote.',
     'Parts of a package marked "waits on D#" were left out on purpose; do not test them.',
     files.some(f => /[\\/]android[\\/]/.test(f))
       ? 'Android files changed this round: include the compile check, flutter build apk --debug --no-pub --target-platform android-x64 (build only, never install). A broken native build fails the round.'
@@ -348,6 +361,20 @@ function roundTestPrompt(round, impl, files, locked, unlocked) {
     'Return the structured result. In "findings", cover every package of the round: copy what the package testers proved, unless your run shows otherwise.',
   )
   return lines.join('\n')
+}
+
+function finalPrompt(round, files, findings) {
+  return [
+    `UX loop run ${a.runId}. Mode: final check, after round ${round}. The redo rounds are done, and their checks passed on what they changed. Now run the whole check once, in the main checkout. Write no new tests.`,
+    `Files changed in this run: ${files.length ? files.join(', ') : 'none reported'}.`,
+    'From App/: flutter gen-l10n if an ARB file changed, then flutter analyze --no-pub.',
+    sideBySide('the UX preview suite for every screen this run changed, then the three older preview commands'),
+    files.some(f => /[\\/]android[\\/]/.test(f))
+      ? 'Android files changed in this run: include the compile check, flutter build apk --debug --no-pub --target-platform android-x64 (build only, never install).'
+      : 'No Android files changed in this run, so no native build is needed.',
+    `Report every failing test against its finding (the run's findings: ${findings.join(', ')}), or with no finding if it proves none; fix only your own test infrastructure, as your instructions say.`,
+    'Return the structured result.',
+  ].join('\n')
 }
 
 function verifyPrompt(round, area, part, items, tested) {
@@ -545,7 +572,9 @@ for (let round = 1; ; round++) {
   const roundFiles = [...new Set(impl.flatMap(r => r.filesChanged))]
   const lockedIds = new Set(locked.map(t => t.id))
   const unlocked = impl.filter(r => !lockedIds.has(r.id))
-  tested = (await agent(roundTestPrompt(round, impl, roundFiles, locked, unlocked), {
+  // Round 1 runs the whole check; redo rounds check what they changed, and the final check
+  // runs the whole suite once at the end.
+  tested = (await agent(roundTestPrompt(round, impl, roundFiles, locked, unlocked, round > 1), {
     agentType: 'ux-tester',
     label: `test · round ${round}`,
     phase: 'Test',
@@ -583,16 +612,45 @@ for (let round = 1; ; round++) {
   const regressions = checked.flatMap(v => v.regressions)
   const seen = new Set(results.map(x => x.id))
   const unchecked = impl.flatMap(r => r.findings).filter(id => !seen.has(id))
-  // A failing acceptance test overrides a "fixed" verdict.
-  const testFailed = {}
-  tested.failures.filter(f => f.owner === 'app' && f.finding).forEach(f => { testFailed[f.finding] = f })
-  const failing = results
-    .filter(x => x.result !== 'fixed' || testFailed[x.id])
-    .map(x => (x.result === 'fixed'
-      ? { ...x, result: 'partly', evidence: `${x.evidence} But a test fails: ${testFailed[x.id].test}: ${testFailed[x.id].evidence}` }
-      : x))
+  // A failing acceptance test overrides a "fixed" verdict, here or from an earlier round.
+  const judge = () => {
+    const testFailed = {}
+    tested.failures.filter(f => f.owner === 'app' && f.finding).forEach(f => { testFailed[f.finding] = f })
+    const list = results
+      .filter(x => x.result !== 'fixed' || testFailed[x.id])
+      .map(x => (x.result === 'fixed'
+        ? { ...x, result: 'partly', evidence: `${x.evidence} But a test fails: ${testFailed[x.id].test}: ${testFailed[x.id].evidence}` }
+        : x))
+    const here = new Set(results.map(x => x.id))
+    Object.values(testFailed).filter(f => !here.has(f.finding)).forEach(f => {
+      list.push({ id: f.finding, result: 'partly', evidence: `Fixed in an earlier round, but a test fails now: ${f.test}: ${f.evidence}` })
+    })
+    return { list, stray: tested.failures.filter(f => f.owner === 'app' && !f.finding) }
+  }
+  let { list: failing, stray: strayTestFailures } = judge()
+  let clean = !failing.length && !regressions.length && !strayTestFailures.length && !unchecked.length && tested.passed
+  if (clean && round > 1) {
+    phase('Test')
+    const findings = [...new Set([...rounds.flatMap(r => r.results.map(x => x.id)), ...results.map(x => x.id)])]
+    const fin = (await agent(finalPrompt(round, [...changedAll], findings), {
+      agentType: 'ux-tester',
+      label: `final check · round ${round}`,
+      phase: 'Test',
+      schema: TESTED,
+    })) || { passed: false, checks: [], findings: [], failures: [], filesChanged: [], notes: 'The final check did not return a result.' }
+    fin.filesChanged.forEach(f => changedAll.add(f))
+    tested = {
+      ...tested,
+      passed: fin.passed,
+      checks: [...tested.checks, ...fin.checks],
+      failures: [...tested.failures, ...fin.failures],
+      notes: [tested.notes, fin.notes].filter(Boolean).join(' '),
+    }
+    ;({ list: failing, stray: strayTestFailures } = judge())
+    clean = !failing.length && !strayTestFailures.length && tested.passed
+    log(`Final check after round ${round}: ${fin.passed ? 'passed' : 'failed'}; ${fin.failures.length} failure(s).`)
+  }
   failing.forEach(f => { failures[f.id] = (failures[f.id] || 0) + 1 })
-  const strayTestFailures = tested.failures.filter(f => f.owner === 'app' && !f.finding)
   rounds.push({
     round,
     planFile,
@@ -607,7 +665,7 @@ for (let round = 1; ; round++) {
   })
   log(`Round ${round}: ${results.length - failing.length} fixed, ${failing.length} not yet, ${regressions.length + strayTestFailures.length} regression(s), ${unchecked.length} unchecked.`)
 
-  if (!failing.length && !regressions.length && !strayTestFailures.length && !unchecked.length && tested.passed) break
+  if (clean) break
   if (round > EXTRA_ROUNDS) {
     log(`Stopping after ${round} rounds; what's left goes to the owner.`)
     break
