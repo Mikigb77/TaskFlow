@@ -1034,6 +1034,10 @@ class Lane:
             if len(fields) >= 2 and find(root, self.L.rx("signIn")) is not None:
                 self.sign_in()
                 continue
+            if find(root, self.L.rx("continueWithEmail")) is not None:
+                # Sign-in with the email form folded behind «Continuar con mi correo» (D2).
+                self.sign_in()
+                continue
             if find_id(root, "aerr_wait") is not None:
                 dismiss_anr()
                 continue
@@ -1055,7 +1059,15 @@ class Lane:
         raise Skip(f"the app didn't reach its main screen in {timeout:.0f} s (the screen then: "
                    f"{stuck})")
 
+    def unfold_email(self) -> None:
+        """Since D2, sign-in shows Google first, with the email form behind «Continuar con mi
+        correo». Opens the form when it's folded."""
+        fields = [n for n in ui().iter("node") if n.get("class") == "android.widget.EditText"]
+        if len(fields) < 2:
+            must_tap(self.L.rx("continueWithEmail"), "Continuar con mi correo", wait=1.5)
+
     def sign_in(self) -> None:
+        self.unfold_email()
         fill_field(0, self.account["email"])
         fill_field(1, self.account["password"], secret=True)
         key("KEYCODE_ENTER", 4)
@@ -1108,10 +1120,16 @@ class Lane:
         removed = self.backend.clear()
         log(f"  cleared {removed} task(s) from the review account")
         sh(f"am start -n {ACTIVITY}", check=True)
-        if wait_for(L.rx("signIn"), timeout=150) is None:
+        if wait_for(L.rx("signIn", "continueWithEmail"), timeout=150) is None:
             raise Skip("the sign-in screen didn't appear (already signed in? use without --keep-data)")
-        self.variants("first-run", "sign-in", "The first screen after installing: sign-in. Debug build: "
-                      "the 'Ajustes de conexión' link at the bottom is debug-only and absent in release.")
+        self.variants("first-run", "sign-in", "The first screen after installing: sign-in, with Google "
+                      "first and the email form folded behind «Continuar con mi correo» (D2). Debug "
+                      "build: the 'Ajustes de conexión' link at the bottom is debug-only and absent in "
+                      "release.")
+        if find(ui(), L.rx("continueWithEmail")) is not None:
+            self.unfold_email()
+            self.variants("first-run", "sign-in-email", "After «Continuar con mi correo»: the email "
+                          "form, opened in place.")
         fill_field(0, self.account["email"])
         self.snap("first-run", "sign-in-typing", "Typing the email: the keyboard covers the lower half.",
                   dump=False)
