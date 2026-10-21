@@ -643,12 +643,15 @@ class Strings:
 PHRASES = {
     # Typed with `input text`, so no accents.
     "es": {"typed": "Llamar a Marta", "share": "Comprar pan y leche el viernes",
+           "share_title": "Comprar pan y leche",
            "tasks": ["Llamar al dentista", "Recoger el coche", "Pagar la luz"],
            "decor": ["Reunión con Laura", "Comprar fruta", "Revisar el presupuesto"]},
     "en": {"typed": "Call Marta", "share": "Buy bread and milk on Friday",
+           "share_title": "Buy bread and milk",
            "tasks": ["Call the dentist", "Pick up the car", "Pay the electricity bill"],
            "decor": ["Meeting with Laura", "Buy fruit", "Review the budget"]},
     "ca": {"typed": "Trucar a la Marta", "share": "Comprar pa i llet divendres",
+           "share_title": "Comprar pa i llet",
            "tasks": ["Trucar al dentista", "Recollir el cotxe", "Pagar la llum"],
            "decor": ["Reunió amb la Laura", "Comprar fruita", "Revisar el pressupost"]},
 }
@@ -1129,7 +1132,7 @@ class Lane:
         if find(ui(), L.rx("continueWithEmail")) is not None:
             self.unfold_email()
             self.variants("first-run", "sign-in-email", "After «Continuar con mi correo»: the email "
-                          "form, opened in place.")
+                          "form, opened in place.", prepare=self.keyboard_clear)
         fill_field(0, self.account["email"])
         self.snap("first-run", "sign-in-typing", "Typing the email: the keyboard covers the lower half.",
                   dump=False)
@@ -1560,7 +1563,9 @@ class Lane:
             sh("input keyevent KEYCODE_HOME")
             self.share_intent(PHRASES[self.lang]["share"], direct=True)
             time.sleep(4)
-        if wait_for(re.escape(PHRASES[self.lang]["share"]), timeout=12) is None:
+        # Since D3 the form reads the day and keeps only the rest as the title, so wait for
+        # the title words, which both the form and the capture sheet show.
+        if wait_for(re.escape(PHRASES[self.lang]["share_title"]), timeout=12) is None:
             raise Skip("the shared text didn't arrive in TaskFlow")
         root = ui()
         in_form = find(root, L.rx("newTask")) is not None
