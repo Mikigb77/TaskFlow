@@ -20,7 +20,8 @@ changes are uncommitted until the round is verified, so:
 Usage:
   python -I -X utf8 .claude/ux-review/waves.py seed --run <runDir> [--files <path> ...] [--no-pub]
   python -I -X utf8 .claude/ux-review/waves.py merge --worktree <id>=<path> [...] [--no-gen] [--keep]
-  python -I -X utf8 .claude/ux-review/waves.py gate [--slots N] -- <heavy command>
+  python -I -X utf8 .claude/ux-review/waves.py gate [--pool app|web] [--slots N] -- <heavy command>
+  python -I -X utf8 .claude/ux-review/waves.py add --repo <website> --name <copy>    (a website copy, seeded)
   python -I -X utf8 .claude/ux-review/waves.py diff --worktree <path>    (a conflicted package's patch)
   python -I -X utf8 .claude/ux-review/waves.py drop --worktree <path>    (remove it once integrated)
 Paths are relative to the repo root. merge prints one JSON object.
@@ -28,6 +29,7 @@ Paths are relative to the repo root. merge prints one JSON object.
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -77,21 +79,26 @@ def write(path, data, like):
 # ---------------------------------------------------------------- seed
 
 def run_changes(main):
-    """The app's uncommitted files in the main checkout: what the run (and anyone else) changed
-    since HEAD. App/config holds secrets and is never copied."""
-    tracked = git(main, "diff", "--name-only", "HEAD", "--", "App").splitlines()
-    untracked = git(main, "ls-files", "--others", "--exclude-standard", "--",
-                    "App/lib", "App/test", "App/assets", "App/android/app/src", "App/ios/Runner").splitlines()
-    return {p for p in tracked + untracked if p and not p.startswith(("App/config/", "App/build/", "App/.dart_tool/"))}
+    """The uncommitted files in the main checkout: what the run (and anyone else) changed since
+    HEAD. In the app, App/config holds secrets and is never copied; in the website, .env files
+    are ignored by git and never listed."""
+    if (main / "App").is_dir():
+        tracked = git(main, "diff", "--name-only", "HEAD", "--", "App").splitlines()
+        untracked = git(main, "ls-files", "--others", "--exclude-standard", "--",
+                        "App/lib", "App/test", "App/assets", "App/android/app/src", "App/ios/Runner").splitlines()
+        return {p for p in tracked + untracked if p and not p.startswith(("App/config/", "App/build/", "App/.dart_tool/"))}
+    tracked = git(main, "diff", "--name-only", "HEAD").splitlines()
+    untracked = git(main, "ls-files", "--others", "--exclude-standard", "--", "src", "tests", "public", "scripts").splitlines()
+    return {p for p in tracked + untracked if p}
 
 
-def seed(args):
-    wt = Path(git(Path.cwd(), "rev-parse", "--show-toplevel"))
-    main = main_root(wt)
+def seed_worktree(wt, main, files=(), run=None, pub=False):
+    """Copies the main checkout's uncommitted state into the worktree and records it as the seed."""
     if wt.resolve() == main.resolve():
         raise SystemExit("seed runs in a worktree, never in the main checkout.")
     copied, removed = [], []
-    for rel in sorted(set(args.files or []) | run_changes(main) | set(CONTEXT)):
+    context = set(CONTEXT) if (main / ".claude" / "ux-review").is_dir() else set()
+    for rel in sorted(set(files or []) | run_changes(main) | context):
         src, dst = main / rel, wt / rel
         if src.is_file():
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -100,27 +107,65 @@ def seed(args):
         elif dst.is_file():
             dst.unlink()  # deleted earlier in the run
             removed.append(rel)
-    if args.run:
-        src = main / args.run
-        if src.is_dir():
-            shutil.copytree(src, wt / args.run, dirs_exist_ok=True)
-            copied.append(args.run + "/")
+    if run and (main / run).is_dir():
+        shutil.copytree(main / run, wt / run, dirs_exist_ok=True)
+        copied.append(run + "/")
     git(wt, "add", "-A")
     tree = git(wt, "write-tree")
     head = git(wt, "rev-parse", "HEAD")
     commit = git(wt, "commit-tree", tree, "-p", head, "-m", "UX loop seed: the run so far")
     gitdir = Path(git(wt, "rev-parse", "--path-format=absolute", "--git-dir"))
     (gitdir / SEED_FILE).write_text(commit, encoding="utf-8")
-    pub = "skipped"
-    if not args.no_pub:
+    note = "skipped"
+    if pub and (wt / "App" / "pubspec.yaml").is_file():
         app = wt / "App"
         flutter = shutil.which("flutter") or "flutter"
         result = subprocess.run([flutter, "pub", "get", "--offline"], cwd=app, capture_output=True, shell=os.name == "nt")
         if result.returncode != 0:
             result = subprocess.run([flutter, "pub", "get"], cwd=app, capture_output=True, shell=os.name == "nt")
-        pub = "ok" if result.returncode == 0 else "failed: " + result.stderr.decode("utf-8", "replace")[-400:]
-    print(f"Seeded {wt} from {main}: {len(copied)} copied, {len(removed)} removed; seed {commit[:10]}; pub get {pub}.")
+        note = "ok" if result.returncode == 0 else "failed: " + result.stderr.decode("utf-8", "replace")[-400:]
+    return copied, removed, commit, note
+
+
+def seed(args):
+    wt = Path(git(Path.cwd(), "rev-parse", "--show-toplevel"))
+    main = main_root(wt)
+    copied, removed, commit, note = seed_worktree(wt, main, args.files, args.run, pub=not args.no_pub)
+    print(f"Seeded {wt} from {main}: {len(copied)} copied, {len(removed)} removed; seed {commit[:10]}; pub get {note}.")
     print("Work here only. Your changes are measured from this seed; don't commit, stage or reset.")
+
+
+COPIES = Path.home() / ".taskflow-tools" / "wt"
+
+
+def wsl_path(path):
+    text = str(path).replace("\\", "/")
+    return re.sub(r"^([A-Za-z]):/", lambda m: f"/mnt/{m.group(1).lower()}/", text)
+
+
+def add(args):
+    """A worktree of another repo (the website), outside both repos, seeded like seed does."""
+    repo = Path(args.repo)
+    main = main_root(repo)
+    name = re.sub(r"[^A-Za-z0-9._-]", "", args.name)
+    wt = COPIES / name
+    if wt.exists():
+        subprocess.run(["git", "-C", str(main), "worktree", "remove", "--force", str(wt)], capture_output=True)
+        shutil.rmtree(wt, ignore_errors=True)
+        git(main, "worktree", "prune")
+    COPIES.mkdir(parents=True, exist_ok=True)
+    git(main, "worktree", "add", "--detach", str(wt), "HEAD")
+    copied, removed, commit, _ = seed_worktree(wt, main, args.files)
+    print(json.dumps({"worktree": str(wt).replace("\\", "/"), "wsl": wsl_path(wt), "name": name,
+                      "seeded": len(copied), "seed": commit[:10]}))
+
+
+def remove_mirror(wt):
+    """A website copy's build mirror on WSL's disk (webrun.py), best effort."""
+    if COPIES not in Path(wt).resolve().parents:
+        return
+    webrun = Path(__file__).resolve().parents[1] / "ux-web" / "webrun.py"
+    subprocess.run(["wsl", "-e", "python3", wsl_path(webrun), "--remove", Path(wt).name], capture_output=True)
 
 
 # ---------------------------------------------------------------- merge
@@ -216,7 +261,9 @@ def gate(args):
     if not command:
         raise SystemExit("gate needs a command after --")
     slots = max(1, int(args.slots or os.environ.get("UX_GATE_SLOTS") or 3))
-    lock_dir = main_root(Path.cwd()) / ".git" / "ux-gate"
+    # One pool per loop: the app's Flutter runs on Windows, the website's builds in WSL.
+    pool = re.sub(r"[^a-z0-9-]", "", (args.pool or "app").lower()) or "app"
+    lock_dir = Path(__file__).resolve().parents[2] / ".git" / f"ux-gate-{pool}"
     lock_dir.mkdir(parents=True, exist_ok=True)
     handle, waited, said = None, 0.0, False
     while handle is None:
@@ -243,8 +290,10 @@ def gate(args):
     if waited:
         print(f"[gate] waited {waited:.0f} s for a slot", file=sys.stderr, flush=True)
     try:
-        line = command[0] if len(command) == 1 else subprocess.list2cmdline(command)
-        return subprocess.run(line, shell=True).returncode
+        if len(command) == 1:  # one command line, for the shell
+            return subprocess.run(command[0], shell=True).returncode
+        exe = shutil.which(command[0]) or command[0]
+        return subprocess.run([exe, *command[1:]]).returncode
     finally:
         handle.close()
 
@@ -330,6 +379,7 @@ def drop_worktree(main, wt):
         return False
     if branch.startswith("worktree-agent-"):
         git(main, "branch", "-D", branch, check=False)
+    remove_mirror(wt)
     return True
 
 
@@ -367,7 +417,12 @@ def main():
     m.add_argument("--keep", action="store_true", help="keep the worktrees")
     g = sub.add_parser("gate")
     g.add_argument("--slots", type=int, help="heavy commands at once (default UX_GATE_SLOTS, else 3)")
+    g.add_argument("--pool", default="app", help="app (Flutter on Windows) or web (builds in WSL)")
     g.add_argument("argv", nargs=argparse.REMAINDER, help="-- <command>, or one quoted command line")
+    w = sub.add_parser("add", help="a seeded worktree of another repo, such as the website")
+    w.add_argument("--repo", required=True)
+    w.add_argument("--name", required=True)
+    w.add_argument("--files", nargs="*", default=[])
     d = sub.add_parser("diff", help="a conflicted package's changes since its seed")
     d.add_argument("--worktree", required=True)
     r = sub.add_parser("drop", help="remove a worktree and its worktree-agent-* branch")
@@ -375,7 +430,7 @@ def main():
     args = parser.parse_args()
     if args.action == "gate":
         return gate(args)
-    {"seed": seed, "merge": merge, "diff": show_diff, "drop": drop}[args.action](args)
+    {"seed": seed, "add": add, "merge": merge, "diff": show_diff, "drop": drop}[args.action](args)
 
 
 if __name__ == "__main__":

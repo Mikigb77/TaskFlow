@@ -30,7 +30,11 @@ The main session runs `/ux-web` by itself after website work, and whenever an ap
    - merges duplicates;
    - sends product decisions to you;
    - groups the fixes into work packages, each with an exact brief and acceptance checks.
-5. **Fix.** `web-ux-implementer` (Opus, high effort) works through the packages one at a time. Each one changes the site, with all copy in the three languages, builds it, runs the Playwright tests it affects, and refreshes the renders.
+5. **Fix.** `web-ux-implementer` (Opus, high effort) changes the site, with all copy in the three languages, builds it, runs the Playwright tests it affects, and refreshes the renders.
+   - **Waves (2026-10-21):** packages that share no file run side by side, up to 12 at once. The site's copy (`src/content/`), the stylesheets and the tests don't count as shared.
+   - Each package gets its own copy of the website (`waves.py add`, under `~/.taskflow-tools/wt/`), its own build mirror on WSL's disk and its own port, and its tester follows it there.
+   - `waves.py merge` brings each copy back like a pull request. A package that conflicts goes to an implementer, who integrates it by hand.
+   - Builds and Playwright runs go through the web pool of `waves.py gate`, 2 at a time.
 6. **Test.** `web-ux-tester` (Opus, high effort) runs once per round.
    - It writes a Playwright test for every acceptance check a test can prove, working from the plan rather than the code, including axe accessibility checks, on the desktop and mobile projects and in light and dark.
    - It then runs the type check, the legal check, the build, the whole suite, the unit tests and the renders, and classes every failure as the site's or the infrastructure's.
@@ -51,7 +55,7 @@ The main session runs `/ux-web` by itself after website work, and whenever an ap
 
 | What | Where | How |
 |---|---|---|
-| Build, type check, tests, renders | **WSL** | `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command>'` |
+| Build, type check, tests, renders | **WSL**, on its own disk | `MSYS_NO_PATHCONV=1 wsl -e python3 /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-web/webrun.py --src /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb --name main --port 3100 -- '<command>'`: a mirror under `~/twb`, synced with rsync, `node_modules` hard-linked, artifacts copied back |
 | Cropping a render | **WSL** | `wsl -e bash -lc 'source ~/.nvm/nvm.sh && node /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-web/crop.mjs <render> <screen>'` |
 | Git, for either repo | **Windows** | from this repo: `git …` and `git -C ../TaskFlowWeb …` |
 | `ux-web.sh` | **Windows** (Git Bash) | `bash .claude/ux-web/ux-web.sh <command>` |
@@ -72,7 +76,7 @@ The website's commands, run in WSL from its root:
 | `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert "perf "` | The renders and the audit. Add `-g "privacy es"` for one page and language, `-g "voice-waiting"` for one demo scenario. |
 | `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf "` | Lab performance, after the renders and on its own. |
 
-Playwright's web server is `npm run start`: the production server on port 3000, serving the **last build**. So build first, or every test and render shows old code. Build with `SITE_URL=https://taskflow.garbar.tech npm run build` when the audit should judge canonical, hreflang and `og:url`: production builds set it, and pages built without it have none. And if something already listens on port 3000, Playwright reuses it: stop it first.
+Playwright's web server is `npm run start`: the production server, serving the **last build**. So build first, or every test and render shows old code. Build with `SITE_URL=https://taskflow.garbar.tech npm run build` when the audit should judge canonical, hreflang and `og:url`: production builds set it, and pages built without it have none. Through `webrun.py` the server runs on the mirror's own port (3100 for the main checkout, 3101 and up for copies), and the runner stops a server left on it first, so Playwright never reuses a stale build.
 
 ## Renders
 

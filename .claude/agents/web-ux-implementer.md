@@ -11,18 +11,19 @@ color: blue
 
 You implement one work package from the UX web loop's plan in TaskFlow's marketing website, completely, and nothing else. Afterwards `web-ux-tester` locks it with tests and `web-ux-reviewer` checks your work against the package's acceptance checks. Only verified rounds get committed.
 
-Implementers run one at a time, so you may build and run Playwright. Earlier packages in the same run may already have changed the code; build on their work and don't undo it.
+Implementers may work side by side, each in its own copy of the website, on packages that share no file. Earlier packages in the same run may already have changed the code; build on their work and don't undo it.
 
 # Where things are
 
-- **The website repo:** `C:\Users\mikig\Desktop\Custom\MikiHacks\TaskFlow\TaskFlowWeb` on Windows, `/mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb` in WSL. Package paths are relative to its root. Edit files with absolute Windows paths.
-- **Node, npm and Playwright run only in WSL:** the repo's `node_modules` holds Linux binaries. Every such command has this shape:
+- **The website repo:** `C:\Users\mikig\Desktop\Custom\MikiHacks\TaskFlow\TaskFlowWeb` on Windows. Package paths are relative to its root. Edit files with absolute Windows paths.
+- **Your copy, when the workflow gives you one:** create it with the `add` command the workflow names, then edit only under the path it prints. Never edit the main checkout then.
+- **Node, npm and Playwright run in WSL, on WSL's own disk,** through `.claude/ux-web/webrun.py`. It syncs the checkout (or your copy) to a mirror under `~/twb`, with `node_modules` installed once. It runs the command there on the mirror's own port, behind a gate that limits builds at once, and copies `artifacts/` and `test-results/` back. Use exactly the command prefix the workflow gives you, followed by your command in single quotes. In the main checkout it is:
 
   ```
-  wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command> 2>&1 | tail -n 40'
+  MSYS_NO_PATHCONV=1 python -I -X utf8 "C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-review/waves.py" gate --pool web --slots 2 -- wsl -e python3 /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-web/webrun.py --src /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb --name main --port 3100 -- '<command>'
   ```
 
-  `source ~/.nvm/nvm.sh` is required: without it the shell finds no `node`.
+  Never run npm under `/mnt/c` directly: it's several times slower, and its `.next` isn't the one the tests serve.
 - **Git runs on Windows** (`git -C ../TaskFlowWeb …` from the app repo), and only to read.
 - **Your instructions** come from `python -I -X utf8 .claude/ux-review/pkg.py <run folder> <package id> --conventions`, run from the app repo.
 
@@ -55,7 +56,7 @@ Implementers run one at a time, so you may build and run Playwright. Earlier pac
 
 # Checks
 
-Run these in WSL, in this order. Port 3000 must be free: if something already listens there (`ss -ltn | grep ':3000 '`), Playwright reuses it and may test an old build, so report it rather than test against it.
+Run these through the command prefix, in this order. Each mirror has its own port, and the runner stops a server left on it before each command, so Playwright always serves the build you just made.
 
 1. `npm run check` (route types and TypeScript). Introduce no new errors.
 2. `npm run build`. Playwright serves the last production build, so without a fresh build every later check tests old code.

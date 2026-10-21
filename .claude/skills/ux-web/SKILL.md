@@ -12,13 +12,16 @@ Two repos are involved:
 - **the app repo** (this one) holds the loop: agents, workflows, this skill, and the state in `.claude/ux-web/`;
 - **the website**, `../TaskFlowWeb` (`C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb`), is what gets reviewed and fixed.
 
-**Where commands run.** Git, `ux-web.sh` and `pkg.py` run on Windows, from the app repo. Node, npm, npx and Playwright run only in WSL, because the website's `node_modules` holds Linux binaries. Every WSL command has this shape (written `WSL: <command>` below):
+**Where commands run.** Git, `ux-web.sh` and `pkg.py` run on Windows, from the app repo. Node, npm, npx and Playwright run in WSL, on WSL's own disk, through `.claude/ux-web/webrun.py` (2026-10-21). Every such command has this shape (written `WSL: <command>` below):
 
 ```
-wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command> 2>&1 | tail -n 40'
+MSYS_NO_PATHCONV=1 wsl -e python3 /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-web/webrun.py --src /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb --name main --port 3100 -- '<command>'
 ```
 
-`source ~/.nvm/nvm.sh` is required: nvm loads Node 26 only from `.bashrc`, which a non-interactive shell skips.
+- **What it does:** it syncs the website to a mirror under `~/twb` with rsync, with `node_modules` installed once per lockfile and hard-linked into each mirror. It runs the command there with nvm's Node, on the mirror's own port, and copies `artifacts/` and `test-results/` back to the checkout.
+- **Why:** on `/mnt/c`, Node was several times slower.
+- **The port:** the loop uses 3100 and up. The runner stops a server left on its port, and 3000 stays free for people.
+- **Git Bash:** `MSYS_NO_PATHCONV=1` keeps Git Bash from rewriting the `/mnt/c` paths.
 
 ## 1. Read the argument
 
@@ -78,7 +81,7 @@ Shared files:
 
 ## 4. Render and measure the pages
 
-Before any reviewer starts, make sure nothing listens on port 3000 (`WSL: ss -ltn | grep ':3000 ' || echo free`). Playwright would reuse that server, which may serve an older build. Then, in WSL, two commands; give the second a 10-minute timeout:
+Before any reviewer starts, run two commands; give the second a 10-minute timeout:
 
 ```
 WSL: SITE_URL=https://taskflow.garbar.tech npm run build
@@ -97,8 +100,8 @@ WSL: rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-render
 
   On 2026-10-18 that was 550 PNGs, 446 focus screenshots and 103 ARIA snapshots.
 - **Safari's engine (WebKit), from Windows, after the renders above.** Those start by deleting `artifacts/ux-web/`, so WebKit goes second. WSL here can't run Playwright's WebKit (its libraries aren't packaged for this Kali Linux), so it runs on Windows with Playwright for Python, in `C:\Users\mikig\.taskflow-tools\webkit`, set up on 2026-10-18.
-  1. **Serve the build from WSL** as a background Bash job: `wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && exec npm run start'`. A server started with `nohup` dies when its `wsl` call returns.
-  2. **Render.** Once http://localhost:3000 answers from Windows, run `C:\Users\mikig\.taskflow-tools\webkit\venv\Scripts\python.exe -X utf8 .claude/ux-web/webkit_renders.py`. It takes about 2 minutes and writes 112 PNGs to `artifacts/ux-web/webkit/`, with an `INDEX.md` that lists any console errors.
+  1. **Serve the mirror's build** as a background Bash job: `WSL: npm run start`, with `--no-back` before the `--`. It serves on port 3100. A server started with `nohup` dies when its `wsl` call returns.
+  2. **Render.** Once http://localhost:3100 answers from Windows, run `UX_WEB_BASE=http://localhost:3100 C:\Users\mikig\.taskflow-tools\webkit\venv\Scripts\python.exe -X utf8 .claude/ux-web/webkit_renders.py`. It takes about 2 minutes and writes 112 PNGs to `artifacts/ux-web/webkit/`, with an `INDEX.md` that lists any console errors.
   3. **Stop the server.**
   4. **If the tools folder is missing,** rebuild it:
      - create it with `python -m venv C:\Users\mikig\.taskflow-tools\webkit\venv`;
@@ -145,7 +148,9 @@ When it returns:
    - Keep the PC awake while it runs. In the desktop app, call `mcp__ccd_host__request_keep_awake` with `until: "session_idle"`. The longest runs so far each lost 2–4 hours to a sleeping or restarting laptop.
    - It may run while a `ux-fix` run is going (owner, 2026-10-21). Each loop runs up to 12 packages side by side, and each limits its own heavy commands: the website's builds in WSL, the app's Flutter on Windows.
 
-   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-web-fix.js`, and args `{ runId, runDir, date, webDir, skip, only, batch, recordMemory, notes }`. For `/ux-web fix`, the run folder is the newest one under `.claude/ux-web/runs/` that has a `plan.json` but no `report.md`.
+   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-web-fix.js`, and args `{ runId, runDir, date, webDir, repoRoot, maxParallel, heavySlots, skip, only, batch, recordMemory, notes }`:
+   - `repoRoot` is the app repo (`git rev-parse --show-toplevel`), with forward slashes. With it, packages that share no file run side by side, each in its own copy of the website (`waves.py add`), with its own build mirror and port. Without it, they run one at a time in the main checkout.
+   - `maxParallel` is 12, and `heavySlots` 2: builds and Playwright runs at once in WSL, which has about 7.5 GB. For `/ux-web fix`, the run folder is the newest one under `.claude/ux-web/runs/` that has a `plan.json` but no `report.md`.
 3. **When it returns:**
    - **Save the reports.** Write `close.report` to `<runDir>/<reportName>`, and each of `inlineNotes` to its `path`. Subagents may not write report files, so the agents return the text.
    - **`testsPassed` is true:** commit, one commit in each repo.

@@ -20,15 +20,15 @@ You write only in the website's `tests/` folder: spec files, and helpers in `tes
 
 # Where things are
 
-- **The website repo:** `C:\Users\mikig\Desktop\Custom\MikiHacks\TaskFlow\TaskFlowWeb` on Windows, `/mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb` in WSL. Edit files with absolute Windows paths.
-- **Node, npm and Playwright run only in WSL:** the repo's `node_modules` holds Linux binaries. Every such command has this shape:
+- **The website repo:** `C:\Users\mikig\Desktop\Custom\MikiHacks\TaskFlow\TaskFlowWeb` on Windows. Edit files with absolute Windows paths. In package mode you work in that package's copy instead, at the path the workflow names.
+- **Node, npm and Playwright run in WSL, on WSL's own disk,** through `.claude/ux-web/webrun.py`. It syncs the checkout (or the copy) to a mirror under `~/twb`, with `node_modules` installed once. It runs the command there on the mirror's own port, behind a gate that limits builds at once, and copies `artifacts/` and `test-results/` back. Use exactly the command prefix the workflow gives you, followed by your command in single quotes. In the main checkout it is:
 
   ```
-  wsl -e bash -lc 'source ~/.nvm/nvm.sh && cd /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb && <command> 2>&1 | tail -n 60'
+  MSYS_NO_PATHCONV=1 python -I -X utf8 "C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-review/waves.py" gate --pool web --slots 2 -- wsl -e python3 /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlow/.claude/ux-web/webrun.py --src /mnt/c/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb --name main --port 3100 -- '<command>'
   ```
 
-  `source ~/.nvm/nvm.sh` is required: without it the shell finds no `node`.
-- **Playwright** (`playwright.config.ts`) runs every spec on two projects: `desktop` (Chromium, 1440 × 1000) and `mobile` (iPhone 13 in Chromium, 390 × 664, touch). Its web server is `npm run start`, which serves the **last production build**: run `npm run build` before any Playwright run, or you test old code. If something already listens on port 3000 (`ss -ltn | grep ':3000 '`), Playwright reuses it; stop and report that as infrastructure rather than test against it.
+  Never run npm under `/mnt/c` directly: it's several times slower, and its `.next` isn't the one the tests serve.
+- **Playwright** (`playwright.config.ts`) runs every spec on two projects: `desktop` (Chromium, 1440 × 1000) and `mobile` (iPhone 13 in Chromium, 390 × 664, touch). Its web server is `npm run start`, which serves the **last production build**: run `npm run build` before any Playwright run, or you test old code. Each mirror has its own port, and the runner stops a server left on it before each command.
 - **Your instructions** come from `python -I -X utf8 .claude/ux-review/pkg.py <run folder> <package ids> --conventions`, run from the app repo.
 
 # For each package in the round
@@ -55,9 +55,16 @@ You write only in the website's `tests/` folder: spec files, and helpers in `tes
    - When a package changes the demos' structure or adds a state, update the scenarios in `tests/support/ux-voice.ts`. They find the demo by classes and `data-stage`, not by its copy, and the API's errors are read from the server code, so a rewording needs nothing.
    - Never let a scenario call the real voice API: every `/api/voice/*` request is answered by `VoiceStub`.
 
+# Package mode: one package, in its copy
+
+When packages run side by side, each one's tester works right after its implementer, in that package's own copy of the website:
+- Write the tests for that package only, as above, under the copy's `tests/`. Never touch the main checkout.
+- Build, then run your new tests and the existing specs of the pages the package changed, with the command prefix the workflow gives you.
+- Skip the round's check below: the round check runs it once every package is merged.
+
 # Then run the round's check
 
-In WSL, in this order:
+Through the command prefix, in this order:
 1. `npm run check`.
 2. `npm run legal:check`.
 3. `SITE_URL=https://taskflow.garbar.tech npm run build`: production's `SITE_URL`, as the `Dockerfile` sets it, so the pages carry the canonical, hreflang and `og:url` production serves. The suite passes on this build too.
@@ -75,7 +82,7 @@ Compare the failures with `.claude/ux-web/KNOWN_FAILURES.md`. Failures listed th
 - **Your test** is wrong: fix it.
 - **An existing test** broke because the round correctly changed behaviour or copy. Update it, and say what changed.
 - **An existing test** broke because the round broke something. Report it as a `site` failure, naming the file and the probable cause.
-- **Infrastructure:** the server didn't start, port 3000 was taken, a browser is missing, the build crashed for a reason outside the round's files, WSL or npm failed. Report it with owner `infrastructure`. You may fix test infrastructure inside `tests/`. If that clears a known failure, remove it from `KNOWN_FAILURES.md` and say so.
+- **Infrastructure:** the server didn't start, its port was taken, a browser is missing, the build crashed for a reason outside the round's files, WSL or npm failed. Report it with owner `infrastructure`. You may fix test infrastructure inside `tests/`. If that clears a known failure, remove it from `KNOWN_FAILURES.md` and say so.
 
 A failing build or type check caused by the round's files is a `site` failure: it fails the round.
 
