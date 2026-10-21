@@ -5,16 +5,16 @@ metadata:
   type: project
 ---
 
-Snapshot 2026-10-20. Check against the code before relying on line numbers.
+Snapshot 2026-10-22 (after run 2026-10-21-changes). Check against the code before relying on line numbers.
 
 **Home** (`src/components/HomePage.tsx`; copy in `src/content/site/{en,es,ca}.ts`, shared type `types.ts`):
 - hero `#hero-title`; primary CTA → `#voice` (`.button`), secondary text link → `#features`
-- `#features` (cards: voice, calendar/reminders, notes/checklist/files, offline as a full-width card)
+- `#features` (cards: voice, calendar/reminders — `.feature-calendar` is a flex column and `.calendar-illustration` grows to the card bottom (WEB-1004; at desktop text200 the week panel shows ~460 px blank, accepted), notes/checklist/files, offline as a full-width card)
 - live voice demo `#voice` (`VoiceDemo.tsx`, static fallback `VoiceExample.tsx`; plans block `.voice-plans` inside the section; `?developer=1` shows English-only developer text, not visitor-facing)
-- FAQ `#questions`; closing `#get-taskflow` (lime button → `#voice`)
+- FAQ `#questions` (8 items: download yet, free, account, voice, offline, family, notes, home screen/WhatsApp); closing `#get-taskflow` (lime button → `#voice`)
 - `TaskDemo.tsx` (sample walkthrough) no longer exists; the agent prompt still names it.
 - Other components: `Header`, `Footer` (back-to-top → `#main-content`, company name GARBAR), `LanguageSwitch` (cookie `taskflow-lang`, 1 year), `SkipLink`, `NotFoundPage`, `useSiteLanguage`. Language routing in `src/proxy.ts` (cookie, then Accept-Language).
-- Hero screenshots: `public/images/hero-calendar-{en,es,ca}-{light,dark}.png` (one per language and theme).
+- Hero screenshots: `public/images/hero-calendar-{en,es,ca}-{light,dark}.png` (one per language and theme), copied from the app's renders (see [[site-patterns]]); also drawn in `opengraph-image.<lang>.png`.
 
 **Legal** (`LegalPage.tsx`, content `src/content/legal/{en,es,ca}.ts`, metadata/UI strings `index.ts`, company data `company.json`, styles `src/styles/legal.css`):
 - h1 = the document's name; no eyebrow, no visible description (description is meta/og/twitter only).
