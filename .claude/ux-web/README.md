@@ -76,7 +76,12 @@ The website's commands, run in WSL from its root:
 | `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=6 --grep-invert "perf "` | The renders and the audit. Add `-g "privacy es"` for one page and language, `-g "voice-waiting"` for one demo scenario. |
 | `UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf "` | Lab performance, after the renders and on its own. |
 
-Playwright's web server is `npm run start`: the production server, serving the **last build**. So build first, or every test and render shows old code. Build with `SITE_URL=https://taskflow.garbar.tech npm run build` when the audit should judge canonical, hreflang and `og:url`: production builds set it, and pages built without it have none. Through `webrun.py` the server runs on the mirror's own port (3100 for the main checkout, 3101 and up for copies), and the runner stops a server left on it first, so Playwright never reuses a stale build.
+Playwright's web server is `npm run start`: the production server, serving the **last build**. So build first, or every test and render shows old code. Build with `SITE_URL=https://taskflow.garbar.tech npm run build` when the audit should judge canonical, hreflang and `og:url`: production builds set it, and pages built without it have none. Through `webrun.py` the server runs on the mirror's own port (3100 for the main checkout, 3101 and up for copies), and the runner stops a server left on it first, so Playwright never reuses a stale build. The mirror's config also runs 4 Playwright workers instead of 2.
+
+Measured on 2026-10-22, the mirror against the loop's averages on `/mnt/c`:
+- the type check: 19 s against 71 s;
+- a production build: 45 s cold and 17 s warm, against 143 s;
+- `ux-web-features.spec.ts`: 51 s with 6 workers, against 128 s with 2.
 
 ## Renders
 

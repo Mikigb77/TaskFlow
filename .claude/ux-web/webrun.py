@@ -126,14 +126,20 @@ def deps(src, mirror):
     return digest, note
 
 
-def own_port(mirror, port):
-    if port == 3000:
-        return
-    pkg = mirror / "package.json"
-    pkg.write_text(re.sub(r"--port 3000\b", f"--port {port}", pkg.read_text()))
+def own_config(mirror, port, workers):
+    """The mirror's own port, and more Playwright workers than the repo's 2: on 2026-10-22 one
+    spec file took 128 s with 2 workers and 51 s with 6. A command's own --workers still wins."""
     cfg = mirror / "playwright.config.ts"
     if cfg.exists():
-        cfg.write_text(cfg.read_text().replace("127.0.0.1:3000", f"127.0.0.1:{port}"))
+        text = cfg.read_text()
+        if workers:
+            text = re.sub(r"\bworkers:\s*\d+\s*,", f"workers: {workers},", text, count=1)
+        if port != 3000:
+            text = text.replace("127.0.0.1:3000", f"127.0.0.1:{port}")
+        cfg.write_text(text)
+    if port != 3000:
+        pkg = mirror / "package.json"
+        pkg.write_text(re.sub(r"--port 3000\b", f"--port {port}", pkg.read_text()))
 
 
 def free_port(port):
@@ -173,6 +179,7 @@ def main():
     parser.add_argument("--src", help="the checkout or worktree, as a WSL path (/mnt/c/...)")
     parser.add_argument("--name", help="the mirror's name under ~/twb: main, or the worktree's name")
     parser.add_argument("--port", type=int, default=3100)
+    parser.add_argument("--workers", type=int, default=4, help="Playwright workers in the mirror's config (0 keeps the repo's)")
     parser.add_argument("--no-back", action="store_true", help="don't copy artifacts and test results back")
     parser.add_argument("--serve", action="store_true",
                         help="serve the last build while the command runs, so Playwright runs side by side share it")
@@ -194,7 +201,7 @@ def main():
     started = time.monotonic()
     copied, removed = sync(src, mirror)
     digest, note = deps(src, mirror)
-    own_port(mirror, args.port)
+    own_config(mirror, args.port, args.workers)
     free_port(args.port)
     say(f"{mirror.name} on :{args.port}: {copied} file(s) synced, {removed} removed, node_modules {note}, {time.monotonic() - started:.1f} s")
     line = command[0] if len(command) == 1 else shlex.join(command)
