@@ -1,0 +1,9 @@
+REFUSED src/components/VoiceDemo.tsx: the run's changes touch lines another session changed and hasn't committed.
+staged the run's hunks only: src/styles/voice.css (another session's changes stay unstaged)
+REFUSED src/content/site/types.ts: the run's changes touch lines another session changed and hasn't committed.
+REFUSED src/content/site/en.ts: the run's changes touch lines another session changed and hasn't committed.
+REFUSED src/content/site/es.ts: the run's changes touch lines another session changed and hasn't committed.
+REFUSED src/content/site/ca.ts: the run's changes touch lines another session changed and hasn't committed.
+staged tests/ux-web-completion.spec.ts
+staged the run's hunks only: tests/support/ux-voice.ts (another session's changes stay unstaged)
+REFUSED tests/voice.spec.ts: the run's changes touch lines another session changed and hasn't committed.

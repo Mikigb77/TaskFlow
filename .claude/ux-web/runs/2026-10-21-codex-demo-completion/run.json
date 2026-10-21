@@ -1,0 +1,187 @@
+{
+  "runId": "2026-10-21-codex-demo-completion",
+  "engine": "codex",
+  "mode": "pages",
+  "created": "2026-10-21T08:59:08.033295+00:00",
+  "scope": [
+    "H: live voice demo completion journey",
+    "G: affected completion accessibility, language, responsive and theme states"
+  ],
+  "startingHeads": {
+    "app": "b77341e6e8be46753fb41d84c97839797256203a",
+    "web": "772ee668d8ee5dd263c56bc95ff0b7e9374937ad"
+  },
+  "baselineRefs": {
+    "webBase": "66e06b3b7c6de8ff2462cc631974b4fb0294689d",
+    "webLast": "8de3f9c93428c1683ac068681adc3994446af485",
+    "appLast": "791aa165a0c77929b951d0a8aeb3e0db3cbe4190"
+  },
+  "initialStatus": {
+    "app": "M App/pubspec.yaml\n M App/scripts/build-staging.ps1\n M Backend/.env.example\n M Backend/README.md\n M Backend/config/cloud/build-staging.yaml\n M Backend/config/settings.py\n M Backend/core/email_delivery.py\n M Backend/core/test_account_deletion.py\n M Backend/core/test_staging.py\n M Backend/core/test_task_creator.py\n M Backend/core/tests.py\n M Backend/docs/STAGING.md\n M Backend/scripts/deploy-staging.ps1\n?? .agents/skills/ux-web/SKILL.md\n?? .agents/skills/ux/SKILL.md\n?? .claude/worktrees/agent-a14bde512490444fd/\n?? .claude/worktrees/agent-a1b6ec0115903ffd0/\n?? .claude/worktrees/agent-a35a71cac82b877bd/\n?? .claude/worktrees/agent-a37ba2c37a010062d/\n?? .claude/worktrees/agent-a94775e1ee94a1bce/\n?? .claude/worktrees/agent-aca32eca92f1c4fbb/\n?? .claude/worktrees/agent-ae3f9c4feb83c5e9a/\n?? .claude/worktrees/agent-ae7aef212fbe7d8c6/\n?? .codex/agents/taskflow_ux_implementer.toml\n?? .codex/agents/taskflow_ux_orchestrator.toml\n?? .codex/agents/taskflow_ux_reviewer.toml\n?? .codex/agents/taskflow_ux_tester.toml\n?? .codex/config.toml\n?? .codex/ux-workflow.md\n?? AGENTS.md\n?? App/config/development.json\n?? App/config/staging.json\n?? Backend/core/test_email_delivery.py\n?? build/.cmake/api/v1/query/client-vscode/query.json\n?? build/.cmake/api/v1/reply/error-2026-10-09T14-10-48-0833.json\n?? build/.cmake/api/v1/reply/error-2026-10-09T14-10-49-0856.json\n?? build/CMakeCache.txt\n?? build/CMakeFiles/4.1.2-msvc8/CMakeCCompiler.cmake\n?? build/CMakeFiles/4.1.2-msvc8/CMakeCXXCompiler.cmake\n?? build/CMakeFiles/4.1.2-msvc8/CMakeDetermineCompilerABI_C.bin\n?? build/CMakeFiles/4.1.2-msvc8/CMakeDetermineCompilerABI_CXX.bin\n?? build/CMakeFiles/4.1.2-msvc8/CMakeRCCompiler.cmake\n?? build/CMakeFiles/4.1.2-msvc8/CMakeSystem.cmake\n?? build/CMakeFiles/4.1.2-msvc8/CompilerIdC/CMakeCCompilerId.c\n?? build/CMakeFiles/4.1.2-msvc8/CompilerIdC/CMakeCCompilerId.exe\n?? build/CMakeFiles/4.1.2-msvc8/CompilerIdC/CMakeCCompilerId.obj\n?? build/CMakeFiles/4.1.2-msvc8/CompilerIdCXX/CMakeCXXCompilerId.cpp\n?? build/CMakeFiles/4.1.2-msvc8/CompilerIdCXX/CMakeCXXCompilerId.exe\n?? build/CMakeFiles/4.1.2-msvc8/CompilerIdCXX/CMakeCXXCompilerId.obj\n?? build/CMakeFiles/CMakeConfigureLog.yaml\n?? build/CMakeFiles/ShowIncludes/foo.h\n?? build/CMakeFiles/ShowIncludes/main.c\n?? build/CMakeFiles/ShowIncludes/main.obj\n?? build/CMakeFiles/cmake.check_cache\n?? scripts/deploy-cloud.ps1\n?? scripts/deploy-cloud.sh\n?? scripts/deploy-local.ps1\n?? scripts/deploy-local.sh\n?? scripts/dev/invoke-powershell.sh",
+    "web": "M .dockerignore\n M Dockerfile\n M README.md\n M package.json\n D scripts/deploy-cloud-run.ps1\n D scripts/deploy-edge.ps1\n D scripts/deploy-edge.sh\n D scripts/setup-ai-spend-cap.ps1\n D scripts/setup-voice.ps1\n D scripts/voice-dev-window.ps1\n D scripts/voice-stats.ps1\n M src/app/layout.tsx\n M src/app/privacy/page.tsx\n M src/app/sitemap.ts\n M src/components/Footer.tsx\n M src/components/VoiceDemo.tsx\n M src/content/site/ca.ts\n M src/content/site/en.ts\n M src/content/site/es.ts\n M src/content/site/types.ts\n M src/styles/voice.css\n M tests/support/ux-voice.ts\n M tests/ux-web-legal.spec.ts\n M tests/ux-web-voice.spec.ts\n M tests/voice.spec.ts\n?? compose.yaml\n?? docs/LEGAL_RELEASE.md\n?? scripts/deploy-cloud.ps1\n?? scripts/deploy-cloud.sh\n?? scripts/deploy-local.ps1\n?? scripts/deploy-local.sh\n?? scripts/dev/check-legal.mjs\n?? scripts/dev/deploy-cloud-run.ps1\n?? scripts/dev/deploy-edge.ps1\n?? scripts/dev/deploy-edge.sh\n?? scripts/dev/invoke-powershell.sh\n?? scripts/dev/setup-ai-spend-cap.ps1\n?? scripts/dev/setup-voice.ps1\n?? scripts/dev/voice-dev-window.ps1\n?? scripts/dev/voice-stats.ps1\n?? src/app/[language]/[document]/page.tsx\n?? src/app/delete-account/page.tsx\n?? src/app/legal/page.tsx\n?? src/app/terms/page.tsx\n?? src/components/LegalPage.tsx\n?? src/components/VoiceExample.tsx\n?? src/content/legal/ca.ts\n?? src/content/legal/company.json\n?? src/content/legal/en.ts\n?? src/content/legal/es.ts\n?? src/content/legal/index.ts\n?? src/content/legal/types.ts\n?? src/styles/legal.css\n?? tests/legal.spec.ts"
+  },
+  "constraints": [
+    "Current owner authorizes this completion journey and local completion controls only.",
+    "One product source writer or test runner at a time; no parallel render lane.",
+    "Preserve all pre-existing staged, unstaged and untracked work.",
+    "No real voice API calls, quota or backend changes.",
+    "No modal, forced scroll, focus replacement or account persistence claim.",
+    "No push, deployment or main changes; owned verified commits only, honoring stage-helper refusal.",
+    "Historical owner-away authority is expired.",
+    "Do not advance review snapshots for unreviewed pre-existing changes."
+  ],
+  "roleSettings": {
+    "orchestrator": {
+      "model": "gpt-6.1-sol",
+      "effort": "max"
+    },
+    "reviewer": {
+      "model": "gpt-6.1-sol",
+      "effort": "max"
+    },
+    "implementer": {
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh"
+    },
+    "tester": {
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh"
+    }
+  },
+  "laneEvidence": {
+    "checkedAt": "2026-10-21T08:59:08.303411+00:00",
+    "sharedLastRunWrite": "2026-10-20T12:00:22+02:00",
+    "taskflowClaudeTranscriptLastWrite": "2026-10-21T09:37:38+02:00",
+    "activeRenderOrServerProcesses": "none",
+    "port3000": "free",
+    "concurrentCodexTaskflowRun": "parent checked none"
+  },
+  "status": "verified-scoped-source-held",
+  "attempt": 1,
+  "evidence": [
+    {
+      "kind": "Chromium stubbed completion preview",
+      "path": "../TaskFlowWeb/artifacts/ux-web/completion/INDEX.md",
+      "freshness": "2026-10-21; production build mVLJlrQHFYPpNKt4mX1vh",
+      "scope": "Completion regions only; global metadata/performance are excluded from this focused audit."
+    },
+    {
+      "kind": "measured focused audit",
+      "path": "../TaskFlowWeb/artifacts/ux-web/completion/AUDIT.md",
+      "freshness": "2026-10-21",
+      "limitations": "Some early region rows lack redundant label-dimension capture. Actual label behavior/dimension checks and later normal renders provide target evidence. Physical phones and native screen readers unverified."
+    }
+  ],
+  "implementationReturnedAt": "2026-10-21T09:02:57.286048+00:00",
+  "implementationReport": "implement-WP51.md",
+  "focusedAcceptanceReturnedAt": "2026-10-21T09:12:42.715890+00:00",
+  "testHarnessNotes": [
+    "Initial request-count assertion assumed one status request; corrected to compare counts before/after toggles.",
+    "Measurements now wait for generation-stage positioning before final-toggle checks.",
+    "Undo of an earlier reward may change absolute scrollY through native anchoring; meaningful acceptance preserves input viewport position/focus and forbids explicit scroll calls.",
+    "Initial generic audit summary was empty/misleading for focused region records. Replaced with explicit measured region report and correct viewport/build provenance; invalid summary is not verification evidence.",
+    "Full run also exposed a pre-existing result-state assertion requiring zero input controls (desktop/mobile). WD16 supersedes it: keep no fieldset/select/non-checkbox input controls and assert native title-labeled unchecked result checkboxes. Capture-stage zero-checkbox test is retained."
+  ],
+  "fullRegression": {
+    "command": "npm test -- --reporter=dot",
+    "exitCode": 1,
+    "passed": 1006,
+    "skipped": 300,
+    "failed": 8,
+    "durationMinutes": 20.2,
+    "failureClassification": {
+      "overstrictUndoViewportAssertions": 6,
+      "legacyResultZeroInputExpectation": 2,
+      "otherFailures": 0
+    },
+    "logs": "../TaskFlowWeb/artifacts/ux-web/completion/logs/playwright.log",
+    "archivedBundles": "../TaskFlowWeb/artifacts/ux-web/completion/failures/round1/",
+    "sourceChangedForFollowUp": false
+  },
+  "focusedFollowUp": {
+    "passed": 26,
+    "failed": 0,
+    "exitCode": 0,
+    "durationMinutes": 2.3,
+    "originalFailuresRetested": 8,
+    "additionalMobileBehaviorProbes": 6,
+    "text200Audits": 12,
+    "rootFontSize": 32,
+    "productSourceChanged": false
+  },
+  "verificationReturnedAt": "2026-10-21T09:49:08.155875+00:00",
+  "verificationReport": "verify-HG.md",
+  "testerReport": "test-WP51.md",
+  "nativeDeviceVerification": "pending",
+  "outOfScopeIssues": [
+    "WEB-801"
+  ],
+  "ownershipStage": {
+    "exitCode": 1,
+    "receipt": "stage.log",
+    "refused": [
+      "src/components/VoiceDemo.tsx",
+      "src/content/site/types.ts",
+      "src/content/site/en.ts",
+      "src/content/site/es.ts",
+      "src/content/site/ca.ts",
+      "tests/voice.spec.ts"
+    ],
+    "acceptedThenUnstaged": [
+      "src/styles/voice.css",
+      "tests/support/ux-voice.ts",
+      "tests/ux-web-completion.spec.ts"
+    ],
+    "websiteCommit": null,
+    "websiteIndexAfter": "empty",
+    "reason": "Essential source hunks overlap other sessions’ pre-existing edits. Entire functional package left uncommitted; no bypass or partial dependent commit."
+  },
+  "serverCleanup": {
+    "pid": 41359,
+    "identityConfirmed": "next-server v16.4.0, exact TaskFlowWeb cwd, port3000",
+    "session47933": "not addressable across agent tool sessions",
+    "action": "TERM to verified PID41359 only; process and port3000 listener absent afterward",
+    "exitCode": 0
+  },
+  "snapshotsAdvanced": false,
+  "endingGlobalRefs": {
+    "webLast": "8de3f9c93428c1683ac068681adc3994446af485",
+    "appLast": "791aa165a0c77929b951d0a8aeb3e0db3cbe4190"
+  },
+  "checks": {
+    "build": 0,
+    "check": 0,
+    "legal": 0,
+    "unit": {
+      "exitCode": 0,
+      "passed": 9
+    },
+    "originalFull": {
+      "command": "npm test -- --reporter=dot",
+      "exitCode": 1,
+      "passed": 1006,
+      "skipped": 300,
+      "failed": 8,
+      "durationMinutes": 20.2,
+      "failureClassification": {
+        "overstrictUndoViewportAssertions": 6,
+        "legacyResultZeroInputExpectation": 2,
+        "otherFailures": 0
+      },
+      "logs": "../TaskFlowWeb/artifacts/ux-web/completion/logs/playwright.log",
+      "archivedBundles": "../TaskFlowWeb/artifacts/ux-web/completion/failures/round1/",
+      "sourceChangedForFollowUp": false
+    },
+    "focusedFinal": {
+      "exitCode": 0,
+      "passed": 26
+    },
+    "typesAfterTests": 0,
+    "webkitSmoke": {
+      "exitCode": 0,
+      "pngs": 112,
+      "notRendered": 0,
+      "scope": "public page/engine smoke, not completion on Safari/iPhone"
+    }
+  }
+}

@@ -12,6 +12,8 @@ Settled by run 2026-10-18-site (b1-b5, closed 2026-10-20). Enforce these; a devi
 - Demo button is "Done" / «Listo» / «Fet» (matches the app). No "Create drafts".
 
 **Live voice demo (VoiceDemo.tsx)**
+- **WD16, verified 2026-10-21 (`2026-10-21-codex-demo-completion`):** generated results have local native completion checkboxes. This current owner request supersedes WEB-7’s old no-ticking constraint. A nonempty fully checked result shows a leaf + localized reward directly after the final-toggled title, before its details; tasks remain visible. One existing atomic polite status announces completion. Undo hides it; record/submit/new result/Change text/close reset it. Inputs retain identity/focus; toggles make no API/quota/storage change or explicit scroll call. Reduced motion removes the 260 ms reveal. Source is verified in the working tree but held uncommitted by overlapping pre-existing edits. Native-phone/AT checks remain pending.
+- **WEB-801 remains open outside WP51:** unchanged tries badge overflows ES 32 px / CA 16 px at 390-wide, actual root32, both themes. Completion has no overflow offender. Do not describe all focused page records as overflow-free.
 - Never shows a server `error` string or `reason.message`; every code maps through `failureFor` to copy in `src/content/site/*.ts` `voice.errors.*`.
 - Opening failure uses `errors.offlineOpening` (no "what you said is kept"); sending failure uses `errors.offline`.
 - Recovery is always a filled `.button` "Try again" under the alert; alert takes focus and is announced.

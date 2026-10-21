@@ -4,6 +4,13 @@ Every agent in the UX web loop reads this before reviewing or planning. Only the
 
 The app's decisions are in `.claude/ux-review/DECISIONS.md`. They bind the site too: the site may only say what the app does, and anything open there is open here.
 
+## 2026-10-21 — WD16: a warm completion moment in the live demo
+The owner requests a rewarding, emotionally warm response after a visitor marks every generated demo task complete, to convey a feeling they want daily from the app. The current request authorizes local completion controls and feedback in this demo journey. The primary session’s bounded implementation brief keeps the existing card and completed tasks visible, permits undo/retry, excludes account saving, additional voice requests, quota changes and new download/subscription capabilities, and clears feedback on undo, new results and reset. Those details are the implementation constraints for this run, rather than a broader change to product policy.
+
+WD16 supersedes WEB-7’s earlier no-ticking rule for generated demo results; WEB-7’s historical record remains intact.
+
+This is the current bounded request. The temporary owner-away authority below is historical and does not apply to new work.
+
 ## 2026-10-18 (night) — The owner is away: the main session decides, records and moves on
 **The owner, before leaving:** "whatever question you have for me, whatever decisions, even if it concerns the product, just for now, record what decision you made, what was your recommendation, and you move forward with your recommendation… you are on your own… prioritize completing everything to the best degree possible."
 

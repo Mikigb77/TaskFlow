@@ -13,6 +13,8 @@ The UX web loop maintains this file (`/ux-web`). There is one line per issue, an
 
 ## Open
 
+- **WEB-801** · S2 · G · open · Localized tries badge overflows at doubled phone text · `src/styles/voice.css:18` · 2026-10-21-codex-demo-completion · AX-3/ML-7; actual root32 audits show ES 32 px and CA 16 px horizontal overflow in both themes. Badge CSS/markup/copy unchanged from ownership base `66e06b3`; outside WP51 by the current scoped brief. No completion overflow. See `verify-HG.md` in the run for reproduction/acceptance.
+
 ## Decision needed
 - **WEB-701** · S2 · G · decision · WebKit draws every weight at Manrope's thinnest · `src/styles/global.css:3` · 2026-10-18-site · WD15: only Safari on the owner's iPhone can tell; probably a Windows-WebKit artifact. The main session can't answer it
 

@@ -1,0 +1,59 @@
+{
+  "runId": "2026-10-21-codex-demo-completion",
+  "mode": "pages",
+  "created": "2026-10-21",
+  "conventions": [
+    "Follow current owner completion request (WD16).",
+    "Keep tasks and all details visible; controls are a local demo interaction.",
+    "Use existing brand tokens/icons, natural EN/ES/CA copy, and no new CTA.",
+    "Only scope the new completion behavior; preserve all pre-existing changes."
+  ],
+  "packages": [
+    {
+      "id": "WP51",
+      "title": "Reward completing every generated demo task",
+      "area": "H",
+      "size": "S",
+      "severity": 1,
+      "findings": [],
+      "files": [
+        "src/components/VoiceDemo.tsx",
+        "src/styles/voice.css",
+        "src/content/site/types.ts",
+        "src/content/site/en.ts",
+        "src/content/site/es.ts",
+        "src/content/site/ca.ts"
+      ],
+      "brief": "Add lightweight local completion checkboxes to generated result cards and a calm rewarding completion moment inside the existing demo card. Use a gentle decorative brand icon/subtle finite motion (honor reduced motion), brief natural EN/ES/CA copy and one polite announcement. Make feedback discoverable when the last remaining task is checked even with long mobile results, without forced scrolling or focus movement. Keep all card detail and surrounding retry path. Derive completion only for a nonempty fully checked list; hide/reset on undo, new result and close/reset. No voice/API/quota/backend or persistence changes.",
+      "acceptance": [
+        "Initial generation, partially checked tasks, zero-task results, loading and failed requests never show completion.",
+        "Checking every task in a nonempty result shows localized warm completion feedback inside the demo card while all tasks, checkboxes and details stay visible.",
+        "Undoing any task immediately removes feedback; rechecking can complete again. New results and closing/resetting begin with no checked tasks or lingering completion.",
+        "Checkbox toggles are local, make no API calls, do not change quota and keep keyboard focus; completion never scrolls or opens a modal.",
+        "One polite accessible announcement communicates completion in the page language, without repeated notifications for unchanged completion; checkbox names include task titles.",
+        "Light/dark, desktop/mobile, EN/ES/CA, 320px, doubled text and reduced-motion states remain legible and operable; final-toggle feedback is discoverable without forced scrolling.",
+        "Focused independent regressions and required check/legal/build/unit/Playwright suites pass; fresh affected screenshots and measured accessibility evidence support scoped review."
+      ],
+      "deviceChecks": [
+        "Native screen-reader announcement and real mobile browser/phone interaction; real voice API remains uncalled."
+      ],
+      "dependsOn": [],
+      "testFiles": [
+        "tests/ux-web-completion.spec.ts",
+        "tests/support/ux-voice.ts",
+        "tests/voice.spec.ts"
+      ],
+      "affectedAreas": [
+        "G"
+      ]
+    }
+  ],
+  "decisions": [],
+  "skipped": [
+    {
+      "id": "WEB-801",
+      "reason": "Independently confirmed existing trial-badge reflow outside WD16/WP51; primary session retained the bounded completion scope. No source fix or extra build round."
+    }
+  ],
+  "source": "Current owner request, dispatched by primary session; implementation already authorized."
+}
