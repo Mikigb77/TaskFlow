@@ -2,6 +2,23 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-21 (later) — Bulk voice commands
+**The owner is back**, and the normal flow applies again: new product questions go to him.
+
+**What he asked for:** "get all my tasks from yesterday and put them on tomorrow… in addition to searching the tasks, you can sort of rearrange them". He answered two questions.
+- **Which bulk actions (all four):**
+  - move, to a day («pasa todo lo de ayer a mañana») or by a stretch of time («pasa lo de esta semana a la semana que viene»);
+  - the other changes a single task already takes, applied to all of them: time, priority, person, deadline;
+  - mark done;
+  - delete, always confirmed first and undoable.
+- **Which tasks «all my tasks» means (recommended):**
+  - the person's own pending tasks, and the tasks assigned to them in shared projects;
+  - completed tasks stay where they are, unless the person says «completadas»;
+  - other people's tasks only when the person names the project or the person;
+  - repeating tasks aren't moved or deleted, and the card says how many were left out. Marking done completes that day's occurrence.
+- **How it works:** one card names the action and the count («Mover 5 tareas a mañana»), lists the tasks, and lets you untick any. One tap applies it, then «Deshacer» undoes all of it.
+- **The contract:** `Backend/docs/VOICE_COMMANDS.md`, section «Bulk commands».
+
 ## 2026-10-21 — The owner is away again: "do not ask me anything for now"
 Until he checks in:
 - Any product question gets decided by the main session, using the plan's recommendation.

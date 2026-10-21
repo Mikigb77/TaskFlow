@@ -56,7 +56,7 @@ A note dictation (`"capture_type": "note"`) with the flag gets `"commands": []`,
 
 ### Commands
 
-Every command has `kind` and `issues`. The kinds are `project`, `find`, `update` and `delete`.
+Every command has `kind` and `issues`. The kinds are `project`, `find`, `update`, `delete` and `complete`. `update`, `delete` and `complete` act on one task, or on many with `"all": true` (see [Bulk commands](#bulk-commands), decided 2026-10-21).
 
 **`project`**: create a project, group or list (all three are a project).
 
@@ -156,6 +156,63 @@ How the app should search its own copy:
 
 - `target` is as for `update`, and the task is found the same way.
 - Show the matched task with «Eliminar», and nothing is deleted without that tap. Then «Tarea eliminada · Deshacer» (D11).
+
+**`complete`**: «marca como hecha», «ya he hecho», «completa».
+
+```json
+{"kind": "complete", "target": {"words": ["médico"], "list_id": null, "project_name": null, "date": null}, "issues": []}
+```
+
+- `target` is as for `update`, and the task is found the same way, among the person's open tasks.
+- Show the matched task with «Marcar como hecha». Then «Tarea completada · Deshacer».
+- A repeating task completes the occurrence of the day said, or of today when no day was said, as ticking it on that day does.
+
+### Bulk commands
+
+Decided by the owner on 2026-10-21: «pasa todas las tareas de ayer a mañana», «pasa lo de esta semana a la semana que viene», «asigna a Paul todo lo del viernes de Matemáticas», «marca como hechas todas las de hoy», «borra todas las completadas de la semana pasada».
+
+`update`, `delete` and `complete` act on many tasks when `target` has `"all": true`. The target then describes a set, with the same filters as `find`:
+
+```json
+{"kind": "update",
+ "target": {"all": true, "words": [], "list_id": null, "project_name": null, "person_id": null, "person_name": null,
+            "status": "open", "from": "2026-10-20", "to": "2026-10-20", "undated": false, "date": null},
+ "changes": {"date": "2026-10-22"},
+ "issues": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `all` | boolean | `true`: every task that matches. Absent or `false`: one task, as before. |
+| `words` | list of strings, 0–8 | As for `find`. Usually empty: «todas las tareas de ayer». |
+| `list_id`, `project_name`, `project_candidates` | as for `find` | The project named. |
+| `person_id`, `person_name` | as for `find` | «Todas las de Paul». «Las mías» gives the person's own id. |
+| `status` | `"open"`, `"completed"` or `"any"` | `"open"` unless the person said completed («las completadas») or all of them. |
+| `from`, `to` | `"YYYY-MM-DD"` or null | An inclusive period on the task's planned day, or its deadline day when it has none. «Ayer» gives the same day twice. «Lo atrasado» gives `"to"` = yesterday and `"from"` = null. |
+| `undated` | boolean | `true`: only tasks with no day («las tareas sin fecha»). `from` and `to` are then null. |
+| `date` | always `null` with `all` | A day said for the set goes in `from` and `to`. |
+
+`changes` for a bulk `update`:
+- `date`, `time`, `deadline_date`, `deadline_time`, `priority`, `assignee_id` and `assignee_name` are as for one task, and apply to every task in the set.
+- `title` and `notes_append` are never set with `all`. The server drops them.
+- **`shift_days`**, an integer from −366 to 366 and never 0, moves each task by that many days and keeps its time. A task with only a deadline moves its deadline. «Pasa lo de esta semana a la semana que viene» gives 7, and «retrásalo todo un día» gives 1. It can also go on a single task: «retrasa dos días la cita del médico». It's never sent together with `date`; if the model sends both, `date` wins.
+
+**Which tasks the set holds** (the owner's choice, 2026-10-21):
+- The person's own tasks, and the tasks assigned to them in shared projects. Other people's tasks are included only when the person names their project (`list_id`) or names them (`person_id`).
+- Only tasks the person can edit, never deleted ones.
+- `status` as above: pending ones by default.
+- **Repeating tasks** are never moved, changed or deleted in bulk; the card says how many were left out. A bulk `complete` whose period is one day (`from` = `to`) completes each repeating task's occurrence that day. With a longer period, it leaves them out too.
+- **Assigning** reaches only tasks in shared projects where the person named can edit. The others are left as they are and counted.
+
+**The card** (app):
+- **The heading:** the action, with the count and the target: «Mover 5 tareas a mañana, jue 22», «Mover 3 tareas una semana después», «Asignar 4 tareas a Paul», «Marcar 4 tareas como hechas», «Eliminar 6 tareas».
+- **The list:** the matched tasks, each with its current day and ticked; untick one to leave it out. A long list scrolls inside the card.
+- **What was left out:** one line, for example «2 tareas que se repiten no cambian».
+- **One filled button with the live count:** «Mover 5 tareas». Deleting uses the delete style: «Eliminar 6 tareas». Nothing changes before that tap.
+- **After the tap:** «5 tareas movidas · Deshacer». «Deshacer» puts every task back as it was, deleted ones included.
+- **No match:** say what was looked for: «No hay tareas pendientes de ayer».
+- **More than 200 matches:** no list. Instead: «Son 230 tareas. Dilo con menos, por ejemplo un día o un proyecto.»
+- **Counting:** a bulk command is part of its dictation, which counts once, as any dictation does.
 
 ### Issues
 
@@ -410,8 +467,8 @@ The model fills `ExtractedCapture`: the `tasks` array of today, plus a `commands
 |---|---|
 | `project` | `name` |
 | `find` | `words`, `project_name`, `person` (`"me"` or `"member"`), `member_name`, `status`, `from_date`, `to_date` |
-| `update`, `delete` | `target` (`words`, `project_name`, `date`) |
-| `update` | `changes` (`title`, `date`, `time`, `deadline_date`, `deadline_time`, `priority`, `notes_append`, `assignee` as `"me"`, `"member"` or `"nobody"`, `member_name`, and `clear`, a list of `"date"`, `"time"`, `"deadline"` and `"deadline_time"`) |
+| `update`, `delete`, `complete` | `target` (`words`, `project_name`, `date`; for a set also `all`, `person` as `"me"` or `"member"`, `member_name`, `status`, `from_date`, `to_date`, `undated`) |
+| `update` | `changes` (`title`, `date`, `shift_days`, `time`, `deadline_date`, `deadline_time`, `priority`, `notes_append`, `assignee` as `"me"`, `"member"` or `"nobody"`, `member_name`, and `clear`, a list of `"date"`, `"time"`, `"deadline"` and `"deadline_time"`) |
 
 Nulls mean "unchanged", so a model that fills every key with null changes nothing.
 
@@ -420,7 +477,8 @@ Format slips that are tolerated, as for tasks:
 - a command in `tasks`, or a task in `commands`;
 - `{"name": …}` objects or one-item lists where a string belongs;
 - `words` given as a string;
-- other names for a kind (`search`, `remove`, `create_project`…) or a status (`pending`, `done`, `all`);
+- other names for a kind (`search`, `remove`, `create_project`, `done`, `mark_done`, `finish`…) or a status (`pending`, `done`, `all`);
+- `all` given as `"true"`, or `shift_days` as a numeric string;
 - `from` and `to` for `from_date` and `to_date`;
 - a flat update or delete, without `target`;
 - empty strings for dates.
