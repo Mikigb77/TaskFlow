@@ -1324,10 +1324,10 @@ abstract class AppLocalizations {
   /// **'Mic button on your home screen'**
   String get homeCapture;
 
-  /// No description provided for @homeCaptureInstructions.
+  /// Settings, Other: how to reach capture from outside the app. Names the home-screen widget by its label (capture_widget_label in android/app/src/main/res/values/strings.xml); keep the two the same.
   ///
   /// In en, this message translates to:
-  /// **'On Android, long-press the TaskFlow icon for its shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.'**
+  /// **'On Android, long-press the TaskFlow icon for its shortcuts, or add the Dictate a task widget from your launcher. Share text to TaskFlow from another app.'**
   String get homeCaptureInstructions;
 
   /// No description provided for @widgetPickerHelp.

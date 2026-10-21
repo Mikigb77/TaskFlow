@@ -3,11 +3,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/capture_widget_button" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:gravity="center" android:padding="6dp"
-    android:background="@drawable/capture_widget_background" android:contentDescription="@string/capture_voice">
+    android:background="@drawable/capture_widget_background" android:contentDescription="@string/capture_widget_label">
     <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/capture_mic"
         android:importantForAccessibility="no" />
     <TextView android:id="@+id/capture_widget_label" android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:text="@string/capture_voice"
+        android:layout_weight="1" android:text="@string/capture_widget_label"
         android:textColor="#FFFFFF" android:textSize="12sp" android:gravity="center" android:maxLines="2"
         android:autoSizeTextType="uniform" android:autoSizeMinTextSize="9sp" android:autoSizeMaxTextSize="12sp"
         android:autoSizeStepGranularity="1sp" />

@@ -69,11 +69,13 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 
 ## Native surfaces
 - **Android** (`android/app/src/main/res/values*/strings.xml`, `res/xml/capture_shortcuts.xml`):
-  - the widget "Dicta una tarea", whose picker description reads "…conserva las capturas pendientes";
-  - the shortcuts "Dicta una tarea" and "Captura texto", both using the app icon;
+  - launcher icon (b7, UX-1608): adaptive `mipmap-anydpi-v26/ic_launcher.xml`, teal #146C5C background + white double-tick (`done_all_rounded`) foreground and monochrome (themed icons); legacy PNGs are the same mark. Notification small icon `drawable/app_notifications_icon.xml`, the same tick; the old `app_icon` is gone;
+  - the widget's label has its own string `capture_widget_label` (layout text, TalkBack name, 13+ label, picker name): EN "Dictate a task", ES «Dictar una tarea», CA «Dicta una tasca»; description "Tap to dictate a task." / «Toca para dictar una tarea.»;
+  - launcher shortcuts `capture_voice`/`capture_text` with short labels (Android shows the short one at 2.0 when the long one is ~15+ chars): EN "Dictate a new task"/"Type a new task" → "Dictate"/"Type"; ES «Dictar una tarea»/«Escribir una tarea» → «Dictar»/«Escribir»; CA «Dicta una tasca»/«Escriu una tasca» → «Dicta»/«Escriu»;
+  - Settings › Otros ajustes help (`homeCaptureInstructions`) names the widget by its label in EN; the row title (EN "Mic button on your home screen") and ES help («widget de micrófono») still describe it by icon;
   - the share entry, whose error toasts are hard-coded in English.
 - **iOS:**
-  - the microphone text says "…crear un borrador de tarea";
+  - the microphone text says "…crear un borrador de tarea"; EN `Info.plist` / `en.lproj` still say "say a task" (app is Android-only, so low priority);
   - the local-network text is written for developers.
 
 ## Header and theme

@@ -579,3 +579,30 @@ Nothing.
 
 ### Phone checks added
 - P219 (emulator lane, free account): share «Llamar a Marta mañana», kill TaskFlow with the form open, move the date forward three days, resume from Sin guardar: no day is selected and the title reads «Llamar a Marta mañana».
+
+## Round 2 (b7)
+
+Round 1 of b7 (P195, P196, P221) fixed two of its three findings in code, according to review D (`verify-b7-r1-D.md`): UX-1608 (the launcher icon is the in-app mark) and UX-421 (the Catalan tab bar fits on one line). UX-1656 came back partly fixed, and the round check failed on its test. No regressions. Round 2 finishes UX-1656 in one small package, written to `plan-b7-r2.json`. It has failed once, so it isn't escalated, and there's no new question for you.
+
+### P222 · S2 · D · S · The widget gets its own label; the English voice shortcut reads «Dictate a new task»
+- **UX-1656 (S2), partly fixed in round 1:** P221 renamed the English text shortcut to “Type a new task”, long enough that the launcher shows «Type» whole at large text. It couldn't rename the voice shortcut, “Say a task”, because the home-screen widget uses the same string for its label, its TalkBack name and its name in the widget picker, and the brief said not to change the widget. So at large text the English voice shortcut still shows «Say a ta…», and at normal size the pair reads “Say a task” / “Type a new task”. Now the widget gets its own string with exactly today's text in all three languages, so it looks and sounds the same, and the English voice shortcut becomes “Dictate a new task”, which falls back to «Dictate» at large text. Spanish and Catalan don't change. This widens round 1's scope, but it isn't a product decision: nothing the user sees on the widget changes.
+
+### Skipped
+Nothing.
+
+### Phone checks added
+- P222 (emulator lane): English at 2.0, the shortcuts read «Dictate» and «Type», whole; at 1.0 «Dictate a new task» and «Type a new task». The widget in EN, ES and CA at 1.0 and 2.0 reads «Say a task» / «Dictar una tarea» / «Dicta una tasca», whole, with the same TalkBack and picker name. On Android 13+, phone in Spanish and TaskFlow in English, the widget reads «Say a task».
+- Carried from round 1 (review D's observation on UX-421, not a regression): at 360 dp and Android's 2.0 in Catalan, «Configuració» fits the tab bar with about 1 dp to spare. The re-capture at 393 and 360 dp should confirm the device doesn't wrap it to «Configuraci / ó».
+
+## Round 3 (b7)
+
+Round 2 of b7 (P222) fixed UX-1656 in code, according to review D (`verify-b7-r2-D.md`): the English voice shortcut now reads “Dictate a new task”, and the widget has its own string. The tests and the round check passed. One small regression came back, now UX-1657: in English only, the widget still says “Say a task” while the voice shortcut and the app say “dictate”. Round 3 fixes it in one small package, written to `plan-b7-r3.json`. Nothing has failed twice, so nothing is escalated, and there's no new question for you.
+
+### P223 · S1 · D · S · The English widget reads “Dictate a task”, like the voice shortcut and the app
+- **UX-1657 (S1), R2D-1 from P222:** the English widget now says “Dictate a task” (14 characters, which fits the widget's two short lines), the widget picker says “Tap to dictate a task.”, and the English line in Settings › Other names “the Dictate a task widget”. Spanish and Catalan already use one word for both and don't change. It keeps a voice wording on the widget, as today, so your open question about the wording at 0 dictations left (UX-910) stays where it was.
+
+### Skipped
+Nothing.
+
+### Phone checks added
+- P223 (emulator lane): in English at 1.0 and 2.0, the widget reads «Dictate a task», whole, on at most two lines; TalkBack and the widget picker use the same name, with «Tap to dictate a task.» in the picker. On Android 13+, phone in Spanish and TaskFlow in English, an already placed widget reads «Dictate a task». Spanish and Catalan unchanged.

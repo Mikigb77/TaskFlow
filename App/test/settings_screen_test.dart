@@ -140,6 +140,42 @@ void main() {
     }
   }
 
+  // ---- Run 2026-10-19-app round 3 · P223 (UX-1657) ----
+  testWidgets(
+    'UX-1657: in English at 2× on 320 dp, the widget help sheet names the widget by its home-screen label, Dictate a task',
+    (tester) async {
+      await openWidgetHelp(tester, 'en', fails: false);
+      final l = lookupAppLocalizations(const Locale('en'));
+      final xml = File(
+        'android/app/src/main/res/values/strings.xml',
+      ).readAsStringSync();
+      final label = RegExp(
+        r'<string name="capture_widget_label">([^<]*)</string>',
+      ).firstMatch(xml)![1]!;
+      final sheet = find.byType(BottomSheet);
+      expect(sheet, findsOneWidget);
+      final text = find.descendant(
+        of: sheet,
+        matching: find.text(l.homeCaptureInstructions),
+      );
+      expect(text, findsOneWidget);
+      final shown = tester.widget<Text>(text).data!;
+      expect(shown, contains('the $label widget'));
+      expect(shown, contains('Dictate a task'));
+      expect(shown.toLowerCase(), isNot(contains('say a task')));
+      // The sheet scrolls, so the whole sentence and Done can be reached.
+      expect(tester.getRect(text).top, lessThan(tester.getRect(sheet).bottom));
+      final done = find.descendant(
+        of: sheet,
+        matching: find.widgetWithText(FilledButton, l.done),
+      );
+      await tester.ensureVisible(done);
+      await tester.pumpAndSettle();
+      expect(done.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   // ---- P18 (UX-404, UX-120, UX-418, UX-406): six rows, Otros ajustes ----
 
   final es = lookupAppLocalizations(const Locale('es'));

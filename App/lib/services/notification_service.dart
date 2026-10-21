@@ -199,7 +199,7 @@ class TaskReminders {
     final strings = await readReminderStrings(TaskDatabase());
     await plugin.initialize(
         InitializationSettings(
-            android: const AndroidInitializationSettings('app_icon'),
+            android: const AndroidInitializationSettings('app_notifications_icon'),
             iOS: DarwinInitializationSettings(
                 requestAlertPermission: false,
                 requestBadgePermission: false,

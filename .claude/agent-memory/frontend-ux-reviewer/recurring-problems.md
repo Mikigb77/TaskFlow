@@ -56,7 +56,8 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - Spanish "Mañana" reads as "tomorrow", not "morning". "Captura" reads as a screenshot.
     - Catalan mixes infinitive and imperative buttons.
     - ICU plurals are missing ("1 completadas").
-    - Spanish says "Dictar una tarea" in the app but "Dicta una tarea" on the widget and shortcut.
+    - Spanish said "Dictar" in the app but "Dicta" on the widget and shortcut (since aligned).
+    - One Android string serving several surfaces (shortcut label, widget text, TalkBack name, picker name, help copy naming it) means changing it for one surface renames the others; fixing one half left EN "Say a task" vs "Dictate a new task" (UX-1656 → UX-1657). Give each surface its own string, then grep every surface and ARB line that names it.
 11. **The app acts without the user, or silently.**
     - Capture records are written before any words.
     - Listening stops when the notification shade is pulled down.
@@ -74,6 +75,7 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - At 2× and 320 dp, labels break mid-word: the theme tiles, "Proyectos" next to "Grupos", the Catalan tab label.
     - Making a label bigger or bolder (P28: tab labels 11 → 12 sp, w800) broke Spanish "Calendario" at < 348 dp. Any size, weight or letter-spacing change to a fixed-width label needs a 320 dp, 1.3×/2×, es+ca width check.
     - Fixes for large text can cap it somewhere else: a MediaQuery clamp also capped the tab tooltips (R2D-1).
+    - Fit-to-width fixes that measure in Flutter can land with ~1 dp spare; device text shaping may still wrap. Ask for a margin or a device capture.
 14. **Colour or faint contrast carries meaning alone.**
     - An overdue deadline only turns red. The calendar dots differ only by colour. Unread shows only as a 16 px icon.
     - The disabled project chip is at about 38%.

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The themed icon (Android 13+): the same tick as ic_launcher_foreground; the system recolours it. Icons.done_all_rounded (Material Icons Round "done_all", U+F6D2), taken from Flutter's materialicons-regular.otf. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M64.5938 42.5625C63.8438 41.8125 62.5312 41.8125 61.7812 42.5625L50.5312 53.9062L53.3438 56.7188L64.5938 45.375C65.3438 44.625 65.3438 43.4062 64.5938 42.5625ZM73.125 42.5625 53.3438 62.3438 46.4062 55.4062C45.5625 54.6562 44.3438 54.6562 43.5 55.4062C42.75 56.1562 42.75 57.4688 43.5 58.2188L51.9375 66.5625C52.6875 67.4062 53.9062 67.4062 54.75 66.5625L75.9375 45.375C76.6875 44.625 76.6875 43.4062 75.9375 42.5625H75.8438C75.0938 41.8125 73.875 41.8125 73.125 42.5625ZM32.25 58.2188 40.5938 66.5625C41.3438 67.4062 42.6562 67.4062 43.4062 66.5625L44.8125 65.1562L35.0625 55.4062C34.3125 54.6562 33 54.6562 32.25 55.4062C31.5 56.1562 31.5 57.4688 32.25 58.2188Z" />
+</vector>

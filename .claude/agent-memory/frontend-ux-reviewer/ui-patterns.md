@@ -119,9 +119,9 @@ What the app does today, so a consistency finding can name the standard and the 
 - **Tabs (after P28/P45/P47):** Calendario, Tareas, Notas, Ajustes, each outlined when unselected and filled when selected: `calendar_month`, `check_box`, `description`, `settings`.
   - Labels (`theme/app_theme.dart`): 12 sp, `letterSpacing: 0`; selected w800 `onSurface`, unselected w500 `onSurfaceVariant`. State is carried by weight + filled icon, not the pill (dark pill 1.41:1).
   - Bar is a fixed 72 dp; Flutter caps labels at 1.3× and long single words wrap mid-word.
-  - Below 360 dp, `main_shell.dart` passes `NavigationBar.labelTextStyle` with a reduced fontSize so labels draw at ≤ 1.2× (14.4 px). Stopgap until U13. `_labelFontSize = 12` there mirrors the theme's 12 sp — they must move together.
+  - Label size (b7 2026-10-21, UX-421): `main_shell.dart` `_fittingLabelScale` measures all four labels (bold and regular) against `(width − padding) / 4` and steps the label scale down until they fit, never below 1.0×; caps stay 1.3× (≥ 360 dp) and 1.2× (< 360 dp). Only the label's fontSize changes, via `NavigationBar.labelTextStyle`. Stopgap until U13. `_labelFontSize = 12` mirrors the theme's 12 sp — they must move together.
+  - The fit has no margin: CA «Configuració» at 360 dp/2× uses ≈ 89 of 90 dp. If a device capture shows «Configuraci / ó», the fix is measuring against tab width minus a few dp, not a new concept.
   - Long-press tooltips follow the phone's text size (14 sp, 28 px at 2×).
-  - Catalan "Configuració" still wraps at 320 dp; only U13's two tabs fix it.
   - The `outlineVariant` hairline above the bar is painted behind the opaque bar, so it never shows; the edge is only a tint change.
 - **Rule to enforce:** never shrink text by wrapping a NavigationBar (or anything with tooltips/menus) in a MediaQuery — OverlayPortal content inherits it. Shrink the style instead.
 - **One icon per concept:** Tareas = `check_box(_outlined)` (tab and the Tareas/Bandeja/project empty state); Notas = `description(_outlined)` (tab, Notas empty state, note rows, a project page's Notas button). Tasks complete with a round Checkbox, steps with square ones. `notes_rounded` remains at `voice_task_screen.dart` ("Revisar nota", should become `description_outlined`) and `captures_screen.dart` (means "typed, no audio" — fine).

@@ -703,7 +703,7 @@ void main() {
   }
 
   test(
-    'UX-114: the text shortcut is named Type a task / Escribir una tarea / Escriu una tasca',
+    'UX-114: the text shortcut is named Type a new task (UX-1656) / Escribir una tarea / Escriu una tasca',
     () {
       String label(String folder) {
         final xml = File(
@@ -714,7 +714,7 @@ void main() {
         ).firstMatch(xml)!.group(1)!;
       }
 
-      expect(label('values'), 'Type a task');
+      expect(label('values'), 'Type a new task');
       expect(label('values-es'), 'Escribir una tarea');
       expect(label('values-ca'), 'Escriu una tasca');
     },

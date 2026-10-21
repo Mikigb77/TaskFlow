@@ -22,7 +22,7 @@ class CaptureWidget : AppWidgetProvider() {
             // On Android 13+ the label comes from this app's resources, in the app's language (the
             // per-app language): the launcher would inflate the layout's text in the phone's.
             // Below 13 the layout's text follows the phone, as the app's resources do.
-            val label = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) context.getString(R.string.capture_voice) else null
+            val label = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) context.getString(R.string.capture_widget_label) else null
             for (id in ids) {
                 val intent = Intent(context, MainActivity::class.java).apply {
                     action = CaptureEntryBridge.VOICE

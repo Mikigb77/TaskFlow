@@ -20,6 +20,48 @@ const _narrowLabelScaleCap = 1.2;
 // The theme's tab label size (app_theme.dart).
 const _labelFontSize = 12.0;
 
+// The largest label scale, from [cap] down to 1.0x, at which the widest of
+// [labels] in [styles] fits on one line in [width]. Below 1.0x it never goes.
+double _fittingLabelScale({
+  required List<String> labels,
+  required List<TextStyle> styles,
+  required double width,
+  required double cap,
+  required TextDirection textDirection,
+  required Locale locale,
+}) {
+  double widest(double scale) {
+    var result = 0.0;
+    for (final style in styles) {
+      for (final label in labels) {
+        final painter = TextPainter(
+          text: TextSpan(
+            text: label,
+            style: style.copyWith(fontSize: _labelFontSize * scale),
+          ),
+          textDirection: textDirection,
+          locale: locale,
+          maxLines: 1,
+        )..layout();
+        result = math.max(result, painter.width);
+        painter.dispose();
+      }
+    }
+    return result;
+  }
+
+  var scale = cap;
+  final measured = widest(scale);
+  if (scale <= 1 || measured <= width) return scale;
+  // Glyph widths grow about linearly with the font size: start there, then
+  // step down until the widest label fits.
+  scale = math.max(1, (scale * width / measured * 100).floorToDouble() / 100);
+  while (scale > 1 && widest(scale) > width) {
+    scale = math.max(1, scale - 0.01);
+  }
+  return scale;
+}
+
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key, this.initialIndex = 0});
   final int initialIndex;
@@ -48,24 +90,52 @@ class _MainShellState extends ConsumerState<MainShell> {
         setState(() => _index = 0);
       }
     });
-    // Below 360 dp four tabs are too narrow for long words such as
-    // "Calendario" at Flutter's 1.3x label cap, so only the label stops at
-    // 1.2x: its font size shrinks so that Flutter's own cap lands on 1.2x. The
-    // bar keeps the phone's text scaling, so the long-press tooltips still
-    // follow the phone's text size. Stopgap until the bar has fewer tabs.
+    // Four tabs are too narrow for long words at Flutter's 1.3x label cap:
+    // «Calendario» below 360 dp, and the Catalan «Configuració» even at 360
+    // and 393 dp. So only the label stops growing: at 1.2x below 360 dp, and
+    // at any width at the largest scale at which the widest label still fits
+    // on one line, never below 1.0x. Its font size shrinks so that Flutter's
+    // own cap lands there. The bar keeps the phone's text scaling, so the
+    // long-press tooltips still follow the phone's text size. Stopgap until
+    // the bar has fewer tabs (U13).
+    final labels = [
+      context.l10n.calendar,
+      context.l10n.tasks,
+      context.l10n.notes,
+      context.l10n.settings,
+    ];
     WidgetStateProperty<TextStyle?>? labelTextStyle;
-    if (MediaQuery.sizeOf(context).width < 360) {
+    final themed = NavigationBarTheme.of(context).labelTextStyle;
+    final selectedStyle = themed?.resolve({WidgetState.selected});
+    final unselectedStyle = themed?.resolve(<WidgetState>{});
+    if (selectedStyle != null && unselectedStyle != null) {
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final padding = MediaQuery.paddingOf(context);
       final scale =
           MediaQuery.textScalerOf(context).scale(_labelFontSize) /
           _labelFontSize;
-      final fontSize =
-          _labelFontSize *
-          math.min(scale, _narrowLabelScaleCap) /
-          math.min(scale, _flutterLabelScaleCap);
-      final themed = NavigationBarTheme.of(context).labelTextStyle;
-      labelTextStyle = WidgetStateProperty.resolveWith(
-        (states) => themed?.resolve(states)?.copyWith(fontSize: fontSize),
+      final flutterScale = math.min(scale, _flutterLabelScaleCap);
+      // The bar's Material draws its labels over bodyMedium.
+      final base = Theme.of(context).textTheme.bodyMedium;
+      final labelScale = _fittingLabelScale(
+        labels: labels,
+        styles: [
+          base?.merge(selectedStyle) ?? selectedStyle,
+          base?.merge(unselectedStyle) ?? unselectedStyle,
+        ],
+        width: (screenWidth - padding.left - padding.right) / labels.length,
+        cap: screenWidth < 360
+            ? math.min(scale, _narrowLabelScaleCap)
+            : flutterScale,
+        textDirection: Directionality.of(context),
+        locale: Localizations.localeOf(context),
       );
+      if (labelScale < flutterScale) {
+        final fontSize = _labelFontSize * labelScale / flutterScale;
+        labelTextStyle = WidgetStateProperty.resolveWith(
+          (states) => themed?.resolve(states)?.copyWith(fontSize: fontSize),
+        );
+      }
     }
     final navigationBar = NavigationBar(
       labelTextStyle: labelTextStyle,
@@ -75,22 +145,22 @@ class _MainShellState extends ConsumerState<MainShell> {
         NavigationDestination(
           icon: const Icon(Icons.calendar_month_outlined),
           selectedIcon: const Icon(Icons.calendar_month),
-          label: context.l10n.calendar,
+          label: labels[0],
         ),
         NavigationDestination(
           icon: const Icon(Icons.check_box_outlined),
           selectedIcon: const Icon(Icons.check_box),
-          label: context.l10n.tasks,
+          label: labels[1],
         ),
         NavigationDestination(
           icon: const Icon(Icons.description_outlined),
           selectedIcon: const Icon(Icons.description),
-          label: context.l10n.notes,
+          label: labels[2],
         ),
         NavigationDestination(
           icon: const Icon(Icons.settings_outlined),
           selectedIcon: const Icon(Icons.settings),
-          label: context.l10n.settings,
+          label: labels[3],
         ),
       ],
     );

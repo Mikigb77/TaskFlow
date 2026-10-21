@@ -401,7 +401,10 @@
   },
   "planTask": "Plan a task",
   "homeCapture": "Mic button on your home screen",
-  "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for its shortcuts, or add the Say a task widget from your launcher. Share text to TaskFlow from another app.",
+  "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for its shortcuts, or add the Dictate a task widget from your launcher. Share text to TaskFlow from another app.",
+  "@homeCaptureInstructions": {
+    "description": "Settings, Other: how to reach capture from outside the app. Names the home-screen widget by its label (capture_widget_label in android/app/src/main/res/values/strings.xml); keep the two the same."
+  },
   "widgetPickerHelp": "Add the TaskFlow widget from your launcher’s widget picker.",
   "appearanceError": "Could not save your appearance preference.",
   "list": "Project",

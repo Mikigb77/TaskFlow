@@ -12,7 +12,7 @@
     <application
         android:label="${taskflowLabel}"
         android:name="${applicationName}"
-        android:icon="@drawable/app_icon"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true">
 
@@ -55,7 +55,7 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".CaptureWidget" android:exported="false" android:label="@string/capture_voice">
+        <receiver android:name=".CaptureWidget" android:exported="false" android:label="@string/capture_widget_label">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/capture_widget_info" />
         </receiver>

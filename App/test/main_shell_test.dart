@@ -264,6 +264,127 @@ void main() {
     );
   }
 
+  // ---- Run 2026-10-19-app · P196 · UX-421: the Catalan «Configuració» stays
+  // whole wherever four tabs are too narrow for it ----
+
+  /// Checks that every label is drawn whole on one line inside its own tab,
+  /// at [minDrawn] px or more, and returns the widest one-line width seen.
+  double expectWholeLabels(
+    WidgetTester tester,
+    List<String> labels,
+    String reason, {
+    double minDrawn = 12,
+  }) {
+    final tabWidth = tester.getSize(bar).width / labels.length;
+    var widest = 0.0;
+    for (final label in labels) {
+      expectOneLine(tester, label, reason);
+      for (final paragraph in labelParagraphs(tester, label)) {
+        final drawn = paragraph.textScaler.scale(
+          paragraph.text.style!.fontSize!,
+        );
+        expect(
+          drawn,
+          greaterThanOrEqualTo(minDrawn - 0.001),
+          reason: '$reason: `$label` is drawn at $drawn px',
+        );
+        final oneLine = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+          locale: paragraph.locale,
+        )..layout();
+        widest = oneLine.width > widest ? oneLine.width : widest;
+        expect(
+          paragraph.didExceedMaxLines,
+          isFalse,
+          reason: '$reason: `$label` is cut',
+        );
+        expect(
+          oneLine.width,
+          lessThanOrEqualTo(paragraph.size.width + 0.01),
+          reason:
+              '$reason: `$label` needs ${oneLine.width} dp, its box is '
+              '${paragraph.size.width}',
+        );
+        expect(
+          oneLine.width,
+          lessThanOrEqualTo(tabWidth + 0.01),
+          reason:
+              '$reason: `$label` needs ${oneLine.width} dp in a $tabWidth dp tab',
+        );
+        final rect = MatrixUtils.transformRect(
+          paragraph.getTransformTo(null),
+          Offset.zero & paragraph.size,
+        );
+        final barRect = tester.getRect(bar);
+        expect(
+          rect.left >= barRect.left - 0.01 && rect.right <= barRect.right + 0.01,
+          isTrue,
+          reason: '$reason: `$label` ($rect) is inside the bar ($barRect)',
+        );
+        oneLine.dispose();
+      }
+    }
+    return widest;
+  }
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    for (final scale in [1.3, 2.0]) {
+      testWidgets(
+        'UX-421: at ${size.width.toInt()} dp and $scale× text the Catalan tab labels lay out on one line, Configuració whole',
+        (tester) async {
+          final l = await pumpShell(
+            tester,
+            language: 'ca',
+            size: size,
+            scale: scale,
+          );
+          final labels = [l.calendar, l.tasks, l.notes, l.settings];
+          // The selected label's style may be the wider one.
+          for (final selected in [l.calendar, l.settings]) {
+            await select(tester, selected);
+            final reason =
+                'ca, ${size.width.toInt()} dp, $scale×, $selected selected';
+            expectWholeLabels(tester, labels, reason);
+            expectInsideBar(tester, reason);
+          }
+          expect(find.descendant(of: bar, matching: find.text(l.settings)),
+              findsWidgets);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'UX-421: at 320×640 and 2.0× text the Catalan tab labels are drawn at 12 px or more, on one line',
+    (tester) async {
+      final l = await pumpShell(
+        tester,
+        language: 'ca',
+        size: const Size(320, 640),
+        scale: 2.0,
+      );
+      final labels = [l.calendar, l.tasks, l.notes, l.settings];
+      for (final selected in [l.calendar, l.settings]) {
+        await select(tester, selected);
+        final reason = 'ca, 320 dp, 2.0×, $selected selected';
+        final widest = expectWholeLabels(tester, labels, reason);
+        final drawn = labelParagraphs(tester, l.settings)
+            .map((p) => p.textScaler.scale(p.text.style!.fontSize!))
+            .reduce((a, b) => a > b ? a : b);
+        // Reported for the round: what «Configuració» measures here.
+        debugPrint(
+          'UX-421 measure ($reason): `${l.settings}` drawn at '
+          '${drawn.toStringAsFixed(2)} px; widest label '
+          '${widest.toStringAsFixed(1)} dp in an 80 dp tab',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   // ---- Round 1 · P23 · UX-223: Back never strands you ----
 
   /// Records whether system Back asked the platform to leave the app.
