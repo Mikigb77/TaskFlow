@@ -780,6 +780,10 @@
   "@noReminderProjectArchived": {
     "description": "Reminder chip and form row when the task's project (or its group) is archived, so this phone gives no reminder."
   },
+  "noReminderTimePassed": "No reminder: the alert time has passed",
+  "@noReminderTimePassed": {
+    "description": "Reminder chip and form row when reminders are on but the task's alert time (its own or the default, such as 9:00 for a task without a time) has already gone by, so nothing will ring. Tapping it opens the reminder choices, where a later time can be picked."
+  },
   "fileLocal": "Only on this device",
   "fileQueued": "Upload queued",
   "fileBackedUp": "Backed up to your account",
@@ -876,6 +880,15 @@
       }
     }
   },
+  "recoveryCodeRenewed": "That code no longer works. If {email} has an account, a new one is on its way.",
+  "@recoveryCodeRenewed": {
+    "description": "Recovery, shown above the recovery code field instead of recoveryEmailRequested when the code typed had expired or was locked: the app asked for a new code for that address at once and cleared the field. Names the address without saying whether it has an account.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "passwordResetComplete": "Password updated. Sign in with your new password.",
   "verifyEmailHeading": "Confirm your email",
   "@verifyEmailHeading": {
@@ -896,7 +909,7 @@
   },
   "verifyEmailCodeLength": "The code has 6 digits",
   "@verifyEmailCodeLength": {
-    "description": "Under the code field when Confirm is tapped with fewer than 6 digits typed."
+    "description": "Under the code field when Confirm is tapped with fewer than 6 digits typed. Also under the recovery code field when Save new password is tapped without 6 digits."
   },
   "verifyEmailConfirm": "Confirm",
   "@verifyEmailConfirm": {
@@ -943,7 +956,7 @@
   },
   "verifyEmailCodeInvalid": "That code isn’t right. Check the newest email we sent.",
   "@verifyEmailCodeInvalid": {
-    "description": "Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line."
+    "description": "Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line. Also under the recovery code field when the server says the recovery code is wrong; the new password typed stays."
   },
   "verifyEmailCodeSpentNew": "That code no longer works. We’ve sent you a new one.",
   "@verifyEmailCodeSpentNew": {
@@ -1252,7 +1265,11 @@
   },
   "nameAskField": "Name",
   "@nameAskField": {
-    "description": "Label of the name field in the name sheet; prefilled from the email."
+    "description": "Label of the name field in the name sheet, prefilled from the email; also the title of the name row in the Account screen, over the person's name."
+  },
+  "accountAddName": "Add your name",
+  "@accountAddName": {
+    "description": "Account screen: the name row's title when the account has no name yet; opens the name sheet."
   },
   "nameAskNotNow": "Not now",
   "@nameAskNotNow": {
@@ -2010,6 +2027,10 @@
     }
   },
   "continueWithGoogle": "Continue with Google",
+  "continueWithEmail": "Continue with email",
+  "@continueWithEmail": {
+    "description": "Sign-in's first screen, a text button under Continue with Google: shows the email and password form in place."
+  },
   "invitationWaitingSignIn": "You have an invitation. Sign in with the email address it was sent to.",
   "@invitationWaitingSignIn": {
     "description": "Sign-in, above Continue with Google, while an invitation link opened before signing in waits: the invitation only works for the address it was sent to."
@@ -2029,7 +2050,6 @@
   "authOr": "or",
   "authRestoring": "Opening your space…",
   "authHaveRecoveryCode": "I already have a code",
-  "authEnterRecoveryCode": "Enter the code from your recovery email.",
   "useTestAccount": "Use test account",
   "developmentOnly": "Development only",
   "projectsAll": "All projects",

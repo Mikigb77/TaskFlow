@@ -563,3 +563,19 @@ Nothing.
 
 ### Phone checks added
 - P218 (emulator lane, Android 13+): Idioma «Como el teléfono», app in the background, phone switched to Català: back in TaskFlow, it's in Catalan without a restart, and a reminder fired after swiping it away is in Catalan. Idioma English with the phone's region changed: the app stays English, the week start follows the phone, and the screen settles at once.
+
+## Round 2 (b6)
+
+Round 1 of b6 (P190 to P194) fixed all five of its findings, according to reviews A and D (`verify-b6-r1-A.md`, `verify-b6-r1-D.md`), and the tests and the round check passed. Two small regressions came back, now UX-1654 and UX-1655. Round 2 fixes them in two small packages, written to `plan-b6-r2.json`. Nothing has failed twice, so nothing is escalated, and there's no new question for you.
+
+### P219 · S2 · A · S · A stale share or dictation opens with no day, not a past one
+- **UX-1654 (S2), R1A-1 from P192:** P192 made a share's day words count from the moment of the share. A share «Llamar a Marta mañana» left in Sin guardar on Monday and resumed on Thursday would open on Tuesday, a day already gone, and one Back would save it there. Now, when the day read has already passed, the form opens as it did before: no day (or the day the person was looking at) and the words as written. This is the same rule the form already has for a day passed in. It also covers a dictation resumed days later. Verified in code; the behaviour is inferred, so the package adds a widget test, and the emulator check is in the phone checks.
+
+### P220 · S2 · D · S · Cuenta: the name row ends in a chevron
+- **UX-1655 (S2), R1D-1 from P194:** the new «Nombre · María» row in Cuenta looked like the read-only rows below it («Cuenta de Google vinculada», «Guardado en tu cuenta»). It now ends in the same chevron as the Settings rows, so it reads as something to tap. No new copy.
+
+### Skipped
+Nothing.
+
+### Phone checks added
+- P219 (emulator lane, free account): share «Llamar a Marta mañana», kill TaskFlow with the form open, move the date forward three days, resume from Sin guardar: no day is selected and the title reads «Llamar a Marta mañana».

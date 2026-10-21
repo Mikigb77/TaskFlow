@@ -587,7 +587,7 @@ void main() {
   // ---- P39 · UX-106 and UX-114: every way in, with or without Pro ----
 
   testWidgets(
-    'UX-106 / 2026-10-18 (later): without Pro and with no dictation to use, the widget and the text shortcut open the form; shared text opens straight in the form with its words, never the phone’s parser; no Actualizar estado anywhere',
+    'UX-106 / 2026-10-18 (later): without Pro and with no dictation to use, the widget and the text shortcut open the form; shared text opens straight in the form, its day read out of the title (UX-1623, D3 of 2026-10-20), with no request to the server; no Actualizar estado anywhere',
     (tester) async {
       final app = await _App.open(
         tester,
@@ -618,7 +618,7 @@ void main() {
       expect(find.text(es.captureSpeakingIsPro), findsNothing);
       expect(find.text('Actualizar estado'), findsNothing);
       expect(app.speech.starts, 0);
-      expect(titleText(tester), 'Comprar pilas el viernes');
+      expect(titleText(tester), 'Comprar pilas');
       expect(app.api.requests, 0);
       expect(tester.takeException(), isNull);
     },

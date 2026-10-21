@@ -67,8 +67,8 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 /// form (DECISIONS.md, 2026-10-18 later): a new task capture that would
 /// only type opens the form instead, and so do typed or shared words with
 /// no result yet (shared text, a capture resumed from `Sin guardar`), as
-/// the form's title and notes. The sheet's keyboard, `Escribir`, opens the
-/// form too.
+/// the form's title and notes; the form reads the day and time of shared
+/// words. The sheet's keyboard, `Escribir`, opens the form too.
 Future<void> showCaptureSheet(
   BuildContext context, {
   String kind = 'task',
@@ -108,6 +108,10 @@ Future<void> showCaptureSheet(
           page: page,
           showCalendar: showCalendar,
           words: typed.text,
+          // Shared words name their day and time, counted from the share
+          // (D3, 2026-10-20); words typed in the sheet stay as written.
+          readsDates: typed.source == 'shared',
+          heardAt: typed.capturedAt.toLocal(),
           captureId: typed.id,
         );
       }
@@ -1811,7 +1815,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _asking = true;
     var words = '';
     String? captureId;
-    var spoken = false;
+    var readsDates = false;
     DateTime? heardAt;
     try {
       await _starting;
@@ -1820,7 +1824,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       words = _words.text.trim();
       final session = _session;
       if (session != null) {
-        spoken = session.source == 'speech' || session.audioPath != null;
+        readsDates = session.source == 'speech' || session.audioPath != null;
         heardAt = session.capturedAt.toLocal();
         if (CaptureStore.isEmpty(session.copyWith(text: words))) {
           await _store.discard(session.id, _owner);
@@ -1850,7 +1854,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         page: origin?.page,
         showCalendar: origin?.showCalendar ?? false,
         words: words,
-        spoken: spoken,
+        readsDates: readsDates,
         heardAt: heardAt,
         captureId: captureId,
       ),

@@ -7,6 +7,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/widgets/google_login_button.dart';
+import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/screens/login_screen.dart';
@@ -195,7 +196,22 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 semanticsLabel: email,
                 style: TextStyle(color: colors.onSurfaceVariant),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
+              // Sets or fixes the name people see on shared projects.
+              ListTile(
+                key: const ValueKey('account-name'),
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.badge_outlined),
+                title: Text(
+                  name.isEmpty
+                      ? context.l10n.accountAddName
+                      : context.l10n.nameAskField,
+                ),
+                subtitle: name.isEmpty ? null : Text(name),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: busy ? null : () => editName(context),
+              ),
+              const SizedBox(height: 12),
               if (auth.account!.googleLinked) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,

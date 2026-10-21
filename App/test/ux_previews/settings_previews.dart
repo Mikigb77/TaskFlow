@@ -30,7 +30,11 @@ const accountScreen = Screen(
   'settings',
   'account',
   'Cuenta (`/account`), as in a release build',
-  sources: ['lib/screens/account_screen.dart', 'lib/widgets/google_login_button.dart'],
+  sources: [
+    'lib/screens/account_screen.dart',
+    'lib/widgets/google_login_button.dart',
+    'lib/widgets/name_ask_sheet.dart',
+  ],
 );
 
 const pro = Screen(
@@ -186,8 +190,8 @@ void settingsPreviews() {
     preview(
       accountScreen,
       'email',
-      'An account that signs in with email and password.',
-      everywhere,
+      'An account that signs in with email and password, without a name: the row Añadir tu nombre.',
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
         await app.pushPage(const AccountScreen(debug: false));
@@ -198,7 +202,7 @@ void settingsPreviews() {
     preview(
       accountScreen,
       'named',
-      'An account with a first name: the name as the heading, the email under it.',
+      'An account with a first name: the name as the heading, the email under it, then the row Nombre · María.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(
@@ -207,6 +211,23 @@ void settingsPreviews() {
           user: account(firstName: 'María'),
         );
         await app.pushPage(const AccountScreen(debug: false));
+        await p.shoot();
+      },
+    );
+
+    preview(
+      accountScreen,
+      'name-sheet',
+      'The name row tapped: the name sheet, filled in with the current name.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          user: account(firstName: 'María'),
+        );
+        await app.pushPage(const AccountScreen(debug: false));
+        await app.tap(p.l.nameAskField);
         await p.shoot();
       },
     );

@@ -20,6 +20,7 @@ const reminderQuestion = Screen(
   sources: [
     'lib/widgets/reminder_ask_sheet.dart',
     'lib/widgets/reminder_control.dart',
+    'lib/services/reminder_engine.dart',
     'lib/widgets/task_editor.dart',
   ],
 );
@@ -35,7 +36,8 @@ const phoneCalendars = Screen(
 );
 
 /// A new account adds its first task with a date, in the form, and the save
-/// message closes: the question comes up.
+/// message closes: the question comes up. Mañana, since at the previews'
+/// 09:41 a task for today without a time is past its 9:00 reminder.
 Future<PreviewApp> _firstDatedTask(
   Preview p, {
   bool allowed = false,
@@ -53,7 +55,7 @@ Future<PreviewApp> _firstDatedTask(
     'Llamar al médico',
   );
   await p.tester.pumpAndSettle();
-  await p.tester.tap(find.byKey(const ValueKey('new-task-today')));
+  await p.tester.tap(find.byKey(const ValueKey('new-task-tomorrow')));
   await p.tester.pumpAndSettle();
   await p.tester.tap(find.byKey(const ValueKey('task-save')));
   await p.tester.pumpAndSettle();

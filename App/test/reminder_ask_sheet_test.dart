@@ -3,6 +3,7 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
@@ -57,6 +58,8 @@ void main() {
     // brings its own store.
     CaptureStore? captureStore,
     bool pro = false,
+    // The time the app reads as now; early today unless a test sets it.
+    DateTime Function()? clock,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -72,6 +75,15 @@ void main() {
       pro: pro,
       overrides: [
         ...reminderOverrides(store, access),
+        // Early today, so a task for today, with or without a time, can
+        // still be reminded of and the question comes (UX-1601).
+        calendarClockProvider.overrideWithValue(
+          clock ??
+              () {
+                final now = DateTime.now();
+                return DateTime(now.year, now.month, now.day, 7);
+              },
+        ),
         captureStoreProvider.overrideWithValue(captureStore ?? captures),
         ...overrides,
       ],
@@ -845,6 +857,240 @@ void main() {
         expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
         await letSaveMessageClose(tester);
         expect(sheet(), findsOneWidget);
+        expect(question(l), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- Run 2026-10-19-app, round 1 · P190 (UX-1601): the question waits
+  // for a save whose reminder can still ring ----
+  group('UX-1601: the question only for a reminder that can come', () {
+    // Monday 19 October 2026, at [hour]:[minute].
+    DateTime Function() at(int hour, [int minute = 0]) =>
+        () => DateTime(2026, 10, 19, hour, minute);
+
+    /// Nueva tarea from Calendar: [title] on the day chip [dayKey], at
+    /// [time] when given, then added.
+    Future<void> save(
+      WidgetTester tester,
+      String title, {
+      String dayKey = 'new-task-today',
+      TimeOfDay? time,
+      bool reminderOff = false,
+    }) async {
+      final l = strings(tester);
+      await tester.tap(find.text(l.newTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('task-title')), title);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(dayKey)));
+      await tester.pumpAndSettle();
+      if (time != null) {
+        final add = find.widgetWithText(ActionChip, l.addTime);
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        final dialog = find.byType(TimePickerDialog);
+        expect(dialog, findsOneWidget);
+        final boxes = find.descendant(
+          of: dialog,
+          matching: find.byType(TextField),
+        );
+        final material = MaterialLocalizations.of(tester.element(dialog));
+        // A 12-hour picker shows a. m. and p. m.; a 24-hour one takes 17.
+        final pm = find.descendant(
+          of: dialog,
+          matching: find.text(material.postMeridiemAbbreviation),
+        );
+        final twelve = pm.evaluate().isNotEmpty;
+        await tester.enterText(
+          boxes.at(0),
+          '${twelve ? time.hourOfPeriod : time.hour}',
+        );
+        await tester.enterText(
+          boxes.at(1),
+          time.minute.toString().padLeft(2, '0'),
+        );
+        await tester.pumpAndSettle();
+        if (twelve && time.period == DayPeriod.pm) {
+          await tester.tap(pm);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(
+          find.text(
+            MaterialLocalizations.of(tester.element(dialog)).okButtonLabel,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+      }
+      if (reminderOff) {
+        final more = find.byKey(const ValueKey('task-more-details'));
+        if (more.evaluate().isNotEmpty) {
+          await tester.ensureVisible(more);
+          await tester.pumpAndSettle();
+          await tester.tap(more);
+          await tester.pumpAndSettle();
+        }
+        final row = find.widgetWithText(ListTile, l.reminder);
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        final choices = find.byType(BottomSheet);
+        expect(choices, findsOneWidget);
+        await tester.tap(find.descendant(of: choices, matching: find.text(l.off)));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: row, matching: find.text(l.off)),
+          findsOneWidget,
+        );
+      }
+      expect(question(l), findsNothing);
+      final add = find.byKey(const ValueKey('task-save'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+    }
+
+    /// The save message closes, and a little more passes: no question.
+    Future<void> noQuestion(
+      WidgetTester tester,
+      MemoryReminderStore store,
+    ) async {
+      final l = strings(tester);
+      await letSaveMessageClose(tester);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(sheet(), findsNothing);
+      expect(question(l), findsNothing);
+      // Not marked asked: the next dated save can still ask.
+      expect(store.value.asked, isFalse);
+    }
+
+    testWidgets(
+      'UX-1601: at 11:00, an account never asked with reminders off saves a date-only task for today: no question; one for tomorrow then asks, once',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess();
+        final container = await openApp(tester, store, access, clock: at(11));
+        final l = strings(tester);
+        await save(tester, 'Llamar a Marta');
+        final saved = container
+            .read(taskProvider)
+            .requireValue
+            .singleWhere((t) => t.title == 'Llamar a Marta');
+        expect(Task.day(saved.dueDate!), DateTime(2026, 10, 19));
+        expect(saved.hasTime, isFalse);
+        await noQuestion(tester, store);
+
+        await save(tester, 'Comprar pan', dayKey: 'new-task-tomorrow');
+        await letSaveMessageClose(tester);
+        expect(sheet(), findsOneWidget);
+        expect(
+          find.descendant(of: sheet(), matching: question(l)),
+          findsOneWidget,
+        );
+        await tester.tap(find.widgetWithText(TextButton, l.reminderAskNotNow));
+        await tester.pumpAndSettle();
+        expect(store.value.asked, isTrue);
+
+        // Once: another task for tomorrow doesn't ask again.
+        await save(tester, 'Pedir cita', dayKey: 'new-task-tomorrow');
+        await letSaveMessageClose(tester);
+        expect(question(l), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (hour, minute, asks) in [(16, 55, false), (16, 0, true)]) {
+      final clock = '$hour:${minute.toString().padLeft(2, '0')}';
+      testWidgets(
+        'UX-1601: at $clock, a task for today at 17:00 with the 10-minute default ${asks ? 'brings' : 'brings no'} question',
+        (tester) async {
+          final store = MemoryReminderStore();
+          expect(store.value.leadMinutes, 10);
+          final container = await openApp(
+            tester,
+            store,
+            FakeReminderAccess(),
+            clock: at(hour, minute),
+          );
+          final l = strings(tester);
+          await save(
+            tester,
+            'Recoger a los niños',
+            time: const TimeOfDay(hour: 17, minute: 0),
+          );
+          final saved = container
+              .read(taskProvider)
+              .requireValue
+              .singleWhere((t) => t.title == 'Recoger a los niños');
+          expect(saved.dueDate, DateTime(2026, 10, 19, 17));
+          expect(saved.hasTime, isTrue);
+          if (asks) {
+            await letSaveMessageClose(tester);
+            expect(
+              find.descendant(of: sheet(), matching: question(l)),
+              findsOneWidget,
+            );
+          } else {
+            await noQuestion(tester, store);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1601: at 08:00, a date-only task for today brings the question',
+      (tester) async {
+        final store = MemoryReminderStore();
+        await openApp(tester, store, FakeReminderAccess(), clock: at(8));
+        final l = strings(tester);
+        await save(tester, 'Llamar a Marta');
+        await letSaveMessageClose(tester);
+        expect(
+          find.descendant(of: sheet(), matching: question(l)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1601: a dated task saved with its reminder set to Desactivado brings no question; the next dated save asks',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final container = await openApp(
+          tester,
+          store,
+          FakeReminderAccess(),
+          clock: at(7),
+        );
+        final l = strings(tester);
+        await save(
+          tester,
+          'Comprar pan',
+          dayKey: 'new-task-tomorrow',
+          reminderOff: true,
+        );
+        expect(
+          container
+              .read(taskProvider)
+              .requireValue
+              .singleWhere((t) => t.title == 'Comprar pan')
+              .reminderMinutes,
+          -1,
+        );
+        await noQuestion(tester, store);
+
+        await save(tester, 'Llamar a mamá', dayKey: 'new-task-tomorrow');
+        await letSaveMessageClose(tester);
         expect(question(l), findsOneWidget);
         expect(tester.takeException(), isNull);
       },

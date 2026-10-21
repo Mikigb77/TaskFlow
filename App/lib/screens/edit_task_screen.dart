@@ -26,26 +26,32 @@ class EditTaskScreen extends ConsumerWidget {
           if (task != null) {
             if (!ref.watch(listCanEditProvider(task.listId))) {
               return Scaffold(
-                  appBar: CustomAppBar(title: context.l10n.viewOnlyTaskTitle),
-                  body: EmptyState(
-                      title: context.l10n.readOnlyList,
-                      message: context.l10n.listEditingAccessHelp));
+                appBar: CustomAppBar(title: context.l10n.viewOnlyTaskTitle),
+                body: EmptyState(
+                  title: context.l10n.readOnlyList,
+                  message: context.l10n.listEditingAccessHelp,
+                ),
+              );
             }
             return TaskEditor(key: ValueKey(taskId), task: task);
           }
           return Scaffold(
-              appBar: CustomAppBar(title: context.l10n.editTask),
-              body: EmptyState(
-                  title: context.l10n.taskUnavailable,
-                  message: context.l10n.taskRemoved));
+            appBar: CustomAppBar(title: context.l10n.editTask),
+            body: EmptyState(
+              title: context.l10n.taskUnavailable,
+              message: context.l10n.taskRemoved,
+            ),
+          );
         },
         loading: () =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
         error: (_, __) => Scaffold(
-            appBar: CustomAppBar(title: context.l10n.editTask),
-            body: EmptyState(
-                title: context.l10n.loadTaskError,
-                message: context.l10n.tryLater)),
+          appBar: CustomAppBar(title: context.l10n.editTask),
+          body: EmptyState(
+            title: context.l10n.loadTaskError,
+            message: context.l10n.tryLater,
+          ),
+        ),
       );
 }
 
@@ -58,7 +64,7 @@ class NewTaskArguments {
     this.page,
     this.showCalendar = false,
     this.words = '',
-    this.spoken = false,
+    this.readsDates = false,
     this.heardAt,
     this.captureId,
     this.askedToSpeak = false,
@@ -85,12 +91,12 @@ class NewTaskArguments {
   /// whatever follows its first sentence.
   final String words;
 
-  /// [words] were dictated before `Escribir`: the form reads their day and
-  /// time once, as it opens, as `Guardar como tarea` does (D2). Words typed
-  /// or shared stay as written.
-  final bool spoken;
+  /// [words] were dictated before `Escribir` (D2), or shared from another
+  /// app (D3, 2026-10-20): the form reads their day and time once, as it
+  /// opens, as `Guardar como tarea` does. Words typed stay as written.
+  final bool readsDates;
 
-  /// When the dictated [words] were heard: the day they name counts from it.
+  /// When [words] were heard or shared: the day they name counts from it.
   final DateTime? heardAt;
 
   /// The capture that holds [words]. The form keeps its title and notes
@@ -123,9 +129,9 @@ class _NewTaskScreenState extends ConsumerState<NewTaskScreen> {
     final later = shown != null && shown.isAfter(today) ? shown : null;
     // As Calendar's project choice does for a capture.
     final scoped = ref.read(projectScopeProvider).projectId;
-    // Dictated words name their day and time, as `Guardar como tarea`
-    // reads them; an hour with no a. m. or p. m. stays in the title.
-    final found = arguments.spoken
+    // Dictated or shared words name their day and time, as `Guardar como
+    // tarea` reads them; an hour with no a. m. or p. m. stays in the title.
+    final read = arguments.readsDates
         ? QuickScheduleParser.parse(
             arguments.words,
             arguments.heardAt ?? now,
@@ -133,6 +139,10 @@ class _NewTaskScreenState extends ConsumerState<NewTaskScreen> {
             keepAmbiguousHour: true,
           )
         : null;
+    // A day read from the words that has already gone by adds nothing either.
+    final found = read != null && Task.day(read.date).isBefore(today)
+        ? null
+        : read;
     final deadline = found != null && found.isDeadline;
     final listId =
         arguments.projectId ??

@@ -17,6 +17,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
+import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/list_sharing_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
@@ -37,6 +38,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'support/design_fixtures.dart';
+import 'support/shown_text.dart';
 
 final en = lookupAppLocalizations(const Locale('en'));
 final es = lookupAppLocalizations(const Locale('es'));
@@ -747,6 +749,330 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-19-app, round 1 · P194 (UX-1515, D5 of
+  // 2026-10-20): Cuenta's name row opens the name sheet ----
+
+  group('UX-1515: the name row in Cuenta', () {
+    const mariaEmail = 'maria.lopez@example.com';
+    final row = find.byKey(const ValueKey('account-name'));
+    String rowTitle(WidgetTester tester) =>
+        (tester.widget<ListTile>(row).title! as Text).data!;
+    String? rowSubtitle(WidgetTester tester) =>
+        (tester.widget<ListTile>(row).subtitle as Text?)?.data;
+
+    /// Cuenta, opened over Calendar.
+    Future<void> openAccount(WidgetTester tester) async {
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => const AccountScreen(debug: false),
+            ),
+          );
+      await tester.pumpAndSettle();
+      expect(find.byType(AccountScreen), findsOneWidget);
+    }
+
+    Future<void> tapRow(WidgetTester tester) async {
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+    }
+
+    test('UX-1515: «Añadir tu nombre» in EN, ES and CA', () {
+      expect(en.accountAddName, 'Add your name');
+      expect(es.accountAddName, 'Añadir tu nombre');
+      expect(ca.accountAddName, 'Afegeix el teu nom');
+      expect(es.nameAskField, 'Nombre');
+    });
+
+    testWidgets(
+      'UX-1515: ES, a password account named «María»: under the email, a row Nombre · María; it opens «¿Cómo te llamas?» with María; «María José» and Guardar save it, and the heading and the row read «María José»',
+      (tester) async {
+        final app = await _NameApp.open(
+          tester,
+          email: mariaEmail,
+          firstName: 'María',
+        );
+        await openAccount(tester);
+        expect(row, findsOneWidget);
+        expect(rowTitle(tester), es.nameAskField);
+        expect(rowSubtitle(tester), 'María');
+        expect(
+          find.descendant(of: row, matching: find.byIcon(Icons.badge_outlined)),
+          findsOneWidget,
+        );
+        final address = findShown(mariaEmail);
+        expect(address, findsOneWidget);
+        expect(
+          tester.getRect(row).top,
+          greaterThanOrEqualTo(tester.getRect(address).bottom),
+          reason: 'right under the email',
+        );
+
+        await tapRow(tester);
+        expect(inSheet(title), findsOneWidget);
+        expect(typedName(tester), 'María');
+        await tester.enterText(field(), 'María José');
+        await tester.pumpAndSettle();
+        await tester.tap(inSheet(find.widgetWithText(FilledButton, es.save)));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        // setFirstName: PATCH auth/me/ with first_name (UX-1112's test).
+        expect(app.api.names, ['María José']);
+        expect(app.container.read(authProvider).account!.firstName, 'María José');
+        expect(rowSubtitle(tester), 'María José');
+        final heading = find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.header == true,
+        );
+        expect(
+          find.descendant(of: heading, matching: find.text('María José')),
+          findsOneWidget,
+          reason: 'the heading',
+        );
+        expect(find.text('María', skipOffstage: false), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1515: an account without a name: the row reads «Añadir tu nombre» with no subtitle, and the sheet opens with the email’s guess «Maria»',
+      (tester) async {
+        await _NameApp.open(tester, email: mariaEmail);
+        await openAccount(tester);
+        expect(rowTitle(tester), es.accountAddName);
+        expect(rowSubtitle(tester), isNull);
+        await tapRow(tester);
+        expect(inSheet(title), findsOneWidget);
+        expect(typedName(tester), 'Maria');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['en', 'ca']) {
+      testWidgets(
+        'UX-1515: ${language.toUpperCase()}, the row for an account without a name reads «${strings(language).accountAddName}»',
+        (tester) async {
+          await _NameApp.open(tester, email: mariaEmail, language: language);
+          await openAccount(tester);
+          expect(rowTitle(tester), strings(language).accountAddName);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1515: a Google-linked account shows the same row, and it opens the sheet',
+      (tester) async {
+        await _NameApp.open(
+          tester,
+          email: mariaEmail,
+          firstName: 'María',
+          googleLinked: true,
+        );
+        await openAccount(tester);
+        expect(
+          tester.widget<ListTile>(row).onTap,
+          isNotNull,
+        );
+        expect(rowTitle(tester), es.nameAskField);
+        expect(rowSubtitle(tester), 'María');
+        await tapRow(tester);
+        expect(inSheet(title), findsOneWidget);
+        expect(typedName(tester), 'María');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- Round 2 · P220 (UX-1655): the name row ends in a chevron ----
+
+    bool endsInChevron(WidgetTester tester) {
+      final trailing = tester.widget<ListTile>(row).trailing;
+      return trailing is Icon && trailing.icon == Icons.chevron_right_rounded;
+    }
+
+    testWidgets(
+      'UX-1655: ES, an account without a name: the row «Añadir tu nombre» ends in a chevron',
+      (tester) async {
+        await _NameApp.open(tester, email: mariaEmail);
+        await openAccount(tester);
+        expect(rowTitle(tester), es.accountAddName);
+        expect(endsInChevron(tester), isTrue);
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1655: ES, named «María»: the row Nombre · María ends in a chevron and still opens the sheet with María',
+      (tester) async {
+        await _NameApp.open(tester, email: mariaEmail, firstName: 'María');
+        await openAccount(tester);
+        expect(rowTitle(tester), es.nameAskField);
+        expect(rowSubtitle(tester), 'María');
+        expect(endsInChevron(tester), isTrue);
+        final chevron = find.descendant(
+          of: row,
+          matching: find.byIcon(Icons.chevron_right_rounded),
+        );
+        expect(chevron, findsOneWidget);
+        expect(
+          tester.getCenter(chevron).dx,
+          greaterThan(tester.getCenter(find.text('María').first).dx),
+          reason: 'at the right of the row',
+        );
+        await tapRow(tester);
+        expect(find.byKey(const ValueKey('name-ask-sheet')), findsOneWidget);
+        expect(typedName(tester), 'María');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1655: ES, Google-linked: «Cuenta de Google vinculada» and «Guardado en tu cuenta» stay read-only, with no trailing icon',
+      (tester) async {
+        await _NameApp.open(
+          tester,
+          email: mariaEmail,
+          firstName: 'María',
+          googleLinked: true,
+        );
+        await openAccount(tester);
+        final google = find.widgetWithText(ListTile, es.googleAccountLinked);
+        expect(google, findsOneWidget);
+        expect(tester.widget<ListTile>(google).trailing, isNull);
+        expect(tester.widget<ListTile>(google).onTap, isNull);
+        final saved = find.byKey(const ValueKey('account-sync-status'));
+        expect(saved, findsOneWidget);
+        expect(tester.widget<ListTile>(saved).trailing, isNull);
+        expect(
+          find.descendant(of: saved, matching: find.text(es.accountSaved)),
+          findsOneWidget,
+        );
+        expect(
+          find.byIcon(Icons.chevron_right_rounded),
+          findsOneWidget,
+          reason: 'only the name row has a chevron',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final asked in [false, true]) {
+      testWidgets(
+        'UX-1515: «Ahora no» from Cuenta changes nothing and leaves the asked-once flag ${asked ? 'set' : 'unset'}',
+        (tester) async {
+          final store = _Asked();
+          final app = await _NameApp.open(tester, email: mariaEmail, asked: store);
+          if (asked) store.owners.add(app.container.read(taskRepositoryProvider).ownerKey);
+          final before = {...store.owners};
+          await openAccount(tester);
+          await tapRow(tester);
+          expect(inSheet(title), findsOneWidget);
+          await tester.tap(
+            inSheet(find.widgetWithText(TextButton, es.nameAskNotNow)),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(app.api.names, isEmpty);
+          expect(app.container.read(authProvider).account!.firstName, '');
+          expect(rowTitle(tester), es.accountAddName);
+          expect(store.owners, before);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1515: after saving, the projects load again, so a shared project’s people come back with the new name',
+      (tester) async {
+        var loads = 0;
+        final app = await _NameApp.open(
+          tester,
+          email: mariaEmail,
+          firstName: 'María',
+          loadProjects: (api) async {
+            loads++;
+            return [
+              TaskListInfo(
+                id: 'casa',
+                name: 'Casa',
+                role: 'owner',
+                version: 2,
+                shared: true,
+                ownerId: 1,
+                people: [
+                  ProjectMember(
+                    id: 1,
+                    name: '${api.user['first_name'] ?? ''}',
+                    role: 'owner',
+                  ),
+                  const ProjectMember(id: 3, name: 'Paul', role: 'editor'),
+                ],
+              ),
+            ];
+          },
+        );
+        await openAccount(tester);
+        await app.container.read(taskListsProvider.future);
+        final before = loads;
+        await tapRow(tester);
+        await tester.enterText(field(), 'María José');
+        await tester.pumpAndSettle();
+        await tester.tap(inSheet(find.widgetWithText(FilledButton, es.save)));
+        await tester.pumpAndSettle();
+        final projects = await app.container.read(taskListsProvider.future);
+        expect(loads, greaterThan(before), reason: 'loaded again');
+        expect(
+          projects.single.people.firstWhere((p) => p.id == 1).name,
+          'María José',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-1515: ${language.toUpperCase()}, 2× on 360×800, the row is whole and at least 48 dp tall, with and without a name',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          for (final name in [null, 'María']) {
+            await _NameApp.open(
+              tester,
+              email: mariaEmail,
+              firstName: name,
+              language: language,
+              size: const Size(360, 800),
+            );
+            await openAccount(tester);
+            await tester.ensureVisible(row);
+            await tester.pumpAndSettle();
+            final rect = tester.getRect(row);
+            expect(rect.height, greaterThanOrEqualTo(48), reason: '$name');
+            expect(rect.left, greaterThanOrEqualTo(0));
+            expect(rect.right, lessThanOrEqualTo(360));
+            for (final paragraph in tester.renderObjectList<RenderParagraph>(
+              find.descendant(of: row, matching: find.byType(RichText)),
+            )) {
+              expect(paragraph.didExceedMaxLines, isFalse, reason: '$name');
+            }
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox());
+            await tester.pumpAndSettle();
+          }
+        },
+      );
+    }
+  });
 }
 
 /// The phone's memory of who was asked their name.
@@ -836,6 +1162,9 @@ class _NameApp {
     _Asked? asked,
     List<TaskListInfo>? projects,
     List<Task> tasks = const [],
+    // Asked each time the projects load, instead of [projects].
+    Future<List<TaskListInfo>> Function(_NameApi api)? loadProjects,
+    bool googleLinked = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -845,6 +1174,7 @@ class _NameApp {
       'email': email,
       'timezone': 'Europe/Madrid',
       'first_name': ?firstName,
+      if (googleLinked) 'google_linked': true,
     });
     final names = asked ?? _Asked();
     final container = ProviderContainer(
@@ -864,6 +1194,7 @@ class _NameApp {
         pendingCapturesProvider.overrideWith((ref) async => []),
         taskListsProvider.overrideWith(
           (ref) async =>
+              await loadProjects?.call(api) ??
               projects ??
               [
                 TaskListInfo(

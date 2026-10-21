@@ -3,9 +3,11 @@ import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/shell_tab_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 
@@ -13,11 +15,12 @@ import 'package:agenda/widgets/reminder_control.dart';
 final _askingProvider = Provider<Set<String>>((ref) => {});
 
 /// Asks once per account on this phone whether to turn reminders on, after
-/// the first task with a date is saved. Call it from the saved form's
-/// context, right after its route was popped, and pass the save message's
-/// [feedback]. The question waits until that route is gone and the save
-/// message has closed, so the person first sees where the task went and can
-/// still undo it. It isn't asked when they undid the save, moved to another
+/// the first saved task with a date whose reminder can still ring: not one
+/// for today saved after its 9:00, nor one saved inside its lead time. Call
+/// it from the saved form's context, right after its route was popped, and
+/// pass the save message's [feedback]. The question waits until that route
+/// is gone and the save message has closed, so the person first sees where
+/// the task went and can still undo it. It isn't asked when they undid the save, moved to another
 /// screen or tab, or another message replaced the save message; the next
 /// dated save asks instead.
 void askAboutRemindersAfterSave(
@@ -25,13 +28,16 @@ void askAboutRemindersAfterSave(
   Iterable<Task> saved, {
   Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>? feedback,
 }) {
-  final dated = saved.any(
-    (task) => !task.isNote && (task.dueDate != null || task.deadline != null),
-  );
+  final dated = saved
+      .where(
+        (task) =>
+            !task.isNote && (task.dueDate != null || task.deadline != null),
+      )
+      .toList();
   final container = ProviderScope.containerOf(context, listen: false);
   final route = ModalRoute.of(context);
   // Phones without reminders (desktop builds) have nothing to turn on.
-  if (!dated ||
+  if (dated.isEmpty ||
       route == null ||
       !container.read(reminderAccessProvider).supported) {
     return;
@@ -47,7 +53,16 @@ void askAboutRemindersAfterSave(
   });
   final tabSwitches = container.read(shellTabSwitchesProvider);
   unawaited(
-    _ask(container, navigator, route, under, tabSwitches, feedback, owner),
+    _ask(
+      container,
+      navigator,
+      route,
+      under,
+      tabSwitches,
+      feedback,
+      owner,
+      dated,
+    ),
   );
 }
 
@@ -59,6 +74,7 @@ Future<void> _ask(
   int tabSwitches,
   Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>? feedback,
   String owner,
+  List<Task> dated,
 ) async {
   final store = container.read(reminderPreferenceStoreProvider);
   var shown = false;
@@ -84,6 +100,11 @@ Future<void> _ask(
         settings.asked ||
         !navigator.mounted ||
         container.read(taskRepositoryProvider).ownerKey != owner) {
+      return;
+    }
+    // Only for a reminder that can still come; the next dated save asks.
+    final now = container.read(calendarClockProvider)();
+    if (!dated.any((task) => ReminderEngine.alertAhead(task, settings, now))) {
       return;
     }
     shown = true;

@@ -1097,6 +1097,111 @@ void main() {
       }
     });
   });
+
+  // ---- Run 2026-10-19-app, round 1 · P190 (UX-1601): whether a task's
+  // next alert can still ring ----
+  group('UX-1601: ReminderEngine.alertAhead', () {
+    // Monday 19 October 2026.
+    final today = DateTime(2026, 10, 19);
+    final at11 = DateTime(2026, 10, 19, 11);
+    final at8 = DateTime(2026, 10, 19, 8);
+    // Reminders off, as for an account never asked, with no date-only time.
+    const off = ReminderPreferences();
+    final dateOnlyToday = Task(
+      id: 1,
+      title: 'Llamar a Marta',
+      priority: 1,
+      dueDate: today,
+      hasTime: false,
+    );
+
+    test(
+        'UX-1601: a date-only task for today is false at 11:00 with no date-only time set (taken as 9:00), and true at 08:00',
+        () {
+      expect(ReminderEngine.alertAhead(dateOnlyToday, off, at11), isFalse);
+      expect(ReminderEngine.alertAhead(dateOnlyToday, off, at8), isTrue);
+    });
+
+    test(
+        'UX-1601: a date-only task for tomorrow is true at 11:00',
+        () {
+      expect(
+        ReminderEngine.alertAhead(
+          dateOnlyToday.copyWith(dueDate: DateTime(2026, 10, 20)),
+          off,
+          at11,
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+        'UX-1601: a 17:00 task with a 10-minute lead is false at 16:55 and true at 16:00',
+        () {
+      final five = Task(
+        id: 2,
+        title: 'Recoger a los niños',
+        priority: 1,
+        dueDate: DateTime(2026, 10, 19, 17),
+      );
+      const lead = ReminderPreferences(leadMinutes: 10);
+      expect(
+        ReminderEngine.alertAhead(five, lead, DateTime(2026, 10, 19, 16, 55)),
+        isFalse,
+      );
+      expect(
+        ReminderEngine.alertAhead(five, lead, DateTime(2026, 10, 19, 16)),
+        isTrue,
+      );
+    });
+
+    test('UX-1601: a task with its reminder off is false, even early', () {
+      expect(
+        ReminderEngine.alertAhead(
+          dateOnlyToday.copyWith(reminderMinutes: -1),
+          off,
+          at8,
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+        'UX-1601: a repeating date-only task whose today alert has passed is true: its next occurrence is ahead',
+        () {
+      final daily = Task(
+        id: 3,
+        title: 'Regar las plantas',
+        priority: 1,
+        dueDate: DateTime(2026, 10, 18),
+        hasTime: false,
+        recurrence: 'daily',
+      );
+      expect(ReminderEngine.alertAhead(daily, off, at11), isTrue);
+    });
+
+    test(
+        'UX-1601: plan() still schedules nothing for a date-only task for today at 11:00, with reminders on at 9:00',
+        () {
+      final planned = ReminderEngine.plan(
+        'local',
+        [dateOnlyToday],
+        const ReminderPreferences(enabled: true, dateOnlyTime: 540),
+        at11,
+      );
+      expect(planned.where((p) => p.taskId == 1), isEmpty);
+      // And at 08:00 the same task is scheduled for 9:00: the helper and
+      // the engine agree.
+      final early = ReminderEngine.plan(
+        'local',
+        [dateOnlyToday],
+        const ReminderPreferences(enabled: true, dateOnlyTime: 540),
+        at8,
+      );
+      expect(early.where((p) => p.taskId == 1).single.when,
+          DateTime(2026, 10, 19, 9));
+    });
+  });
 }
 
 class _Driver implements ReminderDriver {

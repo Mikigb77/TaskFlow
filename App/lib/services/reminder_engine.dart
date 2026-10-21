@@ -186,6 +186,28 @@ class ReminderEngine {
     );
   }
 
+  /// Whether [task]'s next alert would still ring after [now] were reminders
+  /// on, by the steps [plan] takes: [preferences] taken as enabled, and a
+  /// task without a time reminding at the default 9:00 when no time was
+  /// chosen. False for a task whose reminder is off.
+  static bool alertAhead(
+    Task task,
+    ReminderPreferences preferences,
+    DateTime now,
+  ) {
+    if (task.reminderMinutes == -1) return false;
+    final on = ReminderPreferences(
+      enabled: true,
+      leadMinutes: preferences.leadMinutes,
+      dateOnlyTime: preferences.dateOnlyTime ?? 540,
+    );
+    return upcoming([task], now).any((next) {
+      if (next.reminderMinutes == -1) return false;
+      final firing = _firing(next, on);
+      return firing != null && firing.when.isAfter(now);
+    });
+  }
+
   static List<PlannedReminder> plan(
     String owner,
     List<Task> tasks,

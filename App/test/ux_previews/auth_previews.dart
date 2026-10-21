@@ -44,6 +44,18 @@ const _password = 'una frase larga y segura';
 
 Future<PreviewApp> _signedOut(Preview p) => PreviewApp.open(p, signedIn: false);
 
+/// Signed out, after «Continuar con mi correo»: the email form, which a
+/// fresh sign-in folds behind Google.
+Future<PreviewApp> _emailForm(Preview p) async {
+  final app = await _signedOut(p);
+  final open = find.byKey(const ValueKey('continue-with-email'));
+  await p.tester.ensureVisible(open);
+  await p.tester.pumpAndSettle();
+  await p.tester.tap(open);
+  await p.tester.pumpAndSettle();
+  return app;
+}
+
 Future<void> _tapText(Preview p, String text) async {
   final finder = find.text(text);
   await p.tester.ensureVisible(finder.first);
@@ -86,10 +98,21 @@ void authPreviews() {
     preview(
       login,
       'sign-in',
-      'The first screen signed out: Google first, then email and password; the Privacy Policy and Terms links under the card.',
+      'The first screen signed out: Continuar con Google, and under it Continuar con mi correo, with the email form folded; the Privacy Policy and Terms links under the card.',
       [...mainScreen, ...longText],
       (p) async {
         await _signedOut(p);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      login,
+      'email-open',
+      'After Continuar con mi correo: the email and password form in place under Google and «o», the focus in Correo.',
+      [es1, es2, esDark, ca2],
+      (p) async {
+        await _emailForm(p);
         await p.shoot();
       },
     );
@@ -100,7 +123,7 @@ void authPreviews() {
       'Crear una cuenta: the same card for a new account, with the password rule; the Privacy Policy and Terms links under the card.',
       [es1, ca2],
       (p) async {
-        await _signedOut(p);
+        await _emailForm(p);
         await _tapText(p, p.l.createAnAccount);
         await p.shoot();
       },
@@ -112,7 +135,7 @@ void authPreviews() {
       '¿Has olvidado tu contraseña?: the email to send a recovery code to.',
       everywhere,
       (p) async {
-        await _signedOut(p);
+        await _emailForm(p);
         await _tapText(p, p.l.forgotPassword);
         await p.shoot();
       },
@@ -124,7 +147,7 @@ void authPreviews() {
       'Recovery code sent: where it went, above the code and a new password.',
       [es1, es2, ca2],
       (p) async {
-        final app = await _signedOut(p);
+        final app = await _emailForm(p);
         app.api.handlers['POST auth/password-reset/'] = (_) => <String, dynamic>{};
         await _tapText(p, p.l.forgotPassword);
         await _fill(p, password: null);
@@ -132,6 +155,35 @@ void authPreviews() {
         await p.shoot();
       },
     );
+
+    // The recovery code refused: wrong (said under the code, the new password
+    // kept) or expired (a new one asked for at once, the line above says so).
+    for (final (name, refusal, note) in [
+      (
+        'recovery-code-wrong',
+        'code_invalid',
+        'Recovery code refused as wrong: said under the code, the new password kept.',
+      ),
+      (
+        'recovery-code-renewed',
+        'code_expired',
+        'Recovery code expired: a new one asked for, the line above the emptied code says so.',
+      ),
+    ]) {
+      preview(login, name, note, [es2, ca2], (p) async {
+        final app = await _emailForm(p);
+        app.api.handlers['POST auth/password-reset/'] = (_) => <String, dynamic>{};
+        app.api.handlers['POST auth/password-reset/confirm/'] =
+            (_) => throw ApiException(400, 'Refused.', {'code': refusal});
+        await _tapText(p, p.l.forgotPassword);
+        await _fill(p, password: null);
+        await _submit(p);
+        await p.tester.enterText(find.byKey(const ValueKey('account-recovery-code')), '123456');
+        await p.tester.enterText(find.byKey(const ValueKey('account-password')), _password);
+        await _submit(p);
+        await p.shoot();
+      });
+    }
 
     preview(
       login,
@@ -158,7 +210,7 @@ void authPreviews() {
       'An email and password that don\'t match an account.',
       [es1, ca2],
       (p) async {
-        final app = await _signedOut(p);
+        final app = await _emailForm(p);
         app.api.handlers['POST auth/login/'] = (_) => throw ApiException(
           401,
           'Email or password is incorrect.',
@@ -176,7 +228,7 @@ void authPreviews() {
       'Signing in with no connection.',
       [es1],
       (p) async {
-        final app = await _signedOut(p);
+        final app = await _emailForm(p);
         app.api.handlers['POST auth/login/'] =
             (_) => throw ApiException(0, ApiClient.offlineMessage);
         await _fill(p);
@@ -191,7 +243,7 @@ void authPreviews() {
       'Too many attempts: wait 15 minutes.',
       [es1],
       (p) async {
-        final app = await _signedOut(p);
+        final app = await _emailForm(p);
         app.api.handlers['POST auth/login/'] = (_) => throw ApiException(
           429,
           'Request was throttled.',
@@ -210,7 +262,7 @@ void authPreviews() {
       'Creating an account with an email that already has one: sign in or recover instead.',
       [es2],
       (p) async {
-        final app = await _signedOut(p);
+        final app = await _emailForm(p);
         app.api.handlers['POST auth/register/'] = (_) => throw ApiException(
           400,
           'email: An account with this email already exists.',
@@ -231,7 +283,7 @@ void authPreviews() {
       'Iniciar sesión tapped with nothing typed: what each field needs.',
       [es2],
       (p) async {
-        await _signedOut(p);
+        await _emailForm(p);
         await _submit(p);
         await p.shoot();
       },

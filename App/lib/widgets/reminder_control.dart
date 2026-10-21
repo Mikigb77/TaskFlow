@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/notification_service.dart';
+import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/models/task.dart';
@@ -36,6 +38,31 @@ bool _cannotFire(
   if (settings == null || !hasDate || minutes == -1) return false;
   if (!hasTime && (time ?? settings.dateOnlyTime) == null) return false;
   return !settings.enabled || !permission;
+}
+
+/// True when reminders are on here and [task] has a reminder, but its alert
+/// time is already past: a task without a time for today after its 9:00, a
+/// timed task inside its lead time, or a day gone by. Nothing will ring.
+bool _alertPassed(WidgetRef ref, Task? task) {
+  final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+  if (task == null ||
+      settings == null ||
+      !settings.enabled ||
+      task.isCompleted ||
+      task.reminderDate == null ||
+      task.reminderMinutes == -1) {
+    return false;
+  }
+  if (task.reminderHasTime
+      ? (task.reminderMinutes ?? settings.leadMinutes) < 0
+      : (task.reminderTime ?? settings.dateOnlyTime) == null) {
+    return false;
+  }
+  return !ReminderEngine.alertAhead(
+    task,
+    settings,
+    ref.watch(calendarClockProvider)(),
+  );
 }
 
 /// Why the reminder line can't simply read «Recordatorio: …» on this phone:
@@ -355,6 +382,8 @@ class ReminderChip extends ConsumerWidget {
           minutes: task.reminderMinutes,
           time: task.reminderTime,
         );
+    // Last: a tap still opens the choices, where a later time can be set.
+    final passed = reason == null && !blocked && _alertPassed(ref, task);
     final minute = task.reminderTime ?? preferences.dateOnlyTime;
     final label = task.reminderMinutes == -1
         ? context.l10n.off
@@ -367,8 +396,14 @@ class ReminderChip extends ConsumerWidget {
         '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label';
     return LayoutBuilder(
       builder: (context, constraints) => ActionChip(
+        // The icon keeps its own room at any text size, so a long reading
+        // wraps in the label's width instead of the label's height.
+        avatarBoxConstraints: const BoxConstraints.tightFor(
+          width: 20,
+          height: 20,
+        ),
         avatar: Icon(
-          blocked || reason?.silent == true
+          blocked || passed || reason?.silent == true
               ? Icons.notifications_off_outlined
               : Icons.notifications_outlined,
           size: 16,
@@ -396,6 +431,8 @@ class ReminderChip extends ConsumerWidget {
                   )
                 : blocked
                 ? context.l10n.noReminderTurnOn
+                : passed
+                ? context.l10n.noReminderTimePassed
                 : context.l10n.reminderValue(value),
             softWrap: true,
             maxLines: 10,
@@ -431,6 +468,10 @@ class ReminderControl extends ConsumerWidget {
 
   /// The task's project and person, which decide whether this phone rings.
   final Task? task;
+
+  /// The task's dates and repeat as they'd be saved, which decide whether its
+  /// alert time has already passed.
+  final Task? schedule;
   final ValueChanged<int?> onMinutes;
   final ValueChanged<int?> onTime;
   const ReminderControl({
@@ -440,6 +481,7 @@ class ReminderControl extends ConsumerWidget {
     this.minutes,
     this.time,
     this.task,
+    this.schedule,
     required this.onMinutes,
     required this.onTime,
   });
@@ -448,6 +490,23 @@ class ReminderControl extends ConsumerWidget {
     final preferences = ref.watch(reminderPreferencesProvider);
     final settings = preferences.valueOrNull ?? const ReminderPreferences();
     final reason = hasDate ? _reasonFor(ref, task) : null;
+    final blocked =
+        reason == null &&
+        _cannotFire(
+          ref,
+          hasDate: hasDate,
+          hasTime: hasTime,
+          minutes: minutes,
+          time: time,
+        );
+    final passed =
+        hasDate &&
+        reason == null &&
+        !blocked &&
+        _alertPassed(
+          ref,
+          schedule?.copyWith(reminderMinutes: minutes, reminderTime: time),
+        );
     final minute = time ?? settings.dateOnlyTime;
     final value = hasTime
         ? '${context.reminderLead(minutes ?? settings.leadMinutes)}${minutes == null ? ' · ${context.l10n.defaultChoice}' : ''}'
@@ -490,7 +549,7 @@ class ReminderControl extends ConsumerWidget {
                             ? null
                             : value,
                       ) ??
-                      value,
+                      (passed ? context.l10n.noReminderTimePassed : value),
           ),
           trailing: onTap == null
               ? null
@@ -499,14 +558,7 @@ class ReminderControl extends ConsumerWidget {
         ),
         if (preferences.hasError) Text(context.l10n.reminderDefaultsError),
         if (preferences.isLoading) Text(context.l10n.loadingReminders),
-        if (reason == null &&
-            _cannotFire(
-              ref,
-              hasDate: hasDate,
-              hasTime: hasTime,
-              minutes: minutes,
-              time: time,
-            ))
+        if (blocked)
           TextButton.icon(
             onPressed: () => turnOnReminders(context),
             icon: const Icon(Icons.notifications_off_outlined, size: 18),

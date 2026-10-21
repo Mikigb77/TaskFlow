@@ -2302,6 +2302,12 @@ abstract class AppLocalizations {
   /// **'No reminder: project archived'**
   String get noReminderProjectArchived;
 
+  /// Reminder chip and form row when reminders are on but the task's alert time (its own or the default, such as 9:00 for a task without a time) has already gone by, so nothing will ring. Tapping it opens the reminder choices, where a later time can be picked.
+  ///
+  /// In en, this message translates to:
+  /// **'No reminder: the alert time has passed'**
+  String get noReminderTimePassed;
+
   /// No description provided for @fileLocal.
   ///
   /// In en, this message translates to:
@@ -2662,6 +2668,12 @@ abstract class AppLocalizations {
   /// **'If {email} has an account, an email with a code is on its way. Type it here.'**
   String recoveryEmailRequested(String email);
 
+  /// Recovery, shown above the recovery code field instead of recoveryEmailRequested when the code typed had expired or was locked: the app asked for a new code for that address at once and cleared the field. Names the address without saying whether it has an account.
+  ///
+  /// In en, this message translates to:
+  /// **'That code no longer works. If {email} has an account, a new one is on its way.'**
+  String recoveryCodeRenewed(String email);
+
   /// No description provided for @passwordResetComplete.
   ///
   /// In en, this message translates to:
@@ -2686,7 +2698,7 @@ abstract class AppLocalizations {
   /// **'Code'**
   String get verifyEmailCode;
 
-  /// Under the code field when Confirm is tapped with fewer than 6 digits typed.
+  /// Under the code field when Confirm is tapped with fewer than 6 digits typed. Also under the recovery code field when Save new password is tapped without 6 digits.
   ///
   /// In en, this message translates to:
   /// **'The code has 6 digits'**
@@ -2734,7 +2746,7 @@ abstract class AppLocalizations {
   /// **'We’ve sent you a new code. If you can’t see it, check Spam or Promotions.'**
   String get verifyEmailResent;
 
-  /// Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line.
+  /// Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line. Also under the recovery code field when the server says the recovery code is wrong; the new password typed stays.
   ///
   /// In en, this message translates to:
   /// **'That code isn’t right. Check the newest email we sent.'**
@@ -3442,11 +3454,17 @@ abstract class AppLocalizations {
   /// **'It’s how people you share projects with will see you.'**
   String get nameAskBody;
 
-  /// Label of the name field in the name sheet; prefilled from the email.
+  /// Label of the name field in the name sheet, prefilled from the email; also the title of the name row in the Account screen, over the person's name.
   ///
   /// In en, this message translates to:
   /// **'Name'**
   String get nameAskField;
+
+  /// Account screen: the name row's title when the account has no name yet; opens the name sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your name'**
+  String get accountAddName;
 
   /// Closes the name sheet without saving; it isn't asked again.
   ///
@@ -4942,6 +4960,12 @@ abstract class AppLocalizations {
   /// **'Continue with Google'**
   String get continueWithGoogle;
 
+  /// Sign-in's first screen, a text button under Continue with Google: shows the email and password form in place.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with email'**
+  String get continueWithEmail;
+
   /// Sign-in, above Continue with Google, while an invitation link opened before signing in waits: the invitation only works for the address it was sent to.
   ///
   /// In en, this message translates to:
@@ -4995,12 +5019,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I already have a code'**
   String get authHaveRecoveryCode;
-
-  /// No description provided for @authEnterRecoveryCode.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the code from your recovery email.'**
-  String get authEnterRecoveryCode;
 
   /// No description provided for @useTestAccount.
   ///

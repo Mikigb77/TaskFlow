@@ -1247,6 +1247,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     minutes: _reminderMinutes,
     time: _reminderTime,
     task: _responsibility,
+    schedule: _repeatTask.copyWith(
+      exceptions: _exceptions,
+      completedDates: widget.task.completedDates,
+      isCompleted: widget.task.isCompleted,
+    ),
     onMinutes: (value) => setState(() => _reminderMinutes = value),
     onTime: (value) => setState(() => _reminderTime = value),
   );

@@ -738,6 +738,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 hasTime: task.reminderHasTime,
                 minutes: task.reminderMinutes,
                 time: task.reminderTime,
+                schedule: task,
                 onMinutes: (value) {
                   if (widget.enabled) {
                     _change(task.copyWith(reminderMinutes: value));

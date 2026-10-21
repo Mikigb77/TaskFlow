@@ -1343,6 +1343,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noReminderProjectArchived => 'No reminder: project archived';
 
   @override
+  String get noReminderTimePassed => 'No reminder: the alert time has passed';
+
+  @override
   String get fileLocal => 'Only on this device';
 
   @override
@@ -1546,6 +1549,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String recoveryEmailRequested(String email) {
     return 'If $email has an account, an email with a code is on its way. Type it here.';
+  }
+
+  @override
+  String recoveryCodeRenewed(String email) {
+    return 'That code no longer works. If $email has an account, a new one is on its way.';
   }
 
   @override
@@ -2043,6 +2051,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nameAskField => 'Name';
+
+  @override
+  String get accountAddName => 'Add your name';
 
   @override
   String get nameAskNotNow => 'Not now';
@@ -3197,6 +3208,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get continueWithGoogle => 'Continue with Google';
 
   @override
+  String get continueWithEmail => 'Continue with email';
+
+  @override
   String get invitationWaitingSignIn =>
       'You have an invitation. Sign in with the email address it was sent to.';
 
@@ -3245,10 +3259,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authHaveRecoveryCode => 'I already have a code';
-
-  @override
-  String get authEnterRecoveryCode =>
-      'Enter the code from your recovery email.';
 
   @override
   String get useTestAccount => 'Use test account';

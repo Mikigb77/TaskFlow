@@ -85,6 +85,27 @@ Future<void> askForNameOnce(
   }
 }
 
+/// Opens the name sheet from Cuenta, filled in with the account's name, or
+/// with a guess from its email when it has none. It neither checks nor sets
+/// the asked-once flag. A saved name reaches the people chips and «Creada
+/// por» at once.
+Future<void> editName(BuildContext context) async {
+  final container = ProviderScope.containerOf(context, listen: false);
+  final account = container.read(authProvider).account;
+  if (account == null) return;
+  final name = account.firstName.trim();
+  final saved = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _NameAskSheet(
+      suggestion: name.isNotEmpty ? name : suggestedName(account.email),
+    ),
+  );
+  if (saved == true) container.invalidate(taskListsProvider);
+}
+
 /// A first guess at a name, from [email]'s part before the @: up to its
 /// first dot, underscore, hyphen, plus or digit, with a capital first
 /// letter («paul.smith84» → «Paul»). Fewer than 2 letters left gives the

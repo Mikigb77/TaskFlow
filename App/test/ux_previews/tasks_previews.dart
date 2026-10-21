@@ -8,6 +8,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/tasks_with_files_screen.dart';
 import 'package:agenda/services/attachment_store.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:flutter/material.dart';
@@ -58,6 +59,7 @@ const detail = Screen(
     'lib/widgets/attachment_panel.dart',
     'lib/widgets/task_assignment_picker.dart',
     'lib/widgets/task_list_picker.dart',
+    'lib/widgets/reminder_control.dart',
   ],
 );
 
@@ -590,6 +592,43 @@ void tasksPreviews() {
           projects: allProjects,
         );
         await app.push('/taskDetails', arguments: 76);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
+      'alert-passed',
+      'A task for today with no time, opened at 09:41 with reminders on: its 9:00 alert has passed, so the chip says there’s no reminder.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 77,
+              title: 'Llamar a Marta',
+              dueDate: day(0),
+              hasTime: false,
+              priority: 1,
+            ),
+          ],
+          projects: allProjects,
+          reminders: const ReminderPreferences(
+            enabled: true,
+            dateOnlyTime: 540,
+            asked: true,
+          ),
+        );
+        await app.push('/taskDetails', arguments: 77);
+        // The chip in view, below the date at large text.
+        await p.tester.scrollUntilVisible(
+          find.text(p.l.noReminderTimePassed),
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

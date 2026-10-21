@@ -1369,6 +1369,10 @@ class AppLocalizationsCa extends AppLocalizations {
   String get noReminderProjectArchived => 'Sense recordatori: projecte arxivat';
 
   @override
+  String get noReminderTimePassed =>
+      'Sense recordatori: l’hora de l’avís ja ha passat';
+
+  @override
   String get fileLocal => 'Només en aquest dispositiu';
 
   @override
@@ -1574,6 +1578,11 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String recoveryEmailRequested(String email) {
     return 'Si $email té compte, t’arribarà un correu amb un codi. Escriu-lo aquí.';
+  }
+
+  @override
+  String recoveryCodeRenewed(String email) {
+    return 'Aquest codi ja no serveix. Si $email té compte, te n’arribarà un de nou.';
   }
 
   @override
@@ -2076,6 +2085,9 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get nameAskField => 'Nom';
+
+  @override
+  String get accountAddName => 'Afegeix el teu nom';
 
   @override
   String get nameAskNotNow => 'Ara no';
@@ -3266,6 +3278,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get continueWithGoogle => 'Continua amb Google';
 
   @override
+  String get continueWithEmail => 'Continua amb el correu';
+
+  @override
   String get invitationWaitingSignIn =>
       'Tens una invitació. Entra amb el correu on l’has rebuda.';
 
@@ -3314,10 +3329,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get authHaveRecoveryCode => 'Ja tinc un codi';
-
-  @override
-  String get authEnterRecoveryCode =>
-      'Introdueix el codi del correu de recuperació.';
 
   @override
   String get useTestAccount => 'Entrar amb un compte de prova';

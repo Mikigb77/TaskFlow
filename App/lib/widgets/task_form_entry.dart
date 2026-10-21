@@ -13,9 +13,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// tasks once there is no mic, or from the capture sheet's `Escribir`. The
 /// first time in a month that its free dictations are used up, a notice
 /// says why first, once; it offers the form and Pro. [words] are words
-/// already heard, typed or shared, for the title and notes; [spoken] marks
-/// words dictated, heard at [heardAt], whose day and time the form reads;
-/// [captureId] is the capture that keeps them until the task is saved.
+/// already heard, typed or shared, for the title and notes; [readsDates]
+/// marks words dictated or shared, heard or shared at [heardAt], whose day
+/// and time the form reads; [captureId] is the capture that keeps them
+/// until the task is saved.
 /// [person] is the person whose chip is on, on the shared project's page it
 /// opens from: a task going into [projectId] is theirs (D7).
 /// [askedToSpeak]
@@ -30,7 +31,7 @@ Future<void> openTaskForm(
   Object? page,
   bool showCalendar = false,
   String words = '',
-  bool spoken = false,
+  bool readsDates = false,
   DateTime? heardAt,
   String? captureId,
   bool askedToSpeak = false,
@@ -71,7 +72,7 @@ Future<void> openTaskForm(
         page: page,
         showCalendar: showCalendar,
         words: words,
-        spoken: spoken,
+        readsDates: readsDates,
         heardAt: heardAt,
         captureId: captureId,
         askedToSpeak: askedToSpeak,

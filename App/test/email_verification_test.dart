@@ -278,12 +278,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// «Continuar con mi correo», where a fresh sign-in folds the email form
+  /// behind it; already open after create, recovery or the confirm screen.
+  Future<void> openEmailForm(WidgetTester tester) async {
+    final open = find.byKey(const ValueKey('continue-with-email'));
+    if (open.evaluate().isNotEmpty) await tapVisible(tester, open);
+  }
+
   /// Crear una cuenta, with [address] and [typedPassword].
   Future<void> createAccount(
     WidgetTester tester,
     AppLocalizations l, {
     String address = 'Ana@Example.invalid',
   }) async {
+    await openEmailForm(tester);
     await tapVisible(tester, find.text(l.createAnAccount));
     expect(find.text(l.registerHeading), findsOneWidget);
     await tester.enterText(email, address);
@@ -296,6 +304,7 @@ void main() {
     WidgetTester tester, {
     String address = 'ana@example.invalid',
   }) async {
+    await openEmailForm(tester);
     await tester.enterText(email, address);
     await tester.enterText(password, typedPassword);
     await tapVisible(tester, submit);
@@ -2383,6 +2392,7 @@ void main() {
           .flagsCollection;
       expect(signIn.namesRoute, isTrue, reason: 'sign-in');
       expect(signIn.isHeader, isTrue);
+      await openEmailForm(tester);
       await tapVisible(tester, find.text(es.createAnAccount));
       expect(
         tester
@@ -2500,6 +2510,7 @@ void main() {
         }
 
         await expectWhole(l.signInHeading);
+        await openEmailForm(tester);
         await tapVisible(tester, find.text(l.forgotPassword).first);
         await expectWhole(l.recoveryHeading);
         await tester.pumpWidget(const SizedBox());

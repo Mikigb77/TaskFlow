@@ -53,8 +53,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _hasRecoveryCode = false;
   // Where recovery just sent its code: said above the code field.
   String? _sentTo;
+  // The code typed had expired, so a new one was asked for: the line above
+  // the code field says so.
+  bool _codeRenewed = false;
+  // The server said the code typed is wrong: said under the code field
+  // until it changes.
+  bool _codeWrong = false;
   bool _busy = false;
   bool _showPassword = false;
+  // The email form shows, rather than only Google and «Continuar con mi
+  // correo». Once open, it stays open until Back folds it.
+  bool _emailOpen = false;
   // Reached sign-in from create's email-in-use answer, so this email has an
   // account: wrong credentials mean a forgotten password, not a new account.
   bool _accountExists = false;
@@ -68,12 +77,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordField = GlobalKey();
   final _outcome = GlobalKey();
   final _sent = GlobalKey();
+  final _codeField = GlobalKey();
+  final _codeFocus = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _server = TextEditingController(text: ref.read(apiClientProvider).baseUrl);
     if (widget.signInAgain) {
+      _emailOpen = true;
       _email.text = ref.read(authProvider).account?.email ?? '';
     } else {
       unawaited(_resumeConfirming());
@@ -98,6 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       controller.dispose();
     }
     _emailFocus.dispose();
+    _codeFocus.dispose();
     super.dispose();
   }
 
@@ -113,9 +126,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _register = register;
       _recover = recover;
       _accountExists = accountExists;
+      // Create and recovery come back to the open form.
+      _emailOpen = true;
       _hasRecoveryCode = false;
       _sentTo = null;
+      _codeRenewed = false;
+      _codeWrong = false;
       _code.clear();
+      _message = null;
+      _replaced = false;
+      _error = null;
+      _form = GlobalKey<FormState>();
+    });
+  }
+
+  /// Google can sign in here, so the email form can wait behind «Continuar
+  /// con mi correo». Sign-in again keeps it open: it has the email filled.
+  bool get _canFold {
+    final google = ref.read(googleSignInServiceProvider);
+    return !widget.signInAgain && google.supported && google.configured;
+  }
+
+  /// Only Google and «Continuar con mi correo» show: the first screen.
+  bool get _folded => !_emailOpen && !_register && !_recover && _canFold;
+
+  /// «Continuar con mi correo»: today's form in place, ready to type.
+  void _openEmail() {
+    setState(() => _emailOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _emailFocus.requestFocus();
+    });
+  }
+
+  /// Back from the open form folds it again, as create and recovery go back
+  /// to sign-in.
+  void _fold() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    ref.read(authProvider.notifier).clearError();
+    setState(() {
+      _emailOpen = false;
+      _accountExists = false;
       _message = null;
       _replaced = false;
       _error = null;
@@ -132,6 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
       _message = null;
       _replaced = false;
+      _codeWrong = false;
     });
     try {
       await action();
@@ -143,12 +194,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (mounted) _reveal();
   }
 
-  bool get _showsEmail => !_recover || !_hasRecoveryCode;
+  // With a code but none asked for here («Ya tengo un código»), the email
+  // shows too: the code is checked against its address.
+  bool get _showsEmail => !_recover || !_hasRecoveryCode || _sentTo == null;
   bool get _showsPassword => !_recover || _hasRecoveryCode;
 
   /// The visible field a server answer is about, so it shows on that field.
   _Field? _fieldFor(Object? error) {
-    if (error == null || error is GoogleSignInProblem) return null;
+    if (error == null || error is GoogleSignInProblem || _folded) return null;
     return switch (requestProblem(error)) {
       'email' || 'emailUsed' when _showsEmail => _Field.email,
       'password' when _showsPassword => _Field.password,
@@ -166,12 +219,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// text.
   void _reveal() {
     final error = _error ?? ref.read(authProvider).error;
-    if (error == null && _message == null && _sentTo == null) return;
-    final key = switch (_fieldFor(error)) {
-      _Field.email => _emailField,
-      _Field.password => _passwordField,
-      null => error == null && _message == null ? _sent : _outcome,
-    };
+    if (error == null && _message == null && _sentTo == null && !_codeWrong) {
+      return;
+    }
+    final key = _codeWrong
+        ? _codeField
+        : switch (_fieldFor(error)) {
+            _Field.email => _emailField,
+            _Field.password => _passwordField,
+            null => error == null && _message == null ? _sent : _outcome,
+          };
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 250);
@@ -262,42 +319,96 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  /// How the server refused a recovery code: `code_expired` (unknown,
+  /// expired, or tried too often) or `code_invalid` for a wrong one and any
+  /// other answer about the code, as on the verify screen. Null for every
+  /// other problem.
+  static String? _codeRefusal(ApiException error) {
+    if (error.status != 400) return null;
+    return switch (error.body?['code']) {
+      'code_expired' => 'code_expired',
+      _ when error.body?.containsKey('code') == true => 'code_invalid',
+      _ => null,
+    };
+  }
+
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     final password = _password.text;
     // Recovery's email in the app's language, as sign-in's.
     final language = Localizations.localeOf(context).languageCode;
     String? unconfirmed;
+    var renewed = false;
     await _run(() async {
       final api = ref.read(apiClientProvider);
       await api.setServer(_server.text);
       if (_recover) {
-        final confirming = _hasRecoveryCode;
-        await api.request(
+        // The address the code went to, or the one typed with it.
+        final email = _sentTo ?? _email.text.trim();
+        Future<void> requestCode() => api.request(
           'POST',
-          confirming ? 'auth/password-reset/confirm/' : 'auth/password-reset/',
+          'auth/password-reset/',
           authenticated: false,
-          data: confirming
-              ? {'code': _code.text.trim(), 'password': _password.text}
-              : {'email': _email.text.trim(), 'language': language},
+          data: {'email': email, 'language': language},
         );
-        if (!mounted) return;
-        if (confirming) {
-          // Back to sign-in, ready to use the new password.
-          final password = _password.text;
-          _mode();
-          _password.text = password;
-          setState(() => _message = context.l10n.passwordResetComplete);
-        } else {
+        if (!_hasRecoveryCode) {
+          await requestCode();
+          if (!mounted) return;
           setState(() {
             _hasRecoveryCode = true;
-            _sentTo = _email.text.trim();
+            _sentTo = email;
           });
+          return;
         }
+        try {
+          await api.request(
+            'POST',
+            'auth/password-reset/confirm/',
+            authenticated: false,
+            data: {
+              'email': email,
+              'code': _code.text,
+              'password': _password.text,
+            },
+          );
+        } on ApiException catch (error) {
+          switch (_codeRefusal(error)) {
+            case 'code_invalid':
+              // The new password typed stays.
+              if (mounted) setState(() => _codeWrong = true);
+              return;
+            case 'code_expired':
+              // A new code at once, as sign-up does for a spent one; if
+              // asking fails, its own answer shows instead.
+              _code.clear();
+              if (mounted) setState(() => _codeRenewed = false);
+              await requestCode();
+              if (!mounted) return;
+              setState(() {
+                _sentTo = email;
+                _codeRenewed = true;
+              });
+              renewed = true;
+              return;
+          }
+          rethrow;
+        }
+        if (!mounted) return;
+        // Back to sign-in, ready to use the new password.
+        final password = _password.text;
+        _mode();
+        _password.text = password;
+        setState(() => _message = context.l10n.passwordResetComplete);
         return;
       }
       unconfirmed = await _signIn(_email.text, password, register: _register);
     });
+    // Ready for the new code, once the field is enabled again.
+    if (renewed && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _codeFocus.requestFocus();
+      });
+    }
     if (unconfirmed != null && mounted) {
       await _confirmEmail(unconfirmed!, password: password);
     }
@@ -397,11 +508,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : _register
         ? strings.createAccount
         : strings.signIn;
+    final folded = _folded;
     // Create and recover behave like screens on top of sign-in: Back returns.
+    // The open email form folds back behind «Continuar con mi correo».
     return PopScope(
-      canPop: !_register && !_recover,
+      canPop: !_register && !_recover && (!_emailOpen || !_canFold),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !busy && (_register || _recover)) _mode();
+        if (didPop || busy) return;
+        if (_register || _recover) {
+          _mode();
+        } else if (_emailOpen && _canFold) {
+          _fold();
+        }
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: Theme.of(context).appBarTheme.systemOverlayStyle!,
@@ -495,282 +613,345 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                                   ),
                                 ),
-                              const SizedBox(height: 20),
-                              // Seen, not read: «o» alone means nothing.
-                              ExcludeSemantics(
-                                child: Row(
-                                  children: [
-                                    const Expanded(child: Divider()),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                      ),
-                                      child: Text(
-                                        strings.authOr,
-                                        style: TextStyle(
-                                          color: colors.onSurfaceVariant,
-                                          fontSize: 12,
+                              if (folded) ...[
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  key: const ValueKey('continue-with-email'),
+                                  onPressed: busy ? null : _openEmail,
+                                  child: Text(
+                                    strings.continueWithEmail,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ] else ...[
+                                const SizedBox(height: 20),
+                                // Seen, not read: «o» alone means nothing.
+                                ExcludeSemantics(
+                                  child: Row(
+                                    children: [
+                                      const Expanded(child: Divider()),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                        ),
+                                        child: Text(
+                                          strings.authOr,
+                                          style: TextStyle(
+                                            color: colors.onSurfaceVariant,
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const Expanded(child: Divider()),
-                                  ],
+                                      const Expanded(child: Divider()),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 20),
+                                const SizedBox(height: 20),
+                              ],
                             ],
-                            Form(
-                              key: _form,
-                              child: AutofillGroup(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (_showsEmail) ...[
-                                      KeyedSubtree(
-                                        key: _emailField,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            TextFormField(
-                                              key: const ValueKey(
-                                                'account-email',
-                                              ),
-                                              controller: _email,
-                                              focusNode: _emailFocus,
-                                              enabled: !busy,
-                                              keyboardType:
-                                                  TextInputType.emailAddress,
-                                              autocorrect: false,
-                                              autofillHints: const [
-                                                AutofillHints.username,
-                                              ],
-                                              textInputAction: _recover
-                                                  ? TextInputAction.done
-                                                  : TextInputAction.next,
-                                              onFieldSubmitted: _recover
-                                                  ? (_) => _submit()
-                                                  : null,
-                                              onChanged: (_) {
-                                                if (_accountExists) {
-                                                  setState(
-                                                    () =>
-                                                        _accountExists = false,
-                                                  );
-                                                }
-                                                if (emailError != null) {
-                                                  _clearProblem();
-                                                }
-                                              },
-                                              decoration: InputDecoration(
-                                                labelText: strings.email,
-                                                // Above the field, at its
-                                                // smaller size: whole at 2×.
-                                                floatingLabelBehavior:
-                                                    FloatingLabelBehavior
-                                                        .always,
-                                                errorText: emailError,
-                                                errorMaxLines: 4,
-                                              ),
-                                              validator: (value) =>
-                                                  value == null ||
-                                                      !value.contains('@')
-                                                  ? strings.enterEmail
-                                                  : null,
-                                            ),
-                                            if (emailUsed) ...[
-                                              const SizedBox(height: 12),
-                                              OutlinedButton(
+                            if (!folded)
+                              Form(
+                                key: _form,
+                                child: AutofillGroup(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (_showsEmail) ...[
+                                        KeyedSubtree(
+                                          key: _emailField,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              TextFormField(
                                                 key: const ValueKey(
-                                                  'sign-in-with-email',
+                                                  'account-email',
                                                 ),
+                                                controller: _email,
+                                                focusNode: _emailFocus,
+                                                enabled: !busy,
+                                                keyboardType:
+                                                    TextInputType.emailAddress,
+                                                autocorrect: false,
+                                                autofillHints: const [
+                                                  AutofillHints.username,
+                                                ],
+                                                textInputAction:
+                                                    _recover &&
+                                                        !_hasRecoveryCode
+                                                    ? TextInputAction.done
+                                                    : TextInputAction.next,
+                                                onFieldSubmitted:
+                                                    _recover &&
+                                                        !_hasRecoveryCode
+                                                    ? (_) => _submit()
+                                                    : null,
+                                                onChanged: (_) {
+                                                  if (_accountExists) {
+                                                    setState(
+                                                      () => _accountExists =
+                                                          false,
+                                                    );
+                                                  }
+                                                  if (emailError != null) {
+                                                    _clearProblem();
+                                                  }
+                                                },
+                                                decoration: InputDecoration(
+                                                  labelText: strings.email,
+                                                  // Above the field, at its
+                                                  // smaller size: whole at 2×.
+                                                  floatingLabelBehavior:
+                                                      FloatingLabelBehavior
+                                                          .always,
+                                                  errorText: emailError,
+                                                  errorMaxLines: 4,
+                                                ),
+                                                validator: (value) =>
+                                                    value == null ||
+                                                        !value.contains('@')
+                                                    ? strings.enterEmail
+                                                    : null,
+                                              ),
+                                              if (emailUsed) ...[
+                                                const SizedBox(height: 12),
+                                                OutlinedButton(
+                                                  key: const ValueKey(
+                                                    'sign-in-with-email',
+                                                  ),
+                                                  onPressed: busy
+                                                      ? null
+                                                      : () => _mode(
+                                                          accountExists: true,
+                                                        ),
+                                                  child: Text(
+                                                    strings.signInWithEmail,
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
+                                      if (_recover && _hasRecoveryCode) ...[
+                                        if (_sentTo case final sentTo?) ...[
+                                          MessageBanner(
+                                            _codeRenewed
+                                                ? strings.recoveryCodeRenewed(
+                                                    breakableAddress(sentTo),
+                                                  )
+                                                : strings
+                                                      .recoveryEmailRequested(
+                                                        breakableAddress(
+                                                          sentTo,
+                                                        ),
+                                                      ),
+                                            key: _sent,
+                                            icon: Icons.mail_outline_rounded,
+                                            // The answer to the code typed:
+                                            // read out as it appears.
+                                            liveRegion: _codeRenewed,
+                                          ),
+                                          const SizedBox(height: 16),
+                                        ],
+                                        KeyedSubtree(
+                                          key: _codeField,
+                                          child: TextFormField(
+                                            key: const ValueKey(
+                                              'account-recovery-code',
+                                            ),
+                                            controller: _code,
+                                            focusNode: _codeFocus,
+                                            enabled: !busy,
+                                            // The verify screen's setup: the
+                                            // number pad, the code autofilled.
+                                            keyboardType: TextInputType.number,
+                                            autofillHints: const [
+                                              AutofillHints.oneTimeCode,
+                                            ],
+                                            autocorrect: false,
+                                            enableSuggestions: false,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter
+                                                  .digitsOnly,
+                                              LengthLimitingTextInputFormatter(
+                                                VerifyEmailScreen.codeLength,
+                                              ),
+                                            ],
+                                            onChanged: (_) {
+                                              if (_codeWrong) {
+                                                setState(
+                                                  () => _codeWrong = false,
+                                                );
+                                              }
+                                            },
+                                            textInputAction:
+                                                TextInputAction.next,
+                                            decoration: InputDecoration(
+                                              // On the border like the other
+                                              // fields. At large text it is the
+                                              // longest label: it shrinks to
+                                              // stay whole rather than cut.
+                                              label: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: AlignmentDirectional
+                                                    .centerStart,
+                                                child: Text(
+                                                  strings.recoveryCode,
+                                                ),
+                                              ),
+                                              floatingLabelBehavior:
+                                                  FloatingLabelBehavior.always,
+                                              errorText: _codeWrong
+                                                  ? strings
+                                                        .verifyEmailCodeInvalid
+                                                  : null,
+                                              errorMaxLines: 4,
+                                            ),
+                                            validator: (value) =>
+                                                value == null ||
+                                                    value.length !=
+                                                        VerifyEmailScreen
+                                                            .codeLength
+                                                ? strings.verifyEmailCodeLength
+                                                : null,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
+                                      if (_showsPassword)
+                                        KeyedSubtree(
+                                          key: _passwordField,
+                                          child: TextFormField(
+                                            key: const ValueKey(
+                                              'account-password',
+                                            ),
+                                            controller: _password,
+                                            enabled: !busy,
+                                            obscureText: !_showPassword,
+                                            enableSuggestions: false,
+                                            autocorrect: false,
+                                            textInputAction:
+                                                TextInputAction.done,
+                                            onFieldSubmitted: (_) => _submit(),
+                                            onChanged: (_) {
+                                              if (passwordError != null) {
+                                                _clearProblem();
+                                              }
+                                            },
+                                            autofillHints: [
+                                              _register || _recover
+                                                  ? AutofillHints.newPassword
+                                                  : AutofillHints.password,
+                                            ],
+                                            decoration: InputDecoration(
+                                              labelText: _recover
+                                                  ? strings.newPassword
+                                                  : strings.password,
+                                              floatingLabelBehavior:
+                                                  FloatingLabelBehavior.always,
+                                              errorText: passwordError,
+                                              errorMaxLines: 6,
+                                              helperMaxLines: 3,
+                                              helperText: _register || _recover
+                                                  ? strings.passwordHelp
+                                                  : null,
+                                              suffixIcon: IconButton(
+                                                tooltip: _showPassword
+                                                    ? strings.hidePassword
+                                                    : strings.showPassword,
                                                 onPressed: busy
                                                     ? null
-                                                    : () => _mode(
-                                                        accountExists: true,
+                                                    : () => setState(
+                                                        () => _showPassword =
+                                                            !_showPassword,
                                                       ),
+                                                icon: Icon(
+                                                  _showPassword
+                                                      ? Icons
+                                                            .visibility_off_outlined
+                                                      : Icons
+                                                            .visibility_outlined,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                            ),
+                                            // Length rules are for new passwords;
+                                            // signing in only needs one typed.
+                                            validator: (value) =>
+                                                !_register && !_recover
+                                                ? value == null || value.isEmpty
+                                                      ? strings.enterPassword
+                                                      : null
+                                                : value == null ||
+                                                      value.length < 12
+                                                ? strings.passwordTooShort
+                                                : null,
+                                          ),
+                                        ),
+                                      // Hidden while the banner offers the same
+                                      // recovery as a button (UX-495).
+                                      if (!_recover &&
+                                          !_register &&
+                                          !(unknownAccount && _accountExists))
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton(
+                                              onPressed: busy
+                                                  ? null
+                                                  : () => _mode(recover: true),
+                                              child: Text(
+                                                strings.forgotPassword,
+                                                textAlign: TextAlign.end,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        const SizedBox(height: 20),
+                                      FilledButton(
+                                        key: const ValueKey('account-submit'),
+                                        onPressed: busy ? null : _submit,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              if (busy) ...[
+                                                const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                ),
+                                                const SizedBox(width: 10),
+                                              ],
+                                              Flexible(
                                                 child: Text(
-                                                  strings.signInWithEmail,
+                                                  submitLabel,
                                                   textAlign: TextAlign.center,
                                                 ),
                                               ),
                                             ],
-                                          ],
+                                          ),
                                         ),
                                       ),
-                                      const SizedBox(height: 16),
                                     ],
-                                    if (_recover && _hasRecoveryCode) ...[
-                                      if (_sentTo case final sentTo?) ...[
-                                        MessageBanner(
-                                          strings.recoveryEmailRequested(
-                                            breakableAddress(sentTo),
-                                          ),
-                                          key: _sent,
-                                          icon: Icons.mail_outline_rounded,
-                                        ),
-                                        const SizedBox(height: 16),
-                                      ],
-                                      TextFormField(
-                                        key: const ValueKey(
-                                          'account-recovery-code',
-                                        ),
-                                        controller: _code,
-                                        enabled: !busy,
-                                        autocorrect: false,
-                                        textInputAction: TextInputAction.next,
-                                        decoration: InputDecoration(
-                                          // On the border like the other
-                                          // fields. At large text it is the
-                                          // longest label: it shrinks to
-                                          // stay whole rather than cut.
-                                          label: FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: AlignmentDirectional
-                                                .centerStart,
-                                            child: Text(strings.recoveryCode),
-                                          ),
-                                          floatingLabelBehavior:
-                                              FloatingLabelBehavior.always,
-                                          errorMaxLines: 3,
-                                        ),
-                                        validator: (value) =>
-                                            value == null ||
-                                                value.trim().isEmpty
-                                            ? strings.authEnterRecoveryCode
-                                            : null,
-                                      ),
-                                      const SizedBox(height: 16),
-                                    ],
-                                    if (_showsPassword)
-                                      KeyedSubtree(
-                                        key: _passwordField,
-                                        child: TextFormField(
-                                          key: const ValueKey(
-                                            'account-password',
-                                          ),
-                                          controller: _password,
-                                          enabled: !busy,
-                                          obscureText: !_showPassword,
-                                          enableSuggestions: false,
-                                          autocorrect: false,
-                                          textInputAction: TextInputAction.done,
-                                          onFieldSubmitted: (_) => _submit(),
-                                          onChanged: (_) {
-                                            if (passwordError != null) {
-                                              _clearProblem();
-                                            }
-                                          },
-                                          autofillHints: [
-                                            _register || _recover
-                                                ? AutofillHints.newPassword
-                                                : AutofillHints.password,
-                                          ],
-                                          decoration: InputDecoration(
-                                            labelText: _recover
-                                                ? strings.newPassword
-                                                : strings.password,
-                                            floatingLabelBehavior:
-                                                FloatingLabelBehavior.always,
-                                            errorText: passwordError,
-                                            errorMaxLines: 6,
-                                            helperMaxLines: 3,
-                                            helperText: _register || _recover
-                                                ? strings.passwordHelp
-                                                : null,
-                                            suffixIcon: IconButton(
-                                              tooltip: _showPassword
-                                                  ? strings.hidePassword
-                                                  : strings.showPassword,
-                                              onPressed: busy
-                                                  ? null
-                                                  : () => setState(
-                                                      () => _showPassword =
-                                                          !_showPassword,
-                                                    ),
-                                              icon: Icon(
-                                                _showPassword
-                                                    ? Icons
-                                                          .visibility_off_outlined
-                                                    : Icons.visibility_outlined,
-                                                size: 20,
-                                              ),
-                                            ),
-                                          ),
-                                          // Length rules are for new passwords;
-                                          // signing in only needs one typed.
-                                          validator: (value) =>
-                                              !_register && !_recover
-                                              ? value == null || value.isEmpty
-                                                    ? strings.enterPassword
-                                                    : null
-                                              : value == null ||
-                                                    value.length < 12
-                                              ? strings.passwordTooShort
-                                              : null,
-                                        ),
-                                      ),
-                                    // Hidden while the banner offers the same
-                                    // recovery as a button (UX-495).
-                                    if (!_recover &&
-                                        !_register &&
-                                        !(unknownAccount && _accountExists))
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                        ),
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
-                                          child: TextButton(
-                                            onPressed: busy
-                                                ? null
-                                                : () => _mode(recover: true),
-                                            child: Text(
-                                              strings.forgotPassword,
-                                              textAlign: TextAlign.end,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      const SizedBox(height: 20),
-                                    FilledButton(
-                                      key: const ValueKey('account-submit'),
-                                      onPressed: busy ? null : _submit,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            if (busy) ...[
-                                              const SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                            ],
-                                            Flexible(
-                                              child: Text(
-                                                submitLabel,
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
                             if (_message != null ||
                                 (error != null && field == null))
                               Padding(
@@ -841,7 +1022,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 onPressed: busy ? null : () => _mode(),
                                 child: Text(strings.backToSignIn),
                               ),
-                            ] else if (!unknownAccount || _accountExists)
+                            ] else if (!folded &&
+                                (!unknownAccount || _accountExists))
                               // Hidden while the banner offers the same
                               // create as a button.
                               TextButton(

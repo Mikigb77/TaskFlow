@@ -52,6 +52,16 @@ class _Google extends GoogleSignInService {
   bool get configured => true;
 }
 
+/// «Continue with email»: a fresh sign-in folds the email form behind it,
+/// under Continue with Google.
+Future<void> _openEmailForm(WidgetTester tester) async {
+  final open = find.byKey(const ValueKey('continue-with-email'));
+  await tester.ensureVisible(open);
+  await tester.pumpAndSettle();
+  await tester.tap(open);
+  await tester.pumpAndSettle();
+}
+
 Future<(ProviderContainer, _Auth)> _open(
   WidgetTester tester, {
   ThemeMode theme = ThemeMode.light,
@@ -62,6 +72,8 @@ Future<(ProviderContainer, _Auth)> _open(
   Future<bool> Function(Uri)? openPage,
   // Invitation links opened before signing in, without Android's channel.
   InvitationLinks? invitations,
+  // Google sign-in on this phone; supported and configured by default.
+  GoogleSignInService? google,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -73,7 +85,7 @@ Future<(ProviderContainer, _Auth)> _open(
     overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => auth),
-      googleSignInServiceProvider.overrideWithValue(_Google()),
+      googleSignInServiceProvider.overrideWithValue(google ?? _Google()),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
       taskProvider.overrideWith((ref) => DesignTaskNotifier()),
       pendingCapturesProvider.overrideWith((ref) async => []),
@@ -194,11 +206,17 @@ void main() {
         await tester.pumpAndSettle();
         final email = find.byKey(const ValueKey('account-email'));
         final google = find.byKey(const ValueKey('google-sign-in'));
+        final continueWithEmail = find.byKey(
+          const ValueKey('continue-with-email'),
+        );
+        // Google first; the email fields wait behind Continue with email.
+        expect(google.hitTestable(), findsOneWidget);
+        expect(email, findsNothing);
+        expect(find.text('Create an account'), findsNothing);
         expect(
           tester.getBottomLeft(google).dy,
-          lessThan(tester.getTopLeft(email).dy),
+          lessThan(tester.getTopLeft(continueWithEmail).dy),
         );
-        expect(google.hitTestable(), findsOneWidget);
         expect(find.byTooltip('Language'), findsOneWidget);
         expect(tester.takeException(), isNull);
         if (const bool.fromEnvironment('WRITE_AUTH_PREVIEWS')) {
@@ -216,6 +234,12 @@ void main() {
             image.dispose();
           });
         }
+        await _openEmailForm(tester);
+        expect(
+          tester.getBottomLeft(google).dy,
+          lessThan(tester.getTopLeft(email).dy),
+        );
+        expect(continueWithEmail, findsNothing);
         await tester.enterText(
           find.byKey(const ValueKey('account-email')),
           'preserved@example.invalid',
@@ -266,6 +290,7 @@ void main() {
     );
     auth.finish();
     await tester.pumpAndSettle();
+    await _openEmailForm(tester);
     return client;
   }
 
@@ -503,7 +528,11 @@ void main() {
       await tapVisible(tester, submit);
       expect(api.requests.last, [
         'auth/password-reset/confirm/',
-        {'code': '123456', 'password': 'clave-nueva-2026'},
+        {
+          'email': 'ana@example.invalid',
+          'code': '123456',
+          'password': 'clave-nueva-2026',
+        },
       ]);
       expect(find.text(es.signInHeading), findsOneWidget);
       expect(
@@ -691,6 +720,7 @@ void main() {
         );
         auth.finish();
         await tester.pumpAndSettle();
+        await _openEmailForm(tester);
         await tapVisible(tester, find.text(l.createAnAccount));
         expect(find.text(l.registerHeading), findsOneWidget);
         await tester.enterText(email, 'ana@example.invalid');
@@ -758,6 +788,7 @@ void main() {
     );
     auth.finish();
     await tester.pumpAndSettle();
+    await _openEmailForm(tester);
     await tapVisible(tester, find.text(l.createAnAccount));
     expect(find.text(l.registerHeading), findsOneWidget);
     await tester.enterText(email, address);
@@ -1057,6 +1088,7 @@ void main() {
     );
     auth.finish();
     await tester.pumpAndSettle();
+    await _openEmailForm(tester);
     return opened;
   }
 
@@ -1228,6 +1260,7 @@ void main() {
     );
     auth.finish();
     await tester.pumpAndSettle();
+    await _openEmailForm(tester);
     return client;
   }
 
@@ -1265,7 +1298,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-1602: the recovery code field still accepts a 45-character uid:token value',
+    'UX-1602 (P191): the recovery code field keeps only 6 digits of a pasted uid:token value',
     (tester) async {
       final api = await openIn(tester);
       await tapVisible(tester, find.text(es.forgotPassword));
@@ -1275,12 +1308,16 @@ void main() {
       expect(code.length, 45);
       await tester.enterText(recoveryCode, code);
       await tester.pumpAndSettle();
-      expect(typed(tester, recoveryCode), code);
+      expect(typed(tester, recoveryCode), '392471');
       await tester.enterText(password, 'clave-nueva-2026-larga');
       await tapVisible(tester, submit);
       expect(api.requests.last, [
         'auth/password-reset/confirm/',
-        {'code': code, 'password': 'clave-nueva-2026-larga'},
+        {
+          'email': 'maria.lopez@example.com',
+          'code': '392471',
+          'password': 'clave-nueva-2026-larga',
+        },
       ]);
       expect(tester.takeException(), isNull);
     },
@@ -1616,6 +1653,488 @@ void main() {
       },
     );
   }
+
+  // ---- UX loop 2026-10-19-app, round 1 · P191 (UX-1602): recovery with
+  // the 6-digit code ----
+
+  const maria = 'maria.lopez@example.com';
+  const newPassword = 'clave-nueva-2026-larga';
+  TextField codeTextField(WidgetTester tester) => tester.widget<TextField>(
+    find.descendant(of: recoveryCode, matching: find.byType(TextField)),
+  );
+  bool hasFocus(WidgetTester tester, Finder field) => tester
+      .widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      )
+      .focusNode
+      .hasFocus;
+
+  /// Recovery in [l]'s language, with a code sent to [address].
+  Future<_LoginApi> recoverySent(
+    WidgetTester tester,
+    AppLocalizations l, {
+    _LoginApi? api,
+    String address = maria,
+  }) async {
+    final client = await openIn(tester, language: l.localeName, api: api);
+    await tapVisible(tester, find.text(l.forgotPassword));
+    await tester.enterText(email, address);
+    await tapVisible(tester, submit);
+    expect(recoveryCode, findsOneWidget);
+    return client;
+  }
+
+  testWidgets(
+    'UX-1602: ES, after Enviar código, the code field has the number pad and the one-time-code hint, takes digits only and stops at 6; with 5 digits Guardar contraseña nueva says «El código tiene 6 cifras» and sends nothing',
+    (tester) async {
+      final api = await recoverySent(tester, es);
+      final field = codeTextField(tester);
+      expect(field.keyboardType, TextInputType.number);
+      expect(field.autofillHints, contains(AutofillHints.oneTimeCode));
+      expect(field.autocorrect, isFalse);
+      expect(field.enableSuggestions, isFalse);
+      // Its label stays «Código de recuperación».
+      expect(
+        find.descendant(of: recoveryCode, matching: find.text(es.recoveryCode)),
+        findsOneWidget,
+      );
+      await tester.enterText(recoveryCode, '12a3-45 6789');
+      await tester.pumpAndSettle();
+      expect(typed(tester, recoveryCode), '123456');
+
+      await tester.enterText(recoveryCode, '12345');
+      await tester.enterText(password, newPassword);
+      await tester.pumpAndSettle();
+      final sent = api.requests.length;
+      await tapVisible(tester, submit);
+      expect(es.verifyEmailCodeLength, 'El código tiene 6 cifras');
+      expect(
+        find.descendant(
+          of: recoveryCode,
+          matching: find.text(es.verifyEmailCodeLength),
+        ),
+        findsOneWidget,
+      );
+      expect(api.requests.length, sent, reason: 'nothing sent');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1602: with 123456 and a 12-character password, the confirm carries the address the code went to, the code and the password; after a 200 sign-in says Contraseña actualizada',
+    (tester) async {
+      final api = await recoverySent(tester, es, address: '  $maria ');
+      expect(api.requests.last, [
+        'auth/password-reset/',
+        {'email': maria, 'language': 'es'},
+      ]);
+      await tester.enterText(recoveryCode, '123456');
+      expect('doce-letras!'.length, 12);
+      await tester.enterText(password, 'doce-letras!');
+      await tapVisible(tester, submit);
+      expect(api.requests.last, [
+        'auth/password-reset/confirm/',
+        {'email': maria, 'code': '123456', 'password': 'doce-letras!'},
+      ]);
+      expect(find.text(es.signInHeading), findsOneWidget);
+      expect(
+        es.passwordResetComplete,
+        'Contraseña actualizada. Inicia sesión con tu nueva contraseña.',
+      );
+      expect(find.text(es.passwordResetComplete), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1602: through «Ya tengo un código», with no code requested, the email field shows above the code; left empty, nothing is sent and the email field says what is missing',
+    (tester) async {
+      final api = await openIn(tester);
+      await tapVisible(tester, find.text(es.forgotPassword));
+      await tapVisible(tester, find.text(es.authHaveRecoveryCode));
+      expect(email, findsOneWidget);
+      expect(recoveryCode, findsOneWidget);
+      expect(
+        tester.getRect(email).bottom,
+        lessThanOrEqualTo(tester.getRect(recoveryCode).top),
+      );
+      await tester.enterText(recoveryCode, '123456');
+      await tester.enterText(password, newPassword);
+      final before = api.requests.length;
+      await tapVisible(tester, submit);
+      expect(api.requests.length, before, reason: 'nothing sent');
+      expect(
+        find.descendant(of: email, matching: find.text(es.enterEmail)),
+        findsOneWidget,
+      );
+
+      await tester.enterText(email, maria);
+      await tapVisible(tester, submit);
+      expect(api.requests.last, [
+        'auth/password-reset/confirm/',
+        {'email': maria, 'code': '123456', 'password': newPassword},
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1602: a 400 code_invalid says «Ese código no es correcto…» under the code field, and the new password stays typed',
+    (tester) async {
+      await recoverySent(tester, es, api: _RefusingApi('code_invalid'));
+      await tester.enterText(recoveryCode, '123456');
+      await tester.enterText(password, newPassword);
+      await tapVisible(tester, submit);
+      expect(
+        es.verifyEmailCodeInvalid,
+        'Ese código no es correcto. Mira el último correo que te hemos enviado.',
+      );
+      expect(
+        find.descendant(
+          of: recoveryCode,
+          matching: find.text(es.verifyEmailCodeInvalid),
+        ),
+        findsOneWidget,
+      );
+      expect(typed(tester, password), newPassword);
+      expect(find.text(es.signInHeading), findsNothing, reason: 'still here');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UX-1602: the renewed-code line in EN, ES and CA', () {
+    expect(
+      lookupAppLocalizations(const Locale('en')).recoveryCodeRenewed(maria),
+      'That code no longer works. If $maria has an account, a new one is on its way.',
+    );
+    expect(
+      es.recoveryCodeRenewed(maria),
+      'Ese código ya no sirve. Si $maria tiene cuenta, te llegará uno nuevo.',
+    );
+    expect(
+      lookupAppLocalizations(const Locale('ca')).recoveryCodeRenewed(maria),
+      'Aquest codi ja no serveix. Si $maria té compte, te n’arribarà un de nou.',
+    );
+  });
+
+  for (final language in ['es', 'en', 'ca']) {
+    testWidgets(
+      'UX-1602: ${language.toUpperCase()}, a 400 code_expired asks for a new code for the same address and language at once; the code field is empty and focused, and the line above it says a new one is on its way',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final api = await recoverySent(
+          tester,
+          l,
+          api: _RefusingApi('code_expired'),
+        );
+        await tester.enterText(recoveryCode, '123456');
+        await tester.enterText(password, newPassword);
+        await tapVisible(tester, submit);
+        expect(api.requests.last, [
+          'auth/password-reset/',
+          {'email': maria, 'language': language},
+        ]);
+        expect(
+          api.requests.where((r) => r[0] == 'auth/password-reset/'),
+          hasLength(2),
+        );
+        expect(typed(tester, recoveryCode), isEmpty);
+        expect(hasFocus(tester, recoveryCode), isTrue);
+        final line = findShown(l.recoveryCodeRenewed(maria));
+        expect(line, findsOneWidget);
+        expect(findShown(l.recoveryEmailRequested(maria)), findsNothing);
+        expect(
+          tester.getRect(line).bottom,
+          lessThanOrEqualTo(tester.getRect(recoveryCode).top),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test('UX-1602: no catalog has authEnterRecoveryCode', () {
+    for (final language in ['en', 'es', 'ca']) {
+      final arb = File('lib/l10n/app_$language.arb').readAsStringSync();
+      expect(arb, isNot(contains('authEnterRecoveryCode')), reason: language);
+    }
+  });
+
+  // ---- UX loop 2026-10-19-app, round 1 · P193 (UX-1603): Google first, the
+  // email form behind «Continuar con mi correo» ----
+
+  final continueWithEmail = find.byKey(const ValueKey('continue-with-email'));
+
+  /// A fresh sign-in, folded, in [language].
+  Future<_LoginApi> openFolded(
+    WidgetTester tester, {
+    String language = 'es',
+    ThemeMode theme = ThemeMode.light,
+    Size size = const Size(360, 800),
+  }) async {
+    final client = _LoginApi();
+    final (_, auth) = await _open(
+      tester,
+      client: client,
+      language: language,
+      theme: theme,
+      size: size,
+    );
+    auth.finish();
+    await tester.pumpAndSettle();
+    return client;
+  }
+
+  test('UX-1603: «Continuar con mi correo» in EN, ES and CA', () {
+    expect(
+      lookupAppLocalizations(const Locale('en')).continueWithEmail,
+      'Continue with email',
+    );
+    expect(es.continueWithEmail, 'Continuar con mi correo');
+    expect(
+      lookupAppLocalizations(const Locale('ca')).continueWithEmail,
+      'Continua amb el correu',
+    );
+  });
+
+  for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-1603: ES, ${scale}x on 360x800, ${theme.name}, a fresh sign-in shows Continuar con Google and Continuar con mi correo, with no field, no Iniciar sesión, no Crear una cuenta and no «o»',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await openFolded(tester, theme: theme);
+          expect(google.hitTestable(), findsOneWidget);
+          expect(
+            find.descendant(
+              of: google,
+              matching: find.text(es.continueWithGoogle),
+            ),
+            findsOneWidget,
+          );
+          await tester.ensureVisible(continueWithEmail);
+          await tester.pumpAndSettle();
+          expect(continueWithEmail.hitTestable(), findsOneWidget);
+          expect(
+            find.descendant(
+              of: continueWithEmail,
+              matching: find.text(es.continueWithEmail),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.widget(continueWithEmail), isA<TextButton>());
+          // Under Google.
+          expect(
+            tester.getRect(continueWithEmail).top,
+            greaterThanOrEqualTo(tester.getRect(google).bottom),
+          );
+          for (final gone in [
+            email,
+            password,
+            submit,
+            find.byKey(const ValueKey('account-recovery-code')),
+          ]) {
+            expect(find.descendant(of: find.byType(LoginScreen), matching: gone,
+                skipOffstage: false), findsNothing);
+          }
+          for (final text in [
+            es.signIn,
+            es.createAnAccount,
+            es.forgotPassword,
+            es.authOr,
+          ]) {
+            expect(
+              find.text(text, skipOffstage: false),
+              findsNothing,
+              reason: text,
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'UX-1603: ES, 1x on 360x800, folded, the ways to tap are the language, Google, Continuar con mi correo, Privacidad and Términos (besides debug-only controls), and the only button-shaped one is Google',
+    (tester) async {
+      await openFolded(tester);
+      final body = find
+          .descendant(
+            of: find.byType(LoginScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      // Every row built, down to the links under the card.
+      await tester.scrollUntilVisible(
+        find.byKey(ValueKey('site-${SitePage.terms.path}')),
+        100,
+        scrollable: body,
+      );
+      await tester.pumpAndSettle();
+      final debugOnly = {
+        ...find
+            .byKey(const ValueKey('development-sign-in'), skipOffstage: false)
+            .evaluate(),
+        ...find
+            .ancestor(
+              of: find.text(es.connectionSettings, skipOffstage: false),
+              matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+            )
+            .evaluate(),
+      }.map((e) => e.widget).toSet();
+      final targets = find
+          .descendant(
+            of: find.byType(LoginScreen),
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  (w is ButtonStyleButton || w is IconButton) &&
+                  !debugOnly.contains(w),
+            ),
+            skipOffstage: false,
+          )
+          .evaluate()
+          .map((e) => e.widget)
+          .toList();
+      // An IconButton draws a ButtonStyleButton of its own inside it.
+      final icons = targets.whereType<IconButton>().toList();
+      final buttons = targets.whereType<ButtonStyleButton>().where(
+        (b) => !find
+            .descendant(
+              of: find.byType(IconButton, skipOffstage: false),
+              matching: find.byWidget(b),
+              skipOffstage: false,
+            )
+            .evaluate()
+            .isNotEmpty,
+      ).toList();
+      expect(icons, hasLength(1), reason: 'the language menu');
+      expect(icons.single.tooltip, es.language);
+      expect(buttons, hasLength(4), reason: '$buttons');
+      final shaped = buttons
+          .where((b) => b is FilledButton || b is OutlinedButton || b is ElevatedButton)
+          .toList();
+      expect(shaped, hasLength(1));
+      expect(
+        find.descendant(
+          of: google,
+          matching: find.byWidget(shaped.single),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        buttons.whereType<TextButton>().map((b) => b.key).toSet(),
+        {
+          const ValueKey('continue-with-email'),
+          ValueKey('site-${SitePage.privacy.path}'),
+          ValueKey('site-${SitePage.terms.path}'),
+        },
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1603: tapping Continuar con mi correo shows the fields, ¿Has olvidado tu contraseña?, Iniciar sesión and Crear una cuenta, with the focus in Correo; Back folds them again',
+    (tester) async {
+      await openFolded(tester, size: const Size(390, 844));
+      await tapVisible(tester, continueWithEmail);
+      expect(continueWithEmail, findsNothing);
+      expect(email, findsOneWidget);
+      expect(password, findsOneWidget);
+      expect(find.text(es.authOr), findsOneWidget);
+      expect(find.text(es.forgotPassword), findsOneWidget);
+      expect(
+        find.descendant(of: submit, matching: find.text(es.signIn)),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text(es.createAnAccount));
+      await tester.pumpAndSettle();
+      expect(find.text(es.createAnAccount), findsOneWidget);
+      expect(hasFocus(tester, email), isTrue, reason: 'the focus in Correo');
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(email, findsNothing);
+      expect(password, findsNothing);
+      expect(find.text(es.authOr), findsNothing);
+      expect(continueWithEmail, findsOneWidget);
+      expect(google, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (name, way, heading) in [
+    ('create', es.createAnAccount, es.registerHeading),
+    ('recovery', es.forgotPassword, es.recoveryHeading),
+  ]) {
+    testWidgets(
+      'UX-1603: Back from $name lands on the open form, not the folded view',
+      (tester) async {
+        await openFolded(tester, size: const Size(390, 844));
+        await tapVisible(tester, continueWithEmail);
+        await tapVisible(tester, find.text(way));
+        expect(find.text(heading), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(email, findsOneWidget);
+        expect(password, findsOneWidget);
+        expect(
+          find.descendant(of: submit, matching: find.text(es.signIn)),
+          findsOneWidget,
+        );
+        expect(continueWithEmail, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1603: with Google not configured, the email form shows from the start',
+    (tester) async {
+      final (_, auth) = await _open(
+        tester,
+        client: _LoginApi(),
+        language: 'es',
+        google: _UnconfiguredGoogle(),
+      );
+      auth.finish();
+      await tester.pumpAndSettle();
+      expect(email, findsOneWidget);
+      expect(password, findsOneWidget);
+      expect(continueWithEmail, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'UX-1603: TalkBack on the folded sign-in (ES) reads Inicia sesión, the pitch, Continuar con Google, then Continuar con mi correo',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openFolded(tester);
+      final stops = readingOrder(tester);
+      final heading = readAt(stops, (label) => label == es.signInHeading);
+      final pitch = readAt(stops, (label) => label == es.authPitch);
+      final viaGoogle = readAt(
+        stops,
+        (label) => label.contains(es.continueWithGoogle),
+      );
+      final viaEmail = readAt(
+        stops,
+        (label) => label.contains(es.continueWithEmail),
+      );
+      expect(es.signInHeading, 'Inicia sesión');
+      for (final at in [heading, pitch, viaGoogle, viaEmail]) {
+        expect(at, isNot(-1), reason: '$stops');
+      }
+      expect(heading, lessThan(pitch), reason: '$stops');
+      expect(pitch, lessThan(viaGoogle), reason: '$stops');
+      expect(viaGoogle, lessThan(viaEmail), reason: '$stops');
+      semantics.dispose();
+    },
+  );
 }
 
 /// The server for sign-in: [signInError] answers every sign-in until it is
@@ -1658,4 +2177,42 @@ class _LoginApi extends OfflineApiClient {
     requests.add([path, data]);
     return {};
   }
+}
+
+/// P191: the server refuses every recovery code with [refusal]
+/// (`code_invalid` or `code_expired`); asking for a code works.
+class _RefusingApi extends _LoginApi {
+  _RefusingApi(this.refusal);
+  final String refusal;
+
+  @override
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
+    await super.request(
+      method,
+      path,
+      data: data,
+      audioPath: audioPath,
+      authenticated: authenticated,
+      accountId: accountId,
+    );
+    if (path == 'auth/password-reset/confirm/') {
+      throw ApiException(400, 'Refused.', {'code': refusal});
+    }
+    return {};
+  }
+}
+
+/// P193: Google sign-in exists on this phone but isn't set up.
+class _UnconfiguredGoogle extends GoogleSignInService {
+  @override
+  bool get supported => true;
+  @override
+  bool get configured => false;
 }

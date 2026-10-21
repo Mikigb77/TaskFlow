@@ -78,7 +78,7 @@ void main() {
 
       final code = find.byKey(const ValueKey('account-recovery-code'));
       await reveal(code);
-      await tester.enterText(code, '  Fixture:Case-Sensitive-Code  ');
+      await tester.enterText(code, '123456');
       final password = find.byKey(const ValueKey('account-password'));
       await reveal(password);
       await tester.enterText(password, 'short');
@@ -95,7 +95,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(api.requests.last.$1, 'auth/password-reset/confirm/');
       expect(api.requests.last.$2, {
-        'code': 'Fixture:Case-Sensitive-Code',
+        'email': 'recovery@example.invalid',
+        'code': '123456',
         'password': 'Synthetic-only-password!'
       });
       await reveal(find.text(
@@ -495,8 +496,9 @@ void main() {
         'UX-1612: Cuenta for an account named María: the heading reads María, with the email under it',
         (tester) async {
       await openNamed(tester, firstName: 'María');
-      final heading = find.text('María');
-      expect(heading, findsOneWidget);
+      // The heading, then the name row under the email (P194).
+      expect(find.text('María'), findsNWidgets(2));
+      final heading = find.text('María').first;
       final email = findShown('maria.lopez@example.com');
       expect(email, findsOneWidget);
       expect(tester.getRect(email).top,
@@ -561,7 +563,8 @@ void main() {
         (tester) async {
       final semantics = tester.ensureSemantics();
       await openNamed(tester, firstName: 'María');
-      final name = tester.getSemantics(find.text('María'));
+      // The heading; the name row under the email shows it too (P194).
+      final name = tester.getSemantics(find.text('María').first);
       expect(name.label, 'María');
       expect(name.getSemanticsData().flagsCollection.isHeader, isTrue);
       expect(bodyHeaders(tester), ['María']);

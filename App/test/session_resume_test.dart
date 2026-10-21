@@ -16,6 +16,7 @@ import 'package:agenda/screens/login_screen.dart';
 import 'package:agenda/screens/main_shell.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_editor.dart';
@@ -56,6 +57,8 @@ void main() {
     bool signedIn = true,
     String language = 'es',
     Size size = const Size(390, 844),
+    // Google sign-in on this phone, when a test sets one up.
+    GoogleSignInService? google,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -81,6 +84,7 @@ void main() {
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
         taskProvider.overrideWith((ref) => DesignTaskNotifier()),
         themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+        if (google != null) googleSignInServiceProvider.overrideWithValue(google),
       ],
     );
     addTearDown(container.dispose);
@@ -399,6 +403,30 @@ void main() {
       );
     },
   );
+  // ---- UX loop 2026-10-19-app, round 1 · P193 (UX-1603): sign-in again
+  // keeps the email form open, even where Google can sign in ----
+
+  testWidgets(
+    'UX-1603: with Google set up, sign-in again opens with the email form showing and ana@example.com filled, with no Continuar con mi correo',
+    (tester) async {
+      final (_, api) = await openApp(
+        tester,
+        _SlowReminders(),
+        google: _ConfiguredGoogle(),
+      );
+      await editTask(tester, 'Llamar al dentista');
+      api.expire();
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.text(es.signInAgainReason), findsOneWidget);
+      expect(find.byKey(const ValueKey('google-sign-in')), findsOneWidget);
+      expect(find.byKey(const ValueKey('continue-with-email')), findsNothing);
+      expect(find.byKey(const ValueKey('account-email')), findsOneWidget);
+      expect(find.byKey(const ValueKey('account-password')), findsOneWidget);
+      expect(emailText(tester), 'ana@example.com');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// Reminder setup that waits until [finish], as on a phone where a
@@ -485,4 +513,12 @@ class _SessionApi extends OfflineApiClient {
     unawaited(_invalidated.close());
     super.close();
   }
+}
+
+/// P193: Google sign-in set up on this phone.
+class _ConfiguredGoogle extends GoogleSignInService {
+  @override
+  bool get supported => true;
+  @override
+  bool get configured => true;
 }

@@ -2693,8 +2693,8 @@ void main() {
   });
 
   // ---- Run 2026-10-18-commands, b4 · P153 (UX-918, D2): words dictated
-  // before «Escribir» keep the day and time they name; typed and shared
-  // words stay as typed ----
+  // before «Escribir» keep the day and time they name; typed words stay as
+  // typed, and shared ones are read too (UX-1623, D3 of 2026-10-20) ----
 
   group('UX-918: dictated words carried into the form by Escribir', () {
     // Monday 19 October 2026 at 10:00; that week's Friday is the 23rd.
@@ -2828,7 +2828,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-918: a title typed in the form, «Médico el viernes», saved with Añadir tarea has no day; shared text «Médico el viernes» opened in the form keeps that title and no day',
+      'UX-918, UX-1623: a title typed in the form, «Médico el viernes», saved with Añadir tarea has no day; shared text «Médico el viernes» opens the form titled «Médico» on Friday 23, and saves there',
       (tester) async {
         final app = await _FreeApp.open(
           tester,
@@ -2872,7 +2872,170 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(form(), findsOneWidget);
-        expect(formTitle(tester), 'Médico el viernes');
+        // Shared words name their day, as dictated ones do (D3, 2026-10-20).
+        expect(formTitle(tester), 'Médico');
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        final shared = app.tasks.state.requireValue.last;
+        expect(shared.title, 'Médico');
+        expect(Task.day(shared.dueDate!), friday);
+        expect(shared.deadline, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-19-app, round 1 · P192 (UX-1623, D3 of 2026-10-20):
+  // shared text opens the form with its day and time read ----
+
+  group('UX-1623: shared text opened in the form', () {
+    // Monday 19 October 2026 at 10:00; that week's Friday is the 23rd.
+    final monday = DateTime(2026, 10, 19, 10);
+    final tuesday = DateTime(2026, 10, 20);
+    final friday = DateTime(2026, 10, 23);
+    Finder chip(String key) => find.byKey(ValueKey(key));
+    bool selected(WidgetTester tester, String key) =>
+        tester.widget<ChoiceChip>(chip(key)).selected;
+    String chipLabel(WidgetTester tester, String key) => tester
+        .widget<Text>(
+          find.descendant(of: chip(key), matching: find.byType(Text)).last,
+        )
+        .data!;
+    BuildContext formContext(WidgetTester tester) =>
+        tester.element(find.byType(TaskEditor));
+
+    /// [words] shared from another app at [sharedAt], as Android hands them
+    /// over (source 'shared'), opened at the app's clock.
+    Future<void> share(
+      WidgetTester tester,
+      _FreeApp app,
+      String words, {
+      DateTime? sharedAt,
+      String source = 'shared',
+      DateTime? day,
+    }) async {
+      app.store.sessions['shared'] = CaptureSession(
+        id: 'shared',
+        ownerKey: app.owner,
+        timezone: 'Europe/Madrid',
+        capturedAt: (sharedAt ?? monday).toUtc(),
+        text: words,
+        source: source,
+        day: day,
+      );
+      unawaited(
+        showCaptureSheet(
+          tester.element(find.byType(Scaffold).first),
+          captureId: 'shared',
+          startListening: false,
+          typing: true,
+          showCalendar: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'UX-1623: free account, Monday 10:00, a share «Comprar pan y leche el viernes» opens the form titled «Comprar pan y leche» on Friday 23 with no time; Back saves it on Friday, not in Sin fecha',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: monday,
+        );
+        await share(tester, app, 'Comprar pan y leche el viernes');
+        expect(find.byType(VoiceTaskScreen), findsNothing);
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Comprar pan y leche');
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        expect(
+          chipLabel(tester, 'new-task-pick-day'),
+          formContext(tester).weekdayDate(friday),
+        );
+        expect(selected(tester, 'new-task-today'), isFalse);
+        expect(selected(tester, 'new-task-tomorrow'), isFalse);
+        // No time: «Añadir hora», with no time chip.
+        expect(find.widgetWithText(ActionChip, es.addTime), findsOneWidget);
+        expect(find.byType(InputChip), findsNothing);
+        expect(app.api.drafts, isEmpty, reason: 'no dictation used');
+
+        // Back saves (D12).
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(form(), findsNothing);
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.title, 'Comprar pan y leche');
+        expect(saved.dueDate, isNotNull, reason: 'not in Sin fecha');
+        expect(Task.day(saved.dueDate!), friday);
+        expect(saved.hasTime, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1623: a share «Llamar a Marta mañana a las 17:00» opens on Tuesday 20 at 17:00, titled «Llamar a Marta»',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: monday,
+        );
+        await share(tester, app, 'Llamar a Marta mañana a las 17:00');
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Llamar a Marta');
+        expect(selected(tester, 'new-task-tomorrow'), isTrue);
+        final at = formContext(tester).clockTime(DateTime(2026, 10, 20, 17));
+        expect(at, '17:00');
+        expect(find.widgetWithText(InputChip, at), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.title, 'Llamar a Marta');
+        expect(saved.dueDate, DateTime(2026, 10, 20, 17));
+        expect(saved.hasTime, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1623: a share «Llamar a Marta mañana» captured Monday at 23:50 and opened Tuesday at 00:10 lands on Tuesday 20, counted from the share',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: DateTime(2026, 10, 20, 0, 10),
+        );
+        await share(
+          tester,
+          app,
+          'Llamar a Marta mañana',
+          sharedAt: DateTime(2026, 10, 19, 23, 50),
+        );
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Llamar a Marta');
+        // Opened on Tuesday, Tuesday is Hoy; not Wednesday's Mañana.
+        expect(selected(tester, 'new-task-today'), isTrue);
+        expect(selected(tester, 'new-task-tomorrow'), isFalse);
+        await tester.tap(find.byKey(const ValueKey('task-save')));
+        await tester.pumpAndSettle();
+        final saved = app.tasks.state.requireValue.single;
+        expect(Task.day(saved.dueDate!), tuesday);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1623: a share with no date words, «Comprar pan», opens the form with no day, as before',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: monday,
+        );
+        await share(tester, app, 'Comprar pan');
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Comprar pan');
         for (final key in [
           'new-task-today',
           'new-task-tomorrow',
@@ -2880,12 +3043,180 @@ void main() {
         ]) {
           expect(selected(tester, key), isFalse, reason: key);
         }
-        await tester.tap(find.byKey(const ValueKey('task-save')));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1623: words typed in the sheet (source typed, resumed from Sin guardar) keep «el viernes» as written, with no day',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: monday,
+        );
+        await share(
+          tester,
+          app,
+          'Comprar pan y leche el viernes',
+          source: 'typed',
+        );
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Comprar pan y leche el viernes');
+        for (final key in [
+          'new-task-today',
+          'new-task-tomorrow',
+          'new-task-pick-day',
+        ]) {
+          expect(selected(tester, key), isFalse, reason: key);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- Round 2 · P219 (UX-1654): a stale share opens with no day ----
+
+    // Thursday 22 October 2026 at 10:00, three days after Monday's share.
+    final thursday = DateTime(2026, 10, 22, 10);
+
+    void expectNoDay(WidgetTester tester) {
+      for (final key in [
+        'new-task-today',
+        'new-task-tomorrow',
+        'new-task-pick-day',
+      ]) {
+        expect(selected(tester, key), isFalse, reason: key);
+      }
+    }
+
+    testWidgets(
+      'UX-1654: a share «Llamar a Marta mañana» from Monday 19, resumed from Sin guardar on Thursday 22, opens titled as written with no day chosen and no chip on Tuesday 20',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: thursday,
+        );
+        await share(tester, app, 'Llamar a Marta mañana');
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Llamar a Marta mañana');
+        expectNoDay(tester);
+        expect(
+          chipLabel(tester, 'new-task-pick-day'),
+          isNot(formContext(tester).weekdayDate(tuesday)),
+        );
+        expect(
+          find.text(formContext(tester).weekdayDate(tuesday)),
+          findsNothing,
+          reason: 'no chip shows Tuesday 20',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1654: Back on that stale share saves it with no due date and no deadline (Sin fecha), not on Tuesday 20',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: thursday,
+        );
+        await share(tester, app, 'Llamar a Marta mañana');
+        expect(form(), findsOneWidget);
+        await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        final shared = app.tasks.state.requireValue.last;
-        expect(shared.title, 'Médico el viernes');
-        expect(shared.dueDate, isNull);
-        expect(shared.deadline, isNull);
+        expect(form(), findsNothing);
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.title, 'Llamar a Marta mañana');
+        expect(saved.dueDate, isNull, reason: 'lands in Sin fecha');
+        expect(saved.deadline, isNull);
+        expect(saved.hasTime, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1654: the stale share carrying the day Friday 23 (D9) opens on Friday 23, titled «Llamar a Marta mañana» as written',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: thursday,
+        );
+        await share(tester, app, 'Llamar a Marta mañana', day: friday);
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Llamar a Marta mañana');
+        // Opened on Thursday 22, Friday 23 is Mañana.
+        expect(selected(tester, 'new-task-tomorrow'), isTrue);
+        expect(selected(tester, 'new-task-today'), isFalse);
+        expect(selected(tester, 'new-task-pick-day'), isFalse);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        final saved = app.tasks.state.requireValue.single;
+        expect(Task.day(saved.dueDate!), friday);
+        expect(saved.hasTime, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1654: a share «Llamar a Marta el viernes» from Monday 19, opened Thursday 22, still opens on Friday 23 titled «Llamar a Marta» (a read day still ahead is kept)',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: thursday,
+        );
+        await share(tester, app, 'Llamar a Marta el viernes');
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Llamar a Marta');
+        // Opened on Thursday 22, Friday 23 is Mañana.
+        expect(selected(tester, 'new-task-tomorrow'), isTrue);
+        expect(selected(tester, 'new-task-today'), isFalse);
+        expect(selected(tester, 'new-task-pick-day'), isFalse);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.title, 'Llamar a Marta');
+        expect(Task.day(saved.dueDate!), friday);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1654: a share «Entregar la factura antes del miércoles» from Monday 12, opened Thursday 22, reads no deadline that has gone by: titled as written, no day, saved with no deadline',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          clock: thursday,
+        );
+        await share(
+          tester,
+          app,
+          'Entregar la factura antes del miércoles',
+          sharedAt: DateTime(2026, 10, 12, 10),
+        );
+        expect(form(), findsOneWidget);
+        expect(formTitle(tester), 'Entregar la factura antes del miércoles');
+        expectNoDay(tester);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        final saved = app.tasks.state.requireValue.single;
+        expect(saved.deadline, isNull, reason: 'no deadline already gone by');
+        expect(saved.dueDate, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1623: with Pro, a share opens the typing sheet, as before, not the form',
+      (tester) async {
+        final app = await _FreeApp.open(tester, pro: true, clock: monday);
+        await share(tester, app, 'Comprar pan y leche el viernes');
+        expect(form(), findsNothing);
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
