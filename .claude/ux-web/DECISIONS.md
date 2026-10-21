@@ -4,6 +4,12 @@ Every agent in the UX web loop reads this before reviewing or planning. Only the
 
 The app's decisions are in `.claude/ux-review/DECISIONS.md`. They bind the site too: the site may only say what the app does, and anything open there is open here.
 
+## 2026-10-21 (evening) — WD18 and WD19 of run 2026-10-21-changes
+The owner answered both, and not as recommended («not now» for both):
+- **WD18, changing many tasks at once beyond the FAQ:** "Yes, on the card". One sentence on the «Say several things at once» card says that voice can also move or finish many tasks at once, as in «move all of yesterday's tasks to tomorrow». The hero stays as it is. The FAQ's voice answer still names it too (WP53).
+- **WD19, the other ways into TaskFlow:** "Yes, briefly". One short line, or one FAQ answer, names the home-screen widget, the launcher shortcuts and sharing a message from another app such as WhatsApp. Each is named as the app shows it in that language (the widget and shortcuts say «Dictate a task» in English since 2026-10-21; see `.claude/ux-review/DECISIONS.md`).
+- Both stay short, in English, Spanish and Catalan, and the live demo still only adds tasks.
+
 ## 2026-10-21 — WD17: completion belongs above the complete task group
 The owner clarifies that the final all-clear / take-a-breath message should apply across all generated tasks: show it on top, in front of the task list, rather than inside the final task. This corrects the placement chosen for WD16 and authorizes a bounded group-level banner change, with tasks/details and undo retained. The owner also requests an explanation and assessment of the earlier layout changes; that does not authorize a broader redesign. Existing EN/ES/CA completion copy remains.
 

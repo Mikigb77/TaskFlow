@@ -2,6 +2,16 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-21 (evening) — Bulk commands: D1–D3 of run 2026-10-21-changes
+The owner answered the run's three questions, each as recommended:
+- **D1 (UX-1715), a task with only a deadline, moved to a day by voice:** "Move the deadline".
+  - A voice move to a day, for a set («pasa todo lo de ayer a mañana») or for one task, moves the deadline of a task that has only a deadline, as a move by days already does.
+  - A time said for such a task goes on its deadline too (UX-1709's fifth item).
+  - Voice only: Calendar's own «Cambiar fecha» keeps its rule.
+- **D2 (UX-1702), «hoy»:** "Yes, include overdue". A set for exactly today also takes the open tasks Today lists under «Atrasadas», listed first with «Atrasada» and ticked, so any can be unticked.
+- **D3 (UX-1716), fixing a misheard day by touch:** "Yes, on both cards". The day in a move's heading becomes a chip («mañana, jue 22 ▾») that opens the existing «Elegir día» sheet, on the set card and on one task's change card. The count stays live.
+- They are carried out in a round of their own (`/ux plan 2026-10-21-changes`, then a fix round), not by P224–P228, which were already running. The main session updates the contract (`Backend/docs/VOICE_COMMANDS.md`) for D1 and D2.
+
 ## 2026-10-21 (later) — Bulk voice commands
 **The owner is back**, and the normal flow applies again: new product questions go to him.
 
