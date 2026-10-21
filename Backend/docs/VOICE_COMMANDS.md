@@ -7,7 +7,7 @@ This is the contract between the server and the app.
 - **The server never searches, changes or deletes a task for a command.** The model never sees the person's tasks either.
 - **The app** finds the tasks on the phone, shows what will happen, and does it after the person's tap, with «Deshacer».
 
-Code: `core/voice_commands.py` (commands), `core/ai.py` (prompt and validation), `core/capture_context.py` (matching), `core/views.py` (counting and limits). Tests: `core/test_voice_commands.py`, `core/test_lenient_matching.py`, `core/test_day_of_month.py`, `core/test_project_candidates.py`, `core/test_empty_dictations.py`, `core/test_daily_limit_wait.py`.
+Code: `core/voice_commands.py` (commands), `core/ai.py` (prompt and validation), `core/capture_context.py` (matching), `core/views.py` (counting and limits). Tests: `core/test_voice_commands.py`, `core/test_bulk_commands.py`, `core/test_lenient_matching.py`, `core/test_day_of_month.py`, `core/test_project_candidates.py`, `core/test_empty_dictations.py`, `core/test_daily_limit_wait.py`.
 
 ## The request
 
@@ -128,6 +128,7 @@ How the app should search its own copy:
 | `title` | string, 1–160 | The new title. |
 | `date` | `"YYYY-MM-DD"` | Move the task to that day. Keep its time unless `time` is present too. |
 | `date` | `null` | Remove the day: the task goes to the Inbox. `time` is then `null` too. |
+| `shift_days` | integer, −366 to 366, never 0 | Move the task by that many days instead («retrasa dos días la cita del médico»). Never together with `date`. See [Bulk commands](#bulk-commands). |
 | `time` | `"HH:MM"` (24-hour) | Set the time and keep the day. On a task with no day, ask for one. |
 | `time` | `null` | Remove the time and keep the day. |
 | `deadline_date` | `"YYYY-MM-DD"` | Set the deadline's day. Keep its time unless `deadline_time` is present too. |
@@ -187,15 +188,18 @@ Decided by the owner on 2026-10-21: «pasa todas las tareas de ayer a mañana»,
 | `words` | list of strings, 0–8 | As for `find`. Usually empty: «todas las tareas de ayer». |
 | `list_id`, `project_name`, `project_candidates` | as for `find` | The project named. |
 | `person_id`, `person_name` | as for `find` | «Todas las de Paul». «Las mías» gives the person's own id. |
-| `status` | `"open"`, `"completed"` or `"any"` | `"open"` unless the person said completed («las completadas») or all of them. |
-| `from`, `to` | `"YYYY-MM-DD"` or null | An inclusive period on the task's planned day, or its deadline day when it has none. «Ayer» gives the same day twice. «Lo atrasado» gives `"to"` = yesterday and `"from"` = null. |
+| `status` | `"open"`, `"completed"` or `"any"` | `"open"` unless the person said completed («las completadas») or all of them. A `complete` set is always `"open"`: only pending tasks can be marked done. |
+| `from`, `to` | `"YYYY-MM-DD"` or null | An inclusive period on the task's planned day, or its deadline day when it has none. «Ayer» gives the same day twice. «Lo atrasado» gives `"to"` = yesterday and `"from"` = null. `from` is never after `to`. |
 | `undated` | boolean | `true`: only tasks with no day («las tareas sin fecha»). `from` and `to` are then null. |
-| `date` | always `null` with `all` | A day said for the set goes in `from` and `to`. |
+| `date` | always `null` with `all` | A day said for the set goes in `from` and `to`. When a period was said too, the period stays and the day is dropped. |
+
+The person, the project and their issues are resolved as for `find`: the person among the people of the project named, or of all the person's projects. Without `all`, the target keeps exactly the shape it had before, without these keys.
 
 `changes` for a bulk `update`:
 - `date`, `time`, `deadline_date`, `deadline_time`, `priority`, `assignee_id` and `assignee_name` are as for one task, and apply to every task in the set.
 - `title` and `notes_append` are never set with `all`. The server drops them.
-- **`shift_days`**, an integer from −366 to 366 and never 0, moves each task by that many days and keeps its time. A task with only a deadline moves its deadline. «Pasa lo de esta semana a la semana que viene» gives 7, and «retrásalo todo un día» gives 1. It can also go on a single task: «retrasa dos días la cita del médico». It's never sent together with `date`; if the model sends both, `date` wins.
+- **`shift_days`**, an integer from −366 to 366 and never 0, moves each task by that many days and keeps its time. A task with only a deadline moves its deadline. «Pasa lo de esta semana a la semana que viene» gives 7, and «retrásalo todo un día» gives 1. It can also go on a single task: «retrasa dos días la cita del médico». Any other value is dropped. It's never sent together with `date`; if the model sends both, `date` wins, even a `date` of `null`.
+- **Nothing left to change** (the person only gave the tasks a new title, say): the bulk `update` comes to nothing and is dropped, as in [Free dictations](#free-dictations). A single `update` with `{}` still opens the task.
 
 **Which tasks the set holds** (the owner's choice, 2026-10-21):
 - The person's own tasks, and the tasks assigned to them in shared projects. Other people's tasks are included only when the person names their project (`list_id`) or names them (`person_id`).
@@ -229,14 +233,14 @@ Tasks keep two more codes from today: `choose_project` and `shared_project_requi
 
 ### Project candidates
 
-Wherever `ambiguous_project` is reported, `project_candidates` sits beside it: on a task draft, on a `project` or `find` command, and in the `target` of an `update` or `delete`. The card can then offer exactly those projects, «¿Matemáticas o Matemáticas II?», instead of guessing from names (UX-1315, decided 2026-10-20).
+Wherever `ambiguous_project` is reported, `project_candidates` sits beside it: on a task draft, on a `project` or `find` command, and in the `target` of an `update`, `delete` or `complete`, for one task or a set. The card can then offer exactly those projects, «¿Matemáticas o Matemáticas II?», instead of guessing from names (UX-1315, decided 2026-10-20).
 
 ```json
 "project_candidates": [{"id": "7d1c0a52-3c1e-4b8e-9f1a-1f6b2b8f0c11", "name": "Matemáticas"},
                        {"id": "0b8e4a1f-6c2d-4e57-9a3b-5f1d2c7e8a90", "name": "Matemáticas II"}]
 ```
 
-- **Which projects:** the ones that matched the name said, at the tier that decided (see Matching), among the candidates of that place: projects the person can edit for tasks and `project` commands, or edit or only view for `find`, `update` and `delete`. A group name that matched several projects gives those projects.
+- **Which projects:** the ones that matched the name said, at the tier that decided (see Matching), among the candidates of that place: projects the person can edit for tasks and `project` commands, or edit or only view for `find`, `update`, `delete` and `complete`. A group name that matched several projects gives those projects.
 - **Best first:** the fewest letters to change from what was said, then the shorter name, then the directory's order (by name). So «Mates» gives «Matemáticas» before «Matemáticas II».
 - **At most 3.** Each is `{"id": <uuid string>, "name": <the project's name>}`. Two projects in different groups can share a name: their ids tell them apart, and the app knows each one's group.
 - **Projects created in the same answer** have no id yet, so they're never listed. If only such projects matched, the list is empty.
@@ -338,7 +342,7 @@ What a match gives:
 - **Two or more:** `ambiguous_project`.
 - **None:** a directory group with that name selects its project when it holds exactly one. «grupo», «proyecto» and «lista» all mean a project, but a group still points to its only project. A group with several projects gives `ambiguous_project`. Otherwise the answer is `project_not_available`.
 
-The same rules and limits apply everywhere a project is named: a task's project, a `project` command's `existing_list_id`, and the `list_id` of `find` and of the target of `update` and `delete`.
+The same rules and limits apply everywhere a project is named: a task's project, a `project` command's `existing_list_id`, and the `list_id` of `find` and of the target of `update`, `delete` and `complete`.
 
 Which projects are candidates:
 
@@ -346,7 +350,7 @@ Which projects are candidates:
 |---|---|
 | A task's project | The projects the person can edit, and the projects created in the same dictation. |
 | A `project` command | The projects the person can edit. |
-| `find`, and the target of `update` and `delete` | The projects the person can edit or only view. |
+| `find`, and the target of `update`, `delete` and `complete` | The projects the person can edit or only view. |
 
 Cross-language names («math» for «Matemáticas») come from the model, which sees the project names.
 
@@ -364,8 +368,8 @@ Whose people are candidates:
 | Where | Candidates |
 |---|---|
 | A task | The people who can edit the task's project. |
-| `find` | The people of the project named, or everyone in the person's projects. |
-| `update` | The people of the target's project, or everyone in the projects the person can edit. |
+| `find`, and a set's person (`target.person_id`) | The people of the project named, or everyone in the person's projects. |
+| `update` (the assignee) | The people of the target's project, or everyone in the projects the person can edit. |
 
 «Para mí», «mis tareas» and «asígnamela» are the person themselves.
 
@@ -384,7 +388,7 @@ A dictation counts once, whatever it holds: tasks, notes, commands or a mix. It 
 An answer that holds no task and no command doesn't count (D4, decided 2026-10-20). A newcomer's «Hola, ¿me oyes?» costs nothing.
 - It's a `200` with `"tasks": []` and `"commands": []`. Its `free_voice` already shows the dictation given back.
 - The app says nothing was found and offers to say it again.
-- A command that comes to nothing is dropped, such as a project named only with quotes, so an answer can end up empty that way too.
+- A command that comes to nothing is dropped, such as a project named only with quotes, or a bulk `update` with nothing left to change, so an answer can end up empty that way too.
 - It still counts toward the account's daily AI limit (50 a day): the assistant did the work, and that limit bounds dictations that keep finding nothing.
 
 A failed or invalid answer never counts, nor does a cancelled dictation. Neither do budget refusals.
@@ -480,7 +484,9 @@ Format slips that are tolerated, as for tasks:
 - other names for a kind (`search`, `remove`, `create_project`, `done`, `mark_done`, `finish`…) or a status (`pending`, `done`, `all`);
 - `all` given as `"true"`, or `shift_days` as a numeric string;
 - `from` and `to` for `from_date` and `to_date`;
-- a flat update or delete, without `target`;
+- a flat update, delete or complete, without `target`;
+- a set's `all`, `person`, `member_name`, `status`, `from_date`, `to_date` or `undated` written beside `target` instead of in it. What the target says wins;
+- one task's day written as `from_date` and `to_date` of the same day: it becomes the target's `date`;
 - empty strings for dates.
 
 Anything else that doesn't fit the schema makes the answer invalid, as for tasks. Ids written by the model are ignored.

@@ -1,4 +1,4 @@
-"""Voice commands: create a project, find tasks, change or delete a task.
+"""Voice commands: create a project, find tasks, and change, complete or delete one task or many.
 
 The contract with the app is docs/VOICE_COMMANDS.md. The model says what the person
 asked; the server validates it and resolves spoken names to ids from the person's own
@@ -12,16 +12,25 @@ from pydantic import BaseModel, Field, model_validator
 
 from .capture_context import lenient_matches, match_people, normalized, project_candidates, ranked, resolve_project
 
-COMMAND_KINDS = ("project", "find", "update", "delete")
+COMMAND_KINDS = ("project", "find", "update", "delete", "complete")
+# The kinds with a target: one existing task, or many with "all" (Bulk commands).
+TARGET_KINDS = ("update", "delete", "complete")
 # Other names the model may give the same kinds. Anything else stays invalid.
 KIND_ALIASES = {
     "create_project": "project", "new_project": "project", "group": "project", "list": "project",
     "search": "find", "show": "find", "lookup": "find",
     "change": "update", "edit": "update", "move": "update", "rename": "update",
     "remove": "delete", "erase": "delete",
+    "done": "complete", "mark_done": "complete", "mark_as_done": "complete", "mark_complete": "complete",
+    "finish": "complete", "complete_task": "complete", "completed": "complete",
 }
-STATUS_ALIASES = {"all": "any", "pending": "open", "todo": "open", "done": "completed", "finished": "completed"}
-CHANGE_KEYS = ("title", "date", "time", "deadline_date", "deadline_time", "priority", "notes_append", "assignee", "clear")
+STATUS_ALIASES = {"all": "any", "pending": "open", "todo": "open", "done": "completed", "finished": "completed",
+                  "complete": "completed"}
+CHANGE_KEYS = ("title", "date", "shift_days", "time", "deadline_date", "deadline_time", "priority", "notes_append",
+               "assignee", "clear")
+# A set's filters. Written beside the target instead of in it, they're moved into it.
+SET_KEYS = ("all", "person", "status", "from_date", "to_date", "undated")
+MAX_SHIFT_DAYS = 366
 
 Name = Annotated[str, Field(min_length=1, max_length=80)]
 Person = Annotated[str, Field(min_length=1, max_length=120)]
@@ -64,16 +73,63 @@ def _blank_dates(data, keys):
             data[key] = None
 
 
+def _period(data):
+    # «from» and «to» for from_date and to_date.
+    for said, key in (("from", "from_date"), ("to", "to_date")):
+        if data.get(key) is None and said in data:
+            data[key] = data[said]
+
+
+def _flag(value):
+    """A yes or no, which the model may leave null or write as a string such as "true"."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() or False
+    return value  # Anything else is validated as a boolean.
+
+
+def _status(value, default):
+    if value in (None, ""):
+        return default
+    if isinstance(value, str):
+        return STATUS_ALIASES.get(value.strip().lower(), value.strip().lower())
+    return value
+
+
+def _shift_days(value):
+    """Whole days to move a task by: from -366 to 366 and never 0, else None, which drops it.
+    The model may write the number as a string."""
+    if isinstance(value, str):
+        try:
+            value = float(value.strip())
+        except ValueError:
+            return None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, int) and not isinstance(value, bool) and 0 < abs(value) <= MAX_SHIFT_DAYS:
+        return value
+    return None
+
+
 def is_command(item):
     kind = item.get("kind") if isinstance(item, dict) else None
     return isinstance(kind, str) and KIND_ALIASES.get(kind.strip().lower(), kind.strip().lower()) in COMMAND_KINDS
 
 
 class CommandTarget(BaseModel):
-    """Which existing task an update or a deletion is about."""
+    """Which existing task an update, a deletion or a completion is about. With all, which
+    tasks: a set, with find's filters and a period instead of a day."""
     words: list[Word] = Field(default_factory=list, max_length=8)
     project_name: Name | None = None
     date: Date | None = None
+    all: bool = False
+    person: Literal["me", "member"] | None = None  # a set
+    member_name: Person | None = None  # a set
+    status: Literal["any", "open", "completed"] | None = None  # a set: "open" unless said
+    from_date: Date | None = None  # a set
+    to_date: Date | None = None  # a set
+    undated: bool = False  # a set
 
     @model_validator(mode="before")
     @classmethod
@@ -81,15 +137,36 @@ class CommandTarget(BaseModel):
         if isinstance(data, str):
             data = {"words": [data]}
         if isinstance(data, dict):
-            data = {**data, "words": _words(data.get("words")), "project_name": _text(data.get("project_name"))}
-            _blank_dates(data, ("date",))
+            data = {**data, "words": _words(data.get("words")), "project_name": _text(data.get("project_name")),
+                    "member_name": _text(data.get("member_name")), "status": _status(data.get("status"), None),
+                    "all": _flag(data.get("all")), "undated": _flag(data.get("undated"))}
+            _period(data)
+            _blank_dates(data, ("date", "from_date", "to_date"))
         return data
+
+    @model_validator(mode="after")
+    def normalize(self):
+        if self.all:
+            # A set has a period, never a day: a day said for it is the period, unless one was said too.
+            if self.date and not (self.from_date or self.to_date):
+                self.from_date = self.to_date = self.date
+            self.date = None
+            self.status = self.status or "open"
+        elif not self.date and self.from_date and self.from_date == self.to_date:
+            self.date = self.from_date  # One task's day, written as a period of one day.
+        if self.undated:
+            self.from_date = self.to_date = None
+        if self.from_date and self.to_date and self.from_date > self.to_date:
+            self.from_date, self.to_date = self.to_date, self.from_date
+        return self
 
 
 class CommandChanges(BaseModel):
-    """Only what the person asked to change. clear removes a date, a time or the deadline."""
+    """Only what the person asked to change. clear removes a date, a time or the deadline.
+    shift_days moves the task by that many days instead of to a day."""
     title: Annotated[str, Field(min_length=1, max_length=160)] | None = None
     date: Date | None = None
+    shift_days: int | None = None
     time: Time | None = None
     deadline_date: Date | None = None
     deadline_time: Time | None = None
@@ -107,6 +184,7 @@ class CommandChanges(BaseModel):
             for key in ("title", "notes_append", "member_name"):
                 data[key] = _text(data.get(key))
             _blank_dates(data, ("date", "time", "deadline_date", "deadline_time"))
+            data["shift_days"] = _shift_days(data.get("shift_days"))
             if data.get("clear") is None:
                 data["clear"] = []
             elif isinstance(data["clear"], str):
@@ -116,7 +194,7 @@ class CommandChanges(BaseModel):
 
 class ExtractedCommand(BaseModel):
     """One command as the model returns it. Each kind uses only its own fields."""
-    kind: Literal["project", "find", "update", "delete"]
+    kind: Literal["project", "find", "update", "delete", "complete"]
     name: Name | None = None  # project
     words: list[Word] = Field(default_factory=list, max_length=8)  # find
     project_name: Name | None = None  # find
@@ -125,7 +203,7 @@ class ExtractedCommand(BaseModel):
     status: Literal["any", "open", "completed"] = "any"  # find
     from_date: Date | None = None  # find
     to_date: Date | None = None  # find
-    target: CommandTarget | None = None  # update, delete
+    target: CommandTarget | None = None  # update, delete, complete
     changes: CommandChanges | None = None  # update
 
     @model_validator(mode="before")
@@ -146,23 +224,27 @@ class ExtractedCommand(BaseModel):
         if kind == "project" and not data["name"]:
             data["name"] = data["project_name"]
         data["words"] = _words(data.get("words"))
-        for said, key in (("from", "from_date"), ("to", "to_date")):
-            if data.get(key) is None and said in data:
-                data[key] = data[said]
+        _period(data)
         _blank_dates(data, ("from_date", "to_date"))
-        status = data.get("status")
-        if status in (None, ""):
-            data["status"] = "any"
-        elif isinstance(status, str):
-            data["status"] = STATUS_ALIASES.get(status.strip().lower(), status.strip().lower())
+        # A set's filters written beside its target, as said: the status before find's default.
+        beside = {key: data.get(key) for key in SET_KEYS}
+        if data.get("person") is not None and "assignee" not in data:
+            beside["member_name"] = data["member_name"]
+        data["status"] = _status(data.get("status"), "any")
         # A flat command, such as {"kind": "delete", "words": ["médico"]}. In a flat update a
-        # date is the new one, so only a deletion takes its date as the task's current day.
+        # date is the new one, so only a deletion or a completion takes its date as the task's day.
         if kind == "update" and data.get("changes") is None:
             moved = CHANGE_KEYS + (("member_name",) if "assignee" in data else ())
             data["changes"] = {key: data[key] for key in moved if data.get(key) is not None}
-        if kind in ("update", "delete") and not data.get("target"):
-            data["target"] = {"words": data["words"], "project_name": data["project_name"],
-                              "date": data.get("date") if kind == "delete" else None}
+        if kind in TARGET_KINDS:
+            target = data.get("target") or {"words": data["words"], "project_name": data["project_name"],
+                                            "date": data.get("date") if kind != "update" else None}
+            if isinstance(target, str):
+                target = {"words": [target]}
+            if isinstance(target, dict):
+                target = {**target, **{key: value for key, value in beside.items()
+                                       if value not in (None, "") and target.get(key) in (None, "")}}
+            data["target"] = target
         return data
 
     @model_validator(mode="after")
@@ -171,6 +253,8 @@ class ExtractedCommand(BaseModel):
             raise ValueError("A new project needs a name.")
         if self.from_date and self.to_date and self.from_date > self.to_date:
             self.from_date, self.to_date = self.to_date, self.from_date
+        if self.kind == "complete" and self.target and self.target.all:
+            self.target.status = "open"  # Only pending tasks can be marked done, whatever «hechas» suggested.
         return self
 
 
@@ -225,20 +309,38 @@ def _person_ref(request, name, people, user_id):
     return None, name, ["ambiguous_member" if matches else "member_not_available"]
 
 
-def _target(target, projects):
-    list_id, project_name, issues, candidates = _project_ref(target.project_name, projects)
-    item = {"words": target.words, "list_id": list_id, "project_name": project_name, "date": _iso(target.date)}
+def _filters(project_said, person, member_name, projects, user_id):
+    """find's project and person, resolved: ({list_id, project_name, person_id, person_name},
+    issues, project_candidates). The person is looked for in the project named, or in all of them."""
+    list_id, project_name, issues, candidates = _project_ref(project_said, projects)
+    scope = [project for project in projects if project["id"] == list_id] if list_id else projects
+    person_id, person_name, more = _person_ref(person, member_name, _people(scope), user_id)
+    return ({"list_id": list_id, "project_name": project_name, "person_id": person_id, "person_name": person_name},
+            issues + more, candidates)
+
+
+def _target(target, projects, user_id):
+    """One task in today's shape, or with all a set, with find's filters (Bulk commands)."""
+    if not target.all:
+        list_id, project_name, issues, candidates = _project_ref(target.project_name, projects)
+        item = {"words": target.words, "list_id": list_id, "project_name": project_name, "date": _iso(target.date)}
+        return _with_candidates(item, issues, candidates), issues
+    found, issues, candidates = _filters(target.project_name, target.person, target.member_name, projects, user_id)
+    item = {"all": True, "words": target.words, **found, "status": target.status, "from": _iso(target.from_date),
+            "to": _iso(target.to_date), "undated": target.undated, "date": None}
     return _with_candidates(item, issues, candidates), issues
 
 
-def _changes(changes, people, user_id, user_name):
+def _changes(changes, people, user_id, user_name, many=False):
     result, issues = {}, []
-    if changes.title:
+    if changes.title and not many:  # Many tasks never get one title, nor the same notes.
         result["title"] = changes.title
     if changes.date:
         result["date"] = changes.date.isoformat()
     elif "date" in changes.clear:
         result.update(date=None, time=None)  # Back to the Inbox: without a day it has no time either.
+    elif changes.shift_days:
+        result["shift_days"] = changes.shift_days  # Never with a date: the date wins.
     if "date" not in result or result["date"] is not None:
         if changes.time:
             result["time"] = _clock(changes.time)
@@ -255,7 +357,7 @@ def _changes(changes, people, user_id, user_name):
             result["deadline_time"] = None
     if changes.priority:
         result["priority"] = changes.priority
-    if changes.notes_append:
+    if changes.notes_append and not many:
         result["notes_append"] = changes.notes_append
     if changes.assignee == "nobody":
         result.update(assignee_id=None, assignee_name=None)
@@ -292,20 +394,22 @@ def resolve_commands(commands, context):
                  "issues": issues},
                 issues, project_candidates(ranked(name, matches, lambda project: project["name"]))))
         elif command.kind == "find":
-            list_id, project_name, issues, candidates = _project_ref(command.project_name, visible)
-            scope = [project for project in visible if project["id"] == list_id] if list_id else visible
-            person_id, person_name, more = _person_ref(command.person, command.member_name, _people(scope), user_id)
+            found, issues, candidates = _filters(command.project_name, command.person, command.member_name, visible,
+                                                 user_id)
             resolved.append(_with_candidates(
-                {"kind": "find", "words": command.words, "list_id": list_id, "project_name": project_name,
-                 "person_id": person_id, "person_name": person_name, "status": command.status,
-                 "from": _iso(command.from_date), "to": _iso(command.to_date), "issues": issues + more},
+                {"kind": "find", "words": command.words, **found, "status": command.status,
+                 "from": _iso(command.from_date), "to": _iso(command.to_date), "issues": issues},
                 issues, candidates))
         else:
-            target, issues = _target(command.target or CommandTarget(), visible)
+            many = bool(command.target and command.target.all)
+            target, issues = _target(command.target or CommandTarget(), visible, user_id)
             item = {"kind": command.kind, "target": target}
             if command.kind == "update":
                 scope = [project for project in visible if project["id"] == target["list_id"]] if target["list_id"] else editable
-                item["changes"], more = _changes(command.changes or CommandChanges(), _people(scope), user_id, user_name)
+                item["changes"], more = _changes(command.changes or CommandChanges(), _people(scope),
+                                                 user_id, user_name, many)
+                if many and not item["changes"]:
+                    continue  # Nothing to change in many tasks: the command comes to nothing.
                 issues = issues + more
             item["issues"] = issues
             resolved.append(item)
@@ -327,11 +431,16 @@ def commands_prompt(today, day_of_month):
     prompt's day-of-month rule reads «para el 12»."""
     def day(offset):
         return (today + timedelta(days=offset)).isoformat()
+
+    def weekday(number):
+        # Its next occurrence, today included, as the prompt reads «el lunes» (Monday is 0).
+        return day((number - today.weekday()) % 7)
+    monday = -today.weekday()  # This week's Monday, in days from today.
     twelfth = day_of_month(12)
     deadline = f'"deadline_date":"{twelfth.isoformat()}"' if twelfth else '"deadline_date":null'
     return (
-        "Commands: the words may also ask to create a project, find tasks, change a task or delete a task. "
-        "Return each of these as one item of the commands array, in the order said, and never also as a task. "
+        "Commands: the words may also ask to create a project, find tasks, or change, complete or delete one task or "
+        "many. Return each of these as one item of the commands array, in the order said, and never also as a task. "
         "In the user's words 'grupo', 'proyecto' and 'lista' (Catalan 'grup', 'projecte', 'llista'; English 'group', "
         "'project', 'list') all mean a project. "
         "kind 'project' creates a project when the user asks for one: name is its name as said, starting with a capital, "
@@ -352,13 +461,16 @@ def commands_prompt(today, day_of_month):
         '{"kind":"find","words":["report"],"status":"any"}. '
         "kind 'update' changes one existing task when the user asks to change, move, rename or pass it on: target says "
         "how to find it (words, project_name, and date: its current day, only if said); changes holds only what the user "
-        "asked to change: title, date, time, deadline_date, deadline_time, priority, notes_append (text to add to its "
+        "asked to change: title, date, shift_days (whole days to move it by, keeping its time: positive later, negative "
+        "earlier; never with date), time, deadline_date, deadline_time, priority, notes_append (text to add to its "
         "notes), assignee ('me', 'member' with member_name, or 'nobody'), and clear (any of 'date', 'time', 'deadline', "
         "'deadline_time', to remove them). Leave every other change null. "
         "Example: 'Cambia la cita del médico de dentro de tres días a dentro de una semana' is "
         f'{{"kind":"update","target":{{"words":["médico"],"date":"{day(3)}"}},"changes":{{"date":"{day(7)}"}}}}; '
         "'Mou la reunió de demà a les sis de la tarda' is "
         f'{{"kind":"update","target":{{"words":["reunió"],"date":"{day(1)}"}},"changes":{{"time":"18:00"}}}}; '
+        "'Retrasa dos días la cita del médico' is "
+        '{"kind":"update","target":{"words":["médico"]},"changes":{"shift_days":2}}; '
         "'Give the report task to Paul' is "
         '{"kind":"update","target":{"words":["report"]},"changes":{"assignee":"member","member_name":"Paul"}}. '
         "kind 'delete' deletes one existing task when the user asks to delete or remove it: target as for update. "
@@ -368,6 +480,39 @@ def commands_prompt(today, day_of_month):
         '{"kind":"delete","target":{"words":["pa"]}}; '
         "'Delete the dentist task' is "
         '{"kind":"delete","target":{"words":["dentist"]}}. '
+        "kind 'complete' marks one existing task done when the user asks to mark it done or says it's already done: "
+        "target as for update. Example: 'Ya he llamado al dentista' is "
+        '{"kind":"complete","target":{"words":["dentista"]}}; '
+        "'Mark the report as done' is "
+        '{"kind":"complete","target":{"words":["report"]}}. '
+        "Many tasks at once ('todas', 'todo lo de', 'las tareas de ayer'; Catalan 'totes', 'tot'; English 'all', "
+        "'every', 'everything'): update, delete and complete act on a set, and target has \"all\":true with words "
+        "(usually none; in the singular), project_name, person ('me', or 'member' with member_name), status "
+        "('completed' only for tasks already done, as in 'las completadas'; 'any' for done and pending alike; otherwise "
+        "leave it out), from_date and to_date (inclusive; one day is both; weeks run Monday to Sunday; overdue is "
+        "to_date yesterday without from_date), or undated true for tasks without a date, and never date. A task said in "
+        "the singular is one task, never all: 'Cambia la cita del médico al viernes' is one update. "
+        "Examples: 'Pasa todas las tareas de ayer a mañana' is "
+        f'{{"kind":"update","target":{{"all":true,"from_date":"{day(-1)}","to_date":"{day(-1)}"}},'
+        f'"changes":{{"date":"{day(1)}"}}}}; '
+        "'Pasa lo de esta semana a la semana que viene' is "
+        f'{{"kind":"update","target":{{"all":true,"from_date":"{day(monday)}","to_date":"{day(monday + 6)}"}},'
+        '"changes":{"shift_days":7}}; '
+        "'Pasa todo lo atrasado a hoy' is "
+        f'{{"kind":"update","target":{{"all":true,"to_date":"{day(-1)}"}},"changes":{{"date":"{day(0)}"}}}}; '
+        "'Posa totes les tasques sense data per a dilluns' is "
+        f'{{"kind":"update","target":{{"all":true,"undated":true}},"changes":{{"date":"{weekday(0)}"}}}}; '
+        "'Asigna a Paul todo lo del viernes de Matemáticas' is "
+        f'{{"kind":"update","target":{{"all":true,"project_name":"Matemáticas","from_date":"{weekday(4)}",'
+        f'"to_date":"{weekday(4)}"}},"changes":{{"assignee":"member","member_name":"Paul"}}}}; '
+        "'Make everything for tomorrow high priority' is "
+        f'{{"kind":"update","target":{{"all":true,"from_date":"{day(1)}","to_date":"{day(1)}"}},'
+        '"changes":{"priority":3}}; '
+        "'Marca como hechas todas las de hoy' is "
+        f'{{"kind":"complete","target":{{"all":true,"from_date":"{day(0)}","to_date":"{day(0)}"}}}}; '
+        "'Borra todas las completadas de la semana pasada' is "
+        f'{{"kind":"delete","target":{{"all":true,"status":"completed","from_date":"{day(monday - 7)}",'
+        f'"to_date":"{day(monday - 1)}"}}}}. '
         "Resolve relative dates in commands against the reference, as for tasks. Use the directory for project and "
         "people names. When the words hold only commands, return an empty tasks array.\n"
     )
