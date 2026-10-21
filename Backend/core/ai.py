@@ -9,7 +9,7 @@ import logging
 import time as clock
 import wave
 import uuid
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from functools import partial
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
@@ -231,6 +231,33 @@ def day_of_month_rule(today):
     )
 
 
+WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def calendar_line(today):
+    """The days around the reference with their weekdays, and last, this and next week.
+
+    The model works weekdays out from its own idea of the calendar, often another year's:
+    on Wednesday 21 October 2026 it read «el viernes» as the 24th and «esta semana» as
+    Tuesday to Monday, as in 2025. Spelled out, it doesn't have to."""
+    def named(offset):
+        day = today + timedelta(days=offset)
+        return f"{WEEKDAY_NAMES[day.weekday()]} {day.isoformat()}"
+
+    monday = today - timedelta(days=today.weekday())
+
+    def week(offset):
+        start = monday + timedelta(days=7 * offset)
+        return f"{start.isoformat()} to {(start + timedelta(days=6)).isoformat()}"
+
+    return (
+        f"Calendar (use it for every weekday and week; never work them out yourself): today is {named(0)}. "
+        f"Past days: {', '.join(named(offset) for offset in range(-7, 0))}. "
+        f"Coming days: {', '.join(named(offset) for offset in range(1, 15))}. "
+        f"Weeks run Monday to Sunday: last week is {week(-1)}, this week is {week(0)}, next week is {week(1)}.\n"
+    )
+
+
 def build_prompt(data):
     reference = data["reference_time"].astimezone(ZoneInfo(data["timezone"]))
     commands = bool(data.get("commands"))
@@ -301,6 +328,7 @@ def build_prompt(data):
         + (commands_prompt(reference.date(), partial(day_of_month, today=reference.date())) if commands else "") +
         f"Available context (JSON): {json.dumps(prompt_context(data.get('collaboration_context'), data['text']), ensure_ascii=False)}\n"
         f"Reference: {reference.isoformat()} ({reference.strftime('%A')}); zone: {data['timezone']}\n"
+        + calendar_line(reference.date()) +
         f"User words (JSON string): {json.dumps(data['text'])}"
     )
 

@@ -376,6 +376,10 @@ Whose people are candidates:
 ## Dates
 
 - **Relative dates** («mañana», «dentro de una semana», «el viernes») are resolved against `reference_time` in the request's `timezone`, as for tasks.
+- **Weekdays and weeks come from a calendar in the prompt** (`calendar_line` in `core/ai.py`, every dictation, 2026-10-21):
+  - It lists the past 7 days and the next 14 days, each with its weekday name, and last, this and next week from Monday to Sunday.
+  - Without it, the model read weekdays from another year's calendar. On Wednesday 21 October 2026 it gave «el viernes» as the 24th and «esta semana» as Tuesday to Monday, as in 2025.
+  - With it, the real model got all 16 bulk and single phrases right in ES, CA and EN.
 - **A day of the month said alone** («para el 12», "by the 12th", «el dia 12») means this month if that day hasn't passed yet in that time zone, otherwise next month. Today counts as not passed.
   - The prompt spells the rule out with the reference's own dates, for example "days 18 to 31 are 2026-10-18 to 2026-10-31; days 1 to 17 are 2026-11-01 to 2026-11-17".
   - A day the month doesn't have («el 31» in November) gets no date and a clarification instead, as an ambiguous time does today. The draft keeps it in `clarifications` and `questions`.
