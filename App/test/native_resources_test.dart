@@ -177,7 +177,7 @@ void main() {
   test(
     'UX-121: the shortcuts read Dictar una tarea / Escribir una tarea, matching the app',
     () {
-      expect(en['capture_voice'], 'Dictate a new task');
+      expect(en['capture_voice'], 'Dictate a task');
       expect(es['capture_voice'], 'Dictar una tarea');
       expect(ca['capture_voice'], 'Dicta una tasca');
       expect(es['capture_text'], 'Escribir una tarea');
@@ -784,7 +784,7 @@ void main() {
   // their one-word labels at large text ----
 
   test(
-    'UX-1656: each English long shortcut label is at least 15 characters or its short label, and the short labels are one word',
+    'UX-1656, UX-1658: each English long shortcut label is 13-16 characters or its short label, and the short labels are one word',
     () {
       expect(en['capture_voice_short'], 'Dictate');
       expect(en['capture_text_short'], 'Type');
@@ -799,13 +799,19 @@ void main() {
           matches(RegExp(r'^\S+$')),
           reason: '$short is one word',
         );
+        // The Pixel Launcher keeps a long label it thinks fits, without the
+        // pin button beside it, and cuts it. On the emulator (2026-10-21):
+        // 10-11 characters were cut at 2.0 («Say a ta…»), 18 were cut at 1.0
+        // («Dictate a new ta…»), and 15 («Type a new task») read whole at 1.0
+        // and fell back to «Type» at 2.0.
         expect(
-          longLabel.length >= 15 || longLabel == shortLabel,
+          (longLabel.length >= 13 && longLabel.length <= 16) ||
+              longLabel == shortLabel,
           isTrue,
           reason:
               '$long "$longLabel" is ${longLabel.length} characters: the '
-              'Pixel Launcher shows it cut at 2.0 instead of falling back to '
-              '"$shortLabel"',
+              'Pixel Launcher shows it cut at 1.0 or 2.0 instead of whole, '
+              'or of falling back to "$shortLabel"',
         );
         expect(longLabel.trim(), longLabel);
         expect(longLabel, isNot(contains('  ')));
@@ -866,20 +872,20 @@ void main() {
     },
   );
   // ---- Run 2026-10-19-app round 2 · P222 (UX-1656): the widget gets its own
-  // string, so the English voice shortcut can read “Dictate a new task” ----
+  // string; UX-1658 then made the English voice shortcut “Dictate a task” ----
 
   test(
-    'UX-1656: the English shortcuts read Dictate a new task / Type a new task, one wording, at least 15 characters each',
+    'UX-1656, UX-1658: the English shortcuts read Dictate a task / Type a new task: the voice one is the widget label, and each fits the launcher at 1.0 and falls back at 2.0',
     () {
-      expect(en['capture_voice'], 'Dictate a new task');
+      expect(en['capture_voice'], 'Dictate a task');
+      expect(en['capture_voice'], en['capture_widget_label']);
       expect(en['capture_text'], 'Type a new task');
       expect(en['capture_voice_short'], 'Dictate');
       expect(en['capture_text_short'], 'Type');
       for (final name in ['capture_voice', 'capture_text']) {
-        expect(en[name]!.length, greaterThanOrEqualTo(15), reason: name);
-        // One idea, one wording: each long label is its short label plus
-        // the same “a new task”.
-        expect(en[name], endsWith(' a new task'), reason: name);
+        expect(en[name]!.length, inInclusiveRange(13, 16), reason: name);
+        // Each long label starts with its short label, so both name the
+        // same action.
         expect(en[name], startsWith(en['${name}_short']!), reason: name);
       }
     },
@@ -1001,7 +1007,7 @@ void main() {
   test(
     'UX-1657: in English the voice shortcut, its short label and the widget all start with Dictate, and no English Android string says “say a task”',
     () {
-      expect(en['capture_voice'], 'Dictate a new task');
+      expect(en['capture_voice'], 'Dictate a task');
       expect(en['capture_voice_short'], 'Dictate');
       for (final name in [
         'capture_voice',
@@ -1121,7 +1127,7 @@ void main() {
         'share_queue_full': 'Obre TaskFlow i acaba el que ja has compartit.',
         'share_not_saved': 'No s’ha pogut desar. Torna-ho a compartir.',
       });
-      expect(en['capture_voice'], 'Dictate a new task');
+      expect(en['capture_voice'], 'Dictate a task');
       expect(en['capture_voice_short'], 'Dictate');
       expect(en['capture_text'], 'Type a new task');
       expect(en['capture_text_short'], 'Type');

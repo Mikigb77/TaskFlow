@@ -1,9 +1,9 @@
 <resources>
-    <!-- Launcher shortcut, long label: shown where the launcher has room. About 25 characters at most. -->
-    <string name="capture_voice">Dictate a new task</string>
+    <!-- Launcher shortcut, long label: shown where the launcher has room. The Pixel Launcher keeps a long label it thinks fits and cuts it, so in English keep it at 13-16 characters: whole at normal text, and long enough that it falls back to the short label at large text (emulator, 2026-10-21). -->
+    <string name="capture_voice">Dictate a task</string>
     <!-- Launcher shortcut, short label: one word, shown at large text. About 10 characters at most. -->
     <string name="capture_voice_short">Dictate</string>
-    <!-- Launcher shortcut, long label: shown where the launcher has room. About 25 characters at most. -->
+    <!-- Launcher shortcut, long label: shown where the launcher has room. In English keep it at 13-16 characters, as for capture_voice. -->
     <string name="capture_text">Type a new task</string>
     <!-- Launcher shortcut, short label: one word, shown at large text. About 10 characters at most. -->
     <string name="capture_text_short">Type</string>
