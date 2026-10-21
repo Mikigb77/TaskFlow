@@ -9,6 +9,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
+import 'package:agenda/services/bulk_plan.dart';
 import 'package:agenda/services/command_plan.dart';
 import 'package:agenda/services/task_matcher.dart';
 import 'package:agenda/services/text_search.dart';
@@ -19,6 +20,7 @@ import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show DateFormat;
 
 /// A command as its card shows it: what it found on the phone, and what the
 /// confirming tap would do. Worked out again on every build, from the tasks
@@ -33,6 +35,7 @@ class CommandView {
     this.plan,
     this.viewOnly,
     this.asks = false,
+    this.bulk,
   });
   final CaptureCommand command;
 
@@ -56,9 +59,12 @@ class CommandView {
   /// `update`: what would change.
   final UpdatePlan? plan;
 
-  /// `update` and `delete`, when nothing the person can edit matches: the
-  /// first task that would, in a project they can only view.
+  /// `update`, `delete` and `complete`, when nothing the person can edit
+  /// matches: the first task that would, in a project they can only view.
   final Task? viewOnly;
+
+  /// A bulk command's set: the tasks its card lists, and what the tap does.
+  final BulkPlan? bulk;
 
   CommandKind get kind => command.kind;
 
@@ -68,19 +74,31 @@ class CommandView {
   /// Several tasks match and none was tapped yet.
   bool get choosing => target == null && matches.length > 1;
 
-  /// The task to change or delete isn't on the phone.
+  /// The task to change, delete or complete isn't on the phone.
   bool get notFound =>
-      (kind == CommandKind.update || kind == CommandKind.delete) &&
+      (kind == CommandKind.update ||
+          kind == CommandKind.delete ||
+          kind == CommandKind.complete) &&
+      bulk == null &&
       target == null &&
       !choosing;
+
+  /// `complete`: the task meant is done already.
+  bool get alreadyDone =>
+      kind == CommandKind.complete &&
+      bulk == null &&
+      target != null &&
+      TaskMatcher.done(target!);
 
   /// The confirming tap does something for it.
   bool get actionable => switch (kind) {
     CommandKind.project =>
       !command.existing &&
           (!asks || command.choice == CaptureCommand.createChoice),
-    CommandKind.update => plan?.ready == true,
-    CommandKind.delete => stored != null,
+    CommandKind.update => bulk != null ? bulk!.count > 0 : plan?.ready == true,
+    CommandKind.delete => bulk != null ? bulk!.count > 0 : stored != null,
+    CommandKind.complete =>
+      bulk != null ? bulk!.count > 0 : stored != null && !alreadyDone,
     CommandKind.find => false,
   };
 
@@ -88,8 +106,11 @@ class CommandView {
   bool get blocking => switch (kind) {
     CommandKind.project => asking,
     CommandKind.update =>
-      choosing || plan?.needsDay == true || plan?.asksMember == true,
-    CommandKind.delete => choosing,
+      bulk != null
+          ? bulk!.waits
+          : choosing || plan?.needsDay == true || plan?.asksMember == true,
+    CommandKind.delete ||
+    CommandKind.complete => bulk != null ? bulk!.waits : choosing,
     CommandKind.find => false,
   };
 
@@ -130,12 +151,26 @@ CommandView resolveCommand(
       );
     case CommandKind.update:
     case CommandKind.delete:
+    case CommandKind.complete:
+      if (command.bulk) {
+        return CommandView(
+          command,
+          bulk: planBulk(
+            command,
+            tasks: tasks,
+            projects: projects,
+            accountId: accountId,
+          ),
+        );
+      }
       bool canEdit(String? id) =>
           id == null || projects.any((p) => p.id == id && p.canEdit);
+      final completing = command.kind == CommandKind.complete;
       final matches = TaskMatcher.targets(
         tasks,
         command.target,
         canEdit: canEdit,
+        completing: completing,
       );
       // None to edit: the same search among all, for the line saying why.
       final viewOnly = matches.isNotEmpty
@@ -144,6 +179,7 @@ CommandView resolveCommand(
               tasks,
               command.target,
               canEdit: (_) => true,
+              completing: completing,
             ).where((task) => !canEdit(task.listId)).firstOrNull;
       final chosen = command.taskId == null
           ? null
@@ -594,26 +630,16 @@ class FindCommandCard extends ConsumerWidget {
     final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final project = projects.where((p) => p.id == command.listId).firstOrNull;
-    final person = command.personId == null
-        ? null
-        : projects
-              .expand((p) => p.people)
-              .where((p) => p.id == command.personId)
-              .firstOrNull;
-    final mine = command.personId != null && command.personId == accountId;
-    final heading = command.words.isNotEmpty
-        ? l.commandFindWords(_words(command.words))
-        : project != null && mine
-        ? l.commandFindProjectMine(project.name)
-        : project != null && person != null
-        ? l.commandFindProjectPerson(project.name, person.name)
-        : project != null
-        ? l.commandFindProject(project.name)
-        : mine
-        ? l.commandFindMine
-        : person != null
-        ? l.commandFindPerson(person.name)
-        : l.tasks;
+    final heading =
+        _about(
+          context,
+          words: command.words,
+          listId: command.listId,
+          personId: command.personId,
+          projects: projects,
+          accountId: accountId,
+        ) ??
+        l.tasks;
     final unresolved =
         command.projectName != null || command.personName != null;
     final found = view.found;
@@ -665,6 +691,41 @@ class FindCommandCard extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// What a search, or a set, is about in words: «Tareas con «médico»»,
+/// «Tus tareas de «Física»», «Tareas para Paul». Null when only a period or
+/// a status narrows it.
+String? _about(
+  BuildContext context, {
+  required List<String> words,
+  required String? listId,
+  required int? personId,
+  required List<TaskListInfo> projects,
+  required int? accountId,
+}) {
+  final l = context.l10n;
+  final project = projects.where((p) => p.id == listId).firstOrNull;
+  final person = personId == null
+      ? null
+      : projects
+            .expand((p) => p.people)
+            .where((p) => p.id == personId)
+            .firstOrNull;
+  final mine = personId != null && personId == accountId;
+  return words.isNotEmpty
+      ? l.commandFindWords(_words(words))
+      : project != null && mine
+      ? l.commandFindProjectMine(project.name)
+      : project != null && person != null
+      ? l.commandFindProjectPerson(project.name, person.name)
+      : project != null
+      ? l.commandFindProject(project.name)
+      : mine
+      ? l.commandFindMine
+      : person != null
+      ? l.commandFindPerson(person.name)
+      : null;
 }
 
 /// The period and the status a search used, under its heading: «Mañana»,
@@ -773,6 +834,13 @@ class _FoundRow extends ConsumerWidget {
   }
 }
 
+/// A task's day as a command's card lists it: its day and time, or its
+/// deadline when it has only that.
+String _dayOf(BuildContext context, Task task) =>
+    task.displayDate == null && task.deadline != null
+    ? taskDeadlineLabel(context, task)
+    : taskDayLine(context, task);
+
 /// Completed, as a found row says: the repetition shown, or the task (a
 /// repeating one when none is left open).
 bool _completed(Task task) => task.occurrenceDate != null
@@ -830,9 +898,7 @@ class _ChoiceState extends State<_Choice> {
                     Text(task.title, style: theme.textTheme.bodyLarge),
                     Text(
                       [
-                        task.displayDate == null && task.deadline != null
-                            ? taskDeadlineLabel(context, task)
-                            : taskDayLine(context, task),
+                        _dayOf(context, task),
                         if (_completed(task)) l.commandCompleted,
                       ].join(' · '),
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -1159,9 +1225,15 @@ class UpdateCommandCard extends ConsumerWidget {
               ],
             ),
           ),
+        // Moved by days, with no day to move: it stays.
+        if (plan.noDay && plan.isEmpty)
+          _Note(l.commandBulkLeftNoDay(1), icon: Icons.info_outline),
         // Nothing to change: already as asked (unless a line above says
         // why not), or nothing asked, and then it opens to edit.
-        if (plan.isEmpty && !plan.needsDay && plan.problem == null)
+        if (plan.isEmpty &&
+            !plan.needsDay &&
+            !plan.noDay &&
+            plan.problem == null)
           plan.asked
               ? _Note(l.commandNothingToChange)
               : Align(
@@ -1255,6 +1327,463 @@ class DeleteCommandCard extends StatelessWidget {
         if (_completed(shown)) _Note(l.commandCompleted),
         if (view.matches.length > 1)
           _another(context, view, onChanged, enabled),
+      ],
+    );
+  }
+}
+
+/// `complete`: the task with its day, which the confirming tap marks done
+/// («Marcar como hecha»), as ticking it does: a repeating task's repetition.
+/// Or the list to choose it from, or that it wasn't found, or that it is
+/// done already.
+class CompleteCommandCard extends StatelessWidget {
+  const CompleteCommandCard({
+    super.key,
+    required this.view,
+    required this.onChanged,
+    required this.onRemove,
+    this.enabled = true,
+  });
+  final CommandView view;
+  final ValueChanged<CaptureCommand> onChanged;
+  final VoidCallback onRemove;
+  final bool enabled;
+
+  static const _icon = Icons.task_alt_rounded;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    if (view.notFound) {
+      return _Frame(
+        children: [_Header(icon: _icon, text: _notFound(context, view))],
+      );
+    }
+    if (view.choosing) {
+      return _Frame(
+        children: [
+          _Header(
+            icon: _icon,
+            text: l.commandWhichToComplete,
+            onRemove: onRemove,
+            removeLabel: l.commandDontCompleteAny,
+            enabled: enabled,
+          ),
+          _Choice(view: view, onChanged: onChanged, enabled: enabled),
+        ],
+      );
+    }
+    final shown = view.target!;
+    return _Frame(
+      children: [
+        _Header(
+          icon: _icon,
+          text: shown.title,
+          onRemove: onRemove,
+          removeLabel: l.commandDontComplete(shown.title),
+          enabled: enabled,
+        ),
+        _Note(_dayOf(context, shown)),
+        if (view.alreadyDone) _Note(l.commandNothingToChange),
+        if (view.matches.length > 1)
+          _another(context, view, onChanged, enabled),
+      ],
+    );
+  }
+}
+
+/// The person a bulk change assigns the tasks to, as projects name them.
+String _assignee(CaptureCommand command, List<TaskListInfo> projects) {
+  final changes = command.changes;
+  final id = changes.assigneeId;
+  final person = id == null
+      ? null
+      : projects.expand((p) => p.people).where((p) => p.id == id).firstOrNull;
+  return person?.name ?? changes.assigneeName ?? '';
+}
+
+/// A bulk command's heading, with its live [BulkPlan.count]: «Mover 5 tareas
+/// a mañana, jue 22», «Mover 3 tareas una semana después», «Asignar 4
+/// tareas a Paul», «Cambiar 4 tareas», «Marcar 4 tareas como hechas»,
+/// «Eliminar 6 tareas».
+String bulkHeading(
+  BuildContext context,
+  CommandView view,
+  List<TaskListInfo> projects,
+) {
+  final l = context.l10n;
+  final bulk = view.bulk!;
+  final count = bulk.count;
+  final changes = view.command.changes;
+  switch (bulk.action) {
+    case BulkAction.move:
+      final date = changes.date!;
+      final today = DateUtils.dateOnly(DateTime.now());
+      final day = Task.day(date);
+      final when = day == today
+          ? 'today'
+          : day == DateTime(today.year, today.month, today.day + 1)
+          ? 'tomorrow'
+          : 'other';
+      // Today and tomorrow need no month: «mañana, jue 22».
+      final shown = when == 'other'
+          ? context.weekdayDate(date)
+          : DateFormat('E d', context.localeName).format(date);
+      return l.commandBulkMoveTo(count, when, shown);
+    case BulkAction.shift:
+      final days = changes.shiftDays!;
+      final weeks = days % 7 == 0;
+      final span = l.commandBulkSpan(
+        (weeks ? days ~/ 7 : days).abs(),
+        weeks ? 'weeks' : 'days',
+      );
+      return l.commandBulkShift(count, span, days < 0 ? 'earlier' : 'later');
+    case BulkAction.assign:
+      return l.commandBulkAssignTo(count, _assignee(view.command, projects));
+    case BulkAction.change:
+      return l.commandBulkChange(count);
+    case BulkAction.complete:
+      return l.commandBulkComplete(count);
+    case BulkAction.delete:
+      return l.commandBulkDelete(count);
+  }
+}
+
+/// The confirming button for a result whose one card is a bulk command: its
+/// verb and live count, «Mover 5 tareas», «Eliminar 6 tareas».
+String bulkButton(BuildContext context, BulkPlan bulk) {
+  final l = context.l10n;
+  final count = bulk.count;
+  return switch (bulk.action) {
+    BulkAction.move || BulkAction.shift => l.commandBulkMove(count),
+    BulkAction.assign => l.commandBulkAssign(count),
+    BulkAction.change => l.commandBulkChange(count),
+    BulkAction.complete => l.commandBulkComplete(count),
+    BulkAction.delete => l.commandBulkDelete(count),
+  };
+}
+
+/// What a bulk change sets on each task, beyond what its heading says:
+/// «Hora: 18:00 · Prioridad: Alta». Null when the heading says it all.
+String? _bulkSets(
+  BuildContext context,
+  CommandView view,
+  List<TaskListInfo> projects,
+) {
+  final l = context.l10n;
+  final changes = view.command.changes;
+  final action = view.bulk!.action;
+  String clock(({int hour, int minute}) time) =>
+      context.clockTime(DateTime(2000, 1, 1, time.hour, time.minute));
+  String? deadline() {
+    if (!changes.has('deadline_date') && !changes.has('deadline_time')) {
+      return null;
+    }
+    if (changes.has('deadline_date')) {
+      final date = changes.deadlineDate;
+      if (date == null) return l.deadlineUnset;
+      final time = changes.deadlineTime;
+      return time == null
+          ? context.weekdayDate(date)
+          : '${context.weekdayDate(date)} · ${clock(time)}';
+    }
+    final time = changes.deadlineTime;
+    return time == null ? l.anyTime : clock(time);
+  }
+
+  final due = deadline();
+  final parts = [
+    // A day taken away; a new day is the heading's.
+    if (changes.has('date') && changes.date == null)
+      l.commandBulkField(l.reviewSchedule, l.noDate),
+    if (changes.has('time'))
+      l.commandBulkField(
+        l.time,
+        changes.time == null ? l.anyTime : clock(changes.time!),
+      ),
+    if (due != null) l.commandBulkField(l.deadline, due),
+    if (changes.priority case final priority?)
+      l.commandBulkField(l.priority, context.priorityName(priority)),
+    if (action != BulkAction.assign &&
+        changes.assigns &&
+        !changes.hasUnresolved)
+      l.commandBulkField(
+        l.commandAssignee,
+        changes.assignsNobody
+            ? l.assignedToGroup
+            : _assignee(view.command, projects),
+      ),
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
+/// What a bulk command left out, in one line: «2 tareas que se repiten no
+/// cambian». Null when nothing was.
+String? _bulkLeftOut(
+  BuildContext context,
+  CommandView view,
+  List<TaskListInfo> projects,
+) {
+  final l = context.l10n;
+  final bulk = view.bulk!;
+  final parts = [
+    if (bulk.repeating > 0)
+      l.commandBulkLeftRepeating(bulk.repeating, switch (view.kind) {
+        CommandKind.delete => 'delete',
+        CommandKind.complete => 'complete',
+        _ => 'change',
+      }),
+    if (bulk.unassignable > 0)
+      l.commandBulkLeftUnassignable(
+        bulk.unassignable,
+        _assignee(view.command, projects),
+      ),
+    if (bulk.noDay > 0) l.commandBulkLeftNoDay(bulk.noDay),
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
+/// What a set that matched nothing looked for: «No hay tareas pendientes de
+/// ayer».
+String _bulkNone(BuildContext context, CommandTarget target) {
+  final l = context.l10n;
+  final from = target.from;
+  final to = target.to;
+  final today = DateUtils.dateOnly(DateTime.now());
+  bool on(DateTime day, int days) => DateUtils.isSameDay(
+    day,
+    DateTime(today.year, today.month, today.day + days),
+  );
+  final kind = target.undated
+      ? 'undated'
+      : from != null && to != null
+      ? !DateUtils.isSameDay(from, to)
+            ? 'range'
+            : on(from, 0)
+            ? 'today'
+            : on(from, -1)
+            ? 'yesterday'
+            : on(from, 1)
+            ? 'tomorrow'
+            : 'other'
+      : to != null
+      ? 'until'
+      : from != null
+      ? 'since'
+      : null;
+  final period = kind == null
+      ? ''
+      : l.commandBulkPeriod(
+          kind,
+          from == null ? '' : context.weekdayDate(from),
+          to == null ? '' : context.weekdayDate(to),
+        );
+  return l.commandBulkNone(target.status, period).trim();
+}
+
+/// A bulk command (Backend/docs/VOICE_COMMANDS.md, «The card»): its action
+/// and live count, what it sets, one line for what was left out, and the
+/// tasks with their current day, each ticked; untick one to leave it out.
+/// Nothing changes before the confirming tap. Or one line saying why there
+/// is nothing to do: nothing matched, more than 200 did, or a project or a
+/// person wasn't found.
+class BulkCommandCard extends ConsumerStatefulWidget {
+  const BulkCommandCard({
+    super.key,
+    required this.view,
+    required this.onChanged,
+    required this.onRemove,
+    this.enabled = true,
+  });
+  final CommandView view;
+  final ValueChanged<CaptureCommand> onChanged;
+  final VoidCallback onRemove;
+  final bool enabled;
+
+  @override
+  ConsumerState<BulkCommandCard> createState() => _BulkCommandCardState();
+}
+
+class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _toggle(String key) {
+    final command = widget.view.command;
+    final excluded = {...command.excluded};
+    if (!excluded.remove(key)) excluded.add(key);
+    widget.onChanged(command.copyWith(excluded: excluded.toList()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final view = widget.view;
+    final command = view.command;
+    final target = command.target;
+    final bulk = view.bulk!;
+    final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
+    final accountId = ref.watch(authProvider).account?.id;
+    final delete = command.kind == CommandKind.delete;
+    final icon = switch (command.kind) {
+      CommandKind.delete => Icons.delete_outline_rounded,
+      CommandKind.complete => Icons.task_alt_rounded,
+      _ => Icons.edit_outlined,
+    };
+    Widget header(String text, {bool removable = false}) => _Header(
+      icon: icon,
+      text: text,
+      color: delete && removable ? colors.error : null,
+      onRemove: removable ? widget.onRemove : null,
+      removeLabel: switch (command.kind) {
+        CommandKind.delete => l.commandDontDeleteAny,
+        CommandKind.complete => l.commandDontCompleteAny,
+        _ => l.commandDontChangeAny,
+      },
+      enabled: widget.enabled,
+    );
+    String person(String name) => command.issues.contains('ambiguous_member')
+        ? l.commandAmbiguousMember(name)
+        : l.commandPersonNotFound(name);
+
+    // A project or person said that wasn't found: nothing was searched.
+    if (target.projectName case final name?) {
+      return _Frame(children: [header(l.commandProjectNotFound(name))]);
+    }
+    if (target.personName case final name?) {
+      return _Frame(children: [header(person(name))]);
+    }
+    if (bulk.tooMany) {
+      return _Frame(children: [header(l.commandBulkTooMany(bulk.matched))]);
+    }
+    // Nothing said to change: the tasks, as a search lists them; each opens
+    // to edit, as one task's card does.
+    if (bulk.unasked case final found when found.isNotEmpty) {
+      return _Frame(
+        children: [
+          header(
+            _about(
+                  context,
+                  words: target.words,
+                  listId: target.listId,
+                  personId: target.personId,
+                  projects: projects,
+                  accountId: accountId,
+                ) ??
+                l.tasks,
+          ),
+          for (final task in found.take(FindCommandCard.shown))
+            _FoundRow(task: task),
+          if (found.length > FindCommandCard.shown)
+            _Note(l.commandMore(found.length - FindCommandCard.shown)),
+        ],
+      );
+    }
+    final changes = command.changes;
+    // Someone named for the tasks who wasn't found: said once.
+    final problem = changes.hasUnresolved
+        ? person(changes.assigneeName ?? '')
+        : null;
+    final leftOut = _bulkLeftOut(context, view, projects);
+    if (bulk.items.isEmpty) {
+      if (bulk.matched == 0 && bulk.repeating == 0) {
+        if (bulk.viewOnly case final task?) {
+          return _Frame(children: [header(l.commandViewOnly(task.title))]);
+        }
+        final about = _about(
+          context,
+          words: target.words,
+          listId: target.listId,
+          personId: target.personId,
+          projects: projects,
+          accountId: accountId,
+        );
+        return _Frame(
+          children: [
+            header(_bulkNone(context, target)),
+            if (about != null) _Note(about),
+          ],
+        );
+      }
+      // Tasks matched, and none of them would change: why, in one line.
+      return _Frame(
+        children: [
+          header(problem ?? leftOut ?? l.commandNothingToChange),
+          if (problem != null && leftOut != null)
+            _Note(leftOut, icon: Icons.info_outline),
+        ],
+      );
+    }
+    final sets = command.kind == CommandKind.update
+        ? _bulkSets(context, view, projects)
+        : null;
+    Widget row(BulkItem item) {
+      final task = item.shown;
+      final day = [
+        _dayOf(context, task),
+        if (target.status != 'completed' && _completed(task))
+          l.commandCompleted,
+      ].join(' · ');
+      return CheckboxListTile(
+        key: ValueKey('bulk-${command.id}-${item.key}'),
+        value: !bulk.excluded.contains(item.key),
+        onChanged: widget.enabled ? (_) => _toggle(item.key) : null,
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: const EdgeInsetsDirectional.only(end: 8),
+        activeColor: delete ? colors.error : null,
+        checkColor: delete ? colors.onError : null,
+        title: Text(task.title),
+        subtitle: Text(day),
+      );
+    }
+
+    // A long list scrolls inside the card, so a result's other cards stay
+    // near. At large text a window that small would show one task at a
+    // time, so the rows go in the sheet's own scroll instead.
+    final large = MediaQuery.textScalerOf(context).scale(10) >= 15;
+    final list = large
+        ? Column(children: [for (final item in bulk.items) row(item)])
+        : ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: math.max(
+                160.0,
+                MediaQuery.sizeOf(context).height * 0.4,
+              ),
+            ),
+            child: Scrollbar(
+              controller: _scroll,
+              thumbVisibility: true,
+              child: ListView.builder(
+                controller: _scroll,
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: bulk.items.length,
+                itemBuilder: (context, index) => row(bulk.items[index]),
+              ),
+            ),
+          );
+    return _Frame(
+      destructive: delete,
+      children: [
+        header(bulkHeading(context, view, projects), removable: true),
+        if (sets != null) _Note(sets),
+        if (problem != null) _Note(problem, icon: Icons.info_outline),
+        // Apart from the ✕ above, so the first task isn't tapped for it.
+        const SizedBox(height: 8),
+        list,
+        // What was left out, in one line, after the list.
+        if (leftOut != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: _Note(leftOut, icon: Icons.info_outline),
+          ),
       ],
     );
   }

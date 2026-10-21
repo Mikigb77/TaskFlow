@@ -4262,4 +4262,264 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get commandAssignee => 'Responsable';
+
+  @override
+  String get commandMarkDone => 'Marca com a feta';
+
+  @override
+  String get commandWhichToComplete => 'Quina vols marcar com a feta?';
+
+  @override
+  String commandDontComplete(String title) {
+    return 'No completis $title';
+  }
+
+  @override
+  String get commandDontCompleteAny => 'No en completis cap';
+
+  @override
+  String get commandWontComplete => 'No es completarà';
+
+  @override
+  String commandTasksCompleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques completades',
+      one: 'Tasca completada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandTasksMoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques mogudes',
+      one: 'Tasca moguda',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkMoveTo(int count, String when, String day) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques a avui, $day',
+      one: 'Mou 1 tasca a avui, $day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques a demà, $day',
+      one: 'Mou 1 tasca a demà, $day',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques al $day',
+      one: 'Mou 1 tasca al $day',
+    );
+    String _temp3 = intl.Intl.selectLogic(when, {
+      'today': '$_temp0',
+      'tomorrow': '$_temp1',
+      'other': '$_temp2',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String commandBulkShift(int count, String span, String direction) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques $span abans',
+      one: 'Mou 1 tasca $span abans',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques $span més tard',
+      one: 'Mou 1 tasca $span més tard',
+    );
+    String _temp2 = intl.Intl.selectLogic(direction, {
+      'earlier': '$_temp0',
+      'other': '$_temp1',
+    });
+    return '$_temp2';
+  }
+
+  @override
+  String commandBulkSpan(int amount, String unit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      amount,
+      locale: localeName,
+      other: '$amount setmanes',
+      one: 'una setmana',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      amount,
+      locale: localeName,
+      other: '$amount dies',
+      one: 'un dia',
+    );
+    String _temp2 = intl.Intl.selectLogic(unit, {
+      'weeks': '$_temp0',
+      'other': '$_temp1',
+    });
+    return '$_temp2';
+  }
+
+  @override
+  String commandBulkMove(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques',
+      one: 'Mou 1 tasca',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkAssignTo(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Assigna $count tasques a $name',
+      one: 'Assigna 1 tasca a $name',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkAssign(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Assigna $count tasques',
+      one: 'Assigna 1 tasca',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkChange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Canvia $count tasques',
+      one: 'Canvia 1 tasca',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkComplete(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Marca $count tasques com a fetes',
+      one: 'Marca 1 tasca com a feta',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkDelete(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Suprimeix $count tasques',
+      one: 'Suprimeix 1 tasca',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkField(String label, String value) {
+    return '$label: $value';
+  }
+
+  @override
+  String commandBulkLeftRepeating(int count, String action) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques que es repeteixen no se suprimeixen',
+      one: '1 tasca que es repeteix no se suprimeix',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques que es repeteixen no es completen',
+      one: '1 tasca que es repeteix no es completa',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques que es repeteixen no canvien',
+      one: '1 tasca que es repeteix no canvia',
+    );
+    String _temp3 = intl.Intl.selectLogic(action, {
+      'delete': '$_temp0',
+      'complete': '$_temp1',
+      'other': '$_temp2',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String commandBulkLeftUnassignable(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques no es poden assignar a $name',
+      one: '1 tasca no es pot assignar a $name',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkLeftNoDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques sense data no canvien',
+      one: '1 tasca sense data no canvia',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkNone(String status, String period) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'completed': 'No hi ha tasques completades $period',
+      'any': 'No hi ha tasques $period',
+      'other': 'No hi ha tasques pendents $period',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkPeriod(String kind, String from, String to) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'today': 'd’avui',
+      'yesterday': 'd’ahir',
+      'tomorrow': 'de demà',
+      'range': 'del $from al $to',
+      'until': 'fins al $to',
+      'since': 'des del $from',
+      'undated': 'sense data',
+      'other': 'del $from',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkTooMany(int count) {
+    return 'Són $count tasques. Digues-ho amb menys, per exemple un dia o un projecte.';
+  }
 }

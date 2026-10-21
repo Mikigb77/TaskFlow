@@ -6273,6 +6273,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assignee'**
   String get commandAssignee;
+
+  /// The confirming button of a dictation's result whose only command marks one task as done (“I've already done…”). After the tap, commandTasksCompleted shows with Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as done'**
+  String get commandMarkDone;
+
+  /// A dictation asked to mark a task as done and several match: a short list to tap one follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one do you want to mark as done?'**
+  String get commandWhichToComplete;
+
+  /// Tooltip and screen-reader label of the ✕ on a card that marks a task as done in a dictation's result: the task stays to do. {title} is the task's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t complete {title}'**
+  String commandDontComplete(String title);
+
+  /// Tooltip and screen-reader label of the ✕ on a card that marks tasks as done, while it asks which one (commandWhichToComplete) or lists a set of them: none is marked done.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t complete any'**
+  String get commandDontCompleteAny;
+
+  /// Message, with Undo, after the ✕ on a card that marks tasks as done in a dictation's result: nothing is marked.
+  ///
+  /// In en, this message translates to:
+  /// **'Won’t be completed'**
+  String get commandWontComplete;
+
+  /// Brief message after a dictation marked tasks as done, with Undo. For one task it matches taskCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task completed} other{{count} tasks completed}}'**
+  String commandTasksCompleted(int count);
+
+  /// Brief message after a dictation moved several tasks to another day or time, with Undo. One task moved by a change of its own says movedOccurrenceDate instead.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task moved} other{{count} tasks moved}}'**
+  String commandTasksMoved(int count);
+
+  /// Heading of a dictation's card that moves a set of tasks to one day (“move all of yesterday's tasks to tomorrow”); each keeps its time. {count} is how many are still ticked, and changes as the person unticks them. {when} is today, tomorrow or other. {day} is, for today and tomorrow, the weekday and the day of the month (“Thu 22”); otherwise the day weekday first, as the app shows days (“Thu, Oct 29”).
+  ///
+  /// In en, this message translates to:
+  /// **'{when, select, today{{count, plural, =1{Move 1 task to today, {day}} other{Move {count} tasks to today, {day}}}} tomorrow{{count, plural, =1{Move 1 task to tomorrow, {day}} other{Move {count} tasks to tomorrow, {day}}}} other{{count, plural, =1{Move 1 task to {day}} other{Move {count} tasks to {day}}}}}'**
+  String commandBulkMoveTo(int count, String when, String day);
+
+  /// Heading of a dictation's card that moves a set of tasks by some days, each keeping its time (“move this week's to next week”). {count} is how many are still ticked. {span} is commandBulkSpan (“a week”, “2 days”). {direction} is earlier or later.
+  ///
+  /// In en, this message translates to:
+  /// **'{direction, select, earlier{{count, plural, =1{Move 1 task {span} earlier} other{Move {count} tasks {span} earlier}}} other{{count, plural, =1{Move 1 task {span} later} other{Move {count} tasks {span} later}}}}'**
+  String commandBulkShift(int count, String span, String direction);
+
+  /// How far commandBulkShift moves the tasks: in weeks when it is whole weeks ({unit} weeks), otherwise in days. {amount} is how many.
+  ///
+  /// In en, this message translates to:
+  /// **'{unit, select, weeks{{amount, plural, =1{a week} other{{amount} weeks}}} other{{amount, plural, =1{a day} other{{amount} days}}}}'**
+  String commandBulkSpan(int amount, String unit);
+
+  /// The confirming button of a dictation's result that moves a set of tasks (commandBulkMoveTo, commandBulkShift). {count} is how many are still ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Move 1 task} other{Move {count} tasks}}'**
+  String commandBulkMove(int count);
+
+  /// Heading of a dictation's card that assigns a set of tasks to someone. {count} is how many are still ticked; {name} is that person.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Assign 1 task to {name}} other{Assign {count} tasks to {name}}}'**
+  String commandBulkAssignTo(int count, String name);
+
+  /// The confirming button of a dictation's result that assigns a set of tasks (commandBulkAssignTo). {count} is how many are still ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Assign 1 task} other{Assign {count} tasks}}'**
+  String commandBulkAssign(int count);
+
+  /// Heading, and confirming button, of a dictation's card that changes a set of tasks in another way (time, priority, deadline): what it sets is the line under it (commandBulkField). {count} is how many are still ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Change 1 task} other{Change {count} tasks}}'**
+  String commandBulkChange(int count);
+
+  /// Heading, and confirming button, of a dictation's card that marks a set of tasks as done. {count} is how many are still ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Mark 1 task as done} other{Mark {count} tasks as done}}'**
+  String commandBulkComplete(int count);
+
+  /// Heading, and confirming button in the delete style, of a dictation's card that deletes a set of tasks. {count} is how many are still ticked. Undo brings them all back.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Delete 1 task} other{Delete {count} tasks}}'**
+  String commandBulkDelete(int count);
+
+  /// Under the heading of a dictation's card that changes a set of tasks: one thing it sets on each, as label and value (“Time: 18:00”, “Priority: High”). Several are joined with ·.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value}'**
+  String commandBulkField(String label, String value);
+
+  /// On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change).
+  ///
+  /// In en, this message translates to:
+  /// **'{action, select, delete{{count, plural, =1{1 repeating task won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{1 repeating task won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{1 repeating task won’t change} other{{count} repeating tasks won’t change}}}}'**
+  String commandBulkLeftRepeating(int count, String action);
+
+  /// On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 task can’t be assigned to {name}} other{{count} tasks can’t be assigned to {name}}}'**
+  String commandBulkLeftUnassignable(int count, String name);
+
+  /// On a dictation's card that moves tasks by some days or sets their time: tasks with no date (and no deadline) are left as they are. {count} is how many.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 task with no date won’t change} other{{count} tasks with no date won’t change}}'**
+  String commandBulkLeftNoDay(int count);
+
+  /// A dictation's card for a set of tasks when none matched: what was looked for. {status} is completed, any or other (still to do, the default). {period} is commandBulkPeriod, or empty when no period was said.
+  ///
+  /// In en, this message translates to:
+  /// **'{status, select, completed{There are no completed tasks {period}} any{There are no tasks {period}} other{There are no unfinished tasks {period}}}'**
+  String commandBulkNone(String status, String period);
+
+  /// The period at the end of commandBulkNone. {kind} is today, yesterday, tomorrow, range (two days), until (up to a day), since (from a day on), undated (tasks with no date) or other (one day). {from} and {to} are days, weekday first (“Thu, Oct 22”).
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, today{from today} yesterday{from yesterday} tomorrow{for tomorrow} range{from {from} to {to}} until{up to {to}} since{from {from} on} undated{with no date} other{on {from}}}'**
+  String commandBulkPeriod(String kind, String from, String to);
+
+  /// A dictation's card for a set of more than 200 tasks: nothing is listed and nothing can be applied; the person says it again for fewer. {count} is how many matched.
+  ///
+  /// In en, this message translates to:
+  /// **'That’s {count} tasks. Narrow it down, for example to one day or one project.'**
+  String commandBulkTooMany(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -4180,4 +4180,264 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commandAssignee => 'Assignee';
+
+  @override
+  String get commandMarkDone => 'Mark as done';
+
+  @override
+  String get commandWhichToComplete => 'Which one do you want to mark as done?';
+
+  @override
+  String commandDontComplete(String title) {
+    return 'Don’t complete $title';
+  }
+
+  @override
+  String get commandDontCompleteAny => 'Don’t complete any';
+
+  @override
+  String get commandWontComplete => 'Won’t be completed';
+
+  @override
+  String commandTasksCompleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks completed',
+      one: 'Task completed',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandTasksMoved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks moved',
+      one: 'Task moved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkMoveTo(int count, String when, String day) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count tasks to today, $day',
+      one: 'Move 1 task to today, $day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count tasks to tomorrow, $day',
+      one: 'Move 1 task to tomorrow, $day',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count tasks to $day',
+      one: 'Move 1 task to $day',
+    );
+    String _temp3 = intl.Intl.selectLogic(when, {
+      'today': '$_temp0',
+      'tomorrow': '$_temp1',
+      'other': '$_temp2',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String commandBulkShift(int count, String span, String direction) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count tasks $span earlier',
+      one: 'Move 1 task $span earlier',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count tasks $span later',
+      one: 'Move 1 task $span later',
+    );
+    String _temp2 = intl.Intl.selectLogic(direction, {
+      'earlier': '$_temp0',
+      'other': '$_temp1',
+    });
+    return '$_temp2';
+  }
+
+  @override
+  String commandBulkSpan(int amount, String unit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      amount,
+      locale: localeName,
+      other: '$amount weeks',
+      one: 'a week',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      amount,
+      locale: localeName,
+      other: '$amount days',
+      one: 'a day',
+    );
+    String _temp2 = intl.Intl.selectLogic(unit, {
+      'weeks': '$_temp0',
+      'other': '$_temp1',
+    });
+    return '$_temp2';
+  }
+
+  @override
+  String commandBulkMove(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Move $count tasks',
+      one: 'Move 1 task',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkAssignTo(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Assign $count tasks to $name',
+      one: 'Assign 1 task to $name',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkAssign(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Assign $count tasks',
+      one: 'Assign 1 task',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkChange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Change $count tasks',
+      one: 'Change 1 task',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkComplete(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mark $count tasks as done',
+      one: 'Mark 1 task as done',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkDelete(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete $count tasks',
+      one: 'Delete 1 task',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkField(String label, String value) {
+    return '$label: $value';
+  }
+
+  @override
+  String commandBulkLeftRepeating(int count, String action) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count repeating tasks won’t be deleted',
+      one: '1 repeating task won’t be deleted',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count repeating tasks won’t be completed',
+      one: '1 repeating task won’t be completed',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count repeating tasks won’t change',
+      one: '1 repeating task won’t change',
+    );
+    String _temp3 = intl.Intl.selectLogic(action, {
+      'delete': '$_temp0',
+      'complete': '$_temp1',
+      'other': '$_temp2',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String commandBulkLeftUnassignable(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks can’t be assigned to $name',
+      one: '1 task can’t be assigned to $name',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkLeftNoDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks with no date won’t change',
+      one: '1 task with no date won’t change',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkNone(String status, String period) {
+    String _temp0 = intl.Intl.selectLogic(status, {
+      'completed': 'There are no completed tasks $period',
+      'any': 'There are no tasks $period',
+      'other': 'There are no unfinished tasks $period',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkPeriod(String kind, String from, String to) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'today': 'from today',
+      'yesterday': 'from yesterday',
+      'tomorrow': 'for tomorrow',
+      'range': 'from $from to $to',
+      'until': 'up to $to',
+      'since': 'from $from on',
+      'undated': 'with no date',
+      'other': 'on $from',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkTooMany(int count) {
+    return 'That’s $count tasks. Narrow it down, for example to one day or one project.';
+  }
 }

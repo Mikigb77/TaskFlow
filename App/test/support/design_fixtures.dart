@@ -190,6 +190,20 @@ class DesignTaskNotifier extends TaskNotifier {
   Future<void> restoreTask(Task task) async {
     state = AsyncData([...state.requireValue, task]);
   }
+
+  /// One at a time, through [restoreTask], so a stand-in's own wins.
+  @override
+  Future<bool> restoreTasks(List<Task> tasks) async {
+    var whole = true;
+    for (final task in tasks) {
+      try {
+        await restoreTask(task);
+      } catch (_) {
+        whole = false;
+      }
+    }
+    return whole;
+  }
 }
 
 ProviderContainer designContainer({

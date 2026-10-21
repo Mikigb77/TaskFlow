@@ -177,10 +177,18 @@ abstract final class TaskMatcher {
   }
 
   /// The task as the card shows it: a repeating task's repetition on [date],
-  /// or its next open one. Null when it has nothing on [date].
-  static Task? _shown(Task task, DateTime? date) {
+  /// or its next open one. Null when it has nothing on [date]. With [today]
+  /// (marking one done with no day said), a repeating task comes as today's
+  /// repetition, as ticking it on Today does, or else the one Today lists as
+  /// overdue.
+  static Task? _shown(Task task, DateTime? date, {DateTime? today}) {
     if (date == null) {
-      return task.isRecurring ? task.nextOpenOccurrence() ?? task : task;
+      if (!task.isRecurring) return task;
+      if (today != null) {
+        final shown = task.occurrenceOn(today) ?? task.overdueOn(today);
+        if (shown != null) return shown;
+      }
+      return task.nextOpenOccurrence() ?? task;
     }
     if (!task.isRecurring) {
       final key = Task.dateKey(date);
@@ -193,14 +201,17 @@ abstract final class TaskMatcher {
     return task.occurrenceOn(date) ?? task.deadlinesOn(date).firstOrNull;
   }
 
-  /// `update` and `delete`: the tasks [target] may mean, among those the
-  /// person can edit, open ones first. A repeating task comes as the
-  /// repetition meant. Words, a project or a day are needed: with none,
-  /// nothing is found.
+  /// `update`, `delete` and `complete`: the tasks [target] may mean, among
+  /// those the person can edit, open ones first. A repeating task comes as
+  /// the repetition meant; [completing] with no day said, today's (see
+  /// [_shown]). Words, a project or a day are needed: with none, nothing is
+  /// found.
   static List<Task> targets(
     Iterable<Task> tasks,
     CommandTarget target, {
     required bool Function(String? listId) canEdit,
+    bool completing = false,
+    DateTime? now,
   }) {
     if (target.projectName != null) return const [];
     if (_folded(target.words).isEmpty &&
@@ -208,11 +219,12 @@ abstract final class TaskMatcher {
         target.listId == null) {
       return const [];
     }
+    final today = completing ? Task.day(now ?? DateTime.now()) : null;
     final found = <Task>[];
     for (final task in tasks) {
       if (task.isNote || !canEdit(task.listId)) continue;
       if (target.listId != null && task.listId != target.listId) continue;
-      final shown = _shown(task, target.date);
+      final shown = _shown(task, target.date, today: today);
       if (shown != null) found.add(shown);
     }
     found.sort(_newestFirst);
@@ -225,4 +237,165 @@ abstract final class TaskMatcher {
   /// whole, when none is left open.
   static bool _done(Task shown) =>
       shown.occurrenceDate != null ? shown.isCompleted : _completed(shown);
+
+  /// A task as a command shows it is done: a repetition, or the task.
+  static bool done(Task shown) => _done(shown);
+
+  /// Whose tasks a set holds: the person's own (outside shared projects, or
+  /// assigned to them in one); anyone's in the project named; or, with a
+  /// person named, theirs.
+  static bool _inSet(
+    Task task,
+    CommandTarget target,
+    int? accountId,
+    Iterable<TaskListInfo> projects,
+  ) {
+    final shared = projects.any((p) => p.id == task.listId && p.shared);
+    bool assignedTo(int? id) =>
+        task.assignment == 'member' && task.assigneeId == id;
+    final mine = !shared || assignedTo(accountId);
+    if (target.personId case final person?) {
+      return person == accountId ? mine : assignedTo(person);
+    }
+    return target.listId != null || mine;
+  }
+
+  /// A repeating task left out of a set: it has a repetition in the period
+  /// (between [first] and [last], a year at most) with the status asked.
+  static bool _repeatsIn(
+    Task task,
+    CommandTarget target,
+    DateTime? first,
+    DateTime? last,
+  ) {
+    if (first == null && last == null) {
+      return switch (target.status) {
+        'completed' => task.completedDates.isNotEmpty,
+        'any' => true,
+        _ => !_completed(task),
+      };
+    }
+    final start = Task.day(task.dueDate!);
+    var day = first == null || first.isBefore(start) ? start : first;
+    final end = last ?? DateTime(day.year, day.month, day.day + 366);
+    for (var i = 0; i <= 366 && !day.isAfter(end); i++) {
+      for (final shown in task.occurrencesOn(day)) {
+        if (_hasStatus(shown.isCompleted, target.status)) return true;
+      }
+      day = DateTime(day.year, day.month, day.day + 1);
+    }
+    return false;
+  }
+
+  static bool _hasStatus(bool completed, String status) => switch (status) {
+    'completed' => completed,
+    'any' => true,
+    _ => !completed,
+  };
+
+  /// A bulk command's set ([CommandTarget.all]; Backend/docs/VOICE_COMMANDS.md,
+  /// «Bulk commands»), from the phone's own copy:
+  /// - the person's own tasks and those assigned to them in shared projects;
+  ///   other people's only with the project or the person named;
+  /// - only tasks the person can edit, never notes; a project put away
+  ///   (archived) only when it is the one named;
+  /// - the status asked, `open` by default;
+  /// - the period on the planned day, or the deadline's day without one; or
+  ///   only the tasks with no day;
+  /// - the words, as for `find`.
+  ///
+  /// Repeating tasks are left out and counted, except when [completing]
+  /// over one day: then each one's repetition on that day is in the set.
+  /// The set comes soonest first, as Calendar lists it, the tasks with no
+  /// day last. A project or person that wasn't found holds nothing.
+  static ({List<Task> tasks, int repeating, Task? viewOnly}) bulk(
+    Iterable<Task> tasks,
+    CommandTarget target, {
+    int? accountId,
+    Iterable<TaskListInfo> projects = const [],
+    bool completing = false,
+  }) {
+    if (target.projectName != null || target.personName != null) {
+      return (tasks: const [], repeating: 0, viewOnly: null);
+    }
+    final first = target.from == null ? null : Task.day(target.from!);
+    final last = target.to == null ? null : Task.day(target.to!);
+    final oneDay = completing && first != null && first == last;
+    bool editable(String? id) =>
+        id == null || projects.any((p) => p.id == id && p.canEdit);
+    bool putAway(String? id) =>
+        id != target.listId && projects.any((p) => p.id == id && p.inactive);
+    final found = <(Task, _When?)>[];
+    final repeating = <Task>[];
+    final viewOnly = <Task>[];
+    for (final task in tasks) {
+      if (task.isNote || putAway(task.listId)) continue;
+      if (target.listId != null && task.listId != target.listId) continue;
+      if (!_inSet(task, target, accountId, projects)) continue;
+      final edit = editable(task.listId);
+      if (task.isRecurring) {
+        if (target.undated) continue;
+        if (oneDay) {
+          for (final shown in task.occurrencesOn(first)) {
+            if (!_hasStatus(shown.isCompleted, target.status)) continue;
+            if (edit) {
+              found.add((
+                shown,
+                (at: shown.displayDate!, timed: shown.hasTime),
+              ));
+            } else {
+              viewOnly.add(shown);
+            }
+          }
+        } else if (_repeatsIn(task, target, first, last)) {
+          (edit ? repeating : viewOnly).add(task);
+        }
+        continue;
+      }
+      if (!_hasStatus(task.isCompleted, target.status)) continue;
+      final planned = task.dueDate;
+      final date = planned ?? task.deadline;
+      if (target.undated && date != null) continue;
+      _When? when;
+      if (date != null) {
+        final day = Task.day(date);
+        if (first != null && day.isBefore(first)) continue;
+        if (last != null && day.isAfter(last)) continue;
+        when = (
+          at: date,
+          timed: planned != null ? task.hasTime : task.deadlineHasTime,
+        );
+      } else if (first != null || last != null) {
+        continue;
+      }
+      if (edit) {
+        found.add((task, when));
+      } else {
+        viewOnly.add(task);
+      }
+    }
+    // The words, as a search keeps them: every word, or else the most.
+    final kept = _ranked([
+      for (final (task, _) in found) task,
+      ...repeating,
+      ...viewOnly,
+    ], target.words).toSet();
+    found
+      ..removeWhere((item) => !kept.contains(item.$1))
+      ..sort((a, b) {
+        final (aWhen, bWhen) = (a.$2, b.$2);
+        if (aWhen == null || bWhen == null) {
+          if (aWhen != bWhen) return aWhen == null ? 1 : -1;
+        } else {
+          final order = _soonestFirst(aWhen, bWhen);
+          if (order != 0) return order;
+        }
+        return _newestFirst(a.$1, b.$1);
+      });
+    return (
+      tasks: [for (final (task, _) in found) task],
+      repeating: repeating.where(kept.contains).length,
+      viewOnly: viewOnly.where(kept.contains).firstOrNull,
+    );
+  }
 }

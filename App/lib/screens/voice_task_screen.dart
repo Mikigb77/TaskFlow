@@ -27,6 +27,7 @@ import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/capture_entries.dart';
+import 'package:agenda/services/bulk_plan.dart';
 import 'package:agenda/services/command_plan.dart';
 import 'package:agenda/services/command_runner.dart';
 import 'package:agenda/services/text_search.dart';
@@ -336,6 +337,41 @@ Future<bool?> _askToKeep(BuildContext context, {required bool spoken}) =>
         ],
       ),
     );
+
+/// A set's ticked tasks, each changed, deleted or marked done the way a
+/// single command does it, into [applied] for one `Deshacer`. A repeating
+/// task's repetitions marked done go in one write.
+Future<void> _applySet(
+  CommandRunner runner,
+  CommandKind kind,
+  BulkPlan set,
+  AppliedCommands applied,
+) async {
+  final items = set.selected;
+  switch (kind) {
+    case CommandKind.update:
+      for (final item in items) {
+        await runner.update(item.plan!, applied: applied);
+      }
+    case CommandKind.delete:
+      for (final item in items) {
+        await runner.delete(item.stored, applied);
+      }
+    case CommandKind.complete:
+      final byTask = <int, List<BulkItem>>{};
+      for (final item in items) {
+        (byTask[item.stored.id!] ??= []).add(item);
+      }
+      for (final same in byTask.values) {
+        await runner.complete(same.first.stored, [
+          for (final item in same) item.shown,
+        ], applied);
+      }
+    case CommandKind.project:
+    case CommandKind.find:
+      break;
+  }
+}
 
 /// A change that only moves its task to another day or time: its button
 /// reads `Cambiar fecha` and its message names the day.
@@ -2736,9 +2772,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       final view = views.single;
       final card = _cards[view.command.id]?.currentContext;
       final headline = card == null ? null : _headlineIn(card);
-      // A change's card is headed by the task's title alone.
+      // A change's card, and a completion's, is headed by the task's title
+      // alone; a set's names its action.
       final titleOnly =
-          view.kind == CommandKind.update && !view.notFound && !view.choosing;
+          (view.kind == CommandKind.update ||
+              view.kind == CommandKind.complete) &&
+          view.bulk == null &&
+          !view.notFound &&
+          !view.choosing;
       summary = headline != null && titleOnly && button != null
           ? '$headline, $button'
           : headline;
@@ -3308,6 +3349,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         switch (command.kind) {
           CommandKind.delete => l.commandWontDelete,
           CommandKind.update => l.commandWontChange,
+          CommandKind.complete => l.commandWontComplete,
           // A search has no ✕.
           CommandKind.project || CommandKind.find => l.commandWontCreate,
         },
@@ -3460,7 +3502,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             draft,
       ];
       for (final view in actionable) {
-        if (view.kind == CommandKind.update) {
+        if (view.bulk case final set?) {
+          await _applySet(runner, view.kind, set, applied);
+        } else if (view.kind == CommandKind.update) {
           await runner.update(
             view.plan!,
             series: view.command.series,
@@ -3468,16 +3512,20 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           );
         } else if (view.kind == CommandKind.delete) {
           await runner.delete(view.stored!, applied);
+        } else if (view.kind == CommandKind.complete) {
+          await runner.complete(view.stored!, [view.target!], applied);
         }
       }
-      // Done with: what was applied, and changes or deletions with nothing
-      // to do (not found, or already as asked). Choices still wait.
+      // Done with: what was applied, and changes, completions or deletions
+      // with nothing to do (not found, or already as asked). Choices still
+      // wait.
       final handled = {
         for (final view in views)
           if (view.actionable ||
               (!view.blocking &&
                   (view.kind == CommandKind.update ||
-                      view.kind == CommandKind.delete)))
+                      view.kind == CommandKind.delete ||
+                      view.kind == CommandKind.complete)))
             view.command.id,
       };
       written = _session.copyWith(
@@ -3569,9 +3617,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       final updates = actionable
           .where((view) => view.kind == CommandKind.update)
           .toList();
-      final moved = updates.length == 1 ? updates.single.plan! : null;
+      final moved = updates.length == 1 ? updates.single.plan : null;
       // Only moved to another day or time: the message names the day.
       final moving = _onlyMoved(moved) ? moved!.schedule : null;
+      // A set moved, and nothing else changed: «5 tareas movidas».
+      final setsMoved =
+          updates.any((view) => view.bulk != null) &&
+          updates.every(
+            (view) => view.bulk != null
+                ? view.bulk!.movesOnly(view.command.changes)
+                : _onlyMoved(view.plan),
+          );
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
       final due = ready.length == 1 ? ready.single.task.deadline : null;
       final parts = [
@@ -3592,7 +3648,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                     : strings.movedOccurrenceDate(
                         context.weekdayDate(moving.date!),
                       )
+              : setsMoved
+              ? strings.commandTasksMoved(applied.updates.length)
               : strings.commandTasksChanged(applied.updates.length),
+        if (applied.completed.isNotEmpty)
+          strings.commandTasksCompleted(applied.completedCount),
         if (applied.deleted.isNotEmpty)
           strings.commandTasksDeleted(applied.deleted.length),
       ];
@@ -3935,6 +3995,15 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         key: ValueKey(command.id),
         view: view,
       ),
+      CommandKind.update ||
+      CommandKind.delete ||
+      CommandKind.complete when view.bulk != null => BulkCommandCard(
+        key: ValueKey(command.id),
+        view: view,
+        enabled: !_saving,
+        onChanged: changed,
+        onRemove: remove,
+      ),
       CommandKind.update => UpdateCommandCard(
         key: ValueKey(command.id),
         view: view,
@@ -3943,6 +4012,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         onRemove: remove,
       ),
       CommandKind.delete => DeleteCommandCard(
+        key: ValueKey(command.id),
+        view: view,
+        enabled: !_saving,
+        onChanged: changed,
+        onRemove: remove,
+      ),
+      CommandKind.complete => CompleteCommandCard(
         key: ValueKey(command.id),
         view: view,
         enabled: !_saving,
@@ -3967,8 +4043,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final blocked =
         pending.any((d) => !_draftReady(d, undecided)) ||
         views.any((view) => view.blocking);
+    // Marking done is a change too.
     final changes = actionable
-        .where((view) => view.kind == CommandKind.update)
+        .where(
+          (view) =>
+              view.kind == CommandKind.update ||
+              view.kind == CommandKind.complete,
+        )
         .length;
     final deletes = actionable
         .where((view) => view.kind == CommandKind.delete)
@@ -3976,12 +4057,26 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final projects = actionable
         .where((view) => view.kind == CommandKind.project)
         .length;
+    // The one card that waits for the tap, when nothing else here does: a
+    // set's names the button with its live count («Mover 5 tareas»), and a
+    // task to mark done, «Marcar como hecha».
+    final waiting = views
+        .where((view) => view.actionable || view.blocking)
+        .toList();
+    final sole = commands && pending.isEmpty && waiting.length == 1
+        ? waiting.single
+        : null;
+    final soleSet = sole?.bulk;
     // Only things to read (a search, a task not found): nothing to tap.
     final readOnly =
         commands && cards > 0 && ready == 0 && actionable.isEmpty && !blocked;
     // New projects are named only when they are all the tap does: with a
     // deletion alone, the button names it and keeps the warning colour.
-    final deleteOnly = commands && ready == 0 && changes == 0 && deletes > 0;
+    final deleteOnly =
+        commands &&
+        ready == 0 &&
+        changes == 0 &&
+        (deletes > 0 || soleSet?.action == BulkAction.delete);
     // Every command found nothing («Cambia el aceite…» was a task): the
     // words can still become one.
     final asWritten =
@@ -4017,6 +4112,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         : commands
         ? cards == 0
               ? l.captureFinish
+              : soleSet != null
+              ? bulkButton(context, soleSet)
+              : sole?.kind == CommandKind.complete && sole!.actionable
+              ? l.commandMarkDone
               : ready == 0 && actionable.isEmpty
               ? l.captureCheckDetails
               : ready > 0 && changes > 0 && deletes > 0
@@ -4037,10 +4136,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               ? changes == 1 &&
                         _onlyMoved(
                           actionable
-                              .firstWhere(
-                                (view) => view.kind == CommandKind.update,
-                              )
-                              .plan,
+                              .where((view) => view.kind == CommandKind.update)
+                              .firstOrNull
+                              ?.plan,
                         )
                     ? l.reschedule
                     : l.saveChangesSentence

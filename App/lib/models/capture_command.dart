@@ -1,10 +1,11 @@
 import 'package:uuid/uuid.dart';
 
 /// What a dictation asked for besides tasks and notes: create a project, find
-/// tasks, or change or delete one (Backend/docs/VOICE_COMMANDS.md). Commands
-/// are data: the phone finds the tasks itself, and nothing is created,
-/// changed or deleted until the person's tap.
-enum CommandKind { project, find, update, delete }
+/// tasks, or change, delete or complete one, or many at once
+/// (Backend/docs/VOICE_COMMANDS.md). Commands are data: the phone finds the
+/// tasks itself, and nothing is created, changed, completed or deleted until
+/// the person's tap.
+enum CommandKind { project, find, update, delete, complete }
 
 /// A day as the server writes it, `YYYY-MM-DD`; null for anything else.
 DateTime? _day(Object? value) {
@@ -86,13 +87,21 @@ String spokenProjectName(String said) {
       : name;
 }
 
-/// Which existing task an update or a deletion is about.
+/// Which existing task an update, a deletion or a completion is about; with
+/// [all], the set of tasks it is about («todas las tareas de ayer»).
 class CommandTarget {
   const CommandTarget({
     this.words = const [],
     this.listId,
     this.projectName,
     this.date,
+    this.all = false,
+    this.personId,
+    this.personName,
+    this.status = 'open',
+    this.from,
+    this.to,
+    this.undated = false,
   });
 
   /// The distinctive words of the task, in the person's language.
@@ -105,16 +114,59 @@ class CommandTarget {
   /// searched, and the card says so.
   final String? projectName;
 
-  /// The task's current day, only when it was said.
+  /// The task's current day, only when it was said. Never with [all]: a day
+  /// said for a set is its [from] and [to].
   final DateTime? date;
+
+  /// Every task that matches, not one (decided 2026-10-21). The fields below
+  /// are a set's, with `find`'s filters.
+  final bool all;
+
+  /// The person named: their tasks. [personName] only when they couldn't
+  /// be resolved; then nothing is searched, and the card says so.
+  final int? personId;
+  final String? personName;
+
+  /// `open` (the default), `completed` or `any`.
+  final String status;
+
+  /// An inclusive period on the task's planned day, or its deadline's day
+  /// when it has none.
+  final DateTime? from;
+  final DateTime? to;
+
+  /// Only the tasks with no day.
+  final bool undated;
 
   factory CommandTarget.fromJson(Object? json) {
     if (json is! Map) return const CommandTarget();
+    if (json['all'] != true) {
+      return CommandTarget(
+        words: _words(json['words']),
+        listId: _text(json['list_id'], max: 64),
+        projectName: _text(json['project_name'], max: 80),
+        date: _day(json['date']),
+      );
+    }
+    var from = _day(json['from']);
+    var to = _day(json['to']);
+    // A day said for the set, sent in the wrong place, is its period.
+    final day = _day(json['date']);
+    if (from == null && to == null && day != null) from = to = day;
+    if (from != null && to != null && from.isAfter(to)) (from, to) = (to, from);
+    final undated = json['undated'] == true;
+    final status = json['status'];
     return CommandTarget(
+      all: true,
       words: _words(json['words']),
       listId: _text(json['list_id'], max: 64),
       projectName: _text(json['project_name'], max: 80),
-      date: _day(json['date']),
+      personId: _int(json['person_id']),
+      personName: _text(json['person_name'], max: 120),
+      status: status == 'completed' || status == 'any' ? status : 'open',
+      from: undated ? null : from,
+      to: undated ? null : to,
+      undated: undated,
     );
   }
 
@@ -123,6 +175,15 @@ class CommandTarget {
     'list_id': listId,
     'project_name': projectName,
     'date': date == null ? null : _dayKey(date!),
+    if (all) ...{
+      'all': true,
+      'person_id': personId,
+      'person_name': personName,
+      'status': status,
+      'from': from == null ? null : _dayKey(from!),
+      'to': to == null ? null : _dayKey(to!),
+      'undated': undated,
+    },
   };
 }
 
@@ -156,6 +217,14 @@ class TaskChanges {
 
     if (_text(json['title']) case final title?) values['title'] = title;
     day('date');
+    // Days to move by, keeping the time; a day said instead wins.
+    final shift = json['shift_days'];
+    if (!values.containsKey('date') &&
+        shift is int &&
+        shift != 0 &&
+        shift.abs() <= maxShift) {
+      values['shift_days'] = shift;
+    }
     clock('time');
     day('deadline_date');
     clock('deadline_time');
@@ -195,13 +264,26 @@ class TaskChanges {
     return TaskChanges(values);
   }
 
+  /// The most days `shift_days` moves by, either way.
+  static const maxShift = 366;
+
   bool has(String key) => values.containsKey(key);
   bool get isEmpty => values.isEmpty;
+
+  /// These changes without [keys]: a set never takes a title or notes.
+  TaskChanges without(Set<String> keys) => TaskChanges({
+    for (final MapEntry(:key, :value) in values.entries)
+      if (!keys.contains(key)) key: value,
+  });
 
   String? get title => values['title'] as String?;
 
   /// The new day; null with [has] `date` takes the day away.
   DateTime? get date => _day(values['date']);
+
+  /// Days to move the task by, keeping its time: later when positive. A task
+  /// with only a deadline moves its deadline.
+  int? get shiftDays => values['shift_days'] as int?;
 
   /// The new time; null with [has] `time` takes it away.
   ({int hour, int minute})? get time => _clock(values['time']);
@@ -257,6 +339,7 @@ class CaptureCommand {
     this.series = false,
     this.choice,
     this.day,
+    this.excluded = const [],
   });
 
   /// This card's own id, for its state; never sent anywhere.
@@ -291,9 +374,21 @@ class CaptureCommand {
   final DateTime? from;
   final DateTime? to;
 
-  /// `update` and `delete`: which task, and what changes.
+  /// `update`, `delete` and `complete`: which task, or which set of them,
+  /// and what changes.
   final CommandTarget target;
   final TaskChanges changes;
+
+  /// A set's tasks unticked on its card, by their key: they are left as
+  /// they are.
+  final List<String> excluded;
+
+  /// It acts on a set of tasks, not one: a bulk command.
+  bool get bulk =>
+      target.all &&
+      (kind == CommandKind.update ||
+          kind == CommandKind.delete ||
+          kind == CommandKind.complete);
 
   /// The card was taken out (✕): nothing happens for it.
   final bool removed;
@@ -352,6 +447,7 @@ class CaptureCommand {
       'find' => CommandKind.find,
       'update' => CommandKind.update,
       'delete' => CommandKind.delete,
+      'complete' => CommandKind.complete,
       _ => null,
     };
     if (kind == null) return null;
@@ -391,14 +487,20 @@ class CaptureCommand {
         );
       case CommandKind.update:
       case CommandKind.delete:
+      case CommandKind.complete:
+        final target = CommandTarget.fromJson(json['target']);
+        final changes = kind == CommandKind.update
+            ? TaskChanges.fromJson(json['changes'])
+            : const TaskChanges();
         return CaptureCommand(
           id: id,
           kind: kind,
           issues: issues,
-          target: CommandTarget.fromJson(json['target']),
-          changes: kind == CommandKind.update
-              ? TaskChanges.fromJson(json['changes'])
-              : const TaskChanges(),
+          target: target,
+          // A set never takes a title or notes: the server drops them too.
+          changes: target.all
+              ? changes.without(const {'title', 'notes_append'})
+              : changes,
         );
     }
   }
@@ -415,6 +517,7 @@ class CaptureCommand {
     bool clearChoice = false,
     DateTime? day,
     bool clearDay = false,
+    List<String>? excluded,
   }) => CaptureCommand(
     id: id,
     kind: kind,
@@ -439,6 +542,7 @@ class CaptureCommand {
     series: series ?? this.series,
     choice: clearChoice ? null : choice ?? this.choice,
     day: clearDay ? null : day ?? this.day,
+    excluded: excluded ?? this.excluded,
   );
 
   Map<String, dynamic> toJson() => {
@@ -465,6 +569,7 @@ class CaptureCommand {
     'series': series,
     'choice': choice,
     'day': day == null ? null : _dayKey(day!),
+    if (excluded.isNotEmpty) 'excluded': excluded,
   };
 
   /// A command kept with a capture. One this app version can't read is left
@@ -501,6 +606,7 @@ class CaptureCommand {
       series: json['series'] == true,
       choice: json['choice'] as String?,
       day: _day(json['day']),
+      excluded: _strings(json['excluded']),
     );
   }
 }

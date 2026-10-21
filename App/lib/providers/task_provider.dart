@@ -267,4 +267,20 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         await _repository.restoreTask(task);
         if (mounted) await loadTasks();
       });
+
+  /// Undoes several [deleteTask]s at once, each task as it was, then loads
+  /// once: a voice command can delete many. False when one couldn't come
+  /// back; the others still do.
+  Future<bool> restoreTasks(List<Task> tasks) => _mutate(() async {
+        var whole = true;
+        for (final task in tasks) {
+          try {
+            await _repository.restoreTask(task);
+          } catch (_) {
+            whole = false;
+          }
+        }
+        if (mounted) await loadTasks();
+        return whole;
+      });
 }

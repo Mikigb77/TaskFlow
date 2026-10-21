@@ -32,16 +32,41 @@ class AppliedUpdate {
   final Task? landed;
 }
 
+/// A task the confirming tap marked done, with what puts it back.
+class AppliedCompletion {
+  AppliedCompletion(this.before, this.keys);
+
+  /// The task as it was stored.
+  final Task before;
+
+  /// A repeating task's repetitions marked done, by their keys; empty for
+  /// a task that doesn't repeat.
+  final List<String> keys;
+}
+
 /// What one confirming tap did, so one `Deshacer` takes all of it back.
 class AppliedCommands {
   /// Projects created, by id.
   final projects = <String>[];
   final updates = <AppliedUpdate>[];
 
+  /// Tasks marked done.
+  final completed = <AppliedCompletion>[];
+
   /// Tasks deleted, as they were stored.
   final deleted = <Task>[];
 
-  bool get isEmpty => projects.isEmpty && updates.isEmpty && deleted.isEmpty;
+  /// How many tasks were marked done: each repetition counts.
+  int get completedCount => completed.fold(
+    0,
+    (count, done) => count + (done.keys.isEmpty ? 1 : done.keys.length),
+  );
+
+  bool get isEmpty =>
+      projects.isEmpty &&
+      updates.isEmpty &&
+      completed.isEmpty &&
+      deleted.isEmpty;
 }
 
 /// Creates the projects, and changes and deletes the tasks, a dictation's
@@ -145,13 +170,70 @@ class CommandRunner {
     applied.deleted.add(task);
   }
 
-  /// Puts back the deleted tasks and the changed fields, newest first. False
-  /// when something had changed again since, and was left as it is.
+  /// Marks [shown] done, as ticking it does: the task, or for a repeating
+  /// [stored] task the repetitions [shown] (all in one write). One already
+  /// done is left as it is.
+  Future<void> complete(
+    Task stored,
+    Iterable<Task> shown,
+    AppliedCommands applied,
+  ) async {
+    if (!stored.isRecurring) {
+      if (stored.isCompleted) return;
+      await tasks.updateTask(stored.copyWith(isCompleted: true));
+      applied.completed.add(AppliedCompletion(stored, const []));
+      return;
+    }
+    final keys = <String>{
+      for (final repetition in shown)
+        if (repetition.occurrenceId case final key?
+            when !stored.completedDates.contains(key) &&
+                stored.occurrenceByKey(key) != null)
+          key,
+    }.toList();
+    if (keys.isEmpty) return;
+    await tasks.updateTask(
+      stored.copyWith(
+        completedDates: {...stored.completedDates, ...keys}.toList()..sort(),
+      ),
+    );
+    applied.completed.add(AppliedCompletion(stored, keys));
+  }
+
+  /// Puts back the deleted tasks, the tasks marked done and the changed
+  /// fields, newest first. False when something had changed again since,
+  /// and was left as it is.
   Future<bool> undoChanges(AppliedCommands applied) async {
     var whole = true;
-    for (final task in applied.deleted.reversed) {
+    if (applied.deleted.isNotEmpty) {
       try {
-        await tasks.restoreTask(task);
+        if (!await tasks.restoreTasks(applied.deleted.reversed.toList())) {
+          whole = false;
+        }
+      } catch (_) {
+        whole = false;
+      }
+    }
+    for (final done in applied.completed.reversed) {
+      try {
+        final now = current()
+            .where((task) => task.id == done.before.id)
+            .firstOrNull;
+        if (now == null) {
+          whole = false;
+          continue;
+        }
+        // Only what the tap marked: a repetition ticked since stays.
+        await tasks.updateTask(
+          done.keys.isEmpty
+              ? now.copyWith(isCompleted: false)
+              : now.copyWith(
+                  completedDates: [
+                    for (final key in now.completedDates)
+                      if (!done.keys.contains(key)) key,
+                  ],
+                ),
+        );
       } catch (_) {
         whole = false;
       }

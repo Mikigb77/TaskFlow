@@ -1,6 +1,7 @@
 // The voice-command cards in a dictation's result: a project to create, a
 // search, a change and a deletion with their before and after, a mix of
-// tasks and commands, the questions they ask, and what Deshacer brings back.
+// tasks and commands, the questions they ask, what Deshacer brings back, and
+// a set of tasks changed, marked done or deleted at once.
 // Contract: Backend/docs/VOICE_COMMANDS.md.
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
@@ -21,6 +22,8 @@ const cards = Screen(
     'lib/widgets/capture_command_cards.dart',
     'lib/screens/voice_task_screen.dart',
     'lib/services/command_plan.dart',
+    'lib/services/bulk_plan.dart',
+    'lib/services/task_matcher.dart',
     'lib/services/command_runner.dart',
     'lib/widgets/capture_review_editor.dart',
   ],
@@ -72,6 +75,72 @@ Future<void> _apply(PreviewApp app) async {
   await app.tester.tap(find.byKey(const ValueKey('save-drafts')));
   await app.tester.pumpAndSettle();
 }
+
+/// Yesterday's tasks, still to do but one: four to move, the done one stays.
+List<Task> _yesterday() => [
+  Task(
+    id: 60,
+    title: 'Llamar al fontanero',
+    priority: 1,
+    dueDate: day(-1, 9, 30),
+  ),
+  Task(
+    id: 61,
+    title: 'Enviar el informe trimestral',
+    priority: 2,
+    dueDate: day(-1, 12),
+    listId: 'trabajo',
+  ),
+  Task(
+    id: 62,
+    title: 'Comprar el regalo de Lucía',
+    priority: 1,
+    dueDate: day(-1),
+    hasTime: false,
+  ),
+  Task(
+    id: 63,
+    title: 'Pagar la factura del gas',
+    priority: 2,
+    deadline: day(-1),
+    reminderAnchor: 'deadline',
+  ),
+  Task(
+    id: 64,
+    title: 'Reservar mesa para la cena',
+    priority: 1,
+    dueDate: day(-1, 20),
+    isCompleted: true,
+  ),
+];
+
+/// A set (`"all": true`) as the server sends it: open tasks by default,
+/// over one day when [from] alone is given.
+Map<String, dynamic> _set({
+  DateTime? from,
+  DateTime? to,
+  String status = 'open',
+  String? listId,
+}) => {
+  'all': true,
+  'words': [],
+  'list_id': listId,
+  'project_name': null,
+  'person_id': null,
+  'person_name': null,
+  'status': status,
+  'from': from == null ? null : key(from),
+  'to': from == null ? null : key(to ?? from),
+  'undated': false,
+  'date': null,
+};
+
+/// «Pasa todas las tareas de ayer a mañana».
+Map<String, dynamic> _moveYesterday() => {
+  'kind': 'update',
+  'target': _set(from: day(-1)),
+  'changes': {'date': key(day(1))},
+};
 
 void commandPreviews() {
   previewArea('commands', 'Voice commands', () {
@@ -554,6 +623,260 @@ void commandPreviews() {
               'Comprar pan mañana, pasa la peluquería a la semana que viene y borra el dentista',
         );
         await _apply(app);
+        await p.shoot();
+      },
+    );
+
+    // ----------------------------------------------------------- complete
+    preview(
+      cards,
+      'complete',
+      '«Ya he ido a la peluquería»: the task with its day, and «Marcar como hecha».',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), _haircut()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'complete',
+              'target': {
+                'words': ['peluquería'],
+              },
+            }),
+          ],
+          transcript: 'Ya he ido a la peluquería',
+        );
+        await p.shoot();
+      },
+    );
+
+    // ---------------------------------------------------------------- sets
+    preview(
+      cards,
+      'bulk-move',
+      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a mañana, …», yesterday\'s open tasks with their day, all ticked, and «Mover 4 tareas»; the one already done stays.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._yesterday()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [command(_moveYesterday())],
+          transcript: 'Pasa todas las tareas de ayer a mañana',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-unticked',
+      'The same set with one task unticked: the heading and the button count 3.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._yesterday()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [command(_moveYesterday())],
+          transcript: 'Pasa todas las tareas de ayer a mañana',
+        );
+        await app.tap('Comprar el regalo de Lucía');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      landed,
+      'bulk-applied',
+      'Mover 4 tareas tapped: Calendar on tomorrow with the moved tasks lit, «4 tareas movidas» and Deshacer.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._yesterday()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [command(_moveYesterday())],
+          transcript: 'Pasa todas las tareas de ayer a mañana',
+        );
+        await _apply(app);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-delete',
+      '«Borra todas las completadas de la semana pasada»: «Eliminar 3 tareas» in the warning colour, the tasks ticked, and the button in the delete style.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 80,
+              title: 'Devolver los libros a la biblioteca',
+              priority: 1,
+              dueDate: day(-8, 17),
+              isCompleted: true,
+            ),
+            Task(
+              id: 81,
+              title: 'Pedir cita en el dentista',
+              priority: 2,
+              dueDate: day(-6),
+              hasTime: false,
+              isCompleted: true,
+            ),
+            Task(
+              id: 82,
+              title: 'Renovar el seguro del coche',
+              priority: 3,
+              dueDate: day(-4, 11),
+              isCompleted: true,
+            ),
+          ],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'delete',
+              'target': _set(from: day(-9), to: day(-3), status: 'completed'),
+            }),
+          ],
+          transcript: 'Borra todas las completadas de la semana pasada',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-complete',
+      '«Marca como hechas todas las de hoy»: «Marcar 4 tareas como hechas», today\'s open tasks, the weekly class\'s repetition today among them.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({'kind': 'complete', 'target': _set(from: day(0))}),
+          ],
+          transcript: 'Marca como hechas todas las de hoy',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-left-out',
+      '«Asigna a Paul todo lo del viernes»: «Asignar 2 tareas a Paul», and one line for what stays: the repeating class, and a task outside a shared project.',
+      [es1, ca2],
+      (p) async {
+        final friday = next(DateTime.friday);
+        DateTime at(int hour) =>
+            DateTime(friday.year, friday.month, friday.day, hour);
+        final app = await PreviewApp.open(
+          p,
+          projects: allProjects,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 70,
+              title: 'Preparar el examen del tema 6',
+              priority: 2,
+              dueDate: at(10),
+              listId: 'matematicas',
+              assignment: 'member',
+              assigneeId: me,
+              assigneeName: 'María',
+            ),
+            Task(
+              id: 71,
+              title: 'Corregir las redacciones',
+              priority: 1,
+              dueDate: at(16),
+              listId: 'matematicas',
+              assignment: 'member',
+              assigneeId: me,
+              assigneeName: 'María',
+            ),
+            Task(
+              id: 72,
+              title: 'Llamar a la gestoría',
+              priority: 1,
+              dueDate: at(9),
+            ),
+            Task(
+              id: 73,
+              title: 'Natación',
+              priority: 1,
+              dueDate: DateTime(friday.year, friday.month, friday.day - 7, 18),
+              recurrence: 'weekly',
+            ),
+          ],
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'update',
+              'target': _set(from: friday),
+              'changes': {'assignee_id': paul, 'assignee_name': 'Paul'},
+            }),
+          ],
+          transcript: 'Asigna a Paul todo lo del viernes',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-none',
+      'A set that matched nothing: «No hay tareas pendientes de ayer», and only Cerrar.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [command(_moveYesterday())],
+          transcript: 'Pasa todas las tareas de ayer a mañana',
+        );
         await p.shoot();
       },
     );
