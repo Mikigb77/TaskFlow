@@ -1,0 +1,17 @@
+# WEB-903 escalation and primary-session repair
+
+The workflow completed three source fix rounds and escalated the reproduced native-focus visibility defect to root. No new workflow was started and the round count was not reset. Root accepted the routine bounded repair under the current owner's existing correction authorization; no product-choice approval was requested.
+
+Root's first repair changed VoiceDemo.tsx only: compute alreadyVisible; for qualifying pointer completion always instant scrollBy top(alreadyVisible?0:bounds.top-clearance). Comment explains cancelling pending native focus motion. Keyboard/AT guards and CSS remained unchanged. Root scoped diffcheck exit0 and returned source ownership to verification.
+
+Product provenance of prior full suite (1034pass/300skip/exit0; build odml96HNcvwi43MYd41Kx): pre-root VoiceDemo normalized Gitblob08fd04c9ff12f23558cc1b9b3c46572ec16864e0. Root reconstructed it by reversing only its exact hunk to ignored artifact pre-root-repair-VoiceDemo.tsx.txt; hash matches08fd04c in root's read-only diff captured before edit. CSSblob66b2effe377f65d382dbb7818d7a755a735eeea2 unchanged. Prior full suite DOES NOT cover root repair.
+
+Root postrepair source normalizedblob6dd78eb39d8521869d9ac864c6455591357bdccc; SHA256C7F7CB783E3890ABE5693067F0798D3BE864DED870F80633E6F23B922912E979. Testblob103411b175a10325b0f0069b5cd2e446d1947b1b captured after earlier harness edits; it is not asserted to be the pre-full-suite testblob.
+
+Root directs bounded final verification only: fresh productionbuild; isolatedWEB903; affected completionchecks; refresh54completionstates plus agreed scopedhome/demo/performance/WebKit; independentreview; ownershipcommits ifverified. Do not rerun the20min broaderfullsuite. State exact productrevision coverage and any remaining pendingchecks.
+
+The ignored source provenance snapshot and its archive copy were renamed to .tsx.txt after the refreshed build exposed TypeScript including .tsx files under artifacts/. Contents and hashes are preserved. No tsconfig/product change was made; the original build exit1 remains logged as evidence-artifact infrastructure failure.
+
+The first primary repair passed the original CA case and 46 affected behavior checks, but a later natural-focus EN desktop capture failed visibility. Its diagnostic and five exact-case repeats passed; they do not erase the matrix failure. Timing evidence shows the synchronous product call before native input/change, with later browser movement possible. See `review-WEB-903-primary-repair.md` for preserved failures, raw evidence and the independent review.
+
+The primary session then applied the reviewer's bounded scheduling candidate: one cancellable requestAnimationFrame wraps the existing measure and instant scroll; it rechecks the banner ref, and effect cleanup cancels on completion reversal, reset or unmount. No other product or CSS change. Source blob is `50141eab8ad5cb28543658954ced9445d903678e`; the pre-frame bytes are preserved as `../TaskFlowWeb/artifacts/ux-web/completion-banner/pre-frame-repair-VoiceDemo.tsx.txt` with blob `6dd78eb39d8521869d9ac864c6455591357bdccc`. Root diffcheck exited 0 and returned the candidate to verification. This remains the same escalated workflow with three source-worker rounds exhausted. Build, original natural-focus cases, pending-frame cancellation, affected behaviors and all required fresh evidence must pass before closure.

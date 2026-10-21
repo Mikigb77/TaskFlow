@@ -1,0 +1,51 @@
+{
+  "runId": "2026-10-21-codex-completion-banner",
+  "mode": "pages",
+  "created": "2026-10-21",
+  "conventions": [
+    "WD17 supersedes the in-task placement chosen for WD16.",
+    "Keep existing localized copy, native inputs and all task details.",
+    "Change only the generated-results completion journey; preserve the existing site layout.",
+    "One source writer or test runner; do not touch real voice services or physical devices."
+  ],
+  "packages": [
+    {
+      "id": "WP52",
+      "title": "Finish group banner with immediate conditional reveal",
+      "area": "H",
+      "size": "S",
+      "severity": 2,
+      "findings": [
+        "WEB-901",
+        "WEB-902"
+      ],
+      "files": [
+        "src/components/VoiceDemo.tsx",
+        "src/styles/voice.css"
+      ],
+      "brief": "Final source round: independent reviewer confirms WEB-902 ongoing native smooth scroll after rapid undo (rawpositions207/579px), distinct from repaired WEB-901 touch-origin defect. Make existing pointer/touch conditional reveal behavior explicitly instant for ALL motion preferences; preserve offscreen check, headerclearance, actual click-origin latch, all task data/localizedcopy/status/undo/reset and keyboard/assistive no explicitscroll. Do not add cancellation state/global scrollmanager or change established close focus behavior. This immediate reveal is routine smallest robust UX tradeoff agreed by root/reviewer, not new ownerpolicy. Only same two source paths; tests independently update smooth-only expectations while retaining all semantic/touch/rapid-undo probes. At most3source rounds total; any remaining product failure after this must be reported/escalated, no fourth repair.",
+      "acceptance": [
+        "A nonempty fully checked result shows exactly one full-width completion banner as a sibling before the entire task list, outside every task card; initial, partial, zero-task, loading and error states show none.",
+        "Every existing task, title, date, note and question is unchanged and visible; desktop two-column/mobile single-column layout remains. Completion copy remains EN/ES/CA.",
+        "Final pointer/touch completion on tall narrow results makes the banner noticeable with one instant conditional reveal only if offscreen, preserving native input identity/focus. No repeat/undo reveal and no continuing completion motion after rapid undo/reset; reduced-motion decoration remains disabled.",
+        "Keyboard Space retains the same checkbox node and focus, without forced completion scrolling; one existing polite atomic live status announces the complete localized feedback once. The visual banner adds no second live region.",
+        "Undo from any task hides the banner and keeps local toggles usable; identical new results, record/submission, Change text and close/reset clear completion. No API/status/quota/storage/account changes occur from toggles.",
+        "Affected states pass measured contrast, axe, target/focus, 320px, doubled text and spacing checks in all locales/themes on desktop/mobile. Existing WEB-801 badge overflow is distinguished from completion regressions.",
+        "Independent tester runs focused acceptance plus required type/legal/build/unit/full Playwright checks with exact exits, refreshes affected captures, and independent reviewer verifies fresh evidence."
+      ],
+      "deviceChecks": [
+        "Native TalkBack/VoiceOver announcement and checkbox context.",
+        "Physical phone pointer/touch completion, undo and reduced-motion behavior; Safari/iPhone font rendering WEB-701."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": [
+    {
+      "id": "WEB-801",
+      "reason": "Existing localized trial-badge overflow at doubled text; unrelated to bounded group placement correction."
+    }
+  ],
+  "attempt": 3
+}

@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Problem types that recur on the TaskFlow site and review techniques that caught them in run 2026-10-18-site
+description: Problem types and verified review techniques from the shared TaskFlow web UX runs
 metadata:
   type: feedback
 ---
@@ -17,6 +17,11 @@ Regressions that fixes kept introducing; check for them in every verify.
 - **Focus ring contrast** dropping on held/disabled buttons.
 
 - **Old jargon surviving in one corner** after a word sweep (terms §5 "AI capture is optional"; "Google Play" vs "Android" availability lines). After a terminology fix, grep the whole of `src/content/` in all three languages, not just the brief's lines.
+
+- **Native focus can finish after a synchronous completion reveal** (WEB-903, `2026-10-21-codex-completion-banner`): a React effect ran before native input/change, then browser movement hid the group banner. A single cancellable frame with current geometry and instant scrolling passes the original natural-focus cases and 54 current regions. Keep native focus, keyboard/assistive context, undo-before-frame and undo-after-start coverage. A passing isolated repeat does not invalidate an earlier failing matrix case.
+- **Ignored evidence can still be compiler input** (same run): source snapshots ending in `.tsx` under `artifacts/` were included by TypeScript and failed the production build. Preserve provenance snapshots as `.tsx.txt`; do not alter product tsconfig to accommodate evidence files.
+- **Engine tap focus is not keyboard focus** (same run): Windows WebKit moves native checkbox focus to BODY on both partial and final taps before input/change. Preserve that native behavior and input identity; verify explicit keyboard focus separately instead of adding product focus calls for a harness assumption.
+- **Requested English URL is not locale proof** (same run): Windows WebKit inherited Spanish Accept-Language and `/` redirected to `/es/`. Pin the intended browser locale and verify actual URL, document lang and heading before labeling a capture or asserting localized status. Preserve mislabeled evidence, then replace only affected states.
 
 Evidence gaps to name, not paper over: when WSL won't start (`Wsl/Service/CreateInstance/E_UNEXPECTED`), crop.mjs and the tester's specs can't run; say the verdict rests on code + existing renders/AUDIT, and list the unrun tests as pending evidence, not as failures. Files held because another session's uncommitted work shares them can't be committed; that's a loop status, not a finding. `voice-*.panel.png` can be cut at the viewport edge (render-tool artifact): read the `view.png` too. Language of parts (`lang`) isn't in renders or AUDIT: verify by nearest `[lang]` in code and spec.
 

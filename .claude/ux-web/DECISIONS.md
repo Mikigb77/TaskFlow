@@ -4,6 +4,9 @@ Every agent in the UX web loop reads this before reviewing or planning. Only the
 
 The app's decisions are in `.claude/ux-review/DECISIONS.md`. They bind the site too: the site may only say what the app does, and anything open there is open here.
 
+## 2026-10-21 — WD17: completion belongs above the complete task group
+The owner clarifies that the final all-clear / take-a-breath message should apply across all generated tasks: show it on top, in front of the task list, rather than inside the final task. This corrects the placement chosen for WD16 and authorizes a bounded group-level banner change, with tasks/details and undo retained. The owner also requests an explanation and assessment of the earlier layout changes; that does not authorize a broader redesign. Existing EN/ES/CA completion copy remains.
+
 ## 2026-10-21 — WD16: a warm completion moment in the live demo
 The owner requests a rewarding, emotionally warm response after a visitor marks every generated demo task complete, to convey a feeling they want daily from the app. The current request authorizes local completion controls and feedback in this demo journey. The primary session’s bounded implementation brief keeps the existing card and completed tasks visible, permits undo/retry, excludes account saving, additional voice requests, quota changes and new download/subscription capabilities, and clears feedback on undo, new results and reset. Those details are the implementation constraints for this run, rather than a broader change to product policy.
 

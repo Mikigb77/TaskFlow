@@ -1,0 +1,9 @@
+# Independent escalation — WEB-903
+
+Configured reviewer gpt-6.1-sol/max confirms distinct WEB-903,S2,H: native focus scroll hides completion banner. Rules WD17/AX-7/OL-4. Final normal-motion mouse label/input detail1 activation checks all tasks. Root/body stay16px, task18px; screenshot1170x1992 is390x664 atDPR3, not doubledtext. Fresh isolated case without earliertext200 reproduces. scrollY1578→2047 in~350ms with ZERO explicit scrollAPIcalls; banner ends top−287/bottom−173 while same nativeinput/focus remains. The one-time visible guard VoiceDemo.tsx:323 returns; nativefocus/rootCSS smooth then changes viewport, allComplete stays true so effect does not reconsider. Exact guard-time bounds were not sampled, so that ordering detail is inferred; supported narrow-pointer failure is proven. It cannot be dismissed merely because mouse activation occurred in a touch-capable emulated viewport.
+
+Smallest proposed repair: qualifying pointer completion always uses one instant scroll call; existingdelta ifoffscreen, top0 ifalreadyvisible to interrupt pending nativefocusmotion without displacement. Keep keyboard/AT zero-scroll, nativefocus, strict rapidundo/no-repeat and banner visibility. Already-visible acceptance should require no viewport displacement rather than incidental zero APIcall count. Proposal requires focused verification.
+
+Protocol escalation: three workflow source rounds exhausted; no silent fourth round. This is a routine defect, no unresolved owner product choice. Source ownership handed to primary session, failedcapture remains unverified, no further source edits by workflow workers.
+
+Evidence: ../TaskFlowWeb/artifacts/ux-web/completion-banner/failures/round3-ca-diagnostic/ and positions/ca.mobile-realistic.dark.diagnostic.json; original remainingrender attempt45pass6skip5fail with fullbundles in failures/round3-render/. Reviewer changed no files or tests/builds/captures.

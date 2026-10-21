@@ -1,0 +1,49 @@
+{
+  "runId": "2026-10-21-codex-completion-banner",
+  "mode": "pages",
+  "created": "2026-10-21",
+  "conventions": [
+    "WD17 supersedes the in-task placement chosen for WD16.",
+    "Keep existing localized copy, native inputs and all task details.",
+    "Change only the generated-results completion journey; preserve the existing site layout.",
+    "One source writer or test runner; do not touch real voice services or physical devices."
+  ],
+  "packages": [
+    {
+      "id": "WP52",
+      "title": "Show completion above the generated task group",
+      "area": "H",
+      "size": "S",
+      "severity": 2,
+      "findings": [
+        "WEB-901"
+      ],
+      "files": [
+        "src/components/VoiceDemo.tsx",
+        "src/styles/voice.css"
+      ],
+      "brief": "Replace final-task placement with exactly one full-width banner immediately above the entire task list, outside all task cards. Keep existing heading, two-column desktop/single-column mobile layout and EN/ES/CA copy. Remove obsolete final-task placement state. Make completion noticeable when the final pointer/touch action is low in a tall result with the least intrusive conditional reveal: reveal only when offscreen, no focus call, honor reduced motion and do not scroll for undo or keyboard completion. Keyboard completion keeps native focus/context and announces once through the existing polite atomic status. Do not add controls, overlays, blank reserved space or repeated sticky obstruction. Independent prereview approves this modality-specific reveal tradeoff; respect sticky-header clearance. Allow natural scroll anchoring when content is inserted above the focused input, without reserving blank space.",
+      "acceptance": [
+        "A nonempty fully checked result shows exactly one full-width completion banner as a sibling before the entire task list, outside every task card; initial, partial, zero-task, loading and error states show none.",
+        "Every existing task, title, date, note and question is unchanged and visible; desktop two-column/mobile single-column layout remains. Completion copy remains EN/ES/CA.",
+        "Final pointer/touch completion on tall narrow results makes the banner noticeable with a bounded one-time reveal only if needed, without changing native checkbox identity or focus. No repeated or undo scroll; reduced motion has no animated scrolling or reveal.",
+        "Keyboard Space retains the same checkbox node and focus, without forced completion scrolling; one existing polite atomic live status announces the complete localized feedback once. The visual banner adds no second live region.",
+        "Undo from any task hides the banner and keeps local toggles usable; identical new results, record/submission, Change text and close/reset clear completion. No API/status/quota/storage/account changes occur from toggles.",
+        "Affected states pass measured contrast, axe, target/focus, 320px, doubled text and spacing checks in all locales/themes on desktop/mobile. Existing WEB-801 badge overflow is distinguished from completion regressions.",
+        "Independent tester runs focused acceptance plus required type/legal/build/unit/full Playwright checks with exact exits, refreshes affected captures, and independent reviewer verifies fresh evidence."
+      ],
+      "deviceChecks": [
+        "Native TalkBack/VoiceOver announcement and checkbox context.",
+        "Physical phone pointer/touch completion, undo and reduced-motion behavior; Safari/iPhone font rendering WEB-701."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": [
+    {
+      "id": "WEB-801",
+      "reason": "Existing localized trial-badge overflow at doubled text; unrelated to bounded group placement correction."
+    }
+  ]
+}

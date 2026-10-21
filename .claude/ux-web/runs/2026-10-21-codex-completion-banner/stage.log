@@ -1,0 +1,17 @@
+Windows Git Bash, from the app repository:
+.claude/ux-web/ux-web.sh stage src/components/VoiceDemo.tsx src/styles/voice.css tests/ux-web-completion.spec.ts
+
+Actual exit: 0
+staged src/components/VoiceDemo.tsx
+staged src/styles/voice.css
+staged tests/ux-web-completion.spec.ts
+
+Staged blobs matched final verified evidence:
+50141eab8ad5cb28543658954ced9445d903678e src/components/VoiceDemo.tsx
+66b2effe377f65d382dbb7818d7a755a735eeea2 src/styles/voice.css
+b08b9518078c2d68b6a94415a1b11df1aeaa675b tests/ux-web-completion.spec.ts
+
+git diff --cached --check: exit 0
+git commit --only -m "Show demo completion above the task group" -- src/components/VoiceDemo.tsx src/styles/voice.css tests/ux-web-completion.spec.ts: exit 0
+Commit: 406a1159588aec412134f13aaecb0b3291a178a3 on dev
+Post-commit status: clean, ahead 1; only those three paths are in the commit.
