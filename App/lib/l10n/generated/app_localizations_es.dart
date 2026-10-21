@@ -4035,6 +4035,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get commandOtherProject => 'Otro proyecto…';
 
   @override
+  String get commandWhichProjectOfTasks => '¿Qué proyecto?';
+
+  @override
   String commandCreateProjects(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4079,10 +4082,26 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get commandWontDelete => 'No se eliminará';
+  String commandWontDelete(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'No se eliminarán',
+      one: 'No se eliminará',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get commandWontChange => 'No se cambiará';
+  String commandWontChange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'No se cambiarán',
+      one: 'No se cambiará',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get commandWontCreate => 'No se creará';
@@ -4300,7 +4319,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get commandDontCompleteAny => 'No completar ninguna';
 
   @override
-  String get commandWontComplete => 'No se completará';
+  String commandWontComplete(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'No se completarán',
+      one: 'No se completará',
+    );
+    return '$_temp0';
+  }
 
   @override
   String commandTasksCompleted(int count) {
@@ -4320,6 +4347,28 @@ class AppLocalizationsEs extends AppLocalizations {
       locale: localeName,
       other: '$count tareas movidas',
       one: 'Tarea movida',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandTasksMovedTo(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas movidas al $date',
+      one: 'Tarea movida al $date',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandTasksAssignedTo(int count, String name) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas asignadas a $name',
+      one: 'Tarea asignada a $name',
     );
     return '$_temp0';
   }
@@ -4466,24 +4515,24 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String commandBulkLeftRepeating(int count, String action) {
+  String commandBulkLeftRepeating(int count, String action, String title) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: '$count tareas que se repiten no se eliminan',
-      one: '1 tarea que se repite no se elimina',
+      one: '$title se repite: no se elimina',
     );
     String _temp1 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: '$count tareas que se repiten no se completan',
-      one: '1 tarea que se repite no se completa',
+      one: '$title se repite: no se completa',
     );
     String _temp2 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: '$count tareas que se repiten no cambian',
-      one: '1 tarea que se repite no cambia',
+      one: '$title se repite: no cambia',
     );
     String _temp3 = intl.Intl.selectLogic(action, {
       'delete': '$_temp0',
@@ -4494,23 +4543,23 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String commandBulkLeftUnassignable(int count, String name) {
+  String commandBulkLeftUnassignable(int count, String name, String title) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: '$count tareas no se pueden asignar a $name',
-      one: '1 tarea no se puede asignar a $name',
+      one: '$title no se puede asignar a $name',
     );
     return '$_temp0';
   }
 
   @override
-  String commandBulkLeftNoDay(int count) {
+  String commandBulkLeftNoDay(int count, String title) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
       other: '$count tareas sin fecha no cambian',
-      one: '1 tarea sin fecha no cambia',
+      one: '$title no tiene fecha: no cambia',
     );
     return '$_temp0';
   }
@@ -4542,6 +4591,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String commandBulkTooMany(int count) {
-    return 'Son $count tareas. Dilo con menos, por ejemplo un día o un proyecto.';
+    return 'Son $count tareas, demasiadas. Vuelve a decirlo con un día o un proyecto.';
   }
+
+  @override
+  String commandBulkNothingToChange(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ya están así.',
+      one: 'Ya está así.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandBulkViewOnly(String project) {
+    return 'Solo puedes ver «$project»: sus tareas no cambian.';
+  }
+
+  @override
+  String get commandNoDayStays => 'No tiene fecha: no se mueve.';
+
+  @override
+  String get commandAlreadyDone => 'Ya estaba hecha.';
 }

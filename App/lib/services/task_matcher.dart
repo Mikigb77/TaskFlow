@@ -304,11 +304,18 @@ abstract final class TaskMatcher {
   ///   only the tasks with no day;
   /// - the words, as for `find`.
   ///
-  /// Repeating tasks are left out and counted, except when [completing]
-  /// over one day: then each one's repetition on that day is in the set.
+  /// Repeating tasks are left out and counted (`repeatingTasks` lists
+  /// them), except when [completing] over one day: then each one's
+  /// repetition on that day is in the set.
   /// The set comes soonest first, as Calendar lists it, the tasks with no
   /// day last. A project or person that wasn't found holds nothing.
-  static ({List<Task> tasks, int repeating, Task? viewOnly}) bulk(
+  static ({
+    List<Task> tasks,
+    int repeating,
+    List<Task> repeatingTasks,
+    Task? viewOnly,
+  })
+  bulk(
     Iterable<Task> tasks,
     CommandTarget target, {
     int? accountId,
@@ -316,7 +323,12 @@ abstract final class TaskMatcher {
     bool completing = false,
   }) {
     if (target.projectName != null || target.personName != null) {
-      return (tasks: const [], repeating: 0, viewOnly: null);
+      return (
+        tasks: const [],
+        repeating: 0,
+        repeatingTasks: const [],
+        viewOnly: null,
+      );
     }
     final first = target.from == null ? null : Task.day(target.from!);
     final last = target.to == null ? null : Task.day(target.to!);
@@ -392,9 +404,11 @@ abstract final class TaskMatcher {
         }
         return _newestFirst(a.$1, b.$1);
       });
+    final left = repeating.where(kept.contains).toList();
     return (
       tasks: [for (final (task, _) in found) task],
-      repeating: repeating.where(kept.contains).length,
+      repeating: left.length,
+      repeatingTasks: left,
       viewOnly: viewOnly.where(kept.contains).firstOrNull,
     );
   }

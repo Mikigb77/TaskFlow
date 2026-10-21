@@ -1343,6 +1343,7 @@ void main() {
   _commandsRound5();
   _round20261019();
   _round20261019b2();
+  _round20261021();
 
   // UX loop 2026-10-19-app, round 1 · P168 (UX-1302).
   group('P168: the result at large text', () {
@@ -2807,8 +2808,8 @@ void _commandsRound1() {
       (tester) async {
         final app = await openAll(tester);
         await remove(tester, es.commandDontDelete('Dentista'));
-        expect(find.text(es.commandWontDelete), findsOneWidget);
-        expect(es.commandWontDelete, 'No se eliminará');
+        expect(find.text(es.commandWontDelete(1)), findsOneWidget);
+        expect(es.commandWontDelete(1), 'No se eliminará');
         expect(
           find.descendant(
             of: find.byType(SnackBar),
@@ -2820,8 +2821,8 @@ void _commandsRound1() {
         await tester.pumpAndSettle();
 
         await remove(tester, es.commandDontChange('Ir al médico'));
-        expect(find.text(es.commandWontChange), findsOneWidget);
-        expect(es.commandWontChange, 'No se cambiará');
+        expect(find.text(es.commandWontChange(1)), findsOneWidget);
+        expect(es.commandWontChange(1), 'No se cambiará');
         await tester.pumpAndSettle();
 
         await remove(tester, es.commandDontCreate('Física'));
@@ -2870,7 +2871,7 @@ void _commandsRound1() {
           ],
         );
         await remove(tester, es.commandDontDelete('Dentista'));
-        expect(find.text(es.commandWontDelete), findsOneWidget);
+        expect(find.text(es.commandWontDelete(1)), findsOneWidget);
         await tester.pumpAndSettle();
         expect(find.text(es.captureNothingToReview), findsOneWidget);
         expect(es.captureNothingToReview, 'No queda nada por revisar');
@@ -6823,4 +6824,133 @@ void _round20261019b2() {
       }
     },
   );
+}
+
+// ---- UX loop 2026-10-21-changes, round 1 · P225 (UX-1705) -----------------
+//
+// «Ya he…» that found nothing isn't a task to add: the result only closes
+// or listens again. A change, a deletion or a search that found nothing
+// still offers «Guardar como tarea» (UX-901).
+
+void _round20261021() {
+  group('UX-1705: a completion that found nothing', () {
+    Map<String, dynamic> answer(String said, Map<String, dynamic> command) => {
+      'transcript': said,
+      'tasks': [],
+      'commands': [
+        {'issues': [], ...command},
+      ],
+    };
+
+    testWidgets(
+      'UX-1705: «Ya he llamado al dentista» with no such task: no «Guardar '
+      'como tarea»; «No encuentro…» beside the search icon, no done-check; '
+      '«Cerrar» and «Volver a decirlo»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+        );
+        app.api.answer = answer('Ya he llamado al dentista', {
+          'kind': 'complete',
+          'target': {
+            'words': ['dentista'],
+          },
+        });
+        await app.speak(tester, 'Ya he llamado al dentista');
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(_asWritten(), findsNothing);
+        final line = es.commandTaskNotFound('dentista');
+        expect(line, 'No encuentro ninguna tarea con «dentista»');
+        final headline = find.descendant(
+          of: find.byType(CaptureResult),
+          matching: find.byKey(const ValueKey('command-headline')),
+        );
+        expect(tester.widget<Text>(headline).data, line);
+        final header = find.ancestor(of: headline, matching: find.byType(Row));
+        expect(
+          find.descendant(
+            of: header.first,
+            matching: find.byIcon(Icons.search_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.byIcon(Icons.task_alt_rounded),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(of: _close(), matching: find.text(es.captureClose)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.text(es.captureSayAgain),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
+        expect(app.tasks.state.requireValue, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (kind, said, command) in [
+      (
+        'update',
+        'Cambia el aceite del coche',
+        <String, dynamic>{
+          'kind': 'update',
+          'target': {
+            'words': ['aceite', 'coche'],
+          },
+          'changes': {'date': key(day(3))},
+        },
+      ),
+      (
+        'delete',
+        'Borra el dentista',
+        <String, dynamic>{
+          'kind': 'delete',
+          'target': {
+            'words': ['dentista'],
+          },
+        },
+      ),
+      (
+        'find',
+        '¿Cuándo tengo el dentista?',
+        <String, dynamic>{
+          'kind': 'find',
+          'words': ['dentista'],
+        },
+      ),
+    ]) {
+      testWidgets(
+        'UX-1705: a $kind that found nothing still offers «Guardar como '
+        'tarea»',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+          );
+          app.api.answer = answer(said, command);
+          await app.speak(tester, said);
+          expect(_asWritten(), findsOneWidget, reason: kind);
+          expect(
+            find.descendant(
+              of: _asWritten(),
+              matching: find.text(es.captureSaveAsWritten),
+            ),
+            findsOneWidget,
+          );
+          expect(es.captureSaveAsWritten, 'Guardar como tarea');
+        },
+      );
+    }
+  });
 }

@@ -36,8 +36,33 @@ class CommandView {
     this.viewOnly,
     this.asks = false,
     this.bulk,
+    this.projectChoices = const [],
+    this.withProject,
   });
   final CaptureCommand command;
+
+  /// A search, change, deletion or completion whose project as said matched
+  /// several on the phone: those projects, in the server's order. The card
+  /// asks which one, and the chips stay once one is tapped.
+  final List<TaskListInfo> projectChoices;
+
+  /// [command] as if the project tapped among [projectChoices] had been
+  /// said; null when none was tapped, or none was asked.
+  final CaptureCommand? withProject;
+
+  /// What the card looks for and shows: [command], with the project tapped.
+  CaptureCommand get asked => withProject ?? command;
+
+  /// The card asks which project was meant.
+  bool get asksProject => projectChoices.isNotEmpty;
+
+  /// The project tapped among [projectChoices].
+  TaskListInfo? get project =>
+      projectChoices.where((p) => p.id == command.choice).firstOrNull;
+
+  /// It asks which project, and none was tapped yet: nothing was looked
+  /// for.
+  bool get choosingProject => asksProject && project == null;
 
   /// `project`: two projects match the name said, or the one that matches
   /// has another name. The card asks whether to create it.
@@ -81,7 +106,8 @@ class CommandView {
           kind == CommandKind.complete) &&
       bulk == null &&
       target == null &&
-      !choosing;
+      !choosing &&
+      !choosingProject;
 
   /// `complete`: the task meant is done already.
   bool get alreadyDone =>
@@ -108,9 +134,12 @@ class CommandView {
     CommandKind.update =>
       bulk != null
           ? bulk!.waits
-          : choosing || plan?.needsDay == true || plan?.asksMember == true,
-    CommandKind.delete ||
-    CommandKind.complete => bulk != null ? bulk!.waits : choosing,
+          : choosingProject ||
+                choosing ||
+                plan?.needsDay == true ||
+                plan?.asksMember == true,
+    CommandKind.delete || CommandKind.complete =>
+      bulk != null ? bulk!.waits : choosingProject || choosing,
     CommandKind.find => false,
   };
 
@@ -118,13 +147,67 @@ class CommandView {
   String get projectName => spokenProjectName(command.name);
 }
 
-/// Works out [command] against the phone's [tasks] and [projects].
+/// Works out [command] against the phone's [tasks] and [projects]. When the
+/// project said matched several, it waits for one to be tapped, then is
+/// worked out as if that one had been said.
 CommandView resolveCommand(
   CaptureCommand command, {
   required List<Task> tasks,
   required List<TaskListInfo> projects,
   int? accountId,
 }) {
+  final choices = _projectChoices(command, projects);
+  if (choices.isEmpty) {
+    return _resolve(
+      command,
+      command,
+      tasks: tasks,
+      projects: projects,
+      accountId: accountId,
+    );
+  }
+  final picked = choices.where((p) => p.id == command.choice).firstOrNull;
+  if (picked == null) return CommandView(command, projectChoices: choices);
+  return _resolve(
+    command,
+    command.withProject(picked.id),
+    tasks: tasks,
+    projects: projects,
+    accountId: accountId,
+    choices: choices,
+  );
+}
+
+/// The projects to ask between: a search, change, deletion or completion
+/// whose project as said matched several (`ambiguous_project`), those of
+/// the server's candidates the phone has, in its order.
+List<TaskListInfo> _projectChoices(
+  CaptureCommand command,
+  List<TaskListInfo> projects,
+) {
+  if (!command.ambiguous) return const [];
+  final (said, ids) = switch (command.kind) {
+    CommandKind.find => (command.projectName, command.projectCandidates),
+    CommandKind.update || CommandKind.delete || CommandKind.complete => (
+      command.target.projectName,
+      command.target.projectCandidates,
+    ),
+    CommandKind.project => (null, const <String>[]),
+  };
+  if (said == null) return const [];
+  return [for (final id in ids) ?projects.where((p) => p.id == id).firstOrNull];
+}
+
+/// Works out [asked], [command] with the project tapped, if any.
+CommandView _resolve(
+  CaptureCommand command,
+  CaptureCommand asked, {
+  required List<Task> tasks,
+  required List<TaskListInfo> projects,
+  int? accountId,
+  List<TaskListInfo> choices = const [],
+}) {
+  final withProject = identical(asked, command) ? null : asked;
   switch (command.kind) {
     case CommandKind.project:
       // A project matched under another name («Física y Química» for
@@ -142,9 +225,11 @@ CommandView resolveCommand(
     case CommandKind.find:
       return CommandView(
         command,
+        projectChoices: choices,
+        withProject: withProject,
         found: TaskMatcher.find(
           tasks,
-          command,
+          asked,
           accountId: accountId,
           projects: projects,
         ),
@@ -155,8 +240,10 @@ CommandView resolveCommand(
       if (command.bulk) {
         return CommandView(
           command,
+          projectChoices: choices,
+          withProject: withProject,
           bulk: planBulk(
-            command,
+            asked,
             tasks: tasks,
             projects: projects,
             accountId: accountId,
@@ -168,7 +255,7 @@ CommandView resolveCommand(
       final completing = command.kind == CommandKind.complete;
       final matches = TaskMatcher.targets(
         tasks,
-        command.target,
+        asked.target,
         canEdit: canEdit,
         completing: completing,
       );
@@ -177,7 +264,7 @@ CommandView resolveCommand(
           ? null
           : TaskMatcher.targets(
               tasks,
-              command.target,
+              asked.target,
               canEdit: (_) => true,
               completing: completing,
             ).where((task) => !canEdit(task.listId)).firstOrNull;
@@ -193,7 +280,7 @@ CommandView resolveCommand(
               task: stored,
               shown: target!,
               changes: command.changes,
-              issues: command.issues,
+              issues: asked.issues,
               project: projects.where((p) => p.id == stored.listId).firstOrNull,
               accountId: accountId,
               day: command.day,
@@ -202,6 +289,8 @@ CommandView resolveCommand(
           : null;
       return CommandView(
         command,
+        projectChoices: choices,
+        withProject: withProject,
         matches: matches,
         target: stored == null ? null : target,
         stored: stored,
@@ -403,9 +492,17 @@ class ProjectChoices extends ConsumerWidget {
 /// The frame of a command's card, like a task's in a result of several. A
 /// [destructive] card (a deletion) has the error colour's edge.
 class _Frame extends StatelessWidget {
-  const _Frame({required this.children, this.destructive = false});
+  const _Frame({
+    required this.children,
+    this.destructive = false,
+    this.question,
+  });
   final List<Widget> children;
   final bool destructive;
+
+  /// A question that stays under the card's first line, whatever follows:
+  /// which project was meant ([_projectQuestion]).
+  final Widget? question;
 
   @override
   Widget build(BuildContext context) {
@@ -424,11 +521,124 @@ class _Frame extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 10, 8, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
+          children: [
+            if (question case final question?) ...[
+              ...children.take(1),
+              question,
+              ...children.skip(1),
+            ] else
+              ...children,
+          ],
         ),
       ),
     );
   }
+}
+
+/// A command's icon on its first line.
+IconData _kindIcon(CommandKind kind) => switch (kind) {
+  CommandKind.project => Icons.create_new_folder_outlined,
+  CommandKind.find => Icons.search_rounded,
+  CommandKind.update => Icons.edit_outlined,
+  CommandKind.delete => Icons.delete_outline_rounded,
+  CommandKind.complete => Icons.task_alt_rounded,
+};
+
+/// «¿Qué proyecto?», with one chip for each project the one said matched,
+/// in the server's order: a tap works the command out in that project.
+/// The chips stay once one is tapped, to tap another. Null when the card
+/// doesn't ask.
+Widget? _projectQuestion(
+  BuildContext context,
+  CommandView view,
+  ValueChanged<CaptureCommand>? onChanged,
+  bool enabled,
+) {
+  if (!view.asksProject) return null;
+  final command = view.command;
+  final picked = view.project;
+  // The box spans the card, for the chips' room at large text.
+  return Padding(
+    padding: const EdgeInsets.only(right: 10, top: 4, bottom: 8),
+    child: QuestionBox(
+      question: context.l10n.commandWhichProjectOfTasks,
+      child: LayoutBuilder(
+        builder: (context, box) => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final project in view.projectChoices)
+              ChoiceChip(
+                key: ValueKey('command-project-${project.id}'),
+                avatar: Icon(
+                  Icons.folder_outlined,
+                  size: 18,
+                  color: taskListColor(project.color),
+                ),
+                avatarBoxConstraints: ProjectChoices._avatarBox,
+                // A long name wraps to a second line rather than being
+                // cut, as [ProjectChoices] does.
+                label: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: math.max(
+                      0,
+                      box.maxWidth - ProjectChoices._chipFrame,
+                    ),
+                  ),
+                  child: Text(
+                    project.name,
+                    softWrap: true,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                selected: picked?.id == project.id,
+                onSelected: enabled && onChanged != null
+                    ? (_) => onChanged(
+                        command.copyWith(choice: project.id, clearTaskId: true),
+                      )
+                    : null,
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// A card that asks which project before it looks for anything: «Tareas
+/// con «examen»», or «Tareas de «mates»» as said, then the question. A
+/// search has no ✕; the others have their choosing state's.
+Widget _askingProject(
+  BuildContext context,
+  CommandView view, {
+  required ValueChanged<CaptureCommand>? onChanged,
+  VoidCallback? onRemove,
+  bool enabled = true,
+}) {
+  final l = context.l10n;
+  final command = view.command;
+  final find = command.kind == CommandKind.find;
+  final words = find ? command.words : command.target.words;
+  final said = (find ? command.projectName : command.target.projectName) ?? '';
+  return _Frame(
+    question: _projectQuestion(context, view, onChanged, enabled),
+    children: [
+      _Header(
+        icon: _kindIcon(command.kind),
+        text: words.isNotEmpty
+            ? l.commandFindWords(_words(words))
+            : l.commandFindProject(said),
+        onRemove: find ? null : onRemove,
+        removeLabel: switch (command.kind) {
+          CommandKind.delete => l.commandDontDeleteAny,
+          CommandKind.complete => l.commandDontCompleteAny,
+          _ => l.commandDontChangeAny,
+        },
+        enabled: enabled,
+      ),
+    ],
+  );
 }
 
 /// A card's first line: what it is about, with ✕ when it can be taken out.
@@ -617,8 +827,17 @@ class ProjectCommandCard extends ConsumerWidget {
 /// marked, each with its project and assignee. A tap opens the task. No
 /// sentence answers.
 class FindCommandCard extends ConsumerWidget {
-  const FindCommandCard({super.key, required this.view});
+  const FindCommandCard({
+    super.key,
+    required this.view,
+    this.onChanged,
+    this.enabled = true,
+  });
   final CommandView view;
+
+  /// A project tapped, when the one said matched several.
+  final ValueChanged<CaptureCommand>? onChanged;
+  final bool enabled;
 
   /// Enough to scan in the sheet; the rest are counted.
   static const shown = 20;
@@ -626,7 +845,15 @@ class FindCommandCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
-    final command = view.command;
+    if (view.choosingProject) {
+      return _askingProject(
+        context,
+        view,
+        onChanged: onChanged,
+        enabled: enabled,
+      );
+    }
+    final command = view.asked;
     final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final project = projects.where((p) => p.id == command.listId).firstOrNull;
@@ -645,6 +872,7 @@ class FindCommandCard extends ConsumerWidget {
     final found = view.found;
     final scope = _findScope(context, command);
     return _Frame(
+      question: _projectQuestion(context, view, onChanged, enabled),
       children: [
         _Header(icon: Icons.search_rounded, text: heading),
         if (scope != null) _Note(scope),
@@ -756,24 +984,18 @@ class _FoundRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l = context.l10n;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
-    final project = projects.where((p) => p.id == task.listId).firstOrNull;
     final shown = task.isRecurring ? task.nextOpenOccurrence() : task;
     final completed = shown == null || shown.isCompleted;
-    final day = shown ?? task;
-    final details = [
-      if (day.displayDate != null)
-        taskDayLine(context, day)
-      else if (task.deadline != null)
-        taskDeadlineLabel(context, task),
-      ?project?.name,
-      if (project?.shared == true)
-        responsibilityLabel(context, task, ref.watch(authProvider).account?.id),
-      if (completed) l.commandCompleted,
-    ];
+    final details = _taskDetails(
+      context,
+      task: task,
+      shown: shown,
+      projects: projects,
+      accountId: ref.watch(authProvider).account?.id,
+    );
     // Read out as a button, as it opens the task.
     return Semantics(
       button: true,
@@ -808,9 +1030,9 @@ class _FoundRow extends ConsumerWidget {
                             : null,
                       ),
                     ),
-                    if (details.isNotEmpty)
+                    if (details != null)
                       Text(
-                        details.join(' · '),
+                        details,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colors.onSurfaceVariant,
                         ),
@@ -832,6 +1054,32 @@ class _FoundRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// What a listed task's row says under its title: its day and time, or its
+/// deadline when it has only that; its project; the person, when the
+/// project is shared; and «Completada» when done. [shown] is the task as
+/// listed (a repetition), null for a series with none left open. Null when
+/// there is nothing to say.
+String? _taskDetails(
+  BuildContext context, {
+  required Task task,
+  required Task? shown,
+  required List<TaskListInfo> projects,
+  int? accountId,
+}) {
+  final project = projects.where((p) => p.id == task.listId).firstOrNull;
+  final day = shown ?? task;
+  final details = [
+    if (day.displayDate != null)
+      taskDayLine(context, day)
+    else if (task.deadline != null)
+      taskDeadlineLabel(context, task),
+    ?project?.name,
+    if (project?.shared == true) responsibilityLabel(context, task, accountId),
+    if (shown == null || shown.isCompleted) context.l10n.commandCompleted,
+  ];
+  return details.isEmpty ? null : details.join(' · ');
 }
 
 /// A task's day as a command's card lists it: its day and time, or its
@@ -950,7 +1198,7 @@ Widget _another(
 /// project the person can only view, or the words.
 String _notFound(BuildContext context, CommandView view) {
   final l = context.l10n;
-  final target = view.command.target;
+  final target = view.asked.target;
   if (view.viewOnly case final task?) return l.commandViewOnly(task.title);
   if (target.projectName != null) {
     return l.commandProjectNotFound(target.projectName!);
@@ -996,8 +1244,19 @@ class UpdateCommandCard extends ConsumerWidget {
     final l = context.l10n;
     final theme = Theme.of(context);
     final command = view.command;
+    if (view.choosingProject) {
+      return _askingProject(
+        context,
+        view,
+        onChanged: onChanged,
+        onRemove: onRemove,
+        enabled: enabled,
+      );
+    }
+    final question = _projectQuestion(context, view, onChanged, enabled);
     if (view.notFound) {
       return _Frame(
+        question: question,
         children: [
           _Header(icon: Icons.edit_outlined, text: _notFound(context, view)),
         ],
@@ -1005,6 +1264,7 @@ class UpdateCommandCard extends ConsumerWidget {
     }
     if (view.choosing) {
       return _Frame(
+        question: question,
         children: [
           _Header(
             icon: Icons.edit_outlined,
@@ -1077,6 +1337,7 @@ class UpdateCommandCard extends ConsumerWidget {
       null => null,
     };
     return _Frame(
+      question: question,
       children: [
         _Header(
           icon: Icons.edit_outlined,
@@ -1227,7 +1488,7 @@ class UpdateCommandCard extends ConsumerWidget {
           ),
         // Moved by days, with no day to move: it stays.
         if (plan.noDay && plan.isEmpty)
-          _Note(l.commandBulkLeftNoDay(1), icon: Icons.info_outline),
+          _Note(l.commandNoDayStays, icon: Icons.info_outline),
         // Nothing to change: already as asked (unless a line above says
         // why not), or nothing asked, and then it opens to edit.
         if (plan.isEmpty &&
@@ -1279,8 +1540,19 @@ class DeleteCommandCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    if (view.choosingProject) {
+      return _askingProject(
+        context,
+        view,
+        onChanged: onChanged,
+        onRemove: onRemove,
+        enabled: enabled,
+      );
+    }
+    final question = _projectQuestion(context, view, onChanged, enabled);
     if (view.notFound) {
       return _Frame(
+        question: question,
         children: [
           _Header(
             icon: Icons.delete_outline_rounded,
@@ -1291,6 +1563,7 @@ class DeleteCommandCard extends StatelessWidget {
     }
     if (view.choosing) {
       return _Frame(
+        question: question,
         children: [
           _Header(
             icon: Icons.delete_outline_rounded,
@@ -1313,6 +1586,7 @@ class DeleteCommandCard extends StatelessWidget {
     final error = Theme.of(context).colorScheme.error;
     return _Frame(
       destructive: true,
+      question: question,
       children: [
         _Header(
           icon: Icons.delete_outline_rounded,
@@ -1354,13 +1628,28 @@ class CompleteCommandCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    if (view.choosingProject) {
+      return _askingProject(
+        context,
+        view,
+        onChanged: onChanged,
+        onRemove: onRemove,
+        enabled: enabled,
+      );
+    }
+    final question = _projectQuestion(context, view, onChanged, enabled);
+    // Nothing found: the search's icon, not a done-check (UX-1705).
     if (view.notFound) {
       return _Frame(
-        children: [_Header(icon: _icon, text: _notFound(context, view))],
+        question: question,
+        children: [
+          _Header(icon: Icons.search_rounded, text: _notFound(context, view)),
+        ],
       );
     }
     if (view.choosing) {
       return _Frame(
+        question: question,
         children: [
           _Header(
             icon: _icon,
@@ -1375,6 +1664,7 @@ class CompleteCommandCard extends StatelessWidget {
     }
     final shown = view.target!;
     return _Frame(
+      question: question,
       children: [
         _Header(
           icon: _icon,
@@ -1384,7 +1674,7 @@ class CompleteCommandCard extends StatelessWidget {
           enabled: enabled,
         ),
         _Note(_dayOf(context, shown)),
-        if (view.alreadyDone) _Note(l.commandNothingToChange),
+        if (view.alreadyDone) _Note(l.commandAlreadyDone),
         if (view.matches.length > 1)
           _another(context, view, onChanged, enabled),
       ],
@@ -1392,8 +1682,9 @@ class CompleteCommandCard extends StatelessWidget {
   }
 }
 
-/// The person a bulk change assigns the tasks to, as projects name them.
-String _assignee(CaptureCommand command, List<TaskListInfo> projects) {
+/// The person a bulk change assigns the tasks to, as projects name them: on
+/// the card's heading, and in the message after the tap.
+String bulkAssignee(CaptureCommand command, List<TaskListInfo> projects) {
   final changes = command.changes;
   final id = changes.assigneeId;
   final person = id == null
@@ -1425,10 +1716,11 @@ String bulkHeading(
           : day == DateTime(today.year, today.month, today.day + 1)
           ? 'tomorrow'
           : 'other';
-      // Today and tomorrow need no month: «mañana, jue 22».
+      // Today and tomorrow need no month: «mañana, jue 22», the weekday
+      // and its number joined by a no-break space, so they wrap as one.
       final shown = when == 'other'
           ? context.weekdayDate(date)
-          : DateFormat('E d', context.localeName).format(date);
+          : DateFormat('E\u00A0d', context.localeName).format(date);
       return l.commandBulkMoveTo(count, when, shown);
     case BulkAction.shift:
       final days = changes.shiftDays!;
@@ -1439,7 +1731,7 @@ String bulkHeading(
       );
       return l.commandBulkShift(count, span, days < 0 ? 'earlier' : 'later');
     case BulkAction.assign:
-      return l.commandBulkAssignTo(count, _assignee(view.command, projects));
+      return l.commandBulkAssignTo(count, bulkAssignee(view.command, projects));
     case BulkAction.change:
       return l.commandBulkChange(count);
     case BulkAction.complete:
@@ -1511,14 +1803,15 @@ String? _bulkSets(
         l.commandAssignee,
         changes.assignsNobody
             ? l.assignedToGroup
-            : _assignee(view.command, projects),
+            : bulkAssignee(view.command, projects),
       ),
   ];
   return parts.isEmpty ? null : parts.join(' · ');
 }
 
 /// What a bulk command left out, in one line: «2 tareas que se repiten no
-/// cambian». Null when nothing was.
+/// cambian», or a lone one by its title, «Natación se repite: no cambia».
+/// Null when nothing was.
 String? _bulkLeftOut(
   BuildContext context,
   CommandView view,
@@ -1526,19 +1819,23 @@ String? _bulkLeftOut(
 ) {
   final l = context.l10n;
   final bulk = view.bulk!;
+  // A lone task left out is named; from two, counted.
+  String title(List<Task> tasks) => tasks.length == 1 ? tasks.single.title : '';
   final parts = [
     if (bulk.repeating > 0)
       l.commandBulkLeftRepeating(bulk.repeating, switch (view.kind) {
         CommandKind.delete => 'delete',
         CommandKind.complete => 'complete',
         _ => 'change',
-      }),
+      }, title(bulk.repeatingTasks)),
     if (bulk.unassignable > 0)
       l.commandBulkLeftUnassignable(
         bulk.unassignable,
-        _assignee(view.command, projects),
+        bulkAssignee(view.command, projects),
+        title(bulk.unassignableTasks),
       ),
-    if (bulk.noDay > 0) l.commandBulkLeftNoDay(bulk.noDay),
+    if (bulk.noDay > 0)
+      l.commandBulkLeftNoDay(bulk.noDay, title(bulk.noDayTasks)),
   ];
   return parts.isEmpty ? null : parts.join(' · ');
 }
@@ -1627,8 +1924,15 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
     final colors = theme.colorScheme;
     final view = widget.view;
     final command = view.command;
-    final target = command.target;
+    // As the card looks for it: with the project tapped, when it asked.
+    final target = view.asked.target;
     final bulk = view.bulk!;
+    final question = _projectQuestion(
+      context,
+      view,
+      widget.onChanged,
+      widget.enabled,
+    );
     final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final delete = command.kind == CommandKind.delete;
@@ -1655,18 +1959,25 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
 
     // A project or person said that wasn't found: nothing was searched.
     if (target.projectName case final name?) {
-      return _Frame(children: [header(l.commandProjectNotFound(name))]);
+      return _Frame(
+        question: question,
+        children: [header(l.commandProjectNotFound(name))],
+      );
     }
     if (target.personName case final name?) {
-      return _Frame(children: [header(person(name))]);
+      return _Frame(question: question, children: [header(person(name))]);
     }
     if (bulk.tooMany) {
-      return _Frame(children: [header(l.commandBulkTooMany(bulk.matched))]);
+      return _Frame(
+        question: question,
+        children: [header(l.commandBulkTooMany(bulk.matched))],
+      );
     }
     // Nothing said to change: the tasks, as a search lists them; each opens
     // to edit, as one task's card does.
     if (bulk.unasked case final found when found.isNotEmpty) {
       return _Frame(
+        question: question,
         children: [
           header(
             _about(
@@ -1695,7 +2006,20 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
     if (bulk.items.isEmpty) {
       if (bulk.matched == 0 && bulk.repeating == 0) {
         if (bulk.viewOnly case final task?) {
-          return _Frame(children: [header(l.commandViewOnly(task.title))]);
+          // The project they're in, named; its title if it isn't here.
+          final project = projects
+              .where((p) => p.id == task.listId)
+              .firstOrNull;
+          return _Frame(
+            question: question,
+            children: [
+              header(
+                project != null
+                    ? l.commandBulkViewOnly(project.name)
+                    : l.commandViewOnly(task.title),
+              ),
+            ],
+          );
         }
         final about = _about(
           context,
@@ -1706,6 +2030,7 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
           accountId: accountId,
         );
         return _Frame(
+          question: question,
           children: [
             header(_bulkNone(context, target)),
             if (about != null) _Note(about),
@@ -1714,8 +2039,11 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
       }
       // Tasks matched, and none of them would change: why, in one line.
       return _Frame(
+        question: question,
         children: [
-          header(problem ?? leftOut ?? l.commandNothingToChange),
+          header(
+            problem ?? leftOut ?? l.commandBulkNothingToChange(bulk.matched),
+          ),
           if (problem != null && leftOut != null)
             _Note(leftOut, icon: Icons.info_outline),
         ],
@@ -1726,11 +2054,13 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
         : null;
     Widget row(BulkItem item) {
       final task = item.shown;
-      final day = [
-        _dayOf(context, task),
-        if (target.status != 'completed' && _completed(task))
-          l.commandCompleted,
-      ].join(' · ');
+      final details = _taskDetails(
+        context,
+        task: task,
+        shown: task,
+        projects: projects,
+        accountId: accountId,
+      );
       return CheckboxListTile(
         key: ValueKey('bulk-${command.id}-${item.key}'),
         value: !bulk.excluded.contains(item.key),
@@ -1739,8 +2069,16 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
         contentPadding: const EdgeInsetsDirectional.only(end: 8),
         activeColor: delete ? colors.error : null,
         checkColor: delete ? colors.onError : null,
-        title: Text(task.title),
-        subtitle: Text(day),
+        title: Text(
+          task.title,
+          style: task.isCompleted
+              ? TextStyle(
+                  color: colors.onSurfaceVariant,
+                  decoration: TextDecoration.lineThrough,
+                )
+              : null,
+        ),
+        subtitle: details == null ? null : Text(details),
       );
     }
 
@@ -1770,6 +2108,7 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
             ),
           );
     return _Frame(
+      question: question,
       destructive: delete,
       children: [
         header(bulkHeading(context, view, projects), removable: true),

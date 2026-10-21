@@ -142,6 +142,71 @@ Map<String, dynamic> _moveYesterday() => {
   'changes': {'date': key(day(1))},
 };
 
+/// Last week's completed tasks, from Tuesday 13 to Saturday 17 (from
+/// Wednesday 21): what «borra todas las completadas de la semana pasada»
+/// deletes.
+List<Task> _doneLastWeek() => [
+  Task(
+    id: 80,
+    title: 'Devolver los libros a la biblioteca',
+    priority: 1,
+    dueDate: day(-8, 17),
+    isCompleted: true,
+  ),
+  Task(
+    id: 81,
+    title: 'Pedir cita en el dentista',
+    priority: 2,
+    dueDate: day(-6),
+    hasTime: false,
+    isCompleted: true,
+  ),
+  Task(
+    id: 82,
+    title: 'Renovar el seguro del coche',
+    priority: 3,
+    dueDate: day(-4, 11),
+    isCompleted: true,
+  ),
+];
+
+/// Next week's tasks, one a day from Monday to Friday (from Wednesday 21),
+/// one with only a deadline: a week later, they land on five days.
+List<Task> _nextWeek() => [
+  Task(
+    id: 100,
+    title: 'Llevar el coche al taller',
+    priority: 1,
+    dueDate: day(5, 9),
+  ),
+  Task(
+    id: 101,
+    title: 'Reunión con la tutora',
+    priority: 2,
+    dueDate: day(6, 17),
+  ),
+  Task(
+    id: 102,
+    title: 'Comprar el regalo de Lucía',
+    priority: 1,
+    dueDate: day(7),
+    hasTime: false,
+  ),
+  Task(
+    id: 103,
+    title: 'Pagar el seguro de la casa',
+    priority: 2,
+    deadline: day(8),
+    reminderAnchor: 'deadline',
+  ),
+  Task(
+    id: 104,
+    title: 'Cena con los vecinos',
+    priority: 1,
+    dueDate: day(9, 21),
+  ),
+];
+
 void commandPreviews() {
   previewArea('commands', 'Voice commands', () {
     // ------------------------------------------------------------ projects
@@ -656,11 +721,68 @@ void commandPreviews() {
       },
     );
 
+    preview(
+      landed,
+      'complete-applied',
+      '«Ya he ido a la peluquería», Marcar como hecha tapped: Calendar on the task\'s day, Saturday, with its row ticked and lit, «Completada: Ir a la peluquería» and Deshacer.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), _haircut()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'complete',
+              'target': {
+                'words': ['peluquería'],
+              },
+            }),
+          ],
+          transcript: 'Ya he ido a la peluquería',
+        );
+        await _apply(app);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'complete-not-found',
+      '«Ya he llamado al dentista» with no such task: «No encuentro ninguna tarea con «dentista»» beside the search icon, and only Cerrar and Volver a decirlo, no Guardar como tarea.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'complete',
+              'target': {
+                'words': ['dentista'],
+              },
+            }),
+          ],
+          transcript: 'Ya he llamado al dentista',
+        );
+        await p.shoot();
+      },
+    );
+
     // ---------------------------------------------------------------- sets
     preview(
       cards,
       'bulk-move',
-      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a mañana, …», yesterday\'s open tasks with their day, all ticked, and «Mover 4 tareas»; the one already done stays.',
+      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a mañana, jue 22», the weekday and its number kept on one line, yesterday\'s open tasks with their day and, when they have one, their project, all ticked, and «Mover 4 tareas»; the one already done stays.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -703,7 +825,7 @@ void commandPreviews() {
     preview(
       landed,
       'bulk-applied',
-      'Mover 4 tareas tapped: Calendar on tomorrow with the moved tasks lit, «4 tareas movidas» and Deshacer.',
+      'Mover 4 tareas tapped: Calendar on tomorrow with the moved tasks lit, «4 tareas movidas al jue, 22 de oct», naming the day, and Deshacer.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -723,38 +845,43 @@ void commandPreviews() {
     );
 
     preview(
+      landed,
+      'bulk-shift-applied',
+      '«Pasa todo lo de la semana que viene una semana más tarde», Mover 5 tareas tapped: five tasks on five days, one with only a deadline, each a week later; Calendar on the earliest new day with its task lit, and «5 tareas movidas · también en otros 4 días» and Deshacer.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._nextWeek()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'update',
+              'target': _set(from: day(5), to: day(11)),
+              'changes': {'shift_days': 7},
+            }),
+          ],
+          transcript:
+              'Pasa todo lo de la semana que viene una semana más tarde',
+        );
+        await _apply(app);
+        await p.shoot();
+      },
+    );
+
+    preview(
       cards,
       'bulk-delete',
-      '«Borra todas las completadas de la semana pasada»: «Eliminar 3 tareas» in the warning colour, the tasks ticked, and the button in the delete style.',
+      '«Borra todas las completadas de la semana pasada»: «Eliminar 3 tareas» in the warning colour, the tasks ticked, each title struck through with «Completada» after its day, and the button in the delete style; at 2× the sheet opens at the heading.',
       [es1, es2],
       (p) async {
         final app = await PreviewApp.open(
           p,
-          tasks: [
-            ...normalDay(),
-            Task(
-              id: 80,
-              title: 'Devolver los libros a la biblioteca',
-              priority: 1,
-              dueDate: day(-8, 17),
-              isCompleted: true,
-            ),
-            Task(
-              id: 81,
-              title: 'Pedir cita en el dentista',
-              priority: 2,
-              dueDate: day(-6),
-              hasTime: false,
-              isCompleted: true,
-            ),
-            Task(
-              id: 82,
-              title: 'Renovar el seguro del coche',
-              priority: 3,
-              dueDate: day(-4, 11),
-              isCompleted: true,
-            ),
-          ],
+          tasks: [...normalDay(), ..._doneLastWeek()],
           projects: allProjects,
         );
         await resume(
@@ -767,6 +894,33 @@ void commandPreviews() {
             }),
           ],
           transcript: 'Borra todas las completadas de la semana pasada',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-delete-mixed',
+      '«Apunta comprar pan y borra todas las completadas de la semana pasada»: the new task «Comprar pan» first, then «Eliminar 3 tareas»; nothing asks, so the sheet opens with the set\'s heading and its ✕ at the top, the task card scrolled up above it, and «Añadir y eliminar» below.',
+      [es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._doneLastWeek()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          [draft('Comprar pan', date: day(0))],
+          commands: [
+            command({
+              'kind': 'delete',
+              'target': _set(from: day(-9), to: day(-3), status: 'completed'),
+            }),
+          ],
+          transcript:
+              'Apunta comprar pan y borra todas las completadas de la semana pasada',
         );
         await p.shoot();
       },
@@ -798,7 +952,7 @@ void commandPreviews() {
     preview(
       cards,
       'bulk-left-out',
-      '«Asigna a Paul todo lo del viernes»: «Asignar 2 tareas a Paul», and one line for what stays: the repeating class, and a task outside a shared project.',
+      '«Asigna a Paul todo lo del viernes»: «Asignar 2 tareas a Paul», each row with its day, «Matemáticas» and «Yo», and one line for what stays: «Natación se repite: no cambia», and 2 tasks outside a shared project.',
       [es1, ca2],
       (p) async {
         final friday = next(DateTime.friday);
@@ -876,6 +1030,125 @@ void commandPreviews() {
           const [],
           commands: [command(_moveYesterday())],
           transcript: 'Pasa todas las tareas de ayer a mañana',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-view-only',
+      '«Pasa las de Matemáticas de hoy a mañana» when Ana shares Matemáticas with the person only to view: the set\'s only matches are there, so the card names the project, «Solo puedes ver «Matemáticas»: sus tareas no cambian.», then Cerrar and Volver a decirlo, with nothing to apply.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 95,
+              title: 'Preparar el examen del tema 6',
+              priority: 2,
+              dueDate: day(0, 17),
+              listId: 'matematicas',
+            ),
+            Task(
+              id: 96,
+              title: 'Corregir los ejercicios de fracciones',
+              priority: 1,
+              dueDate: day(0),
+              hasTime: false,
+              listId: 'matematicas',
+            ),
+          ],
+          projects: [
+            TaskListInfo(
+              id: 'matematicas',
+              name: 'Matemáticas',
+              color: 'blue',
+              version: 3,
+              role: 'viewer',
+              shared: true,
+              ownerId: ana,
+              people: const [
+                ProjectMember(id: ana, name: 'Ana', role: 'owner'),
+                ProjectMember(id: me, name: 'María', role: 'viewer'),
+              ],
+            ),
+            excursion,
+            casa,
+            trabajo,
+          ],
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'update',
+              'target': _set(from: day(0), listId: 'matematicas'),
+              'changes': {'date': key(day(1))},
+            }),
+          ],
+          transcript: 'Pasa las de Matemáticas de hoy a mañana',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-ambiguous-project',
+      '«Pasa todo lo de mates a mañana» with Matemáticas and Matemáticas II on the phone, both matched: «Tareas de «mates»», then «¿Qué proyecto?» with a chip for each, best first, and the button disabled, reading «Revisa los datos de arriba».',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 90,
+              title: 'Corregir los ejercicios de fracciones',
+              priority: 1,
+              dueDate: day(-1, 17),
+              listId: 'matematicas',
+              assignment: 'member',
+              assigneeId: me,
+              assigneeName: 'María',
+            ),
+            Task(
+              id: 91,
+              title: 'Preparar el examen del tema 6',
+              priority: 2,
+              dueDate: day(-1),
+              hasTime: false,
+              listId: 'matematicas',
+              assignment: 'member',
+              assigneeId: me,
+              assigneeName: 'María',
+            ),
+          ],
+          projects: [...allProjects, _mathsTwo],
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'update',
+              'issues': ['ambiguous_project'],
+              'target': {
+                ..._set(),
+                'project_name': 'mates',
+                'project_candidates': [
+                  {'id': 'matematicas', 'name': 'Matemáticas'},
+                  {'id': 'matematicas2', 'name': 'Matemáticas II'},
+                ],
+              },
+              'changes': {'date': key(day(1))},
+            }),
+          ],
+          transcript: 'Pasa todo lo de mates a mañana',
         );
         await p.shoot();
       },

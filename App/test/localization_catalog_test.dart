@@ -734,11 +734,11 @@ void main() {
       'Don’t create Física / No crear Física / No creïs Física',
     );
     expect(
-      all((l) => l.commandWontDelete),
-      'Won’t be deleted / No se eliminará / No es suprimirà',
+      all((l) => l.commandWontDelete(1)),
+      'Won’t be deleted / No se eliminará / No se suprimirà',
     );
     expect(
-      all((l) => l.commandWontChange),
+      all((l) => l.commandWontChange(1)),
       'Won’t be changed / No se cambiará / No es canviarà',
     );
     expect(

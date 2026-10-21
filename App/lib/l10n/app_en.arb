@@ -1641,7 +1641,7 @@
     }
   },
   "@notificationCompleted": {
-    "description": "Replaces a reminder for a few seconds after Complete, beside an Undo action.",
+    "description": "Replaces a reminder for a few seconds after Complete, beside an Undo action. Also the message, with Undo, after a dictation marked exactly one task as done.",
     "placeholders": {
       "title": {
         "type": "String"
@@ -2701,6 +2701,10 @@
   "@commandOtherProject": {
     "description": "Chip after the similar projects under commandWhichProject or commandCreateProjectQuestion: opens the list of the person's projects, where a pick answers the question. Shown only when they have other projects."
   },
+  "commandWhichProjectOfTasks": "Which project?",
+  "@commandWhichProjectOfTasks": {
+    "description": "A dictation's search, change, deletion or completion named a project that matches two or more of the person's projects. One chip per project follows; a tap works the command out in that project. Not for placing a new task (that is commandWhichProject)."
+  },
   "commandCreateProjects": "{count, plural, =1{Create project} other{Create {count} projects}}",
   "@commandCreateProjects": {
     "description": "The confirming button of a dictation's result that only creates projects.",
@@ -2761,13 +2765,23 @@
       }
     }
   },
-  "commandWontDelete": "Won’t be deleted",
+  "commandWontDelete": "{count, plural, =1{Won’t be deleted} other{Won’t be deleted}}",
   "@commandWontDelete": {
-    "description": "Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the task is kept."
+    "description": "Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the tasks are kept. {count} is how many tasks the card would have deleted: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
-  "commandWontChange": "Won’t be changed",
+  "commandWontChange": "{count, plural, =1{Won’t be changed} other{Won’t be changed}}",
   "@commandWontChange": {
-    "description": "Message, with Undo, after the ✕ on a change's card in a dictation's result: the task stays as it is."
+    "description": "Message, with Undo, after the ✕ on a change's card in a dictation's result: the tasks stay as they are. {count} is how many tasks the card would have changed: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "commandWontCreate": "Won’t be created",
   "@commandWontCreate": {
@@ -3091,13 +3105,18 @@
   "@commandDontCompleteAny": {
     "description": "Tooltip and screen-reader label of the ✕ on a card that marks tasks as done, while it asks which one (commandWhichToComplete) or lists a set of them: none is marked done."
   },
-  "commandWontComplete": "Won’t be completed",
+  "commandWontComplete": "{count, plural, =1{Won’t be completed} other{Won’t be completed}}",
   "@commandWontComplete": {
-    "description": "Message, with Undo, after the ✕ on a card that marks tasks as done in a dictation's result: nothing is marked."
+    "description": "Message, with Undo, after the ✕ on a card that marks tasks as done in a dictation's result: nothing is marked. {count} is how many tasks the card would have marked done: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "commandTasksCompleted": "{count, plural, =1{Task completed} other{{count} tasks completed}}",
   "@commandTasksCompleted": {
-    "description": "Brief message after a dictation marked tasks as done, with Undo. For one task it matches taskCompleted.",
+    "description": "Brief message after a dictation marked two or more tasks as done, with Undo. For one task, notificationCompleted names it instead.",
     "placeholders": {
       "count": {
         "type": "int"
@@ -3110,6 +3129,30 @@
     "placeholders": {
       "count": {
         "type": "int"
+      }
+    }
+  },
+  "commandTasksMovedTo": "{count, plural, =1{Task moved to {date}} other{{count} tasks moved to {date}}}",
+  "@commandTasksMovedTo": {
+    "description": "Brief message after a dictation moved a set of tasks, with Undo, when every task moved landed on the same day. {count} is how many tasks moved; {date} is that day, weekday first (“Thu, Oct 22”). When they landed on several days, commandTasksMoved says it instead.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "commandTasksAssignedTo": "{count, plural, =1{Task assigned to {name}} other{{count} tasks assigned to {name}}}",
+  "@commandTasksAssignedTo": {
+    "description": "Brief message after a dictation assigned a set of tasks to someone, and changed nothing else, with Undo. {count} is how many tasks were assigned; {name} is that person, as the card's heading (commandBulkAssignTo) names them.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
       }
     }
   },
@@ -3224,40 +3267,49 @@
       }
     }
   },
-  "commandBulkLeftRepeating": "{action, select, delete{{count, plural, =1{1 repeating task won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{1 repeating task won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{1 repeating task won’t change} other{{count} repeating tasks won’t change}}}}",
+  "commandBulkLeftRepeating": "{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}",
   "@commandBulkLeftRepeating": {
-    "description": "On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change).",
+    "description": "On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).",
     "placeholders": {
       "count": {
         "type": "int"
       },
       "action": {
         "type": "String"
+      },
+      "title": {
+        "type": "String"
       }
     }
   },
-  "commandBulkLeftUnassignable": "{count, plural, =1{1 task can’t be assigned to {name}} other{{count} tasks can’t be assigned to {name}}}",
+  "commandBulkLeftUnassignable": "{count, plural, =1{{title} can’t be assigned to {name}} other{{count} tasks can’t be assigned to {name}}}",
   "@commandBulkLeftUnassignable": {
-    "description": "On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many.",
+    "description": "On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many; {title} is the one task's title when only one is left out.",
     "placeholders": {
       "count": {
         "type": "int"
       },
       "name": {
         "type": "String"
+      },
+      "title": {
+        "type": "String"
       }
     }
   },
-  "commandBulkLeftNoDay": "{count, plural, =1{1 task with no date won’t change} other{{count} tasks with no date won’t change}}",
+  "commandBulkLeftNoDay": "{count, plural, =1{{title} has no date: it won’t change} other{{count} tasks with no date won’t change}}",
   "@commandBulkLeftNoDay": {
-    "description": "On a dictation's card that moves tasks by some days or sets their time: tasks with no date (and no deadline) are left as they are. {count} is how many.",
+    "description": "On a dictation's card that moves tasks by some days or sets their time: tasks with no date (and no deadline) are left as they are. {count} is how many; {title} is the one task's title when only one is left out.",
     "placeholders": {
       "count": {
         "type": "int"
+      },
+      "title": {
+        "type": "String"
       }
     }
   },
-  "commandBulkNone": "{status, select, completed{There are no completed tasks {period}} any{There are no tasks {period}} other{There are no unfinished tasks {period}}}",
+  "commandBulkNone": "{status, select, completed{There are no completed tasks {period}} any{There are no tasks {period}} other{There are no tasks to do {period}}}",
   "@commandBulkNone": {
     "description": "A dictation's card for a set of tasks when none matched: what was looked for. {status} is completed, any or other (still to do, the default). {period} is commandBulkPeriod, or empty when no period was said.",
     "placeholders": {
@@ -3269,7 +3321,7 @@
       }
     }
   },
-  "commandBulkPeriod": "{kind, select, today{from today} yesterday{from yesterday} tomorrow{for tomorrow} range{from {from} to {to}} until{up to {to}} since{from {from} on} undated{with no date} other{on {from}}}",
+  "commandBulkPeriod": "{kind, select, today{for today} yesterday{from yesterday} tomorrow{for tomorrow} range{from {from} to {to}} until{up to {to}} since{from {from} on} undated{with no date} other{on {from}}}",
   "@commandBulkPeriod": {
     "description": "The period at the end of commandBulkNone. {kind} is today, yesterday, tomorrow, range (two days), until (up to a day), since (from a day on), undated (tasks with no date) or other (one day). {from} and {to} are days, weekday first (“Thu, Oct 22”).",
     "placeholders": {
@@ -3284,7 +3336,7 @@
       }
     }
   },
-  "commandBulkTooMany": "That’s {count} tasks. Narrow it down, for example to one day or one project.",
+  "commandBulkTooMany": "That’s {count} tasks, too many. Say it again with one day or one project.",
   "@commandBulkTooMany": {
     "description": "A dictation's card for a set of more than 200 tasks: nothing is listed and nothing can be applied; the person says it again for fewer. {count} is how many matched.",
     "placeholders": {
@@ -3292,5 +3344,31 @@
         "type": "int"
       }
     }
+  },
+  "commandBulkNothingToChange": "{count, plural, =1{It’s already like that.} other{They’re already like that.}}",
+  "@commandBulkNothingToChange": {
+    "description": "A dictation asked to change a set of tasks, and every task that matched already is as asked. {count} is how many matched. For one task's change card, commandNothingToChange.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkViewOnly": "You can only view “{project}”: its tasks stay as they are.",
+  "@commandBulkViewOnly": {
+    "description": "A dictation asked to change, delete or mark done a set of tasks, and the only tasks that match are in a project the person can only view, so none changes. {project} is that project's name.",
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "commandNoDayStays": "It has no date, so it stays.",
+  "@commandNoDayStays": {
+    "description": "Under one task's title on a dictation's card that moves it by some days: the task has no date (and no deadline), so it isn't moved."
+  },
+  "commandAlreadyDone": "It was already done.",
+  "@commandAlreadyDone": {
+    "description": "On a dictation's card that marks one task as done: the task was already done, so nothing changes."
   }
 }

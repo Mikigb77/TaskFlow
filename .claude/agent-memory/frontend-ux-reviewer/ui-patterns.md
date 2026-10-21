@@ -22,6 +22,7 @@ What the app does today, so a consistency finding can name the standard and the 
 - **No undo for:** typed save, delete, archive, moving a task into a shared project, leaving.
 - **Undo outside the app (b10, 2026-10-14):** Completar on a notification posts a silent `Completada: {title}` + Deshacer that reopens the task (or that day of a repeat). Its `timeoutAfter` is `TaskReminders.undoTimeout()`: the stored accessibility timeout (`undo_timeout_ms`, saved on foreground/resume) when longer than 10 s, else 10 s. Any new out-of-app undo should follow this, not a fixed 10 s.
 - `FeedbackTimeout.forAction({original})` takes a base duration and returns it on every fallback.
+- **Undo restores locally first (2026-10-21):** `restoreTasks`, `undoSchedule`, `undoOccurrence` in `providers/task_provider.dart` end with `showLocal()`, so Deshacer shows at once and syncs behind. Any new undo must do the same — never wait for the server.
 - **Destructive actions** use confirmation dialogs where the destructive button is the filled or default-teal one. Nothing uses `colorScheme.error`.
 
 ## Date, time and repeat
@@ -93,6 +94,10 @@ What the app does today, so a consistency finding can name the standard and the 
   - On the result card, day chips (Hoy, Mañana, Sin fecha) apply and close in one tap, as when moving a task; empty optional fields (notes) stay inside Más opciones until asked for.
   - Editable text on the result has a visible underline; don't ship borderless editable titles.
   - Capture copy never says "borrador/draft"; leftovers are "sin añadir" / «Quitada».
+
+## Voice command and set cards (2026-10-21)
+- One verb per action across card heading, button and landing message (Mover / Asignar / Marcar como hechas / Eliminar). Count words follow the real count (ICU plurals); a set with no count yet uses the plural.
+- Destructive set: its heading and ✕ must be in view before the button can be pressed. An ambiguity is a question with chips, never a "not found" error. See [[screens-a-voice-capture]].
 
 ## Reminders and notifications
 - The reminders master switch defaults to off, per account and per device (`ReminderPreferences.enabled = false`).

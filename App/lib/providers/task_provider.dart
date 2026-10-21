@@ -139,7 +139,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
             .firstOrNull;
         if (task == null || !change.canUndo(task)) return false;
         await _repository.updateTask(change.restore(task));
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
         return true;
       });
 
@@ -191,7 +191,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
             .firstOrNull;
         if (task == null || !change.canUndo(task)) return false;
         await _repository.updateTask(change.restore(task));
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
         return true;
       });
 
@@ -268,8 +268,9 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         if (mounted) await loadTasks();
       });
 
-  /// Undoes several [deleteTask]s at once, each task as it was, then loads
-  /// once: a voice command can delete many. False when one couldn't come
+  /// Undoes several [deleteTask]s at once, each task as it was, then shows
+  /// them once, syncing behind: a voice command can delete many, and its
+  /// Deshacer doesn't wait for the network. False when one couldn't come
   /// back; the others still do.
   Future<bool> restoreTasks(List<Task> tasks) => _mutate(() async {
         var whole = true;
@@ -280,7 +281,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
             whole = false;
           }
         }
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
         return whole;
       });
 }

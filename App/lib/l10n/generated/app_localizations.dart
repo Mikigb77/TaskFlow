@@ -4258,7 +4258,7 @@ abstract class AppLocalizations {
   /// **'{when} · in {hours} h'**
   String notificationInHours(String when, int hours);
 
-  /// Replaces a reminder for a few seconds after Complete, beside an Undo action.
+  /// Replaces a reminder for a few seconds after Complete, beside an Undo action. Also the message, with Undo, after a dictation marked exactly one task as done.
   ///
   /// In en, this message translates to:
   /// **'Completed: {title}'**
@@ -5974,6 +5974,12 @@ abstract class AppLocalizations {
   /// **'Another project…'**
   String get commandOtherProject;
 
+  /// A dictation's search, change, deletion or completion named a project that matches two or more of the person's projects. One chip per project follows; a tap works the command out in that project. Not for placing a new task (that is commandWhichProject).
+  ///
+  /// In en, this message translates to:
+  /// **'Which project?'**
+  String get commandWhichProjectOfTasks;
+
   /// The confirming button of a dictation's result that only creates projects.
   ///
   /// In en, this message translates to:
@@ -6034,17 +6040,17 @@ abstract class AppLocalizations {
   /// **'Don’t create {name}'**
   String commandDontCreate(String name);
 
-  /// Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the task is kept.
+  /// Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the tasks are kept. {count} is how many tasks the card would have deleted: a set's ticked tasks, or 1.
   ///
   /// In en, this message translates to:
-  /// **'Won’t be deleted'**
-  String get commandWontDelete;
+  /// **'{count, plural, =1{Won’t be deleted} other{Won’t be deleted}}'**
+  String commandWontDelete(int count);
 
-  /// Message, with Undo, after the ✕ on a change's card in a dictation's result: the task stays as it is.
+  /// Message, with Undo, after the ✕ on a change's card in a dictation's result: the tasks stay as they are. {count} is how many tasks the card would have changed: a set's ticked tasks, or 1.
   ///
   /// In en, this message translates to:
-  /// **'Won’t be changed'**
-  String get commandWontChange;
+  /// **'{count, plural, =1{Won’t be changed} other{Won’t be changed}}'**
+  String commandWontChange(int count);
 
   /// Message, with Undo, after the ✕ on a new project's card in a dictation's result: the project isn't created.
   ///
@@ -6298,13 +6304,13 @@ abstract class AppLocalizations {
   /// **'Don’t complete any'**
   String get commandDontCompleteAny;
 
-  /// Message, with Undo, after the ✕ on a card that marks tasks as done in a dictation's result: nothing is marked.
+  /// Message, with Undo, after the ✕ on a card that marks tasks as done in a dictation's result: nothing is marked. {count} is how many tasks the card would have marked done: a set's ticked tasks, or 1.
   ///
   /// In en, this message translates to:
-  /// **'Won’t be completed'**
-  String get commandWontComplete;
+  /// **'{count, plural, =1{Won’t be completed} other{Won’t be completed}}'**
+  String commandWontComplete(int count);
 
-  /// Brief message after a dictation marked tasks as done, with Undo. For one task it matches taskCompleted.
+  /// Brief message after a dictation marked two or more tasks as done, with Undo. For one task, notificationCompleted names it instead.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{Task completed} other{{count} tasks completed}}'**
@@ -6315,6 +6321,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Task moved} other{{count} tasks moved}}'**
   String commandTasksMoved(int count);
+
+  /// Brief message after a dictation moved a set of tasks, with Undo, when every task moved landed on the same day. {count} is how many tasks moved; {date} is that day, weekday first (“Thu, Oct 22”). When they landed on several days, commandTasksMoved says it instead.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task moved to {date}} other{{count} tasks moved to {date}}}'**
+  String commandTasksMovedTo(int count, String date);
+
+  /// Brief message after a dictation assigned a set of tasks to someone, and changed nothing else, with Undo. {count} is how many tasks were assigned; {name} is that person, as the card's heading (commandBulkAssignTo) names them.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task assigned to {name}} other{{count} tasks assigned to {name}}}'**
+  String commandTasksAssignedTo(int count, String name);
 
   /// Heading of a dictation's card that moves a set of tasks to one day (“move all of yesterday's tasks to tomorrow”); each keeps its time. {count} is how many are still ticked, and changes as the person unticks them. {when} is today, tomorrow or other. {day} is, for today and tomorrow, the weekday and the day of the month (“Thu 22”); otherwise the day weekday first, as the app shows days (“Thu, Oct 29”).
   ///
@@ -6376,41 +6394,65 @@ abstract class AppLocalizations {
   /// **'{label}: {value}'**
   String commandBulkField(String label, String value);
 
-  /// On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change).
+  /// On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).
   ///
   /// In en, this message translates to:
-  /// **'{action, select, delete{{count, plural, =1{1 repeating task won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{1 repeating task won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{1 repeating task won’t change} other{{count} repeating tasks won’t change}}}}'**
-  String commandBulkLeftRepeating(int count, String action);
+  /// **'{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}'**
+  String commandBulkLeftRepeating(int count, String action, String title);
 
-  /// On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many.
+  /// On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many; {title} is the one task's title when only one is left out.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 task can’t be assigned to {name}} other{{count} tasks can’t be assigned to {name}}}'**
-  String commandBulkLeftUnassignable(int count, String name);
+  /// **'{count, plural, =1{{title} can’t be assigned to {name}} other{{count} tasks can’t be assigned to {name}}}'**
+  String commandBulkLeftUnassignable(int count, String name, String title);
 
-  /// On a dictation's card that moves tasks by some days or sets their time: tasks with no date (and no deadline) are left as they are. {count} is how many.
+  /// On a dictation's card that moves tasks by some days or sets their time: tasks with no date (and no deadline) are left as they are. {count} is how many; {title} is the one task's title when only one is left out.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 task with no date won’t change} other{{count} tasks with no date won’t change}}'**
-  String commandBulkLeftNoDay(int count);
+  /// **'{count, plural, =1{{title} has no date: it won’t change} other{{count} tasks with no date won’t change}}'**
+  String commandBulkLeftNoDay(int count, String title);
 
   /// A dictation's card for a set of tasks when none matched: what was looked for. {status} is completed, any or other (still to do, the default). {period} is commandBulkPeriod, or empty when no period was said.
   ///
   /// In en, this message translates to:
-  /// **'{status, select, completed{There are no completed tasks {period}} any{There are no tasks {period}} other{There are no unfinished tasks {period}}}'**
+  /// **'{status, select, completed{There are no completed tasks {period}} any{There are no tasks {period}} other{There are no tasks to do {period}}}'**
   String commandBulkNone(String status, String period);
 
   /// The period at the end of commandBulkNone. {kind} is today, yesterday, tomorrow, range (two days), until (up to a day), since (from a day on), undated (tasks with no date) or other (one day). {from} and {to} are days, weekday first (“Thu, Oct 22”).
   ///
   /// In en, this message translates to:
-  /// **'{kind, select, today{from today} yesterday{from yesterday} tomorrow{for tomorrow} range{from {from} to {to}} until{up to {to}} since{from {from} on} undated{with no date} other{on {from}}}'**
+  /// **'{kind, select, today{for today} yesterday{from yesterday} tomorrow{for tomorrow} range{from {from} to {to}} until{up to {to}} since{from {from} on} undated{with no date} other{on {from}}}'**
   String commandBulkPeriod(String kind, String from, String to);
 
   /// A dictation's card for a set of more than 200 tasks: nothing is listed and nothing can be applied; the person says it again for fewer. {count} is how many matched.
   ///
   /// In en, this message translates to:
-  /// **'That’s {count} tasks. Narrow it down, for example to one day or one project.'**
+  /// **'That’s {count} tasks, too many. Say it again with one day or one project.'**
   String commandBulkTooMany(int count);
+
+  /// A dictation asked to change a set of tasks, and every task that matched already is as asked. {count} is how many matched. For one task's change card, commandNothingToChange.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{It’s already like that.} other{They’re already like that.}}'**
+  String commandBulkNothingToChange(int count);
+
+  /// A dictation asked to change, delete or mark done a set of tasks, and the only tasks that match are in a project the person can only view, so none changes. {project} is that project's name.
+  ///
+  /// In en, this message translates to:
+  /// **'You can only view “{project}”: its tasks stay as they are.'**
+  String commandBulkViewOnly(String project);
+
+  /// Under one task's title on a dictation's card that moves it by some days: the task has no date (and no deadline), so it isn't moved.
+  ///
+  /// In en, this message translates to:
+  /// **'It has no date, so it stays.'**
+  String get commandNoDayStays;
+
+  /// On a dictation's card that marks one task as done: the task was already done, so nothing changes.
+  ///
+  /// In en, this message translates to:
+  /// **'It was already done.'**
+  String get commandAlreadyDone;
 }
 
 class _AppLocalizationsDelegate

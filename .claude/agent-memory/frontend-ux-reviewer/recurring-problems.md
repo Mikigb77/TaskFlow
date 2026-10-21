@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Twenty-four problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
+description: Twenty-six problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -113,5 +113,12 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
 24. **Instruction copy outlives the state it describes.**
     - On delete-account, «O confirma con Google…» stayed after Google had confirmed: an alternative to nothing, asking for an action already done (R1D-1 → UX-1232, b5).
     - For any help line that offers an alternative or asks for an action, check each state after the action succeeds, fails and is retried; derive the line's visibility from the same state as the control.
+
+25. **Scroll-reveal targets drift between states of the same card.**
+    - Skipping the reveal for set deletions hid a red card below a task card (R1A-2 → UX-1718); revealing the question box instead of the card then pushed the heading and ✕ off the top once the project was answered (R2A-1 → UX-1719). Three rounds.
+    - For any `ensureVisible`, enumerate: lone card, mixed result, before/after a question is answered, card taller than the view at 2×. Name what must be visible (heading + way out), and reveal that.
+26. **New plural copy fed a count that isn't known yet.**
+    - ✕ on a set still asking «¿Qué proyecto?» fell back to count 1 and spoke in the singular (R1A-1 → UX-1717).
+    - When a string takes a count, check every state where the count is null (asking, loading, not found) and pick the form for what the thing is, not 1.
 
 Related: [[ui-patterns]], [[review-techniques]].

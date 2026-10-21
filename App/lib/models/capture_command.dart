@@ -102,6 +102,7 @@ class CommandTarget {
     this.from,
     this.to,
     this.undated = false,
+    this.projectCandidates = const [],
   });
 
   /// The distinctive words of the task, in the person's language.
@@ -113,6 +114,11 @@ class CommandTarget {
   /// The project as said, when the server couldn't find it: then nothing is
   /// searched, and the card says so.
   final String? projectName;
+
+  /// With `ambiguous_project`: the ids of the projects that matched, best
+  /// first, at most [CaptureCommand.candidateLimit], as the server sent
+  /// them. The card offers them.
+  final List<String> projectCandidates;
 
   /// The task's current day, only when it was said. Never with [all]: a day
   /// said for a set is its [from] and [to].
@@ -146,6 +152,7 @@ class CommandTarget {
         listId: _text(json['list_id'], max: 64),
         projectName: _text(json['project_name'], max: 80),
         date: _day(json['date']),
+        projectCandidates: _candidates(json['project_candidates']),
       );
     }
     var from = _day(json['from']);
@@ -167,14 +174,34 @@ class CommandTarget {
       from: undated ? null : from,
       to: undated ? null : to,
       undated: undated,
+      projectCandidates: _candidates(json['project_candidates']),
     );
   }
+
+  /// This target, as if the project [listId] had been said.
+  CommandTarget withProject(String listId) => CommandTarget(
+    words: words,
+    listId: listId,
+    date: date,
+    all: all,
+    personId: personId,
+    personName: personName,
+    status: status,
+    from: from,
+    to: to,
+    undated: undated,
+  );
 
   Map<String, dynamic> toJson() => {
     'words': words,
     'list_id': listId,
     'project_name': projectName,
     'date': date == null ? null : _dayKey(date!),
+    // In the server's shape, so [CommandTarget.fromJson] reads it back.
+    if (projectCandidates.isNotEmpty)
+      'project_candidates': [
+        for (final id in projectCandidates) {'id': id},
+      ],
     if (all) ...{
       'all': true,
       'person_id': personId,
@@ -355,8 +382,8 @@ class CaptureCommand {
   final String name;
   final String? existingListId;
 
-  /// `project` with `ambiguous_project`: the ids of the projects that
-  /// matched, best first, at most 3, as the server sent them.
+  /// `project` and `find` with `ambiguous_project`: the ids of the projects
+  /// that matched, best first, at most 3, as the server sent them.
   final List<String> projectCandidates;
 
   /// The candidates the server can send for one command.
@@ -408,7 +435,8 @@ class CaptureCommand {
   final bool series;
 
   /// `project` with two matching projects: `new` creates it, or the id of
-  /// the existing project chosen instead.
+  /// the existing project chosen instead. A search, change, deletion or
+  /// completion whose project matched several: the id of the one tapped.
   final String? choice;
 
   /// The day chosen for a new time on a task that has no day.
@@ -484,6 +512,7 @@ class CaptureCommand {
           status: status == 'open' || status == 'completed' ? status : 'any',
           from: from,
           to: to,
+          projectCandidates: _candidates(json['project_candidates']),
         );
       case CommandKind.update:
       case CommandKind.delete:
@@ -543,6 +572,34 @@ class CaptureCommand {
     choice: clearChoice ? null : choice ?? this.choice,
     day: clearDay ? null : day ?? this.day,
     excluded: excluded ?? this.excluded,
+  );
+
+  /// A search, change, deletion or completion as if the project [listId]
+  /// had been said, for the one tapped among those that matched. The
+  /// command as it came stays as it is.
+  CaptureCommand withProject(String listId) => CaptureCommand(
+    id: id,
+    kind: kind,
+    issues: [
+      for (final issue in issues)
+        if (issue != 'ambiguous_project') issue,
+    ],
+    words: words,
+    listId: kind == CommandKind.find ? listId : this.listId,
+    personId: personId,
+    personName: personName,
+    status: status,
+    from: from,
+    to: to,
+    target: kind == CommandKind.find ? target : target.withProject(listId),
+    changes: changes,
+    removed: removed,
+    done: done,
+    taskId: taskId,
+    memberId: memberId,
+    series: series,
+    day: day,
+    excluded: excluded,
   );
 
   Map<String, dynamic> toJson() => {

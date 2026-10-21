@@ -34,7 +34,7 @@ class AppliedUpdate {
 
 /// A task the confirming tap marked done, with what puts it back.
 class AppliedCompletion {
-  AppliedCompletion(this.before, this.keys);
+  AppliedCompletion(this.before, this.keys, {this.days = const []});
 
   /// The task as it was stored.
   final Task before;
@@ -42,6 +42,10 @@ class AppliedCompletion {
   /// A repeating task's repetitions marked done, by their keys; empty for
   /// a task that doesn't repeat.
   final List<String> keys;
+
+  /// The days Calendar shows what was marked on: each repetition's, else
+  /// the task's day, else its deadline's. Empty for a task with no day.
+  final List<DateTime> days;
 }
 
 /// What one confirming tap did, so one `Deshacer` takes all of it back.
@@ -134,11 +138,7 @@ class CommandRunner {
                 date.hour,
                 date.minute,
               );
-        whole = await tasks.rescheduleTask(
-          before.id!,
-          moved,
-          schedule.hasTime,
-        );
+        whole = await tasks.rescheduleTask(before.id!, moved, schedule.hasTime);
         landed = whole.after.nextOpenOccurrence() ?? whole.after;
       } else {
         occurrence = await tasks.changeOccurrence(
@@ -181,7 +181,13 @@ class CommandRunner {
     if (!stored.isRecurring) {
       if (stored.isCompleted) return;
       await tasks.updateTask(stored.copyWith(isCompleted: true));
-      applied.completed.add(AppliedCompletion(stored, const []));
+      applied.completed.add(
+        AppliedCompletion(
+          stored,
+          const [],
+          days: [?(stored.dueDate ?? stored.deadline)],
+        ),
+      );
       return;
     }
     final keys = <String>{
@@ -192,12 +198,15 @@ class CommandRunner {
           key,
     }.toList();
     if (keys.isEmpty) return;
+    final days = [
+      for (final key in keys) ?stored.occurrenceByKey(key)?.displayDate,
+    ];
     await tasks.updateTask(
       stored.copyWith(
         completedDates: {...stored.completedDates, ...keys}.toList()..sort(),
       ),
     );
-    applied.completed.add(AppliedCompletion(stored, keys));
+    applied.completed.add(AppliedCompletion(stored, keys, days: days));
   }
 
   /// Puts back the deleted tasks, the tasks marked done and the changed

@@ -1,0 +1,308 @@
+{
+ "runId": "2026-10-21-changes",
+ "mode": "changes",
+ "created": "2026-10-21",
+ "conventions": [
+  "Paths are relative to the repo root. Line numbers come from review A (.claude/ux-review/runs/2026-10-21-changes/review-A.md) at dc17ab1; nothing under App/ has changed since (HEAD 4464710). Packages run one at a time, in order, and share files (App/lib/widgets/capture_command_cards.dart, App/lib/screens/voice_task_screen.dart and the three ARB files): after an earlier package, search for the code a line number points at, and build on what it left.",
+  "Copy is exact, shown as EN / ES / CA. EN copy sits between “ ”, or between backticks when it holds its own quotes; ES and CA sit between « », or between backticks when they hold their own « ». Keep the catalogs' marks: “…” and ’ in English; «…» in Spanish and Catalan; ’ in Catalan; … as one character (U+2026); ICU plurals and selects as written. Every new or changed string goes in app_en.arb, app_es.arb and app_ca.arb (App/docs/LOCALIZATION.md), with an accurate @key description in app_en.arb and typed placeholders; a key a package replaces goes from all three once nothing uses it. Run flutter gen-l10n; never edit lib/l10n/generated/. The Catalan is the reviewer's; where the organizer wrote or changed it, the brief says so.",
+  "Owner decisions bind every package (.claude/ux-review/DECISIONS.md). Above all the newest, 2026-10-21 (later), Bulk voice commands: all four actions (move to a day or by days; the other changes one task takes, applied to all; mark done; delete, always confirmed and undoable); «all my tasks» is the person's own pending tasks and those assigned to them, completed ones only when said, other people's only when a project or person is named; repeating tasks are left out and counted, except that marking a day's tasks done completes that day's repetition; one card names the action and the count, lists the tasks ticked, one tap applies, «Deshacer» undoes all of it. Also: D11 of 2026-10-13 (delete at once with Deshacer; only a whole series asks), D3 (one capture sheet, the result in it, landing on the task, «Guardar como tarea» when the assistant is slow or fails), D1 of 2026-10-13 (overdue tasks in Today) and UX-1315's project candidates (2026-10-20).",
+  "The contract binds the app: Backend/docs/VOICE_COMMANDS.md, sections «Commands», «Bulk commands» and «Project candidates». No package changes which tasks a set holds, its period rule, or what a move does to a task with only a deadline: those are this plan's open questions D1 (a deadline-only task moved to a day), D2 («hoy» and the overdue tasks Today lists) and D3 (the target day by touch). Each brief says how it fits with them. Card copy quoted in the contract («Dilo con menos…», «5 tareas movidas · Deshacer») is the main session's spec text, not an owner decision: where a brief changes it, updating the contract's quote is a note for the main session.",
+  "The speed bar holds: a plain one-task dictation stays Añadir tarea → speak → Listo → one confirming tap, and looks and saves as today. The test 'a plain single-task dictation looks and saves exactly as before, with no new tap' (App/test/voice_command_cards_test.dart) keeps passing. Judge every screen as a first-time, non-technical user would, in Spanish, often at large text: the owner's father.",
+  "Subtract first. No new settings, screens, tabs or concepts beyond what a brief names, and new strings only where a brief gives the copy.",
+  "Out of scope: Backend/ (Backend/docs/VOICE_COMMANDS.md included: contract changes are notes for the main session, and no package changes the server), and another session's uncommitted work: Backend/, App/pubspec.yaml, App/scripts/, App/config/, .claude/ux-web/ and .claude/agent-memory/web-ux-reviewer/. Don't edit, format or stage them.",
+  "Tests: the implementer keeps the whole suite passing (2458 passed, 4 skipped at dc17ab1) and updates only the tests its change rightly breaks (briefs name those they know); ux-tester writes the acceptance tests and reads copy through the generated AppLocalizations. Harnesses: App/test/bulk_voice_commands_test.dart (sets, one-task completion, the set card at 2×), App/test/voice_command_cards_test.dart (one-task commands; UX-1315's candidates at :6503-6623), App/test/capture_landing_test.dart (landings; `_SlowCloud` at :1835, a cloud sync that never completes), App/test/capture_sheet_test.dart, App/test/localization_catalog_test.dart, App/test/support/design_fixtures.dart, and the preview suite's App/test/ux_previews/support/ (app.dart, fixtures.dart, fakes.dart).",
+  "Sizes: 2× means TextScaler.linear(2.0); 360 dp means a 360×800 view at devicePixelRatio 1 (the preview suite's phone). Where a check counts lines or positions, load Manrope (assets/fonts/Manrope.ttf) as App/test/calendar_feedback_test.dart does. Dates: today is Wednesday 21 Oct 2026 and the renders come from that day («mañana, jue 22»), so example dates in the briefs are from them; tests use days relative to the real today, as App/test/bulk_voice_commands_test.dart does, or calendarClockProvider (App/lib/providers/calendar_focus_provider.dart).",
+  "Renders: from App/, flutter test --no-pub --dart-define=WRITE_UX_PREVIEWS=true test/ux_previews/ux_previews_test.dart --plain-name \"commands/\" refreshes the commands previews (cards.* and applied.*), with INDEX.md and AUDIT.md. Re-render what a package changes, add the preview states its brief asks for in App/test/ux_previews/commands_previews.dart, keep each preview's description true to what it now shows, and fix a preview script your change breaks.",
+  "No agent touches a phone or an emulator, runs the backend or calls the AI. Device checks are for the main session (the TaskFlow_Review emulator lane) or the owner's phone. Emulator evidence is not phone evidence."
+ ],
+ "packages": [
+  {
+   "id": "P224",
+   "title": "The set card reads right: rows like the find card's, a lone left-out task named, the day kept whole, a deletion opening at its heading",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-1701",
+    "UX-1704",
+    "UX-1706",
+    "UX-1712",
+    "UX-1713"
+   ],
+   "files": [
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/services/bulk_plan.dart",
+    "App/lib/services/task_matcher.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, review A, on dc17ab1 (bulk voice commands, the app half). One card per set (`BulkCommandCard`, App/lib/widgets/capture_command_cards.dart:1584-1790) names the action and the live count, lists the matched tasks ticked, says in one line what was left out, and one filled button applies it (contract «The card»). This package changes what each row and the left-out line say, keeps the heading's day in one piece, rewrites the too-many line, and makes a set deletion open at its heading. It doesn't change which tasks a set holds (D2), the move rules (D1) or whether the heading's day is a control (D3).",
+    "UX-1701 (S2). A set's row (`row()`, capture_command_cards.dart:1727-1745) shows the title and, under it, only the day (`_dayOf`), plus «Completada» only when the set didn't ask for completed tasks (:1731); titles are never struck through. So «Borra todas las completadas de la semana pasada» lists three tasks that look exactly like pending ones under «Eliminar 3 tareas» (cards.bulk-delete, es 1× and 2×): had «completadas» been misheard, the card would look the same, so the one word that decides which tasks go can't be checked before the red tap. Rows never show the project or the person either, though «all my tasks» includes tasks assigned to the person in shared projects (deleting one removes it for everyone in the project), and «Asignar 2 tareas a Paul» lists «Preparar el examen del tema 6» without «Matemáticas», so nothing hints why others «no se pueden asignar a Paul». The find card's row (`_FoundRow`, :753-835) already shows a task the right way.",
+    "Fix UX-1701: subtract the special case and reuse the find row's line. Move what `_FoundRow` puts under its title (:766-776: the day, `taskDayLine`, or `taskDeadlineLabel` when there's only a deadline; the project's name; the person, `responsibilityLabel`, when the project is shared; «Completada», `commandCompleted`, when done) into one helper that both rows call. The set row passes the task as listed (`item.shown`, a repetition when a day's tasks are marked done); `_FoundRow` keeps resolving a repeating series to its next open repetition before calling it. «Completada» shows for every done task, whatever status was asked (drop the `target.status != 'completed'` condition), and a done task's title is struck through in onSurfaceVariant, as `_FoundRow` draws it. No new copy. Keep the set row a CheckboxListTile with its key `bulk-<command id>-<item key>`, its whole-row tap target, its leading checkbox and the delete style's colours; the find row keeps its chevron and its tap that opens the task. Both lines wrap: no maxLines, no ellipsis. Fits with D2: if the owner adds Today's overdue tasks to «hoy» sets, their rows get «Atrasada» through this same helper.",
+    "UX-1704 (S2). When a result opens, `_reveal` (App/lib/screens/voice_task_screen.dart:2727-2738) scrolls `_firstOpen()`'s card into view with `alignment: 1`, its bottom at the bottom of the view; with nothing to answer, `_firstOpen` (:2664-2681) picks «the first task the button deletes» (:2678). That rule was made for one task's deletion card, which fits on screen. A set's card is taller than the view at large text, so at 2× the sheet opens scrolled to the bottom of the red card: «Eliminar 3 tareas», the ✕ and the first title are above the view, and the first text seen is the tail «biblioteca» (cards.bulk-delete.es.light.2x). The move and complete set cards open at their heading. Fix: subtract: add `&& view.bulk == null` to that line (:2678), so a set's deletion isn't revealed and the sheet opens at the card's heading. A one-task deletion card keeps its reveal, and questions on cards keep theirs.",
+    "UX-1706 (S2). What a set left out is one line after the list (`_bulkLeftOut`, capture_command_cards.dart:1520-1544): «1 tarea que se repite no cambia · 2 tareas no se pueden asignar a Paul» (cards.bulk-left-out.es.light.1x). Those tasks aren't in the list, so the person can't tell which one stayed, or deal with it, for example by moving the class by hand; after «pasa todo lo de ayer a mañana», the unnamed daily task comes back in Today as «Atrasada». Fix: name the task when exactly one is left out for a reason, and keep the count from two. `BulkPlan` (App/lib/services/bulk_plan.dart:53-125) keeps its counts and also the tasks left out for each reason, so the card can name a lone one: the repeating tasks `TaskMatcher.bulk` collects (App/lib/services/task_matcher.dart:329 and :351, returned only as a count at :397), and the tasks `planBulk` counts as unassignable or with no day (bulk_plan.dart:179-200). Name a task by its title as stored (a repeating task's series title).",
+    "UX-1706 copy, exact. Only the =1 case of each plural changes, and each key gains a String placeholder `title` (describe it in app_en.arb). `commandBulkLeftRepeating(count, action, title)`: EN `{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}` / ES `{action, select, delete{{count, plural, =1{{title} se repite: no se elimina} other{{count} tareas que se repiten no se eliminan}}} complete{{count, plural, =1{{title} se repite: no se completa} other{{count} tareas que se repiten no se completan}}} other{{count, plural, =1{{title} se repite: no cambia} other{{count} tareas que se repiten no cambian}}}}` / CA `{action, select, delete{{count, plural, =1{{title} es repeteix: no se suprimeix} other{{count} tasques que es repeteixen no se suprimeixen}}} complete{{count, plural, =1{{title} es repeteix: no es completa} other{{count} tasques que es repeteixen no es completen}}} other{{count, plural, =1{{title} es repeteix: no canvia} other{{count} tasques que es repeteixen no canvien}}}}`. `commandBulkLeftUnassignable(count, name, title)`, =1: EN `{title} can’t be assigned to {name}` / ES `{title} no se puede asignar a {name}` / CA `{title} no es pot assignar a {name}`. `commandBulkLeftNoDay(count, title)`, =1: EN `{title} has no date: it won’t change` / ES `{title} no tiene fecha: no cambia` / CA `{title} no té data: no canvia`. Every other case stays word for word. The one-task change card also calls `commandBulkLeftNoDay(1)` (:1229-1230): pass that task's title there for now; P228 (UX-1709) replaces that line with its own string.",
+    "UX-1712 (S1). `bulkHeading` (:1409-1450) writes today's and tomorrow's day with `DateFormat('E d', localeName)` (:1431): «jue 22», with a normal space, so at 2× the heading wraps «Mover 4 / tareas a / mañana, jue / 22», leaving «22» alone on the fourth line (cards.bulk-move.es.light.2x). Fix: join the weekday and the number with a no-break space (U+00A0) in that string, in every language, so they wrap as one: «… mañana, / jue 22». Other days (`weekdayDate`, :1430) are unchanged. Fits with D3: if the day becomes a chip, its label is this same text.",
+    "UX-1713 (S1). Over 200 matches, the card's heading is `commandBulkTooMany` (:1663-1664): ES «Son {count} tareas. Dilo con menos, por ejemplo un día o un proyecto.», telegraphic («¿Con menos qué?»), and the Catalan copies it word for word. New copy, exact: EN `That’s {count} tasks, too many. Say it again with one day or one project.` / ES `Son {count} tareas, demasiadas. Vuelve a decirlo con un día o un proyecto.` / CA `Són {count} tasques, massa. Torna-ho a dir amb un dia o un projecte.` The contract quotes the old Spanish («More than 200 matches»); updating that quote is the main session's job, so don't edit Backend/.",
+    "Don't touch: which tasks a set holds and their order (`TaskMatcher.bulk`), the counts, the heading's and the button's wording, the checkboxes and the live count, the list's scroll (inside the card below 1.5× text, in the sheet from 1.5×, :1747-1771), the one-task cards (except the one call at :1230), the messages after the tap (P226) and the strings P228 changes.",
+    "Tests this rightly breaks: App/test/bulk_voice_commands_test.dart:1060-1063 and :1158-1159 (a lone left-out task is now named), :1360-1363 (the too-many line), and any test that reads a set row's second line or `commandBulkLeftNoDay(1)`; :1648's Catalan repeating line at 2 stays. Previews: re-render commands/ (cards.bulk-move, bulk-unticked, bulk-delete, bulk-complete, bulk-left-out, bulk-none) and update the descriptions that quote changed text."
+   ],
+   "acceptance": [
+    "Widget test (UX-1701): Spanish, 1×, the cards.bulk-delete state (three completed tasks from last week; «Borra todas las completadas de la semana pasada», target status completed). Each row's second line is its `taskDayLine` followed by « · Completada» (for «Devolver los libros a la biblioteca»: its day · 17:00 · Completada), and each row's title is drawn with TextDecoration.lineThrough.",
+    "Widget test (UX-1701): Spanish, 1×, the cards.bulk-left-out state («Asigna a Paul todo lo del viernes»; two tasks in the shared project Matemáticas, assigned to the person themselves). The row «Preparar el examen del tema 6» reads, under its title, its `taskDayLine` (Friday · 10:00) · «Matemáticas» · «Yo» (`assignedToMe`), with no «Completada» and no strike-through.",
+    "Widget test (UX-1701): Spanish, 1×, a pending move set (the cards.bulk-move state). No row shows «Completada» or a struck title; a task in a personal project shows that project's name and no person; a task with no project shows only its day.",
+    "Widget test (UX-1701): Spanish and Catalan, 2×, 360 dp, the cards.bulk-left-out state. No overflow is reported, and every set row's title and second line show in full (no Text in a row is cut or ellipsized).",
+    "Widget test (UX-1704): Spanish, 2×, 360 dp, the cards.bulk-delete result just opened and settled. The card's `command-headline` («Eliminar 3 tareas») and its ✕ (tooltip «No eliminar ninguna») lie inside the visible part of the sheet's scroll view. A one-task deletion result («Borra el dentista») at 2× still brings its card fully into view above the buttons, as before.",
+    "Widget test (UX-1706): Spanish, 1×, «Pasa todas las tareas de ayer a mañana» with yesterday's open tasks and exactly one weekly task, «Natación», that repeats yesterday. The left-out line reads «Natación se repite: no cambia»; with two such weekly tasks, «2 tareas que se repiten no cambian».",
+    "Widget test (UX-1706): Spanish, 1×, the cards.bulk-left-out state. The left-out line reads «Natación se repite: no cambia · 2 tareas no se pueden asignar a Paul»; with exactly one task that can't be assigned, that part reads «<its title> no se puede asignar a Paul».",
+    "Widget test (UX-1706): Spanish, 1×, a move by one day of every task in one project («Retrasa un día todo lo de Casa») that holds exactly one task with no day and no deadline. The left-out line reads «<its title> no tiene fecha: no cambia».",
+    "Unit test (UX-1706): `commandBulkLeftRepeating` for each action, `commandBulkLeftUnassignable` and `commandBulkLeftNoDay`, at count 1 with a title and at count 2, read exactly the brief's copy in EN, ES and CA.",
+    "Unit test (UX-1712): in ES, CA and EN, the heading of a move to tomorrow (`bulkHeading`) joins the weekday abbreviation and the day number with U+00A0, with no plain space between them. Render (reviewer): cards.bulk-move.es.light.2x and cards.bulk-move.ca.light.2x keep the weekday and its number on one line.",
+    "Unit test (UX-1713): `commandBulkTooMany(230)` reads exactly «Son 230 tareas, demasiadas. Vuelve a decirlo con un día o un proyecto.», “That’s 230 tasks, too many. Say it again with one day or one project.” and «Són 230 tasques, massa. Torna-ho a dir amb un dia o un projecte.» Widget test: a set with more than 200 matches shows the Spanish line as the card's first line, with no list."
+   ],
+   "deviceChecks": [
+    "Phone, TalkBack (UX-1701): on «Borra todas las completadas de la semana pasada», each row is read as a checkbox with its title, its day and «Completada», and as ticked or not; on «Asigna a Paul todo lo del viernes», the shared project's rows include «Matemáticas» and the person.",
+    "Phone, or the emulator lane at Android's largest font (UX-1704): a set deletion's result opens with «Eliminar N tareas» and its ✕ at the top."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P225",
+   "title": "When a command's task or project isn't settled: «Ya he…» with no match doesn't offer to save the words, and two similar projects become chips",
+   "area": "A",
+   "size": "L",
+   "severity": 2,
+   "findings": [
+    "UX-1705",
+    "UX-1708"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/models/capture_command.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, review A, on dc17ab1. A command whose task or project can't be settled says why and offers a way forward. Two cases are wrong: a completion that found nothing offers to save the sentence as a new task (UX-1705), and a project named in a command that matches two of the person's projects reads as missing, though the server sends both (UX-1708). Both change what `notFound` covers, so they go together.",
+    "UX-1705 (S2). `asWritten` (App/lib/screens/voice_task_screen.dart:4080-4092) offers «Guardar como tarea» when every command found nothing (`view.notFound`) or is a search with no results, and `notFound` (App/lib/widgets/capture_command_cards.dart:77-84) now includes `complete`. So «Ya he llamado al dentista», with no such task, shows «No encuentro ninguna tarea con «dentista»» beside the green done-check (`CompleteCommandCard._icon`, :1352; :1357-1360), and the only filled button, «Guardar como tarea», saves the sentence as a new, undone task under «Sin fecha». That fallback (UX-901) was for a task misread as a change («Cambia el aceite del coche»). A past-tense «ya he…» is never a task to add.",
+    "Fix UX-1705: leave `complete` out of `asWritten`, so only a change, a deletion or a search that found nothing offers it (for example `(view.notFound && view.kind != CommandKind.complete) || …`). A result holding only a completion that found nothing then offers what any read-only result offers (:4312-4333): «Cerrar» (`capture-result-close`), and «Volver a decirlo» when it was spoken and a dictation is left. Head a completion that found nothing with the find card's search icon (`Icons.search_rounded`, as FindCommandCard does at :649) instead of `Icons.task_alt_rounded`; the completion card's other states keep the done-check. No new copy. Keep: «Guardar como tarea» on a change, a deletion or a search that found nothing (UX-901), UX-1301's «Volver a decirlo» on «No se encontraron tareas», and U7's slow and failed states.",
+    "UX-1708 (S2). The server sends `project_candidates` beside `ambiguous_project` for a search and in the target of an update, delete or complete, for one task or a set (contract «Project candidates»; read-only reference: Backend/core/voice_commands.py:285-296 and :322-330). The app reads them only for `project` commands: `CommandTarget.fromJson` (App/lib/models/capture_command.dart:141-171) and the `find` branch of `CaptureCommand.fromServer` (:470-488) ignore them. So «Pasa todo lo de mates a mañana», with Matemáticas and Matemáticas II, comes back with both as candidates, and the card says «No encuentro el proyecto «mates»» (a set: capture_command_cards.dart:1656-1659; one task: `_notFound`, :949-961; a search: :651-655), offering only Cerrar and Volver a decirlo. The project was found twice, not missing, and saying it again fixes far fewer recognition errors than a tap (VO-6). Since UX-1315, a `project` command offers its candidates as chips.",
+    "Fix UX-1708, the answer: read `project_candidates` into the target (a new `CommandTarget.projectCandidates`: ids in the server's order, at most `CaptureCommand.candidateLimit`, through the existing `_candidates`, :56-68) for one task and for a set, and keep them in `toJson`/`fromJson`, so a result reopened later still has them. For `find`, read them into `CaptureCommand.projectCandidates`, as `project` does (:466). Answers and stored sessions without the key parse as before.",
+    "Fix UX-1708, the card. Ask when the command's issues hold `ambiguous_project`, its project as said is unresolved (`projectName` set), and at least one candidate is among the person's projects (`taskListsProvider`; for these commands, projects they can edit or only view). First line: «Tareas con «{words}»» (`commandFindWords`) when words were said, else «Tareas de «{name}»» (`commandFindProject`, with the name as said), beside the kind's icon (never in the error colour), with ✕ for an update, a deletion or a completion (`commandDontChangeAny`, `commandDontDeleteAny`, `commandDontCompleteAny`, as their choosing state has) and none for a search. Under it, a `QuestionBox` (:243-268) with one chip per candidate on the phone, in the server's order: the project's name with the folder icon in the project's colour, as `ProjectChoices` draws its project chips (:353-364). No «Crear …», «Otro proyecto» or «Sin proyecto» chip: these commands look for tasks that exist. The question is a new key: EN “Which project?” / ES «¿Qué proyecto?» / CA «Quin projecte?». The existing `commandWhichProject` («¿En qué proyecto la pongo?») is for placing a new task and stays as it is.",
+    "Fix UX-1708, the tap. Keep the answer as it came and store the tap beside it, as a project command's `choice` and the change card's `memberId` are kept, saved with the result like other choices. Then work the command out as if that project had been said: a set shows its normal card («Mover 2 tareas a mañana, …», its rows and button); a one-task change, deletion or completion finds its task in that project; a search lists that project's tasks with «Abrir «Matemáticas»». The question and its chips stay above the card, the tapped one selected, so another can be tapped, as the change card's namesake chips stay (:1179-1206). Until a chip is tapped, an update, deletion or completion waits for it, as other choices do: it counts as `blocking`, so `_openCount` and `_reveal` bring the question into view, and it is not `notFound`, so it never offers «Guardar como tarea». Meanwhile the confirming button is disabled and reads «Revisa los datos de arriba» (`captureCheckDetails`), not «Mover 0 tareas». A search that asks stays read-only.",
+    "UX-1708, what stays: with `ambiguous_project` and no candidate on the phone, or with `project_not_available`, the line «No encuentro el proyecto «…»» stays as it is. A person who is ambiguous in a set's filter keeps its line («Hay varias personas que se llaman …»): the server sends no candidates for people (cause server-side; a note for the main session). Don't touch `ProjectChoices` or the `project` command's card (UX-1315), the change card's namesake chips, or what a set holds once its project is known.",
+    "Tests this rightly breaks: any test that expects «No encuentro el proyecto «…»» for `ambiguous_project` with candidates the phone has (search App/test/bulk_voice_commands_test.dart and App/test/voice_command_cards_test.dart for `commandProjectNotFound`), and any test that expects `result-save-as-written` for a `complete` that found nothing. Previews: add cards.complete-not-found (es 1×: «Ya he llamado al dentista» with no such task) and cards.bulk-ambiguous-project (es 1× and 2×: «Pasa todo lo de mates a mañana», with Matemáticas and a second project, «Matemáticas II», on the phone and both as candidates), and re-render commands/."
+   ],
+   "acceptance": [
+    "Widget test (UX-1705): Spanish, 1×, a spoken result whose only command is a one-task `complete` with words ['dentista'] and no task like it. There is no widget with key `result-save-as-written`; the card's first line reads «No encuentro ninguna tarea con «dentista»» beside `Icons.search_rounded`, and the card shows no `Icons.task_alt_rounded`; the result offers «Cerrar» (`capture-result-close`) and «Volver a decirlo».",
+    "Widget test (UX-1705): Spanish, 1×. A result whose only command is an `update` that found nothing («Cambia el aceite del coche») still shows `result-save-as-written` («Guardar como tarea»), and so does a result whose only command is a `delete` or a `find` that found nothing.",
+    "Unit test (UX-1708): `CaptureCommand.fromServer` keeps `project_candidates` [{id: A, name: Matemáticas}, {id: B, name: Matemáticas II}] as [A, B], in that order, for a set `update` (target `all: true`, `project_name` «mates», issues ['ambiguous_project']), for a one-task `delete` and `complete` target, and for a `find`. At most 3 are kept; they survive the command's `toMap`/`fromMap`; an answer without the key parses with no candidates, as before.",
+    "Widget test (UX-1708): Spanish, 1×. The phone has Matemáticas (two open tasks dated yesterday, the person's own) and Matemáticas II. The result is «Pasa todo lo de mates a mañana»: a move set to tomorrow with `project_name` «mates», `ambiguous_project` and both candidates. The card reads «Tareas de «mates»», then «¿Qué proyecto?» with exactly two chips, «Matemáticas» then «Matemáticas II»; «No encuentro el proyecto «mates»» doesn't show; the confirming button is disabled and reads «Revisa los datos de arriba». After tapping «Matemáticas»: the heading reads «Mover 2 tareas a mañana, …», both tasks are listed ticked, the button reads «Mover 2 tareas» and is enabled, and the «Matemáticas» chip shows selected.",
+    "Widget test (UX-1708): Spanish, 1×, the same candidates on a one-task `complete` with words ['examen'], where only Matemáticas holds an open task «Preparar el examen del tema 6». The card reads «Tareas con «examen»» and «¿Qué proyecto?» with the two chips; tapping «Matemáticas» shows that task with «Marcar como hecha» on the button. On a `find` with the same candidates, tapping «Matemáticas» lists that project's tasks and «Abrir «Matemáticas»».",
+    "Widget test (UX-1708): with `ambiguous_project` and candidate ids the phone doesn't have, the card still reads «No encuentro el proyecto «mates»», as now.",
+    "Unit test (UX-1708): the new question reads exactly “Which project?” (EN), «¿Qué proyecto?» (ES) and «Quin projecte?» (CA)."
+   ],
+   "deviceChecks": [
+    "Phone, real microphone (UX-1705): «Ya he llamado al dentista» with no dentist task. The result offers «Cerrar» and «Volver a decirlo», and no task is saved.",
+    "Main session, real model, when the free quota allows (UX-1708): «Pasa todo lo de mates a mañana» with Matemáticas and Matemáticas II returns `ambiguous_project` with both candidates, and the card offers both."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P226",
+   "title": "After the tap: the message names the day, the person and the task, and a completion lands where it is",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-1703",
+    "UX-1710",
+    "UX-1711"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/services/command_runner.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/capture_landing_test.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, review A, on dc17ab1. After the confirming tap, `_apply` (App/lib/screens/voice_task_screen.dart:3395-3830) closes the sheet, lands Calendar on the earliest day it touched with the rows lit, and says what happened, with «Deshacer». U5's bar: after saving, the task is visible and highlighted, with Undo, every time. Three gaps: a moved set's day isn't named and other days aren't mentioned (UX-1703); the message and the button name some actions differently from the card (UX-1710); and a task marked done by voice isn't shown or named (UX-1711). All three live in the same message and landing code.",
+    "UX-1703 (S2). After «Mover 4 tareas», Calendar scrolls to the 4 lit rows; the day heading («jueves, 22 de octubre») and the week strip are above the fold (AUDIT for applied.bulk-applied), and the message says only «4 tareas movidas» (`commandTasksMoved`, :3644-3653). After a move by days, the tasks land on up to 7 days: Calendar shows the earliest, and nothing says the rest went elsewhere, unlike a plain save (`_save`, :3144-3175: `captureAlsoOn`, `captureAlsoOnDays`) and a single move («Movida al …», `movedOccurrenceDate`).",
+    "Fix UX-1703, the day. When the applied updates are only moved sets (`setsMoved`, :3624-3628) and every moved task landed on one day, that part reads a new `commandTasksMovedTo(count, date)` (count an int; date a String, `context.weekdayDate(day)`): EN `{count, plural, =1{Task moved to {date}} other{{count} tasks moved to {date}}}` / ES `{count, plural, =1{Tarea movida al {date}} other{{count} tareas movidas al {date}}}` / CA `{count, plural, =1{Tasca moguda al {date}} other{{count} tasques mogudes al {date}}}`. For example «4 tareas movidas al jue, 22 oct», with the date as `weekdayDate` writes it.",
+    "Fix UX-1703, the other days. When the tasks a result added, changed or completed landed on more than one day, and nothing is left to review (`remaining == 0`), end the message as `_save` does (:3166-3175), with the days after the one Calendar lands on: one day gives « · también el {date}» (`captureAlsoOn(weekdayDate)`), more give « · también en otros N días» (`captureAlsoOnDays(n)`). For example, a move by a week of 5 tasks on 5 days: «5 tareas movidas · también en otros 4 días». Leave out a day the message already names (an added task's «Añadida al …», a set's «movidas al …», a single move's «Movida al …»).",
+    "Fix UX-1703, which day a task landed on. A landed task's day is its planned day, or its deadline's day when it has none, as `_save` counts it (:3144-3151) since UX-902. Use that for the landing's `days` (:3611-3616) and for `undated` (:3696-3702). Today both count a task with only a deadline, moved by days (the contract's own case), as having no day. This is the organizer's reading, for the reviewer to confirm: without it, «también…» undercounts, and the no-date row lights for a task that has a deadline. Fits with D1: whatever the owner answers, a task lands on the day it shows.",
+    "UX-1710 (S1), part 1: assigning a set. The card says «Asignar 2 tareas a Paul»; the message says «2 tareas cambiadas». When the applied updates are only sets that only assign (`BulkAction.assign`, with the set's changes holding only `assignee_id` and `assignee_name`, as `BulkPlan.movesOnly` checks moves, App/lib/services/bulk_plan.dart:119-124), that part reads a new `commandTasksAssignedTo(count, name)`, with `name` as the card's heading names the person (`_assignee`, App/lib/widgets/capture_command_cards.dart:1396-1403; share it rather than copy it): EN `{count, plural, =1{Task assigned to {name}} other{{count} tasks assigned to {name}}}` / ES `{count, plural, =1{Tarea asignada a {name}} other{{count} tareas asignadas a {name}}}` / CA `{count, plural, =1{Tasca assignada a {name}} other{{count} tasques assignades a {name}}}`.",
+    "UX-1710, part 2: two or more one-task completions. The button reads «Guardar cambios» (`saveChangesSentence`, :4116-4144). When every actionable command marks tasks done (one task or a set) and nothing is added, changed or deleted, the button reads `commandBulkComplete(total)`, where total is the number of tasks the tap marks done (1 per one-task completion, the live count per set): «Marcar 2 tareas como hechas». One completion alone keeps «Marcar como hecha» (:4117), and a set alone keeps `bulkButton`.",
+    "UX-1710, part 3: the tasks still to do. Catalan `commandBulkNone` says «No hi ha tasques pendents …», while the rest of the app says «per fer» (`commandFindOpen` «Per fer», the agenda): its last branch becomes `No hi ha tasques per fer {period}`. English says “There are no unfinished tasks …”, while the app says “To do”: its last branch becomes `There are no tasks to do {period}`, and the today branch of English `commandBulkPeriod` becomes `for today` (was “from today”). Spanish, and every other branch, stay word for word.",
+    "UX-1711 (S1). «Ya he ido a la peluquería» (a Saturday task) → «Marcar como hecha»: the sheet closes on whatever day Calendar showed, with «Tarea completada · Deshacer». The landing's ids come only from added and changed tasks (:3680-3705), and the message doesn't name the task (:3654-3655). A change, by contrast, lands lit on its day. Fix: land completed tasks the way changed ones land. Their ids go into the `CalendarFocus`, and their days (the repetition marked, else the planned day, else the deadline's day) into the landing's `days`, so Calendar shows the ticked row on its day, lit (Calendar lists done tasks on their day). Keep what's needed in `AppliedCompletion` (App/lib/services/command_runner.dart:35-45), as `AppliedUpdate.landed` does for changes. A done task with no day lands nowhere (the no-date row lists only open tasks), and its message still names it. When the tap marks exactly one task done (`completedCount == 1`), its part reads the notification's existing `notificationCompleted(title)`: «Completada: Ir a la peluquería» / “Completed: …” / «Completada: …». From two on, `commandTasksCompleted(n)` stays as it is.",
+    "Don't touch: the plain save's messages and landing (`_save`), the single move's «Movida al …» and its «Cambiar fecha» button, what Deshacer undoes and when the sheet reopens (P227 removes the wait), the set card (P224), and which tasks a set holds.",
+    "Tests this rightly breaks: App/test/bulk_voice_commands_test.dart:1084 and :1133 (a move to one day now reads `commandTasksMovedTo`; a move by days whose tasks land on several days ends «· también …»), :1437-1468 («Tarea completada» becomes «Completada: …»), and :1638-1643 (Catalan and English `commandBulkNone`). Previews: re-render commands/applied.*; add applied.bulk-shift-applied (es 1×, ca 2×: a move by a week whose tasks land on several days) and applied.complete-applied (es 1×: «Ya he ido a la peluquería» applied, with Calendar on the task's day and its row ticked and lit)."
+   ],
+   "acceptance": [
+    "Widget test (UX-1703): Spanish, 1×, Calendar on today. «Pasa todas las tareas de ayer a mañana» with 4 open tasks dated yesterday (the applied.bulk-applied state), «Mover 4 tareas» tapped. The message reads «4 tareas movidas al <tomorrow's weekdayDate>», with «Deshacer»; Calendar selects tomorrow, with the 4 rows lit.",
+    "Widget test (UX-1703): Spanish, 1×. A move by 7 days of 5 tasks on 5 different days: Calendar selects the earliest new day, and the message reads «5 tareas movidas · también en otros 4 días». A move by 7 days of 2 tasks on 2 days: «2 tareas movidas · también el <the later day's weekdayDate>».",
+    "Widget test (UX-1703): Spanish, 1×. A move by 1 day of a task with only a deadline (its deadline moves) and of a task planned on a later day. The deadline's new day counts as a landing day (Calendar selects the earlier of the two days, and «también el …» names the other), and the no-date row isn't lit.",
+    "Widget test (UX-1703): Catalan, 2×, 360 dp, Manrope loaded. After a 4-task move to tomorrow, the message (`commandTasksMovedTo` with tomorrow's `weekdayDate`) takes at most 3 lines.",
+    "Unit test (UX-1703, UX-1710): with date «jue, 22 oct» and name «Paul», `commandTasksMovedTo` reads «Tarea movida al jue, 22 oct» and «4 tareas movidas al jue, 22 oct», and `commandTasksAssignedTo` reads «Tarea asignada a Paul» and «4 tareas asignadas a Paul»; EN and CA read exactly the brief's copy at 1 and 4.",
+    "Widget test (UX-1710): Spanish, 1×, «Asigna a Paul todo lo del viernes» (the cards.bulk-left-out state), «Asignar 2 tareas» tapped. The message reads «2 tareas asignadas a Paul», with «Deshacer».",
+    "Widget test (UX-1710): Spanish, 1×, a result with two one-task completions, each matching one open task. The button reads «Marcar 2 tareas como hechas»; tapped, both tasks are done, and the message reads «2 tareas completadas».",
+    "Unit test (UX-1710): `commandBulkNone('open', commandBulkPeriod('yesterday', '', ''))` reads «No hi ha tasques per fer d’ahir» (CA) and “There are no tasks to do from yesterday” (EN); with 'today', EN reads “There are no tasks to do for today”; Spanish is unchanged («No hay tareas pendientes de ayer»).",
+    "Widget test (UX-1711): Spanish, 1×, Calendar on today; an open, non-repeating task «Ir a la peluquería» dated the coming Saturday (neither today nor tomorrow). «Ya he ido a la peluquería» → «Marcar como hecha» tapped: Calendar selects that Saturday, the task's row is ticked and lit, and the message reads «Completada: Ir a la peluquería», with «Deshacer». Deshacer reopens the result, and the task is open again.",
+    "Widget test (UX-1711): Spanish, 1×, «Marca como hechas todas las de hoy» with 4 open tasks today, applied. Calendar stays on today with the 4 rows ticked and lit, and the message reads «4 tareas completadas»."
+   ],
+   "deviceChecks": [
+    "Phone at 1.3× and 2× (UX-1703): after «Pasa todas las tareas de ayer a mañana» → «Mover N tareas», the message names the day, and the lit rows show above it.",
+    "Phone, real microphone: «Pasa todas las tareas de ayer a mañana» and «Marca como hechas todas las de hoy», each applied, then undone with «Deshacer».",
+    "Phone, TalkBack (UX-1711): after «Ya he ido a la peluquería» → «Marcar como hecha», TalkBack reads «Completada: Ir a la peluquería» once."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P227",
+   "title": "The tap and Deshacer don't wait or flicker: a deletion's Deshacer comes back at once, and the result holds still while it closes",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-1707",
+    "UX-1714"
+   ],
+   "files": [
+    "App/lib/providers/task_provider.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/capture_landing_test.dart",
+    "App/test/advanced_recurrence_test.dart",
+    "App/test/flexible_tasks_test.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, review A, on dc17ab1. UX-601's standard (2026-10-14-speed): nothing on the network between a tap and its result. Saves and `updateTask` read the phone, show the list and sync behind (`showLocal`, App/lib/providers/task_provider.dart:72-85). Two gaps around the confirming tap: Deshacer after a deletion waits for the server (UX-1707), and the result redraws from the changing task list while it applies and closes (UX-1714).",
+    "UX-1707 (S2). `restoreTasks` (task_provider.dart:271-285) ends with `await loadTasks()`, which awaits `_repository.sync()` (:54). `CommandRunner.undoChanges` calls it (App/lib/services/command_runner.dart:206-216), and the result reopens only afterwards (App/lib/screens/voice_task_screen.dart:3712-3801). So Deshacer after any voice deletion, one task or a set, puts the tasks back on the phone, then waits for a full sync before `undoSave` and before the sheet reopens: up to 12 s per request on a stalled connection (App/lib/services/api_client.dart:628-637), longer across several. Calendar shows the tasks back quickly, but the sheet pops up only when the sync ends, an unannounced change seconds later. Undoing a move, a change or a completion doesn't wait (`updateTask` syncs behind).",
+    "Fix UX-1707: end `restoreTasks` with `await showLocal()` instead of `await loadTasks()`: it reads the phone, shows the list and syncs behind, unawaited. `undoSchedule` (:136-141) and `undoOccurrence` (:188-195) share the pattern for a single repeating task, and are used here and by Calendar's own move (App/lib/widgets/task_interactions.dart:92-93): make the same change there. Keep `_mutate`'s order. Don't change `rescheduleTask`, `changeOccurrence`, `setCompleted`, `restoreTask` or the other writes, which are outside this finding.",
+    "UX-1714 (S1). The result builds from `_views(watch: true)` (:4037; :3052-3071), which works every command out again against the live task list. While the tap applies (`_applySet`, :344-374), each `updateTask` reloads that list, so under «Guardando…» a set card can recount («Mover 3 tareas…») and drop rows that already moved. Then the commands are marked done (:3531-3539), the result takes the saved session (:3546-3548) and the list is shown again (`showLocal`, :3596), so the sheet slides away (popped at :3676-3679) showing the empty result: «No queda nada por revisar» (`captureNothingToReview`) and «No se hará ningún cambio.» (`captureRemovedDraftsHelp`). The recount is new with sets; the empty result while closing affects every command result.",
+    "Fix UX-1714: freeze the result once the confirming tap starts applying. From the views captured at the tap (`final views = _views()`, :3422) and the drafts and commands as they were, build the cards, the heading and the button (which reads «Guardando…») until the sheet is gone; while frozen, every `_views()` read returns those views. Unfreeze when the apply fails and the result stays (the catch, :3554-3586), and when Deshacer brings the result back (:3770-3800), so it is worked out live again. Nothing else changes: the writes, the message, the landing and what Deshacer undoes.",
+    "Don't touch: the plain save path (`_save`, which UX-601 already made instant), the confirming tap's own logic, what Deshacer undoes, and the messages (P226).",
+    "Tests: App/test/advanced_recurrence_test.dart:39-82 and App/test/flexible_tasks_test.dart:197-241 call `undoSchedule` and `undoOccurrence` and read the list afterwards. They should keep passing, because the phone's list is shown before the call returns; if one relied on the sync having finished, wait for the sync in that test. No preview changes: nothing changes at rest."
+   ],
+   "acceptance": [
+    "Widget test (UX-1707): signed in, with a cloud sync that never completes (as `_SlowCloud`, App/test/capture_landing_test.dart:1835). «Borra todas las completadas de la semana pasada» → «Eliminar 3 tareas» → «Deshacer» on the message. Within 1 s of pumping, while the sync is still running, the three tasks are back in the task list and the result sheet is open again, with «Eliminar 3 tareas» as the card's first line.",
+    "Widget test (UX-1707): the same with a one-task voice deletion («Borra el dentista» → «Eliminar» → «Deshacer»): the result reopens at once, while the sync is still running.",
+    "Unit test (UX-1707): with a repository whose sync never completes, `TaskNotifier.restoreTasks`, `undoSchedule` and `undoOccurrence` each complete, and the notifier's state already holds the restored task.",
+    "Widget test (UX-1714): Spanish, 1×, a 4-task move set to tomorrow. Tap «Mover 4 tareas» and pump in 16 ms steps until the sheet is gone. In every frame where the card shows, its first line reads «Mover 4 tareas a mañana, …» and it lists 4 rows; `captureNothingToReview` and `captureRemovedDraftsHelp` never show.",
+    "Widget test (UX-1714): when the apply fails (the capture store's write throws), the result stays with its cards and the error, and unticking a task changes the count (worked out live again).",
+    "Widget test (UX-1714): after «Deshacer», the reopened result shows the set again, and unticking a task changes the heading's and the button's count."
+   ],
+   "deviceChecks": [
+    "Phone, on a throttled connection or in airplane mode after the tap (UX-1707): «Deshacer» after a set deletion brings the result back at once.",
+    "Phone, screen recording (UX-1714): the sheet closing after «Mover 4 tareas» shows no recount and no «No queda nada por revisar»."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P228",
+   "title": "Words that fit how many tasks: «Ya están así», «No se eliminarán», the project you can only view, «No tiene fecha», «Ya estaba hecha»",
+   "area": "A",
+   "size": "M",
+   "severity": 1,
+   "findings": [
+    "UX-1709"
+   ],
+   "files": [
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/localization_catalog_test.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, review A, on dc17ab1. Strings written for one task show on sets, and a set's string shows on one task (recurring problem 9: copy borrowed from another context). This package gives each its own words. It builds on P224, which changed `commandBulkLeftNoDay` and the call at capture_command_cards.dart:1230. UX-1709 has six items; the fifth waits on D1 and isn't built here.",
+    "UX-1709 (S1), item 1. A set already as asked (`header(problem ?? leftOut ?? l.commandNothingToChange)`, App/lib/widgets/capture_command_cards.dart:1716-1722) says «Ya está así.» about several tasks. Use a new key whose count is the tasks that matched (`bulk.matched`): EN `{count, plural, =1{It’s already like that.} other{They’re already like that.}}` / ES `{count, plural, =1{Ya está así.} other{Ya están así.}}` / CA `{count, plural, =1{Ja és així.} other{Ja són així.}}`. `commandNothingToChange` stays for one task's change card (:1238).",
+    "Item 2. ✕ on a set (`_removeCommand`, App/lib/screens/voice_task_screen.dart:3343-3356) says «No se cambiará» / «No se eliminará» / «No se completará» for several tasks. Make `commandWontChange`, `commandWontDelete` and `commandWontComplete` plurals of an int `count`: the set's live count (`bulk.count`) when ✕ is tapped, or 1 for a one-task command. ES `{count, plural, =1{No se cambiará} other{No se cambiarán}}`, `{count, plural, =1{No se eliminará} other{No se eliminarán}}`, `{count, plural, =1{No se completará} other{No se completarán}}`. CA `{count, plural, =1{No es canviarà} other{No es canviaran}}`, `{count, plural, =1{No se suprimirà} other{No se suprimiran}}`, `{count, plural, =1{No es completarà} other{No es completaran}}`. EN keeps its words in both cases: `{count, plural, =1{Won’t be changed} other{Won’t be changed}}`, `{count, plural, =1{Won’t be deleted} other{Won’t be deleted}}`, `{count, plural, =1{Won’t be completed} other{Won’t be completed}}`. The Catalan plurals are the reviewer's. The Catalan singular «No se suprimirà» is the organizer's, replacing «No es suprimirà», so that «se» comes before s- as app_ca.arb already writes it («El fitxer original no se suprimirà», «no se suprimeix»); a native read is welcome. `commandWontCreate` stays as it is.",
+    "Item 3. A set whose matches are all in a project the person can only view (:1697-1699) names one task: ««Preparar el examen» es de un proyecto que solo puedes ver.» Name the project instead (the project of `bulk.viewOnly`), with a new key: EN `You can only view “{project}”: its tasks stay as they are.` / ES `Solo puedes ver «{project}»: sus tareas no cambian.` / CA `Només pots veure «{project}»: les seves tasques no canvien.` If that project isn't on the phone, keep `commandViewOnly(title)`. One task's `commandViewOnly` (`_notFound`, :954) stays.",
+    "Item 4. One task moved by days with no day (`UpdateCommandCard`, :1228-1230) shows the set's left-out line under its own title (after P224, «<title> no tiene fecha: no cambia»). Use a new key: EN `It has no date, so it stays.` / ES `No tiene fecha: no se mueve.` / CA `No té data: no es mou.`",
+    "Item 5, not in this package. A new time for tasks that have only a deadline counts them under «sin fecha» (App/lib/services/bulk_plan.dart:194, with App/lib/services/command_plan.dart:237-241), though they show «Vence …». It waits on D1; leave it as it is.",
+    "Item 6. One task already done (`CompleteCommandCard`, :1387) says «Ya está así.» Use a new key: EN `It was already done.` / ES `Ya estaba hecha.` / CA `Ja estava feta.`",
+    "Don't touch: the set rows and the left-out line (P224), the messages after the tap (P226), the card layouts.",
+    "Tests this rightly breaks: App/test/bulk_voice_commands_test.dart:1501-1527 (one task already done now reads «Ya estaba hecha.»), :1529-1560 (✕ on one completion: `commandWontComplete(1)`), :1594-1615 (one task with no day moved by days: the new line), and App/test/localization_catalog_test.dart if it lists these keys. Previews: re-render commands/; add cards.bulk-view-only (es 1×: a set whose only matches are in a project the person can only view)."
+   ],
+   "acceptance": [
+    "Widget test (UX-1709, item 1): Spanish, 1×, a set that sets 18:00 on tomorrow's tasks («Pon todas las de mañana a las 18:00») when its 3 matching tasks are already at 18:00. The card's first line reads «Ya están así.»; with one such task, «Ya está así.».",
+    "Widget test (UX-1709, item 2): Spanish, 1×. ✕ on a 4-task deletion set shows «No se eliminarán», with «Deshacer»; ✕ on a one-task deletion card shows «No se eliminará». Likewise «No se cambiarán» / «No se cambiará» and «No se completarán» / «No se completará». In Catalan, the set forms read «No se suprimiran», «No es canviaran» and «No es completaran».",
+    "Widget test (UX-1709, item 3): Spanish, 1×, a move set whose only matches are in «Matemáticas», a project the person can only view. The card's first line reads «Solo puedes ver «Matemáticas»: sus tareas no cambian.»",
+    "Widget test (UX-1709, item 4): Spanish, 1×, one task with no day and no deadline, moved by days («Retrasa dos días lo del banco»). Under its title the card reads «No tiene fecha: no se mueve.», and no line counts tasks «sin fecha».",
+    "Widget test (UX-1709, item 6): Spanish, 1×, «Ya he ido a la peluquería» when that task is already done. The card reads «Ya estaba hecha.», and the result offers no «Marcar como hecha».",
+    "Unit test (UX-1709): every new and changed string reads exactly the brief's copy in EN, ES and CA, with plurals checked at 1 and 4."
+   ],
+   "deviceChecks": [],
+   "dependsOn": [
+    "P224"
+   ]
+  }
+ ],
+ "decisions": [
+  {
+   "id": "D1",
+   "question": "A task with only a deadline, moved to a day by voice, still reads overdue (UX-1715, S2; review A's Q1; the rule as designed, which you've been told about). «Pasa todas las tareas de ayer a mañana» listed «Pagar la factura del gas · Vence mar, 20 de oct» under «Mover 4 tareas a mañana, jue 22» (cards.bulk-move). After the tap it sits on Thursday reading «Vence mar, 20 de oct · Fecha límite vencida», in red (applied.bulk-applied). «Retrásalo todo un día» moves the same task's deadline instead (App/lib/services/command_plan.dart:246-254, the contract's shift rule), so two ways of saying «move it» give two results: «Le he dicho que la pase a mañana… ¿por qué sigue en rojo, vencida?». (a) For a task whose only date is a deadline, a voice move to a day moves the deadline, as a move by days already does: one rule for both. (b) Keep the rule, but say it on that row before the tap («Vence mar, 20 de oct · no cambia»), so the red line isn't a surprise. The same answer settles UX-1709's fifth item: a new time said for such tasks («a las 18:00») now counts them under «sin fecha», though they show «Vence …».",
+   "findings": [
+    "UX-1715",
+    "UX-1709"
+   ],
+   "recommendation": "(a), as the reviewer recommends. For that task the deadline is the only date the card and Calendar show, so it's what the person's words point at, and (a) matches the move-by-days rule. Anyone who needs both dates still has them in the form. With (a), a time said for such tasks would go on their deadline too, and they'd no longer be counted «sin fecha»; with (b), they'd be counted on a line of their own, with copy written once you answer. Scope as asked: voice moves, for one task or a set; Calendar's own «Cambiar fecha» keeps its rule unless you say otherwise. The contract (Backend/docs/VOICE_COMMANDS.md, the `date` change) would gain that line, which the main session writes. Reversible.",
+   "relatedPackages": [
+    "P226",
+    "P228"
+   ],
+   "status": "open"
+  },
+  {
+   "id": "D2",
+   "question": "Does «hoy» in a voice command include the overdue tasks Today lists? (UX-1702, S2. The reviewer left it to the organizer, because the fix changes the contract's period rule.) Your D1 of 2026-10-13 put unfinished tasks from earlier days into Today, under «Atrasadas · N», counted in «pendientes» and in the Tareas «Hoy» filter. A set «de hoy» (from = to = today) keeps only tasks dated today (App/lib/services/task_matcher.dart:362), as the contract's period rule says. So with 6 tasks in Today, 2 of them overdue, «Marca como hechas todas las de hoy» offers «Marcar 4 tareas como hechas», and the next morning the 2 are still «Atrasadas»; «Pasa todo lo de hoy a mañana» leaves them behind too, and no line mentions them. A single «Ya he…» already takes the repetition Today lists as overdue (:184-192), so the two paths disagree. (a) When a set's period is exactly today, it also takes the open tasks Today lists as overdue: listed first, as Today lists them, with the existing day line «mar, 20 oct · Atrasada», ticked so any can be unticked; a repeating one comes as its latest missed repetition when marking done, and is left out and counted otherwise, as now. (b) Keep the rule: only tasks dated today, and «lo atrasado» stays the way to reach the others.",
+   "findings": [
+    "UX-1702"
+   ],
+   "recommendation": "(a). «Hoy» is what Today shows (your D1 of 2026-10-13), and the one-task path already works this way. Every task is listed and ticked before the tap, so a deletion or completion never takes one unseen, and Deshacer undoes all of it. No new copy. The contract's period rule (Backend/docs/VOICE_COMMANDS.md, «Bulk commands», `from` and `to`) would gain one line, which the main session writes. Once you answer, the package is small: `TaskMatcher.bulk`, and the set row's day line (P224's shared helper). Reversible.",
+   "relatedPackages": [
+    "P224"
+   ],
+   "status": "open"
+  },
+  {
+   "id": "D3",
+   "question": "Should a set's target day be fixable by touch? (UX-1716, S2; review A's Q2; still open on U4, which made the result's date a tappable row for this reason.) If «a mañana» was misheard, the set card's only fix is «Volver a decirlo»: a whole new dictation, and without Pro one of the 10 a month. The one-task change card has the same gap. Saying it again fixed 35% of recognition errors, against 75–87% by touch or typing (Suhm, Myers & Waibel 2001; VO-6).",
+   "findings": [
+    "UX-1716"
+   ],
+   "recommendation": "Yes, as the reviewer recommends: make the day in a move's heading a chip («mañana, jue 22 ▾») that opens the existing «Elegir día» sheet, with Hoy and Mañana; the count stays live. It adds one control to the card you specified, so it's your call. P224 keeps that day in one piece (UX-1712), and the chip's label would reuse it. Say too whether a one-task change's new day should get the same.",
+   "relatedPackages": [
+    "P224"
+   ],
+   "status": "open"
+  }
+ ],
+ "skipped": [],
+ "notes": [
+  "For the main session, outside this run (Backend/ is out of reach while another session works there): (1) after P224, update the contract's quote of the too-many line (Backend/docs/VOICE_COMMANDS.md, «More than 200 matches») to «Son 230 tareas, demasiadas. Vuelve a decirlo con un día o un proyecto.»; (2) after P226, its «After the tap» example («5 tareas movidas · Deshacer») names the day when the tasks land on one day; (3) an ambiguous person in a set's filter gets no candidates from the server, so the card keeps «Hay varias personas que se llaman …» (cause server-side; nothing planned); (4) D1 and D2, once answered, change the contract's text.",
+  "Review A's Q1 and Q2 had no IDs. They are UX-1715 (D1) and UX-1716 (D3) in ISSUES.md; their severities are the organizer's.",
+  "The organizer's readings, for the reviewer to check: P226 counts a deadline-only task's deadline day as its landing day (as `_save` does since UX-902); P225's question chips stay after a tap, the tapped one selected (as the change card's namesake chips do), and the asking card's first line reuses «Tareas con «…»» / «Tareas de «…»»; P228's Catalan singular «No se suprimirà»; UX-1709's fifth item waits on D1.",
+  "Progress against UX_REVIEW.md, from review A: §7 task 4 («Mark buy bread as done») now works by voice in 3 taps, and moving a day's tasks takes 3 taps for all of them. U5 advanced for sets (a move lands lit on its day) and stays open for UX-1703 and UX-1711; U4's fix-by-touch doesn't reach command cards (D3); U7 regressed slightly (UX-1705). U1–U3, U6 and U8–U14: untouched by dc17ab1, so their ledger lines are unchanged.",
+  "After the run, regenerate PHONE_CHECKS.md: python -I -X utf8 .claude/ux-review/phone_checks.py."
+ ]
+}

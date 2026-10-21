@@ -88,4 +88,16 @@ The base map above predates the free tier (b7) and this run; trust this section 
 - **Counts after the run (reviewer estimates):** taps for one dated spoken task 3; avoidable waits per capture 2 → 0; day fix to Hoy/Mañana/Sin fecha 3 → 2 taps; tap targets on one spoken result 8 → 7.
 - **Still open here:** cold-start waits (UX-424 / P30), U11 names («bandeja de entrada» on undated save), U12 first-run line (P41), server AI wait (UX-616), Catalan 0-left line length (UX-609).
 
+## Voice commands and sets (dc17ab1 + run 2026-10-21-changes; widget-test level, phone checks pending)
+- **Cards** (`widgets/capture_command_cards.dart`): Update/Delete/Complete/Find/Project command cards for one task; `BulkCommandCard` for a set (move to a day, shift by days/weeks, assign, other changes, mark done, delete). A set lists tickable rows (≈72 dp); unticking updates the heading count and the button live; 0 ticked disables the button.
+- **Row details** come from one `_taskDetails` for single and set rows: date · time · project · person, «· Completada» and struck title (onSurfaceVariant) when done.
+- **Left-out line** (`_bulkLeftOut`): names a lone task («Natación se repite: no cambia»), counts several («2 tareas no se pueden asignar a Paul»). `BulkPlan` keeps repeating / unassignable / no-day lists.
+- **Ambiguous project** asks «¿Qué proyecto?» with 48 dp chips (`_projectQuestion`) under the heading; the button reads «Revisa los datos de arriba», disabled, until answered. It counts as blocking, not "not found".
+- **Not found «Ya he…»**: search icon, Cerrar + Volver a decirlo; no «Guardar como tarea» (complete and asking cards are excluded from «as written»).
+- **Opening reveal** (`_firstOpen`/`_reveal` in `voice_task_screen.dart`): a set deletion is revealed by its card at `alignment: 0` (heading and ✕ at top), also after its project question is answered; other open/blocking cards go to `alignment: 1`; move/complete sets aren't revealed. Mixed result (new task + set deletion) opens at the red card; nothing on screen shows the task card above it (accepted trade-off).
+- **Button and message name the same verb:** «Mover/Asignar/Marcar N tareas…», «Eliminar N tareas»; landings «4 tareas movidas al jue, 22 de oct» (one day) or «también el …/en otros N días», «Tareas asignadas a Paul», «Completada: {title} · Deshacer» (Calendar goes to the task's own day, even past). Set headings use `DateFormat('E d')` so «jue 22» doesn't split.
+- **While closing** the result is frozen (`_frozen`) and cards/buttons disabled (`_busy`); cleared on failure, when the result stays, and on Deshacer.
+- **Plurals:** «No se cambiarán / eliminarán / completarán» on ✕; a set still asking (no count yet) passes 2 so it stays plural.
+- **Device checks still open:** largest font, «Borra todas las completadas de mates» → tap «Matemáticas»; heading and ✕ must stay in view.
+
 Related: [[ui-patterns]], [[screens-b-calendar-tasks]].

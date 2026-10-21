@@ -384,6 +384,13 @@ bool _onlyMoved(UpdatePlan? plan) =>
     plan.notes == null &&
     plan.assignee == null;
 
+/// A set that only assigns its tasks to someone: its message names them.
+bool _assignsOnly(CommandView view) =>
+    view.bulk?.action == BulkAction.assign &&
+    view.command.changes.values.keys.every(
+      (key) => const {'assignee_id', 'assignee_name'}.contains(key),
+    );
+
 /// The capture sheet's content. Open it with [showCaptureSheet]. A recorder
 /// is created only with the mic; without it every way in types.
 class VoiceTaskScreen extends ConsumerWidget {
@@ -2610,6 +2617,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   late final CaptureStore _store;
   Future<void> _writes = Future.value();
   bool _saving = false;
+  // From the confirming tap until the sheet is gone: the result as it was at
+  // the tap, so it doesn't recount while the tasks change, nor empty while
+  // it closes. Cleared when the result stays: a failed apply, something
+  // left to review, or `Deshacer`.
+  ({List<CommandView> views, List<CaptureDraft> items})? _frozen;
+  // Saving, or closing after it: the cards and buttons wait.
+  bool get _busy => _saving || _frozen != null;
   String? _expandedId;
   String? _error;
   final _reviewWatch = Stopwatch()..start();
@@ -2660,24 +2674,29 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       _views().where((view) => view.blocking).length;
 
   /// The first card, in the order shown, that still asks something; with
-  /// nothing to answer, the first task the button deletes.
-  BuildContext? _firstOpen() {
+  /// nothing to answer, the first task or set the button deletes. A set's
+  /// card is taller than the view, so it is revealed at its [heading].
+  ({BuildContext card, bool heading})? _firstOpen() {
     final views = _views();
     bool asks(CaptureDraft draft) =>
         !draft.confirmed ||
         !draft.assignmentReviewed ||
         draft.projectSuggestion != null;
-    final id = [
+    final first = [
       for (final view in views)
-        if (view.kind == CommandKind.project && view.blocking) view.command.id,
+        if (view.kind == CommandKind.project && view.blocking)
+          (id: view.command.id, heading: false),
       for (final draft in _items)
-        if (draft.pending && asks(draft)) draft.id,
+        if (draft.pending && asks(draft)) (id: draft.id, heading: false),
       for (final view in views)
-        if (view.kind != CommandKind.project && view.blocking) view.command.id,
+        if (view.kind != CommandKind.project && view.blocking)
+          (id: view.command.id, heading: false),
       for (final view in views)
-        if (view.kind == CommandKind.delete && view.actionable) view.command.id,
+        if (view.kind == CommandKind.delete && view.actionable)
+          (id: view.command.id, heading: view.bulk != null),
     ].firstOrNull;
-    return id == null ? null : _cards[id]?.currentContext;
+    final card = first == null ? null : _cards[first.id]?.currentContext;
+    return card == null ? null : (card: card, heading: first!.heading);
   }
 
   /// The first widget under [root] that [test] accepts, in the order shown.
@@ -2722,16 +2741,19 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   }
 
   /// The first open question's answers, or its card, scrolled into view
-  /// above the buttons; with nothing open, the task the button deletes.
-  /// Otherwise the scroll stays where it is.
+  /// above the buttons; with nothing open, the task the button deletes, or
+  /// the set it deletes with its heading at the top of the view. A set is
+  /// revealed by its card, not by a question it has answered, so its heading
+  /// and ✕ stay in view. Otherwise the scroll stays where it is.
   void _reveal() {
-    final card = _firstOpen();
-    if (card == null) return;
+    final open = _firstOpen();
+    if (open == null) return;
+    final card = open.card;
     final still = MediaQuery.disableAnimationsOf(context);
     unawaited(
       Scrollable.ensureVisible(
-        _questionIn(card) ?? card,
-        alignment: 1,
+        open.heading ? card : (_questionIn(card) ?? card),
+        alignment: open.heading ? 0 : 1,
         duration: still ? Duration.zero : const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
       ),
@@ -2779,7 +2801,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               view.kind == CommandKind.complete) &&
           view.bulk == null &&
           !view.notFound &&
-          !view.choosing;
+          !view.choosing &&
+          !view.choosingProject;
       summary = headline != null && titleOnly && button != null
           ? '$headline, $button'
           : headline;
@@ -2789,7 +2812,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       return;
     }
     if (summary == null || summary.isEmpty) return;
-    final card = _firstOpen();
+    final card = _firstOpen()?.card;
     final question = card == null ? null : _questionIn(card)?.widget;
     final message = question is QuestionBox
         ? '$summary. ${question.question}'
@@ -3050,8 +3073,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       _items.any((d) => d.pending && d.newProject != null);
 
   /// The cards of the commands still shown, worked out against the tasks
-  /// and projects on the phone. [watch] only from [build].
+  /// and projects on the phone; from the confirming tap, as they were then.
+  /// [watch] only from [build].
   List<CommandView> _views({bool watch = false}) {
+    if (_frozen case final frozen?) return frozen.views;
     if (_commands.isEmpty) return const [];
     final tasks = watch ? ref.watch(taskProvider) : ref.read(taskProvider);
     final projects = watch
@@ -3309,7 +3334,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
 
   /// ✕ on a command's card: nothing happens for it. A new project taken out
   /// takes its tasks with it out of the project: they go without one.
-  void _removeCommand(CaptureCommand command) {
+  /// [count] is how many tasks it would have acted on: a set's ticked
+  /// tasks, a plural count for a set not yet counted, or 1.
+  void _removeCommand(CaptureCommand command, {int count = 1}) {
     final name = command.kind == CommandKind.project
         ? foldForSearch(spokenProjectName(command.name))
         : null;
@@ -3347,9 +3374,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       showFeedback(
         ScaffoldMessenger.of(context),
         switch (command.kind) {
-          CommandKind.delete => l.commandWontDelete,
-          CommandKind.update => l.commandWontChange,
-          CommandKind.complete => l.commandWontComplete,
+          CommandKind.delete => l.commandWontDelete(count),
+          CommandKind.update => l.commandWontChange(count),
+          CommandKind.complete => l.commandWontComplete(count),
           // A search has no ✕.
           CommandKind.project || CommandKind.find => l.commandWontCreate,
         },
@@ -3437,6 +3464,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     setState(() {
       _saving = true;
       _error = null;
+      _frozen = (views: views, items: _items);
     });
     final notifier = ref.read(taskProvider.notifier);
     final container = ProviderScope.containerOf(context, listen: false);
@@ -3459,6 +3487,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final undoIds = <String, int>{};
     late CaptureSession written;
     var committed = false;
+    // The sheet is going: the result stays as it was at the tap.
+    var closing = false;
     try {
       await _writes;
       // The projects: those the cards create, and those ready tasks go to.
@@ -3574,6 +3604,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         setState(() {
           _error = offline ? CaptureProblem.offline : CaptureProblem.saveFailed;
           _saving = false;
+          _frozen = null;
           if (!committed) {
             _session = before;
             _items = before.drafts;
@@ -3608,11 +3639,21 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         for (final update in applied.updates)
           if (update.landed case final task?) task,
       ];
-      // Calendar lands on the earliest day among those added and changed; a
-      // task with only a deadline, on its deadline's day.
+      // The day a task lands on: its own, or its deadline's when it has
+      // only a deadline, where Calendar lists it.
+      DateTime? landing(Task task) => task.displayDate ?? task.deadline;
+      // Tasks marked done land where they are, ticked; one with no day
+      // lands nowhere, as the no-date row lists only open tasks.
+      final done = [
+        for (final completion in applied.completed)
+          if (completion.days.isNotEmpty) completion,
+      ];
+      // Calendar lands on the earliest day among those added, changed and
+      // marked done.
       final days = [
-        for (final item in tasks) ?(item.task.dueDate ?? item.task.deadline),
-        for (final task in landed) ?task.displayDate,
+        for (final item in tasks) ?landing(item.task),
+        for (final task in landed) ?landing(task),
+        for (final completion in done) ...completion.days,
       ].map(Task.day).toSet().toList()..sort();
       final updates = actionable
           .where((view) => view.kind == CommandKind.update)
@@ -3628,8 +3669,36 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 ? view.bulk!.movesOnly(view.command.changes)
                 : _onlyMoved(view.plan),
           );
+      // ...all to one day: «4 tareas movidas al jue, 22 oct».
+      final movedDays = {
+        for (final task in landed) ?landing(task),
+      }.map(Task.day).toSet();
+      final movedTo =
+          setsMoved &&
+              landed.length == applied.updates.length &&
+              landed.every((task) => landing(task) != null) &&
+              movedDays.length == 1
+          ? movedDays.single
+          : null;
+      // Sets only assigned, all to one person: «2 tareas asignadas a Paul».
+      final assignees = {
+        for (final view in updates) bulkAssignee(view.command, projects),
+      };
+      final assignedTo =
+          updates.isNotEmpty &&
+              updates.every(_assignsOnly) &&
+              assignees.length == 1 &&
+              assignees.single.isNotEmpty
+          ? assignees.single
+          : null;
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
       final due = ready.length == 1 ? ready.single.task.deadline : null;
+      // The days the message names already.
+      final named = {
+        if (day ?? due case final date?) Task.day(date),
+        if (moving?.date case final date?) Task.day(date),
+        ?movedTo,
+      };
       final parts = [
         if (applied.projects.isNotEmpty)
           strings.commandProjectsCreated(applied.projects.length),
@@ -3648,17 +3717,29 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                     : strings.movedOccurrenceDate(
                         context.weekdayDate(moving.date!),
                       )
+              : movedTo != null
+              ? strings.commandTasksMovedTo(
+                  applied.updates.length,
+                  context.weekdayDate(movedTo),
+                )
               : setsMoved
               ? strings.commandTasksMoved(applied.updates.length)
+              : assignedTo != null
+              ? strings.commandTasksAssignedTo(
+                  applied.updates.length,
+                  assignedTo,
+                )
               : strings.commandTasksChanged(applied.updates.length),
+        // One task marked done is named: «Completada: Ir a la peluquería».
         if (applied.completed.isNotEmpty)
-          strings.commandTasksCompleted(applied.completedCount),
+          applied.completedCount == 1
+              ? strings.notificationCompleted(
+                  applied.completed.single.before.title,
+                )
+              : strings.commandTasksCompleted(applied.completedCount),
         if (applied.deleted.isNotEmpty)
           strings.commandTasksDeleted(applied.deleted.length),
       ];
-      final message = remaining > 0
-          ? '${parts.join(' · ')} · ${strings.captureKeptForReview(remaining)}'
-          : parts.join(' · ');
       // One new project, with only its own new tasks and no changes: its
       // page opens, as making one by hand does, with the tasks lit.
       final project = applied.projects.length == 1 && applied.updates.isEmpty
@@ -3669,9 +3750,24 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           written.drafts
               .where((draft) => readyIds.contains(draft.id))
               .every((draft) => draft.task.listId == project);
+      // Tasks on days other than the one Calendar lands on are out of
+      // sight: they are named, as after a save, unless the message names
+      // their day already.
+      final otherDays = opensProject
+          ? const <DateTime>[]
+          : days.skip(1).where((day) => !named.contains(day)).toList();
+      final said = parts.join(' · ');
+      final message = remaining > 0
+          ? '$said · ${strings.captureKeptForReview(remaining)}'
+          : otherDays.length == 1
+          ? '$said · ${strings.captureAlsoOn(context.weekdayDate(otherDays.single))}'
+          : otherDays.length > 1
+          ? '$said · ${strings.captureAlsoOnDays(otherDays.length)}'
+          : said;
       MaterialPageRoute<void>? projectPage;
       CalendarFocus? focus;
       if (remaining == 0) {
+        closing = true;
         if (origin?.showCalendar == true) {
           navigator.popUntil((route) => route.isFirst);
         } else {
@@ -3681,6 +3777,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           for (final item in tasks)
             if (undoIds[item.id] != null) undoIds[item.id]!,
           for (final update in applied.updates) ?update.before.id,
+          for (final completion in done) ?completion.before.id,
         };
         if (opensProject) {
           projectPage = MaterialPageRoute<void>(
@@ -3695,11 +3792,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             page: origin?.page,
             showCalendar: origin?.showCalendar ?? false,
             undated:
-                tasks.any(
-                  (item) =>
-                      item.task.dueDate == null && item.task.deadline == null,
-                ) ||
-                landed.any((task) => task.displayDate == null),
+                tasks.any((item) => landing(item.task) == null) ||
+                landed.any((task) => landing(task) == null),
           );
           container.read(calendarFocusProvider.notifier).state = focus;
         }
@@ -3776,6 +3870,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 _items = restored.drafts;
                 _commands = restored.commands;
                 _finished = false;
+                _frozen = null;
               });
               if (whole && messenger.mounted) {
                 unawaited(
@@ -3832,7 +3927,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     } catch (_) {
       if (mounted) setState(() => _error = CaptureProblem.saveFailed);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          // The result stays: worked out live again.
+          if (!closing) _frozen = null;
+        });
+      }
     }
   }
 
@@ -3932,14 +4033,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final l = context.l10n;
     final cancel = TextButton(
       key: close ? const ValueKey('capture-result-close') : null,
-      onPressed: _saving ? null : () => unawaited(Navigator.maybePop(context)),
+      onPressed: _busy ? null : () => unawaited(Navigator.maybePop(context)),
       child: Text(close ? l.captureClose : l.cancel),
     );
     if (!canSayAgain) {
       return Align(alignment: AlignmentDirectional.centerStart, child: cancel);
     }
     final sayAgain = TextButton(
-      onPressed: _saving ? null : () => unawaited(_sayAgain()),
+      onPressed: _busy ? null : () => unawaited(_sayAgain()),
       child: Text(l.captureSayAgain),
     );
     if (MediaQuery.textScalerOf(context).scale(14) > 18) {
@@ -3973,13 +4074,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   Widget _commandCard(CommandView view, List<CaptureDraft> pending) {
     final command = view.command;
     void changed(CaptureCommand next) => unawaited(_changeCommand(next));
-    void remove() => _removeCommand(command);
+    // A set still asking its project isn't counted yet: the plural is used.
+    void remove() => _removeCommand(
+      command,
+      count: view.bulk?.count ?? (command.bulk ? 2 : 1),
+    );
     final existing = command.existingId;
     return switch (view.kind) {
       CommandKind.project => ProjectCommandCard(
         key: ValueKey(command.id),
         view: view,
-        enabled: !_saving,
+        enabled: !_busy,
         taskCount: pending
             .where(
               (draft) =>
@@ -3994,34 +4099,36 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       CommandKind.find => FindCommandCard(
         key: ValueKey(command.id),
         view: view,
+        enabled: !_busy,
+        onChanged: changed,
       ),
       CommandKind.update ||
       CommandKind.delete ||
       CommandKind.complete when view.bulk != null => BulkCommandCard(
         key: ValueKey(command.id),
         view: view,
-        enabled: !_saving,
+        enabled: !_busy,
         onChanged: changed,
         onRemove: remove,
       ),
       CommandKind.update => UpdateCommandCard(
         key: ValueKey(command.id),
         view: view,
-        enabled: !_saving,
+        enabled: !_busy,
         onChanged: changed,
         onRemove: remove,
       ),
       CommandKind.delete => DeleteCommandCard(
         key: ValueKey(command.id),
         view: view,
-        enabled: !_saving,
+        enabled: !_busy,
         onChanged: changed,
         onRemove: remove,
       ),
       CommandKind.complete => CompleteCommandCard(
         key: ValueKey(command.id),
         view: view,
-        enabled: !_saving,
+        enabled: !_busy,
         onChanged: changed,
         onRemove: remove,
       ),
@@ -4030,10 +4137,12 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
 
   @override
   Widget build(BuildContext context) {
-    final pending = _items.where((d) => d.pending).toList();
+    // From the confirming tap, the result as it was then.
+    final items = _frozen?.items ?? _items;
+    final pending = items.where((d) => d.pending).toList();
     // Commands: one card each, the new projects before the tasks, and the
     // searches, changes and deletions after them, in the order said.
-    final commands = _usesCommands;
+    final commands = _frozen != null || _usesCommands;
     final views = commands ? _views(watch: true) : const <CommandView>[];
     final undecided = _undecided(views);
     final ready = pending.where((d) => _draftReady(d, undecided)).length;
@@ -4067,6 +4176,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         ? waiting.single
         : null;
     final soleSet = sole?.bulk;
+    // Every card the tap acts on marks tasks done, and nothing is added:
+    // how many it marks, «Marcar 2 tareas como hechas», one per task and a
+    // set's live count.
+    final marking =
+        commands &&
+            ready == 0 &&
+            actionable.isNotEmpty &&
+            actionable.every((view) => view.kind == CommandKind.complete)
+        ? actionable.fold(0, (total, view) => total + (view.bulk?.count ?? 1))
+        : 0;
     // Only things to read (a search, a task not found): nothing to tap.
     final readOnly =
         commands && cards > 0 && ready == 0 && actionable.isEmpty && !blocked;
@@ -4077,16 +4196,18 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         ready == 0 &&
         changes == 0 &&
         (deletes > 0 || soleSet?.action == BulkAction.delete);
-    // Every command found nothing («Cambia el aceite…» was a task): the
-    // words can still become one.
+    // Every change, deletion or search found nothing («Cambia el aceite…»
+    // was a task): the words can still become one. Not «Ya he…», which is
+    // never a task to add, nor a project said that matched several.
     final asWritten =
         readOnly &&
         widget.onSaveAsWritten != null &&
         cards == views.length &&
         views.every(
           (view) =>
-              view.notFound ||
-              (view.kind == CommandKind.find && view.found.isEmpty),
+              !view.asksProject &&
+              ((view.notFound && view.kind != CommandKind.complete) ||
+                  (view.kind == CommandKind.find && view.found.isEmpty)),
         ) &&
         (_session.transcript.trim().isNotEmpty ||
             _session.text.trim().isNotEmpty);
@@ -4094,7 +4215,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final theme = Theme.of(context);
     final note =
         _session.kind == 'note' ||
-        (_items.isNotEmpty && _items.every((d) => d.task.isNote));
+        (items.isNotEmpty && items.every((d) => d.task.isNote));
     // "See what I said" and "Say it again" only fit words that were spoken.
     final spoken = _session.source == 'speech' || _session.audioPath != null;
     // Saying it again needs a dictation: with none left, Cancel stands alone.
@@ -4107,7 +4228,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     // Without Pro, a spoken result says how many free dictations are left,
     // once only a few are.
     final freeLeft = spoken ? ref.watch(freeVoiceLeftProvider) : null;
-    final label = _saving
+    final label = _busy
         ? l.saving
         : commands
         ? cards == 0
@@ -4115,6 +4236,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               : soleSet != null
               ? bulkButton(context, soleSet)
               : sole?.kind == CommandKind.complete && sole!.actionable
+              ? l.commandMarkDone
+              : marking > 1
+              ? l.commandBulkComplete(marking)
+              : marking == 1
               ? l.commandMarkDone
               : ready == 0 && actionable.isEmpty
               ? l.captureCheckDetails
@@ -4156,7 +4281,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         : pending.single.task.dueDate != null
         ? l.captureAddToCalendar
         : l.captureAddTask;
-    final onSave = _saving
+    final onSave = _busy
         ? null
         : commands
         ? cards == 0
@@ -4225,7 +4350,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                           draft: item,
                           compact: compact,
                           expanded: _expandedId == item.id,
-                          enabled: !_saving,
+                          enabled: !_busy,
                           onExpand: () => setState(
                             () => _expandedId = _expandedId == item.id
                                 ? null
@@ -4296,7 +4421,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                               foregroundColor: theme.colorScheme.onError,
                             )
                           : null,
-                      icon: _saving
+                      icon: _busy
                           ? const SizedBox(
                               width: 18,
                               height: 18,
@@ -4312,7 +4437,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                   else if (asWritten)
                     FilledButton(
                       key: const ValueKey('result-save-as-written'),
-                      onPressed: _saving
+                      onPressed: _busy
                           ? null
                           : () => unawaited(_saveAsWritten()),
                       child: Text(l.captureSaveAsWritten),

@@ -56,9 +56,9 @@ class BulkPlan {
     this.items = const [],
     this.excluded = const {},
     this.matched = 0,
-    this.repeating = 0,
-    this.unassignable = 0,
-    this.noDay = 0,
+    this.repeatingTasks = const [],
+    this.unassignableTasks = const [],
+    this.noDayTasks = const [],
     this.viewOnly,
     this.unasked = const [],
   });
@@ -77,17 +77,26 @@ class BulkPlan {
   /// How many tasks matched, before leaving out those already as asked.
   final int matched;
 
-  /// Left out: repeating tasks.
-  final int repeating;
+  /// Left out: repeating tasks, as stored. The card names a lone one.
+  final List<Task> repeatingTasks;
 
   /// Left out of the assignment: tasks the person named can't be given (no
   /// shared project, or they can't edit it). Their other changes still
   /// apply.
-  final int unassignable;
+  final List<Task> unassignableTasks;
 
   /// Left out: tasks with no day, which can't be moved by days or take a
   /// time.
-  final int noDay;
+  final List<Task> noDayTasks;
+
+  /// How many repeating tasks were left out.
+  int get repeating => repeatingTasks.length;
+
+  /// How many tasks the person named can't be given.
+  int get unassignable => unassignableTasks.length;
+
+  /// How many tasks with no day were left out.
+  int get noDay => noDayTasks.length;
 
   /// Nothing matched among the tasks the person can edit: the first that
   /// would have, in a project they can only view.
@@ -163,21 +172,25 @@ BulkPlan planBulk(
   );
   final matched = set.tasks.length;
   if (matched > BulkPlan.limit) {
-    return BulkPlan(action: action, matched: matched, repeating: set.repeating);
+    return BulkPlan(
+      action: action,
+      matched: matched,
+      repeatingTasks: set.repeatingTasks,
+    );
   }
   final changes = command.changes;
   if (command.kind == CommandKind.update && changes.isEmpty) {
     return BulkPlan(
       action: action,
       matched: matched,
-      repeating: set.repeating,
+      repeatingTasks: set.repeatingTasks,
       viewOnly: set.viewOnly,
       unasked: set.tasks,
     );
   }
   final items = <BulkItem>[];
-  var unassignable = 0;
-  var noDay = 0;
+  final unassignable = <Task>[];
+  final noDay = <Task>[];
   for (final shown in set.tasks) {
     final stored = tasks.where((task) => task.id == shown.id).firstOrNull;
     if (stored == null) continue;
@@ -191,12 +204,12 @@ BulkPlan planBulk(
           project: projects.where((p) => p.id == stored.listId).firstOrNull,
           accountId: accountId,
         );
-        if (plan.noDay || plan.needsDay) noDay++;
+        if (plan.noDay || plan.needsDay) noDay.add(stored);
         // A name not found is said once, on the card, not for each task.
         if (!changes.hasUnresolved &&
             (plan.problem == AssigneeProblem.notInProject ||
                 plan.problem == AssigneeProblem.needsShared)) {
-          unassignable++;
+          unassignable.add(stored);
         }
         if (!plan.isEmpty) {
           items.add(BulkItem(shown: shown, stored: stored, plan: plan));
@@ -217,9 +230,9 @@ BulkPlan planBulk(
     items: items,
     excluded: command.excluded.toSet(),
     matched: matched,
-    repeating: set.repeating,
-    unassignable: unassignable,
-    noDay: noDay,
+    repeatingTasks: set.repeatingTasks,
+    unassignableTasks: unassignable,
+    noDayTasks: noDay,
     viewOnly: set.viewOnly,
   );
 }
