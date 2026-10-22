@@ -2,6 +2,17 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-22 — Reminder plans: nudges that come more often as a task's day approaches
+**What he asked for:** "present the company project in 3 weeks from now, and I would like reminders every 3 days for the first 2 weeks, and later on the last week, I want a reminder every day", without making a manual task "too much", and never as copies of the task. The contract: `Backend/docs/REMINDER_PLANS.md`.
+- **One task, one plan:** reminders are notifications about the one task, never tasks of their own.
+- **The anchor:** the plan counts back from the deadline when there is one, otherwise from the task's own day. "Most of the time the user is not going to bother setting a deadline … the deadline … will be the same as the task."
+- **For everyone, no AI:** «Hasta la fecha límite» with three strengths, Suave, Normal and Intenso ("Suave, Normal, Intenso (Recommended)"), and the same preview: the plan in words, dots to the day, the next reminder.
+- **Said while dictating:** a rhythm said in a dictation is honored for free users too, since it's the same AI call ("Honor it for free users too").
+- **Pro:** «A tu manera» in the reminder sheet, typed or said, read by the AI: "we will not use llm calls for the non paying users … reserve the «a tu manera» for pro users". Free users see it with a Pro badge that opens the Pro screen.
+- **The offer:** after saving a task whose day is far away, the reminder question offers the plan ("Yes, in the reminder question").
+- **After the day:** one last notice, then silence ("One last notice, then stop").
+- **Order:** "All of it, then the UX review".
+
 ## 2026-10-22 — D4 of run 2026-10-21-changes (UX-1721)
 **«Retrasa todo lo de hoy un día», and the overdue tasks a «hoy» set takes (D2):** "From today: to tomorrow", as recommended. Moved by days, the overdue tasks in a «hoy» set count from today, like the rest, so «un día» puts them all on tomorrow. They're listed with «Atrasada» before the tap, and Deshacer undoes it. Other sets, one task and moves to a day are unchanged. P232 builds it in the same round; the main session updates the contract.
 
