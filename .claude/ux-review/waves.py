@@ -96,6 +96,13 @@ def seed_worktree(wt, main, files=(), run=None, pub=False):
     """Copies the main checkout's uncommitted state into the worktree and records it as the seed."""
     if wt.resolve() == main.resolve():
         raise SystemExit("seed runs in a worktree, never in the main checkout.")
+    # The workflow engine makes a worktree from the repo's default branch (main), not from the
+    # branch the main checkout is on (dev): on 2026-10-22 that left a whole wave without the
+    # code it was meant to change. Start from the main checkout's commit, before anything else.
+    # A reset keeps the worktree's own throwaway branch, which drop removes afterwards.
+    base = git(main, "rev-parse", "HEAD")
+    if git(wt, "rev-parse", "HEAD") != base:
+        git(wt, "reset", "--hard", "--quiet", base)
     copied, removed = [], []
     context = set(CONTEXT) if (main / ".claude" / "ux-review").is_dir() else set()
     for rel in sorted(set(files or []) | run_changes(main) | context):
@@ -377,7 +384,8 @@ def drop_worktree(main, wt):
     removed = subprocess.run(["git", "-C", str(main), "worktree", "remove", "--force", str(wt)], capture_output=True)
     if removed.returncode != 0:
         return False
-    if branch.startswith("worktree-agent-"):
+    # The engine's throwaway branches: worktree-agent-* (Agent tool) and worktree-wf_* (workflows).
+    if branch.startswith(("worktree-agent-", "worktree-wf_")):
         git(main, "branch", "-D", branch, check=False)
     remove_mirror(wt)
     return True
