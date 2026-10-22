@@ -3526,6 +3526,12 @@ abstract class AppLocalizations {
   /// **'Date-only tasks'**
   String get dateOnlyTasks;
 
+  /// Settings › Reminders, under “Date-only tasks” when it is off and some open task has an “Until the deadline” plan without its own time: those plans still ring at {time}. {time} is the default hour in the app’s clock format (9:00 AM). Follows the sheet’s name for the plan (reminderPlanUntilDay).
+  ///
+  /// In en, this message translates to:
+  /// **'Off · “Until the deadline”: {time}'**
+  String dateOnlyOffPlans(String time);
+
   /// No description provided for @dailyCheckIns.
   ///
   /// In en, this message translates to:
@@ -6496,10 +6502,10 @@ abstract class AppLocalizations {
   /// **'Your way'**
   String get reminderPlanYourWay;
 
-  /// Under the field of reminderPlanYourWay: what to put in it.
+  /// Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line.
   ///
   /// In en, this message translates to:
-  /// **'Type it or say it the way you’d tell someone.'**
+  /// **'For example: “a week before, and the day before at 8”.'**
   String get reminderPlanYourWayHint;
 
   /// A small badge beside a choice that comes with TaskFlow Pro. Tapping the choice opens the Pro screen.
@@ -6526,10 +6532,10 @@ abstract class AppLocalizations {
   /// **'One moment…'**
   String get reminderPlanReading;
 
-  /// The assistant found no reminders in the words of reminderPlanYourWay: ask for them again, with an example.
+  /// The assistant found no reminders in the words of reminderPlanYourWay: ask for them again. The field's helper, reminderPlanYourWayHint, gives the example; saying it again starts from an empty field.
   ///
   /// In en, this message translates to:
-  /// **'I didn’t get that. Say it another way, for example: “every 3 days, and daily the last week”.'**
+  /// **'I didn’t get that. Try saying it another way.'**
   String get reminderPlanUnclear;
 
   /// reminderPlanYourWay with no connection: it needs one, and the strengths of reminderPlanUntilDay work without.
@@ -6559,7 +6565,7 @@ abstract class AppLocalizations {
   /// The plan's preview in the reminder sheet: how many reminders are still to come, and the next one. {when} is today, tomorrow or other; {date} is the day (sat 25); {time} the clock time.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 reminder · {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}} other{{count} reminders · next one {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}}}'**
+  /// **'{count, plural, =1{1 reminder: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}} other{{count} reminders · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}}}'**
   String reminderPlanCount(int count, String when, String date, String time);
 
   /// The plan's preview when none of its reminders is still to come.
@@ -6658,25 +6664,61 @@ abstract class AppLocalizations {
   /// **'{first}, {rest}'**
   String reminderPlanList(String first, String rest);
 
-  /// On a task with a plan: the plan in words, then its next reminder. {when} is today, tomorrow or other; {date} the day (sat 25).
+  /// On a task with a plan: the plan in words (reminderPlanStrengthLine or reminderPlanOwnLine), then its next reminder, on or before the task's day. {when} is today, tomorrow or other; {date} the day (sat 24); {time} the clock time, as the app writes it.
   ///
   /// In en, this message translates to:
-  /// **'{plan} · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}'**
-  String reminderPlanLine(String plan, String when, String date);
+  /// **'{plan} · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}'**
+  String reminderPlanLine(String plan, String when, String date, String time);
 
-  /// A plan's notification text, under the task's title: how many days are left until its day (2 or more).
+  /// On a task whose plan is one of the three strengths (reminderPlanGentle, reminderPlanNormal, reminderPlanIntense): the plan in words, naming its strength. {strength} is gentle, normal or other (intense); {when} is today, tomorrow or other; {date} is the day the plan counts back from (thu 12).
   ///
   /// In en, this message translates to:
-  /// **'{days, plural, =1{1 day left} other{{days} days left}}'**
-  String reminderPlanNoticeDays(int days);
+  /// **'{strength, select, gentle{Gentle} normal{Normal} other{Intense}} reminders {when, select, today{until today} tomorrow{until tomorrow} other{until {date}}}'**
+  String reminderPlanStrengthLine(String strength, String when, String date);
 
-  /// A plan's notification text, the day before the task's day.
+  /// On a task with a plan of one's own: the plan in words. {rhythm} is its rhythm, lowercase (every 3 days, and daily for the last week).
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders: {rhythm}'**
+  String reminderPlanOwnLine(String rhythm);
+
+  /// A plan's notification text, under the task's title: how many days are left until its day (2 or more), then the day. {date} is the weekday date as notifications write it (Thu, Nov 12), followed by the time when the task has one (Thu, Nov 12, 5:00 PM).
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 day left · {date}} other{{days} days left · {date}}}'**
+  String reminderPlanNoticeDays(int days, String date);
+
+  /// A plan's notification text for a task with a deadline, under the task's title: the deadline, then how many days are left (2 or more). {date} is the weekday date as notifications write it (Thu, Nov 12), followed by the time when the deadline has one (Thu, Nov 12, 5:00 PM).
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{Deadline: {date} · 1 day left} other{Deadline: {date} · {days} days left}}'**
+  String reminderPlanNoticeDeadlineDays(int days, String date);
+
+  /// A plan's notification text, the day before a task with a time. {time} is the task's time as the app's clock writes it; {hour} is the hour as shown, for the article (Spanish and Catalan say a la 1:00).
+  ///
+  /// In en, this message translates to:
+  /// **'{hour, plural, other{It’s tomorrow at {time}}}'**
+  String reminderPlanNoticeTomorrowAt(int hour, String time);
+
+  /// A plan's notification text, on the day of a task with a time. Placeholders as in reminderPlanNoticeTomorrowAt.
+  ///
+  /// In en, this message translates to:
+  /// **'{hour, plural, other{It’s today at {time}}}'**
+  String reminderPlanNoticeTodayAt(int hour, String time);
+
+  /// A plan's notification text, the day before a deadline that has no time.
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline: tomorrow'**
+  String get reminderPlanNoticeDeadlineTomorrow;
+
+  /// A plan's notification text, the day before a task's day that has no time.
   ///
   /// In en, this message translates to:
   /// **'It’s tomorrow'**
   String get reminderPlanNoticeTomorrow;
 
-  /// A plan's notification text, on the task's day.
+  /// A plan's notification text, on a task's day that has no time.
   ///
   /// In en, this message translates to:
   /// **'It’s today'**
@@ -6685,7 +6727,7 @@ abstract class AppLocalizations {
   /// A plan's one last notification, the day after, for a task with only a day that isn't done.
   ///
   /// In en, this message translates to:
-  /// **'It was for yesterday'**
+  /// **'It was planned for yesterday'**
   String get reminderPlanNoticeWas;
 
   /// A plan's one last notification, the day after, for a task with a deadline that isn't done.
@@ -6694,23 +6736,17 @@ abstract class AppLocalizations {
   /// **'It was due yesterday'**
   String get reminderPlanNoticeDue;
 
-  /// Asked once after saving a task whose day is 2 weeks or more away: shall the app remind the person more and more often until then. Sí sets Normal.
+  /// Asked once after saving a task whose day is 2 weeks or more away, under the task's title and day: shall the app remind the person with the Normal plan. {rhythm} is Normal's rhythm in lowercase words, as reminderPlanEveryDays and reminderPlanPhase write it (every 3 days, and daily for the last week). Yes, remind me (reminderAskYes) sets Normal.
   ///
   /// In en, this message translates to:
-  /// **'{weeks, plural, =1{1 week to go: shall I remind you until then?} other{{weeks} weeks to go: shall I remind you until then?}}'**
-  String reminderPlanOfferWeeks(int weeks);
+  /// **'{weeks, plural, =1{1 week to go. Shall I remind you {rhythm}?} other{{weeks} weeks to go. Shall I remind you {rhythm}?}}'**
+  String reminderPlanOfferWeeks(int weeks, String rhythm);
 
-  /// reminderPlanOfferWeeks for a day 2 months or more away.
+  /// reminderPlanOfferWeeks for a day 2 months or more away. {rhythm} is Normal's rhythm in lowercase words.
   ///
   /// In en, this message translates to:
-  /// **'{months, plural, =1{1 month to go: shall I remind you until then?} other{{months} months to go: shall I remind you until then?}}'**
-  String reminderPlanOfferMonths(int months);
-
-  /// The offer's yes: set the Normal plan on the task just saved.
-  ///
-  /// In en, this message translates to:
-  /// **'Yes'**
-  String get reminderPlanOfferYes;
+  /// **'{months, plural, =1{1 month to go. Shall I remind you {rhythm}?} other{{months} months to go. Shall I remind you {rhythm}?}}'**
+  String reminderPlanOfferMonths(int months, String rhythm);
 
   /// After yes to the offer: the plan is set. {date} is the day it counts back from (thu 12).
   ///
@@ -6718,11 +6754,17 @@ abstract class AppLocalizations {
   /// **'Done. I’ll remind you until {date}.'**
   String reminderPlanOfferDone(String date);
 
-  /// On the Pro screen, opened from «Your way» in the reminder sheet: what Pro adds there.
+  /// On the Pro screen, opened from “Your way” in the reminder sheet: what Pro adds there. A heading, followed by billingReasonReminderPlansExample.
   ///
   /// In en, this message translates to:
-  /// **'With Pro, your reminders your way'**
+  /// **'With Pro, ask for reminders in your own words:'**
   String get billingReasonReminderPlans;
+
+  /// On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line.
+  ///
+  /// In en, this message translates to:
+  /// **'“a week before, and the day before at 8”'**
+  String get billingReasonReminderPlansExample;
 }
 
 class _AppLocalizationsDelegate

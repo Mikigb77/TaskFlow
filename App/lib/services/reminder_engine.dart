@@ -158,7 +158,10 @@ class ReminderEngine {
     return ReminderPlans.daysUntil(anchor, day);
   }
 
-  /// The next few reminders of [task]'s [plan]: never the whole plan.
+  /// The next few reminders of [task]'s [plan], never the whole plan, and
+  /// always its last days still ahead (the day before, the day itself and
+  /// the day after), so a phone that defers background work still rings
+  /// them.
   static List<PlannedReminder> planReminders(
     String owner,
     Task task,
@@ -175,19 +178,17 @@ class ReminderEngine {
       now,
     );
     return [
-      for (final alert in alerts.take(ReminderPlans.window))
-        PlannedReminder(
-          identity: planIdentity(owner, task, alert),
-          taskId: task.id,
-          due: anchor,
-          when: alert.when,
-          title: task.title,
-          languageCode: copy.languageCode,
-          body: copy.planBody(
-            alert.daysBefore,
-            deadline: task.deadline != null,
+      for (final (index, alert) in alerts.indexed)
+        if (index < ReminderPlans.window || alert.daysBefore <= 1)
+          PlannedReminder(
+            identity: planIdentity(owner, task, alert),
+            taskId: task.id,
+            due: anchor,
+            when: alert.when,
+            title: task.title,
+            languageCode: copy.languageCode,
+            body: copy.planBody(task, alert.daysBefore),
           ),
-        ),
     ];
   }
 
@@ -429,10 +430,7 @@ class ReminderEngine {
             title: task.title,
             languageCode: copy.languageCode,
             body: ofPlan
-                ? copy.planBody(
-                    _planDaysBefore(row, task),
-                    deadline: task.deadline != null,
-                  )
+                ? copy.planBody(task, _planDaysBefore(row, task))
                 : copy.body(task, when.toLocal(), 0),
           ),
         );
@@ -462,6 +460,38 @@ class ReminderEngine {
           await db.update(
             'reminder_state',
             {'status': stillRelevant ? 'elapsed' : 'inactive'},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        }
+      }
+      // One plan notice per task in the shade: each is true only on its day,
+      // so once a newer one has rung, the older ones go. One already gone
+      // isn't cancelled again.
+      final gone = {
+        for (final row in old)
+          if (row['status'] == 'inactive') row['id'],
+      };
+      final rang = <Object?, List<Map<String, Object?>>>{};
+      for (final row in await db.query(
+        'reminder_state',
+        where: 'owner_key = ? AND status = ?',
+        whereArgs: [owner, 'elapsed'],
+      )) {
+        if (!isPlanAlert(row['identity'])) continue;
+        final fired = DateTime.tryParse(row['fire_at'] as String? ?? '');
+        if (fired == null || fired.isAfter(now)) continue;
+        (rang[row['task_id']] ??= []).add(row);
+      }
+      for (final rows in rang.values) {
+        rows.sort(
+          (a, b) => (b['fire_at'] as String).compareTo(a['fire_at'] as String),
+        );
+        for (final row in rows.skip(1)) {
+          if (!gone.contains(row['id'])) await driver.cancel(row['id'] as int);
+          await db.update(
+            'reminder_state',
+            {'status': 'inactive'},
             where: 'id = ?',
             whereArgs: [row['id']],
           );

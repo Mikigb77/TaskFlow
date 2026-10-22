@@ -27,13 +27,15 @@ String planWhen(DateTime date, DateTime now) =>
 
 /// The plan's rhythm in words, from the phases with reminders still to come:
 /// «Cada 3 días, y a diario la última semana». A phase already over isn't
-/// said; once every reminder has gone by, the whole plan is.
+/// said; once every reminder has gone by, the whole plan is. Without
+/// [capitalized], it reads as it does after a colon: «cada 3 días, …».
 String planRhythm(
   AppLocalizations l,
   ReminderPlan plan, {
   required DateTime anchor,
   required DateTime now,
   required int minute,
+  bool capitalized = true,
 }) {
   final until = math.max(0, ReminderPlans.daysUntil(anchor, now));
   final phases = [...plan.phases]
@@ -47,11 +49,14 @@ String planRhythm(
     for (var i = 0; i < said.length; i++)
       _phase(l, said[i], last: i == said.length - 1, until: until),
   ];
-  return _capitalized(_joined(l, parts));
+  final text = _joined(l, parts);
+  return capitalized ? _capitalized(text) : text;
 }
 
-/// What a plan reads as on its task: a strength «Cada vez más a menudo
-/// hasta el jue 12», a plan of one's own its rhythm.
+/// What a plan reads as on its task, named as reminders: a strength
+/// «Recordatorios normales hasta el jue 12», a plan of one's own
+/// «Recordatorios: cada 3 días, …». [bare] leaves the noun out, lowercase,
+/// for a line that already names it («Recordatorio para Ana: …»).
 String planSummary(
   AppLocalizations l,
   ReminderPlan plan, {
@@ -59,12 +64,29 @@ String planSummary(
   required DateTime now,
   required int minute,
   required String locale,
-}) => plan.isRhythm
-    ? l.reminderPlanGrowing(planWhen(anchor, now), planDay(anchor, now, locale))
-    : planRhythm(l, plan, anchor: anchor, now: now, minute: minute);
+  bool bare = false,
+}) {
+  final when = planWhen(anchor, now);
+  final day = planDay(anchor, now, locale);
+  if (plan.isRhythm) {
+    return bare
+        ? _lowercased(l.reminderPlanGrowing(when, day))
+        : l.reminderPlanStrengthLine(plan.strength!, when, day);
+  }
+  final rhythm = planRhythm(
+    l,
+    plan,
+    anchor: anchor,
+    now: now,
+    minute: minute,
+    capitalized: false,
+  );
+  return bare ? rhythm : l.reminderPlanOwnLine(rhythm);
+}
 
-/// The task's one line: the plan, then its next reminder, the last notice
-/// included («… · próximo: sáb 25»).
+/// The task's one line: the plan, then its next reminder on or before the
+/// task's day, with its time («… · próximo: sáb 24, 9:00»). A task that's
+/// [done] reads as the plan alone. [clock] writes a time as the app does.
 String planLine(
   AppLocalizations l,
   ReminderPlan plan, {
@@ -72,6 +94,9 @@ String planLine(
   required DateTime now,
   required int minute,
   required String locale,
+  required String Function(DateTime time) clock,
+  bool done = false,
+  bool bare = false,
 }) {
   final summary = planSummary(
     l,
@@ -80,18 +105,30 @@ String planLine(
     now: now,
     minute: minute,
     locale: locale,
+    bare: bare,
   );
-  final next = ReminderPlans.alerts(plan, anchor, minute, now).firstOrNull;
+  // The last notice, the day after, isn't promised: nothing rings for the
+  // task itself then.
+  final next = done
+      ? null
+      : ReminderPlans.alerts(
+          plan,
+          anchor,
+          minute,
+          now,
+          late: false,
+        ).firstOrNull;
   return next == null
       ? summary
       : l.reminderPlanLine(
           summary,
           planWhen(next.when, now),
           planDay(next.when, now, locale),
+          clock(next.when),
         );
 }
 
-/// The preview's count and next reminder: «8 avisos · el próximo sáb 25,
+/// The preview's count and next reminder: «13 avisos · próximo: sáb 24,
 /// 9:00». [clock] writes a time as the app does.
 String planCount(
   AppLocalizations l,
@@ -113,24 +150,12 @@ String planCount(
   );
 }
 
-/// A plan's notification text, under the task's title: how far its day is,
-/// or, the day after, that it was for yesterday.
-String planNotice(
-  AppLocalizations l,
-  int daysBefore, {
-  required bool deadline,
-}) => switch (daysBefore) {
-  < 0 => deadline ? l.reminderPlanNoticeDue : l.reminderPlanNoticeWas,
-  0 => l.reminderPlanNoticeToday,
-  1 => l.reminderPlanNoticeTomorrow,
-  _ => l.reminderPlanNoticeDays(daysBefore),
-};
-
-/// The offer after saving a task [days] away: «Faltan 3 semanas: ¿te lo
-/// recuerdo hasta entonces?». Weeks up to eight, then months.
-String planOffer(AppLocalizations l, int days) => days < 56
-    ? l.reminderPlanOfferWeeks(math.max(1, (days / 7).round()))
-    : l.reminderPlanOfferMonths(math.max(1, (days / 30).round()));
+/// The offer after saving a task [days] away, with Normal's [rhythm] in
+/// lowercase words: «Faltan 3 semanas. ¿Te aviso cada 3 días, y a diario la
+/// última semana?». Weeks up to eight, then months.
+String planOffer(AppLocalizations l, int days, String rhythm) => days < 56
+    ? l.reminderPlanOfferWeeks(math.max(1, (days / 7).round()), rhythm)
+    : l.reminderPlanOfferMonths(math.max(1, (days / 30).round()), rhythm);
 
 String _phase(
   AppLocalizations l,
@@ -194,3 +219,6 @@ String _joined(AppLocalizations l, List<String> parts) => switch (parts) {
 
 String _capitalized(String text) =>
     text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+
+String _lowercased(String text) =>
+    text.isEmpty ? text : text[0].toLowerCase() + text.substring(1);

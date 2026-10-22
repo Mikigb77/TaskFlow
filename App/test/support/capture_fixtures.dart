@@ -186,7 +186,13 @@ class MemoryCaptures extends CaptureStore {
     String ownerKey,
     Set<String> draftIds,
   ) async {
-    final drafts = current!.drafts;
+    // Saved as the real store saves them: without a plan that can't apply.
+    final drafts = [
+      for (final draft in current!.drafts)
+        draftIds.contains(draft.id)
+            ? draft.copyWith(task: CaptureStore.withoutStalePlan(draft.task))
+            : draft,
+    ];
     final known = {
       for (final task in tasks?.read(taskProvider).valueOrNull ?? <Task>[])
         task.id,

@@ -52,7 +52,8 @@ bool _cannotFire(
 /// True when reminders are on here and [task] has a reminder, but its alert
 /// time is already past: a task without a time for today after its 9:00, a
 /// timed task inside its lead time, or a day gone by. Nothing will ring. A
-/// plan's are past once its last notice, the day after, has gone by.
+/// plan's are past once none is left on or before the task's day: the last
+/// notice, the day after, isn't a reminder of it.
 bool _alertPassed(WidgetRef ref, Task? task) {
   final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
   if (task == null ||
@@ -61,24 +62,34 @@ bool _alertPassed(WidgetRef ref, Task? task) {
       task.isCompleted) {
     return false;
   }
-  if (ReminderPlans.active(task) == null) {
-    if (task.reminderDate == null || task.reminderMinutes == -1) return false;
-    if (task.reminderHasTime
-        ? (task.reminderMinutes ?? settings.leadMinutes) < 0
-        : (task.reminderTime ?? settings.dateOnlyTime) == null) {
-      return false;
-    }
+  final now = ref.watch(calendarClockProvider)();
+  if (ReminderPlans.active(task) != null) {
+    return ReminderPlans.taskAlerts(
+      task,
+      settings.dateOnlyTime,
+      now,
+      late: false,
+    ).isEmpty;
   }
-  return !ReminderEngine.alertAhead(
-    task,
-    settings,
-    ref.watch(calendarClockProvider)(),
-  );
+  if (task.reminderDate == null || task.reminderMinutes == -1) return false;
+  if (task.reminderHasTime
+      ? (task.reminderMinutes ?? settings.leadMinutes) < 0
+      : (task.reminderTime ?? settings.dateOnlyTime) == null) {
+    return false;
+  }
+  return !ReminderEngine.alertAhead(task, settings, now);
 }
 
-/// A plan as its task shows it: «Cada 3 días, y a diario la última semana ·
-/// próximo: sáb 25», or a strength's «Cada vez más a menudo hasta el jue 12».
-String reminderPlanText(BuildContext context, WidgetRef ref, Task task) {
+/// A plan as its task shows it: «Recordatorios: cada 3 días, y a diario la
+/// última semana · próximo: sáb 24, 9:00», or a strength's «Recordatorios
+/// normales hasta el jue 12 · …». [bare], after a person's name, leaves the
+/// noun out: «cada 3 días, … · próximo: …».
+String reminderPlanText(
+  BuildContext context,
+  WidgetRef ref,
+  Task task, {
+  bool bare = false,
+}) {
   final plan = ReminderPlans.active(task)!;
   final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
   return planLine(
@@ -88,6 +99,9 @@ String reminderPlanText(BuildContext context, WidgetRef ref, Task task) {
     now: ref.watch(calendarClockProvider)(),
     minute: ReminderPlans.minute(plan, settings?.dateOnlyTime),
     locale: context.localeName,
+    clock: context.clockTime,
+    done: task.isCompleted,
+    bare: bare,
   );
 }
 
@@ -367,41 +381,6 @@ Future<void> _chooseReminder(
   }
 }
 
-/// Opens [task]'s reminder choices, as its reminder line does, and gives
-/// back the task with the one chosen. For a line that isn't the chip, such
-/// as the plan read from a dictation on the capture's card.
-Future<void> editTaskReminder(
-  BuildContext context,
-  Task task, {
-  required ValueChanged<Task> onChanged,
-}) async {
-  final container = ProviderScope.containerOf(context, listen: false);
-  ReminderPreferences settings;
-  try {
-    settings = await container.read(reminderPreferencesProvider.future);
-  } catch (_) {
-    settings = const ReminderPreferences();
-  }
-  if (!context.mounted) return;
-  await _chooseReminder(
-    context,
-    hasTime: task.reminderHasTime,
-    minutes: task.reminderMinutes,
-    time: task.reminderTime,
-    defaultLead: settings.leadMinutes,
-    defaultTime: settings.dateOnlyTime,
-    plan: task.reminderPlan,
-    schedule: task,
-    onChosen: (minutes, time, plan) => onChanged(
-      task.copyWith(
-        reminderMinutes: minutes,
-        reminderTime: time,
-        reminderPlan: plan,
-      ),
-    ),
-  );
-}
-
 /// The default lead for tasks with a time, from the chip's list of leads.
 /// This list sets the default, so it has no «default» row. Null when the
 /// person leaves without picking.
@@ -459,58 +438,121 @@ Future<int?> _pickFrom(
   ),
 );
 
+/// [task]'s reminder line as this phone reads it: its icon, its words and
+/// what a tap does. The plan's line, «Recordatorio: 1 hora antes», «Sin
+/// recordatorio · Activar» when this phone won't ring (the tap turns
+/// reminders on), or «Sin recordatorio: ya ha pasado la hora del aviso»;
+/// otherwise a tap opens the reminder choices and gives [onChanged] the task
+/// with the one chosen. The task's chip and a collapsed row on the capture's
+/// card both read it, so they can't drift. For a task with a reminder date
+/// or a plan that applies.
+({IconData icon, String text, VoidCallback? onTap}) reminderLine(
+  BuildContext context,
+  WidgetRef ref,
+  Task task, {
+  ValueChanged<Task>? onChanged,
+}) {
+  final preferences =
+      ref.watch(reminderPreferencesProvider).valueOrNull ??
+      const ReminderPreferences();
+  // A plan replaces the single reminder: the line is its one line.
+  final plan = ReminderPlans.active(task);
+  final reason = _reasonFor(ref, task);
+  final blocked =
+      reason == null &&
+      _cannotFire(
+        ref,
+        hasDate: task.reminderDate != null || plan != null,
+        hasTime: task.reminderHasTime,
+        minutes: task.reminderMinutes,
+        time: task.reminderTime,
+        planned: plan != null,
+      );
+  // Last: a tap still opens the choices, where a later time can be set.
+  final passed = reason == null && !blocked && _alertPassed(ref, task);
+  final minute = task.reminderTime ?? preferences.dateOnlyTime;
+  final label = task.reminderMinutes == -1
+      ? context.l10n.off
+      : task.reminderHasTime
+      ? context.reminderLead(task.reminderMinutes ?? preferences.leadMinutes)
+      : minute == null
+      ? context.l10n.off
+      : _clock(context, minute);
+  final value = plan != null
+      ? reminderPlanText(context, ref, task)
+      : '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label';
+  return (
+    icon: blocked || passed || reason?.silent == true
+        ? Icons.notifications_off_outlined
+        : plan != null
+        ? Icons.notifications_active_outlined
+        : Icons.notifications_outlined,
+    text: reason != null
+        ? reason.text(
+            context,
+            plan != null
+                // After the person's name, the plan without its noun.
+                ? reminderPlanText(context, ref, task, bare: true)
+                : _followsDefault(
+                    hasTime: task.reminderHasTime,
+                    minutes: task.reminderMinutes,
+                    time: task.reminderTime,
+                  )
+                ? null
+                : value,
+          )
+        : blocked
+        ? context.l10n.noReminderTurnOn
+        : passed
+        ? context.l10n.noReminderTimePassed
+        : plan != null
+        ? value
+        : context.l10n.reminderValue(value),
+    onTap: reason?.silent == true
+        ? reason!.action(context, ref)
+        : blocked
+        ? () => turnOnReminders(context)
+        : onChanged == null
+        ? null
+        : () => _chooseReminder(
+            context,
+            hasTime: task.reminderHasTime,
+            minutes: task.reminderMinutes,
+            time: task.reminderTime,
+            defaultLead: preferences.leadMinutes,
+            defaultTime: preferences.dateOnlyTime,
+            plan: task.reminderPlan,
+            schedule: task,
+            onChosen: (minutes, time, plan) => onChanged(
+              task.copyWith(
+                reminderMinutes: minutes,
+                reminderTime: time,
+                reminderPlan: plan,
+              ),
+            ),
+          ),
+  );
+}
+
 class ReminderChip extends ConsumerWidget {
   final Task task;
   final ValueChanged<Task>? onChanged;
   const ReminderChip({super.key, required this.task, this.onChanged});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preferences =
-        ref.watch(reminderPreferencesProvider).valueOrNull ??
-        const ReminderPreferences();
-    // A plan replaces the single reminder: the chip is its one line.
-    final plan = ReminderPlans.active(task);
-    final reason = _reasonFor(ref, task);
-    final blocked =
-        reason == null &&
-        _cannotFire(
-          ref,
-          hasDate: task.reminderDate != null || plan != null,
-          hasTime: task.reminderHasTime,
-          minutes: task.reminderMinutes,
-          time: task.reminderTime,
-          planned: plan != null,
-        );
-    // Last: a tap still opens the choices, where a later time can be set.
-    final passed = reason == null && !blocked && _alertPassed(ref, task);
-    final minute = task.reminderTime ?? preferences.dateOnlyTime;
-    final label = task.reminderMinutes == -1
-        ? context.l10n.off
-        : task.reminderHasTime
-        ? context.reminderLead(task.reminderMinutes ?? preferences.leadMinutes)
-        : minute == null
-        ? context.l10n.off
-        : _clock(context, minute);
-    final value = plan != null
-        ? reminderPlanText(context, ref, task)
-        : '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label';
+    final line = reminderLine(context, ref, task, onChanged: onChanged);
     return LayoutBuilder(
       builder: (context, constraints) => ActionChip(
-        key: plan == null ? null : const ValueKey('reminder-plan-line'),
+        key: ReminderPlans.active(task) == null
+            ? null
+            : const ValueKey('reminder-plan-line'),
         // The icon keeps its own room at any text size, so a long reading
         // wraps in the label's width instead of the label's height.
         avatarBoxConstraints: const BoxConstraints.tightFor(
           width: 20,
           height: 20,
         ),
-        avatar: Icon(
-          blocked || passed || reason?.silent == true
-              ? Icons.notifications_off_outlined
-              : plan != null
-              ? Icons.notifications_active_outlined
-              : Icons.notifications_outlined,
-          size: 16,
-        ),
+        avatar: Icon(line.icon, size: 16),
         label: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth:
@@ -520,53 +562,9 @@ class ReminderChip extends ConsumerWidget {
                         80)
                     .clamp(0, double.infinity),
           ),
-          child: Text(
-            reason != null
-                ? reason.text(
-                    context,
-                    plan == null &&
-                            _followsDefault(
-                              hasTime: task.reminderHasTime,
-                              minutes: task.reminderMinutes,
-                              time: task.reminderTime,
-                            )
-                        ? null
-                        : value,
-                  )
-                : blocked
-                ? context.l10n.noReminderTurnOn
-                : passed
-                ? context.l10n.noReminderTimePassed
-                : plan != null
-                ? value
-                : context.l10n.reminderValue(value),
-            softWrap: true,
-            maxLines: 10,
-          ),
+          child: Text(line.text, softWrap: true, maxLines: 10),
         ),
-        onPressed: reason?.silent == true
-            ? reason!.action(context, ref)
-            : blocked
-            ? () => turnOnReminders(context)
-            : onChanged == null
-            ? null
-            : () => _chooseReminder(
-                context,
-                hasTime: task.reminderHasTime,
-                minutes: task.reminderMinutes,
-                time: task.reminderTime,
-                defaultLead: preferences.leadMinutes,
-                defaultTime: preferences.dateOnlyTime,
-                plan: task.reminderPlan,
-                schedule: task,
-                onChosen: (minutes, time, plan) => onChanged?.call(
-                  task.copyWith(
-                    reminderMinutes: minutes,
-                    reminderTime: time,
-                    reminderPlan: plan,
-                  ),
-                ),
-              ),
+        onPressed: line.onTap,
       ),
     );
   }
@@ -678,7 +676,9 @@ class ReminderControl extends ConsumerWidget {
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(
-            active != null
+            passed
+                ? Icons.notifications_off_outlined
+                : active != null
                 ? Icons.notifications_active_outlined
                 : Icons.notifications_outlined,
           ),
@@ -688,12 +688,20 @@ class ReminderControl extends ConsumerWidget {
                 ? context.l10n.dateForReminder
                 : reason?.text(
                         context,
-                        active == null &&
-                                _followsDefault(
-                                  hasTime: hasTime,
-                                  minutes: minutes,
-                                  time: time,
-                                )
+                        active != null
+                            // After the person's name, the plan without its
+                            // noun.
+                            ? reminderPlanText(
+                                context,
+                                ref,
+                                planned!,
+                                bare: true,
+                              )
+                            : _followsDefault(
+                                hasTime: hasTime,
+                                minutes: minutes,
+                                time: time,
+                              )
                             ? null
                             : value,
                       ) ??

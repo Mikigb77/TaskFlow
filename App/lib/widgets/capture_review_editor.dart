@@ -59,6 +59,14 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
   // The notes field shows once the task has notes, or once `Añadir notas`
   // opened it; then it stays for this card even if emptied again.
   late bool _notesOpen = _hasNotes;
+  // The reminder row shows above `Más opciones` when the task arrives with
+  // a reminder (said while dictating, or changed before a resume); then it
+  // stays for this card, as the notes do. A reminder changed inside
+  // `Más opciones` stays there.
+  late final bool _reminderOpen =
+      task.reminderPlan != null ||
+      task.reminderMinutes != null ||
+      task.reminderTime != null;
   Task get task => widget.draft.task;
   bool get expanded => !widget.compact || widget.expanded;
   bool get _hasNotes => task.notes?.trim().isNotEmpty ?? false;
@@ -394,6 +402,41 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     );
   }
 
+  /// A collapsed row's reminder said while dictating, under its date line
+  /// and in its style: the task's reminder line (the plan's, «Recordatorio:
+  /// 1 hora antes», or why it won't ring here), whose tap opens the reminder
+  /// choices or turns reminders on. TalkBack reads its words, as a button.
+  Widget _reminderLine() => Consumer(
+    builder: (context, ref, _) {
+      final line = reminderLine(context, ref, task, onChanged: _change);
+      final onTap = widget.enabled ? line.onTap : null;
+      return Semantics(
+        label: line.text,
+        button: true,
+        enabled: onTap != null,
+        excludeSemantics: true,
+        onTap: onTap,
+        child: ListTile(
+          key: ValueKey('draft-reminder-line-${widget.draft.id}'),
+          contentPadding: EdgeInsets.zero,
+          horizontalTitleGap: 8,
+          minLeadingWidth: 0,
+          leading: Icon(
+            line.icon,
+            color: Theme.of(context).colorScheme.primary,
+            size: 18,
+          ),
+          title: Text(line.text),
+          titleTextStyle: Theme.of(context).textTheme.bodyMedium,
+          trailing: onTap == null
+              ? null
+              : const Icon(Icons.chevron_right_rounded, size: 20),
+          onTap: onTap,
+        ),
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -489,19 +532,52 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         borderSide: BorderSide(color: colors.primary, width: 2),
       ),
     );
-    // A plan read from the words: one line, like the other details.
-    final plan = ReminderPlans.active(task);
+    // A reminder said («una hora antes», a plan) is one row above `Más
+    // opciones`; otherwise its control stays inside them.
+    final showReminder = _reminderOpen && !task.isNote;
+    // A reminder changed inside `Más opciones` has no row: its line shows in
+    // their subtitle and on the collapsed row, as priority and repeat do.
+    final reminderInOptions =
+        !showReminder &&
+        !task.isNote &&
+        (task.reminderPlan != null ||
+            task.reminderMinutes != null ||
+            task.reminderTime != null) &&
+        (task.reminderDate != null || ReminderPlans.active(task) != null);
+    Widget reminder({Key? key}) => ReminderControl(
+      key: key,
+      hasDate: task.reminderDate != null,
+      hasTime: task.reminderHasTime,
+      minutes: task.reminderMinutes,
+      time: task.reminderTime,
+      plan: task.reminderPlan,
+      schedule: task,
+      onMinutes: (value) {
+        if (widget.enabled) {
+          _change(task.copyWith(reminderMinutes: value));
+        }
+      },
+      onTime: (value) {
+        if (widget.enabled) {
+          _change(task.copyWith(reminderTime: value));
+        }
+      },
+      onChanged: (minutes, time, plan) {
+        if (widget.enabled) {
+          _change(
+            task.copyWith(
+              reminderMinutes: minutes,
+              reminderTime: time,
+              reminderPlan: plan,
+            ),
+          );
+        }
+      },
+    );
     final optionsSummary = [
       if (task.priority > 1)
         l.priorityValue(context.priorityName(task.priority)),
       if (task.isRecurring) context.repeatLabel(task),
-      // A reminder said («una hora antes») shows without opening Opciones.
-      if (plan == null &&
-          !task.isNote &&
-          task.reminderHasTime &&
-          task.reminderMinutes != null &&
-          task.reminderMinutes != -1)
-        l.reminderValue(context.reminderLead(task.reminderMinutes!)),
     ];
     final repair = [
       if (repairTitle != null || repairNotes != null) ...[
@@ -524,7 +600,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     final belowNotes =
         repair.isNotEmpty ||
         showAssignment ||
-        plan != null ||
+        showReminder ||
         (!task.isNote &&
             (task.deadline != null ||
                 task.durationMinutes != null ||
@@ -654,17 +730,9 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               ),
             _questions('duration'),
           ],
-          // The plan read from the dictation; it opens the reminder sheet.
-          if (plan != null)
-            Consumer(
-              builder: (context, ref, _) => _row(
-                Icons.notifications_active_outlined,
-                reminderPlanText(context, ref, task),
-                key: ValueKey('draft-reminder-plan-${widget.draft.id}'),
-                onTap: () =>
-                    editTaskReminder(context, task, onChanged: _change),
-              ),
-            ),
+          // The reminder said while dictating; it opens the reminder sheet.
+          if (showReminder)
+            reminder(key: ValueKey('draft-reminder-${widget.draft.id}')),
           if (task.checklist.isNotEmpty)
             ChecklistEditor(
               key: _steps,
@@ -708,7 +776,16 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             leading: const Icon(Icons.tune_rounded, size: 22),
             title: Text(l.reviewOptions),
             // Only what differs from the defaults; nothing when all are.
-            subtitle: optionsSummary.isEmpty
+            subtitle: reminderInOptions
+                ? Consumer(
+                    builder: (context, ref, _) => Text(
+                      [
+                        ...optionsSummary,
+                        reminderLine(context, ref, task).text,
+                      ].join(' · '),
+                    ),
+                  )
+                : optionsSummary.isEmpty
                 ? null
                 : Text(optionsSummary.join(' · ')),
             trailing: Icon(
@@ -755,35 +832,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 task: task,
                 onChanged: widget.enabled ? _change : null,
               ),
-              ReminderControl(
-                hasDate: task.reminderDate != null,
-                hasTime: task.reminderHasTime,
-                minutes: task.reminderMinutes,
-                time: task.reminderTime,
-                plan: task.reminderPlan,
-                schedule: task,
-                onMinutes: (value) {
-                  if (widget.enabled) {
-                    _change(task.copyWith(reminderMinutes: value));
-                  }
-                },
-                onTime: (value) {
-                  if (widget.enabled) {
-                    _change(task.copyWith(reminderTime: value));
-                  }
-                },
-                onChanged: (minutes, time, plan) {
-                  if (widget.enabled) {
-                    _change(
-                      task.copyWith(
-                        reminderMinutes: minutes,
-                        reminderTime: time,
-                        reminderPlan: plan,
-                      ),
-                    );
-                  }
-                },
-              ),
+              if (!showReminder) reminder(),
             ],
             if (task.checklist.isEmpty)
               ChecklistEditor(
@@ -805,7 +854,16 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
           // question in view, so `Revisa los datos de arriba` always points
           // at something.
           _questions('title'),
-          if (!task.isNote) ...[_dateLine(main: false), _questions('schedule')],
+          if (!task.isNote) ...[
+            _dateLine(main: false),
+            // The date's open time question stays next to it.
+            _questions('schedule'),
+            if ((showReminder &&
+                    (task.reminderDate != null ||
+                        ReminderPlans.active(task) != null)) ||
+                reminderInOptions)
+              _reminderLine(),
+          ],
           ...repair,
           if (!widget.draft.assignmentReviewed || newProject != null)
             assignment(),

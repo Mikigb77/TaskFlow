@@ -7,17 +7,20 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_archive.dart';
 import 'package:agenda/models/task_draft.dart';
+import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_processor.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/command_runner.dart';
+import 'package:agenda/services/reminder_copy.dart';
 import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -739,58 +742,80 @@ void main() {
     });
 
     test(
-      'on the task: a strength «Cada vez más a menudo hasta el vie 13 · próximo: sáb 24»',
+      'on the task: «Recordatorios normales hasta el vie 13 · próximo: sáb 24, 9:00»',
       () {
         const normal = ReminderPlan.rhythm(ReminderPlan.normal);
-        String line(String code, ReminderPlan plan) => planLine(
+        String clock(DateTime time) =>
+            '${time.hour}:${time.minute.toString().padLeft(2, '0')}';
+        String line(
+          String code,
+          ReminderPlan plan, {
+          DateTime? anchor,
+          bool done = false,
+          bool bare = false,
+        }) => planLine(
           strings(code),
           plan,
-          anchor: friday13,
+          anchor: anchor ?? friday13,
           now: now,
           minute: 540,
           locale: code,
+          clock: clock,
+          done: done,
+          bare: bare,
         );
         expect(
           line('es', normal),
-          'Cada vez más a menudo hasta el vie\u00a013 · próximo: sáb\u00a024',
+          'Recordatorios normales hasta el vie\u00a013 · próximo: sáb\u00a024, 9:00',
         );
         expect(
           line('ca', normal),
-          'Cada cop més sovint fins al dv.\u00a013 · proper: ds.\u00a024',
+          'Recordatoris normals fins al dv.\u00a013 · proper: ds.\u00a024, 9:00',
         );
         expect(
           line('en', normal),
-          'More and more often until Fri\u00a013 · next: Sat\u00a024',
+          'Normal reminders until Fri\u00a013 · next: Sat\u00a024, 9:00',
         );
         expect(
-          planLine(
-            strings('es'),
-            ownersPlan,
-            anchor: DateTime(2026, 11, 12),
-            now: now,
-            minute: 540,
-            locale: 'es',
-          ),
-          'Cada 3 días, y a diario la última semana · próximo: mañana',
+          line('es', const ReminderPlan.rhythm(ReminderPlan.intense)),
+          startsWith('Recordatorios intensos hasta el vie\u00a013 · próximo: '),
+        );
+        expect(
+          line('es', const ReminderPlan.rhythm(ReminderPlan.gentle)),
+          startsWith('Recordatorios suaves hasta el vie\u00a013 · próximo: '),
+        );
+        expect(
+          line('es', ownersPlan, anchor: DateTime(2026, 11, 12)),
+          'Recordatorios: cada 3 días, y a diario la última semana · próximo: mañana, 9:00',
+        );
+        // After a person's name: the plan alone, lowercase.
+        expect(
+          line('es', ownersPlan, anchor: DateTime(2026, 11, 12), bare: true),
+          'cada 3 días, y a diario la última semana · próximo: mañana, 9:00',
+        );
+        expect(
+          line('es', normal, bare: true),
+          'cada vez más a menudo hasta el vie\u00a013 · próximo: sáb\u00a024, 9:00',
+        );
+        // A task that's done reads as its plan alone.
+        expect(
+          line('es', normal, done: true),
+          'Recordatorios normales hasta el vie\u00a013',
         );
         // Tomorrow and today read as words.
         expect(
-          planLine(
-            strings('es'),
-            normal,
-            anchor: DateTime(2026, 10, 23),
-            now: now,
-            minute: 540,
-            locale: 'es',
-          ),
-          'Cada vez más a menudo hasta mañana · próximo: mañana',
+          line('es', normal, anchor: DateTime(2026, 10, 23)),
+          'Recordatorios normales hasta mañana · próximo: mañana, 9:00',
         );
         // Far days carry their month.
-        expect(planDay(DateTime(2027, 1, 14), now, 'es'), 'jue,\u00a014\u00a0ene');
+        expect(
+          planDay(DateTime(2027, 1, 14), now, 'es'),
+          'jue,\u00a014\u00a0ene',
+        );
       },
     );
 
-    test('the preview’s count: «13 avisos · el próximo sáb 24, 9:00»', () {
+    test('the preview’s count: «13 avisos · próximo: sáb 24, 9:00»', () {
       String count(String code, {DateTime? at}) => planCount(
         strings(code),
         const ReminderPlan.rhythm(ReminderPlan.normal),
@@ -801,12 +826,12 @@ void main() {
         clock: (time) =>
             '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
       );
-      expect(count('es'), '13 avisos · el próximo sáb\u00a024, 9:00');
-      expect(count('ca'), '13 avisos · el proper ds.\u00a024, 9:00');
-      expect(count('en'), '13 reminders · next one Sat\u00a024, 9:00');
+      expect(count('es'), '13 avisos · próximo: sáb\u00a024, 9:00');
+      expect(count('ca'), '13 avisos · proper: ds.\u00a024, 9:00');
+      expect(count('en'), '13 reminders · next: Sat\u00a024, 9:00');
       expect(
         count('es', at: DateTime(2026, 11, 12, 10)),
-        '1 aviso · mañana, 9:00',
+        '1 aviso: mañana, 9:00',
       );
       expect(
         count('es', at: DateTime(2026, 11, 13, 10)),
@@ -815,46 +840,231 @@ void main() {
     });
 
     test(
-      'the notices: «faltan 12 días», «es mañana», «es hoy», then «era para ayer» or «venció ayer»',
-      () {
-        final es = strings('es');
-        expect(planNotice(es, 12, deadline: false), 'Faltan 12 días');
-        expect(planNotice(es, 1, deadline: false), 'Es mañana');
-        expect(planNotice(es, 0, deadline: false), 'Es hoy');
-        expect(planNotice(es, -1, deadline: false), 'Era para ayer');
-        expect(planNotice(es, -1, deadline: true), 'Venció ayer');
-        final ca = strings('ca');
-        expect(planNotice(ca, 12, deadline: false), 'Falten 12 dies');
-        expect(planNotice(ca, 1, deadline: false), 'És demà');
-        expect(planNotice(ca, 0, deadline: false), 'És avui');
-        expect(planNotice(ca, -1, deadline: false), 'Era per a ahir');
-        expect(planNotice(ca, -1, deadline: true), 'Va vèncer ahir');
-        final en = strings('en');
-        expect(planNotice(en, 12, deadline: false), '12 days left');
-        expect(planNotice(en, -1, deadline: true), 'It was due yesterday');
+      'the notices: «faltan 12 días · jue, 12 nov», «es mañana», «es hoy», then «era para ayer» or «venció ayer»',
+      () async {
+        Future<ReminderCopy> copy(String code) async => ReminderCopy(
+          strings(code),
+          await RegionalMaterialDelegate(
+            const RegionalPreferences(),
+            Locale(code),
+            system24Hour: true,
+          ).load(Locale(code)),
+          use24: true,
+        );
+        // Thursday 12 November, without a time.
+        final task = Task(
+          title: 'Presentar el proyecto',
+          priority: 1,
+          dueDate: DateTime(2026, 11, 12),
+          hasTime: false,
+        );
+        final deadline = task.copyWith(deadline: DateTime(2026, 11, 12));
+        final es = await copy('es');
+        expect(es.planBody(task, 12), 'Faltan 12 días · jue, 12 nov');
+        expect(es.planBody(task, 1), 'Es mañana');
+        expect(es.planBody(task, 0), 'Es hoy');
+        expect(es.planBody(task, -1), 'Era para ayer');
+        expect(es.planBody(deadline, -1), 'Venció ayer');
+        final ca = await copy('ca');
+        expect(ca.planBody(task, 12), 'Falten 12 dies · dj., 12 de nov.');
+        expect(ca.planBody(task, 1), 'És demà');
+        expect(ca.planBody(task, 0), 'És avui');
+        expect(ca.planBody(task, -1), 'Era per a ahir');
+        expect(ca.planBody(deadline, -1), 'Va vèncer ahir');
+        final en = await copy('en');
+        expect(en.planBody(task, 12), '12 days left · Thu, Nov 12');
+        expect(en.planBody(task, -1), 'It was planned for yesterday');
+        expect(en.planBody(deadline, -1), 'It was due yesterday');
       },
     );
 
-    test('the offer: «Faltan 3 semanas: ¿te lo recuerdo hasta entonces?»', () {
+    group('UX-2005, UX-2012: a plan notice says the day and its time', () {
+      /// The copy a notification is written in, with a 24-hour or a 12-hour
+      /// clock, as `readReminderCopy` builds it.
+      Future<ReminderCopy> copy(String code, {bool use24 = true}) async =>
+          ReminderCopy(
+            strings(code),
+            await RegionalMaterialDelegate(
+              RegionalPreferences(
+                clock: use24 ? ClockFormat.twentyFour : ClockFormat.twelve,
+              ),
+              Locale(code),
+            ).load(Locale(code)),
+            use24: use24,
+          );
+
+      // «Presentar el proyecto» on Thursday 12 November 2026.
+      Task day({int? hour}) => Task(
+        title: 'Presentar el proyecto',
+        priority: 1,
+        dueDate: DateTime(2026, 11, 12, hour ?? 0),
+        hasTime: hour != null,
+      );
+      Task due({int? hour}) => Task(
+        title: 'Presentar el proyecto',
+        priority: 1,
+        deadline: DateTime(2026, 11, 12, hour ?? 0),
+        deadlineHasTime: hour != null,
+        reminderAnchor: 'deadline',
+      );
+
+      test(
+        'UX-2005: a day without a time, 12 days before, gives the date in es, en and ca',
+        () async {
+          expect(
+            (await copy('es')).planBody(day(), 12),
+            'Faltan 12 días · jue, 12 nov',
+          );
+          expect(
+            (await copy('en')).planBody(day(), 12),
+            '12 days left · Thu, Nov 12',
+          );
+          expect(
+            (await copy('ca')).planBody(day(), 12),
+            'Falten 12 dies · dj., 12 de nov.',
+          );
+        },
+      );
+
+      test(
+        'UX-2005: a day at 17:00, 12 days before, adds the time; 12-hour English “5:00 PM”',
+        () async {
+          expect(
+            (await copy('es')).planBody(day(hour: 17), 12),
+            'Faltan 12 días · jue, 12 nov, 17:00',
+          );
+          expect(
+            (await copy('en', use24: false)).planBody(day(hour: 17), 12),
+            '12 days left · Thu, Nov 12, 5:00 PM',
+          );
+        },
+      );
+
+      test(
+        'UX-2005: a day at 17:00 reads «Es mañana a las 17:00» and «Es hoy a las 17:00»',
+        () async {
+          final es = await copy('es');
+          expect(es.planBody(day(hour: 17), 1), 'Es mañana a las 17:00');
+          expect(es.planBody(day(hour: 17), 0), 'Es hoy a las 17:00');
+          expect(
+            (await copy('ca')).planBody(day(hour: 17), 1),
+            'És demà a les 17:00',
+          );
+          expect(
+            (await copy('en', use24: false)).planBody(day(hour: 17), 1),
+            'It’s tomorrow at 5:00 PM',
+          );
+        },
+      );
+
+      test(
+        'UX-2005: at 13:00 on a 12-hour clock Spanish says «a la 1:00»',
+        () async {
+          final es = await copy('es', use24: false);
+          expect(
+            es.planBody(day(hour: 13), 1),
+            startsWith('Es mañana a la 1:00'),
+          );
+          expect(es.planBody(day(hour: 13), 0), startsWith('Es hoy a la 1:00'));
+          expect(es.planBody(day(hour: 13), 0), isNot(contains('a las')));
+        },
+      );
+
+      test(
+        'UX-2005, UX-2012: without a time, «Es mañana» and «Es hoy»; the day after, «Era para ayer» and “It was planned for yesterday”',
+        () async {
+          final es = await copy('es');
+          expect(es.planBody(day(), 1), 'Es mañana');
+          expect(es.planBody(day(), 0), 'Es hoy');
+          expect(es.planBody(day(), -1), 'Era para ayer');
+          expect(es.planBody(day(hour: 17), -1), 'Era para ayer');
+          expect(
+            (await copy('en')).planBody(day(), -1),
+            'It was planned for yesterday',
+          );
+          expect(
+            strings('en').reminderPlanNoticeWas,
+            'It was planned for yesterday',
+          );
+          // Spanish and Catalan keep the owner's words.
+          expect(strings('es').reminderPlanNoticeWas, 'Era para ayer');
+          expect(strings('ca').reminderPlanNoticeWas, 'Era per a ahir');
+        },
+      );
+
+      test(
+        'UX-2005: a deadline 12 days ahead reads «Fecha límite: jue, 12 nov · faltan 12 días» in es, en and ca',
+        () async {
+          expect(
+            (await copy('es')).planBody(due(), 12),
+            'Fecha límite: jue, 12 nov · faltan 12 días',
+          );
+          expect(
+            (await copy('en')).planBody(due(), 12),
+            'Deadline: Thu, Nov 12 · 12 days left',
+          );
+          expect(
+            (await copy('ca')).planBody(due(), 12),
+            'Termini: dj., 12 de nov. · falten 12 dies',
+          );
+          expect(
+            (await copy('es')).planBody(due(hour: 17), 12),
+            'Fecha límite: jue, 12 nov, 17:00 · faltan 12 días',
+          );
+        },
+      );
+
+      test(
+        'UX-2005: a deadline tomorrow and today: «Fecha límite: mañana», «Fecha límite: hoy», «… mañana a las 17:00»; the day after, «Venció ayer»',
+        () async {
+          final es = await copy('es');
+          expect(es.planBody(due(), 1), 'Fecha límite: mañana');
+          expect((await copy('en')).planBody(due(), 1), 'Deadline: tomorrow');
+          expect((await copy('ca')).planBody(due(), 1), 'Termini: demà');
+          expect(es.planBody(due(), 0), 'Fecha límite: hoy');
+          expect(
+            es.planBody(due(hour: 17), 1),
+            'Fecha límite: mañana a las 17:00',
+          );
+          expect(es.planBody(due(), -1), 'Venció ayer');
+          expect(es.planBody(due(hour: 17), -1), 'Venció ayer');
+        },
+      );
+    });
+
+    test('the offer: «Faltan 3 semanas. ¿Te aviso cada 3 días, …?»', () {
+      const es = 'cada 3 días, y a diario la última semana';
       expect(
-        planOffer(strings('es'), 21),
-        'Faltan 3 semanas: ¿te lo recuerdo hasta entonces?',
+        planOffer(strings('es'), 21, es),
+        'Faltan 3 semanas. ¿Te aviso cada 3 días, y a diario la última '
+        'semana?',
       );
       expect(
-        planOffer(strings('es'), 14),
-        'Faltan 2 semanas: ¿te lo recuerdo hasta entonces?',
+        planOffer(strings('es'), 14, es),
+        'Faltan 2 semanas. ¿Te aviso cada 3 días, y a diario la última '
+        'semana?',
       );
       expect(
-        planOffer(strings('es'), 90),
-        'Faltan 3 meses: ¿te lo recuerdo hasta entonces?',
+        planOffer(strings('es'), 90, es),
+        'Faltan 3 meses. ¿Te aviso cada 3 días, y a diario la última semana?',
       );
       expect(
-        planOffer(strings('ca'), 21),
-        'Falten 3 setmanes: t’ho recordo fins aleshores?',
+        planOffer(
+          strings('ca'),
+          21,
+          'cada 3 dies, i cada dia l’última setmana',
+        ),
+        'Falten 3 setmanes. T’aviso cada 3 dies, i cada dia l’última '
+        'setmana?',
       );
       expect(
-        planOffer(strings('en'), 21),
-        '3 weeks to go: shall I remind you until then?',
+        planOffer(
+          strings('en'),
+          21,
+          'every 3 days, and daily for the last week',
+        ),
+        '3 weeks to go. Shall I remind you every 3 days, and daily for the '
+        'last week?',
       );
     });
   });

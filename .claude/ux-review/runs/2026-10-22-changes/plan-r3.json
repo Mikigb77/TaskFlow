@@ -1,0 +1,71 @@
+{
+ "runId": "2026-10-22-changes",
+ "mode": "changes",
+ "round": 3,
+ "packages": [
+  {
+   "id": "P250",
+   "title": "The capture card: a reminder changed inside «Más opciones» still shows once they're closed, and on the collapsed row",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-2018"
+   ],
+   "files": [
+    "App/lib/widgets/capture_review_editor.dart"
+   ],
+   "brief": [
+    "UX-2018 (S1), regression R2A-1 of round 2, from P248. What the last attempts did: P242 (UX-1805) took the reminder out of «Más opciones»' subtitle (`optionsSummary`, now App/lib/widgets/capture_review_editor.dart:568-572; HEAD had `l.reminderValue(context.reminderLead(...))` there for a said lead), because then any change moved the control above «Más opciones», where it showed itself. P248 (UX-2016, verified) stopped that move: `_reminderOpen` (:66-69) is now `late final`, true only when the task arrives with a reminder. Why it's a regression: on a plain draft, a reminder changed inside «Más opciones» now stays there, but once «Más opciones» is closed nothing on the card shows it, and a collapsed row of a several-task card shows its reminder line (:843-846) only when `showReminder`. \"I set it to 18:00… is it still on?\"",
+    "Fix, in App/lib/widgets/capture_review_editor.dart only. In build(), next to `showReminder` (:536), add one flag, for example `reminderInOptions`: `!showReminder && !task.isNote && (task.reminderPlan != null || task.reminderMinutes != null || task.reminderTime != null) && (task.reminderDate != null || ReminderPlans.active(task) != null)`. A plain draft has none of the three fields set, so the flag is only true after a change made inside «Más opciones» (or a change back to «predeterminado» clears all three and the flag goes false again, as the default isn't shown anywhere today).",
+    "1) «Más opciones»' subtitle (:770-772). When `reminderInOptions`, append the task's reminder line text, exactly the words the collapsed row already shows: `reminderLine(context, ref, task).text` (App/lib/widgets/reminder_control.dart:449; ES «Recordatorio: 18:00», «Recordatorio: Desactivado», «Recordatorio: 1 hora antes», a plan's own line «Recordatorios normales hasta el vie 13 · próximo: sáb 24, 9:00»; it also says why it won't ring here, as the line does). This state is a plain `State`, so build the subtitle inside a `Consumer` to get `ref`, as `_reminderLine()` (:409) does: `[...optionsSummary, reminderLine(context, ref, task).text].join(' · ')`. Keep it last, after priority and repeat. The subtitle stays null when there's nothing to show. No new copy and no ARB change: every word comes from existing strings (`reminderValue` and the plan line).",
+    "2) The collapsed row (:843-846): show `_reminderLine()` when `(showReminder && (task.reminderDate != null || ReminderPlans.active(task) != null)) || reminderInOptions`. Nothing else in the collapsed row changes. There's no duplicate: a collapsed row has no «Más opciones».",
+    "Settled between the reports: UX-1805's «nothing in the subtitle» was about a reminder said while dictating, which has its own row above «Más opciones»; that stays true (`showReminder` keeps the flag false). This only covers a reminder changed inside «Más opciones», which has no row. Same rule as priority and repeat: only what differs from the defaults shows in the subtitle.",
+    "Don't touch: `_reminderOpen` and its comment, `showReminder`, the `reminder()` builder and its callbacks (:537-567), where the control sits, ReminderControl, reminder_control.dart, the reminder sheet, any ARB or copy. The tests in App/test/reminder_plan_sheet_test.dart (UX-1805's group about :770-1030, UX-2016's at about :1216-1284, which scope their finders to the control) and App/test/voice_command_cards_test.dart:1019 (a plain dictation looks and saves as before) keep passing; if one breaks because the subtitle now repeats a value it finds globally, scope that finder to the control and say so in your notes. No render needed: no preview shows a reminder changed inside «Más opciones», and capture/result.one-task, result.several and reminders/capture-card.* don't change (check that INDEX.md descriptions stay true if you re-render capture/)."
+   ],
+   "acceptance": [
+    "Capture result card, Spanish, 1×, 360×800, clock Thu 22 Oct 2026 10:00, reminders on and allowed, a plain one-task draft dated Fri 13 Nov with no time (nothing said about reminders): before any change, «Más opciones»' subtitle has no «Recordatorio» (null, or priority/repeat only). Open «Más opciones» → its «Recordatorio» → «Elegir hora del aviso» → 18:00 → close «Más opciones»: the `draft-options-<id>` row's subtitle reads «Recordatorio: 18:00» (es.reminderValue('18:00'), with the app's clock format), and the ReminderControl is still below «Más opciones» (no `draft-reminder-<id>` row).",
+    "Same plain draft, 1×, Spanish: inside «Más opciones» → «Recordatorio» → «Desactivado» → close «Más opciones»: the subtitle reads es.reminderValue(es.off) («Recordatorio: Desactivado»).",
+    "Same plain draft with priority set to high inside «Más opciones», then 18:00 chosen: the subtitle reads es.priorityValue(...) · es.reminderValue('18:00'), in that order, joined by « · ».",
+    "Unchanged: a draft with `reminder_minutes: 60` said (and a draft with `ownersPlan`) shows its «Recordatorio» row above «Más opciones» and nothing about the reminder in «Más opciones»' subtitle (UX-1805), also after a change made through that row. A plain single-task dictation still looks and saves as before (voice_command_cards_test.dart:1019): no subtitle on «Más opciones», no reminder row.",
+    "Several-task card, Spanish, 1×, reminders on and allowed, two plain drafts with days and no reminder said: expand the second draft, «Más opciones» → «Recordatorio» → «Elegir hora del aviso» → 18:00, then collapse it: its collapsed row shows `draft-reminder-line-<id>` reading «Recordatorio: 18:00». The first draft's collapsed row, unchanged, shows no reminder line.",
+    "At 2× text on 360×800, Spanish, after 18:00 chosen inside «Más opciones» and «Más opciones» closed: the subtitle «Recordatorio: 18:00» is fully visible (not clipped, no overflow exception)."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P251",
+   "title": "The «A tu manera» example keeps «a las 8» together on one line",
+   "area": "D",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-2019"
+   ],
+   "files": [
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/reminder_plan_sheet_test.dart"
+   ],
+   "brief": [
+    "UX-2019 (S1), regression R2D-1 of round 2, from P249. What the last attempt did: P249 (UX-2017, verified) made the Pro screen's example `billingReasonReminderPlansExample` the same words as «A tu manera»'s helper `reminderPlanYourWayHint`. Why it's a regression: in the renders reminders/sheet.pro-screen.es.light.1x.png and es.light.2x.png the Spanish line breaks «…a las» / «8»», leaving the time alone on its own line, the one word that makes the example concrete.",
+    "Fix: replace the plain space between the preposition and «8» with a literal no-break space (U+00A0) in both keys, in all three catalogs. The catalogs already hold literal U+00A0 characters (for example `storageFull` in app_es.arb:1221), so write the character itself, not an escape. Below, [U+00A0] stands for that one character (it is not text to type). The words don't change. App/lib/l10n/app_es.arb:1366 `reminderPlanYourWayHint` and :1409 `billingReasonReminderPlansExample`: «a las 8» → «a las[U+00A0]8». App/lib/l10n/app_ca.arb:1070 and :1113: «a les 8» → «a les[U+00A0]8». App/lib/l10n/app_en.arb:3430 and :3781: “at 8” → “at[U+00A0]8”. Only that one space in each value; leave every other space alone. In app_en.arb, add one sentence to both descriptions (@reminderPlanYourWayHint :3432, @billingReasonReminderPlansExample :3783): “Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line.” Run flutter gen-l10n.",
+    "Tests: App/test/reminder_plan_sheet_test.dart:3476-3478 (UX-1908's helper check) compares the helper with literals that hold a plain space; this change rightly breaks it. Change only those three literals to hold `\\u00A0` at the same place (`'…a las\\u00A08».'`, `'…at\\u00A08”.'`, `'…a les\\u00A08».'`), and say so in your notes. P249's tests (about :1840-1960) compare the example with the helper through AppLocalizations and should pass unchanged. The literal «cada 3 días y la última semana a diario» at about :317-322 is a different test's typed words; leave it.",
+    "Renders: from App/, flutter test --no-pub --dart-define=WRITE_UX_PREVIEWS=true test/ux_previews/ux_previews_test.dart --plain-name reminders/ and look at reminders/sheet.pro-screen in es 1×, es 2×, ca 2× and en 1×, and at reminders/sheet.your-way (the helper) in es 1× and 2×: «a las 8»» / «a les 8»» / “at 8”” never split across lines. The preview descriptions in App/test/ux_previews/reminders_previews.dart don't need to change (they quote the words, which are the same); don't edit that file.",
+    "Don't touch: subscription_screen.dart, reminder_plan_sheet.dart, the heading `billingReasonReminderPlans`, any other key, the wording of these two values, RevenueCat's paywall (D7). Backend/docs/REMINDER_PLANS.md quotes «A tu manera»'s helper (a note for the main session from round 1); the visible words are the same, so no new contract note."
+   ],
+   "acceptance": [
+    "In Spanish, English and Catalan, reminderPlanYourWayHint and billingReasonReminderPlansExample each contain the hour joined by U+00A0 ([U+00A0] marks that character): ES «las[U+00A0]8», EN “at[U+00A0]8”, CA «les[U+00A0]8»; neither contains «las 8» / “at 8” / «les 8» with a plain space; and billingReasonReminderPlansExample is still exactly the quoted part of reminderPlanYourWayHint.",
+    "Pro screen opened from «A tu manera · Pro», free account, Spanish, 360×800, at 1× and at 2×: the example Text's last line holds «a las 8»» together (the «8» is never alone on a line; the line holding «8» also holds «las»).",
+    "Same at 2× in Catalan: «a les 8»» stays together on one line, and the heading, the example and the pinned «Mostra la subscripció» are all on screen, unclipped (UX-2017's check still passes).",
+    "«A tu manera» with an empty field, Pro account, Spanish, 360×800 at 2×: the helper «Por ejemplo: «una semana antes y el día antes a las 8».» never puts «8».» alone on a line."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

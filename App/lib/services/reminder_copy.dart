@@ -5,10 +5,10 @@ import 'package:agenda/l10n/app_languages.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/generated/app_localizations_en.dart';
 import 'package:agenda/l10n/region.dart';
-import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/services/app_language.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/task_database.dart';
 
 /// The phone's languages: the bridge's answer; else, with «Como el teléfono»,
@@ -108,12 +108,7 @@ class ReminderCopy {
           : strings.notificationToday;
     }
     final due = task.reminderDate!;
-    final time = TimeOfDay.fromDateTime(due);
-    final format = _formats.timeOfDayFormat(alwaysUse24HourFormat: use24);
-    final clock = _formats.formatTimeOfDay(time, alwaysUse24HourFormat: use24);
-    // Spanish and Catalan say `a la 1:00` but `a las 17:00`.
-    final hour =
-        hourFormat(of: format) == HourFormat.h ? time.hourOfPeriod : time.hour;
+    final (:clock, :hour) = _clock(due);
     final whenDay = Task.day(when);
     final dueDay = Task.day(due);
     final day = dueDay == whenDay
@@ -138,9 +133,62 @@ class ReminderCopy {
         : strings.notificationInMinutes(at, lead);
   }
 
-  /// A plan's notification text, [daysBefore] its task's day: «Faltan 12
-  /// días», «Es mañana», «Es hoy»; the day after (-1), «Era para ayer», or
-  /// «Venció ayer» for a task with a [deadline].
-  String planBody(int daysBefore, {required bool deadline}) =>
-      planNotice(strings, daysBefore, deadline: deadline);
+  /// [value]'s time as the app's clock writes it, and the hour as shown:
+  /// Spanish and Catalan say `a la 1:00` but `a las 17:00`.
+  ({String clock, int hour}) _clock(DateTime value) {
+    final time = TimeOfDay.fromDateTime(value);
+    final format = _formats.timeOfDayFormat(alwaysUse24HourFormat: use24);
+    return (
+      clock: _formats.formatTimeOfDay(time, alwaysUse24HourFormat: use24),
+      hour: hourFormat(of: format) == HourFormat.h
+          ? time.hourOfPeriod
+          : time.hour,
+    );
+  }
+
+  /// A plan's notification text for [task], [daysBefore] its plan's anchor
+  /// (the deadline, else the task's day), with that day and its time if it
+  /// has one, as the single reminder writes them: «Faltan 12 días · jue, 12
+  /// nov», «Es mañana a las 17:00», «Fecha límite: jue, 12 nov · faltan 12
+  /// días», «Fecha límite: hoy». The day after (-1), «Era para ayer», or
+  /// «Venció ayer» for a task with a deadline.
+  String planBody(Task task, int daysBefore) {
+    final deadline = task.deadline != null;
+    if (daysBefore < 0) {
+      return deadline
+          ? strings.reminderPlanNoticeDue
+          : strings.reminderPlanNoticeWas;
+    }
+    final anchor = ReminderPlans.anchor(task)!;
+    final timed = deadline ? task.deadlineHasTime : task.hasTime;
+    final medium = _formats.formatMediumDate(anchor);
+    if (!timed) {
+      return switch ((deadline, daysBefore)) {
+        (true, 0) => strings.notificationDeadlineToday,
+        (true, 1) => strings.reminderPlanNoticeDeadlineTomorrow,
+        (true, _) => strings.reminderPlanNoticeDeadlineDays(daysBefore, medium),
+        (false, 0) => strings.reminderPlanNoticeToday,
+        (false, 1) => strings.reminderPlanNoticeTomorrow,
+        (false, _) => strings.reminderPlanNoticeDays(daysBefore, medium),
+      };
+    }
+    final (:clock, :hour) = _clock(anchor);
+    if (daysBefore >= 2) {
+      final date = '$medium, $clock';
+      return deadline
+          ? strings.reminderPlanNoticeDeadlineDays(daysBefore, date)
+          : strings.reminderPlanNoticeDays(daysBefore, date);
+    }
+    if (deadline) {
+      return strings.notificationDeadlineAt(
+        daysBefore == 0 ? 'today' : 'tomorrow',
+        medium,
+        clock,
+        hour,
+      );
+    }
+    return daysBefore == 0
+        ? strings.reminderPlanNoticeTodayAt(hour, clock)
+        : strings.reminderPlanNoticeTomorrowAt(hour, clock);
+  }
 }

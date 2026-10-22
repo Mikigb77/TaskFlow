@@ -572,7 +572,7 @@
       }
     }
   },
-"overdueCount": "{count, plural, other{Overdue · {count}}}",
+  "overdueCount": "{count, plural, other{Overdue · {count}}}",
   "@overdueCount": {
     "description": "Header above unfinished tasks from earlier days, shown first on Today.",
     "placeholders": {
@@ -1296,6 +1296,15 @@
   "allowPreciseAlarms": "Allow “Alarms & reminders”",
   "timedTasks": "Timed tasks",
   "dateOnlyTasks": "Date-only tasks",
+  "dateOnlyOffPlans": "Off · “Until the deadline”: {time}",
+  "@dateOnlyOffPlans": {
+    "description": "Settings › Reminders, under “Date-only tasks” when it is off and some open task has an “Until the deadline” plan without its own time: those plans still ring at {time}. {time} is the default hour in the app’s clock format (9:00 AM). Follows the sheet’s name for the plan (reminderPlanUntilDay).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "dailyCheckIns": "Daily check-ins",
   "dailyCheckInsHelp": "A gentle prompt to review your current tasks.",
   "morningCheckIn": "Morning",
@@ -3418,9 +3427,9 @@
   "@reminderPlanYourWay": {
     "description": "In the reminder sheet, a Pro choice: the person types or says the rhythm they want, and the assistant reads it."
   },
-  "reminderPlanYourWayHint": "Type it or say it the way you’d tell someone.",
+  "reminderPlanYourWayHint": "For example: “a week before, and the day before at 8”.",
   "@reminderPlanYourWayHint": {
-    "description": "Under the field of reminderPlanYourWay: what to put in it."
+    "description": "Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line."
   },
   "proBadge": "Pro",
   "@proBadge": {
@@ -3438,9 +3447,9 @@
   "@reminderPlanReading": {
     "description": "While the assistant reads the words typed or said in reminderPlanYourWay."
   },
-  "reminderPlanUnclear": "I didn’t get that. Say it another way, for example: “every 3 days, and daily the last week”.",
+  "reminderPlanUnclear": "I didn’t get that. Try saying it another way.",
   "@reminderPlanUnclear": {
-    "description": "The assistant found no reminders in the words of reminderPlanYourWay: ask for them again, with an example."
+    "description": "The assistant found no reminders in the words of reminderPlanYourWay: ask for them again. The field's helper, reminderPlanYourWayHint, gives the example; saying it again starts from an empty field."
   },
   "reminderPlanOffline": "This needs a connection. “Until the deadline” works without one.",
   "@reminderPlanOffline": {
@@ -3458,7 +3467,7 @@
   "@reminderPlanCantListen": {
     "description": "reminderPlanSpeak tapped, and the phone can't recognise speech on its own."
   },
-  "reminderPlanCount": "{count, plural, =1{1 reminder · {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}} other{{count} reminders · next one {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}}}",
+  "reminderPlanCount": "{count, plural, =1{1 reminder: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}} other{{count} reminders · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}}}",
   "@reminderPlanCount": {
     "description": "The plan's preview in the reminder sheet: how many reminders are still to come, and the next one. {when} is today, tomorrow or other; {date} is the day (sat 25); {time} the clock time.",
     "placeholders": {
@@ -3622,11 +3631,29 @@
       }
     }
   },
-  "reminderPlanLine": "{plan} · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}",
+  "reminderPlanLine": "{plan} · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}",
   "@reminderPlanLine": {
-    "description": "On a task with a plan: the plan in words, then its next reminder. {when} is today, tomorrow or other; {date} the day (sat 25).",
+    "description": "On a task with a plan: the plan in words (reminderPlanStrengthLine or reminderPlanOwnLine), then its next reminder, on or before the task's day. {when} is today, tomorrow or other; {date} the day (sat 24); {time} the clock time, as the app writes it.",
     "placeholders": {
       "plan": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanStrengthLine": "{strength, select, gentle{Gentle} normal{Normal} other{Intense}} reminders {when, select, today{until today} tomorrow{until tomorrow} other{until {date}}}",
+  "@reminderPlanStrengthLine": {
+    "description": "On a task whose plan is one of the three strengths (reminderPlanGentle, reminderPlanNormal, reminderPlanIntense): the plan in words, naming its strength. {strength} is gentle, normal or other (intense); {when} is today, tomorrow or other; {date} is the day the plan counts back from (thu 12).",
+    "placeholders": {
+      "strength": {
         "type": "String"
       },
       "when": {
@@ -3637,24 +3664,76 @@
       }
     }
   },
-  "reminderPlanNoticeDays": "{days, plural, =1{1 day left} other{{days} days left}}",
-  "@reminderPlanNoticeDays": {
-    "description": "A plan's notification text, under the task's title: how many days are left until its day (2 or more).",
+  "reminderPlanOwnLine": "Reminders: {rhythm}",
+  "@reminderPlanOwnLine": {
+    "description": "On a task with a plan of one's own: the plan in words. {rhythm} is its rhythm, lowercase (every 3 days, and daily for the last week).",
     "placeholders": {
-      "days": {
-        "type": "int"
+      "rhythm": {
+        "type": "String"
       }
     }
   },
+  "reminderPlanNoticeDays": "{days, plural, =1{1 day left · {date}} other{{days} days left · {date}}}",
+  "@reminderPlanNoticeDays": {
+    "description": "A plan's notification text, under the task's title: how many days are left until its day (2 or more), then the day. {date} is the weekday date as notifications write it (Thu, Nov 12), followed by the time when the task has one (Thu, Nov 12, 5:00 PM).",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeDeadlineDays": "{days, plural, =1{Deadline: {date} · 1 day left} other{Deadline: {date} · {days} days left}}",
+  "@reminderPlanNoticeDeadlineDays": {
+    "description": "A plan's notification text for a task with a deadline, under the task's title: the deadline, then how many days are left (2 or more). {date} is the weekday date as notifications write it (Thu, Nov 12), followed by the time when the deadline has one (Thu, Nov 12, 5:00 PM).",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeTomorrowAt": "{hour, plural, other{It’s tomorrow at {time}}}",
+  "@reminderPlanNoticeTomorrowAt": {
+    "description": "A plan's notification text, the day before a task with a time. {time} is the task's time as the app's clock writes it; {hour} is the hour as shown, for the article (Spanish and Catalan say a la 1:00).",
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeTodayAt": "{hour, plural, other{It’s today at {time}}}",
+  "@reminderPlanNoticeTodayAt": {
+    "description": "A plan's notification text, on the day of a task with a time. Placeholders as in reminderPlanNoticeTomorrowAt.",
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeDeadlineTomorrow": "Deadline: tomorrow",
+  "@reminderPlanNoticeDeadlineTomorrow": {
+    "description": "A plan's notification text, the day before a deadline that has no time."
+  },
   "reminderPlanNoticeTomorrow": "It’s tomorrow",
   "@reminderPlanNoticeTomorrow": {
-    "description": "A plan's notification text, the day before the task's day."
+    "description": "A plan's notification text, the day before a task's day that has no time."
   },
   "reminderPlanNoticeToday": "It’s today",
   "@reminderPlanNoticeToday": {
-    "description": "A plan's notification text, on the task's day."
+    "description": "A plan's notification text, on a task's day that has no time."
   },
-  "reminderPlanNoticeWas": "It was for yesterday",
+  "reminderPlanNoticeWas": "It was planned for yesterday",
   "@reminderPlanNoticeWas": {
     "description": "A plan's one last notification, the day after, for a task with only a day that isn't done."
   },
@@ -3662,27 +3741,29 @@
   "@reminderPlanNoticeDue": {
     "description": "A plan's one last notification, the day after, for a task with a deadline that isn't done."
   },
-  "reminderPlanOfferWeeks": "{weeks, plural, =1{1 week to go: shall I remind you until then?} other{{weeks} weeks to go: shall I remind you until then?}}",
+  "reminderPlanOfferWeeks": "{weeks, plural, =1{1 week to go. Shall I remind you {rhythm}?} other{{weeks} weeks to go. Shall I remind you {rhythm}?}}",
   "@reminderPlanOfferWeeks": {
-    "description": "Asked once after saving a task whose day is 2 weeks or more away: shall the app remind the person more and more often until then. Sí sets Normal.",
+    "description": "Asked once after saving a task whose day is 2 weeks or more away, under the task's title and day: shall the app remind the person with the Normal plan. {rhythm} is Normal's rhythm in lowercase words, as reminderPlanEveryDays and reminderPlanPhase write it (every 3 days, and daily for the last week). Yes, remind me (reminderAskYes) sets Normal.",
     "placeholders": {
       "weeks": {
         "type": "int"
+      },
+      "rhythm": {
+        "type": "String"
       }
     }
   },
-  "reminderPlanOfferMonths": "{months, plural, =1{1 month to go: shall I remind you until then?} other{{months} months to go: shall I remind you until then?}}",
+  "reminderPlanOfferMonths": "{months, plural, =1{1 month to go. Shall I remind you {rhythm}?} other{{months} months to go. Shall I remind you {rhythm}?}}",
   "@reminderPlanOfferMonths": {
-    "description": "reminderPlanOfferWeeks for a day 2 months or more away.",
+    "description": "reminderPlanOfferWeeks for a day 2 months or more away. {rhythm} is Normal's rhythm in lowercase words.",
     "placeholders": {
       "months": {
         "type": "int"
+      },
+      "rhythm": {
+        "type": "String"
       }
     }
-  },
-  "reminderPlanOfferYes": "Yes",
-  "@reminderPlanOfferYes": {
-    "description": "The offer's yes: set the Normal plan on the task just saved."
   },
   "reminderPlanOfferDone": "Done. I’ll remind you until {date}.",
   "@reminderPlanOfferDone": {
@@ -3693,8 +3774,12 @@
       }
     }
   },
-  "billingReasonReminderPlans": "With Pro, your reminders your way",
+  "billingReasonReminderPlans": "With Pro, ask for reminders in your own words:",
   "@billingReasonReminderPlans": {
-    "description": "On the Pro screen, opened from «Your way» in the reminder sheet: what Pro adds there."
+    "description": "On the Pro screen, opened from “Your way” in the reminder sheet: what Pro adds there. A heading, followed by billingReasonReminderPlansExample."
+  },
+  "billingReasonReminderPlansExample": "“a week before, and the day before at 8”",
+  "@billingReasonReminderPlansExample": {
+    "description": "On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line."
   }
 }

@@ -9,12 +9,17 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/shell_tab_provider.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/reminder_preferences.dart';
+import 'package:agenda/services/task_database.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
+import 'package:agenda/widgets/task_schedule_label.dart';
 
 /// Accounts asked, in this run of the app, whether to turn reminders on.
 final _askingProvider = Provider<Set<String>>((ref) => {});
@@ -37,11 +42,13 @@ final _offeredProvider = Provider<Set<String>>((ref) => {});
 ///
 /// With reminders on, the question offers a plan instead, once per task: for
 /// a saved task (with its id) whose deadline, else day, is two weeks or more
-/// away and has none (Backend/docs/REMINDER_PLANS.md, «The offer»).
+/// away and has none (Backend/docs/REMINDER_PLANS.md, «The offer»). Only
+/// when [offerPlan]: an edit save passes false unless it moved that day.
 void askAboutRemindersAfterSave(
   BuildContext context,
   Iterable<Task> saved, {
   Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>? feedback,
+  bool offerPlan = true,
 }) {
   final dated = saved
       .where(
@@ -77,6 +84,7 @@ void askAboutRemindersAfterSave(
       feedback,
       owner,
       dated,
+      offerPlan,
     ),
   );
 }
@@ -90,6 +98,7 @@ Future<void> _ask(
   Future<ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?>? feedback,
   String owner,
   List<Task> dated,
+  bool offerPlan,
 ) async {
   final store = container.read(reminderPreferenceStoreProvider);
   try {
@@ -118,7 +127,17 @@ Future<void> _ask(
     // With reminders on, the question offers a plan instead; never with
     // them off.
     if (settings.enabled) {
-      await _offer(container, navigator, store, owner, dated, now);
+      if (offerPlan) {
+        await _offer(
+          container,
+          navigator,
+          store,
+          owner,
+          dated,
+          now,
+          settings.dateOnlyTime,
+        );
+      }
       return;
     }
     if (settings.asked || container.read(_askingProvider).contains(owner)) {
@@ -170,9 +189,12 @@ Future<void> _ask(
 }
 
 /// The offer: a saved task whose day is two weeks or more away, with no
-/// plan, gets one question, «Faltan 3 semanas: ¿te lo recuerdo hasta
-/// entonces?». «Sí» sets Normal. At most once per task, whatever the answer;
-/// never for a task that's someone else's, nor when this phone can't ring.
+/// plan and its reminder still the default, gets one question under its
+/// title and day: «Faltan 3 semanas. ¿Te aviso cada 3 días, y a diario la
+/// última semana?». «Sí, recuérdamelo» sets Normal, with Deshacer. At most
+/// once per task, whatever the answer; only for a task that rings on this
+/// phone alone (personal, or assigned to this account, in a project not
+/// muted or archived here), and never when this phone can't ring.
 Future<void> _offer(
   ProviderContainer container,
   NavigatorState navigator,
@@ -180,6 +202,7 @@ Future<void> _offer(
   String owner,
   List<Task> dated,
   DateTime now,
+  int? dateOnlyTime,
 ) async {
   final me = container.read(authProvider).account?.id;
   final offered = container.read(_offeredProvider);
@@ -189,11 +212,40 @@ Future<void> _offer(
   } catch (_) {
     before = {};
   }
+  List<TaskListInfo> projects;
+  try {
+    projects = await container.read(taskListsProvider.future);
+  } catch (_) {
+    projects = const [];
+  }
+  // A plan on a «Todos» task rings every member's phone; one in a project
+  // muted or archived here never rings on this one (UX-1601's rule).
+  bool ringsHereAlone(Task task) {
+    if (task.assignment != 'personal' &&
+        !(task.assignment == 'member' && me != null && task.assigneeId == me)) {
+      return false;
+    }
+    if (task.listId == null) return true;
+    final project = projects
+        .where((project) => project.id == task.listId)
+        .firstOrNull;
+    // A project this phone doesn't know yet: not asked.
+    if (project == null) return false;
+    return TaskDatabase.reminderBlock(
+          task,
+          me,
+          archived: project.inactive,
+          muted: project.notifications == 'muted',
+          role: project.role,
+        ) ==
+        null;
+  }
+
   final task = dated
       .where(
         (task) =>
             task.id != null &&
-            task.isForAccount(me) &&
+            ringsHereAlone(task) &&
             ReminderPlans.offerable(task, now) &&
             !before.contains(task.id) &&
             !offered.contains('$owner/${task.id}'),
@@ -214,7 +266,12 @@ Future<void> _offer(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (_) => _PlanOfferSheet(days: ReminderPlans.daysUntil(anchor, now)),
+    builder: (_) => _PlanOfferSheet(
+      task: task,
+      anchor: anchor,
+      now: now,
+      dateOnlyTime: dateOnlyTime,
+    ),
   );
   if (yes != true || !navigator.mounted) return;
   // The task as it is now: only one that still has no plan gets Normal.
@@ -233,14 +290,13 @@ Future<void> _offer(
   final done = strings.reminderPlanOfferDone(
     planDay(ReminderPlans.anchor(current)!, now, navigator.context.localeName),
   );
+  final notifier = container.read(taskProvider.notifier);
   try {
-    await container
-        .read(taskProvider.notifier)
-        .updateTask(
-          current.copyWith(
-            reminderPlan: const ReminderPlan.rhythm(ReminderPlan.normal),
-          ),
-        );
+    await notifier.updateTask(
+      current.copyWith(
+        reminderPlan: const ReminderPlan.rhythm(ReminderPlan.normal),
+      ),
+    );
   } catch (_) {
     if (messenger != null && messenger.mounted) {
       unawaited(showFeedback(messenger, strings.updateReminderError));
@@ -248,43 +304,171 @@ Future<void> _offer(
     return;
   }
   if (messenger != null && messenger.mounted) {
-    unawaited(showFeedback(messenger, done));
+    unawaited(
+      showFeedback(
+        messenger,
+        done,
+        actionLabel: strings.undo,
+        onAction: () async {
+          if (!messenger.mounted ||
+              !identical(container.read(taskProvider.notifier), notifier)) {
+            return;
+          }
+          // The task as it was before «Sí», shown at once, even while a
+          // sync is under way. It stays offered: not asked again.
+          try {
+            await notifier.updateTask(current);
+            await notifier.showLocal();
+          } catch (_) {
+            if (messenger.mounted) {
+              unawaited(showFeedback(messenger, strings.undoError));
+            }
+          }
+        },
+      ),
+    );
   }
 }
 
 class _PlanOfferSheet extends StatelessWidget {
-  const _PlanOfferSheet({required this.days});
-  final int days;
+  const _PlanOfferSheet({
+    required this.task,
+    required this.anchor,
+    required this.now,
+    required this.dateOnlyTime,
+  });
+  final Task task;
+  final DateTime anchor;
+  final DateTime now;
+  final int? dateOnlyTime;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Read out by TalkBack as the sheet opens.
-        Semantics(
-          header: true,
-          liveRegion: true,
-          child: Text(
-            planOffer(context.l10n, days),
-            style: Theme.of(context).textTheme.titleLarge,
+  Widget build(BuildContext context) {
+    final strings = context.l10n;
+    final theme = Theme.of(context);
+    const plan = ReminderPlan.rhythm(ReminderPlan.normal);
+    // Which task, and when: after a dictation of several, Calendar may show
+    // another one lit.
+    final when = task.deadline != null
+        ? taskDeadlineLabel(context, task)
+        : taskDayLine(context, task);
+    final rhythm = planRhythm(
+      strings,
+      plan,
+      anchor: anchor,
+      now: now,
+      minute: ReminderPlans.minute(plan, dateOnlyTime),
+      capitalized: false,
+    );
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Read out by TalkBack as the sheet opens: the task, then the
+          // question. In titleMedium, both answers stay on screen at 2× on
+          // a small phone.
+          MergeSemantics(
+            child: Semantics(
+              header: true,
+              liveRegion: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _TaskLine(
+                    title: task.title,
+                    when: when,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    planOffer(
+                      strings,
+                      ReminderPlans.daysUntil(anchor, now),
+                      rhythm,
+                    ),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
-        FilledButton(
-          key: const ValueKey('reminder-plan-offer-yes'),
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(context.l10n.reminderPlanOfferYes),
-        ),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(context.l10n.reminderAskNotNow),
-        ),
-      ],
-    ),
+          const SizedBox(height: 24),
+          FilledButton(
+            key: const ValueKey('reminder-plan-offer-yes'),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(strings.reminderAskYes),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(strings.reminderAskNotNow),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// «{title} · {when}» on at most two lines. A title too long for them is
+/// cut with an ellipsis, never the day: it's what says which task. TalkBack
+/// reads the whole line.
+class _TaskLine extends StatelessWidget {
+  const _TaskLine({required this.title, required this.when, this.style});
+  final String title;
+  final String when;
+  final TextStyle? style;
+
+  static const _lines = 2;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final full = '$title · $when';
+      final scaler = MediaQuery.textScalerOf(context);
+      final direction = Directionality.of(context);
+      bool fits(String text) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textScaler: scaler,
+          textDirection: direction,
+          maxLines: _lines,
+        )..layout(maxWidth: constraints.maxWidth);
+        final fits = !painter.didExceedMaxLines;
+        painter.dispose();
+        return fits;
+      }
+
+      var shown = full;
+      if (!fits(full)) {
+        // The longest start of the title that fits with the day.
+        final letters = title.characters;
+        // The dot stays with the cut title, not at the start of a line.
+        String cut(int length) =>
+            '${letters.take(length).toString().trimRight()}… · $when';
+        var low = 0;
+        var high = letters.length;
+        while (low < high) {
+          final middle = (low + high + 1) ~/ 2;
+          if (fits(cut(middle))) {
+            low = middle;
+          } else {
+            high = middle - 1;
+          }
+        }
+        shown = cut(low);
+      }
+      return Text(
+        shown,
+        semanticsLabel: full,
+        maxLines: _lines,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    },
   );
 }
 

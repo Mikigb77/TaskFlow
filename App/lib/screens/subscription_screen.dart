@@ -76,6 +76,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     // Without Pro, «Ver suscripción» stays in view, as the task form's button.
     final offer = !state.hasPro && state.monthly != null;
     final restore = !state.complimentary && !state.hasPro;
+    final reason = widget.reason == ProReason.reminderPlans;
     return Scaffold(
       appBar: CustomAppBar(title: l10n.taskflowPro),
       body: ListView(
@@ -83,73 +84,88 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         children: [
           AppSurface(
             color: colors.primaryContainer,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Opened from a Pro choice: what Pro gives there, first.
-                if (widget.reason == ProReason.reminderPlans) ...[
+            // With a reason, each line its own node, so the reason reads first
+            // as a heading.
+            child: Semantics(
+              container: reason,
+              explicitChildNodes: reason,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Opened from a Pro choice: what Pro gives there, first, with
+                  // an example.
+                  if (reason) ...[
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        l10n.billingReasonReminderPlans,
+                        key: const ValueKey('subscription-reason'),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: colors.onPrimaryContainer),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.billingReasonReminderPlansExample,
+                      key: const ValueKey('subscription-reason-example'),
+                      style: TextStyle(color: colors.onPrimaryContainer),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  // What Pro gives; the app bar already says «TaskFlow Pro».
                   Text(
-                    l10n.billingReasonReminderPlans,
-                    key: const ValueKey('subscription-reason'),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    state.complimentary
+                        ? l10n.billingComplimentary
+                        : l10n.billingIntro,
+                    style: TextStyle(color: colors.onPrimaryContainer),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    l10n.billingStatus(
+                      state.hasPro
+                          ? 'active'
+                          : state.customerInfo == null
+                          ? 'unknown'
+                          : 'inactive',
+                    ),
+                    key: const ValueKey('subscription-status'),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
                       color: colors.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-                // What Pro gives; the app bar already says «TaskFlow Pro».
-                Text(
-                  state.complimentary
-                      ? l10n.billingComplimentary
-                      : l10n.billingIntro,
-                  style: TextStyle(color: colors.onPrimaryContainer),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  l10n.billingStatus(
-                    state.hasPro
-                        ? 'active'
-                        : state.customerInfo == null
-                        ? 'unknown'
-                        : 'inactive',
-                  ),
-                  key: const ValueKey('subscription-status'),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: colors.onPrimaryContainer,
-                  ),
-                ),
-                if (state.hasPro && expiration != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.billingUntil(
-                      state.pro!.willRenew ? 'renews' : 'expires',
-                      MaterialLocalizations.of(
-                        context,
-                      ).formatMediumDate(expiration.toLocal()),
+                  if (state.hasPro && expiration != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.billingUntil(
+                        state.pro!.willRenew ? 'renews' : 'expires',
+                        MaterialLocalizations.of(
+                          context,
+                        ).formatMediumDate(expiration.toLocal()),
+                      ),
+                      style: TextStyle(color: colors.onPrimaryContainer),
                     ),
-                    style: TextStyle(color: colors.onPrimaryContainer),
-                  ),
-                ],
-                for (final line in freeLines) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    line,
-                    style: TextStyle(color: colors.onPrimaryContainer),
-                  ),
-                ],
-                // A full space: which tasks use it, to make room.
-                if (storage != null &&
-                    storage.limitBytes > 0 &&
-                    storage.usedBytes >= storage.limitBytes)
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: colors.onPrimaryContainer,
+                  ],
+                  for (final line in freeLines) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      line,
+                      style: TextStyle(color: colors.onPrimaryContainer),
                     ),
-                    onPressed: () => TasksWithFilesScreen.open(context),
-                    child: Text(l10n.storageSeeTasks),
-                  ),
-              ],
+                  ],
+                  // A full space: which tasks use it, to make room.
+                  if (storage != null &&
+                      storage.limitBytes > 0 &&
+                      storage.usedBytes >= storage.limitBytes)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.onPrimaryContainer,
+                      ),
+                      onPressed: () => TasksWithFilesScreen.open(context),
+                      child: Text(l10n.storageSeeTasks),
+                    ),
+                ],
+              ),
             ),
           ),
           if (config.isTestStore && !state.complimentary) ...[

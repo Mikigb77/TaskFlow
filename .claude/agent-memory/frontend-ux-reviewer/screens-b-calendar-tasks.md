@@ -58,6 +58,8 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
 - **Bottom:** Completar and Cambiar fecha.
 - Notes use a different version of this screen; see [[screens-c-lists-notes-sharing]].
 
+- **Reminder chip with a plan (2026-10-22):** reads the plan line («Recordatorios normales hasta el … · próximo: …») and opens the reminder sheet: single rows, then (task ≥ 2 days away or already planned) «Hasta la fecha límite» (strengths) and «A tu manera» (Pro; dictate or type). See [[ui-patterns]] › Reminder plans. TaskEditor offers a plan only on create or when the anchor day moves.
+
 ## TaskEditor (`widgets/task_editor.dart`; `/createTask`, `/editTask`)
 - **Above the title:** a headline, a help line, the "Bandeja personal ›" project row, and a Nueva tarea | Nota choice. The title field isn't autofocused.
 - **Dates:**

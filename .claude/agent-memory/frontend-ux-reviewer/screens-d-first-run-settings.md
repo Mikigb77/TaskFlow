@@ -65,6 +65,7 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 - **Notification body:** absolute time ("Hoy a las 17:00 · en 10 min"); snoozed alerts drop the tail (b10, UX-409/632).
 - **Notification actions:** Completar, then a silent Deshacer notification that follows the accessibility timeout (UX-411/631); Posponer 10 min. Phone checks for these are in `.claude/ux-review/PHONE_CHECKS.md`.
 - **Tapping a notification** opens the task detail, or a second MainShell if the task is gone.
+- **Reminder plans (2026-10-22):** after saving a task ≥ 14 days away with no reminder of its own, the offer sheet asks «¿Te aviso cada 3 días…?» (Normal). «Sí» → undo bar. Plan notices have only «Completar». Ajustes › Recordatorios' all-day line names plans with no time («Desactivado · «Hasta la fecha límite»: 09:00»). Pro screen (`subscription_screen.dart`) with a reason shows a header + example, «Ver suscripción» pinned; RevenueCat's paywall text is external. Renders: `App/build/ux/reminders/` (sheet.*, task-line.*, capture-card.*, offer.*, sheet.pro-screen.*). Details in [[ui-patterns]] › Reminder plans.
 - The task-detail reminder chip and the off-by-default switch are described in [[ui-patterns]].
 
 ## Native surfaces

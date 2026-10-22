@@ -9,6 +9,7 @@ import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/reminder_control.dart';
@@ -294,7 +295,12 @@ class _NotificationSettingsScreenState
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: _busy ? null : _chooseLead),
                 _timeRow(context.l10n.dateOnlyTasks, settings.dateOnlyTime,
-                    (value) => _save(_changed(dateOnly: value))),
+                    (value) => _save(_changed(dateOnly: value)),
+                    // Off, plans without their own time still ring: say when.
+                    off: _plansWithoutTime()
+                        ? context.l10n.dateOnlyOffPlans(
+                            _time(ReminderPlans.defaultMinute))
+                        : null),
                 const SizedBox(height: 8),
                 ExpansionTile(
                     key: const ValueKey('reminder-details'),
@@ -357,11 +363,21 @@ class _NotificationSettingsScreenState
     return '${MaterialLocalizations.of(context).formatMediumDate(date)} ${TimeOfDay.fromDateTime(date).format(context)}';
   }
 
-  Widget _timeRow(String title, int? value, ValueChanged<int?> save) =>
+  /// Whether an open task has a plan that takes its hour from «Tareas sin
+  /// hora».
+  bool _plansWithoutTime() =>
+      (ref.watch(taskProvider).valueOrNull ?? const []).any((task) {
+        final plan = ReminderPlans.active(task);
+        return plan != null && plan.time == null && !task.isCompleted;
+      });
+
+  /// [off] replaces «Desactivado» while [value] is null.
+  Widget _timeRow(String title, int? value, ValueChanged<int?> save,
+          {String? off}) =>
       ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(title),
-          subtitle: Text(_time(value)),
+          subtitle: Text(value == null ? off ?? _time(null) : _time(value)),
           onTap: _busy ? null : () => _pick(value, save),
           trailing: value == null
               ? const Icon(Icons.add_rounded)

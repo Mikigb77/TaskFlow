@@ -10,6 +10,7 @@ import 'package:collection/collection.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/task_database.dart';
 
 final captureOwnerProvider = Provider<String>((ref) {
@@ -192,6 +193,12 @@ class CaptureStore {
     if (changed != 1) throw StateError('This capture is no longer available.');
   }
 
+  /// [task] as a draft saves it: a plan that no longer applies (the day
+  /// cleared, a repeat added on the card) isn't kept, so a day given later
+  /// can't turn it back on unseen.
+  static Task withoutStalePlan(Task task) =>
+      ReminderPlans.plannable(task) ? task : task.copyWith(reminderPlan: null);
+
   /// Saved draft IDs remain in the journal even if a task is later deleted.
   /// Repeating Save after a lost response cannot insert the tasks again.
   /// A capture is finished once no draft and no command waits: commands are
@@ -220,11 +227,12 @@ class CaptureStore {
         if (!draft.ready) {
           throw StateError('Confirm the uncertain details first.');
         }
-        final task = await TaskDatabase.normalizeResponsibility(
+        final normalized = await TaskDatabase.normalizeResponsibility(
           tx,
           draft.task,
           ownerKey,
         );
+        final task = withoutStalePlan(normalized);
         final values = task.toMap()..remove('id');
         final syncId = const Uuid().v4();
         final taskId = await tx.insert('tasks', {

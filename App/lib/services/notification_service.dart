@@ -44,11 +44,13 @@ void reminderWorker() {
 }
 
 /// How a reminder shows. Marked as a reminder, so Do Not Disturb lets it
-/// through when its «Reminders» exception is allowed.
+/// through when its «Reminders» exception is allowed. A plan's notice offers
+/// only «Completar»: a snooze would bring the same notice back.
 @visibleForTesting
 NotificationDetails reminderNotificationDetails(PlannedReminder reminder,
     {bool silent = false}) {
   final l = lookupAppLocalizations(Locale(reminder.languageCode));
+  final ofPlan = ReminderEngine.isPlanAlert(reminder.identity);
   return NotificationDetails(
       android: AndroidNotificationDetails(
           'taskflow_reminders', l.notificationChannel,
@@ -61,13 +63,14 @@ NotificationDetails reminderNotificationDetails(PlannedReminder reminder,
               ? null
               : [
                   AndroidNotificationAction('complete', l.notificationComplete),
-                  AndroidNotificationAction('snooze', l.notificationSnooze),
+                  if (!ofPlan)
+                    AndroidNotificationAction('snooze', l.notificationSnooze),
                 ]),
       iOS: DarwinNotificationDetails(
           presentSound: silent ? false : null,
           categoryIdentifier: reminder.taskId == null
               ? null
-              : 'task_${reminder.languageCode}'));
+              : '${ofPlan ? 'plan' : 'task'}_${reminder.languageCode}'));
 }
 
 /// The silent «Completed» line with Undo: not a reminder, so no reminder
@@ -228,6 +231,9 @@ class TaskReminders {
                   for (final locale in AppLocalizations.supportedLocales) ...[
                     _category('task_${locale.languageCode}',
                         lookupAppLocalizations(locale)),
+                    _category('plan_${locale.languageCode}',
+                        lookupAppLocalizations(locale),
+                        snooze: false),
                     DarwinNotificationCategory('undo_${locale.languageCode}',
                         actions: [
                           DarwinNotificationAction.plain(
@@ -288,10 +294,12 @@ class TaskReminders {
     return undoWindow;
   }
 
-  static DarwinNotificationCategory _category(String id, AppLocalizations l) =>
+  static DarwinNotificationCategory _category(String id, AppLocalizations l,
+          {bool snooze = true}) =>
       DarwinNotificationCategory(id, actions: [
         DarwinNotificationAction.plain('complete', l.notificationComplete),
-        DarwinNotificationAction.plain('snooze', l.notificationSnooze),
+        if (snooze)
+          DarwinNotificationAction.plain('snooze', l.notificationSnooze),
       ]);
 
   static Future<void> _updateChannel(AppLocalizations strings) async {

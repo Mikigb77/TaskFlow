@@ -100,12 +100,14 @@ abstract final class ReminderPlans {
   }
 
   /// After saving [task], the reminder question offers a plan: its anchor is
-  /// [offerDays] or more days away and it has none. A task whose single
-  /// reminder was turned off isn't asked.
+  /// [offerDays] or more days away and it has none. Only while its reminder
+  /// is still the default: a reminder chosen or said (or turned off) is kept,
+  /// as a plan would replace it.
   static bool offerable(Task task, DateTime now) =>
       plannable(task) &&
       task.reminderPlan == null &&
       !task.isCompleted &&
-      task.reminderMinutes != -1 &&
+      task.reminderMinutes == null &&
+      task.reminderTime == null &&
       daysUntil(anchor(task)!, now) >= offerDays;
 }

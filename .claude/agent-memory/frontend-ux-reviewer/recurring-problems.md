@@ -132,4 +132,16 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - Voice moves of deadline-only tasks stopped creating a planned day (UX-1715, correct), and every such landing row then printed the long-standing «Sin fecha» beside «Movida al …» (R1A-1 → UX-1725).
     - When a change makes a new data shape reachable (no date + deadline, done + dated, etc.), render where that item lands and read the row's first words against the confirmation next to it.
 
+30. **A control's placement keyed on mutable state jumps away on the user's own change.**
+    - The capture card's reminder moved from «Más opciones» to above it as soon as it was changed there (`setState(_reminderOpen = true)`, R1A-1 → UX-2016); the fix (place once, `late final`) then left no summary once closed (R2A-1 → UX-2018). Three rounds.
+    - For any "show here if X, else there", check: does editing the control flip X? Decide placement once, and when you move or remove a summary, check what the closed state still says.
+
+31. **Copy examples that collide across tiers.**
+    - The Pro screen's example was Normal's free rhythm, which the free offer had just proposed (R1D-1 → UX-2017).
+    - Any "Pro lets you…" example must be something no free option produces; grep the free strings for it.
+
+32. **No-break spaces bound one word short.**
+    - U+00A0 in «las 8» stopped the lone «8» but left «a» dangling (UX-2019 → UX-2020, open).
+    - Bind the whole phrase («a las 8», «a les 8») and check es 1×/2× renders, not only the widest locale.
+
 Related: [[ui-patterns]], [[review-techniques]].

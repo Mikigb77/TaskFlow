@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/capture_clarification.dart';
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_diagnostics.dart';
@@ -123,6 +124,69 @@ void main() {
       expect(await database.getTasks(ownerKey: owner), hasLength(1));
     });
   }
+
+  // UX-1811: a plan the task can no longer keep (its day cleared on the
+  // card, a repeat added) isn't saved, so a day given later can't turn it
+  // back on unseen.
+  test(
+    'UX-1811: saving drops a reminder plan that no longer applies, and keeps one that does',
+    () async {
+      final plan = ReminderPlan.tryParse({
+        'kind': 'custom',
+        'phases': [
+          {'from_days': 21, 'to_days': 8, 'every_days': 3},
+          {'from_days': 7, 'to_days': 0, 'every_days': 1},
+        ],
+        'time': null,
+        'said': 'cada 3 días las dos primeras semanas y luego cada día',
+      })!;
+      Task task(String title, {DateTime? day, String recurrence = 'none'}) =>
+          Task(
+            title: title,
+            priority: 1,
+            dueDate: day,
+            hasTime: false,
+            recurrence: recurrence,
+            reminderPlan: plan,
+          );
+      final session = (await store.create('local', 'Europe/Madrid')).copyWith(
+        status: 'ready',
+        drafts: [
+          CaptureDraft(id: 'no-day', task: task('Sin día')),
+          CaptureDraft(
+            id: 'weekly',
+            task: task(
+              'Cada semana',
+              day: DateTime(2026, 11, 13),
+              recurrence: 'weekly',
+            ),
+          ),
+          CaptureDraft(
+            id: 'kept',
+            task: task('Con día', day: DateTime(2026, 11, 13)),
+          ),
+        ],
+      );
+      await store.update(session);
+      // The draft stores the task as saved while the capture still waits.
+      final first = await store.saveReady(session.id, 'local', {
+        'no-day',
+        'weekly',
+      });
+      final drafts = {for (final d in first.drafts) d.id: d.task};
+      expect(drafts['no-day']!.reminderPlan, isNull);
+      expect(drafts['weekly']!.reminderPlan, isNull);
+      expect(drafts['kept']!.reminderPlan, plan);
+      await store.saveReady(session.id, 'local', {'kept'});
+      final stored = {
+        for (final t in await database.getTasks(ownerKey: 'local')) t.title: t,
+      };
+      expect(stored['Sin día']!.reminderPlan, isNull);
+      expect(stored['Cada semana']!.reminderPlan, isNull);
+      expect(stored['Cada semana']!.recurrence, 'weekly');
+      expect(stored['Con día']!.reminderPlan, plan);
+    },
+  );
 
   test('restart retains separately resolved clarification fields', () async {
     const schedule = CaptureClarification(

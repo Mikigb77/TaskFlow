@@ -560,7 +560,19 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         },
       );
       unawaited(feedback);
-      askAboutRemindersAfterSave(context, [task], feedback: feedback);
+      // The plan offer only when the save gave the task its day or moved
+      // it: not after fixing a letter of its title.
+      final was = ReminderPlans.anchor(before);
+      final anchor = ReminderPlans.anchor(task);
+      askAboutRemindersAfterSave(
+        context,
+        [task],
+        feedback: feedback,
+        offerPlan:
+            was == null ||
+            anchor == null ||
+            ReminderPlans.daysUntil(anchor, was) != 0,
+      );
     } catch (_) {
       if (mounted) {
         unawaited(

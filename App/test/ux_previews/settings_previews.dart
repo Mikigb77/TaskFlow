@@ -2,6 +2,8 @@
 // billing states, reminders, region, voice, other settings, data transfer,
 // pending captures and capture diagnostics.
 import 'package:agenda/models/capture_session.dart';
+import 'package:agenda/models/reminder_plan.dart';
+import 'package:agenda/models/task.dart';
 import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
 import 'package:agenda/services/capture_problem.dart';
@@ -372,6 +374,31 @@ void settingsPreviews() {
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.push('/notifications');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      remindersScreen,
+      'all-day-off-plans',
+      '«Tareas sin hora» off, with one open task on Normal: the row says «Hasta la fecha límite» still rings at 9:00.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 90,
+              title: 'Presentar el proyecto de empresa',
+              dueDate: day(21),
+              hasTime: false,
+              priority: 2,
+              reminderPlan: const ReminderPlan.rhythm(ReminderPlan.normal),
+            ),
+          ],
+        );
         await app.push('/notifications');
         await p.shoot();
       },
