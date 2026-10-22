@@ -438,6 +438,9 @@ class PromptTests(SimpleTestCase):
                 '"changes":{"shift_days":7}}',
                 "'Pasa todo lo atrasado a hoy' is "
                 '{"kind":"update","target":{"all":true,"to_date":"2026-10-17"},"changes":{"date":"2026-10-18"}}',
+                # «Atrasado» means pending: the real model searched done tasks too (2026-10-22).
+                "'¿Qué tengo atrasado?' is "
+                '{"kind":"find","words":[],"status":"open","to_date":"2026-10-17"}',
                 "'Posa totes les tasques sense data per a dilluns' is "
                 '{"kind":"update","target":{"all":true,"undated":true},"changes":{"date":"2026-10-19"}}',
                 "'Asigna a Paul todo lo del viernes de Matemáticas' is "
@@ -471,7 +474,13 @@ class PromptTests(SimpleTestCase):
             value, index = decoder.raw_decode(section, start)
             kinds.append(ExtractedCommand.model_validate(value).kind)
         self.assertEqual(kinds.count("complete"), 3)
-        self.assertEqual(len(kinds), 21)
+        self.assertEqual(len(kinds), 22)
+
+    def test_overdue_always_means_pending(self):
+        section = self.section(date(2026, 10, 21))
+        self.assertIn("Overdue ('atrasado', 'vencido'; Catalan 'endarrerit'; English 'overdue', 'late') always means "
+                      "pending tasks from before today: status 'open' and to_date yesterday without from_date", section)
+        self.assertIn('"status":"open","to_date":"2026-10-20"', section)
 
 
 @override_settings(FREE_VOICE_CAPTURES_PER_MONTH=10)

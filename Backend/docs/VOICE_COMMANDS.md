@@ -99,6 +99,7 @@ How the app should search its own copy:
 - **Tasks:** every task the person can see, completed ones included, and not deleted.
 - **Words:** match each word against the title and notes, ignoring case and accents. A word may match the start of a longer one. Keep the tasks that match every word; when none do, the ones that match the most words.
 - **Filters:** `list_id` limits the search to that project. `person_id` means tasks assigned to that person. `from` and `to` compare with the task's planned day, or its deadline day when it has none.
+- **Overdue** («¿Qué tengo atrasado?», «show me my overdue tasks», «què tinc endarrerit?») is always pending: `status` `"open"`, `to` yesterday and no `from`, in a search as in a set (2026-10-22: the model had searched done tasks too).
 - **`project_name` or `person_name` set:** say so («No encuentro el proyecto «Geografía»»), and don't silently search everything.
 - **Showing the results:** a list, newest first, with completed tasks marked, and «Abrir «Matemáticas»» when `list_id` is set.
 

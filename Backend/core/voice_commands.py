@@ -452,9 +452,13 @@ def commands_prompt(today, day_of_month):
         "return only the search. words are the one or two distinctive words of the task, in the user's language: never "
         "filler such as 'tarea', 'tasca' or 'task', and never the project or the person. project_name, person ('me', or "
         "'member' with member_name), status ('open', 'completed' or 'any'; 'any' unless the user says pending or done), "
-        "and from_date and to_date (YYYY-MM-DD, inclusive) only when stated. "
+        "and from_date and to_date (YYYY-MM-DD, inclusive) only when stated. Overdue ('atrasado', 'vencido'; Catalan "
+        "'endarrerit'; English 'overdue', 'late') always means pending tasks from before today: status 'open' and "
+        "to_date yesterday without from_date, in a search as in a set. "
         "Example: 'Busca la tarea de la introducción del proyecto de matemáticas' is "
         '{"kind":"find","words":["introducción"],"project_name":"Matemáticas","status":"any"}; '
+        "'¿Qué tengo atrasado?' is "
+        f'{{"kind":"find","words":[],"status":"open","to_date":"{day(-1)}"}}; '
         "'Ensenya'm les tasques pendents de la Marta' is "
         '{"kind":"find","words":[],"person":"member","member_name":"Marta","status":"open"}; '
         "'Who had the report task?' is "
