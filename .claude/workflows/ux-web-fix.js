@@ -484,7 +484,7 @@ function closePrompt(rounds, escalated, files) {
     ...rounds.map(r => [
       `- Round ${r.round} (${r.planFile}):`,
       `packages ${r.packages.map(p => `${p.id} ${p.status}`).join(', ')};`,
-      `waves ${r.waves};`,
+      `in ${r.waves.split(', ').length} wave(s) of ${r.waves} package(s), one wave after another;`,
       `tests ${r.tests.passed ? 'passed' : 'failed'}, proven by test ${ids(r.tests.proven)}, device-only ${ids(r.tests.device)};`,
       `verification ${ids(r.verifyReports)};`,
       `fixed ${ids(r.results.filter(x => x.result === 'fixed').map(x => x.id))};`,
