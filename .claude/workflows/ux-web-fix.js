@@ -19,6 +19,8 @@ export const meta = {
 //                   every package runs in the main checkout, one at a time.
 //   maxParallel:    packages side by side in one wave; default 12 (owner, 2026-10-21)
 //   heavySlots:     builds and Playwright runs at once in WSL; default 2 (WSL has about 7.5 GB)
+//   planFile:       the plan to load, when not the run's plan.json (optional): for packages
+//                   from later plan-*.json files, run again on their own
 //   skip:           [packageId] — packages the owner struck (optional)
 //   only:           [packageId] — run just these (optional)
 //   maxExtraRounds: number      — re-plan rounds after the first; default 2
@@ -34,6 +36,7 @@ const batch = typeof a.batch === 'string' && a.batch ? a.batch : ''
 const tag = batch ? `${batch}-` : ''
 const reportName = batch ? `report-${batch}.md` : 'report.md'
 const recordMemory = a.recordMemory !== false
+const PLAN = typeof a.planFile === 'string' && a.planFile ? a.planFile : `${a.runDir}/plan.json`
 
 const WEB = (a.webDir || 'C:/Users/mikig/Desktop/Custom/MikiHacks/TaskFlow/TaskFlowWeb').replace(/\\/g, '/').replace(/\/$/, '')
 const toWsl = p => p.replace(/^([A-Za-z]):/, (m, d) => `/mnt/${d.toLowerCase()}`)
@@ -502,10 +505,10 @@ function closePrompt(rounds, escalated, files) {
 
 phase('Load')
 const loaded = await agent(
-  `Read ${a.runDir}/plan.json and return the header of every package in its "packages" array, in order: id, title, area, size, findings, dependsOn, files. Copy the values exactly.`,
+  `Read ${PLAN} and return the header of every package in its "packages" array, in order: id, title, area, size, findings, dependsOn, files. Copy the values exactly.`,
   { label: 'load plan', phase: 'Load', schema: LOADED, effort: 'low' },
 )
-if (!loaded || !loaded.packages.length) throw new Error(`No packages found in ${a.runDir}/plan.json.`)
+if (!loaded || !loaded.packages.length) throw new Error(`No packages found in ${PLAN}.`)
 let packages = loaded.packages.filter(p => !skip.has(p.id) && (!only || only.has(p.id)))
 if (packages.length < loaded.packages.length) {
   log(`Running ${packages.length} of ${loaded.packages.length} packages; the rest were skipped or limited.`)
@@ -518,7 +521,7 @@ const rounds = []
 const failures = {}
 const escalated = []
 const changedAll = new Set()
-let planFile = `${a.runDir}/plan.json`
+let planFile = PLAN
 let tested = null
 
 const noResult = p => ({

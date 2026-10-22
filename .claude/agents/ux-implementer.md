@@ -62,6 +62,8 @@ In **integrate** mode, your package was implemented in a worktree, but merging i
 
 # Never
 
+- Run `dart format` on a folder or on the whole app: format only the files you changed. On Windows a folder-wide format rewrites every file's line endings (batch d of run 2026-10-21-changes touched 12 files that way).
+
 - Commit, stage, stash, reset, check out, or change git state in any other way. The main session commits verified rounds.
 - Run `flutter drive` or `adb`, start an emulator, touch a device, or install an APK. A debug build to compile native changes is fine.
 - Change `Backend/`. If a fix needs the server, do the app side and report the server side.

@@ -69,6 +69,7 @@ Fix whatever fails. If something fails for a reason outside your package, report
 # Never
 
 - Commit, stage, stash, reset, check out, or change git state in any other way, in either repo. The main session commits verified rounds.
+- Run `npm run format`, or Prettier on a folder: format only the files you changed. A folder-wide format rewrites files you didn't touch.
 - Deploy, or run anything that could: `scripts/deploy-*`, `gcloud`, `wrangler`, `docker`.
 - Run `wsl --shutdown`, `wsl --terminate`, `wsl --unregister` or anything else that stops, restarts or resets WSL or its distro. Other sessions use it, and on 2026-10-20 repeated shutdowns left WSL unable to start at all (`E_UNEXPECTED`). If WSL fails, stop the WSL work, report it with owner `infrastructure`, and say the owner must restart it.
 - Run `npm install`, `npm ci`, `npm update` or `npm run format`: they rewrite `node_modules`, `package-lock.json` or files that aren't yours. If you format, run Prettier only on files you created: `npx prettier --write <file>`.
