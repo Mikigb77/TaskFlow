@@ -1762,4 +1762,78 @@ void main() {
     expect(es.sendInvitation, 'Enviar invitación');
     expect(ca.sendInvitation, 'Envia la invitació');
   });
+
+  // ---- 2026-10-21-changes · P236 (UX-1720): why your words go to Google ----
+
+  test('UX-1720: capturePrivacy says in plain words why the words go to '
+      'Google’s AI; its other three sentences are unchanged, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    for (final (language, privacy, sentences) in [
+      (
+        'en',
+        en.capturePrivacy,
+        [
+          'Live transcription uses on-device speech where available; no audio '
+              'is retained in that mode.',
+          'To add, find or change tasks, your words go over the internet to '
+              'Google’s AI.',
+          'Saved audio is transcribed online.',
+          'Anything not saved yet stays on this phone until you save or '
+              'discard it.',
+        ],
+      ),
+      (
+        'es',
+        es.capturePrivacy,
+        [
+          'La transcripción en directo usa el reconocimiento local cuando está '
+              'disponible; ese modo no conserva audio.',
+          'Para añadir, buscar o cambiar tareas, tus palabras van por internet '
+              'a la IA de Google.',
+          'El audio guardado se transcribe en línea.',
+          'Lo que aún no has guardado se queda en este teléfono hasta que lo '
+              'guardes o lo descartes.',
+        ],
+      ),
+      (
+        'ca',
+        ca.capturePrivacy,
+        [
+          'La transcripció en directe utilitza el reconeixement local quan '
+              'està disponible; en aquest mode no es conserva l’àudio.',
+          'Per afegir, cercar o canviar tasques, les teves paraules van per '
+              'internet a la IA de Google.',
+          'L’àudio desat es transcriu en línia.',
+          'El que encara no has desat es queda en aquest telèfon fins que ho '
+              'desis o ho descartis.',
+        ],
+      ),
+    ]) {
+      // Exactly four sentences: the first, third and fourth word for word as
+      // before, the second the new plain one.
+      expect(privacy, sentences.join(' '), reason: language);
+      final lower = privacy.toLowerCase();
+      for (final jargon in ['extracción', 'extracció', 'extraction']) {
+        expect(lower, isNot(contains(jargon)), reason: '$language $jargon');
+      }
+    }
+  });
+
+  test('UX-1720: app_en.arb describes capturePrivacy', () {
+    final entry = template['@capturePrivacy'];
+    expect(entry, isA<Map<String, dynamic>>());
+    final description = (entry as Map<String, dynamic>)['description'];
+    expect(description, isA<String>());
+    expect((description as String).trim(), isNotEmpty);
+    // The organizer's description, so translators know where it shows.
+    expect(
+      description,
+      'The full voice privacy note at the end of the Voice screen in '
+      'Settings: on-device or online transcription, why the words go to '
+      'Google’s AI, saved audio, and what stays on the phone. '
+      'capturePrivacyLine is its short form in the capture sheet.',
+    );
+  });
 }

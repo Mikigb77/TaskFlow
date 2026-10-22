@@ -263,3 +263,17 @@ These failed twice, but no fix was ever tried. Each time the worktree was on `ma
 ### Notes for the main session
 - Six tests will keep failing until P235 and P236 run: the two round 1 P231 tests (UX-1702's B, UX-1716's deadline-only chip) and the four UX-1720 tests in `voice_privacy_copy_test.dart`. You could list them in `KNOWN_FAILURES.md`, pointing to these escalations, so round 3's check only judges P238 and P239.
 - P235's other edits to `voice_task_screen.dart` (`_onlyMoved` and `moving`, :378-385 and :3682) are well away from P239's lines (:3655-3666).
+
+## Round 2 (e) — 2026-10-22
+
+Round 1 (e) built P235 (D1: a voice move of a task with only a deadline moves its deadline), P236 (the Voz privacy sentence) and P239 (overdue tasks moved by a «hoy» set land where they went). The check passed, no test failed, and the reviewer found nothing left unfixed. One regression: with D1 built, a moved deadline-only task ends on a Calendar row that starts with «Sin fecha». Full brief: `plan-e-r2.json`.
+
+### P240 · S2 · A · S · after P235 · A row with a deadline doesn't say «Sin fecha»
+- **UX-1725** (S2, new, regression R1A-1 from P235): after «Pasa todas las tareas de ayer a mañana», the gas bill's row read «Sin fecha   Vence vie, 23 de oct» right above «4 tareas movidas al vie, 23 de oct». The fix removes words: a row whose task has a deadline no longer says «Sin fecha», because its «Vence …» line already says when it's due. One condition in `task_tile.dart:48`, no new copy. This also applies on Tareas and project pages. A task with no date and no deadline still says «Sin fecha».
+
+### Phone checks added
+- None.
+
+### Notes for the main session
+- P240 shares only `App/test/ux_previews/commands_previews.dart` (one description) with round 1's work, so it builds on the uncommitted working tree.
+- Round 1's implementers said the seed's `flutter pub get` regenerated the plugin registrants under `App/linux`, `App/macos` and `App/windows`, and that `App/pubspec.yaml`, `App/scripts/build-staging.ps1` and `plan-e.json` came in already staged from another session. None of those belong to this run's commit.

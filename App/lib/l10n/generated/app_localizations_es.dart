@@ -1017,7 +1017,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. La extracción de tareas con IA necesita internet y envía tus palabras a Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
+      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
 
   @override
   String get capturePrivacyLine =>

@@ -36,7 +36,7 @@ class TaskTile extends ConsumerWidget {
   /// The page's project: a row leaves out a project label naming it.
   final String? project;
 
-  /// Whether a row with no date says so. On the Sin fecha page it doesn't.
+  /// Whether a row with no date and no deadline says so. On the Sin fecha page it doesn't; a row with a deadline shows its «Vence …» line instead.
   final bool showUndated;
 
   /// In task lists, an open task whose day has passed says «Atrasada».
@@ -45,7 +45,9 @@ class TaskTile extends ConsumerWidget {
   /// The row's date line, or null when it has nothing to say.
   String? _dateLine(BuildContext context, WidgetRef ref) {
     final date = task.displayDate;
-    if (date == null) return showUndated ? context.l10n.noDate : null;
+    if (date == null) {
+      return showUndated && task.deadline == null ? context.l10n.noDate : null;
+    }
     if (!showDate) return task.hasTime ? context.clockTime(date) : null;
     final line = taskDayLine(context, task);
     final today = DateUtils.dateOnly(ref.watch(calendarClockProvider)());

@@ -41,6 +41,7 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
 - Swipe right completes.
 - Swipe left or long-press opens "Cambiar fecha" (`_ScheduleSheet`).
 - A tap opens the task detail.
+- **Date line (`_dateLine`, 2026-10-22):** «Sin fecha» only when the task has neither a date nor a deadline (and `showUndated`); a deadline-only row reads just «Vence …» (red «· Fecha límite vencida» when passed). `LandedTaskTile` delegates to `TaskTile`. The Sin fecha page passes `showUndated: false`.
 
 ## Task detail (`screens/task_detail_screen.dart`, `/taskDetails`)
 - **App bar:**

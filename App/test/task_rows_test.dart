@@ -17,7 +17,7 @@ import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -847,6 +847,187 @@ void main() {
       expect(named - here, greaterThanOrEqualTo(40), reason: '$named vs $here');
     },
   );
+
+  // ---- Run 2026-10-21-changes, batch e, round 2 · P240 (UX-1725): a row
+  // with a deadline doesn't say «Sin fecha» ----
+
+  /// «Pagar la factura del gas», with only a deadline, [offset] days away.
+  Task gasBill(int offset, {int id = 41, String? listId}) => Task(
+    id: id,
+    title: 'Pagar la factura del gas',
+    priority: 2,
+    deadline: on(offset),
+    reminderAnchor: 'deadline',
+    listId: listId,
+  );
+
+  /// Every label TalkBack can read in [node] and below it.
+  String spoken(SemanticsNode node) {
+    final parts = <String>[node.getSemanticsData().label];
+    node.visitChildren((child) {
+      parts.add(spoken(child));
+      return true;
+    });
+    return parts.where((part) => part.isNotEmpty).join(', ');
+  }
+
+  /// The deadline line [l] writes for a deadline on [date].
+  String dueLine(WidgetTester tester, AppLocalizations l, DateTime date) =>
+      l.deadlineLabel(
+        tester.element(find.byType(TaskTile).first).weekdayDate(date),
+      );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'UX-1725: es ${scale}x on 360×800, Calendar on the day of a task with only a deadline: its row reads «Vence <day>», whole, and no «Sin fecha»',
+      (tester) async {
+        await app(
+          tester,
+          size: const Size(360, 800),
+          scale: scale,
+          tasks: [gasBill(0)],
+        );
+        final calendar = find.byType(CalendarScreen);
+        final gas = find.descendant(
+          of: calendar,
+          matching: row('Pagar la factura del gas'),
+        );
+        expect(gas, findsOneWidget);
+        final due = dueLine(tester, es, on(0));
+        expect(due, startsWith('Vence '));
+        final line = find.descendant(of: gas, matching: find.text(due));
+        expect(line, findsOneWidget, reason: 'the row reads «$due»');
+        expect(
+          find.descendant(of: gas, matching: find.textContaining(es.noDate)),
+          findsNothing,
+          reason: 'no «Sin fecha» in the row',
+        );
+        // «Vence …» shows whole: inside the row and the screen, not cut off.
+        final rect = tester.getRect(line);
+        final rowRect = tester.getRect(gas);
+        expect(rect.left, greaterThanOrEqualTo(rowRect.left - 0.5));
+        expect(rect.right, lessThanOrEqualTo(rowRect.right + 0.5));
+        expect(rect.right, lessThanOrEqualTo(360.5));
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: line, matching: find.byType(RichText)).first,
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(paragraph.size.width, lessThanOrEqualTo(rowRect.width));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'UX-1725: TalkBack reads a deadline-only row with «Vence …» and no «Sin fecha», on Calendar and as a view-only row',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await app(tester, size: const Size(360, 800), tasks: [gasBill(0)]);
+      final due = dueLine(tester, es, on(0));
+      final heard = spoken(rowNode(tester, 'Pagar la factura del gas'));
+      expect(heard, contains(due));
+      expect(heard, isNot(contains(es.noDate)));
+
+      // A row that can't be changed is one button; its label is the details.
+      await tester.pumpWidget(const SizedBox());
+      await page(
+        tester,
+        const HomeScreen(listId: 'coro', isRoot: false),
+        projects: [choirToView],
+        tasks: [gasBill(2, id: 42, listId: 'coro')],
+      );
+      final node = rowNode(tester, 'Pagar la factura del gas');
+      final label = node.getSemanticsData().label;
+      expect(label, startsWith('Pagar la factura del gas, '));
+      expect(label, contains(dueLine(tester, es, on(2))));
+      expect(label, isNot(contains(es.noDate)));
+      semantics.dispose();
+    },
+  );
+
+  testWidgets(
+    'UX-1725: on the Tareas root a task with only a deadline reads «Vence …» and no «Sin fecha»; a task with neither still reads «Sin fecha»',
+    (tester) async {
+      await page(
+        tester,
+        const HomeScreen(),
+        size: const Size(360, 1600),
+        tasks: [
+          gasBill(3),
+          Task(id: 6, title: 'Comprar pilas para el mando', priority: 1),
+        ],
+      );
+      expect(row('Pagar la factura del gas'), findsOneWidget);
+      expect(
+        inRow(
+          'Pagar la factura del gas',
+          find.text(dueLine(tester, es, on(3))),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        inRow('Pagar la factura del gas', find.textContaining(es.noDate)),
+        findsNothing,
+      );
+      expect(
+        inRow('Comprar pilas para el mando', find.text(es.noDate)),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final language in ['en', 'ca']) {
+    testWidgets(
+      'UX-1725: $language, on the Tareas root a deadline-only row reads its deadline line and not its «no date» word',
+      (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        sized(tester, const Size(360, 1600), 1);
+        final container = containerFor(
+          [
+            gasBill(3),
+            Task(id: 6, title: 'Comprar pilas para el mando', priority: 1),
+          ],
+          const [],
+          language: language,
+        );
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              locale: Locale(language),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: const HomeScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final due = dueLine(tester, l, on(3));
+        expect(
+          due,
+          startsWith(language == 'en' ? 'Due ' : 'Termini: '),
+          reason: 'the catalog’s deadline line',
+        );
+        expect(
+          inRow('Pagar la factura del gas', find.text(due)),
+          findsOneWidget,
+        );
+        expect(
+          inRow('Pagar la factura del gas', find.textContaining(l.noDate)),
+          findsNothing,
+          reason: 'no «${l.noDate}»',
+        );
+        // A task with neither a day nor a deadline still says so.
+        expect(
+          inRow('Comprar pilas para el mando', find.text(l.noDate)),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 class _GivenTasks extends DesignTaskNotifier {

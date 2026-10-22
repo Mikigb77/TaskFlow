@@ -94,6 +94,7 @@ What the app does today, so a consistency finding can name the standard and the 
   - On the result card, day chips (Hoy, Mañana, Sin fecha) apply and close in one tap, as when moving a task; empty optional fields (notes) stay inside Más opciones until asked for.
   - Editable text on the result has a visible underline; don't ship borderless editable titles.
   - Capture copy never says "borrador/draft"; leftovers are "sin añadir" / «Quitada».
+  - Voice privacy line (`capturePrivacy`, Ajustes › Voz, 2026-10-22) covers commands too: «Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google.» Any new voice feature that sends words out must still fit that sentence.
 
 ## Voice command and set cards (2026-10-21)
 - One verb per action across card heading, button and landing message (Mover / Asignar / Marcar como hechas / Eliminar). Count words follow the real count (ICU plurals); a set with no count yet uses the plural.

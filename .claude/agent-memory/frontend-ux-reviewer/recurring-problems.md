@@ -128,4 +128,8 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - Landing sent every overdue item to Today, even ones a −1 shift moved to yesterday (R1A-2 → UX-1723).
     - For any "where does the user land" rule, check it against items that moved and items changed in place; derive it from the item's day before vs after.
 
+29. **A new model rule exposes an old row/label branch nobody reached before.**
+    - Voice moves of deadline-only tasks stopped creating a planned day (UX-1715, correct), and every such landing row then printed the long-standing «Sin fecha» beside «Movida al …» (R1A-1 → UX-1725).
+    - When a change makes a new data shape reachable (no date + deadline, done + dated, etc.), render where that item lands and read the row's first words against the confirmation next to it.
+
 Related: [[ui-patterns]], [[review-techniques]].

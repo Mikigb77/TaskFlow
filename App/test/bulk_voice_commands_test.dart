@@ -128,6 +128,9 @@ void main() {
   _plan2Round1();
   _plan2Round2();
   _plan2Round3();
+  _p235DeadlineOnly();
+  _p239OverdueLanding();
+  _p240DeadlineRow();
 }
 
 // ---------------------------------------------------------------- parsing
@@ -592,11 +595,17 @@ void _plans() {
         'changes': {'time': '18:00'},
       });
       expect(evening.action, BulkAction.change);
-      // No planned day: the one with nothing, and the one with only a
-      // deadline, as a single change would ask which day.
-      expect(ids(evening.items.map((item) => item.stored)), [1, 3, 12]);
-      expect(evening.noDay, 2);
-      expect(evening.items.first.plan!.after().dueDate, day(-1, 18));
+      // The one with nothing is left out; the one with only a deadline
+      // takes the time on its deadline (D1).
+      expect(ids(evening.items.map((item) => item.stored)), [7, 1, 3, 12]);
+      expect(evening.noDay, 1);
+      final byId = {
+        for (final item in evening.items) item.stored.id: item.plan!.after(),
+      };
+      expect(byId[1]!.dueDate, day(-1, 18));
+      expect(byId[7]!.dueDate, isNull);
+      expect(byId[7]!.deadline, day(-1, 18));
+      expect(byId[7]!.deadlineHasTime, isTrue);
       final urgent = _plan(
         {
           'kind': 'update',
@@ -624,9 +633,9 @@ void _plans() {
       };
       expect(byId[1]!.dueDate, day(1, 10));
       expect(byId[3]!.dueDate, day(1, 12));
-      // As for one task: it gets that day, and keeps its deadline.
-      expect(byId[7]!.dueDate, day(1));
-      expect(byId[7]!.deadline, day(-1));
+      // As for one task: one with only a deadline moves its deadline (D1).
+      expect(byId[7]!.dueDate, isNull);
+      expect(byId[7]!.deadline, day(1));
     });
 
     test('marking done lists only what is still to do; deleting lists all; '
@@ -5053,7 +5062,7 @@ void _plan2Round1() {
               'changes': {'time': '18:00'},
             }),
             // «Pagar la factura del gas» is at 18:00 already.
-        () => es.commandBulkChange(3),
+            () => es.commandBulkChange(3),
           ),
         ];
     for (final (what, tasks, projects, said, heading) in noChip) {
@@ -5412,10 +5421,7 @@ void _plan2Round2() {
           'the chip’s label',
         );
         _expectMarkBesideLabel(tester);
-        expect(
-          tester.getRect(_moveChip).right,
-          lessThanOrEqualTo(360.5),
-        );
+        expect(tester.getRect(_moveChip).right, lessThanOrEqualTo(360.5));
         expect(tester.takeException(), isNull);
       });
     }
@@ -5426,7 +5432,12 @@ void _plan2Round2() {
       final app = await _App.open(
         tester,
         tasks: [
-          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(monday, 10)),
+          Task(
+            id: 1,
+            title: 'Ir al médico',
+            priority: 1,
+            dueDate: day(monday, 10),
+          ),
         ],
         size: const Size(360, 800),
       );
@@ -5457,9 +5468,11 @@ void _plan2Round2() {
     wednesday = DateTime(year, month, wednesday.day + 1);
   }
   // Whole days, safe across a change of clock.
-  final ahead = DateTime.utc(year, month, wednesday.day)
-      .difference(DateTime.utc(today.year, today.month, today.day))
-      .inDays;
+  final ahead = DateTime.utc(
+    year,
+    month,
+    wednesday.day,
+  ).difference(DateTime.utc(today.year, today.month, today.day)).inDays;
   return (ahead - 2, ahead);
 }
 
@@ -5530,9 +5543,7 @@ void _plan2Round3() {
                     width: row,
                     child: Row(
                       children: [
-                        Expanded(
-                          child: Text('label', key: ValueKey('label')),
-                        ),
+                        Expanded(child: Text('label', key: ValueKey('label'))),
                         DropDownMark(),
                       ],
                     ),
@@ -5632,6 +5643,782 @@ void _plan2Round3() {
           expect(tester.takeException(), isNull);
         });
       }
+    }
+  });
+}
+
+// --------------------------------------------- P235 of run 2026-10-21-changes
+//
+// D1 (owner, 2026-10-21 evening): a voice move to a day, by days or to a time,
+// of a task with only a deadline moves its deadline; it gets no planned day.
+// D4 (2026-10-22): moved by days, the overdue tasks of a «hoy» set count from
+// today.
+
+/// «Pagar la factura del gas», with only a deadline: yesterday, or
+/// [deadline] (with its time when [timed]).
+Task _gasBill({DateTime? deadline, bool timed = false}) => Task(
+  id: 1,
+  title: 'Pagar la factura del gas',
+  priority: 2,
+  deadline: deadline ?? day(-1),
+  deadlineHasTime: timed,
+  reminderAnchor: 'deadline',
+);
+
+CaptureCommand _changeGasBill(Map<String, dynamic> changes) => command({
+  'kind': 'update',
+  'target': {
+    'words': ['factura', 'gas'],
+  },
+  'changes': changes,
+});
+
+/// The card's «Fecha y hora» line, as TalkBack reads it.
+Finder get _scheduleLine =>
+    find.bySemanticsLabel(RegExp('^${RegExp.escape(es.reviewSchedule)}:'));
+
+/// Any change line, as TalkBack reads it («<label>: de … a …»).
+Finder get _anyChangeLine => find.bySemanticsLabel(RegExp(r'^[^:]+: de .+ a '));
+
+void _p235DeadlineOnly() {
+  group('UX loop 2026-10-21-changes, P235 (D1)', () {
+    TaskChanges changes(Map<String, Object?> json) =>
+        TaskChanges.fromJson(json);
+
+    test('UX-1715: a task with only a deadline moved «a mañana»: its '
+        'deadline moves to tomorrow, keeping its 9:00; no planned day', () {
+      final gas = _gasBill(deadline: day(-1, 9), timed: true);
+      final plan = planUpdate(
+        task: gas,
+        shown: gas,
+        changes: changes({'date': key(day(1))}),
+      );
+      expect(plan.schedule, isNull, reason: 'no planned day is set');
+      expect(plan.needsDay, isFalse);
+      final after = plan.after();
+      expect(after.dueDate, isNull);
+      expect(after.deadline, day(1, 9));
+      expect(after.deadlineHasTime, isTrue);
+      // Without a time, it stays without one.
+      final plain = _gasBill();
+      final moved = planUpdate(
+        task: plain,
+        shown: plain,
+        changes: changes({'date': key(day(1))}),
+      ).after();
+      expect(moved.dueDate, isNull);
+      expect(Task.day(moved.deadline!), day(1));
+      expect(moved.deadlineHasTime, isFalse);
+      // A day and a time said: both go on the deadline.
+      final evening = planUpdate(
+        task: plain,
+        shown: plain,
+        changes: changes({'date': key(day(1)), 'time': '18:00'}),
+      ).after();
+      expect(evening.dueDate, isNull);
+      expect(evening.deadline, day(1, 18));
+      expect(evening.deadlineHasTime, isTrue);
+    });
+
+    test('UX-1715: unchanged: a task with a planned day and a deadline gets '
+        'tomorrow and keeps its deadline; a change naming the deadline sets '
+        'each as said; a task with neither, given a time, needs a day', () {
+      final both = Task(
+        id: 2,
+        title: 'Entregar el trabajo',
+        priority: 1,
+        dueDate: day(-1, 10),
+        deadline: day(3),
+      );
+      final moved = planUpdate(
+        task: both,
+        shown: both,
+        changes: changes({'date': key(day(1))}),
+      ).after();
+      expect(moved.dueDate, day(1, 10));
+      expect(Task.day(moved.deadline!), day(3));
+
+      final monday = _ahead(DateTime.monday);
+      final gas = _gasBill();
+      final named = planUpdate(
+        task: gas,
+        shown: gas,
+        changes: changes({
+          'date': key(day(1)),
+          'deadline_date': key(day(monday)),
+        }),
+      ).after();
+      expect(Task.day(named.dueDate!), day(1), reason: 'planned tomorrow');
+      expect(Task.day(named.deadline!), day(monday), reason: 'due Monday');
+
+      final undated = Task(id: 3, title: 'Comprar gafas', priority: 1);
+      final asks = planUpdate(
+        task: undated,
+        shown: undated,
+        changes: changes({'time': '18:00'}),
+      );
+      expect(asks.needsDay, isTrue);
+    });
+
+    testWidgets('UX-1715: es 1× on 360 dp, «Pasa la factura del gas a '
+        'mañana»: one change line, the deadline’s, with the chip «Mañana»; '
+        'no «Fecha y hora»; «Cambiar fecha»', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.open(
+        tester,
+        tasks: [_gasBill()],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeGasBill({'date': key(day(1))}),
+      ], transcript: 'Pasa la factura del gas a mañana');
+      expect(_moveChip, findsOneWidget);
+      expect(_chipLabel(tester), es.tomorrow);
+      expect(
+        find.bySemanticsLabel(
+          es.commandChangeSemantics(
+            es.deadline,
+            _weekdayDate(tester, day(-1)),
+            es.tomorrow,
+          ),
+        ),
+        findsOneWidget,
+        reason: 'TalkBack: «Fecha límite: de <ayer> a Mañana»',
+      );
+      expect(_anyChangeLine, findsOneWidget, reason: 'one change line');
+      expect(_scheduleLine, findsNothing, reason: 'no «Fecha y hora» line');
+      expect(_inResult(find.textContaining('${es.noDate} →')), findsNothing);
+      expect(_buttonLabel(tester), es.reschedule);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets('UX-1715: after «Cambiar fecha»: no planned day, the deadline '
+        'tomorrow; Calendar on tomorrow, the row lit, not «Fecha límite '
+        'vencida»; «Movida al …» with Deshacer, which puts it back on '
+        'yesterday', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [_gasBill()],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeGasBill({'date': key(day(1))}),
+      ], transcript: 'Pasa la factura del gas a mañana');
+      await _confirm(tester);
+      expect(find.byType(CaptureResult), findsNothing);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull, reason: 'no planned day is added');
+      expect(Task.day(gas.deadline!), day(1), reason: 'its deadline moved');
+      expect(find.text(_dayHeading(day(1))), findsOneWidget);
+      final row = _calendarRow('Pagar la factura del gas');
+      expect(row, findsOneWidget);
+      expect(tester.widget<TaskTile>(row).color, _litColor(tester));
+      expect(find.textContaining(es.deadlineOverdue), findsNothing);
+      expect(
+        find.text(es.movedOccurrenceDate(_weekdayDate(tester, day(1)))),
+        findsOneWidget,
+      );
+      expect(find.text(es.undo), findsOneWidget);
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      final back = app.tasks.byId(1)!;
+      expect(back.dueDate, isNull);
+      expect(Task.day(back.deadline!), day(-1), reason: 'back on yesterday');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1715: another day picked in the «Fecha límite» chip keeps '
+        'one deadline line, «<ayer> → <that day>», never «Sin fecha → …»; '
+        'after the tap the deadline is there, still no planned day', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.open(
+        tester,
+        tasks: [_gasBill()],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeGasBill({'date': key(day(1))}),
+      ], transcript: 'Pasa la factura del gas a mañana');
+      await _openDaySheet(tester);
+      await _pickInCalendar(tester, day(2), day(1));
+      expect(find.text(es.pickDay), findsNothing, reason: 'the sheet closed');
+      final picked = _weekdayDate(tester, day(2));
+      expect(_chipLabel(tester), picked);
+      expect(
+        find.bySemanticsLabel(
+          es.commandChangeSemantics(
+            es.deadline,
+            _weekdayDate(tester, day(-1)),
+            picked,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(_anyChangeLine, findsOneWidget, reason: 'one change line');
+      expect(_scheduleLine, findsNothing, reason: 'no «Fecha y hora» line');
+      expect(_inResult(find.textContaining('${es.noDate} →')), findsNothing);
+      await _confirm(tester);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull);
+      expect(Task.day(gas.deadline!), day(2));
+      semantics.dispose();
+    });
+
+    testWidgets('UX-1715: «Retrásala un día» on a task with only a deadline: '
+        'the «Fecha límite» line with the chip; a day picked keeps it a '
+        '«Fecha límite» line; «Cambiar fecha», then «Movida al …»', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.open(
+        tester,
+        tasks: [_gasBill()],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeGasBill({'shift_days': 1}),
+      ], transcript: 'Retrásala un día');
+      final yesterday = _weekdayDate(tester, day(-1));
+      expect(_moveChip, findsOneWidget);
+      expect(_chipLabel(tester), es.today);
+      expect(
+        find.bySemanticsLabel(
+          es.commandChangeSemantics(es.deadline, yesterday, es.today),
+        ),
+        findsOneWidget,
+      );
+      expect(_scheduleLine, findsNothing);
+      expect(_buttonLabel(tester), es.reschedule);
+      await _openDaySheet(tester);
+      await tester.tap(
+        _inDaySheet(find.widgetWithText(ChoiceChip, es.tomorrow)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel(
+          es.commandChangeSemantics(es.deadline, yesterday, es.tomorrow),
+        ),
+        findsOneWidget,
+        reason: 'still the «Fecha límite» line',
+      );
+      expect(_anyChangeLine, findsOneWidget);
+      expect(_scheduleLine, findsNothing, reason: 'not «Fecha y hora»');
+      expect(_buttonLabel(tester), es.reschedule);
+      await _confirm(tester);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull);
+      expect(Task.day(gas.deadline!), day(1));
+      expect(
+        find.text(es.movedOccurrenceDate(_weekdayDate(tester, day(1)))),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('UX-1715: «Retrásala un día», tapped as said: the deadline on '
+        'today, no planned day, «Movida al <hoy>»', (tester) async {
+      final app = await _App.open(tester, tasks: [_gasBill()]);
+      await app.showResult(tester, [
+        _changeGasBill({'shift_days': 1}),
+      ], transcript: 'Retrásala un día');
+      await _confirm(tester);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull);
+      expect(Task.day(gas.deadline!), day(0));
+      expect(
+        find.text(es.movedOccurrenceDate(_weekdayDate(tester, day(0)))),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('UX-1715: «Pon la factura del gas a las 18:00»: no «¿Qué día, '
+        'a las 18:00?»; «<ayer> → <ayer> · 18:00»; after the tap the deadline '
+        'is yesterday at 18:00, still no planned day', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [_gasBill()],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeGasBill({'time': '18:00'}),
+      ], transcript: 'Pon la factura del gas a las 18:00');
+      expect(find.text(es.commandWhichDay(18, '18:00')), findsNothing);
+      expect(find.textContaining('¿Qué día'), findsNothing);
+      final yesterday = _weekdayDate(tester, day(-1));
+      expect(
+        _inResult(find.text('$yesterday → $yesterday · 18:00')),
+        findsOneWidget,
+      );
+      expect(_inResult(find.textContaining('${es.noDate} →')), findsNothing);
+      await _confirm(tester);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull);
+      expect(gas.deadline, day(-1, 18));
+      expect(gas.deadlineHasTime, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1715: unchanged: a task with neither a day nor a deadline, '
+        'given a time, still asks «¿Qué día, a las 18:00?»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [Task(id: 3, title: 'Comprar gafas', priority: 1)],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': {
+            'words': ['gafas'],
+          },
+          'changes': {'time': '18:00'},
+        }),
+      ]);
+      expect(find.text(es.commandWhichDay(18, '18:00')), findsOneWidget);
+      expect(es.commandWhichDay(18, '18:00'), '¿Qué día, a las 18:00?');
+    });
+
+    testWidgets('UX-1715: es 1×, «Pasa todas las tareas de ayer a mañana» over '
+        '4, one with only yesterday’s deadline: «Mover 4 tareas a» and '
+        '«mañana, …»; after «Mover 4 tareas» its deadline is tomorrow, no '
+        'planned day, «4 tareas movidas al …»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          for (final task in _fourYesterday())
+            if (task.id == 4)
+              Task(
+                id: 4,
+                title: task.title,
+                priority: task.priority,
+                deadline: day(-1),
+                reminderAnchor: 'deadline',
+              )
+            else
+              task,
+        ],
+        projects: [_casa],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _moveYesterdayToTomorrow(),
+      ], transcript: 'Pasa todas las tareas de ayer a mañana');
+      expect(_lead(tester), es.commandBulkMoveLead(4, 'tomorrow'));
+      expect(_lead(tester), 'Mover 4 tareas a');
+      expect(
+        _chipLabel(tester),
+        es.commandMoveDay('tomorrow', _short(day(1), 'es')),
+      );
+      // Before the tap, the row shows the deadline as it is.
+      _expectRowLine(
+        'Pagar la factura del gas',
+        es.deadlineLabel(_weekdayDate(tester, day(-1))),
+      );
+      expect(_buttonLabel(tester), es.commandBulkMove(4));
+      await _confirm(tester);
+      final gas = app.tasks.byId(4)!;
+      expect(gas.dueDate, isNull, reason: 'no planned day is added');
+      expect(Task.day(gas.deadline!), day(1), reason: 'its deadline moved');
+      expect(app.tasks.byId(1)!.dueDate, day(1, 9));
+      expect(
+        find.text(es.commandTasksMovedTo(4, _weekdayDate(tester, day(1)))),
+        findsOneWidget,
+      );
+      expect(find.textContaining(es.deadlineOverdue), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1715: «Pon todas mis tareas a las 18:00» over one with '
+        'only a deadline and one with neither: the first listed, 18:00 on its '
+        'deadline after the tap; the line after the list names the other', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          _gasBill(),
+          Task(id: 3, title: 'Comprar gafas', priority: 1),
+        ],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': setTarget(),
+          'changes': {'time': '18:00'},
+        }),
+      ], transcript: 'Pon todas mis tareas a las 18:00');
+      expect(
+        _inResult(find.textContaining('Pagar la factura del gas')),
+        findsWidgets,
+        reason: 'the task with only a deadline is listed',
+      );
+      expect(
+        _inResult(find.text(es.commandBulkLeftNoDay(1, 'Comprar gafas'))),
+        findsOneWidget,
+      );
+      expect(
+        es.commandBulkLeftNoDay(1, 'Comprar gafas'),
+        'Comprar gafas no tiene fecha: no cambia',
+      );
+      expect(
+        _inResult(find.textContaining('Pagar la factura del gas no tiene')),
+        findsNothing,
+      );
+      await _confirm(tester);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull);
+      expect(gas.deadline, day(-1, 18));
+      expect(gas.deadlineHasTime, isTrue);
+      final glasses = app.tasks.byId(3)!;
+      expect(glasses.dueDate, isNull);
+      expect(glasses.deadline, isNull);
+    });
+
+    testWidgets('UX-1721 (D4): «Retrasa todo lo de hoy un día» over today’s '
+        'task, one overdue since 3 days ago and one with only a deadline 2 '
+        'days ago: all three on tomorrow, the last by its deadline', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: day(0, 10)),
+          Task(
+            id: 2,
+            title: 'Devolver el libro a la biblioteca',
+            priority: 1,
+            dueDate: day(-3),
+            hasTime: false,
+          ),
+          Task(
+            id: 3,
+            title: 'Pagar la factura del gas',
+            priority: 2,
+            deadline: day(-2),
+            reminderAnchor: 'deadline',
+          ),
+        ],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': setTarget(from: day(0)),
+          'changes': {'shift_days': 1},
+        }),
+      ], transcript: 'Retrasa todo lo de hoy un día');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(3));
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(1, 10));
+      expect(Task.day(app.tasks.byId(2)!.dueDate!), day(1));
+      final gas = app.tasks.byId(3)!;
+      expect(gas.dueDate, isNull, reason: 'no planned day is added');
+      expect(Task.day(gas.deadline!), day(1), reason: 'from today, one day');
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+// ------------------------------------------- P239 · UX-1723, UX-1721 (D4)
+
+/// Today's task and one overdue since [overdueDays] ago, which a «hoy» set
+/// takes (D2).
+List<Task> _todayAndOverdue({int overdueDays = -3}) => [
+  Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: day(0, 10)),
+  Task(
+    id: 2,
+    title: 'Devolver el libro a la biblioteca',
+    priority: 1,
+    dueDate: day(overdueDays),
+    hasTime: false,
+  ),
+];
+
+/// A «hoy» set changed by [changes].
+CaptureCommand _changeToday(Map<String, dynamic> changes) => command({
+  'kind': 'update',
+  'target': setTarget(from: day(0)),
+  'changes': changes,
+});
+
+/// The message after the tap names no other day.
+void _expectNoAlso() {
+  expect(find.textContaining('también'), findsNothing);
+  expect(find.textContaining(es.captureAlsoOnDays(2)), findsNothing);
+}
+
+void _p239OverdueLanding() {
+  group('UX loop 2026-10-21-changes, P239 (overdue tasks of a «hoy» set)', () {
+    testWidgets('UX-1723: «Adelanta todo lo de hoy un día» over today’s task '
+        'and one overdue since 3 days ago: both on yesterday, Calendar on '
+        'yesterday, «2 tareas movidas al <ayer>», no «también»', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayAndOverdue(),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeToday({'shift_days': -1}),
+      ], transcript: 'Adelanta todo lo de hoy un día');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(2));
+      expect(_buttonLabel(tester), startsWith('Mover 2 tareas'));
+      await _confirm(tester);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(app.tasks.byId(1)!.dueDate, day(-1, 10));
+      expect(Task.day(app.tasks.byId(2)!.dueDate!), day(-1));
+      expect(find.text(_dayHeading(day(-1))), findsOneWidget);
+      expect(find.text(es.todayAgenda), findsNothing);
+      final message = es.commandTasksMovedTo(2, _weekdayDate(tester, day(-1)));
+      expect(message, startsWith('2 tareas movidas al '));
+      expect(find.text(message), findsOneWidget);
+      _expectNoAlso();
+      for (final title in [
+        'Comprar pan',
+        'Devolver el libro a la biblioteca',
+      ]) {
+        expect(_calendarRow(title), findsOneWidget, reason: title);
+        expect(
+          tester.widget<TaskTile>(_calendarRow(title)).color,
+          _litColor(tester),
+          reason: '$title is lit',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1723: the overdue task overdue since yesterday, moved by '
+        '−1 day: both on yesterday, Calendar on yesterday, not on Today', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayAndOverdue(overdueDays: -1),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeToday({'shift_days': -1}),
+      ], transcript: 'Adelanta todo lo de hoy un día');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(2));
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(-1, 10));
+      expect(Task.day(app.tasks.byId(2)!.dueDate!), day(-1));
+      expect(find.text(_dayHeading(day(-1))), findsOneWidget);
+      expect(find.text(es.todayAgenda), findsNothing);
+      expect(
+        find.text(es.commandTasksMovedTo(2, _weekdayDate(tester, day(-1)))),
+        findsOneWidget,
+      );
+      _expectNoAlso();
+      expect(
+        tester
+            .widget<TaskTile>(_calendarRow('Devolver el libro a la biblioteca'))
+            .color,
+        _litColor(tester),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1723: unchanged: «Pon todo lo de hoy en prioridad alta» '
+        'with an overdue task: Calendar on Today, not on its own day; '
+        '«2 tareas cambiadas», no «también»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayAndOverdue(),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeToday({'priority': 3}),
+      ], transcript: 'Pon todo lo de hoy en prioridad alta');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(2));
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.priority, 3);
+      expect(app.tasks.byId(2)!.priority, 3);
+      expect(Task.day(app.tasks.byId(2)!.dueDate!), day(-3));
+      expect(find.text(es.todayAgenda), findsOneWidget);
+      expect(find.text(_dayHeading(day(-3))), findsNothing);
+      expect(find.text(es.commandTasksChanged(2)), findsOneWidget);
+      _expectNoAlso();
+      expect(
+        _calendarRow('Devolver el libro a la biblioteca'),
+        findsOneWidget,
+        reason: 'Today lists it, still overdue',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1723: unchanged: «Pon todo lo de hoy a las 18:00» with an '
+        'overdue task, which keeps its own earlier day: Calendar on Today, '
+        'no «también»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayAndOverdue(),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeToday({'time': '18:00'}),
+      ], transcript: 'Pon todo lo de hoy a las 18:00');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(2));
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(0, 18));
+      expect(app.tasks.byId(2)!.dueDate, day(-3, 18));
+      expect(find.text(es.todayAgenda), findsOneWidget);
+      expect(find.text(_dayHeading(day(-3))), findsNothing);
+      _expectNoAlso();
+      expect(_calendarRow('Devolver el libro a la biblioteca'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1721 (D4): «Retrasa todo lo de hoy un día» over today’s '
+        'task and one overdue since 3 days ago: both on tomorrow, Calendar on '
+        'tomorrow, «2 tareas movidas al <mañana>»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayAndOverdue(),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeToday({'shift_days': 1}),
+      ], transcript: 'Retrasa todo lo de hoy un día');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(2));
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(1, 10));
+      expect(Task.day(app.tasks.byId(2)!.dueDate!), day(1));
+      expect(find.text(_dayHeading(day(1))), findsOneWidget);
+      final message = es.commandTasksMovedTo(2, _weekdayDate(tester, day(1)));
+      expect(message, startsWith('2 tareas movidas al '));
+      expect(find.text(message), findsOneWidget);
+      _expectNoAlso();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1721 (D4): in that set, a task with only a deadline '
+        'overdue since 2 days ago: its deadline on tomorrow, no planned day; '
+        'Calendar on tomorrow lists it lit, «3 tareas movidas al <mañana>»', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          ..._todayAndOverdue(),
+          Task(
+            id: 3,
+            title: 'Pagar la factura del gas',
+            priority: 2,
+            deadline: day(-2),
+            reminderAnchor: 'deadline',
+          ),
+        ],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _changeToday({'shift_days': 1}),
+      ], transcript: 'Retrasa todo lo de hoy un día');
+      expect(_inResult(find.byType(CheckboxListTile)), findsNWidgets(3));
+      await _confirm(tester);
+      final gas = app.tasks.byId(3)!;
+      expect(gas.dueDate, isNull, reason: 'no planned day is added');
+      expect(Task.day(gas.deadline!), day(1));
+      expect(find.text(_dayHeading(day(1))), findsOneWidget);
+      expect(
+        find.text(es.commandTasksMovedTo(3, _weekdayDate(tester, day(1)))),
+        findsOneWidget,
+      );
+      _expectNoAlso();
+      final row = _calendarRow('Pagar la factura del gas');
+      expect(row, findsOneWidget);
+      expect(tester.widget<TaskTile>(row).color, _litColor(tester));
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+// --------------------------------------------- P240 of run 2026-10-21-changes
+//
+// UX-1725: after a voice move of a task with only a deadline, its row on
+// Calendar reads «Vence <day>» and no «Sin fecha».
+void _p240DeadlineRow() {
+  group('UX loop 2026-10-21-changes, P240 (UX-1725)', () {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('UX-1725: es ${scale}x on 360×800, «Pasa todas las tareas '
+          'de ayer a mañana» then «Mover 4 tareas»: on Calendar on tomorrow '
+          'the deadline-only «Pagar la factura del gas» reads «Vence '
+          '<tomorrow>» and no «Sin fecha», beside «4 tareas movidas al …»', (
+        tester,
+      ) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            for (final task in _fourYesterday())
+              if (task.id == 4)
+                Task(
+                  id: 4,
+                  title: task.title,
+                  priority: task.priority,
+                  deadline: day(-1),
+                  reminderAnchor: 'deadline',
+                )
+              else
+                task,
+          ],
+          projects: [_casa],
+          size: const Size(360, 800),
+          textScale: scale,
+        );
+        await app.showResult(tester, [
+          _moveYesterdayToTomorrow(),
+        ], transcript: 'Pasa todas las tareas de ayer a mañana');
+        expect(_buttonLabel(tester), es.commandBulkMove(4));
+        await _confirm(tester);
+        expect(find.byType(CaptureResult), findsNothing);
+        expect(find.text(_dayHeading(day(1))), findsOneWidget);
+        expect(
+          find.text(es.commandTasksMovedTo(4, _weekdayDate(tester, day(1)))),
+          findsOneWidget,
+        );
+        // At 2× the row may sit below the fold: scroll Calendar's day to it.
+        await tester.scrollUntilVisible(
+          find.text('Pagar la factura del gas'),
+          120,
+          scrollable: find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        final gas = _calendarRow('Pagar la factura del gas');
+        expect(gas, findsOneWidget);
+        final due = es.deadlineLabel(_weekdayDate(tester, day(1)));
+        expect(due, startsWith('Vence '));
+        final line = find.descendant(of: gas, matching: find.text(due));
+        expect(line, findsOneWidget, reason: 'the row reads «$due»');
+        expect(
+          find.descendant(of: gas, matching: find.textContaining(es.noDate)),
+          findsNothing,
+          reason: 'no «Sin fecha» in the row',
+        );
+        expect(
+          find.descendant(
+            of: gas,
+            matching: find.textContaining(es.deadlineOverdue),
+          ),
+          findsNothing,
+        );
+        // «Vence …» shows whole, inside the row.
+        final rect = tester.getRect(line);
+        final rowRect = tester.getRect(gas);
+        expect(rect.left, greaterThanOrEqualTo(rowRect.left - 0.5));
+        expect(rect.right, lessThanOrEqualTo(rowRect.right + 0.5));
+        expect(rect.bottom, lessThanOrEqualTo(rowRect.bottom + 0.5));
+        expect(tester.takeException(), isNull);
+      });
     }
   });
 }

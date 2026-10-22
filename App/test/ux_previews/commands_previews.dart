@@ -398,6 +398,36 @@ void commandPreviews() {
     );
 
     preview(
+      cards,
+      'change-deadline-only',
+      '«Pasa la factura del gas a mañana» for a task with only yesterday\'s deadline: one change line, the deadline\'s, yesterday → the chip «Mañana ▾», no «Fecha y hora» line, and Cambiar fecha.',
+      [es1, es2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), _yesterday()[3]],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['gas'],
+                'date': null,
+              },
+              'changes': {'date': key(day(1))},
+            }),
+          ],
+          transcript: 'Pasa la factura del gas a mañana',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
       landed,
       'change-applied',
       'Cambiar fecha tapped: Calendar with the moved task\'s message and Deshacer.',
@@ -867,7 +897,7 @@ void commandPreviews() {
     preview(
       landed,
       'bulk-applied',
-      'Mover 4 tareas tapped: Calendar on tomorrow with the moved tasks lit, «4 tareas movidas al jue, 22 de oct», naming the day, and Deshacer.',
+      'Mover 4 tareas tapped: Calendar on tomorrow with the moved tasks lit, «Pagar la factura del gas» (only a deadline) among them reading only «Vence <tomorrow>», with no «Sin fecha» and no «Fecha límite vencida», «4 tareas movidas al <tomorrow>», naming the day, and Deshacer.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(

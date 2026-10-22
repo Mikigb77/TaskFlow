@@ -1104,6 +1104,139 @@ void main() {
     );
   });
 
+  // ---- 2026-10-21-changes · P236 (UX-1720): why the words go to Google ----
+
+  group('UX-1720: the Voz privacy paragraph with the app’s fonts', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    /// Whether [rect] lies wholly inside [viewport].
+    bool inside(Rect rect, Rect viewport) =>
+        rect.top >= viewport.top - 0.5 &&
+        rect.bottom <= viewport.bottom + 0.5 &&
+        rect.left >= viewport.left - 0.5 &&
+        rect.right <= viewport.right + 0.5;
+
+    /// Voz in [language] at 2× text on 320×640, read down to its privacy
+    /// paragraph. At 2× on 320 dp the four sentences stand taller than the
+    /// page's scroll view, so "whole" is checked as a reader meets it: the
+    /// paragraph is laid out in full (nothing cut or ellipsized), its first
+    /// line and its last line each come fully into view on the screen, the
+    /// new [sentence] is in it and shows wholly at once, and nothing
+    /// overflows.
+    Future<void> expectWholeParagraph(
+      WidgetTester tester,
+      AppLocalizations l,
+      String language,
+      String sentence,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await openApp(
+        tester,
+        _JsonRegionalStore(RegionalPreferences(language: language)),
+        _Speech()..installed = false,
+        size: const Size(320, 640),
+      );
+      await openVoice(tester, l);
+      const screen = Rect.fromLTWH(0, 0, 320, 640);
+      final page = find.byType(VoiceSettingsScreen);
+      final privacy = find.descendant(
+        of: page,
+        matching: find.text(l.capturePrivacy),
+      );
+      final scrollable = find
+          .descendant(of: page, matching: find.byType(Scrollable))
+          .first;
+      await tester.scrollUntilVisible(privacy, 100, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      expect(privacy, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: privacy, matching: find.byType(RichText)).first,
+      );
+      final text = paragraph.text.toPlainText();
+      expect(text, l.capturePrivacy);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final start = text.indexOf(sentence);
+      expect(start, isNonNegative, reason: 'the new sentence is in it');
+
+      Rect viewport() => tester.getRect(scrollable).intersect(screen);
+      List<Rect> boxes(int from, int to) => [
+        for (final box in paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: from, extentOffset: to),
+        ))
+          box.toRect().shift(paragraph.localToGlobal(Offset.zero)),
+      ];
+
+      // Scrolled to the end of the page: the paragraph's last line is whole.
+      await tester.drag(scrollable, const Offset(0, -3000));
+      await tester.pumpAndSettle();
+      final end = tester.getRect(privacy);
+      expect(
+        inside(boxes(text.length - 1, text.length).last, viewport()),
+        isTrue,
+        reason: 'last line, paragraph $end, scroll view ${viewport()}',
+      );
+      expect(
+        end.bottom <= viewport().bottom + 0.5,
+        isTrue,
+        reason: 'paragraph $end, scroll view ${viewport()}',
+      );
+
+      // Scrolled back to the paragraph's top: its first line is whole, and so
+      // is the whole new sentence, at once.
+      await tester.ensureVisible(privacy);
+      await tester.pumpAndSettle();
+      final top = tester.getRect(privacy);
+      expect(
+        top.top >= viewport().top - 0.5,
+        isTrue,
+        reason: 'paragraph $top, scroll view ${viewport()}',
+      );
+      expect(inside(boxes(0, 1).first, viewport()), isTrue);
+      for (final box in boxes(start, start + sentence.length)) {
+        expect(
+          inside(box, viewport()),
+          isTrue,
+          reason: 'sentence line $box, scroll view ${viewport()}',
+        );
+      }
+      expect(tester.takeException(), isNull);
+    }
+
+    testWidgets(
+      'UX-1720: Voz in Spanish at 2× text on 320×640, scrolled down, shows the whole privacy paragraph with Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google. and nothing overflows',
+      (tester) async {
+        await expectWholeParagraph(
+          tester,
+          es,
+          'es',
+          'Para añadir, buscar o cambiar tareas, tus palabras van por internet '
+              'a la IA de Google.',
+        );
+      },
+    );
+
+    testWidgets(
+      'UX-1720: Voz in Catalan at 2× text on 320×640, scrolled down, shows the whole privacy paragraph with Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google. and nothing overflows',
+      (tester) async {
+        await expectWholeParagraph(
+          tester,
+          ca,
+          'ca',
+          'Per afegir, cercar o canviar tasques, les teves paraules van per '
+              'internet a la IA de Google.',
+        );
+      },
+    );
+  });
+
   // ---- 2026-10-14-speed · P103 (UX-603): the remembered answer ----
 
   testWidgets(

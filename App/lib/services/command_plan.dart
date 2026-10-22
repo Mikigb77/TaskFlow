@@ -39,6 +39,7 @@ class UpdatePlan {
     this.needsDay = false,
     this.seriesOnly = false,
     this.noDay = false,
+    this.movesDeadline = false,
   });
 
   /// The task as stored: a repeating one is the whole series.
@@ -79,6 +80,10 @@ class UpdatePlan {
   /// Days to move by (`shift_days`), for a task with no day and no
   /// deadline: there is nothing to move.
   final bool noDay;
+
+  /// A task with only a deadline, moved to a day, by days or to a time: its
+  /// [deadline] moved in place of a planned day it doesn't have.
+  final bool movesDeadline;
 
   bool get repeating => task.isRecurring;
 
@@ -216,13 +221,26 @@ UpdatePlan planUpdate({
   final shift = changes.has('date') ? null : changes.shiftDays;
   final planned = shown.displayDate;
   final due = shown.displayDeadline ?? task.deadline;
+  final namesDeadline =
+      changes.has('deadline_date') || changes.has('deadline_time');
+  // A task with only a deadline: a day said, a time said or days to move by
+  // move its deadline, where Calendar lists it, and it gets no planned day.
+  // A change that names the deadline too sets each as said.
+  final onDeadline =
+      planned == null &&
+      due != null &&
+      !namesDeadline &&
+      ((changes.has('date') && changes.date != null) ||
+          (!changes.has('date') && changes.time != null) ||
+          shift != null);
 
   // The planned day and time: a new day keeps the time, unless a time is
   // said too; a new time keeps the day. Moved by days, it keeps its time.
   Schedule? schedule;
   var needsDay = false;
   var seriesOnly = false;
-  if (changes.has('date') || changes.has('time') || shift != null) {
+  if (!onDeadline &&
+      (changes.has('date') || changes.has('time') || shift != null)) {
     final current = (date: planned, hasTime: shown.hasTime);
     if (changes.has('date') && changes.date == null) {
       schedule = (date: null, hasTime: false);
@@ -243,16 +261,20 @@ UpdatePlan planUpdate({
     if (schedule != null && _same(schedule, current)) schedule = null;
   }
 
-  // The deadline, the same way. A task with only a deadline, moved by
-  // days, moves its deadline.
+  // The deadline, the same way: a day said or days to move by keep its
+  // time, unless a time is said too; a time said keeps its day.
   Schedule? deadline;
-  if (shift != null &&
-      planned == null &&
-      due != null &&
-      !changes.has('deadline_date') &&
-      !changes.has('deadline_time')) {
-    deadline = (date: shiftedBy(due, shift), hasTime: task.deadlineHasTime);
-  } else if (changes.has('deadline_date') || changes.has('deadline_time')) {
+  if (onDeadline) {
+    final current = (date: due, hasTime: task.deadlineHasTime);
+    final base = changes.has('date')
+        ? changes.date!
+        : shift != null
+        ? shiftedBy(due, shift)
+        : due;
+    final clock = changes.has('time') ? changes.time : _clockOf(current);
+    deadline = _at(base, clock);
+    if (_same(deadline, current)) deadline = null;
+  } else if (namesDeadline) {
     final current = (
       date: shown.displayDeadline ?? task.deadline,
       hasTime: task.deadlineHasTime,
@@ -343,5 +365,6 @@ UpdatePlan planUpdate({
     needsDay: needsDay,
     seriesOnly: seriesOnly,
     noDay: shift != null && planned == null && due == null,
+    movesDeadline: onDeadline && deadline != null,
   );
 }

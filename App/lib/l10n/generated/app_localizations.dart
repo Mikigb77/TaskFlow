@@ -1792,10 +1792,10 @@ abstract class AppLocalizations {
   /// **'Keep'**
   String get keep;
 
-  /// No description provided for @capturePrivacy.
+  /// The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI, saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet.
   ///
   /// In en, this message translates to:
-  /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. AI task extraction still needs the internet and sends your words to Google. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.'**
+  /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.'**
   String get capturePrivacy;
 
   /// One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings.

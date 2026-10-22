@@ -1017,7 +1017,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. L’extracció de tasques amb IA necessita internet i envia les teves paraules a Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
+      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
 
   @override
   String get capturePrivacyLine =>

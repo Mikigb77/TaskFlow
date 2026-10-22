@@ -373,13 +373,15 @@ Future<void> _applySet(
   }
 }
 
-/// A change that only moves its task to another day or time: its button
-/// reads `Cambiar fecha` and its message names the day.
+/// A change that only moves its task to another day or time, or a task with
+/// only a deadline its deadline: its button reads `Cambiar fecha` and its
+/// message names the day.
 bool _onlyMoved(UpdatePlan? plan) =>
     plan != null &&
-    plan.schedule != null &&
+    (plan.schedule != null
+        ? plan.deadline == null
+        : plan.movesDeadline && plan.deadline != null) &&
     plan.title == null &&
-    plan.deadline == null &&
     plan.priority == null &&
     plan.notes == null &&
     plan.assignee == null;
@@ -3652,13 +3654,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         for (final completion in applied.completed)
           if (completion.days.isNotEmpty) completion,
       ];
-      // The overdue tasks a «hoy» set took were listed on Today: left on an
-      // earlier day, they land on Today, not on their own day.
+      // The overdue tasks a «hoy» set took were listed on Today: changed in
+      // place or marked done, so left on an earlier day, they land on Today,
+      // not on their own day. A set that moves to a day or by days moves
+      // them too, and they land where they went.
       final today = Task.day(ref.read(calendarClockProvider)());
       final overdueIds = {
         for (final view in actionable)
-          for (final item in view.bulk?.selected ?? const <BulkItem>[])
-            if (item.overdue) item.stored.id,
+          if (!view.command.changes.has('date') &&
+              view.command.changes.shiftDays == null)
+            for (final item in view.bulk?.selected ?? const <BulkItem>[])
+              if (item.overdue) item.stored.id,
       };
       DateTime onToday(int? id, DateTime date) =>
           overdueIds.contains(id) && Task.day(date).isBefore(today)
@@ -3679,7 +3685,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           .toList();
       final moved = updates.length == 1 ? updates.single.plan : null;
       // Only moved to another day or time: the message names the day.
-      final moving = _onlyMoved(moved) ? moved!.schedule : null;
+      final moving = _onlyMoved(moved)
+          ? moved!.schedule ?? moved.deadline
+          : null;
       // A set moved, and nothing else changed: «5 tareas movidas».
       final setsMoved =
           updates.any((view) => view.bulk != null) &&
