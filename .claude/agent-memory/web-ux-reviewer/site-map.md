@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Snapshot 2026-10-22 (after run 2026-10-21-changes). Check against the code before relying on line numbers.
+Snapshot 2026-10-22 (after run 2026-10-21-changes; 2026-10-22-changes changed only copy in `features.calendar.body` and FAQ item 2, plus `.feature-card p` wrapping). Check against the code before relying on line numbers.
 
 **Home** (`src/components/HomePage.tsx`; copy in `src/content/site/{en,es,ca}.ts`, shared type `types.ts`):
 - hero `#hero-title`; primary CTA → `#voice` (`.button`), secondary text link → `#features`

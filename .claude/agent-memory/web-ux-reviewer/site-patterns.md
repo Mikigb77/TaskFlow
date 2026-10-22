@@ -41,6 +41,10 @@ Settled by run 2026-10-18-site (b1-b5, closed 2026-10-20). Enforce these; a devi
 - Catalan uses «suprimir/supressió» for the account (eliminar only for records/exports).
 - Per-page openGraph + twitter (summary_large_image) in the page's language.
 
+**Feature-card / prose wrapping**: `text-wrap: pretty` on `.feature-card p` (`global.css:583`, WEB-1105), `.floating-note p`, `.closing-card > p`; any new paragraph style that can end on one word gets it too. Lengthening a card sentence: crop es/ca mobile full renders (screens 4-5) for a one-word last line and the drawing still reaching the card's bottom edge (WEB-1004).
+
+**Reminder wording**: site says «recordatorios»/«recordatoris» everywhere; the app's ES/CA Pro screen says «avisos» (`app_es.arb:1408`) — accepted, not a finding. Don't quote the app's «A tu manera» label on the site. The short line under the demo omits reminders by decision (WD2/WD14).
+
 **Language**: every string in en/es/ca from one shared type; app's words for features; no jargon (draft, allowance, sync, transcript, voice-to-task) on home.
 
 Related: [[site-map]], [[recurring-problems]].

@@ -10,7 +10,7 @@ Snapshot 2026-10-22 (after run 2026-10-22-changes) (English lines in `src/conten
 | Feature claimed | Site (en) | Source of truth |
 |---|---|---|
 | Android only; not on Google Play yet, can't download | site en.ts hero ~7, status ~52, FAQ ~89, closing ~124, demo hand-over ~184, header `comingSoon` ~23 | ux-web DECISIONS (Play not published) |
-| Several tasks in one dictation; calendar card ends "TaskFlow can remind you of tasks with a date." (no "asks you once": reminder plans also ask per task 2+ weeks away); hero "can remind you before it" | en.ts ~49, ~61, hero | app ARBs, ux-review DECISIONS (reminder plans), `App/lib/widgets/reminder_plan_sheet.dart` |
+| Several tasks in one dictation; calendar card ends "TaskFlow can remind you of tasks with a date, more and more often as the day gets closer." (WD20; ES «cada vez más a menudo según se acerca el día», matches app `reminderPlanGrowing` «Cada vez más a menudo»); hero "can remind you before it" | en/es/ca.ts:61, hero | `Backend/docs/REMINDER_PLANS.md:11, 50-56` (strengths free), app ARBs, `App/lib/services/reminder_plans.dart:105-110` |
 | Privacy §4: "With Pro, words you type for the AI are sent the same way. Without Pro, the task form never sends anything to the AI." (Pro reminder sheet sends own-words to `ai/reminder-plan/`) | legal en.ts:55 | `App/lib/widgets/reminder_plan_sheet.dart:207,219,252,476` (free: own-words row opens Pro) |
 | Voice finds and changes tasks too, incl. bulk (move yesterday's to tomorrow, complete many at once; one undo) | FAQ "How do I add tasks by voice?" en.ts ~104; calendar/voice card sentence ~71 | ux-review DECISIONS 2026-10-21 "Bulk voice commands"; `Backend/docs/VOICE_COMMANDS.md:400` (no Pro needed) |
 | Home-screen shortcut/widget "Dictate a task" / «Dictar una tarea» / «Dicta una tasca»; share text from WhatsApp | FAQ 8th item en.ts ~122-125 | `App/android/app/src/main/res/values{,-es,-ca}/strings.xml:3,11`; `AndroidManifest.xml:46-48` (`text/plain`) |
@@ -19,7 +19,7 @@ Snapshot 2026-10-22 (after run 2026-10-22-changes) (English lines in `src/conten
 | Files on tasks, backed up, 6 MB each | en.ts ~76 | free-tier plan / backend limits |
 | Offline use | features offline card ~78, FAQ ~107 | IMPLEMENTATION_STATUS |
 | Sharing with family | FAQ ~112 | sharing docs, ARBs |
-| Free: 10 dictations/month; form unlimited after; Pro: unlimited dictation + files, 50/day safety limit, typed sentences to tasks, monthly, price not set | FAQ ~94 | free-tier-plan.md, REVENUECAT_SETUP.md |
+| Free: 10 dictations/month; form unlimited after; "Reminders are free too, even the ones that come more and more often…" (WD21); Pro: unlimited dictation + files, 50/day safety limit, then separate sentence "It also turns sentences you type into tasks, and lets you ask for reminders in your own words."; monthly, price not set (price sentence last) | FAQ "Is TaskFlow free?" en.ts:94, es.ts:94, ca.ts:100 | free-tier-plan.md, REVENUECAT_SETUP.md, `REMINDER_PLANS.md:13, 90-105` (own words Pro only, 402), `reminder_plan_sheet.dart:454-461`, `app_en.arb` `billingReasonReminderPlans` |
 | Live demo: 3 tries; recording not kept; quota records only | demo badge; privacy §8 #website | `src/lib/voice/policy.ts` |
 | Google sign-in keeps first name only, no photo (NOT "no surname": falls back to full `name`) | privacy §2 #data | `Backend/core/google_auth.py:42-45` |
 | 6-digit email code, 30 min | privacy §2 | `Backend/docs/EMAIL_VERIFICATION.md:3` |
