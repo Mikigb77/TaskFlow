@@ -53,7 +53,7 @@ const MAIN_RUN = webrun(WSL, 'main', MAIN_PORT)
 // The build served once, so the whole suite and the renders run side by side against it, each
 // Playwright run with its own output folder.
 const MAIN_SERVED = webrun(WSL, 'main', MAIN_PORT, true)
-const SIDE_BY_SIDE = `${MAIN_SERVED} 'npx playwright test --reporter=dot > /tmp/ux-suite.log 2>&1 & s=$!; (rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=4 --grep-invert "perf " --reporter=dot --output=test-results-renders > /tmp/ux-renders.log 2>&1) & r=$!; wait $s; se=$?; wait $r; re=$?; tail -n 40 /tmp/ux-suite.log; tail -n 15 /tmp/ux-renders.log; echo "suite exit $se, renders exit $re"'`
+const SIDE_BY_SIDE = `${MAIN_SERVED} 'npx playwright test --reporter=dot --workers=6 > /tmp/ux-suite.log 2>&1 & s=$!; (rm -rf artifacts/ux-web && UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=4 --grep-invert "perf " --reporter=dot --output=test-results-renders > /tmp/ux-renders.log 2>&1) & r=$!; wait $s; se=$?; wait $r; re=$?; tail -n 40 /tmp/ux-suite.log; tail -n 15 /tmp/ux-renders.log; echo "suite exit $se, renders exit $re"'`
 const PERF = `${MAIN_RUN} 'UX_RENDERS=1 npx playwright test tests/ux-renders.spec.ts --workers=1 --grep "perf " --reporter=dot'`
 // A verifier checks at most this many packages, so a wide wave still gets focused checks.
 const VERIFY_CHUNK = 4
@@ -379,6 +379,7 @@ function mergePrompt(items) {
 const FULL_CHECK = [
   `The check, in order: ${MAIN_RUN} 'npm run check'; then 'npm run legal:check'; then 'SITE_URL=https://taskflow.garbar.tech npm run build'.`,
   `Then the whole suite and the renders side by side, against that build, as exactly this one command: ${SIDE_BY_SIDE}`,
+  'It takes about 11 minutes (on 2026-10-22 the suite alone was 1392 tests in 10.8 minutes), longer than one tool call may run: start it with the Bash tool\'s run_in_background, then wait for it to finish before reading its output.',
   `Then ${MAIN_RUN} 'npm run test:unit', and lab performance on its own: ${PERF}`,
   'Then check the acceptance checks that artifacts/ux-web/AUDIT.md measures against its rows.',
 ].join('\n')

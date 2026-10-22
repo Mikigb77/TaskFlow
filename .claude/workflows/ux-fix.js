@@ -328,6 +328,7 @@ function sideBySide(previews) {
   return [
     'Run the slow checks side by side, in one shell command from App/, and wait for both:',
     `mkdir -p build/round-check && ( ${gate}flutter test --no-pub --reporter failures-only > build/round-check/suite.log 2>&1; echo "suite exit $?" ) & ( ${previews} > build/round-check/previews.log 2>&1; echo "previews exit $?" ) & wait`,
+    'It can take longer than one tool call may run (the suite alone took 8 minutes on 2026-10-22): start it with the Bash tool\'s run_in_background, and wait for it to finish.',
     'Then read the tails of build/round-check/suite.log and previews.log. Run the previews one after another inside their group, each through the gate.',
   ].join('\n')
 }
