@@ -13,6 +13,7 @@ import 'package:agenda/services/bulk_plan.dart';
 import 'package:agenda/services/command_plan.dart';
 import 'package:agenda/services/task_matcher.dart';
 import 'package:agenda/services/text_search.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/schedule_editor.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
@@ -147,14 +148,16 @@ class CommandView {
   String get projectName => spokenProjectName(command.name);
 }
 
-/// Works out [command] against the phone's [tasks] and [projects]. When the
-/// project said matched several, it waits for one to be tapped, then is
-/// worked out as if that one had been said.
+/// Works out [command] against the phone's [tasks] and [projects], today
+/// being [now]'s day (Calendar's). When the project said matched several,
+/// it waits for one to be tapped, then is worked out as if that one had
+/// been said.
 CommandView resolveCommand(
   CaptureCommand command, {
   required List<Task> tasks,
   required List<TaskListInfo> projects,
   int? accountId,
+  DateTime? now,
 }) {
   final choices = _projectChoices(command, projects);
   if (choices.isEmpty) {
@@ -164,6 +167,7 @@ CommandView resolveCommand(
       tasks: tasks,
       projects: projects,
       accountId: accountId,
+      now: now,
     );
   }
   final picked = choices.where((p) => p.id == command.choice).firstOrNull;
@@ -175,6 +179,7 @@ CommandView resolveCommand(
     projects: projects,
     accountId: accountId,
     choices: choices,
+    now: now,
   );
 }
 
@@ -206,6 +211,7 @@ CommandView _resolve(
   required List<TaskListInfo> projects,
   int? accountId,
   List<TaskListInfo> choices = const [],
+  DateTime? now,
 }) {
   final withProject = identical(asked, command) ? null : asked;
   switch (command.kind) {
@@ -247,6 +253,7 @@ CommandView _resolve(
             tasks: tasks,
             projects: projects,
             accountId: accountId,
+            now: now,
           ),
         );
       }
@@ -258,6 +265,7 @@ CommandView _resolve(
         asked.target,
         canEdit: canEdit,
         completing: completing,
+        now: now,
       );
       // None to edit: the same search among all, for the line saying why.
       final viewOnly = matches.isNotEmpty
@@ -267,6 +275,7 @@ CommandView _resolve(
               asked.target,
               canEdit: (_) => true,
               completing: completing,
+              now: now,
             ).where((task) => !canEdit(task.listId)).firstOrNull;
       final chosen = command.taskId == null
           ? null
@@ -642,6 +651,9 @@ Widget _askingProject(
 }
 
 /// A card's first line: what it is about, with ✕ when it can be taken out.
+/// A move's [chip] follows the [text], and they wrap together as one
+/// heading; TalkBack then hears the heading as [semanticsLabel], then the
+/// chip.
 class _Header extends StatelessWidget {
   const _Header({
     required this.icon,
@@ -650,6 +662,8 @@ class _Header extends StatelessWidget {
     this.onRemove,
     this.removeLabel,
     this.enabled = true,
+    this.chip,
+    this.semanticsLabel,
   });
   final IconData icon;
   final String text;
@@ -657,11 +671,22 @@ class _Header extends StatelessWidget {
   final VoidCallback? onRemove;
   final String? removeLabel;
   final bool enabled;
+  final Widget? chip;
+  final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final tint = color ?? theme.colorScheme.primary;
+    // TalkBack hears the card by this line, as shown, or by the whole
+    // sentence when the day is a chip.
+    final headline = Text(
+      text,
+      key: const ValueKey('command-headline'),
+      semanticsLabel: semanticsLabel,
+      style: theme.textTheme.titleMedium?.copyWith(color: color),
+    );
+    final chip = this.chip;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -671,15 +696,17 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            // TalkBack hears the card by this line, as shown.
-            child: Text(
-              text,
-              key: const ValueKey('command-headline'),
-              style: theme.textTheme.titleMedium?.copyWith(color: color),
-            ),
-          ),
+          child: chip == null
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: headline,
+                )
+              // The chip is as tall as the ✕ already.
+              : Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  children: [headline, chip],
+                ),
         ),
         if (onRemove != null)
           IconButton(
@@ -690,6 +717,74 @@ class _Header extends StatelessWidget {
         else
           const SizedBox(width: 8),
       ],
+    );
+  }
+}
+
+/// The day of a move, as a chip with ▾: a tap opens «Elegir día» on [day],
+/// with no «Sin fecha», and the day picked goes to [onPicked], as if it had
+/// been said. Disabled without [onPicked]. A long label wraps rather than
+/// being cut.
+class _MoveDayChip extends StatelessWidget {
+  const _MoveDayChip({
+    required this.label,
+    required this.day,
+    required this.onPicked,
+    this.style,
+  });
+  final String label;
+  final DateTime day;
+  final ValueChanged<DateTime>? onPicked;
+  final TextStyle? style;
+
+  /// 8 dp around, up to 8 dp each side of the label, and the border.
+  static const _frame = 16.0 + 16 + 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final onPicked = this.onPicked;
+    return LayoutBuilder(
+      builder: (context, box) => ActionChip(
+        key: const ValueKey('command-move-day'),
+        tooltip: l.pickDay,
+        labelStyle: style,
+        // A chip measures its label at its whole width before taking off
+        // its padding, so the label keeps to what is left.
+        label: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.max(0, box.maxWidth - _frame),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  softWrap: true,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const DropDownMark(),
+            ],
+          ),
+        ),
+        onPressed: onPicked == null
+            ? null
+            : () async {
+                final result = await editSchedule(
+                  context,
+                  date: day,
+                  hasTime: false,
+                  title: l.pickDay,
+                  dayOnly: true,
+                  noDate: false,
+                );
+                final date = result?.date;
+                if (date != null) onPicked(Task.day(date));
+              },
+      ),
     );
   }
 }
@@ -1057,24 +1152,27 @@ class _FoundRow extends ConsumerWidget {
 }
 
 /// What a listed task's row says under its title: its day and time, or its
-/// deadline when it has only that; its project; the person, when the
-/// project is shared; and «Completada» when done. [shown] is the task as
-/// listed (a repetition), null for a series with none left open. Null when
-/// there is nothing to say.
+/// deadline when it has only that, with «Atrasada» when [overdue]; its
+/// project; the person, when the project is shared; and «Completada» when
+/// done. [shown] is the task as listed (a repetition), null for a series
+/// with none left open. Null when there is nothing to say.
 String? _taskDetails(
   BuildContext context, {
   required Task task,
   required Task? shown,
   required List<TaskListInfo> projects,
   int? accountId,
+  bool overdue = false,
 }) {
   final project = projects.where((p) => p.id == task.listId).firstOrNull;
   final day = shown ?? task;
+  final when = day.displayDate != null
+      ? taskDayLine(context, day)
+      : task.deadline != null
+      ? taskDeadlineLabel(context, task)
+      : null;
   final details = [
-    if (day.displayDate != null)
-      taskDayLine(context, day)
-    else if (task.deadline != null)
-      taskDeadlineLabel(context, task),
+    if (when != null) overdue ? context.l10n.overdueDate(when) : when,
     ?project?.name,
     if (project?.shared == true) responsibilityLabel(context, task, accountId),
     if (shown == null || shown.isCompleted) context.l10n.commandCompleted,
@@ -1304,6 +1402,55 @@ class UpdateCommandCard extends ConsumerWidget {
             ),
           ),
         );
+    // Moved to a day, by a day or by days: the new day is a chip, and a day
+    // picked is as if it had been said.
+    final moves =
+        command.changes.date != null || command.changes.shiftDays != null;
+    Widget dayChip(String label, DateTime day) => _MoveDayChip(
+      label: label,
+      day: day,
+      style: theme.textTheme.bodyLarge,
+      onPicked: enabled
+          ? (day) => onChanged(
+              command.copyWith(changes: command.changes.movedTo(day)),
+            )
+          : null,
+    );
+    // The line with the new day: «lun, 26 oct · 10:00 →», then the chip.
+    // TalkBack hears the line as one, then the chip.
+    Widget moveLine(
+      IconData icon,
+      String label,
+      String before,
+      String after,
+      DateTime day,
+    ) => Padding(
+      padding: const EdgeInsets.only(left: 34, right: 8, bottom: 6),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 4,
+        children: [
+          Semantics(
+            label: l.commandChangeSemantics(label, before, after),
+            excludeSemantics: true,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 8),
+                  child: Icon(icon, size: 18, color: theme.colorScheme.primary),
+                ),
+                Flexible(
+                  child: Text('$before →', style: theme.textTheme.bodyLarge),
+                ),
+              ],
+            ),
+          ),
+          dayChip(after, day),
+        ],
+      ),
+    );
     final current = (date: shown.displayDate, hasTime: shown.hasTime);
     final deadline = (
       date: shown.displayDeadline ?? task.deadline,
@@ -1350,12 +1497,21 @@ class UpdateCommandCard extends ConsumerWidget {
         if (plan.title != null)
           line(Icons.short_text_rounded, l.taskTitle, task.title, plan.title!),
         if (plan.schedule case final schedule?)
-          line(
-            Icons.calendar_today_outlined,
-            l.reviewSchedule,
-            scheduleText(context, current),
-            scheduleText(context, schedule),
-          ),
+          if (moves && schedule.date != null)
+            moveLine(
+              Icons.calendar_today_outlined,
+              l.reviewSchedule,
+              scheduleText(context, current),
+              scheduleText(context, schedule),
+              schedule.date!,
+            )
+          else
+            line(
+              Icons.calendar_today_outlined,
+              l.reviewSchedule,
+              scheduleText(context, current),
+              scheduleText(context, schedule),
+            ),
         // The box spans the card, for the chips' room at large text.
         if (asksDay)
           Padding(
@@ -1406,12 +1562,25 @@ class UpdateCommandCard extends ConsumerWidget {
             ),
           ),
         if (plan.deadline case final changed?)
-          line(
-            Icons.flag_outlined,
-            l.deadline,
-            scheduleText(context, deadline, none: l.deadlineUnset),
-            scheduleText(context, changed, none: l.deadlineUnset),
-          ),
+          // A task with only a deadline moves its deadline.
+          if (moves &&
+              plan.schedule == null &&
+              current.date == null &&
+              changed.date != null)
+            moveLine(
+              Icons.flag_outlined,
+              l.deadline,
+              scheduleText(context, deadline, none: l.deadlineUnset),
+              scheduleText(context, changed, none: l.deadlineUnset),
+              changed.date!,
+            )
+          else
+            line(
+              Icons.flag_outlined,
+              l.deadline,
+              scheduleText(context, deadline, none: l.deadlineUnset),
+              scheduleText(context, changed, none: l.deadlineUnset),
+            ),
         if (plan.priority case final priority?)
           line(
             Icons.flag_outlined,
@@ -1496,7 +1665,33 @@ class UpdateCommandCard extends ConsumerWidget {
             !plan.noDay &&
             plan.problem == null)
           plan.asked
-              ? _Note(l.commandNothingToChange)
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Note(l.commandNothingToChange),
+                    // Already on the day said: its chip, to pick another.
+                    if (moves && (current.date ?? deadline.date) != null)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 34,
+                          right: 8,
+                          bottom: 4,
+                        ),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: current.date != null
+                              ? dayChip(
+                                  scheduleText(context, current),
+                                  current.date!,
+                                )
+                              : dayChip(
+                                  scheduleText(context, deadline),
+                                  deadline.date!,
+                                ),
+                        ),
+                      ),
+                  ],
+                )
               : Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: Padding(
@@ -1693,6 +1888,26 @@ String bulkAssignee(CaptureCommand command, List<TaskListInfo> projects) {
   return person?.name ?? changes.assigneeName ?? '';
 }
 
+/// The day a set moves to, as its heading says it: `when` is `today`,
+/// `tomorrow` or `other`, and `day` needs no month for today and tomorrow:
+/// «mañana, jue 22», the weekday and its number joined by a no-break space,
+/// so they wrap as one.
+({String when, String day}) _moveDay(BuildContext context, DateTime date) {
+  final today = DateUtils.dateOnly(DateTime.now());
+  final day = Task.day(date);
+  final when = day == today
+      ? 'today'
+      : day == DateTime(today.year, today.month, today.day + 1)
+      ? 'tomorrow'
+      : 'other';
+  return (
+    when: when,
+    day: when == 'other'
+        ? context.weekdayDate(date)
+        : DateFormat('E\u00A0d', context.localeName).format(date),
+  );
+}
+
 /// A bulk command's heading, with its live [BulkPlan.count]: «Mover 5 tareas
 /// a mañana, jue 22», «Mover 3 tareas una semana después», «Asignar 4
 /// tareas a Paul», «Cambiar 4 tareas», «Marcar 4 tareas como hechas»,
@@ -1708,20 +1923,8 @@ String bulkHeading(
   final changes = view.command.changes;
   switch (bulk.action) {
     case BulkAction.move:
-      final date = changes.date!;
-      final today = DateUtils.dateOnly(DateTime.now());
-      final day = Task.day(date);
-      final when = day == today
-          ? 'today'
-          : day == DateTime(today.year, today.month, today.day + 1)
-          ? 'tomorrow'
-          : 'other';
-      // Today and tomorrow need no month: «mañana, jue 22», the weekday
-      // and its number joined by a no-break space, so they wrap as one.
-      final shown = when == 'other'
-          ? context.weekdayDate(date)
-          : DateFormat('E\u00A0d', context.localeName).format(date);
-      return l.commandBulkMoveTo(count, when, shown);
+      final moved = _moveDay(context, changes.date!);
+      return l.commandBulkMoveTo(count, moved.when, moved.day);
     case BulkAction.shift:
       final days = changes.shiftDays!;
       final weeks = days % 7 == 0;
@@ -1941,9 +2144,33 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
       CommandKind.complete => Icons.task_alt_rounded,
       _ => Icons.edit_outlined,
     };
-    Widget header(String text, {bool removable = false}) => _Header(
+    // A move's day is a chip: a day picked is as if it had been said.
+    final moveTo = bulk.action == BulkAction.move ? command.changes.date : null;
+    Widget? dayChip() {
+      if (moveTo == null) return null;
+      final moved = _moveDay(context, moveTo);
+      return _MoveDayChip(
+        label: l.commandMoveDay(moved.when, moved.day),
+        day: moveTo,
+        style: theme.textTheme.titleMedium,
+        onPicked: widget.enabled
+            ? (day) => widget.onChanged(
+                command.copyWith(changes: command.changes.movedTo(day)),
+              )
+            : null,
+      );
+    }
+
+    Widget header(
+      String text, {
+      bool removable = false,
+      Widget? chip,
+      String? semanticsLabel,
+    }) => _Header(
       icon: icon,
       text: text,
+      chip: chip,
+      semanticsLabel: semanticsLabel,
       color: delete && removable ? colors.error : null,
       onRemove: removable ? widget.onRemove : null,
       removeLabel: switch (command.kind) {
@@ -2038,6 +2265,8 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
         );
       }
       // Tasks matched, and none of them would change: why, in one line.
+      // Moved to a day, its chip stays under it, to pick another.
+      final chip = bulk.matched > 0 ? dayChip() : null;
       return _Frame(
         question: question,
         children: [
@@ -2046,6 +2275,14 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
           ),
           if (problem != null && leftOut != null)
             _Note(leftOut, icon: Icons.info_outline),
+          if (chip != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 34, right: 8, bottom: 4),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: chip,
+              ),
+            ),
         ],
       );
     }
@@ -2060,6 +2297,7 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
         shown: task,
         projects: projects,
         accountId: accountId,
+        overdue: item.overdue,
       );
       return CheckboxListTile(
         key: ValueKey('bulk-${command.id}-${item.key}'),
@@ -2111,7 +2349,15 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
       question: question,
       destructive: delete,
       children: [
-        header(bulkHeading(context, view, projects), removable: true),
+        if (moveTo != null)
+          header(
+            l.commandBulkMoveLead(bulk.count, _moveDay(context, moveTo).when),
+            removable: true,
+            chip: dayChip(),
+            semanticsLabel: bulkHeading(context, view, projects),
+          )
+        else
+          header(bulkHeading(context, view, projects), removable: true),
         if (sets != null) _Note(sets),
         if (problem != null) _Note(problem, icon: Icons.info_outline),
         // Apart from the ✕ above, so the first task isn't tapped for it.

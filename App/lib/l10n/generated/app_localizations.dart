@@ -6340,6 +6340,18 @@ abstract class AppLocalizations {
   /// **'{when, select, today{{count, plural, =1{Move 1 task to today, {day}} other{Move {count} tasks to today, {day}}}} tomorrow{{count, plural, =1{Move 1 task to tomorrow, {day}} other{Move {count} tasks to tomorrow, {day}}}} other{{count, plural, =1{Move 1 task to {day}} other{Move {count} tasks to {day}}}}}'**
   String commandBulkMoveTo(int count, String when, String day);
 
+  /// The start of commandBulkMoveTo, shown before the day's chip (commandMoveDay) on a dictation's card that moves a set of tasks to one day: commandBulkMoveLead, a space and commandMoveDay read as commandBulkMoveTo, word for word. {count} is how many are still ticked, and changes as the person unticks them. {when} is today, tomorrow or other, as in commandBulkMoveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'{when, select, today{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}} tomorrow{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}} other{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}}}'**
+  String commandBulkMoveLead(int count, String when);
+
+  /// The day of a move on a dictation's card, as a chip after commandBulkMoveLead; a tap opens “Pick a day” to choose another. It ends commandBulkMoveTo, word for word. {when} is today, tomorrow or other. {day} is, for today and tomorrow, the weekday and the day of the month (“Thu 22”); otherwise the day weekday first, as the app shows days (“Thu, Oct 29”).
+  ///
+  /// In en, this message translates to:
+  /// **'{when, select, today{today, {day}} tomorrow{tomorrow, {day}} other{{day}}}'**
+  String commandMoveDay(String when, String day);
+
   /// Heading of a dictation's card that moves a set of tasks by some days, each keeping its time (“move this week's to next week”). {count} is how many are still ticked. {span} is commandBulkSpan (“a week”, “2 days”). {direction} is earlier or later.
   ///
   /// In en, this message translates to:

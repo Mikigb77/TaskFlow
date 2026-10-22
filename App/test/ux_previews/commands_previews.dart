@@ -114,6 +114,25 @@ List<Task> _yesterday() => [
   ),
 ];
 
+/// Two tasks Today lists under «Atrasadas»: one dated two days ago, one
+/// with only a deadline, yesterday.
+List<Task> _overdue() => [
+  Task(
+    id: 65,
+    title: 'Devolver el libro a la biblioteca',
+    priority: 1,
+    dueDate: day(-2),
+    hasTime: false,
+  ),
+  Task(
+    id: 66,
+    title: 'Pagar la factura del gas',
+    priority: 2,
+    deadline: day(-1),
+    reminderAnchor: 'deadline',
+  ),
+];
+
 /// A set (`"all": true`) as the server sends it: open tasks by default,
 /// over one day when [from] alone is given.
 Map<String, dynamic> _set({
@@ -360,7 +379,7 @@ void commandPreviews() {
     preview(
       cards,
       'change',
-      '«Pasa la peluquería a la semana que viene»: the task and its day before → after, with Cambiar fecha.',
+      '«Pasa la peluquería a la semana que viene»: the task and its day before →, the new day a chip with ▾ that opens «Elegir día», and Cambiar fecha.',
       [es1, es2, ca2, esDark],
       (p) async {
         final app = await PreviewApp.open(
@@ -626,7 +645,7 @@ void commandPreviews() {
     preview(
       cards,
       'mixed',
-      'A task, a change and a deletion said at once: the task first, then the change and the deletion; one button does all three.',
+      'A task, a change and a deletion said at once: the task first, then the change, its new day a chip with ▾, and the deletion; one button does all three.',
       [es1, es2, ca2, en2],
       (p) async {
         final app = await PreviewApp.open(
@@ -782,7 +801,7 @@ void commandPreviews() {
     preview(
       cards,
       'bulk-move',
-      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a mañana, jue 22», the weekday and its number kept on one line, yesterday\'s open tasks with their day and, when they have one, their project, all ticked, and «Mover 4 tareas»; the one already done stays.',
+      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a», then the day as a chip with ▾, «mañana, <tomorrow>», the weekday and its number kept on one line, that opens «Elegir día»; yesterday\'s open tasks with their day and, when they have one, their project, all ticked, and «Mover 4 tareas»; the one already done stays.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -796,6 +815,29 @@ void commandPreviews() {
           commands: [command(_moveYesterday())],
           transcript: 'Pasa todas las tareas de ayer a mañana',
         );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-move-pick-day',
+      'The same set, its day chip tapped: «Elegir día» with Hoy, Mañana (selected) and the calendar, and no «Sin fecha»; a day tapped moves the set there.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._yesterday()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [command(_moveYesterday())],
+          transcript: 'Pasa todas las tareas de ayer a mañana',
+        );
+        await app.tester.tap(find.byKey(const ValueKey('command-move-day')));
+        await app.tester.pumpAndSettle();
         await p.shoot();
       },
     );
@@ -932,9 +974,28 @@ void commandPreviews() {
       '«Marca como hechas todas las de hoy»: «Marcar 4 tareas como hechas», today\'s open tasks, the weekly class\'s repetition today among them.',
       [es1, es2],
       (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay(), projects: allProjects);
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({'kind': 'complete', 'target': _set(from: day(0))}),
+          ],
+          transcript: 'Marca como hechas todas las de hoy',
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      cards,
+      'bulk-today-overdue',
+      '«Marca como hechas todas las de hoy» with two tasks Today lists under «Atrasadas»: «Marcar 6 tareas como hechas», those two first, «… · Atrasada» (one dated two days ago, one with only yesterday\'s deadline, «Vence …»), all ticked, then today\'s open tasks.',
+      [es1, es2, ca2],
+      (p) async {
         final app = await PreviewApp.open(
           p,
-          tasks: normalDay(),
+          tasks: [...normalDay(), ..._overdue()],
           projects: allProjects,
         );
         await resume(
@@ -945,6 +1006,30 @@ void commandPreviews() {
           ],
           transcript: 'Marca como hechas todas las de hoy',
         );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      landed,
+      'bulk-today-overdue-applied',
+      'The same set, Marcar 6 tareas como hechas tapped: Calendar on today with no «Atrasadas», today\'s tasks ticked and lit, and «6 tareas completadas» with Deshacer, no «también».',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._overdue()],
+          projects: allProjects,
+        );
+        await resume(
+          app,
+          const [],
+          commands: [
+            command({'kind': 'complete', 'target': _set(from: day(0))}),
+          ],
+          transcript: 'Marca como hechas todas las de hoy',
+        );
+        await _apply(app);
         await p.shoot();
       },
     );

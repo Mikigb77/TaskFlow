@@ -1336,6 +1336,8 @@
   "commandTasksMovedTo": "{count, plural, =1{Tarea movida al {date}} other{{count} tareas movidas al {date}}}",
   "commandTasksAssignedTo": "{count, plural, =1{Tarea asignada a {name}} other{{count} tareas asignadas a {name}}}",
   "commandBulkMoveTo": "{when, select, today{{count, plural, =1{Mover 1 tarea a hoy, {day}} other{Mover {count} tareas a hoy, {day}}}} tomorrow{{count, plural, =1{Mover 1 tarea a mañana, {day}} other{Mover {count} tareas a mañana, {day}}}} other{{count, plural, =1{Mover 1 tarea al {day}} other{Mover {count} tareas al {day}}}}}",
+  "commandBulkMoveLead": "{when, select, today{{count, plural, =1{Mover 1 tarea a} other{Mover {count} tareas a}}} tomorrow{{count, plural, =1{Mover 1 tarea a} other{Mover {count} tareas a}}} other{{count, plural, =1{Mover 1 tarea al} other{Mover {count} tareas al}}}}",
+  "commandMoveDay": "{when, select, today{hoy, {day}} tomorrow{mañana, {day}} other{{day}}}",
   "commandBulkShift": "{direction, select, earlier{{count, plural, =1{Mover 1 tarea {span} antes} other{Mover {count} tareas {span} antes}}} other{{count, plural, =1{Mover 1 tarea {span} después} other{Mover {count} tareas {span} después}}}}",
   "commandBulkSpan": "{unit, select, weeks{{amount, plural, =1{una semana} other{{amount} semanas}}} other{{amount, plural, =1{un día} other{{amount} días}}}}",
   "commandBulkMove": "{count, plural, =1{Mover 1 tarea} other{Mover {count} tareas}}",

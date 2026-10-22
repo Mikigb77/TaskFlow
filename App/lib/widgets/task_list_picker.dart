@@ -299,7 +299,7 @@ class TaskListPicker extends ConsumerWidget {
               ),
             ),
             if (!locked && onChanged != null)
-              const Icon(Icons.arrow_drop_down_rounded, size: 18),
+              const DropDownMark(),
           ],
         ),
       ),

@@ -3171,6 +3171,30 @@
       }
     }
   },
+  "commandBulkMoveLead": "{when, select, today{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}} tomorrow{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}} other{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}}}",
+  "@commandBulkMoveLead": {
+    "description": "The start of commandBulkMoveTo, shown before the day's chip (commandMoveDay) on a dictation's card that moves a set of tasks to one day: commandBulkMoveLead, a space and commandMoveDay read as commandBulkMoveTo, word for word. {count} is how many are still ticked, and changes as the person unticks them. {when} is today, tomorrow or other, as in commandBulkMoveTo.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "commandMoveDay": "{when, select, today{today, {day}} tomorrow{tomorrow, {day}} other{{day}}}",
+  "@commandMoveDay": {
+    "description": "The day of a move on a dictation's card, as a chip after commandBulkMoveLead; a tap opens “Pick a day” to choose another. It ends commandBulkMoveTo, word for word. {when} is today, tomorrow or other. {day} is, for today and tomorrow, the weekday and the day of the month (“Thu 22”); otherwise the day weekday first, as the app shows days (“Thu, Oct 29”).",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "day": {
+        "type": "String"
+      }
+    }
+  },
   "commandBulkShift": "{direction, select, earlier{{count, plural, =1{Move 1 task {span} earlier} other{Move {count} tasks {span} earlier}}} other{{count, plural, =1{Move 1 task {span} later} other{Move {count} tasks {span} later}}}}",
   "@commandBulkShift": {
     "description": "Heading of a dictation's card that moves a set of tasks by some days, each keeping its time (“move this week's to next week”). {count} is how many are still ticked. {span} is commandBulkSpan (“a week”, “2 days”). {direction} is earlier or later.",

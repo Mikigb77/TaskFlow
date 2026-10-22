@@ -4380,6 +4380,44 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String commandBulkMoveLead(int count, String when) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques a',
+      one: 'Mou 1 tasca a',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques a',
+      one: 'Mou 1 tasca a',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mou $count tasques al',
+      one: 'Mou 1 tasca al',
+    );
+    String _temp3 = intl.Intl.selectLogic(when, {
+      'today': '$_temp0',
+      'tomorrow': '$_temp1',
+      'other': '$_temp2',
+    });
+    return '$_temp3';
+  }
+
+  @override
+  String commandMoveDay(String when, String day) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'avui, $day',
+      'tomorrow': 'demà, $day',
+      'other': '$day',
+    });
+    return '$_temp0';
+  }
+
+  @override
   String commandBulkShift(int count, String span, String direction) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

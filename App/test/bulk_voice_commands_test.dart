@@ -31,6 +31,7 @@ import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/task_list_store.dart';
 import 'package:agenda/services/task_matcher.dart';
+import 'package:agenda/widgets/app_components.dart' show DropDownMark;
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:agenda/widgets/task_tile.dart';
@@ -124,6 +125,9 @@ void main() {
   _round20261021();
   _round20261021Second();
   _round20261021Third();
+  _plan2Round1();
+  _plan2Round2();
+  _plan2Round3();
 }
 
 // ---------------------------------------------------------------- parsing
@@ -386,7 +390,13 @@ List<Task> _fixtures() => [
 
 final _projects = [team, club, old];
 
-({List<Task> tasks, int repeating, List<Task> repeatingTasks, Task? viewOnly})
+({
+  List<Task> tasks,
+  int repeating,
+  List<Task> repeatingTasks,
+  Task? viewOnly,
+  Set<String> overdue,
+})
 _set(
   Map<String, dynamic> target, {
   bool completing = false,
@@ -985,9 +995,14 @@ String _buttonLabel(WidgetTester tester) => tester
     )
     .data!;
 
-String _headline(WidgetTester tester) => tester
-    .widget<Text>(find.byKey(const ValueKey('command-headline')).first)
-    .data!;
+/// The card's heading as TalkBack reads it: a move's whole sentence, its
+/// day a chip.
+String _headline(WidgetTester tester) {
+  final text = tester.widget<Text>(
+    find.byKey(const ValueKey('command-headline')).first,
+  );
+  return text.semanticsLabel ?? text.data!;
+}
 
 Future<void> _confirm(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -1635,8 +1650,13 @@ void _cards() {
       String weekday(DateTime date) => DateFormat.MMMEd(
         Localizations.localeOf(context).toString(),
       ).format(date);
+      // Before →, then the new day as a chip that opens «Elegir día».
+      expect(find.text('${weekday(day(3))} · 10:00 →'), findsOneWidget);
       expect(
-        find.text('${weekday(day(3))} · 10:00 → ${weekday(day(5))} · 10:00'),
+        find.descendant(
+          of: find.byKey(const ValueKey('command-move-day')),
+          matching: find.text('${weekday(day(5))} · 10:00'),
+        ),
         findsOneWidget,
       );
       expect(_buttonLabel(tester), es.reschedule);
@@ -3069,6 +3089,8 @@ void _round20261021() {
             priority: 1,
             dueDate: day(-7, 19),
             recurrence: 'daily',
+            // Yesterday's class was done: Today lists nothing overdue.
+            completedDates: [key(day(-1))],
           ),
         ],
       );
@@ -4105,5 +4127,1511 @@ void _round20261021Third() {
       );
       expect(tester.takeException(), isNull);
     });
+  });
+}
+
+// ------------------------------------------- plan 2 of run 2026-10-21-changes
+
+/// A fixed Thursday at noon: the briefs' «now» (Thursday 22 Oct 2026).
+final _thursday = DateTime(2026, 10, 22, 12);
+
+/// [days] from [_thursday], at [hour]:[minute].
+DateTime _t(int days, [int hour = 0, int minute = 0]) => DateTime(
+  _thursday.year,
+  _thursday.month,
+  _thursday.day + days,
+  hour,
+  minute,
+);
+
+/// P232's acceptance tasks, around [_thursday]: A (two days ago), B (only a
+/// deadline, yesterday), C (done yesterday), D (today 9:00), E (today, no
+/// time), G (daily at 8:00 since 7 days ago), a note, and H
+/// (yesterday, in a project the person only views).
+List<Task> _hoyTasks() => [
+  Task(id: 1, title: 'A', priority: 1, dueDate: _t(-2), hasTime: false),
+  Task(
+    id: 2,
+    title: 'B',
+    priority: 1,
+    deadline: _t(-1),
+    reminderAnchor: 'deadline',
+  ),
+  Task(id: 3, title: 'C', priority: 1, dueDate: _t(-1, 10), isCompleted: true),
+  Task(id: 4, title: 'D', priority: 1, dueDate: _t(0, 9)),
+  Task(id: 5, title: 'E', priority: 1, dueDate: _t(0), hasTime: false),
+  Task(id: 7, title: 'G', priority: 1, dueDate: _t(-7, 8), recurrence: 'daily'),
+  // A note can't carry a day: the app refuses one with a schedule.
+  Task(id: 9, title: 'Nota de ayer', kind: 'note', priority: 1),
+  Task(
+    id: 8,
+    title: 'H',
+    priority: 1,
+    dueDate: _t(-1, 11),
+    listId: 'club',
+    assignment: 'member',
+    assigneeId: 1,
+    assigneeName: 'Yo',
+  ),
+];
+
+/// A set's target for exactly [date], as the server sends it.
+CommandTarget _target(DateTime date, {String status = 'open'}) =>
+    CommandTarget.fromJson(setTarget(from: date, status: status));
+
+/// [TaskMatcher.bulk] over [_hoyTasks], today being [now]'s day.
+({
+  List<Task> tasks,
+  int repeating,
+  List<Task> repeatingTasks,
+  Task? viewOnly,
+  Set<String> overdue,
+})
+_hoySet(
+  DateTime date, {
+  DateTime? now,
+  String status = 'open',
+  bool completing = false,
+}) => TaskMatcher.bulk(
+  _hoyTasks(),
+  _target(date, status: status),
+  accountId: 1,
+  projects: _projects,
+  completing: completing,
+  now: now ?? _thursday,
+);
+
+/// A task as a set lists it: `7@2026-10-21` for a repetition.
+String _shownKey(Task task) => task.occurrenceId == null
+    ? '${task.id}'
+    : '${task.id}@${task.occurrenceId}';
+
+/// The «Elegir día» sheet opened from a move's chip.
+Finder _daySheet() => find.byType(BottomSheet).last;
+
+Finder _inDaySheet(Finder finder) =>
+    find.descendant(of: _daySheet(), matching: finder);
+
+/// The move's day chip.
+final _moveChip = find.byKey(const ValueKey('command-move-day'));
+
+/// The chip's label, as shown.
+String _chipLabel(WidgetTester tester) => tester
+    .widget<Text>(find.descendant(of: _moveChip, matching: find.byType(Text)))
+    .data!;
+
+/// The set heading's first part, before the chip.
+String _lead(WidgetTester tester) => tester
+    .widget<Text>(
+      _inResult(find.byKey(const ValueKey('command-headline'))).first,
+    )
+    .data!;
+
+Future<void> _openDaySheet(WidgetTester tester) async {
+  await tester.ensureVisible(_moveChip);
+  await tester.pumpAndSettle();
+  await tester.tap(_moveChip);
+  await tester.pumpAndSettle();
+}
+
+/// Taps [date] in the open sheet's calendar, which shows [shown]'s month.
+Future<void> _pickInCalendar(
+  WidgetTester tester,
+  DateTime date,
+  DateTime shown,
+) async {
+  final calendar = _inDaySheet(find.byType(CalendarDatePicker));
+  if (date.month != shown.month) {
+    await tester.tap(
+      find.descendant(of: calendar, matching: find.byIcon(Icons.chevron_right)),
+    );
+    await tester.pumpAndSettle();
+  }
+  final cell = find.descendant(
+    of: calendar,
+    matching: find.text('${date.day}'),
+  );
+  await tester.ensureVisible(cell);
+  await tester.pumpAndSettle();
+  await tester.tap(cell);
+  await tester.pumpAndSettle();
+}
+
+/// [text] laid out whole: no line cut off, nothing ellipsized.
+void _expectWhole(WidgetTester tester, Finder text, String what) {
+  final paragraph = tester.renderObject<RenderParagraph>(
+    find.descendant(of: text, matching: find.byType(RichText)).first,
+  );
+  expect(paragraph.didExceedMaxLines, isFalse, reason: '$what is cut');
+  final painter = TextPainter(
+    text: paragraph.text,
+    textDirection: paragraph.textDirection,
+    textScaler: paragraph.textScaler,
+    locale: paragraph.locale,
+    strutStyle: paragraph.strutStyle,
+    textWidthBasis: paragraph.textWidthBasis,
+    textHeightBehavior: paragraph.textHeightBehavior,
+  )..layout(maxWidth: paragraph.constraints.maxWidth);
+  addTearDown(painter.dispose);
+  expect(
+    paragraph.size.height,
+    greaterThanOrEqualTo(painter.height - 0.5),
+    reason: '$what is clipped',
+  );
+}
+
+/// The characters at [index] and [index] + 2 of [text] sit on one line: the
+/// weekday and its number, joined by the no-break space at [index] + 1.
+bool _sameLine(WidgetTester tester, Finder text, int index) {
+  final paragraph = tester.renderObject<RenderParagraph>(
+    find.descendant(of: text, matching: find.byType(RichText)).first,
+  );
+  final painter = TextPainter(
+    text: paragraph.text,
+    textDirection: paragraph.textDirection,
+    textScaler: paragraph.textScaler,
+    locale: paragraph.locale,
+    textWidthBasis: paragraph.textWidthBasis,
+  )..layout(maxWidth: paragraph.constraints.maxWidth);
+  addTearDown(painter.dispose);
+  return painter.getLineBoundary(TextPosition(offset: index)) ==
+      painter.getLineBoundary(TextPosition(offset: index + 2));
+}
+
+/// Two tasks Today lists under «Atrasadas» (A two days ago, B with only
+/// yesterday's deadline) and three open tasks today.
+List<Task> _todayWithOverdue() => [
+  Task(
+    id: 1,
+    title: 'Devolver el libro a la biblioteca',
+    priority: 1,
+    dueDate: day(-2),
+    hasTime: false,
+  ),
+  Task(
+    id: 2,
+    title: 'Pagar la factura del gas',
+    priority: 2,
+    deadline: day(-1),
+    reminderAnchor: 'deadline',
+  ),
+  Task(id: 3, title: 'Comprar pan', priority: 1, dueDate: day(0, 9)),
+  Task(id: 4, title: 'Ir al médico', priority: 1, dueDate: day(0, 11)),
+  Task(id: 5, title: 'Llamar a mamá', priority: 1, dueDate: day(0, 13)),
+];
+
+CaptureCommand _completeToday() =>
+    command({'kind': 'complete', 'target': setTarget(from: day(0))});
+
+CaptureCommand _moveTodayToTomorrow() => command({
+  'kind': 'update',
+  'target': setTarget(from: day(0)),
+  'changes': {'date': key(day(1))},
+});
+
+/// Taps the confirming button and checks [chip] stays disabled in every
+/// frame while the result applies and closes.
+Future<void> _expectChipDisabledWhileApplying(WidgetTester tester) async {
+  expect(tester.widget<ActionChip>(_moveChip).onPressed, isNotNull);
+  await tester.tap(find.byKey(const ValueKey('save-drafts')));
+  var frames = 0;
+  var seen = 0;
+  while (find.byType(CaptureResult).evaluate().isNotEmpty && frames < 400) {
+    await tester.pump(const Duration(milliseconds: 16));
+    frames++;
+    final chip = _inResult(_moveChip);
+    if (chip.evaluate().isEmpty) continue;
+    seen++;
+    expect(
+      tester.widget<ActionChip>(chip).onPressed,
+      isNull,
+      reason: 'frame $frames',
+    );
+  }
+  expect(find.byType(CaptureResult), findsNothing, reason: 'it closed');
+  expect(seen, greaterThan(0));
+  await tester.pumpAndSettle();
+}
+
+void _plan2Round1() {
+  group('UX loop 2026-10-21-changes, plan 2 round 1', () {
+    setUpAll(() async {
+      // Lines and positions are measured with the app's own font.
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    // ---------------------------------------------------- P232 · UX-1702
+    test('UX-1702: a pending «hoy» completion set holds A, B and G’s missed '
+        'repetition first, marked, then today’s D, E and G; not C, the note '
+        'or H', () {
+      final found = _hoySet(_t(0), completing: true);
+      final keys = found.tasks.map(_shownKey).toList();
+      expect(keys.take(3), ['1', '2', '7@${key(_t(-1))}']);
+      expect(keys.skip(3).toSet(), {'4', '5', '7@${key(_t(0))}'});
+      expect(keys, hasLength(6));
+      expect(found.overdue, {'1', '2', '7@${key(_t(-1))}'});
+      expect(ids(found.tasks), isNot(contains(3)));
+      expect(ids(found.tasks), isNot(contains(9)));
+      expect(ids(found.tasks), isNot(contains(8)));
+      expect(found.viewOnly?.id, 8, reason: 'H: only viewed, so left out');
+
+      final plan = planBulk(
+        command({'kind': 'complete', 'target': setTarget(from: _t(0))}),
+        tasks: _hoyTasks(),
+        projects: _projects,
+        accountId: 1,
+        now: _thursday,
+      );
+      expect(plan.items.map((item) => item.key).take(3), [
+        '1',
+        '2',
+        '7@${key(_t(-1))}',
+      ]);
+      expect(
+        {
+          for (final item in plan.items)
+            if (item.overdue) item.key,
+        },
+        {'1', '2', '7@${key(_t(-1))}'},
+      );
+      expect(
+        {
+          for (final item in plan.items)
+            if (!item.overdue) item.key,
+        },
+        {'4', '5', '7@${key(_t(0))}'},
+      );
+    });
+
+    test('UX-1702: a pending «hoy» move to tomorrow: A and B first, marked, '
+        'then D and E; G left out and counted once', () {
+      final plan = planBulk(
+        command({
+          'kind': 'update',
+          'target': setTarget(from: _t(0)),
+          'changes': {'date': key(_t(1))},
+        }),
+        tasks: _hoyTasks(),
+        projects: _projects,
+        accountId: 1,
+        now: _thursday,
+      );
+      expect(plan.action, BulkAction.move);
+      expect(plan.items.map((item) => item.key).take(2), ['1', '2']);
+      expect(plan.items.skip(2).map((item) => item.key).toSet(), {'4', '5'});
+      expect(plan.items, hasLength(4));
+      expect(
+        [for (final item in plan.items) item.overdue],
+        [true, true, false, false],
+      );
+      expect(ids(plan.repeatingTasks), [7]);
+    });
+
+    test('UX-1702: unchanged: a «hoy» set of completed or any tasks takes '
+        'neither A nor B; yesterday’s set holds what it held', () {
+      for (final status in ['completed', 'any']) {
+        final found = _hoySet(_t(0), status: status);
+        expect(ids(found.tasks), isNot(contains(1)), reason: status);
+        expect(ids(found.tasks), isNot(contains(2)), reason: status);
+        expect(found.overdue, isEmpty, reason: status);
+      }
+      // Yesterday: B by its deadline; C done, the note and H out; G counted.
+      final yesterday = _hoySet(_t(-1));
+      expect(ids(yesterday.tasks), [2]);
+      expect(yesterday.repeating, 1);
+      expect(yesterday.overdue, isEmpty);
+      final doneYesterday = _hoySet(_t(-1), completing: true);
+      expect(doneYesterday.tasks.map(_shownKey).toSet(), {
+        '2',
+        '7@${key(_t(-1))}',
+      });
+      expect(doneYesterday.overdue, isEmpty);
+    });
+
+    test('UX-1702: with now on Friday, the «hoy» rule works from Friday', () {
+      final friday = _t(1, 12);
+      final found = _hoySet(_t(1), now: friday, completing: true);
+      final keys = found.tasks.map(_shownKey).toList();
+      // Oldest first: A, then B; then Thursday's leftovers.
+      expect(keys.take(2), ['1', '2']);
+      expect(found.overdue, {'1', '2', '4', '5', '7@${key(_t(0))}'});
+      expect(keys.take(5).toSet(), found.overdue);
+      expect(keys, contains('7@${key(_t(1))}'));
+      // On Friday, Thursday is yesterday: its set takes no overdue tasks.
+      final thursday = _hoySet(_t(0), now: friday);
+      expect(thursday.overdue, isEmpty);
+      expect(ids(thursday.tasks), isNot(contains(1)));
+    });
+
+    test('UX-1702: «¿Qué tengo hoy?» still lists only today’s tasks', () {
+      final found = TaskMatcher.find(
+        _todayWithOverdue(),
+        command({
+          'kind': 'find',
+          'words': <String>[],
+          'from': key(day(0)),
+          'to': key(day(0)),
+        }),
+        accountId: 1,
+      );
+      expect(ids(found).toSet(), {3, 4, 5});
+    });
+
+    testWidgets('UX-1702: «Marca como hechas todas las de hoy»: «Marcar 5 '
+        'tareas como hechas», the two overdue first with «Atrasada», ticked; '
+        'unticking one counts 4', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayWithOverdue(),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _completeToday(),
+      ], transcript: 'Marca como hechas todas las de hoy');
+      expect(_headline(tester), es.commandBulkComplete(5));
+      expect(_headline(tester), 'Marcar 5 tareas como hechas');
+      expect(_buttonLabel(tester), es.commandBulkComplete(5));
+      final rows = _inResult(find.byType(CheckboxListTile));
+      expect(rows, findsNWidgets(5));
+      expect(
+        find.descendant(
+          of: rows.at(0),
+          matching: find.text('Devolver el libro a la biblioteca'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: rows.at(1),
+          matching: find.text('Pagar la factura del gas'),
+        ),
+        findsOneWidget,
+      );
+      _expectRowLine(
+        'Devolver el libro a la biblioteca',
+        es.overdueDate(_weekdayDate(tester, day(-2))),
+      );
+      _expectRowLine(
+        'Pagar la factura del gas',
+        es.overdueDate(es.deadlineLabel(_weekdayDate(tester, day(-1)))),
+      );
+      for (final index in [0, 1]) {
+        expect(
+          tester.widget<CheckboxListTile>(rows.at(index)).value,
+          isTrue,
+          reason: 'row $index is ticked',
+        );
+      }
+      // Only the overdue ones say «Atrasada».
+      expect(_inResult(find.textContaining('Atrasada')), findsNWidgets(2));
+      await tester.tap(_setRow('Devolver el libro a la biblioteca'));
+      await tester.pumpAndSettle();
+      expect(_headline(tester), es.commandBulkComplete(4));
+      expect(_buttonLabel(tester), es.commandBulkComplete(4));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1702: all five done: Calendar on today with no '
+        '«Atrasadas», today’s rows ticked and lit, «5 tareas completadas»; '
+        'Deshacer opens all five again', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayWithOverdue(),
+        size: const Size(360, 800),
+      );
+      // Before: Today lists the two under «Atrasadas · 2».
+      expect(find.text(es.overdueCount(2)), findsOneWidget);
+      await app.showResult(tester, [
+        _completeToday(),
+      ], transcript: 'Marca como hechas todas las de hoy');
+      await _confirm(tester);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(find.text(es.todayAgenda), findsOneWidget);
+      expect(find.textContaining('Atrasada'), findsNothing);
+      for (final title in ['Comprar pan', 'Ir al médico', 'Llamar a mamá']) {
+        expect(_calendarRow(title), findsOneWidget, reason: title);
+        final tile = tester.widget<TaskTile>(_calendarRow(title));
+        expect(tile.task.isCompleted, isTrue, reason: '$title is ticked');
+        expect(tile.color, _litColor(tester), reason: '$title is lit');
+      }
+      expect(find.text(es.commandTasksCompleted(5)), findsOneWidget);
+      expect(es.commandTasksCompleted(5), '5 tareas completadas');
+      expect(find.textContaining('también'), findsNothing);
+      expect(find.text(es.undo), findsOneWidget);
+      for (final id in [1, 2, 3, 4, 5]) {
+        expect(app.tasks.byId(id)!.isCompleted, isTrue, reason: 'task $id');
+      }
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      for (final id in [1, 2, 3, 4, 5]) {
+        expect(app.tasks.byId(id)!.isCompleted, isFalse, reason: 'task $id');
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1702: «Pasa todo lo de hoy a mañana»: «Mover 5 tareas a '
+        'mañana, …», the overdue first; after the tap all five on tomorrow, '
+        '«5 tareas movidas al …»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _todayWithOverdue(),
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _moveTodayToTomorrow(),
+      ], transcript: 'Pasa todo lo de hoy a mañana');
+      expect(
+        _headline(tester),
+        es.commandBulkMoveTo(5, 'tomorrow', _short(day(1), 'es')),
+      );
+      final rows = _inResult(find.byType(CheckboxListTile));
+      expect(rows, findsNWidgets(5));
+      expect(
+        find.descendant(
+          of: rows.at(0),
+          matching: find.text('Devolver el libro a la biblioteca'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: rows.at(1),
+          matching: find.text('Pagar la factura del gas'),
+        ),
+        findsOneWidget,
+      );
+      _expectRowLine(
+        'Devolver el libro a la biblioteca',
+        es.overdueDate(_weekdayDate(tester, day(-2))),
+      );
+      _expectRowLine(
+        'Pagar la factura del gas',
+        es.overdueDate(es.deadlineLabel(_weekdayDate(tester, day(-1)))),
+      );
+      await _confirm(tester);
+      expect(Task.day(app.tasks.byId(1)!.dueDate!), day(1));
+      expect(app.tasks.byId(3)!.dueDate, day(1, 9));
+      expect(app.tasks.byId(4)!.dueDate, day(1, 11));
+      expect(app.tasks.byId(5)!.dueDate, day(1, 13));
+      expect(
+        find.text(es.commandTasksMovedTo(5, _weekdayDate(tester, day(1)))),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1702: «Pasa todo lo de hoy a mañana» moves B, which has '
+        'only a deadline, by its deadline (P231)', (tester) async {
+      final app = await _App.open(tester, tasks: _todayWithOverdue());
+      await app.showResult(tester, [_moveTodayToTomorrow()]);
+      await _confirm(tester);
+      final gas = app.tasks.byId(2)!;
+      expect(gas.dueDate, isNull, reason: 'no planned day is added');
+      expect(Task.day(gas.deadline!), day(1), reason: 'its deadline moved');
+    });
+
+    for (final (language, strings) in [('es', es), ('ca', ca)]) {
+      testWidgets('UX-1702: $language at 2× on 360 dp, the overdue rows wrap '
+          'whole, with nothing clipped', (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: _todayWithOverdue(),
+          language: language,
+          textScale: 2,
+          size: const Size(360, 800),
+        );
+        await app.showResult(tester, [_completeToday()]);
+        expect(_headline(tester), strings.commandBulkComplete(5));
+        final lines = {
+          'Devolver el libro a la biblioteca': strings.overdueDate(
+            _weekdayDate(tester, day(-2)),
+          ),
+          'Pagar la factura del gas': strings.overdueDate(
+            strings.deadlineLabel(_weekdayDate(tester, day(-1))),
+          ),
+        };
+        final card = _setCard(tester);
+        for (final MapEntry(key: title, value: line) in lines.entries) {
+          _expectRowLine(title, line);
+          final text = find.descendant(
+            of: _setRow(title),
+            matching: find.text(line),
+          );
+          _expectWhole(tester, text, '«$line»');
+          _expectWhole(
+            tester,
+            find.descendant(of: _setRow(title), matching: find.text(title)),
+            '«$title»',
+          );
+          final rect = tester.getRect(text);
+          expect(rect.left, greaterThanOrEqualTo(card.left - 0.5));
+          expect(rect.right, lessThanOrEqualTo(card.right + 0.5));
+        }
+        if (language == 'ca') {
+          expect(
+            _inResult(find.textContaining('Endarrerida')),
+            findsNWidgets(2),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    // ---------------------------------------------------- P233 · UX-1716
+    test('UX-1716: the heading’s lead, a space and the chip’s day read as '
+        'the whole sentence, in EN, ES and CA', () {
+      for (final strings in [en, es, ca]) {
+        for (final when in ['today', 'tomorrow', 'other']) {
+          for (final count in [1, 4]) {
+            const shown = 'X 22';
+            expect(
+              '${strings.commandBulkMoveLead(count, when)} '
+              '${strings.commandMoveDay(when, shown)}',
+              strings.commandBulkMoveTo(count, when, shown),
+              reason: '${strings.localeName} $when $count',
+            );
+          }
+        }
+      }
+      expect(es.commandBulkMoveLead(4, 'tomorrow'), 'Mover 4 tareas a');
+      expect(es.commandBulkMoveLead(4, 'other'), 'Mover 4 tareas al');
+      expect(ca.commandBulkMoveLead(4, 'tomorrow'), 'Mou 4 tasques a');
+      expect(en.commandBulkMoveLead(4, 'tomorrow'), 'Move 4 tasks to');
+      expect(es.commandMoveDay('tomorrow', 'jue 22'), 'mañana, jue 22');
+      expect(ca.commandMoveDay('today', 'dj. 22'), 'avui, dj. 22');
+      expect(es.pickDay, 'Elegir día');
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('UX-1716: es at ${scale.toInt()}× on 360 dp: «Mover 4 '
+          'tareas a», then the chip «mañana, …», whole, 48 dp tall, the ✕ '
+          'at the right of the first line', (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: _fourYesterday(),
+          projects: [_casa],
+          textScale: scale,
+          size: const Size(360, 800),
+        );
+        await app.showResult(tester, [
+          _moveYesterdayToTomorrow(),
+        ], transcript: 'Pasa todas las tareas de ayer a mañana');
+        final short = _short(day(1), 'es');
+        expect(_lead(tester), es.commandBulkMoveLead(4, 'tomorrow'));
+        expect(_lead(tester), 'Mover 4 tareas a');
+        expect(_moveChip, findsOneWidget);
+        expect(_chipLabel(tester), es.commandMoveDay('tomorrow', short));
+        expect(
+          find.descendant(
+            of: _moveChip,
+            matching: find.byIcon(Icons.arrow_drop_down_rounded),
+          ),
+          findsOneWidget,
+        );
+        final label = find.descendant(
+          of: _moveChip,
+          matching: find.text(_chipLabel(tester)),
+        );
+        _expectWhole(tester, label, 'the chip’s label');
+        _expectWhole(
+          tester,
+          _inResult(find.byKey(const ValueKey('command-headline'))).first,
+          'the heading',
+        );
+        final nbsp = _chipLabel(tester).indexOf(' ');
+        expect(nbsp, greaterThan(0));
+        expect(
+          _sameLine(tester, label, nbsp - 1),
+          isTrue,
+          reason: 'the weekday and its number stay together',
+        );
+        expect(tester.getSize(_moveChip).height, greaterThanOrEqualTo(48));
+        final card = _setCard(tester);
+        final chip = tester.getRect(_moveChip);
+        expect(chip.right, lessThanOrEqualTo(card.right + 0.5));
+        final close = tester.getRect(
+          _inResult(find.byTooltip(es.commandDontChangeAny)),
+        );
+        final lead = tester.getRect(
+          _inResult(find.byKey(const ValueKey('command-headline'))).first,
+        );
+        expect(close.left, greaterThanOrEqualTo(lead.right - 0.5));
+        expect(close.left, greaterThanOrEqualTo(chip.right - 0.5));
+        expect(
+          close.top < lead.bottom && close.bottom > lead.top,
+          isTrue,
+          reason: 'the ✕ $close beside the first line $lead',
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('UX-1716: the chip opens «Elegir día» (Hoy, Mañana selected, '
+        'the calendar, no «Sin fecha»); a day 3 ahead moves the set there; '
+        'the tap moves the 4 and Deshacer brings the day back', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      await _openDaySheet(tester);
+      expect(_inDaySheet(find.text(es.pickDay)), findsOneWidget);
+      expect(_inDaySheet(find.byType(CalendarDatePicker)), findsOneWidget);
+      final today = _inDaySheet(find.widgetWithText(ChoiceChip, es.today));
+      final tomorrow = _inDaySheet(
+        find.widgetWithText(ChoiceChip, es.tomorrow),
+      );
+      expect(tester.widget<ChoiceChip>(today).selected, isFalse);
+      expect(tester.widget<ChoiceChip>(tomorrow).selected, isTrue);
+      expect(_inDaySheet(find.text(es.noDate)), findsNothing);
+      await _pickInCalendar(tester, day(3), day(1));
+      expect(find.text(es.pickDay), findsNothing, reason: 'the sheet closed');
+      final picked = _weekdayDate(tester, day(3));
+      expect(_lead(tester), es.commandBulkMoveLead(4, 'other'));
+      expect(_lead(tester), 'Mover 4 tareas al');
+      expect(_chipLabel(tester), picked);
+      expect(_headline(tester), es.commandBulkMoveTo(4, 'other', picked));
+      expect(_buttonLabel(tester), es.commandBulkMove(4));
+      expect(_buttonLabel(tester), 'Mover 4 tareas');
+
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(3, 9));
+      expect(app.tasks.byId(2)!.dueDate, day(3, 12));
+      expect(Task.day(app.tasks.byId(3)!.dueDate!), day(3));
+      expect(app.tasks.byId(3)!.hasTime, isFalse);
+      expect(app.tasks.byId(4)!.dueDate, day(3, 18));
+      expect(find.text(es.commandTasksMovedTo(4, picked)), findsOneWidget);
+      expect(find.text(es.undo), findsOneWidget);
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(app.tasks.byId(1)!.dueDate, day(-1, 9));
+      expect(app.tasks.byId(4)!.dueDate, day(-1, 18));
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(_chipLabel(tester), picked);
+      expect(_headline(tester), es.commandBulkMoveTo(4, 'other', picked));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1716: dismissing «Elegir día» changes nothing; Hoy gives '
+        '«Mover 4 tareas a» and «hoy, …»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      final said = es.commandBulkMoveTo(4, 'tomorrow', _short(day(1), 'es'));
+      await _openDaySheet(tester);
+      expect(find.text(es.pickDay), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text(es.pickDay), findsNothing);
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(_headline(tester), said);
+      expect(
+        _chipLabel(tester),
+        es.commandMoveDay('tomorrow', _short(day(1), 'es')),
+      );
+      await _openDaySheet(tester);
+      await tester.tap(_inDaySheet(find.widgetWithText(ChoiceChip, es.today)));
+      await tester.pumpAndSettle();
+      expect(_lead(tester), es.commandBulkMoveLead(4, 'today'));
+      expect(_lead(tester), 'Mover 4 tareas a');
+      expect(
+        _chipLabel(tester),
+        es.commandMoveDay('today', _short(day(0), 'es')),
+      );
+      expect(_chipLabel(tester), startsWith('hoy, '));
+      expect(_buttonLabel(tester), es.commandBulkMove(4));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1716: a task already on the day picked leaves the list: '
+        '«Mover 3 tareas a …», «Mover 3 tareas»', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          ..._fourYesterday().take(3),
+          Task(
+            id: 4,
+            title: 'Pagar la factura del gas',
+            priority: 2,
+            dueDate: day(0, 18),
+          ),
+        ],
+        projects: [_casa],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': setTarget(from: day(-1), to: day(0)),
+          'changes': {'date': key(day(1))},
+        }),
+      ]);
+      expect(_lead(tester), es.commandBulkMoveLead(4, 'tomorrow'));
+      expect(_buttonLabel(tester), es.commandBulkMove(4));
+      await _openDaySheet(tester);
+      await tester.tap(_inDaySheet(find.widgetWithText(ChoiceChip, es.today)));
+      await tester.pumpAndSettle();
+      expect(_lead(tester), es.commandBulkMoveLead(3, 'today'));
+      expect(
+        _headline(tester),
+        es.commandBulkMoveTo(3, 'today', _short(day(0), 'es')),
+      );
+      expect(_buttonLabel(tester), es.commandBulkMove(3));
+      expect(_setRow('Pagar la factura del gas'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1716: all 4 already on the day said: «Ya están así.», '
+        'with the chip still under it', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': setTarget(from: day(-1)),
+          'changes': {'date': key(day(-1))},
+        }),
+      ]);
+      final nothing = _inResult(find.text(es.commandBulkNothingToChange(4)));
+      expect(nothing, findsOneWidget);
+      expect(es.commandBulkNothingToChange(4), 'Ya están así.');
+      expect(_moveChip, findsOneWidget);
+      expect(
+        tester.getRect(_moveChip).top,
+        greaterThanOrEqualTo(tester.getRect(nothing).bottom - 0.5),
+        reason: 'the chip is under that line',
+      );
+      expect(tester.widget<ActionChip>(_moveChip).onPressed, isNotNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1716: TalkBack hears «Mover 4 tareas a mañana, …» once; '
+        'the chip is a button «mañana, …» with the tooltip «Elegir día»', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+      );
+      tester.takeAnnouncements();
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      final short = _short(day(1), 'es');
+      expect(tester.takeAnnouncements().map((a) => a.message).toList(), [
+        es.commandBulkMoveTo(4, 'tomorrow', short),
+      ]);
+      expect(
+        tester.getSemantics(_moveChip),
+        isSemantics(
+          label: es.commandMoveDay('tomorrow', short),
+          tooltip: es.pickDay,
+          isButton: true,
+          isEnabled: true,
+        ),
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('UX-1716: Catalan at 2× on 360 dp: «Mou 4 tasques a» and '
+        '«demà, …», nothing clipped', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+        language: 'ca',
+        textScale: 2,
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      expect(_lead(tester), 'Mou 4 tasques a');
+      expect(_lead(tester), ca.commandBulkMoveLead(4, 'tomorrow'));
+      expect(
+        _chipLabel(tester),
+        ca.commandMoveDay('tomorrow', _short(day(1), 'ca')),
+      );
+      expect(_chipLabel(tester), startsWith('demà, '));
+      _expectWhole(
+        tester,
+        find.descendant(of: _moveChip, matching: find.text(_chipLabel(tester))),
+        'the chip’s label',
+      );
+      _expectWhole(
+        tester,
+        _inResult(find.byKey(const ValueKey('command-headline'))).first,
+        'the heading',
+      );
+      final card = _setCard(tester);
+      expect(
+        tester.getRect(_moveChip).right,
+        lessThanOrEqualTo(card.right + 0.5),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1716: English at 1×: «Move 4 tasks to» and «tomorrow, …»', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+        language: 'en',
+      );
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      expect(_lead(tester), 'Move 4 tasks to');
+      expect(
+        _chipLabel(tester),
+        en.commandMoveDay('tomorrow', _short(day(1), 'en')),
+      );
+      expect(_chipLabel(tester), startsWith('tomorrow, '));
+    });
+
+    final noChip =
+        <
+          (
+            String,
+            List<Task> Function(),
+            List<TaskListInfo>,
+            CaptureCommand Function(),
+            String Function(),
+          )
+        >[
+          (
+            'a move by days',
+            _fourYesterday,
+            [_casa],
+            () => command({
+              'kind': 'update',
+              'target': setTarget(from: day(-1)),
+              'changes': {'shift_days': 7},
+            }),
+            () =>
+                es.commandBulkShift(4, es.commandBulkSpan(1, 'weeks'), 'later'),
+          ),
+          (
+            'a completion',
+            () => _todayWithOverdue().skip(2).toList(),
+            const [],
+            _completeToday,
+            () => es.commandBulkComplete(3),
+          ),
+          (
+            'a deletion',
+            _doneLastWeek,
+            const [],
+            _deleteDoneLastWeek,
+            () => es.commandBulkDelete(3),
+          ),
+          (
+            'an assignment',
+            _friday,
+            [_mathsShared],
+            _assignFridayToPaul,
+            () => es.commandBulkAssignTo(2, 'Paul'),
+          ),
+          (
+            'another change',
+            _fourYesterday,
+            [_casa],
+            () => command({
+              'kind': 'update',
+              'target': setTarget(from: day(-1)),
+              'changes': {'time': '18:00'},
+            }),
+            // «Pagar la factura del gas» is at 18:00 already.
+        () => es.commandBulkChange(3),
+          ),
+        ];
+    for (final (what, tasks, projects, said, heading) in noChip) {
+      testWidgets('UX-1716: no day chip on $what', (tester) async {
+        final app = await _App.open(tester, tasks: tasks(), projects: projects);
+        await app.showResult(tester, [said()]);
+        expect(_headline(tester), heading());
+        expect(_moveChip, findsNothing);
+      });
+    }
+
+    testWidgets('UX-1716: while «Mover 4 tareas» applies and closes, the '
+        'chip is disabled', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+      );
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      await _expectChipDisabledWhileApplying(tester);
+    });
+
+    testWidgets('UX-1716: one task, «Pasa la cita del médico al miércoles»: '
+        '«<lunes> · 10:00 →» and the chip «<miércoles> · 10:00»; Mañana '
+        'picked moves it to tomorrow, «Movida al …»', (tester) async {
+      final monday = _ahead(DateTime.monday);
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(
+            id: 1,
+            title: 'Ir al médico',
+            priority: 1,
+            dueDate: day(monday, 10),
+          ),
+        ],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': {
+            'words': ['médico'],
+          },
+          'changes': {'date': key(day(monday + 2))},
+        }),
+      ], transcript: 'Pasa la cita del médico al miércoles');
+      final before = '${_weekdayDate(tester, day(monday))} · 10:00';
+      expect(_inResult(find.text('$before →')), findsOneWidget);
+      expect(
+        _chipLabel(tester),
+        '${_weekdayDate(tester, day(monday + 2))} · 10:00',
+      );
+      expect(
+        find.descendant(
+          of: _moveChip,
+          matching: find.byIcon(Icons.arrow_drop_down_rounded),
+        ),
+        findsOneWidget,
+      );
+      await _openDaySheet(tester);
+      expect(_inDaySheet(find.text(es.pickDay)), findsOneWidget);
+      expect(_inDaySheet(find.text(es.noDate)), findsNothing);
+      await tester.tap(
+        _inDaySheet(find.widgetWithText(ChoiceChip, es.tomorrow)),
+      );
+      await tester.pumpAndSettle();
+      expect(_chipLabel(tester), '${es.tomorrow} · 10:00');
+      expect(_buttonLabel(tester), es.reschedule);
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(1, 10));
+      expect(
+        find.text(es.movedOccurrenceDate(_weekdayDate(tester, day(1)))),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-1716: one task with only a deadline, «Pasa la factura del '
+        'gas a mañana»: the «Fecha límite» line’s chip «Mañana»; a day picked '
+        'moves the deadline there (P231)', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(
+            id: 1,
+            title: 'Pagar la factura del gas',
+            priority: 2,
+            deadline: day(3),
+            reminderAnchor: 'deadline',
+          ),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': {
+            'words': ['factura', 'gas'],
+          },
+          'changes': {'date': key(day(1))},
+        }),
+      ], transcript: 'Pasa la factura del gas a mañana');
+      expect(_chipLabel(tester), es.tomorrow);
+      expect(
+        find.bySemanticsLabel(
+          es.commandChangeSemantics(
+            es.deadline,
+            _weekdayDate(tester, day(3)),
+            es.tomorrow,
+          ),
+        ),
+        findsOneWidget,
+        reason: 'the chip sits on the «Fecha límite» line',
+      );
+      await _openDaySheet(tester);
+      await tester.tap(_inDaySheet(find.widgetWithText(ChoiceChip, es.today)));
+      await tester.pumpAndSettle();
+      await _confirm(tester);
+      final gas = app.tasks.byId(1)!;
+      expect(gas.dueDate, isNull, reason: 'no planned day is added');
+      expect(Task.day(gas.deadline!), day(0));
+      expect(
+        find.textContaining(_weekdayDate(tester, day(0))),
+        findsWidgets,
+        reason: 'the message names that day',
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('UX-1716: one task, a change of time only: no chip', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(3, 10)),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': {
+            'words': ['médico'],
+          },
+          'changes': {'time': '18:00'},
+        }),
+      ], transcript: 'Pon la cita a las 18:00');
+      expect(_inResult(find.textContaining('18:00')), findsWidgets);
+      expect(_moveChip, findsNothing);
+    });
+
+    testWidgets('UX-1716: one task moved to the day it is on: «Ya está así.», '
+        'with the chip under it', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(3, 10)),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': {
+            'words': ['médico'],
+          },
+          'changes': {'date': key(day(3))},
+        }),
+      ]);
+      final nothing = _inResult(find.text(es.commandNothingToChange));
+      expect(nothing, findsOneWidget);
+      expect(_moveChip, findsOneWidget);
+      expect(_chipLabel(tester), '${_weekdayDate(tester, day(3))} · 10:00');
+      expect(
+        tester.getRect(_moveChip).top,
+        greaterThanOrEqualTo(tester.getRect(nothing).bottom - 0.5),
+        reason: 'the chip is under that line',
+      );
+      expect(tester.widget<ActionChip>(_moveChip).onPressed, isNotNull);
+    });
+
+    testWidgets('UX-1716: while one task’s change applies and closes, its '
+        'chip is disabled', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(3, 10)),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'update',
+          'target': {
+            'words': ['médico'],
+          },
+          'changes': {'date': key(day(5))},
+        }),
+      ]);
+      await _expectChipDisabledWhileApplying(tester);
+    });
+  });
+}
+
+// ------------------------------------- plan 2 of run 2026-10-21-changes, r2
+//
+// P237 (UX-1722): the ▾ on the day chip grows with the text, 18 dp at 1×,
+// up to 28 dp, and the chip's label still fits beside it.
+
+/// The ▾ inside the move's day chip.
+Finder get _moveMark => find.descendant(
+  of: _moveChip,
+  matching: find.byIcon(Icons.arrow_drop_down_rounded),
+);
+
+/// How many lines the chip's label takes, as laid out.
+int _chipLabelLines(WidgetTester tester) {
+  final paragraph = tester.renderObject<RenderParagraph>(
+    find
+        .descendant(
+          of: find.descendant(
+            of: _moveChip,
+            matching: find.text(_chipLabel(tester)),
+          ),
+          matching: find.byType(RichText),
+        )
+        .first,
+  );
+  final painter = TextPainter(
+    text: paragraph.text,
+    textDirection: paragraph.textDirection,
+    textScaler: paragraph.textScaler,
+    locale: paragraph.locale,
+    maxLines: paragraph.maxLines,
+    strutStyle: paragraph.strutStyle,
+    textWidthBasis: paragraph.textWidthBasis,
+    textHeightBehavior: paragraph.textHeightBehavior,
+  )..layout(maxWidth: paragraph.constraints.maxWidth);
+  addTearDown(painter.dispose);
+  return painter.computeLineMetrics().length;
+}
+
+/// The ▾ sits inside the chip, beside its label, not over it.
+void _expectMarkBesideLabel(WidgetTester tester) {
+  final chip = tester.getRect(_moveChip);
+  final mark = tester.getRect(_moveMark);
+  final label = tester.getRect(
+    find.descendant(of: _moveChip, matching: find.text(_chipLabel(tester))),
+  );
+  expect(mark.right, lessThanOrEqualTo(chip.right + 0.5), reason: 'in chip');
+  expect(mark.left, greaterThanOrEqualTo(chip.left - 0.5), reason: 'in chip');
+  // The glyph is narrower than its box, so its box may overlap the label's
+  // trailing space; its centre stays to the label's right.
+  expect(mark.center.dx, greaterThan(label.right), reason: 'after the label');
+}
+
+CaptureCommand _moveDoctorToWednesday(int monday) => command({
+  'kind': 'update',
+  'target': {
+    'words': ['médico'],
+  },
+  'changes': {'date': key(day(monday + 2))},
+});
+
+void _plan2Round2() {
+  group('UX loop 2026-10-21-changes, plan 2 round 2', () {
+    setUpAll(() async {
+      // Lines and positions are measured with the app's own font.
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    // ---------------------------------------------------- P237 · UX-1722
+    for (final (scale, size) in [(1.0, 18.0), (1.3, 23.4), (2.0, 28.0)]) {
+      testWidgets('UX-1722: es at $scale× on 360 dp, «Pasa todas las tareas '
+          'de ayer a mañana»: the day chip’s ▾ is ${size.round()} dp; the '
+          'label takes at most 2 lines and nothing overflows', (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: _fourYesterday(),
+          projects: [_casa],
+          textScale: scale,
+          size: const Size(360, 800),
+        );
+        await app.showResult(tester, [
+          _moveYesterdayToTomorrow(),
+        ], transcript: 'Pasa todas las tareas de ayer a mañana');
+        expect(_lead(tester), es.commandBulkMoveLead(4, 'tomorrow'));
+        expect(
+          _chipLabel(tester),
+          es.commandMoveDay('tomorrow', _short(day(1), 'es')),
+        );
+        expect(_moveMark, findsOneWidget);
+        final mark = tester.getSize(_moveMark);
+        expect(mark.width, closeTo(size, 0.5), reason: 'the ▾ $mark');
+        expect(mark.height, closeTo(size, 0.5), reason: 'the ▾ $mark');
+        if (scale == 1.3) {
+          expect(mark.height.round(), 23, reason: 'about 23 dp');
+        }
+        expect(_chipLabelLines(tester), lessThanOrEqualTo(2));
+        _expectWhole(
+          tester,
+          find.descendant(
+            of: _moveChip,
+            matching: find.text(_chipLabel(tester)),
+          ),
+          'the chip’s label',
+        );
+        _expectMarkBesideLabel(tester);
+        expect(
+          tester.getRect(_moveChip).right,
+          lessThanOrEqualTo(_setCard(tester).right + 0.5),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets('UX-1722: $language at 2× on 360 dp, one task, «Pasa la '
+          'cita del médico al miércoles»: the day chip’s ▾ is 28 dp, the '
+          'label at most 2 lines, nothing overflows', (tester) async {
+        final monday = _ahead(DateTime.monday);
+        final app = await _App.open(
+          tester,
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Ir al médico',
+              priority: 1,
+              dueDate: day(monday, 10),
+            ),
+          ],
+          language: language,
+          textScale: 2,
+          size: const Size(360, 800),
+        );
+        await app.showResult(tester, [
+          _moveDoctorToWednesday(monday),
+        ], transcript: 'Pasa la cita del médico al miércoles');
+        expect(_moveChip, findsOneWidget);
+        expect(
+          _chipLabel(tester),
+          '${_weekdayDate(tester, day(monday + 2))} · 10:00',
+        );
+        expect(_moveMark, findsOneWidget);
+        final mark = tester.getSize(_moveMark);
+        expect(mark.width, closeTo(28, 0.5), reason: 'the ▾ $mark');
+        expect(mark.height, closeTo(28, 0.5), reason: 'the ▾ $mark');
+        expect(_chipLabelLines(tester), lessThanOrEqualTo(2));
+        _expectWhole(
+          tester,
+          find.descendant(
+            of: _moveChip,
+            matching: find.text(_chipLabel(tester)),
+          ),
+          'the chip’s label',
+        );
+        _expectMarkBesideLabel(tester);
+        expect(
+          tester.getRect(_moveChip).right,
+          lessThanOrEqualTo(360.5),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('UX-1722: es at 1×, one task’s change card: the day chip’s ▾ '
+        'stays 18 dp', (tester) async {
+      final monday = _ahead(DateTime.monday);
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(monday, 10)),
+        ],
+        size: const Size(360, 800),
+      );
+      await app.showResult(tester, [
+        _moveDoctorToWednesday(monday),
+      ], transcript: 'Pasa la cita del médico al miércoles');
+      final mark = tester.getSize(_moveMark);
+      expect(mark.width, closeTo(18, 0.5));
+      expect(mark.height, closeTo(18, 0.5));
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+// ------------------------------------- plan 2 of run 2026-10-21-changes, r3
+//
+// P238 (UX-1724, UX-1722): the ▾ grows with the text but takes no more of
+// the row than the old 18 dp icon did, so the day chip's label keeps its
+// room and the Catalan time shows again; a third line is the safety net.
+
+/// The first Wednesday on or after the 20th of [month], in the year ahead,
+/// and the Monday before it, as days from today.
+(int monday, int wednesday) _wednesdayIn(int month) {
+  final today = day(0);
+  final year = month <= today.month ? today.year + 1 : today.year;
+  var wednesday = DateTime(year, month, 20);
+  while (wednesday.weekday != DateTime.wednesday) {
+    wednesday = DateTime(year, month, wednesday.day + 1);
+  }
+  // Whole days, safe across a change of clock.
+  final ahead = DateTime.utc(year, month, wednesday.day)
+      .difference(DateTime.utc(today.year, today.month, today.day))
+      .inDays;
+  return (ahead - 2, ahead);
+}
+
+/// The months whose short Catalan name takes «de» («de febr.», «de des.»):
+/// all but abril, agost and octubre («d’abr.», «d’ag.», «d’oct.»).
+const _deMonths = {
+  1: 'January',
+  2: 'February',
+  3: 'March',
+  5: 'May',
+  6: 'June',
+  7: 'July',
+  9: 'September',
+  11: 'November',
+  12: 'December',
+};
+
+/// One task, «Ir al médico» on a Monday at 10:00, moved to [wednesday].
+Future<void> _showDoctorMovedTo(
+  WidgetTester tester, {
+  required int monday,
+  required int wednesday,
+  required String language,
+}) async {
+  final app = await _App.open(
+    tester,
+    tasks: [
+      Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(monday, 10)),
+    ],
+    language: language,
+    textScale: 2,
+    size: const Size(360, 800),
+  );
+  await app.showResult(tester, [
+    command({
+      'kind': 'update',
+      'target': {
+        'words': ['médico'],
+      },
+      'changes': {'date': key(day(wednesday))},
+    }),
+  ], transcript: 'Pasa la cita del médico al miércoles');
+}
+
+void _plan2Round3() {
+  group('UX loop 2026-10-21-changes, plan 2 round 3', () {
+    setUpAll(() async {
+      // Lines and positions are measured with the app's own font.
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    // ---------------------------------------------------- P238 · UX-1724
+    for (final (scale, size) in [(1.0, 18.0), (1.3, 23.4), (2.0, 28.0)]) {
+      testWidgets('UX-1724: at $scale× the ▾ is ${size.toStringAsFixed(1)} dp '
+          'but takes 18 dp of its row, so the label beside it keeps all its '
+          'room', (tester) async {
+        const row = 200.0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+              child: const Scaffold(
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: row,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text('label', key: ValueKey('label')),
+                        ),
+                        DropDownMark(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        final icon = find.descendant(
+          of: find.byType(DropDownMark),
+          matching: find.byIcon(Icons.arrow_drop_down_rounded),
+        );
+        expect(icon, findsOneWidget);
+        expect(tester.getSize(icon).width, closeTo(size, 0.05));
+        expect(tester.getSize(icon).height, closeTo(size, 0.05));
+        if (scale == 1.3) expect(tester.getSize(icon).height.round(), 23);
+        final reserved = tester.getRect(find.byType(DropDownMark));
+        expect(reserved.width, closeTo(18, 0.05), reason: 'room in the row');
+        expect(
+          tester.getSize(find.byKey(const ValueKey('label'))).width,
+          closeTo(row - 18, 0.05),
+          reason: 'the label keeps the room it had beside the 18 dp icon',
+        );
+        // The glyph's triangle, about 7.4/24 of its box and centred in it,
+        // stays inside the 18 dp it reserves, clear of the label.
+        final glyph = tester.getRect(icon);
+        expect(glyph.center.dx, closeTo(reserved.center.dx, 0.05));
+        expect(
+          glyph.center.dx - size * 7.4 / 48,
+          greaterThanOrEqualTo(reserved.left),
+          reason: 'the triangle starts after the label',
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final MapEntry(key: month, value: name) in _deMonths.entries) {
+      testWidgets('UX-1724: ca at 2× on 360 dp, one task moved to a Wednesday '
+          'in $name («de» before the month): the day chip shows the whole day '
+          'and «· 10:00», in at most 3 lines, the ▾ 28 dp, nothing '
+          'overflows', (tester) async {
+        final (monday, wednesday) = _wednesdayIn(month);
+        await _showDoctorMovedTo(
+          tester,
+          monday: monday,
+          wednesday: wednesday,
+          language: 'ca',
+        );
+        expect(_moveChip, findsOneWidget);
+        final date = _weekdayDate(tester, day(wednesday));
+        expect(date, contains(' de '), reason: 'a month that takes «de»');
+        expect(_chipLabel(tester), '$date · 10:00');
+        expect(_moveMark, findsOneWidget);
+        expect(tester.getSize(_moveMark).height, closeTo(28, 0.5));
+        expect(_chipLabelLines(tester), lessThanOrEqualTo(3));
+        _expectWhole(
+          tester,
+          find.descendant(
+            of: _moveChip,
+            matching: find.text(_chipLabel(tester)),
+          ),
+          'the chip’s label',
+        );
+        _expectMarkBesideLabel(tester);
+        expect(tester.getRect(_moveChip).right, lessThanOrEqualTo(360.5));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    // Spanish and English keep to 2 lines on the same long-month days.
+    for (final language in ['es', 'en']) {
+      for (final month in [2, 9, 12]) {
+        testWidgets('UX-1724: $language at 2× on 360 dp, one task moved to a '
+            'Wednesday in ${_deMonths[month]}: the chip’s label shows whole '
+            'in at most 2 lines', (tester) async {
+          final (monday, wednesday) = _wednesdayIn(month);
+          await _showDoctorMovedTo(
+            tester,
+            monday: monday,
+            wednesday: wednesday,
+            language: language,
+          );
+          expect(
+            _chipLabel(tester),
+            '${_weekdayDate(tester, day(wednesday))} · 10:00',
+          );
+          expect(_chipLabelLines(tester), lessThanOrEqualTo(2));
+          _expectWhole(
+            tester,
+            find.descendant(
+              of: _moveChip,
+              matching: find.text(_chipLabel(tester)),
+            ),
+            'the chip’s label',
+          );
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
   });
 }

@@ -1040,6 +1040,8 @@
   "commandTasksMovedTo": "{count, plural, =1{Tasca moguda al {date}} other{{count} tasques mogudes al {date}}}",
   "commandTasksAssignedTo": "{count, plural, =1{Tasca assignada a {name}} other{{count} tasques assignades a {name}}}",
   "commandBulkMoveTo": "{when, select, today{{count, plural, =1{Mou 1 tasca a avui, {day}} other{Mou {count} tasques a avui, {day}}}} tomorrow{{count, plural, =1{Mou 1 tasca a demà, {day}} other{Mou {count} tasques a demà, {day}}}} other{{count, plural, =1{Mou 1 tasca al {day}} other{Mou {count} tasques al {day}}}}}",
+  "commandBulkMoveLead": "{when, select, today{{count, plural, =1{Mou 1 tasca a} other{Mou {count} tasques a}}} tomorrow{{count, plural, =1{Mou 1 tasca a} other{Mou {count} tasques a}}} other{{count, plural, =1{Mou 1 tasca al} other{Mou {count} tasques al}}}}",
+  "commandMoveDay": "{when, select, today{avui, {day}} tomorrow{demà, {day}} other{{day}}}",
   "commandBulkShift": "{direction, select, earlier{{count, plural, =1{Mou 1 tasca {span} abans} other{Mou {count} tasques {span} abans}}} other{{count, plural, =1{Mou 1 tasca {span} més tard} other{Mou {count} tasques {span} més tard}}}}",
   "commandBulkSpan": "{unit, select, weeks{{amount, plural, =1{una setmana} other{{amount} setmanes}}} other{{amount, plural, =1{un dia} other{{amount} dies}}}}",
   "commandBulkMove": "{count, plural, =1{Mou 1 tasca} other{Mou {count} tasques}}",

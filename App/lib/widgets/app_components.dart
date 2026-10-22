@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/feedback_timeout.dart';
@@ -102,6 +104,23 @@ class AppSurface extends StatelessWidget {
               BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
       clipBehavior: Clip.antiAlias,
       child: Padding(padding: padding, child: child));
+}
+
+/// The ▾ that says a chip can be changed, as large as the text lets it be
+/// seen: 18 dp at normal text, growing with the text size up to 28 dp.
+/// It always takes 18 dp beside the label, as before, so the label keeps all
+/// its room: the glyph's triangle is far narrower than its box and stays
+/// inside those 18 dp.
+class DropDownMark extends StatelessWidget {
+  const DropDownMark({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final size = math.min(28.0, MediaQuery.textScalerOf(context).scale(18));
+    return Align(
+        widthFactor: 18 / size,
+        heightFactor: 1,
+        child: Icon(Icons.arrow_drop_down_rounded, size: size));
+  }
 }
 
 class SectionLabel extends StatelessWidget {

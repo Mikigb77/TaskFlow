@@ -681,4 +681,172 @@ void main() {
       },
     );
   }
+
+  // ---- Run 2026-10-21-changes, plan 2 round 2 · P237 (UX-1722) ----
+
+  group('UX-1722: the ▾ on the project and person chips grows with the text', () {
+    Future<void> pumpPicker(
+      WidgetTester tester, {
+      required Task task,
+      List<TaskListInfo>? projects,
+      double scale = 2,
+      bool lockShared = false,
+      bool changeable = true,
+    }) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(api),
+            authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+            taskListsProvider.overrideWith(
+              (ref) async => projects ?? [shared],
+            ),
+          ],
+          child: localized(
+            Scaffold(
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: TaskAssignmentPicker(
+                  task: task,
+                  lockShared: lockShared,
+                  onChanged: changeable ? (_) {} : null,
+                ),
+              ),
+            ),
+            language: 'es',
+            scale: scale,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder mark(Finder chip) => find.descendant(
+      of: chip,
+      matching: find.byIcon(Icons.arrow_drop_down_rounded),
+    );
+
+    Task anaTask({String? name}) => Task(
+      title: 'Ejercicio tres',
+      priority: 1,
+      listId: shared.id,
+      assignment: 'member',
+      assigneeId: 2,
+      assigneeName: name ?? 'Ana',
+    );
+
+    for (final (scale, size) in [(2.0, 28.0), (1.0, 18.0)]) {
+      testWidgets(
+        'UX-1722: es at ${scale.toInt()}× on 360 dp, the project chip’s and '
+        'the person chip’s ▾ are ${size.toInt()} dp, inside their chips',
+        (tester) async {
+          await pumpPicker(tester, task: anaTask(), scale: scale);
+          final project = find.widgetWithText(ActionChip, 'Physics');
+          final person = find.widgetWithText(ActionChip, 'Ana');
+          expect(project, findsOneWidget);
+          expect(person, findsOneWidget);
+          for (final (what, chip) in [
+            ('project', project),
+            ('person', person),
+          ]) {
+            expect(mark(chip), findsOneWidget, reason: what);
+            final box = tester.getSize(mark(chip));
+            expect(box.width, closeTo(size, 0.5), reason: '$what ▾ $box');
+            expect(box.height, closeTo(size, 0.5), reason: '$what ▾ $box');
+            final rect = tester.getRect(chip);
+            final glyph = tester.getRect(mark(chip));
+            expect(glyph.right, lessThanOrEqualTo(rect.right + 0.5));
+            expect(glyph.left, greaterThanOrEqualTo(rect.left - 0.5));
+            expect(rect.right, lessThanOrEqualTo(360.5), reason: what);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-1722: es at 2× on 360 dp, a long project name and a long person '
+      'name end in “…” with the 28 dp ▾ still beside them; nothing overflows',
+      (tester) async {
+        const longProject =
+            'Trabajo de fin de máster de física cuántica aplicada';
+        const longPerson = 'Ana María de los Ángeles Fernández-Villaverde';
+        final project = TaskListInfo(
+          id: shared.id,
+          name: longProject,
+          groupId: 'master',
+          groupName: 'Master',
+          shared: true,
+          people: const [
+            ProjectMember(id: 1, name: 'Miki', role: 'owner'),
+            ProjectMember(id: 2, name: longPerson, role: 'editor'),
+          ],
+        );
+        await pumpPicker(
+          tester,
+          task: anaTask(name: longPerson),
+          projects: [project],
+        );
+        expect(tester.takeException(), isNull);
+        for (final name in [longProject, longPerson]) {
+          final chip = find.ancestor(
+            of: find.text(name),
+            matching: find.byType(ActionChip),
+          );
+          expect(chip, findsOneWidget, reason: name);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find
+                .descendant(
+                  of: find.text(name),
+                  matching: find.byType(RichText),
+                )
+                .first,
+          );
+          expect(paragraph.didExceedMaxLines, isTrue, reason: '$name ends in …');
+          expect(mark(chip), findsOneWidget, reason: name);
+          final box = tester.getSize(mark(chip));
+          expect(box.height, closeTo(28, 0.5), reason: name);
+          final rect = tester.getRect(chip);
+          expect(rect.right, lessThanOrEqualTo(360.5), reason: name);
+          expect(
+            tester.getRect(mark(chip)).right,
+            lessThanOrEqualTo(rect.right + 0.5),
+            reason: name,
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'UX-1722: es at 2×, a locked shared project chip shows no ▾; the '
+      'person chip that can still be changed keeps its 28 dp ▾',
+      (tester) async {
+        await pumpPicker(tester, task: anaTask(), lockShared: true);
+        final project = find.widgetWithText(ActionChip, 'Physics');
+        final person = find.widgetWithText(ActionChip, 'Ana');
+        expect(project, findsOneWidget);
+        expect(mark(project), findsNothing);
+        expect(mark(person), findsOneWidget);
+        expect(tester.getSize(mark(person)).height, closeTo(28, 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1722: es at 2×, a person chip that can’t be changed shows no ▾',
+      (tester) async {
+        await pumpPicker(tester, task: anaTask(), changeable: false);
+        final person = find.widgetWithText(ActionChip, 'Ana');
+        expect(person, findsOneWidget);
+        expect(mark(person), findsNothing);
+        expect(tester.widget<ActionChip>(person).onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }

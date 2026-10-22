@@ -1,14 +1,14 @@
 # frontend-ux-reviewer — memory index
 
 Updated 2026-10-13 from the whole-app run (`.claude/ux-review/runs/2026-10-13-app/`) and 2026-10-14 from the capture-speed run (`runs/2026-10-14-speed/`, b1 r1–r3); b10 (reminder copy, notification undo, first-run line) merged 2026-10-14; 2026-10-18-commands b5 (person chips, site links, delete account) merged 2026-10-19. Check a line against the code before relying on it.
-Run 2026-10-19-app closed 2026-10-21 (b7: launcher icon, tab-label fit, widget/shortcut labels). Run 2026-10-21-changes (bulk voice commands) closed 2026-10-22.
+Run 2026-10-19-app closed 2026-10-21 (b7: launcher icon, tab-label fit, widget/shortcut labels). Run 2026-10-21-changes (bulk voice commands) ended 2026-10-22 not done: UX-1722/1724 fixed (DropDownMark); six findings never ran (worktrees from main).
 
 **Issues and owner decisions aren't kept here:** issues and statuses → `.claude/ux-review/ISSUES.md`; owner decisions → `.claude/ux-review/DECISIONS.md`.
 
 ## How the app works
 - [UI patterns](ui-patterns.md) — standards for undo bars, date sheets, task forms, capture save/leave, errors, scope, search, tabs/icons, notification body/undo, local-first undo, command/set cards, first-run teaching, person chips, site links; corrects "one shared sheet/editor".
-- [Recurring problems](recurring-problems.md) — 26 problem types (25 reveal drift, 26 null-count plurals added 2026-10-22) (incl. awaited work in taps, stale scheduled copy, show-once flags, help copy outliving state); check them first.
-- [Review techniques](review-techniques.md) — Manrope width model, render cropping, prefix tracing, Flutter 3.44.5 NavigationBar/tooltip facts.
+- [Recurring problems](recurring-problems.md) — 28 problem types (27 scaled glyph steals label room, 28 landing keyed on a flag, added 2026-10-22) (incl. awaited work in taps, stale scheduled copy, show-once flags, help copy outliving state); check them first.
+- [Review techniques](review-techniques.md) — verify: confirm fixes landed; Manrope width model, render cropping, prefix tracing, Flutter 3.44.5 NavigationBar/tooltip facts.
 - [Decisions in docs](decisions-in-docs.md) — already in DECISIONS.md; plus doc lines, code comments and tests that only look like decisions.
 
 ## Screen maps, one per UX-loop area

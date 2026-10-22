@@ -20,6 +20,9 @@ Ways to turn "needs a device check" into measured evidence, proven in the 2026-1
 - Crop and enlarge the region in question from `App/build/*.png` and measure ink width and pixel colours (tint edges, contrast).
 - `calendar-feedback-*.png` is the only current render showing the tab bar; nothing current shows Tareas, Notas or search (as of 2026-10-13).
 
+## Verify rounds
+- First check each fix's files actually have a diff in the main checkout (`git diff HEAD -- <file>`, grep for the new symbol). In run 2026-10-21-changes, five fixer worktrees were made from main instead of dev, so their fixes never landed; testers' failing tests were the first sign.
+
 ## Search changes
 - Re-implement the matcher as a script and run every prefix of real words (Catalan l·l words in all three spellings, accented Spanish) against stored forms; diff old vs new matcher over all pairs to prove "no lost matches".
 

@@ -98,6 +98,8 @@ What the app does today, so a consistency finding can name the standard and the 
 ## Voice command and set cards (2026-10-21)
 - One verb per action across card heading, button and landing message (Mover / Asignar / Marcar como hechas / Eliminar). Count words follow the real count (ICU plurals); a set with no count yet uses the plural.
 - Destructive set: its heading and ✕ must be in view before the button can be pressed. An ambiguity is a question with chips, never a "not found" error. See [[screens-a-voice-capture]].
+- **Drop-down mark ▾ (`DropDownMark`, `widgets/app_components.dart`, 2026-10-22):** the one ▾ for chips that open a picker — the move-day chip, the project chip (`task_list_picker.dart`) and the person chip (`task_assignment_picker.dart`). The glyph scales with text (18 dp at 1×, capped at 28 dp) but always reserves 18 dp of row width (`widthFactor: 18 / size`), so a larger ▾ never takes room from the label. Locked/unchangeable chips show no ▾. New picker chips must use it, not a raw `Icon(arrow_drop_down)`.
+- **Day chip on command cards (`_MoveDayChip`):** a 48 dp ActionChip, tooltip «Elegir día», on «move to a day» set headings and the one-task change card; the label may carry the time («jue, 29 de oct · 10:00») but the sheet changes the day only; label `maxLines: 3`; no «Sin fecha» in its sheet; absent on shift-by-days, complete, delete, assign.
 
 ## Reminders and notifications
 - The reminders master switch defaults to off, per account and per device (`ReminderPreferences.enabled = false`).

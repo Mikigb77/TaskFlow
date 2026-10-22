@@ -506,8 +506,13 @@ void main() {
           ],
         );
         expect(find.text('Ir al médico'), findsOneWidget);
+        // Before →, then the new day as a chip that opens «Elegir día».
+        expect(find.text('${weekday(day(3))} · 10:00 →'), findsOneWidget);
         expect(
-          find.text('${weekday(day(3))} · 10:00 → ${weekday(day(7))} · 10:00'),
+          find.descendant(
+            of: find.byKey(const ValueKey('command-move-day')),
+            matching: find.text('${weekday(day(7))} · 10:00'),
+          ),
           findsOneWidget,
         );
         expect(

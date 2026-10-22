@@ -19,7 +19,8 @@ class ScheduleChoice {
 /// as on the capture result. Otherwise (the edit form) they only select.
 /// [dayOnly] is the new-task form's «Elegir día»: only a day, with no time
 /// and no «Listo»; a day tapped, in the chips or the calendar, applies at
-/// once.
+/// once. Without [noDate] there is no «Sin fecha»: a move's day on the
+/// capture result is always a day.
 Future<ScheduleChoice?> editSchedule(
   BuildContext context, {
   DateTime? date,
@@ -28,6 +29,7 @@ Future<ScheduleChoice?> editSchedule(
   Task? moving,
   bool applyDays = false,
   bool dayOnly = false,
+  bool noDate = true,
 }) => showModalBottomSheet<ScheduleChoice>(
   context: context,
   isScrollControlled: true,
@@ -39,6 +41,7 @@ Future<ScheduleChoice?> editSchedule(
     moving: moving,
     applyDays: applyDays,
     dayOnly: dayOnly,
+    noDate: noDate,
   ),
 );
 
@@ -50,6 +53,7 @@ class _ScheduleEditor extends StatefulWidget {
     this.moving,
     this.applyDays = false,
     this.dayOnly = false,
+    this.noDate = true,
   });
   final DateTime? date;
   final bool hasTime;
@@ -57,6 +61,7 @@ class _ScheduleEditor extends StatefulWidget {
   final Task? moving;
   final bool applyDays;
   final bool dayOnly;
+  final bool noDate;
   @override
   State<_ScheduleEditor> createState() => _ScheduleEditorState();
 }
@@ -261,7 +266,8 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                             for (final entry in [
                               (l.today, today),
                               (l.tomorrow, tomorrow),
-                              if (!occurrence) (l.noDate, null),
+                              if (!occurrence && widget.noDate)
+                                (l.noDate, null),
                             ])
                               ChoiceChip(
                                 label: Text(entry.$1),

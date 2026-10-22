@@ -5,6 +5,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 
 Task taskWithProject(Task task, TaskListInfo? project) => task.copyWith(
@@ -124,7 +125,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
                         ),
                       ),
                       if (changeable)
-                        const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                        const DropDownMark(),
                     ],
                   ),
                 ),

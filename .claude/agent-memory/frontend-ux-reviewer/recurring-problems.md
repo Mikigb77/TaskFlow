@@ -121,4 +121,11 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - ✕ on a set still asking «¿Qué proyecto?» fell back to count 1 and spoke in the singular (R1A-1 → UX-1717).
     - When a string takes a count, check every state where the count is null (asking, loading, not found) and pick the form for what the thing is, not 1.
 
+27. **Scaling a decoration with text steals the label's room.**
+    - Growing the chip ▾ with the text scale (UX-1722) took 5 dp more of the row at 2×, and the Catalan day chip lost its time «· 10:00» (R2A-1 → UX-1724).
+    - When an icon, badge or mark grows with text, check the longest locale at 2× on 360 dp; reserve the old layout width and let the glyph overflow its box visually.
+28. **A landing or remap rule keyed on a flag, not on before/after.**
+    - Landing sent every overdue item to Today, even ones a −1 shift moved to yesterday (R1A-2 → UX-1723).
+    - For any "where does the user land" rule, check it against items that moved and items changed in place; derive it from the item's day before vs after.
+
 Related: [[ui-patterns]], [[review-techniques]].

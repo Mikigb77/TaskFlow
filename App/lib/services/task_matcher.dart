@@ -293,6 +293,11 @@ abstract final class TaskMatcher {
     _ => !completed,
   };
 
+  /// A task's key on a set's card: the task, or the repetition.
+  static String keyOf(Task shown) => shown.occurrenceId == null
+      ? '${shown.id}'
+      : '${shown.id}@${shown.occurrenceId}';
+
   /// A bulk command's set ([CommandTarget.all]; Backend/docs/VOICE_COMMANDS.md,
   /// «Bulk commands»), from the phone's own copy:
   /// - the person's own tasks and those assigned to them in shared projects;
@@ -307,13 +312,23 @@ abstract final class TaskMatcher {
   /// Repeating tasks are left out and counted (`repeatingTasks` lists
   /// them), except when [completing] over one day: then each one's
   /// repetition on that day is in the set.
-  /// The set comes soonest first, as Calendar lists it, the tasks with no
-  /// day last. A project or person that wasn't found holds nothing.
+  ///
+  /// «Hoy»: a pending set for exactly today ([now]'s day, as Calendar's)
+  /// also takes the open tasks Today lists under «Atrasadas»
+  /// ([Task.overdueOn]): a task from an earlier day, or a repeating task's
+  /// latest missed repetition when [completing] (else that task is left out
+  /// and counted, once). They come first, oldest first, as Today lists
+  /// them, and `overdue` holds their keys ([keyOf]).
+  ///
+  /// The rest of the set comes soonest first, as Calendar lists it, the
+  /// tasks with no day last. A project or person that wasn't found holds
+  /// nothing.
   static ({
     List<Task> tasks,
     int repeating,
     List<Task> repeatingTasks,
     Task? viewOnly,
+    Set<String> overdue,
   })
   bulk(
     Iterable<Task> tasks,
@@ -321,6 +336,7 @@ abstract final class TaskMatcher {
     int? accountId,
     Iterable<TaskListInfo> projects = const [],
     bool completing = false,
+    DateTime? now,
   }) {
     if (target.projectName != null || target.personName != null) {
       return (
@@ -328,16 +344,25 @@ abstract final class TaskMatcher {
         repeating: 0,
         repeatingTasks: const [],
         viewOnly: null,
+        overdue: const {},
       );
     }
     final first = target.from == null ? null : Task.day(target.from!);
     final last = target.to == null ? null : Task.day(target.to!);
     final oneDay = completing && first != null && first == last;
+    final today = Task.day(now ?? DateTime.now());
+    // «Hoy» takes what Today lists as overdue too (the owner's D2).
+    final hoy =
+        target.status == 'open' &&
+        !target.undated &&
+        first == today &&
+        last == today;
     bool editable(String? id) =>
         id == null || projects.any((p) => p.id == id && p.canEdit);
     bool putAway(String? id) =>
         id != target.listId && projects.any((p) => p.id == id && p.inactive);
     final found = <(Task, _When?)>[];
+    final overdue = <Task>[];
     final repeating = <Task>[];
     final viewOnly = <Task>[];
     for (final task in tasks) {
@@ -345,10 +370,12 @@ abstract final class TaskMatcher {
       if (target.listId != null && task.listId != target.listId) continue;
       if (!_inSet(task, target, accountId, projects)) continue;
       final edit = editable(task.listId);
+      final missed = hoy ? task.overdueOn(today) : null;
       if (task.isRecurring) {
         if (target.undated) continue;
         if (oneDay) {
-          for (final shown in task.occurrencesOn(first)) {
+          final shownToday = task.occurrencesOn(first);
+          for (final shown in shownToday) {
             if (!_hasStatus(shown.isCompleted, target.status)) continue;
             if (edit) {
               found.add((
@@ -359,9 +386,17 @@ abstract final class TaskMatcher {
               viewOnly.add(shown);
             }
           }
-        } else if (_repeatsIn(task, target, first, last)) {
+          if (missed != null &&
+              !shownToday.any((shown) => keyOf(shown) == keyOf(missed))) {
+            (edit ? overdue : viewOnly).add(missed);
+          }
+        } else if (missed != null || _repeatsIn(task, target, first, last)) {
           (edit ? repeating : viewOnly).add(task);
         }
+        continue;
+      }
+      if (missed != null) {
+        (edit ? overdue : viewOnly).add(task);
         continue;
       }
       if (!_hasStatus(task.isCompleted, target.status)) continue;
@@ -388,6 +423,7 @@ abstract final class TaskMatcher {
     }
     // The words, as a search keeps them: every word, or else the most.
     final kept = _ranked([
+      ...overdue,
       for (final (task, _) in found) task,
       ...repeating,
       ...viewOnly,
@@ -404,12 +440,22 @@ abstract final class TaskMatcher {
         }
         return _newestFirst(a.$1, b.$1);
       });
+    // Oldest first, as Today lists its «Atrasadas».
+    overdue
+      ..removeWhere((task) => !kept.contains(task))
+      ..sort((a, b) {
+        final order = (a.displayDate ?? a.displayDeadline!).compareTo(
+          b.displayDate ?? b.displayDeadline!,
+        );
+        return order != 0 ? order : _newestFirst(a, b);
+      });
     final left = repeating.where(kept.contains).toList();
     return (
-      tasks: [for (final (task, _) in found) task],
+      tasks: [...overdue, for (final (task, _) in found) task],
       repeating: left.length,
       repeatingTasks: left,
       viewOnly: viewOnly.where(kept.contains).firstOrNull,
+      overdue: {for (final task in overdue) keyOf(task)},
     );
   }
 }

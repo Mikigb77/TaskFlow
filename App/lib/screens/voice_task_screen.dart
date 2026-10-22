@@ -2719,13 +2719,14 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   static Element? _questionIn(BuildContext card) =>
       _firstIn(card, (widget) => widget is QuestionBox);
 
-  /// A command card's first line under [root], as shown.
+  /// A command card's first line under [root], as TalkBack reads it.
   static String? _headlineIn(BuildContext root) {
     final headline = _firstIn(
       root,
       (widget) => widget.key == const ValueKey('command-headline'),
     )?.widget;
-    return headline is Text ? headline.data : null;
+    // A move's heading is read as its whole sentence, its day a chip.
+    return headline is Text ? headline.semanticsLabel ?? headline.data : null;
   }
 
   /// The confirming button's label, as shown; none for a search.
@@ -3083,6 +3084,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         ? ref.watch(taskListsProvider)
         : ref.read(taskListsProvider);
     final auth = watch ? ref.watch(authProvider) : ref.read(authProvider);
+    // Today is Calendar's, as Today lists its «Atrasadas».
+    final now = ref.read(calendarClockProvider)();
     return [
       for (final command in _commands)
         if (command.shown)
@@ -3091,6 +3094,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             tasks: tasks.valueOrNull ?? const [],
             projects: projects.valueOrNull ?? const [],
             accountId: auth.account?.id,
+            now: now,
           ),
     ];
   }
@@ -3648,12 +3652,27 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         for (final completion in applied.completed)
           if (completion.days.isNotEmpty) completion,
       ];
+      // The overdue tasks a «hoy» set took were listed on Today: left on an
+      // earlier day, they land on Today, not on their own day.
+      final today = Task.day(ref.read(calendarClockProvider)());
+      final overdueIds = {
+        for (final view in actionable)
+          for (final item in view.bulk?.selected ?? const <BulkItem>[])
+            if (item.overdue) item.stored.id,
+      };
+      DateTime onToday(int? id, DateTime date) =>
+          overdueIds.contains(id) && Task.day(date).isBefore(today)
+          ? today
+          : date;
       // Calendar lands on the earliest day among those added, changed and
       // marked done.
       final days = [
         for (final item in tasks) ?landing(item.task),
-        for (final task in landed) ?landing(task),
-        for (final completion in done) ...completion.days,
+        for (final task in landed)
+          if (landing(task) case final date?) onToday(task.id, date),
+        for (final completion in done)
+          for (final date in completion.days)
+            onToday(completion.before.id, date),
       ].map(Task.day).toSet().toList()..sort();
       final updates = actionable
           .where((view) => view.kind == CommandKind.update)

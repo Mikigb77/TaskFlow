@@ -303,6 +303,15 @@ class TaskChanges {
       if (!keys.contains(key)) key: value,
   });
 
+  /// These changes moved to [day], picked on the card as if it had been
+  /// said: `date` is that day and `shift_days` goes; the rest stays, a
+  /// `time` said included.
+  TaskChanges movedTo(DateTime day) => TaskChanges({
+    for (final MapEntry(:key, :value) in values.entries)
+      if (key != 'shift_days') key: value,
+    'date': _dayKey(day),
+  });
+
   String? get title => values['title'] as String?;
 
   /// The new day; null with [has] `date` takes the day away.
@@ -547,6 +556,7 @@ class CaptureCommand {
     DateTime? day,
     bool clearDay = false,
     List<String>? excluded,
+    TaskChanges? changes,
   }) => CaptureCommand(
     id: id,
     kind: kind,
@@ -563,7 +573,7 @@ class CaptureCommand {
     from: from,
     to: to,
     target: target,
-    changes: changes,
+    changes: changes ?? this.changes,
     removed: removed ?? this.removed,
     done: done ?? this.done,
     taskId: clearTaskId ? null : taskId ?? this.taskId,
