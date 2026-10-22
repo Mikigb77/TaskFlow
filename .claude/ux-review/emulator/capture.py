@@ -871,7 +871,16 @@ def install(apk: Path) -> None:
     # -d: a build from another checkout or worktree can carry a lower version code (the
     # pubspec's build number), which Android refuses as a downgrade. It's allowed for debug
     # builds, and the data stays, as with -r.
-    out = adb("install", "-r", "-d", str(apk), timeout=300)
+    try:
+        out = adb("install", "-r", "-d", str(apk), timeout=300)
+    except RuntimeError as error:
+        # The emulator's /data fills up over many runs (2026-10-22). Clearing the system's
+        # caches frees it without touching any app's data; then one more try.
+        if "INSUFFICIENT_STORAGE" not in str(error):
+            raise
+        log("  the emulator's storage is full: clearing system caches and trying again")
+        sh("pm trim-caches 999G", timeout=120)
+        out = adb("install", "-r", "-d", str(apk), timeout=300)
     if "Success" not in out:
         raise RuntimeError(f"install failed: {out.strip()[-300:]}")
 
