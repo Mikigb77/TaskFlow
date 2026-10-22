@@ -2,6 +2,9 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-22 — D4 of run 2026-10-21-changes (UX-1721)
+**«Retrasa todo lo de hoy un día», and the overdue tasks a «hoy» set takes (D2):** "From today: to tomorrow", as recommended. Moved by days, the overdue tasks in a «hoy» set count from today, like the rest, so «un día» puts them all on tomorrow. They're listed with «Atrasada» before the tap, and Deshacer undoes it. Other sets, one task and moves to a day are unchanged. P232 builds it in the same round; the main session updates the contract.
+
 ## 2026-10-21 (evening) — Bulk commands: D1–D3 of run 2026-10-21-changes
 The owner answered the run's three questions, each as recommended:
 - **D1 (UX-1715), a task with only a deadline, moved to a day by voice:** "Move the deadline".

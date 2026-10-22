@@ -205,7 +205,7 @@ The person, the project and their issues are resolved as for `find`: the person 
 - The person's own tasks, and the tasks assigned to them in shared projects. Other people's tasks are included only when the person names their project (`list_id`) or names them (`person_id`).
 - Only tasks the person can edit, never deleted ones.
 - `status` as above: pending ones by default.
-- **«Hoy»:** a set whose period is exactly today (`from` = `to` = today) also takes the open tasks Today lists under «Atrasadas», listed first with «Atrasada» and ticked, so any can be unticked (the owner's D2, 2026-10-21). This applies to pending sets only, so it never adds to «las completadas de hoy».
+- **«Hoy»:** a set whose period is exactly today (`from` = `to` = today) also takes the open tasks Today lists under «Atrasadas», listed first with «Atrasada» and ticked, so any can be unticked (the owner's D2, 2026-10-21). This applies to pending sets only, so it never adds to «las completadas de hoy». Moved by days («retrasa todo lo de hoy un día»), those overdue tasks count from today, like the rest, so they all land on the same day (the owner's D4, 2026-10-22).
 - **Repeating tasks** are never moved, changed or deleted in bulk; the card says how many were left out. A bulk `complete` whose period is one day (`from` = `to`) completes each repeating task's occurrence that day. With a longer period, it leaves them out too.
 - **Assigning** reaches only tasks in shared projects where the person named can edit. The others are left as they are and counted.
 
