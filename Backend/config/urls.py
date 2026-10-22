@@ -39,5 +39,6 @@ urlpatterns = [
     path("api/ai/draft/", views.DraftView.as_view()),
     path("api/ai/drafts/", views.DraftBatchView.as_view()),
     path("api/ai/drafts/<uuid:capture_id>/", views.DraftCancelView.as_view()),
+    path("api/ai/reminder-plan/", views.ReminderPlanView.as_view()),
     path("api/", include(router.urls)),
 ]

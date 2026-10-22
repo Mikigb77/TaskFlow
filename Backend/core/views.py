@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from . import ai
 from .models import FreeDictation, User
-from .serializers import DraftRequestSerializer
+from .serializers import DraftRequestSerializer, ReminderPlanRequestSerializer
 from .capture_context import capture_context
 from .billing import BillingUnavailable, has_pro
 from .free_tier import cancel_free_dictation, capture_digest, free_voice, reserve_free_dictation
@@ -93,6 +93,23 @@ def release_budget(key):
         pass  # The reservation expired while the provider was running.
 
 
+def reserve_ai_call(user):
+    """Count one AI call against the account's and everyone's daily budgets, or refuse it with a 429.
+
+    Returns the account's budget key, so that a failed call can be given back with release_budget."""
+    now = timezone.now()
+    day = now.date().isoformat()  # The UTC day: both budgets start again at 00:00 UTC.
+    wait = seconds_until_next_day(now)
+    budget_key = f"ai:{day}:user:{user.pk}"
+    consume_budget(budget_key, settings.AI_REQUESTS_PER_DAY, wait)
+    try:
+        consume_budget(f"ai:{day}:global", settings.AI_GLOBAL_REQUESTS_PER_DAY, wait)
+    except Throttled:
+        release_budget(budget_key)
+        raise
+    return budget_key
+
+
 class DraftView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = "ai"
@@ -145,16 +162,7 @@ class DraftView(APIView):
         return self.batch and not result.get("tasks") and not result.get("commands")
 
     def draft(self, user, data):
-        now = timezone.now()
-        day = now.date().isoformat()  # The UTC day: both budgets start again at 00:00 UTC.
-        wait = seconds_until_next_day(now)
-        budget_key = f"ai:{day}:user:{user.pk}"
-        consume_budget(budget_key, settings.AI_REQUESTS_PER_DAY, wait)
-        try:
-            consume_budget(f"ai:{day}:global", settings.AI_GLOBAL_REQUESTS_PER_DAY, wait)
-        except Throttled:
-            release_budget(budget_key)
-            raise
+        budget_key = reserve_ai_call(user)
         data.setdefault("reference_time", timezone.now())
         try:
             return ai.make_drafts(data) if self.batch else ai.make_draft(data)
@@ -167,6 +175,35 @@ class DraftView(APIView):
 
 class DraftBatchView(DraftView):
     batch = True
+
+
+class ReminderPlanView(APIView):
+    """«A tu manera» (docs/REMINDER_PLANS.md): one rhythm, typed or said in the reminder sheet, read
+    into a custom plan. Pro only. It shares dictation's throttle and daily AI budgets, and it isn't a
+    dictation: nothing here touches the free dictations."""
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "ai"
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        serializer = ReminderPlanRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pro = has_pro(request.user)
+        if pro is None:
+            raise BillingUnavailable()  # Never tell a paying customer that this needs Pro.
+        if not pro:
+            return Response({"code": "pro_required"}, status=402)
+        data = serializer.validated_data
+        budget_key = reserve_ai_call(request.user)
+        data.setdefault("reference_time", timezone.now())
+        try:
+            plan = ai.read_reminder_plan(data)
+        except ai.AIUnavailable as error:
+            release_budget(budget_key)  # A failed read doesn't use up the account's allowance.
+            return Response({"detail": str(error)}, status=error.status)
+        if plan is None:
+            return Response({"reminder_plan": None, "issue": "unclear"})
+        return Response({"reminder_plan": plan})
 
 
 class DraftCancelView(APIView):

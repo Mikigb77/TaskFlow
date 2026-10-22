@@ -6,6 +6,7 @@ from .models import User, Task, TaskList, TaskGroup, ProjectPreference
 from .billing import complimentary_pro
 from .email_verification import unconfirmed
 from .free_tier import free_voice
+from .reminder_plans import MAX_SAID, InvalidPlan, check_plan
 
 EMAIL_EXISTS = "An account with this email already exists."
 
@@ -178,6 +179,8 @@ class TaskSerializer(serializers.ModelSerializer):
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
     reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, default=None)
     reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, default=None)
+    # docs/REMINDER_PLANS.md. Without a default, an older app that doesn't send it keeps the plan.
+    reminder_plan = serializers.JSONField(allow_null=True, required=False)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
     checklist = ChecklistItemSerializer(many=True, required=False)
@@ -231,6 +234,13 @@ class TaskSerializer(serializers.ModelSerializer):
     def validate_repeat_weekdays(self, value):
         return sorted(set(value))
 
+    def validate_reminder_plan(self, value):
+        # Only the shape: the phone schedules the plan.
+        try:
+            return check_plan(value)
+        except InvalidPlan as error:
+            raise serializers.ValidationError(str(error))
+
     def validate_exceptions(self, value):
         if len(value) > 500:
             raise serializers.ValidationError("Use no more than 500 occurrence changes per series.")
@@ -258,7 +268,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "reminder_plan", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -269,7 +279,7 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"kind": "Keep the original type. Create a separate task or note instead."})
         if kind == "note":
             effective = lambda key, default=None: attrs.get(key, getattr(self.instance, key, default))
-            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_time", "repeat_until"))
+            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_time", "reminder_plan", "repeat_until"))
                     or effective("priority", 1) != 1 or effective("is_completed", False)
                     or effective("recurrence", "none") != "none" or effective("repeat_interval", 1) != 1
                     or effective("reminder_anchor", "planned") != "planned" or effective("reminder_minutes") not in (None, -1)
@@ -326,3 +336,15 @@ class DraftRequestSerializer(serializers.Serializer):
         if bool(attrs.get("text")) == bool(attrs.get("audio")):
             raise serializers.ValidationError("Supply either text or one WAV recording.")
         return attrs
+
+
+class ReminderPlanRequestSerializer(serializers.Serializer):
+    """«A tu manera» (docs/REMINDER_PLANS.md): the words, read relative to the task's anchor."""
+    # The words become the plan's said, which holds at most 200 characters.
+    text = serializers.CharField(max_length=MAX_SAID)
+    timezone = serializers.CharField(max_length=64, validators=[validate_timezone])
+    reference_time = ZonedDateTimeField(required=False)
+    # The task's deadline when it has one, otherwise its own day: the plan counts back from it.
+    anchor_date = serializers.DateField()
+    language = serializers.RegexField(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$", max_length=35,
+                                      required=False, allow_null=True)
