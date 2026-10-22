@@ -1139,9 +1139,16 @@ void main() {
         await tester.tap(find.byType(ReminderChip));
         await tester.pumpAndSettle();
         final sheet = find.byType(BottomSheet);
+        // The single reminder's rows; a task with a day also has the two
+        // plans under them (reminder_plan_sheet_test.dart).
         final rows = tester
             .widgetList<ListTile>(
               find.descendant(of: sheet, matching: find.byType(ListTile)),
+            )
+            .where(
+              (row) =>
+                  row.key != const ValueKey('reminder-plan-until-day') &&
+                  row.key != const ValueKey('reminder-plan-your-way'),
             )
             .toList();
         expect(rows, hasLength(6));

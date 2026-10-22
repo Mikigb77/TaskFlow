@@ -32,7 +32,9 @@ import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/reminder_plans.dart';
 
 /// Edits a saved task or note, or fills in a new task: a [task] with no id
 /// is new. That is how an account without Pro creates tasks (DECISIONS.md,
@@ -107,6 +109,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   late int _priority;
   int? _reminderMinutes;
   int? _reminderTime;
+  ReminderPlan? _reminderPlan;
   late final List<String> _attachments;
   bool _saving = false;
   late final Map<String, dynamic> _unchanged;
@@ -130,6 +133,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     reminderAnchor: _reminderAnchor,
     reminderMinutes: _reminderMinutes,
     reminderTime: _reminderTime,
+    reminderPlan: _isNote ? null : _reminderPlan,
   );
 
   Task get _repeatTask => _planningTask.copyWith(
@@ -288,6 +292,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _priority = task.priority;
     _reminderMinutes = task.reminderMinutes;
     _reminderTime = task.reminderTime;
+    _reminderPlan = task.reminderPlan;
     _attachments = [...task.filePaths, ...task.imagePaths];
     _checklist = [...task.checklist];
     _unchanged = _edited().toMap();
@@ -415,8 +420,17 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         );
   }
 
-  /// The task as the form would save it.
+  /// The task as the form would save it. Its plan stays only while it
+  /// applies: with a deadline or a day, and not repeating. The form keeps it
+  /// meanwhile, so a day taken away and put back brings it back.
   Task _edited() {
+    final task = _withoutPlan();
+    return ReminderPlans.plannable(task)
+        ? task.copyWith(reminderPlan: _isNote ? null : _reminderPlan)
+        : task;
+  }
+
+  Task _withoutPlan() {
     final before = widget.task;
     final ruleChanged = _ruleChanged;
     return Task(
@@ -621,7 +635,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         },
       );
       unawaited(feedback);
-      askAboutRemindersAfterSave(context, [task], feedback: feedback);
+      askAboutRemindersAfterSave(context, [
+        task.copyWith(id: id),
+      ], feedback: feedback);
     } catch (_) {
       if (mounted) {
         unawaited(
@@ -922,6 +938,16 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                                 ),
                             ].join(' · '),
                             style: TextStyle(color: colors.onSurfaceVariant),
+                          ),
+                        // A plan shows, as its one line, once it's set.
+                        if (ReminderPlans.active(_planningTask) != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              reminderPlanText(context, ref, _planningTask),
+                              key: const ValueKey('task-reminder-plan'),
+                              style: TextStyle(color: colors.onSurfaceVariant),
+                            ),
                           ),
                         if (_checklist.isNotEmpty)
                           ChecklistEditor(
@@ -1246,6 +1272,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     hasTime: _planningTask.reminderHasTime,
     minutes: _reminderMinutes,
     time: _reminderTime,
+    plan: _reminderPlan,
     task: _responsibility,
     schedule: _repeatTask.copyWith(
       exceptions: _exceptions,
@@ -1254,6 +1281,12 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     ),
     onMinutes: (value) => setState(() => _reminderMinutes = value),
     onTime: (value) => setState(() => _reminderTime = value),
+    // One choice of the exclusive ones: a plan, or the single reminder.
+    onChanged: (minutes, time, plan) => setState(() {
+      _reminderMinutes = minutes;
+      _reminderTime = time;
+      _reminderPlan = plan;
+    }),
   );
 
   Widget _repeat() => ListTile(

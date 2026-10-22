@@ -1,5 +1,6 @@
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/capture_clarification.dart';
+import 'package:agenda/models/reminder_plan.dart';
 
 class TaskDraft {
   final String title;
@@ -34,8 +35,17 @@ class TaskDraft {
   /// it: the result offers to create it or to pick another.
   final String? projectSuggestion;
 
+  /// Reminders said while dictating (Backend/docs/REMINDER_PLANS.md, «The
+  /// dictation»): a rhythm, or a reminder some days before, as a plan; some
+  /// minutes or hours before a timed task, as minutes. Absent from older
+  /// servers, and when nothing was said about reminders.
+  final ReminderPlan? reminderPlan;
+  final int? reminderMinutes;
+
   TaskDraft.fromJson(Map<String, dynamic> data)
     : title = data['title'] as String,
+      reminderPlan = ReminderPlan.tryParse(data['reminder_plan']),
+      reminderMinutes = _minutes(data['reminder_minutes']),
       clarifications = (data['clarifications'] as List? ?? [])
           .map(
             (value) =>
@@ -83,6 +93,10 @@ class TaskDraft {
           .toList(),
       transcript = data['transcript'] as String,
       questions = List<String>.from(data['questions'] as List);
+
+  /// A reminder lead the task form could also set: off, or up to a week.
+  static int? _minutes(Object? value) =>
+      value is int && value >= -1 && value <= 10080 ? value : null;
 
   /// A project name from the server: absent from older servers.
   static String? _name(Object? value) {

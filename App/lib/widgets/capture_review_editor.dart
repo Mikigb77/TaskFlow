@@ -4,6 +4,7 @@ import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/text_encoding_repair.dart';
 import 'package:agenda/widgets/capture_command_cards.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
@@ -488,10 +489,19 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         borderSide: BorderSide(color: colors.primary, width: 2),
       ),
     );
+    // A plan read from the words: one line, like the other details.
+    final plan = ReminderPlans.active(task);
     final optionsSummary = [
       if (task.priority > 1)
         l.priorityValue(context.priorityName(task.priority)),
       if (task.isRecurring) context.repeatLabel(task),
+      // A reminder said («una hora antes») shows without opening Opciones.
+      if (plan == null &&
+          !task.isNote &&
+          task.reminderHasTime &&
+          task.reminderMinutes != null &&
+          task.reminderMinutes != -1)
+        l.reminderValue(context.reminderLead(task.reminderMinutes!)),
     ];
     final repair = [
       if (repairTitle != null || repairNotes != null) ...[
@@ -514,6 +524,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     final belowNotes =
         repair.isNotEmpty ||
         showAssignment ||
+        plan != null ||
         (!task.isNote &&
             (task.deadline != null ||
                 task.durationMinutes != null ||
@@ -643,6 +654,17 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               ),
             _questions('duration'),
           ],
+          // The plan read from the dictation; it opens the reminder sheet.
+          if (plan != null)
+            Consumer(
+              builder: (context, ref, _) => _row(
+                Icons.notifications_active_outlined,
+                reminderPlanText(context, ref, task),
+                key: ValueKey('draft-reminder-plan-${widget.draft.id}'),
+                onTap: () =>
+                    editTaskReminder(context, task, onChanged: _change),
+              ),
+            ),
           if (task.checklist.isNotEmpty)
             ChecklistEditor(
               key: _steps,
@@ -738,6 +760,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 hasTime: task.reminderHasTime,
                 minutes: task.reminderMinutes,
                 time: task.reminderTime,
+                plan: task.reminderPlan,
                 schedule: task,
                 onMinutes: (value) {
                   if (widget.enabled) {
@@ -747,6 +770,17 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 onTime: (value) {
                   if (widget.enabled) {
                     _change(task.copyWith(reminderTime: value));
+                  }
+                },
+                onChanged: (minutes, time, plan) {
+                  if (widget.enabled) {
+                    _change(
+                      task.copyWith(
+                        reminderMinutes: minutes,
+                        reminderTime: time,
+                        reminderPlan: plan,
+                      ),
+                    );
                   }
                 },
               ),

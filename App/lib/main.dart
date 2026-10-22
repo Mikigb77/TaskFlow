@@ -487,7 +487,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               '/completedTasks': (_) => const CompletedTasksScreen(),
               '/account': (_) => const AccountScreen(),
               '/deleteAccount': (_) => const DeleteAccountScreen(),
-              '/subscription': (_) => const SubscriptionScreen(),
+              '/subscription': (context) => SubscriptionScreen(
+                reason: switch (ModalRoute.of(context)?.settings.arguments) {
+                  final ProReason reason => reason,
+                  _ => null,
+                },
+              ),
               '/captures': (_) => const CapturesScreen(),
               '/captureDiagnostics': (_) => const CaptureDiagnosticsScreen(),
               '/notifications': (_) => const NotificationSettingsScreen(),

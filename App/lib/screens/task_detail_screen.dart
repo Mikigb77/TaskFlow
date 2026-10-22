@@ -9,6 +9,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -364,7 +365,9 @@ class TaskDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                     ],
-                    if (task.reminderDate != null)
+                    // The task's reminder, or its plan's one line.
+                    if (task.reminderDate != null ||
+                        ReminderPlans.active(task) != null)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: ReminderChip(
@@ -380,6 +383,7 @@ class TaskDetailScreen extends ConsumerWidget {
                                             reminderMinutes:
                                                 updated.reminderMinutes,
                                             reminderTime: updated.reminderTime,
+                                            reminderPlan: updated.reminderPlan,
                                           ),
                                         );
                                   } catch (_) {
@@ -393,7 +397,9 @@ class TaskDetailScreen extends ConsumerWidget {
                                 },
                         ),
                       ),
-                    if (!task.isNote && task.reminderDate != null)
+                    if (!task.isNote &&
+                        (task.reminderDate != null ||
+                            ReminderPlans.active(task) != null))
                       const SizedBox(height: 16),
                     if (task.checklist.isNotEmpty) ...[
                       SectionLabel(

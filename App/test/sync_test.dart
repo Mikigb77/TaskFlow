@@ -48,7 +48,8 @@ void main() {
         ..remove('repeatInterval')
         ..remove('repeatWeekdays')
         ..remove('exceptions')
-        ..remove('reminderTime'),
+        ..remove('reminderTime')
+        ..remove('reminderPlan'),
     );
     await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
     database = TaskDatabase.forTesting(sql);

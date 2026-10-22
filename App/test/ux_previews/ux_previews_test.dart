@@ -19,6 +19,7 @@ import 'delete_previews.dart';
 import 'first_run_previews.dart';
 import 'form_previews.dart';
 import 'notes_previews.dart';
+import 'reminders_previews.dart';
 import 'settings_previews.dart';
 import 'sharing_previews.dart';
 import 'support/audit_check.dart';
@@ -62,7 +63,10 @@ const _routes = <String, String>{
       '`sharing/*`',
   'Email confirmation (pushed after sign-up)': '`auth/verify-email.*`',
   'Sign-in again over open screens': '`auth/sign-in.sign-in-again.*`',
-  'Sheets and dialogs': 'the used-up notice `capture/used-up-notice.*`, the reminder question `first-run/reminder-question.*`, keep-or-discard `capture/sheet.keep-question.*`, the series deletion `commands/cards.delete-series.*`, the view menu `calendar/agenda.view-menu.*`, the invite dialog `sharing/project-sharing.invite.*`',
+  'Sheets and dialogs':
+      'the used-up notice `capture/used-up-notice.*`, the reminder question `first-run/reminder-question.*`, the reminder sheet with its plans `reminders/sheet.*`, the plan offer `reminders/offer.*`, keep-or-discard `capture/sheet.keep-question.*`, the series deletion `commands/cards.delete-series.*`, the view menu `calendar/agenda.view-menu.*`, the invite dialog `sharing/project-sharing.invite.*`',
+  'Reminder plans on a task and on the capture\'s card':
+      '`reminders/task-line.*`, `reminders/capture-card.*`',
 };
 
 /// What the previews can't show, and why.
@@ -72,7 +76,7 @@ const _notCovered = <String, String>{
   'The home-screen widget:':
       'a native Android widget (`CaptureWidget.kt` and its layout), outside Flutter. Phone only.',
   'Notifications and reminders in the shade:':
-      'Android draws them; their text comes from `lib/services/reminder_copy.dart` and `notification_service.dart`. Read the copy there; check delivery, actions and grouping on a phone.',
+      'Android draws them; their text comes from `lib/services/reminder_copy.dart` and `notification_service.dart`, and a reminder plan\'s («Faltan 12 días», «Es mañana», «Es hoy», «Era para ayer», «Venció ayer») from `planNotice` in `lib/l10n/reminder_plan_words.dart`. Read the copy there; check delivery, actions and grouping on a phone.',
   'System permission dialogs:':
       'the microphone, notification, exact-alarm and calendar prompts are Android\'s. The app\'s own explanations before and after them are covered (the reminder question sheet, the blocked-microphone message).',
   'The share sheet:':
@@ -142,6 +146,7 @@ void main() {
   formPreviews();
   calendarPreviews();
   tasksPreviews();
+  remindersPreviews();
   sharingPreviews();
   notesPreviews();
   authPreviews();

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/reminder_copy.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:sqflite/sqflite.dart';
@@ -90,6 +92,11 @@ class ReminderEngine {
   final int capacity;
   final Duration leaseWait;
   final Future<ReminderCopy> Function() readCopy;
+
+  /// After each refresh: when the earliest plan reminder set rings, or null
+  /// when none is set. A plan's reminders are set only a few at a time, so
+  /// the phone plans them again once one has fired.
+  final Future<void> Function(DateTime? next)? wake;
   ReminderEngine(
     this.database,
     this.driver, {
@@ -97,6 +104,7 @@ class ReminderEngine {
     this.capacity = 400,
     this.leaseWait = const Duration(seconds: 10),
     Future<ReminderCopy> Function()? readCopy,
+    this.wake,
   }) : clock = clock ?? DateTime.now,
        readCopy = readCopy ?? (() => readReminderCopy(database));
 
@@ -133,6 +141,55 @@ class ReminderEngine {
 
   static String identity(String owner, Task task) =>
       '$owner/task/${task.id}/${task.occurrenceId ?? 'once'}';
+
+  /// One reminder of [task]'s plan, by the day it rings.
+  static String planIdentity(String owner, Task task, PlanAlert alert) =>
+      '$owner/task/${task.id}/plan/${Task.dateKey(alert.when)}';
+
+  static bool isPlanAlert(Object? identity) =>
+      identity is String && identity.contains('/plan/');
+
+  /// The days before its task's day that plan alert [row] rings.
+  static int _planDaysBefore(Map<String, Object?> row, Task task) {
+    final key = (row['identity'] as String).split('/plan/').last;
+    final day = DateTime.tryParse(key);
+    final anchor = ReminderPlans.anchor(task);
+    if (day == null || anchor == null) return 0;
+    return ReminderPlans.daysUntil(anchor, day);
+  }
+
+  /// The next few reminders of [task]'s [plan]: never the whole plan.
+  static List<PlannedReminder> planReminders(
+    String owner,
+    Task task,
+    ReminderPlan plan,
+    ReminderPreferences preferences,
+    DateTime now,
+    ReminderCopy copy,
+  ) {
+    final anchor = ReminderPlans.anchor(task)!;
+    final alerts = ReminderPlans.alerts(
+      plan,
+      anchor,
+      ReminderPlans.minute(plan, preferences.dateOnlyTime),
+      now,
+    );
+    return [
+      for (final alert in alerts.take(ReminderPlans.window))
+        PlannedReminder(
+          identity: planIdentity(owner, task, alert),
+          taskId: task.id,
+          due: anchor,
+          when: alert.when,
+          title: task.title,
+          languageCode: copy.languageCode,
+          body: copy.planBody(
+            alert.daysBefore,
+            deadline: task.deadline != null,
+          ),
+        ),
+    ];
+  }
 
   static List<Task> upcoming(List<Task> tasks, DateTime now, {int days = 365}) {
     final result = <Task>[];
@@ -195,6 +252,14 @@ class ReminderEngine {
     ReminderPreferences preferences,
     DateTime now,
   ) {
+    // A plan rings by its own days, whatever the single reminder says.
+    if (ReminderPlans.active(task) != null) {
+      return ReminderPlans.taskAlerts(
+        task,
+        preferences.dateOnlyTime,
+        now,
+      ).isNotEmpty;
+    }
     if (task.reminderMinutes == -1) return false;
     final on = ReminderPreferences(
       enabled: true,
@@ -219,7 +284,17 @@ class ReminderEngine {
     final c = copy ?? ReminderCopy.fallback();
     final l = c.strings;
     final result = <PlannedReminder>[];
-    for (final task in upcoming(tasks, now)) {
+    // A plan replaces its task's single reminder while it's set.
+    final single = <Task>[];
+    for (final task in tasks) {
+      final plan = ReminderPlans.active(task);
+      if (plan == null) {
+        single.add(task);
+      } else if (task.id != null && !task.isCompleted) {
+        result.addAll(planReminders(owner, task, plan, preferences, now, c));
+      }
+    }
+    for (final task in upcoming(single, now)) {
       if (task.id == null || task.reminderMinutes == -1) continue;
       final firing = _firing(task, preferences);
       if (firing == null || !firing.when.isAfter(now)) continue;
@@ -335,9 +410,10 @@ class ReminderEngine {
       for (final row in snoozes) {
         final when = DateTime.parse(row['snooze_at'] as String);
         final task = _currentTask(tasks, row);
+        final ofPlan = isPlanAlert(row['identity']);
         if (!preferences.enabled ||
             task == null ||
-            task.reminderMinutes == -1 ||
+            (!ofPlan && task.reminderMinutes == -1) ||
             !when.isAfter(now)) {
           continue;
         }
@@ -348,11 +424,16 @@ class ReminderEngine {
             identity: row['identity'] as String,
             taskId: task.id,
             occurrence: row['occurrence'] as String?,
-            due: task.reminderDate,
+            due: ofPlan ? ReminderPlans.anchor(task) : task.reminderDate,
             when: when,
             title: task.title,
             languageCode: copy.languageCode,
-            body: copy.body(task, when.toLocal(), 0),
+            body: ofPlan
+                ? copy.planBody(
+                    _planDaysBefore(row, task),
+                    deadline: task.deadline != null,
+                  )
+                : copy.body(task, when.toLocal(), 0),
           ),
         );
       }
@@ -367,11 +448,13 @@ class ReminderEngine {
       final old = await db.query('reminder_state');
       for (final row in old) {
         if (!keys.contains(row['identity']) || row['owner_key'] != owner) {
+          final current = _currentTask(tasks, row);
+          // A plan's alerts ring whatever the single reminder says.
           final stillRelevant =
               row['owner_key'] == owner &&
               preferences.enabled &&
-              _currentTask(tasks, row)?.reminderMinutes != -1 &&
-              _currentTask(tasks, row) != null;
+              current != null &&
+              (isPlanAlert(row['identity']) || current.reminderMinutes != -1);
           if (pending.contains(row['id']) ||
               (!stillRelevant && row['status'] != 'inactive')) {
             await driver.cancel(row['id'] as int);
@@ -472,6 +555,21 @@ class ReminderEngine {
           now.toUtc().subtract(const Duration(days: 30)).toIso8601String(),
         ],
       );
+      // Once the earliest plan reminder has fired, the next ones are set.
+      DateTime? next;
+      if (capabilities.allowed) {
+        for (final reminder in window) {
+          if (isPlanAlert(reminder.identity) &&
+              (next == null || reminder.when.isBefore(next))) {
+            next = reminder.when;
+          }
+        }
+      }
+      try {
+        await wake?.call(next);
+      } catch (_) {
+        // The hourly refresh plans them again all the same.
+      }
     } finally {
       final db = await database.database;
       await db.transaction((tx) async {
@@ -501,6 +599,17 @@ class ReminderEngine {
   }) {
     var task = tasks.where((t) => t.id == row['task_id']).firstOrNull;
     if (task == null) return null;
+    // A plan's alert holds while the plan is set and counts from the same
+    // day: moving the day moves the whole plan.
+    if (isPlanAlert(row['identity'])) {
+      final anchor = ReminderPlans.anchor(task);
+      return ReminderPlans.active(task) == null ||
+              task.isCompleted != completed ||
+              anchor == null ||
+              anchor.toIso8601String() != row['due_at']
+          ? null
+          : task;
+    }
     if (task.isRecurring) {
       final date = DateTime.tryParse(row['occurrence'] as String? ?? '');
       if (date == null) return null;

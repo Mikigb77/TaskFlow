@@ -169,7 +169,25 @@ class TaskReminders {
   static bool get supported => Platform.isAndroid || Platform.isIOS;
   static final engine = ReminderEngine(
       TaskDatabase(), _NotificationDriver(plugin),
-      capacity: Platform.isIOS ? 60 : 400);
+      capacity: Platform.isIOS ? 60 : 400, wake: _planAgainAfter);
+
+  static const _planRefresh = 'taskflow-plan-reminders';
+
+  /// A plan's reminders are set a few at a time: a minute after the
+  /// earliest one rings, the background worker sets the next. On Android;
+  /// elsewhere, and if this fails, opening the app and the hourly refresh do.
+  static Future<void> _planAgainAfter(DateTime? next) async {
+    if (!Platform.isAndroid) return;
+    if (next == null) {
+      await Workmanager().cancelByUniqueName(_planRefresh);
+      return;
+    }
+    final delay = next.difference(DateTime.now()) + const Duration(minutes: 1);
+    await Workmanager().registerOneOffTask(
+        _planRefresh, 'refresh-reminders',
+        initialDelay: delay.isNegative ? Duration.zero : delay,
+        existingWorkPolicy: ExistingWorkPolicy.replace);
+  }
 
   static List<Task> upcoming(List<Task> tasks, DateTime now) =>
       ReminderEngine.upcoming(tasks, now);

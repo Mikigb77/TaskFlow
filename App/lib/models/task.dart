@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/occurrence_exception.dart';
+import 'package:agenda/models/reminder_plan.dart';
 
 const _unchanged = Object();
 
@@ -42,6 +43,12 @@ class Task {
 
   /// Local minute of day for date-only tasks. Null follows device defaults.
   final int? reminderTime;
+
+  /// Nudges counted back from the deadline, else from the task's own day
+  /// (Backend/docs/REMINDER_PLANS.md). While set, it replaces the single
+  /// reminder: [reminderMinutes] and [reminderTime] stay as they are, unused.
+  /// A repeating task, or one with no day, has none in effect.
+  final ReminderPlan? reminderPlan;
   final bool _isCompleted;
   final String? notes;
   final List<String> filePaths;
@@ -89,6 +96,7 @@ class Task {
     required this.priority,
     this.reminderMinutes,
     this.reminderTime,
+    this.reminderPlan,
     bool isCompleted = false,
     this.notes,
     List<String>? filePaths,
@@ -140,6 +148,7 @@ class Task {
             priority != 1 ||
             isCompleted ||
             reminderTime != null ||
+            reminderPlan != null ||
             (reminderMinutes != null && reminderMinutes != -1) ||
             reminderAnchor != 'planned' ||
             this.checklist.any((item) => item.completedDates.isNotEmpty))) {
@@ -527,6 +536,7 @@ class Task {
     int? priority,
     Object? reminderMinutes = _unchanged,
     Object? reminderTime = _unchanged,
+    Object? reminderPlan = _unchanged,
     bool? isCompleted,
     String? notes,
     List<String>? filePaths,
@@ -579,6 +589,9 @@ class Task {
     reminderTime: identical(reminderTime, _unchanged)
         ? this.reminderTime
         : reminderTime as int?,
+    reminderPlan: identical(reminderPlan, _unchanged)
+        ? this.reminderPlan
+        : reminderPlan as ReminderPlan?,
     isCompleted: isCompleted ?? _isCompleted,
     notes: notes ?? this.notes,
     filePaths: filePaths ?? this.filePaths,
@@ -630,6 +643,7 @@ class Task {
     'priority': priority,
     'reminderMinutes': reminderMinutes,
     'reminderTime': reminderTime,
+    'reminderPlan': reminderPlan?.encode(),
     'isCompleted': _isCompleted ? 1 : 0,
     'notes': notes,
     'listId': listId,
@@ -676,6 +690,10 @@ class Task {
     priority: map['priority'],
     reminderMinutes: map['reminderMinutes'],
     reminderTime: map['reminderTime'],
+    // Notes take no reminders; a plan this app can't read is left out.
+    reminderPlan: (map['kind'] ?? 'task') == 'note'
+        ? null
+        : ReminderPlan.decode(map['reminderPlan']),
     isCompleted: map['isCompleted'] == 1,
     notes: map['notes'],
     listId: map['listId'],
@@ -718,6 +736,7 @@ class Task {
     'priority': priority,
     'reminder_minutes': reminderMinutes,
     'reminder_time': reminderTime,
+    'reminder_plan': reminderPlan?.toJson(),
     'notes': notes ?? '',
     'list_id': listId,
     'assignment': assignment,
@@ -760,6 +779,10 @@ class Task {
     priority: data['priority'],
     reminderMinutes: data['reminder_minutes'],
     reminderTime: data['reminder_time'],
+    // Missing on an older server, or a shape this app can't read: none.
+    reminderPlan: (data['kind'] ?? 'task') == 'note'
+        ? null
+        : ReminderPlan.tryParse(data['reminder_plan']),
     notes: data['notes'],
     listId: data['list_id'],
     assignment: data['assignment'] ?? 'personal',

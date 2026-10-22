@@ -7,8 +7,15 @@ import 'package:agenda/screens/tasks_with_files_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
+/// What led to the Pro screen, when a Pro choice was tapped: the screen
+/// says first what Pro gives there.
+enum ProReason { reminderPlans }
+
 class SubscriptionScreen extends ConsumerStatefulWidget {
-  const SubscriptionScreen({super.key});
+  const SubscriptionScreen({super.key, this.reason});
+
+  /// Pushed with this as the `/subscription` route's arguments.
+  final ProReason? reason;
   @override
   ConsumerState<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
@@ -79,6 +86,17 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Opened from a Pro choice: what Pro gives there, first.
+                if (widget.reason == ProReason.reminderPlans) ...[
+                  Text(
+                    l10n.billingReasonReminderPlans,
+                    key: const ValueKey('subscription-reason'),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colors.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 // What Pro gives; the app bar already says «TaskFlow Pro».
                 Text(
                   state.complimentary

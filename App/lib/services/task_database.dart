@@ -10,7 +10,7 @@ import 'package:agenda/services/android_database_factory.dart';
 enum ReminderBlock { archived, muted, notForAccount }
 
 class TaskDatabase {
-  static const schemaVersion = 18;
+  static const schemaVersion = 19;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -57,7 +57,7 @@ class TaskDatabase {
           imagePaths TEXT, hasTime INTEGER NOT NULL DEFAULT 1,
           recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
           completedDates TEXT NOT NULL DEFAULT '[]',
-          reminderMinutes INTEGER, reminderTime INTEGER,
+          reminderMinutes INTEGER, reminderTime INTEGER, reminderPlan TEXT,
           deadline TEXT, deadlineHasTime INTEGER NOT NULL DEFAULT 0,
           durationMinutes INTEGER, reminderAnchor TEXT NOT NULL DEFAULT 'planned',
           checklist TEXT NOT NULL DEFAULT '[]',
@@ -234,6 +234,11 @@ class TaskDatabase {
     if (oldVersion < 18 && newVersion >= 18) {
       // Who created a shared task, by name; filled in by the next sync.
       await db.execute('ALTER TABLE tasks ADD COLUMN createdByName TEXT');
+    }
+    if (oldVersion < 19 && newVersion >= 19) {
+      // A reminder plan, as its JSON (Backend/docs/REMINDER_PLANS.md).
+      // Every task keeps its single reminder: none has a plan yet.
+      await db.execute('ALTER TABLE tasks ADD COLUMN reminderPlan TEXT');
     }
   }
 
@@ -677,7 +682,12 @@ class TaskDatabase {
     ...(Task.fromApi(remote).toMap()
       ..remove('id')
       ..remove('filePaths')
-      ..remove('imagePaths')),
+      ..remove('imagePaths')
+      // A server that doesn't send plans yet leaves this phone's as it is.
+      ..removeWhere(
+        (key, _) =>
+            key == 'reminderPlan' && !remote.containsKey('reminder_plan'),
+      )),
     'is_deleted': remote['is_deleted'] == true ? 1 : 0,
     'remote_version': remote['version'],
     'sync_pending': 0,

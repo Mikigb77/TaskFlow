@@ -6465,6 +6465,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'It was already done.'**
   String get commandAlreadyDone;
+
+  /// In the reminder sheet: the choice of a plan of reminders that come more often as the task's day approaches, counted back from its deadline, or from its own day when it has none. Suave, Normal and Intenso sit under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Until the deadline'**
+  String get reminderPlanUntilDay;
+
+  /// One of the three strengths under reminderPlanUntilDay: the fewest reminders (weekly, then daily the last 3 days and the day).
+  ///
+  /// In en, this message translates to:
+  /// **'Gentle'**
+  String get reminderPlanGentle;
+
+  /// One of the three strengths under reminderPlanUntilDay, the one chosen first: every 3 days, then daily the last week and the day.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get reminderPlanNormal;
+
+  /// One of the three strengths under reminderPlanUntilDay: the most reminders (every 2 days, then daily the last 2 weeks and the day).
+  ///
+  /// In en, this message translates to:
+  /// **'Intense'**
+  String get reminderPlanIntense;
+
+  /// In the reminder sheet, a Pro choice: the person types or says the rhythm they want, and the assistant reads it.
+  ///
+  /// In en, this message translates to:
+  /// **'Your way'**
+  String get reminderPlanYourWay;
+
+  /// Under the field of reminderPlanYourWay: what to put in it.
+  ///
+  /// In en, this message translates to:
+  /// **'Type it or say it the way you’d tell someone.'**
+  String get reminderPlanYourWayHint;
+
+  /// A small badge beside a choice that comes with TaskFlow Pro. Tapping the choice opens the Pro screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Pro'**
+  String get proBadge;
+
+  /// Button under the field of reminderPlanYourWay: listen with the phone's own speech recognition and write the words in the field. Catalan buttons are imperatives.
+  ///
+  /// In en, this message translates to:
+  /// **'Say it'**
+  String get reminderPlanSpeak;
+
+  /// The same button while the phone listens: stop, and read the words heard.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop listening'**
+  String get reminderPlanStopListening;
+
+  /// While the assistant reads the words typed or said in reminderPlanYourWay.
+  ///
+  /// In en, this message translates to:
+  /// **'One moment…'**
+  String get reminderPlanReading;
+
+  /// The assistant found no reminders in the words of reminderPlanYourWay: ask for them again, with an example.
+  ///
+  /// In en, this message translates to:
+  /// **'I didn’t get that. Say it another way, for example: “every 3 days, and daily the last week”.'**
+  String get reminderPlanUnclear;
+
+  /// reminderPlanYourWay with no connection: it needs one, and the strengths of reminderPlanUntilDay work without.
+  ///
+  /// In en, this message translates to:
+  /// **'This needs a connection. “Until the deadline” works without one.'**
+  String get reminderPlanOffline;
+
+  /// reminderPlanYourWay: the assistant failed, was busy, or today's limit was reached. The strengths of reminderPlanUntilDay still work.
+  ///
+  /// In en, this message translates to:
+  /// **'I couldn’t read that just now. Try again later, or choose “Until the deadline”.'**
+  String get reminderPlanFailed;
+
+  /// reminderPlanSpeak tapped, and the microphone isn't allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Without the microphone I can’t hear you. You can type it.'**
+  String get reminderPlanMicOff;
+
+  /// reminderPlanSpeak tapped, and the phone can't recognise speech on its own.
+  ///
+  /// In en, this message translates to:
+  /// **'I can’t listen on this phone right now. You can type it.'**
+  String get reminderPlanCantListen;
+
+  /// The plan's preview in the reminder sheet: how many reminders are still to come, and the next one. {when} is today, tomorrow or other; {date} is the day (sat 25); {time} the clock time.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 reminder · {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}} other{{count} reminders · next one {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}}}'**
+  String reminderPlanCount(int count, String when, String date, String time);
+
+  /// The plan's preview when none of its reminders is still to come.
+  ///
+  /// In en, this message translates to:
+  /// **'No reminders left'**
+  String get reminderPlanNoneLeft;
+
+  /// A strength's plan in words, on the task and under reminderPlanUntilDay. {when} is today, tomorrow or other; {date} is the day the plan counts back from (thu 12).
+  ///
+  /// In en, this message translates to:
+  /// **'More and more often {when, select, today{until today} tomorrow{until tomorrow} other{until {date}}}'**
+  String reminderPlanGrowing(String when, String date);
+
+  /// A plan's rhythm, lowercase: part of a sentence such as «Cada 3 días, y a diario la última semana».
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{daily} other{every {days} days}}'**
+  String reminderPlanEveryDays(int days);
+
+  /// A plan's rhythm in weeks, lowercase: part of a plan's sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{weekly} other{every {weeks} weeks}}'**
+  String reminderPlanEveryWeeks(int weeks);
+
+  /// When a rhythm applies: the last days before the task's day, and the day. Goes after reminderPlanEveryDays: «a diario los últimos 3 días».
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{for the last day} other{for the last {days} days}}'**
+  String reminderPlanLastDays(int days);
+
+  /// When a rhythm applies: the last weeks before the task's day, and the day: «a diario la última semana».
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{for the last week} other{for the last {weeks} weeks}}'**
+  String reminderPlanLastWeeks(int weeks);
+
+  /// When a rhythm starts, counted back from the task's day: «cada 2 días desde 10 días antes».
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{from the day before} other{from {days} days before}}'**
+  String reminderPlanFromDays(int days);
+
+  /// When a rhythm starts, in weeks before the task's day: «cada 2 días desde 2 semanas antes».
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{from a week before} other{from {weeks} weeks before}}'**
+  String reminderPlanFromWeeks(int weeks);
+
+  /// When a rhythm stops, before the task's day: «cada 3 días hasta 8 días antes».
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{until the day before} other{until {days} days before}}'**
+  String reminderPlanUntilDays(int days);
+
+  /// When a rhythm stops, in weeks before the task's day: «cada 3 días hasta una semana antes».
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{until a week before} other{until {weeks} weeks before}}'**
+  String reminderPlanUntilWeeks(int weeks);
+
+  /// A single reminder of a plan, on the task's day itself, lowercase: «El día antes, y el mismo día».
+  ///
+  /// In en, this message translates to:
+  /// **'on the day'**
+  String get reminderPlanOnTheDay;
+
+  /// A single reminder of a plan, some days before the task's day, lowercase: «el día antes», «3 días antes».
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{the day before} other{{days} days before}}'**
+  String reminderPlanDaysBefore(int days);
+
+  /// A single reminder of a plan, some weeks before the task's day, lowercase: «una semana antes».
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{a week before} other{{weeks} weeks before}}'**
+  String reminderPlanWeeksBefore(int weeks);
+
+  /// A rhythm and when it applies: «a diario» + «la última semana». Each is one of the reminderPlan… parts.
+  ///
+  /// In en, this message translates to:
+  /// **'{rhythm} {window}'**
+  String reminderPlanPhase(String rhythm, String window);
+
+  /// The last two parts of a plan's sentence: «Cada 3 días, y a diario la última semana».
+  ///
+  /// In en, this message translates to:
+  /// **'{first}, and {last}'**
+  String reminderPlanAnd(String first, String last);
+
+  /// A plan's sentence with three or four parts: the first, then the rest (which ends with reminderPlanAnd).
+  ///
+  /// In en, this message translates to:
+  /// **'{first}, {rest}'**
+  String reminderPlanList(String first, String rest);
+
+  /// On a task with a plan: the plan in words, then its next reminder. {when} is today, tomorrow or other; {date} the day (sat 25).
+  ///
+  /// In en, this message translates to:
+  /// **'{plan} · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}'**
+  String reminderPlanLine(String plan, String when, String date);
+
+  /// A plan's notification text, under the task's title: how many days are left until its day (2 or more).
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 day left} other{{days} days left}}'**
+  String reminderPlanNoticeDays(int days);
+
+  /// A plan's notification text, the day before the task's day.
+  ///
+  /// In en, this message translates to:
+  /// **'It’s tomorrow'**
+  String get reminderPlanNoticeTomorrow;
+
+  /// A plan's notification text, on the task's day.
+  ///
+  /// In en, this message translates to:
+  /// **'It’s today'**
+  String get reminderPlanNoticeToday;
+
+  /// A plan's one last notification, the day after, for a task with only a day that isn't done.
+  ///
+  /// In en, this message translates to:
+  /// **'It was for yesterday'**
+  String get reminderPlanNoticeWas;
+
+  /// A plan's one last notification, the day after, for a task with a deadline that isn't done.
+  ///
+  /// In en, this message translates to:
+  /// **'It was due yesterday'**
+  String get reminderPlanNoticeDue;
+
+  /// Asked once after saving a task whose day is 2 weeks or more away: shall the app remind the person more and more often until then. Sí sets Normal.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks, plural, =1{1 week to go: shall I remind you until then?} other{{weeks} weeks to go: shall I remind you until then?}}'**
+  String reminderPlanOfferWeeks(int weeks);
+
+  /// reminderPlanOfferWeeks for a day 2 months or more away.
+  ///
+  /// In en, this message translates to:
+  /// **'{months, plural, =1{1 month to go: shall I remind you until then?} other{{months} months to go: shall I remind you until then?}}'**
+  String reminderPlanOfferMonths(int months);
+
+  /// The offer's yes: set the Normal plan on the task just saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get reminderPlanOfferYes;
+
+  /// After yes to the offer: the plan is set. {date} is the day it counts back from (thu 12).
+  ///
+  /// In en, this message translates to:
+  /// **'Done. I’ll remind you until {date}.'**
+  String reminderPlanOfferDone(String date);
+
+  /// On the Pro screen, opened from «Your way» in the reminder sheet: what Pro adds there.
+  ///
+  /// In en, this message translates to:
+  /// **'With Pro, your reminders your way'**
+  String get billingReasonReminderPlans;
 }
 
 class _AppLocalizationsDelegate

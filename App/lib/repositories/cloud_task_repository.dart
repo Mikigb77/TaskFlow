@@ -62,6 +62,13 @@ class CloudTaskRepository extends TaskRepository {
       sent['priority'] == remote['priority'] &&
       sent['reminder_minutes'] == remote['reminder_minutes'] &&
       sent['reminder_time'] == remote['reminder_time'] &&
+      // As maps: the server may send the keys in another order. A server
+      // without plans can't tell: only one that sends them differs.
+      (!remote.containsKey('reminder_plan') ||
+          const DeepCollectionEquality().equals(
+            sent['reminder_plan'],
+            remote['reminder_plan'],
+          )) &&
       sent['is_completed'] == remote['is_completed'] &&
       sent['is_deleted'] == remote['is_deleted'] &&
       sent['scheduled_date'] == remote['scheduled_date'] &&

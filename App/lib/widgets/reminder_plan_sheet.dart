@@ -1,0 +1,807 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/reminder_plan_words.dart';
+import 'package:agenda/models/reminder_plan.dart';
+import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/providers/reminder_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/screens/subscription_screen.dart';
+import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/capture_problem.dart';
+import 'package:agenda/services/native_speech.dart';
+import 'package:agenda/services/reminder_plans.dart';
+
+/// What the reminder sheet chose: one of the single reminder's values, as
+/// the list has always given them, or a plan.
+class ReminderSheetChoice {
+  const ReminderSheetChoice.single(int this.value) : plan = null;
+  const ReminderSheetChoice.plan(ReminderPlan this.plan) : value = null;
+  final int? value;
+  final ReminderPlan? plan;
+}
+
+/// One row of the single reminder: its value, and how it reads.
+typedef ReminderRow = ({int value, String label, String? subtitle});
+
+/// The reminder sheet of a task with a deadline or a day: the single
+/// reminder's rows, each applied with one tap as before, then the plans.
+/// «Hasta la fecha límite» opens Suave · Normal · Intenso; «A tu manera»,
+/// for Pro, a field to type or say a rhythm. A plan shows what it gives
+/// (its words, a strip of dots from today to the day, the count and the
+/// next one) and applies with «Listo». [current] is the single row in use,
+/// null while [plan] is set. [task] is the task as it would be saved.
+Future<ReminderSheetChoice?> showReminderPlanSheet(
+  BuildContext context, {
+  required String title,
+  required List<ReminderRow> rows,
+  required int? current,
+  required Task task,
+  required ReminderPlan? plan,
+}) => showModalBottomSheet<ReminderSheetChoice>(
+  context: context,
+  isScrollControlled: true,
+  builder: (context) => _ReminderPlanSheet(
+    title: title,
+    rows: rows,
+    current: current,
+    task: task,
+    plan: plan,
+  ),
+);
+
+/// The words typed in «A tu manera» and not read yet when the sheet closed,
+/// by account and task, so opening it again doesn't lose them.
+final _unsentProvider = Provider<Map<String, String>>((ref) => {});
+
+enum _Open { none, rhythm, custom }
+
+class _ReminderPlanSheet extends ConsumerStatefulWidget {
+  const _ReminderPlanSheet({
+    required this.title,
+    required this.rows,
+    required this.current,
+    required this.task,
+    required this.plan,
+  });
+  final String title;
+  final List<ReminderRow> rows;
+  final int? current;
+  final Task task;
+  final ReminderPlan? plan;
+
+  @override
+  ConsumerState<_ReminderPlanSheet> createState() => _ReminderPlanSheetState();
+}
+
+class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
+  late _Open _open = widget.plan == null
+      ? _Open.none
+      : widget.plan!.isRhythm
+      ? _Open.rhythm
+      : _Open.custom;
+  late String _strength = widget.plan?.strength ?? ReminderPlan.normal;
+  late final Map<String, String> _unsent = ref.read(_unsentProvider);
+  late final String _unsentKey =
+      '${ref.read(taskRepositoryProvider).ownerKey}/${widget.task.id}';
+  late final _words = TextEditingController(
+    text: widget.plan?.said ?? _unsent[_unsentKey] ?? '',
+  );
+  final _wordsFocus = FocusNode();
+  final _section = GlobalKey();
+
+  /// The plan read from the words in the field, while they are these.
+  late ReminderPlan? _custom = widget.plan?.isRhythm == false
+      ? widget.plan
+      : null;
+  late String? _readWords = _custom == null ? null : _words.text.trim();
+  bool _reading = false;
+  String? _problem;
+
+  // Listening, with the phone's own recognizer. Its runs are numbered apart
+  // from capture's, which may be open underneath.
+  late final NativeSpeech _speech = ref.read(nativeSpeechProvider);
+  static var _runs = 1 << 20;
+  int _run = 0;
+  bool _listening = false;
+  String _prefix = '';
+  StreamSubscription<SpeechEvent>? _speechEvents;
+  Timer? _limit;
+  Timer? _ending;
+
+  DateTime get _anchor => ReminderPlans.anchor(widget.task)!;
+
+  bool _closed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Read now: the sheet's providers aren't read while it closes.
+    _speech;
+    _unsent;
+    _unsentKey;
+    _wordsFocus.addListener(() {
+      // Leaving the field reads what was typed.
+      if (!_closed && !_wordsFocus.hasFocus && !_listening) {
+        unawaited(_read());
+      }
+    });
+    _words.addListener(_wordsChanged);
+  }
+
+  @override
+  void dispose() {
+    _closed = true;
+    final words = _words.text.trim();
+    // Only a saved task is known again by its id; a capture's isn't yet.
+    if (_custom == null && words.isNotEmpty && widget.task.id != null) {
+      _unsent[_unsentKey] = words;
+    } else {
+      _unsent.remove(_unsentKey);
+    }
+    _limit?.cancel();
+    _ending?.cancel();
+    unawaited(_speechEvents?.cancel());
+    if (_listening) {
+      unawaited(_speech.cancel(_run).catchError((Object _) {}));
+    }
+    _words.dispose();
+    _wordsFocus.dispose();
+    super.dispose();
+  }
+
+  void _wordsChanged() {
+    // Other words than those read: their plan isn't known yet.
+    if (_custom != null && _words.text.trim() != _readWords) {
+      setState(() => _custom = null);
+    }
+  }
+
+  void _toggle(_Open open) {
+    setState(() {
+      _open = _open == open ? _Open.none : open;
+      _problem = null;
+    });
+    if (_open == _Open.none) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final section = _section.currentContext;
+      if (section != null && section.mounted) {
+        unawaited(
+          Scrollable.ensureVisible(
+            section,
+            duration: const Duration(milliseconds: 200),
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          ),
+        );
+      }
+    });
+  }
+
+  void _openPro() => Navigator.of(
+    context,
+  ).pushNamed('/subscription', arguments: ProReason.reminderPlans);
+
+  String _zone() {
+    final chosen = ref.read(regionalProvider).captureTimezone;
+    if (CaptureTimezone.valid(chosen)) return chosen!;
+    final account = ref.read(authProvider).account?.timezone;
+    return CaptureTimezone.valid(account) ? account! : 'UTC';
+  }
+
+  /// Sends the words to the assistant, which reads them as a plan.
+  Future<void> _read() async {
+    if (_closed || !mounted) return;
+    final words = _words.text.trim();
+    if (words.isEmpty || _reading) return;
+    if (_custom != null && words == _readWords) return;
+    final account = ref.read(authProvider).account;
+    if (account == null) return _openPro();
+    final l = context.l10n;
+    final language = Localizations.localeOf(context).languageCode;
+    setState(() {
+      _reading = true;
+      _problem = null;
+    });
+    try {
+      final answer = await ref
+          .read(apiClientProvider)
+          .request(
+            'POST',
+            'ai/reminder-plan/',
+            accountId: account.id,
+            data: {
+              'text': words,
+              'timezone': _zone(),
+              'reference_time': ref
+                  .read(calendarClockProvider)()
+                  .toUtc()
+                  .toIso8601String(),
+              'anchor_date': Task.dateKey(_anchor),
+              'language': language,
+            },
+          );
+      if (!mounted) return;
+      final plan = answer is Map
+          ? ReminderPlan.tryParse(answer['reminder_plan'])
+          : null;
+      setState(() {
+        if (plan == null || plan.isRhythm) {
+          // Words that don't describe reminders: asked for again.
+          _custom = null;
+          _problem = l.reminderPlanUnclear;
+        } else {
+          _custom = plan.said == null
+              ? ReminderPlan.custom(plan.phases, time: plan.time, said: words)
+              : plan;
+          _readWords = words;
+        }
+      });
+      _announce(_problem);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      if (error.status == 402) {
+        _openPro();
+        return;
+      }
+      setState(
+        () => _problem = CaptureProblem.from(error) == CaptureProblem.offline
+            ? l.reminderPlanOffline
+            : l.reminderPlanFailed,
+      );
+      _announce(_problem);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _problem = l.reminderPlanFailed);
+      _announce(_problem);
+    } finally {
+      if (mounted) setState(() => _reading = false);
+    }
+  }
+
+  void _announce(String? message) {
+    if (message == null || !mounted) return;
+    unawaited(
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
+        Directionality.of(context),
+      ),
+    );
+  }
+
+  Future<void> _toggleListening() async {
+    if (_listening) return _stopListening();
+    final l = context.l10n;
+    final speech = _speech;
+    final language = captureSpeechLanguage(context, ref.read(regionalProvider));
+    setState(() => _problem = null);
+    try {
+      if (await speech.permission() != SpeechPermission.granted) {
+        if (mounted) setState(() => _problem = l.reminderPlanMicOff);
+        return;
+      }
+      if (!(await speech.knownCapability(language)).usable) {
+        if (mounted) setState(() => _problem = l.reminderPlanCantListen);
+        return;
+      }
+      if (!mounted) return;
+      _run = ++_runs;
+      _prefix = _words.text.trim();
+      _wordsFocus.unfocus();
+      _speechEvents ??= speech.events.listen(
+        _hear,
+        onError: (Object _) => _hear(SpeechEvent(_run, 'error')),
+      );
+      setState(() => _listening = true);
+      await speech.start(_run, language);
+      // Nobody needs longer for a rhythm: it stops by itself, as Listo does.
+      _limit = Timer(const Duration(seconds: 30), _stopListening);
+    } catch (_) {
+      _endListening(read: false);
+      if (mounted) setState(() => _problem = l.reminderPlanCantListen);
+    }
+  }
+
+  void _hear(SpeechEvent event) {
+    if (!_listening || event.run != _run) return;
+    final text = event.text?.trim() ?? '';
+    if (text.isNotEmpty) {
+      // Words said go after those already in the field.
+      final words = [_prefix, text].where((s) => s.isNotEmpty).join(' ');
+      final bounded = words.length > ReminderPlan.saidLimit
+          ? words.substring(0, ReminderPlan.saidLimit)
+          : words;
+      if (event.kind == 'segment') _prefix = bounded;
+      _words.value = TextEditingValue(
+        text: bounded,
+        selection: TextSelection.collapsed(offset: bounded.length),
+      );
+    }
+    if (event.kind == 'error') {
+      final heard = _words.text.trim().isNotEmpty;
+      _endListening(read: heard);
+      if (!heard && mounted) {
+        setState(() => _problem = context.l10n.reminderPlanCantListen);
+      }
+    } else if (event.terminal) {
+      _endListening(read: true);
+    }
+  }
+
+  Future<void> _stopListening() async {
+    if (!_listening) return;
+    _limit?.cancel();
+    // The recognizer still has the last words: give it time to send them.
+    _ending = Timer(
+      const Duration(seconds: 4),
+      () => _endListening(read: true),
+    );
+    try {
+      await _speech.stop(_run);
+    } catch (_) {
+      _endListening(read: true);
+    }
+  }
+
+  void _endListening({required bool read}) {
+    if (!_listening) return;
+    _listening = false;
+    _limit?.cancel();
+    _ending?.cancel();
+    unawaited(_speech.cancel(_run).catchError((Object _) {}));
+    if (!mounted) return;
+    setState(() {});
+    if (read) unawaited(_read());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final pro = ref.watch(hasProProvider);
+    final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+    final now = ref.watch(calendarClockProvider)();
+    final minute = settings?.dateOnlyTime;
+    final current = widget.plan;
+    Widget check(bool on) =>
+        on ? const Icon(Icons.check_rounded) : const SizedBox.shrink();
+    Widget expander(bool open) =>
+        Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded);
+    final rhythm = ReminderPlan.rhythm(_strength);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(widget.title, style: theme.textTheme.titleMedium),
+              ),
+              // The single reminder, as the list has always been: a tap
+              // applies it and closes.
+              for (final row in widget.rows)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                  title: Text(row.label),
+                  subtitle: row.subtitle == null ? null : Text(row.subtitle!),
+                  selected: current == null && row.value == widget.current,
+                  trailing: check(
+                    current == null && row.value == widget.current,
+                  ),
+                  onTap: () => Navigator.pop(
+                    context,
+                    ReminderSheetChoice.single(row.value),
+                  ),
+                ),
+              const Divider(height: 17),
+              ListTile(
+                key: const ValueKey('reminder-plan-until-day'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: Text(l.reminderPlanUntilDay),
+                subtitle: _open == _Open.rhythm
+                    ? null
+                    : Text(
+                        l.reminderPlanGrowing(
+                          planWhen(_anchor, now),
+                          planDay(_anchor, now, context.localeName),
+                        ),
+                      ),
+                selected: current?.isRhythm == true,
+                trailing: current?.isRhythm == true && _open != _Open.rhythm
+                    ? check(true)
+                    : expander(_open == _Open.rhythm),
+                onTap: () => _toggle(_Open.rhythm),
+              ),
+              if (_open == _Open.rhythm)
+                _Section(
+                  key: _section,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final strength in ReminderPlan.strengths)
+                          ChoiceChip(
+                            key: ValueKey('reminder-plan-$strength'),
+                            label: Text(switch (strength) {
+                              ReminderPlan.gentle => l.reminderPlanGentle,
+                              ReminderPlan.intense => l.reminderPlanIntense,
+                              _ => l.reminderPlanNormal,
+                            }),
+                            selected: _strength == strength,
+                            onSelected: (_) =>
+                                setState(() => _strength = strength),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    PlanPreview(
+                      plan: rhythm,
+                      anchor: _anchor,
+                      now: now,
+                      minute: ReminderPlans.minute(rhythm, minute),
+                    ),
+                    const SizedBox(height: 16),
+                    _Apply(plan: rhythm),
+                  ],
+                ),
+              ListTile(
+                key: const ValueKey('reminder-plan-your-way'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.record_voice_over_outlined),
+                title: Text(l.reminderPlanYourWay),
+                selected: pro && current?.isRhythm == false,
+                trailing: !pro
+                    ? const ProBadge()
+                    : current?.isRhythm == false && _open != _Open.custom
+                    ? check(true)
+                    : expander(_open == _Open.custom),
+                // Without Pro, the Pro screen says what it gives here.
+                onTap: pro ? () => _toggle(_Open.custom) : _openPro,
+              ),
+              if (pro && _open == _Open.custom)
+                _Section(
+                  key: _section,
+                  children: [
+                    // Named as capture's words field is.
+                    Semantics(
+                      label: l.captureYourWords,
+                      child: TextField(
+                        key: const ValueKey('reminder-plan-words'),
+                        controller: _words,
+                        focusNode: _wordsFocus,
+                        enabled: !_reading,
+                        minLines: 1,
+                        maxLines: 4,
+                        maxLength: ReminderPlan.saidLimit,
+                        textCapitalization: TextCapitalization.sentences,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => unawaited(_read()),
+                        // What to put in it stays in view while typing.
+                        decoration: InputDecoration(
+                          helperText: l.reminderPlanYourWayHint,
+                          helperMaxLines: 4,
+                          counterText: '',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      children: [
+                        TextButton.icon(
+                          key: const ValueKey('reminder-plan-speak'),
+                          onPressed: _reading
+                              ? null
+                              : () => unawaited(_toggleListening()),
+                          icon: Icon(
+                            _listening
+                                ? Icons.stop_rounded
+                                : Icons.mic_none_rounded,
+                          ),
+                          label: Text(
+                            _listening
+                                ? l.reminderPlanStopListening
+                                : l.reminderPlanSpeak,
+                          ),
+                        ),
+                        if (_listening)
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              l.captureListening,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (_reading) ...[
+                      const SizedBox(height: 8),
+                      const LinearProgressIndicator(),
+                      const SizedBox(height: 8),
+                      Text(l.reminderPlanReading),
+                    ],
+                    if (_problem case final problem?) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        problem,
+                        key: const ValueKey('reminder-plan-problem'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    if (_custom case final plan? when !_reading) ...[
+                      const SizedBox(height: 16),
+                      PlanPreview(
+                        plan: plan,
+                        anchor: _anchor,
+                        now: now,
+                        minute: ReminderPlans.minute(plan, minute),
+                      ),
+                      const SizedBox(height: 16),
+                      _Apply(plan: plan),
+                    ],
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A plan's choices, under its row.
+class _Section extends StatelessWidget {
+  const _Section({super.key, required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    ),
+  );
+}
+
+/// Applies the plan shown and closes: the sheet's one primary action, as
+/// wide as the other sheets' are.
+class _Apply extends StatelessWidget {
+  const _Apply({required this.plan});
+  final ReminderPlan plan;
+  @override
+  Widget build(BuildContext context) => FilledButton(
+    key: const ValueKey('reminder-plan-apply'),
+    onPressed: () => Navigator.pop(context, ReminderSheetChoice.plan(plan)),
+    child: Text(context.l10n.done),
+  );
+}
+
+/// What a plan gives: its words, a strip of dots from today to the day, and
+/// how many reminders are still to come, with the next one.
+class PlanPreview extends StatelessWidget {
+  const PlanPreview({
+    super.key,
+    required this.plan,
+    required this.anchor,
+    required this.now,
+    required this.minute,
+  });
+  final ReminderPlan plan;
+  final DateTime anchor;
+  final DateTime now;
+  final int minute;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final locale = context.localeName;
+    final days = [
+      for (final alert in ReminderPlans.alerts(
+        plan,
+        anchor,
+        minute,
+        now,
+        late: false,
+      ))
+        alert.daysBefore,
+    ];
+    return Column(
+      key: const ValueKey('reminder-plan-preview'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          planRhythm(l, plan, anchor: anchor, now: now, minute: minute),
+          style: theme.textTheme.titleSmall,
+        ),
+        const SizedBox(height: 12),
+        // The count below says it in words.
+        ExcludeSemantics(
+          child: PlanStrip(
+            days: days,
+            span: math.max(0, ReminderPlans.daysUntil(anchor, now)),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                l.today,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            // The task's day under the strip's end.
+            Expanded(
+              child: Text(
+                planDay(anchor, now, locale),
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            planCount(
+              l,
+              plan,
+              anchor: anchor,
+              now: now,
+              minute: minute,
+              locale: locale,
+              clock: context.clockTime,
+            ),
+            key: const ValueKey('reminder-plan-count'),
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A strip from today, on the left, to the task's day, on the right, with a
+/// dot on each day a reminder is still to come: closer together as the day
+/// approaches. [days] are days before the task's day; [span] is how many
+/// days away it is.
+class PlanStrip extends StatelessWidget {
+  const PlanStrip({super.key, required this.days, required this.span});
+  final List<int> days;
+  final int span;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 20,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _StripPainter(
+          days: days,
+          span: span,
+          line: colors.outline,
+          dot: colors.primary,
+          today: colors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _StripPainter extends CustomPainter {
+  _StripPainter({
+    required this.days,
+    required this.span,
+    required this.line,
+    required this.dot,
+    required this.today,
+  });
+  final List<int> days;
+  final int span;
+  final Color line;
+  final Color dot;
+  final Color today;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const end = 7.0;
+    final middle = size.height / 2;
+    final width = size.width - 2 * end;
+    double x(int daysBefore) =>
+        end + (span == 0 ? width : width * (span - daysBefore) / span);
+    canvas.drawLine(
+      Offset(end, middle),
+      Offset(size.width - end, middle),
+      Paint()
+        ..color = line
+        ..strokeWidth = 1.5,
+    );
+    // Today: an open ring at the start.
+    canvas.drawCircle(
+      Offset(end, middle),
+      5,
+      Paint()
+        ..color = today
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    final fill = Paint()..color = dot;
+    for (final day in days) {
+      if (day < 0 || day > span) continue;
+      canvas.drawCircle(Offset(x(day), middle), day == 0 ? 6 : 3.5, fill);
+    }
+    // The day itself, always marked.
+    if (!days.contains(0)) {
+      canvas.drawCircle(
+        Offset(x(0), middle),
+        6,
+        Paint()
+          ..color = dot
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StripPainter old) =>
+      old.span != span ||
+      old.line != line ||
+      old.dot != dot ||
+      old.today != today ||
+      old.days.length != days.length ||
+      !old.days.every(days.contains);
+}
+
+/// A small «Pro» beside a choice that comes with TaskFlow Pro.
+class ProBadge extends StatelessWidget {
+  const ProBadge({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        context.l10n.proBadge,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: colors.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}

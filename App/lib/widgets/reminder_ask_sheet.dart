@@ -1,18 +1,29 @@
 import 'dart:async';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/shell_tab_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/reminder_engine.dart';
+import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/reminder_preferences.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 
-/// Accounts asked, or being asked, in this run of the app.
+/// Accounts asked, in this run of the app, whether to turn reminders on.
 final _askingProvider = Provider<Set<String>>((ref) => {});
+
+/// Accounts with the question, or an offer, waiting or showing now.
+final _waitingProvider = Provider<Set<String>>((ref) => {});
+
+/// The tasks offered a plan in this run of the app, by owner and id.
+final _offeredProvider = Provider<Set<String>>((ref) => {});
 
 /// Asks once per account on this phone whether to turn reminders on, after
 /// the first saved task with a date whose reminder can still ring: not one
@@ -23,6 +34,10 @@ final _askingProvider = Provider<Set<String>>((ref) => {});
 /// the task went and can still undo it. It isn't asked when they undid the save, moved to another
 /// screen or tab, or another message replaced the save message; the next
 /// dated save asks instead.
+///
+/// With reminders on, the question offers a plan instead, once per task: for
+/// a saved task (with its id) whose deadline, else day, is two weeks or more
+/// away and has none (Backend/docs/REMINDER_PLANS.md, «The offer»).
 void askAboutRemindersAfterSave(
   BuildContext context,
   Iterable<Task> saved, {
@@ -43,7 +58,7 @@ void askAboutRemindersAfterSave(
     return;
   }
   final owner = container.read(taskRepositoryProvider).ownerKey;
-  if (!container.read(_askingProvider).add(owner)) return;
+  if (!container.read(_waitingProvider).add(owner)) return;
   final navigator = Navigator.of(context);
   // The screen the form was over; pops nothing.
   Route<Object?>? under;
@@ -77,7 +92,6 @@ Future<void> _ask(
   List<Task> dated,
 ) async {
   final store = container.read(reminderPreferenceStoreProvider);
-  var shown = false;
   try {
     await route.completed;
     final bar = await feedback;
@@ -96,18 +110,26 @@ Future<void> _ask(
     // Nor over another tab, even if they came back.
     if (container.read(shellTabSwitchesProvider) != tabSwitches) return;
     final settings = await store.read(owner);
-    if (settings.enabled ||
-        settings.asked ||
-        !navigator.mounted ||
+    if (!navigator.mounted ||
         container.read(taskRepositoryProvider).ownerKey != owner) {
       return;
     }
-    // Only for a reminder that can still come; the next dated save asks.
     final now = container.read(calendarClockProvider)();
+    // With reminders on, the question offers a plan instead; never with
+    // them off.
+    if (settings.enabled) {
+      await _offer(container, navigator, store, owner, dated, now);
+      return;
+    }
+    if (settings.asked || container.read(_askingProvider).contains(owner)) {
+      return;
+    }
+    // Only for a reminder that can still come; the next dated save asks.
     if (!dated.any((task) => ReminderEngine.alertAhead(task, settings, now))) {
       return;
     }
-    shown = true;
+    // Asked: not again in this run, whatever happens next.
+    container.read(_askingProvider).add(owner);
     final yes = await showModalBottomSheet<bool>(
       context: navigator.context,
       isScrollControlled: true,
@@ -139,8 +161,131 @@ Future<void> _ask(
   } catch (_) {
     // Without the saved answer the question waits for the next dated task.
   } finally {
-    if (!shown) container.read(_askingProvider).remove(owner);
+    try {
+      container.read(_waitingProvider).remove(owner);
+    } catch (_) {
+      // The app has gone: nothing waits any more.
+    }
   }
+}
+
+/// The offer: a saved task whose day is two weeks or more away, with no
+/// plan, gets one question, «Faltan 3 semanas: ¿te lo recuerdo hasta
+/// entonces?». «Sí» sets Normal. At most once per task, whatever the answer;
+/// never for a task that's someone else's, nor when this phone can't ring.
+Future<void> _offer(
+  ProviderContainer container,
+  NavigatorState navigator,
+  ReminderPreferenceStore store,
+  String owner,
+  List<Task> dated,
+  DateTime now,
+) async {
+  final me = container.read(authProvider).account?.id;
+  final offered = container.read(_offeredProvider);
+  Set<int> before;
+  try {
+    before = await store.planOffers(owner);
+  } catch (_) {
+    before = {};
+  }
+  final task = dated
+      .where(
+        (task) =>
+            task.id != null &&
+            task.isForAccount(me) &&
+            ReminderPlans.offerable(task, now) &&
+            !before.contains(task.id) &&
+            !offered.contains('$owner/${task.id}'),
+      )
+      .firstOrNull;
+  if (task == null || !navigator.mounted) return;
+  if (!(await container.read(reminderAccessProvider).capability()).allowed) {
+    return;
+  }
+  if (!navigator.mounted) return;
+  // Asked: at most once per task, whatever the answer. Not offered again in
+  // this run even if it can't be saved.
+  offered.add('$owner/${task.id}');
+  unawaited(store.addPlanOffer(owner, task.id!).catchError((Object _) {}));
+  final anchor = ReminderPlans.anchor(task)!;
+  final yes = await showModalBottomSheet<bool>(
+    context: navigator.context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _PlanOfferSheet(days: ReminderPlans.daysUntil(anchor, now)),
+  );
+  if (yes != true || !navigator.mounted) return;
+  // The task as it is now: only one that still has no plan gets Normal.
+  final current = container
+      .read(taskProvider)
+      .valueOrNull
+      ?.where((item) => item.id == task.id)
+      .firstOrNull;
+  if (current == null ||
+      current.reminderPlan != null ||
+      !ReminderPlans.plannable(current)) {
+    return;
+  }
+  final messenger = ScaffoldMessenger.maybeOf(navigator.context);
+  final strings = navigator.context.l10n;
+  final done = strings.reminderPlanOfferDone(
+    planDay(ReminderPlans.anchor(current)!, now, navigator.context.localeName),
+  );
+  try {
+    await container
+        .read(taskProvider.notifier)
+        .updateTask(
+          current.copyWith(
+            reminderPlan: const ReminderPlan.rhythm(ReminderPlan.normal),
+          ),
+        );
+  } catch (_) {
+    if (messenger != null && messenger.mounted) {
+      unawaited(showFeedback(messenger, strings.updateReminderError));
+    }
+    return;
+  }
+  if (messenger != null && messenger.mounted) {
+    unawaited(showFeedback(messenger, done));
+  }
+}
+
+class _PlanOfferSheet extends StatelessWidget {
+  const _PlanOfferSheet({required this.days});
+  final int days;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Read out by TalkBack as the sheet opens.
+        Semantics(
+          header: true,
+          liveRegion: true,
+          child: Text(
+            planOffer(context.l10n, days),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        const SizedBox(height: 24),
+        FilledButton(
+          key: const ValueKey('reminder-plan-offer-yes'),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(context.l10n.reminderPlanOfferYes),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(context.l10n.reminderAskNotNow),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ReminderAskSheet extends StatelessWidget {

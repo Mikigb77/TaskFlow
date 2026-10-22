@@ -5,6 +5,7 @@ import 'package:agenda/l10n/app_languages.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/generated/app_localizations_en.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/services/app_language.dart';
@@ -136,4 +137,10 @@ class ReminderCopy {
         ? strings.notificationInHours(at, lead ~/ 60)
         : strings.notificationInMinutes(at, lead);
   }
+
+  /// A plan's notification text, [daysBefore] its task's day: «Faltan 12
+  /// días», «Es mañana», «Es hoy»; the day after (-1), «Era para ayer», or
+  /// «Venció ayer» for a task with a [deadline].
+  String planBody(int daysBefore, {required bool deadline}) =>
+      planNotice(strings, daysBefore, deadline: deadline);
 }

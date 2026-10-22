@@ -83,6 +83,12 @@ class CaptureDraft {
       priority: draft.priority,
       checklist: draft.checklist,
       notes: draft.notes,
+      // Reminders said while dictating; a note takes none. Minutes before
+      // count only when what the reminder is about has a time.
+      reminderMinutes: draft.kind != 'note' && _timedReminder(draft)
+          ? draft.reminderMinutes
+          : null,
+      reminderPlan: draft.kind == 'note' ? null : draft.reminderPlan,
     ),
     questions: draft.questions,
     clarifications: draft.clarifications,
@@ -93,6 +99,13 @@ class CaptureDraft {
     newProject: draft.newProject,
     projectSuggestion: draft.projectSuggestion,
   );
+
+  /// The reminder is about the deadline for a task with only a deadline,
+  /// else about its day, as [fromAI] sets `reminderAnchor`.
+  static bool _timedReminder(TaskDraft draft) =>
+      draft.dueDate == null && draft.deadline != null
+      ? draft.deadlineHasTime
+      : draft.dueDate != null && draft.hasTime;
 
   bool get pending => savedTaskId == null && !removed;
   bool get ready =>

@@ -4653,4 +4653,284 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get commandAlreadyDone => 'Ya estaba hecha.';
+
+  @override
+  String get reminderPlanUntilDay => 'Hasta la fecha límite';
+
+  @override
+  String get reminderPlanGentle => 'Suave';
+
+  @override
+  String get reminderPlanNormal => 'Normal';
+
+  @override
+  String get reminderPlanIntense => 'Intenso';
+
+  @override
+  String get reminderPlanYourWay => 'A tu manera';
+
+  @override
+  String get reminderPlanYourWayHint =>
+      'Escríbelo o dilo como se lo dirías a alguien.';
+
+  @override
+  String get proBadge => 'Pro';
+
+  @override
+  String get reminderPlanSpeak => 'Dictarlo';
+
+  @override
+  String get reminderPlanStopListening => 'Dejar de escuchar';
+
+  @override
+  String get reminderPlanReading => 'Un momento…';
+
+  @override
+  String get reminderPlanUnclear =>
+      'No lo he entendido. Dilo de otra forma, por ejemplo: «cada 3 días y la última semana a diario».';
+
+  @override
+  String get reminderPlanOffline =>
+      'Esto necesita conexión. «Hasta la fecha límite» funciona sin ella.';
+
+  @override
+  String get reminderPlanFailed =>
+      'Ahora no he podido leerlo. Inténtalo más tarde, o elige «Hasta la fecha límite».';
+
+  @override
+  String get reminderPlanMicOff =>
+      'Sin micrófono no puedo escucharte. Puedes escribirlo.';
+
+  @override
+  String get reminderPlanCantListen =>
+      'Ahora no puedo escucharte en este teléfono. Puedes escribirlo.';
+
+  @override
+  String reminderPlanCount(int count, String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    String _temp1 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': 'el $date',
+    });
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count avisos · el próximo $_temp0, $time',
+      one: '1 aviso · $_temp1, $time',
+    );
+    return '$_temp2';
+  }
+
+  @override
+  String get reminderPlanNoneLeft => 'Ya no quedan avisos';
+
+  @override
+  String reminderPlanGrowing(String when, String date) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hasta hoy',
+      'tomorrow': 'hasta mañana',
+      'other': 'hasta el $date',
+    });
+    return 'Cada vez más a menudo $_temp0';
+  }
+
+  @override
+  String reminderPlanEveryDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'cada $days días',
+      one: 'a diario',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanEveryWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'cada $weeks semanas',
+      one: 'cada semana',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanLastDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'los últimos $days días',
+      one: 'el último día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanLastWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'las últimas $weeks semanas',
+      one: 'la última semana',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanFromDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'desde $days días antes',
+      one: 'desde el día antes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanFromWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'desde $weeks semanas antes',
+      one: 'desde una semana antes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanUntilDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'hasta $days días antes',
+      one: 'hasta el día antes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanUntilWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'hasta $weeks semanas antes',
+      one: 'hasta una semana antes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reminderPlanOnTheDay => 'el mismo día';
+
+  @override
+  String reminderPlanDaysBefore(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days días antes',
+      one: 'el día antes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanWeeksBefore(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: '$weeks semanas antes',
+      one: 'una semana antes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanPhase(String rhythm, String window) {
+    return '$rhythm $window';
+  }
+
+  @override
+  String reminderPlanAnd(String first, String last) {
+    return '$first, y $last';
+  }
+
+  @override
+  String reminderPlanList(String first, String rest) {
+    return '$first, $rest';
+  }
+
+  @override
+  String reminderPlanLine(String plan, String when, String date) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return '$plan · próximo: $_temp0';
+  }
+
+  @override
+  String reminderPlanNoticeDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'Faltan $days días',
+      one: 'Falta 1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reminderPlanNoticeTomorrow => 'Es mañana';
+
+  @override
+  String get reminderPlanNoticeToday => 'Es hoy';
+
+  @override
+  String get reminderPlanNoticeWas => 'Era para ayer';
+
+  @override
+  String get reminderPlanNoticeDue => 'Venció ayer';
+
+  @override
+  String reminderPlanOfferWeeks(int weeks) {
+    String _temp0 = intl.Intl.pluralLogic(
+      weeks,
+      locale: localeName,
+      other: 'Faltan $weeks semanas: ¿te lo recuerdo hasta entonces?',
+      one: 'Falta 1 semana: ¿te lo recuerdo hasta entonces?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String reminderPlanOfferMonths(int months) {
+    String _temp0 = intl.Intl.pluralLogic(
+      months,
+      locale: localeName,
+      other: 'Faltan $months meses: ¿te lo recuerdo hasta entonces?',
+      one: 'Falta 1 mes: ¿te lo recuerdo hasta entonces?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reminderPlanOfferYes => 'Sí';
+
+  @override
+  String reminderPlanOfferDone(String date) {
+    return 'Listo. Te lo recordaré hasta el $date.';
+  }
+
+  @override
+  String get billingReasonReminderPlans =>
+      'Con Pro, tus recordatorios a tu manera';
 }

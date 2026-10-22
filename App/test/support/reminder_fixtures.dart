@@ -24,6 +24,15 @@ class MemoryReminderStore extends ReminderPreferenceStore {
       alerts;
   @override
   Future<List<Map<String, Object?>>> schedulingInfo() async => info;
+
+  /// The tasks the reminder question has offered a plan for.
+  final Set<int> offered = {};
+  @override
+  Future<Set<int>> planOffers(String owner) async => {...offered};
+  @override
+  Future<void> addPlanOffer(String owner, int taskId) async {
+    offered.add(taskId);
+  }
 }
 
 /// Stands in for the phone: whether notifications and exact alarms are

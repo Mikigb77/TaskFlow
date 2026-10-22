@@ -63,6 +63,27 @@ class ReminderPreferenceStore {
       (await database.database).insert('app_preferences',
           {'scope': 'reminders:$owner', 'data': jsonEncode(value.toJson())},
           conflictAlgorithm: ConflictAlgorithm.replace);
+
+  /// The tasks the reminder question has offered a plan for, on this phone:
+  /// it's asked at most once per task.
+  Future<Set<int>> planOffers(String owner) async {
+    final rows = await (await database.database).query('app_preferences',
+        where: 'scope = ?', whereArgs: ['plan-offers:$owner']);
+    if (rows.isEmpty) return {};
+    final data = jsonDecode(rows.single['data'] as String);
+    return data is List ? {...data.whereType<int>()} : {};
+  }
+
+  /// Remembers that [taskId] was offered a plan. The newest 500 are kept.
+  Future<void> addPlanOffer(String owner, int taskId) async {
+    final offered = [...await planOffers(owner), taskId];
+    final kept = offered.length > 500
+        ? offered.sublist(offered.length - 500)
+        : offered;
+    await (await database.database).insert('app_preferences',
+        {'scope': 'plan-offers:$owner', 'data': jsonEncode(kept)},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 }
 
 String reminderLeadLabel(int? minutes) => switch (minutes) {

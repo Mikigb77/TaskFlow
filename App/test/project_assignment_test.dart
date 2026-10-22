@@ -142,7 +142,8 @@ void main() {
               ..remove('assigneeId')
               ..remove('assigneeName')
               ..remove('createdBy')
-              ..remove('createdByName');
+              ..remove('createdByName')
+              ..remove('reminderPlan');
         await old.insert('tasks', {
           ...row,
           'owner_key': owner,
@@ -347,7 +348,8 @@ void main() {
               createdBy: 2,
             ).toMap()
             ..remove('id')
-            ..remove('createdByName');
+            ..remove('createdByName')
+            ..remove('reminderPlan');
       await old.insert('tasks', {
         ...row,
         'owner_key': owner,

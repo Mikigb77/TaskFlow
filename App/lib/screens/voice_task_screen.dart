@@ -3306,11 +3306,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       );
       unawaited(feedback);
       if (remaining == 0) {
-        askAboutRemindersAfterSave(
-          context,
-          ready.map((d) => d.task),
-          feedback: feedback,
-        );
+        // As saved, with their ids: a plan can be offered for one.
+        askAboutRemindersAfterSave(context, [
+          for (final draft in result.drafts)
+            if (undoIds[draft.id] case final id?) draft.task.copyWith(id: id),
+        ], feedback: feedback);
       }
     } catch (_) {
       if (mounted) {
@@ -3945,11 +3945,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         );
       }
       if (remaining == 0 && ready.isNotEmpty) {
-        askAboutRemindersAfterSave(
-          context,
-          ready.map((d) => d.task),
-          feedback: feedback,
-        );
+        // As saved, with their ids: a plan can be offered for one.
+        askAboutRemindersAfterSave(context, [
+          for (final draft in _items)
+            if (undoIds[draft.id] case final id?) draft.task.copyWith(id: id),
+        ], feedback: feedback);
       }
     } catch (_) {
       if (mounted) setState(() => _error = CaptureProblem.saveFailed);
