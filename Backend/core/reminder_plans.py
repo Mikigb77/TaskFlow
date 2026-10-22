@@ -103,8 +103,9 @@ def _clock(value):
     return False
 
 
-def read_plan(value, said=None):
-    """A custom plan from what the model wrote, or None when it isn't a valid one.
+def read_plan(value, said=None, strengths=False):
+    """A custom plan from what the model wrote, or None when it isn't a valid one. With strengths
+    (a dictation), «until the day» with no rhythm said may also be a strength and no phases (D4).
 
     Tolerates the usual slips: numbers as strings, from_days and to_days the wrong way round, one
     phase without its list, «9:00». said, when given, is the person's own words (the reminder
@@ -114,7 +115,12 @@ def read_plan(value, said=None):
             value = json.loads(value)  # A plan written as a JSON string.
         except ValueError:
             return None
-    if not isinstance(value, dict) or value.get("kind") not in (None, "", "custom"):
+    if not isinstance(value, dict):
+        return None
+    if strengths and value.get("strength") in STRENGTHS and not value.get("phases"):
+        time = _clock(value.get("time"))
+        return None if time is False else {"kind": "rhythm", "strength": value["strength"], "time": time}
+    if value.get("kind") not in (None, "", "custom"):
         return None
     phases = value.get("phases")
     if isinstance(phases, dict):
@@ -167,8 +173,9 @@ PHASES_RULE = (
     "every_days days counted back from to_days: on to_days, to_days + every_days, and so on up to from_days. "
     "Use 1 to 4 phases, 0 <= to_days <= from_days <= 366, and every_days from 1 to 30. A rhythm said without a "
     "start runs from now on: from_days 366. A rhythm also reminds on the day itself, to_days 0, unless the words "
-    "exclude it; a single reminder said is just that one. time is the time of day said for the reminders (HH:MM, "
-    "24-hour), else null. "
+    "exclude it; a single reminder said is just that one, one phase with from_days equal to to_days: 'una semana "
+    "antes' is {\"from_days\":7,\"to_days\":7,\"every_days\":1}. time is the time of day said for the reminders "
+    "(HH:MM, 24-hour), else null. "
 )
 
 
@@ -201,18 +208,29 @@ def reminders_prompt(today):
         ("Renew the passport in two weeks, remind me every day the last week but not on the day",
          {"title": "Renew the passport", "date": day(14), "reminder_plan": _plan(
              [(7, 1, 1)], None, "every day the last week but not on the day")}),
+        ("Terminar la solicitud en 10 días y recuérdamelo hasta la fecha límite",
+         {"title": "Terminar la solicitud", "date": day(10), "deadline_date": None,
+          "reminder_plan": {"strength": "normal", "time": None}}),
+        ("Renovar el passaport, recorda-m’ho cada setmana",
+         {"title": "Renovar el passaport", "date": None, "reminder_plan": _plan([(366, 0, 7)], None, "cada setmana")}),
     )
     return (
         "Reminders: each task also has reminder_minutes and reminder_plan, both null unless the user asks to be "
         "reminded about it ('recuérdamelo', 'avísame'; Catalan 'recorda-m’ho', 'avisa’m'; English 'remind me'). "
-        "Minutes or hours before a task with a time are reminder_minutes, an integer: 'una hora antes' is 60. "
+        "Minutes or hours before the task are reminder_minutes, an integer: 'una hora antes' is 60, also for a "
+        "task said without a time. "
         "A rhythm of reminders, or reminders some days before, is reminder_plan: an object with phases, time and "
-        "said, counted back from the task's anchor, which is its deadline_date when it has one, else its date. "
+        "said, counted back from the task's anchor, which is its deadline_date when it has one, else its date. A task "
+        "with neither yet still keeps every reminder asked for: write its reminder_plan or reminder_minutes as usual, "
+        "and they count back from the day it gets later. "
         + PHASES_RULE +
         "said is the user's words saying when to remind, as said, without the request itself ('recuérdamelo'); "
         "those words never go in the title or notes. A reminder plan counts down to one task's day: something to do "
-        "every day or every week is a repeating task, and a repeating task, or a task without a date or a deadline, "
-        "has no reminder_plan. "
+        "every day or every week is a repeating task, and a repeating task has no reminder_plan. Reminders until "
+        "the task's day or deadline with no rhythm said ('recuérdamelo hasta la fecha límite', 'hasta entonces'; "
+        "Catalan 'fins al termini', 'fins aleshores'; English 'until the due date', 'until then') are reminder_plan "
+        "{\"strength\":\"normal\",\"time\":null} with no phases; a time said for them goes in time. Those words "
+        "name no deadline of their own: a task said for a day keeps that day as its date, with no deadline_date. "
         + "".join(f"Example: '{words}' has {_json(task)}. " for words, task in examples) +
         "'Recorda’m prendre la pastilla cada dia' is a daily repeating task from today, not a reminder plan.\n"
     )

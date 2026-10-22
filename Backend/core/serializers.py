@@ -2,7 +2,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.password_validation import validate_password
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
-from .models import User, Task, TaskList, TaskGroup, ProjectPreference
+from .models import User, Task, TaskList, TaskGroup, ProjectPreference, TaskReminderPlan
 from .billing import complimentary_pro
 from .email_verification import unconfirmed
 from .free_tier import free_voice
@@ -179,8 +179,9 @@ class TaskSerializer(serializers.ModelSerializer):
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
     reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, default=None)
     reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, default=None)
-    # docs/REMINDER_PLANS.md. Without a default, an older app that doesn't send it keeps the plan.
-    reminder_plan = serializers.JSONField(allow_null=True, required=False)
+    # docs/REMINDER_PLANS.md: the asker's own plan, kept apart from the task (TaskReminderPlan) and
+    # saved by the view. Without a default, an older app that doesn't send it keeps the plan.
+    reminder_plan = serializers.JSONField(allow_null=True, required=False, write_only=True)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
     checklist = ChecklistItemSerializer(many=True, required=False)
@@ -241,6 +242,34 @@ class TaskSerializer(serializers.ModelSerializer):
         except InvalidPlan as error:
             raise serializers.ValidationError(str(error))
 
+    def to_representation(self, task):
+        data = super().to_representation(task)
+        data["reminder_plan"] = self.asker_plan(task)
+        return data
+
+    def asker_plan(self, task):
+        """The plan of the account asking, never anyone else's (docs/REMINDER_PLANS.md, D6). The
+        task views prefetch it as asker_plans; a task fetched another way reads it here."""
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return None
+        prefetched = getattr(task, "asker_plans", None)
+        if prefetched is not None:
+            return prefetched[0].plan if prefetched else None
+        row = TaskReminderPlan.objects.filter(task_id=task.pk, user=request.user).only("plan").first()
+        return row.plan if row else None
+
+    def leaves_unchanged(self, task):
+        """True when saving would leave task as it is. The view asks it of a PUT that sends the
+        asker's plan: when nothing else changed, there's no new version and nothing to tell."""
+        for key, value in self.validated_data.items():
+            if key in ("version", "reminder_plan"):
+                continue
+            current = task.task_list_id if key == "task_list" else getattr(task, key)
+            if (value.pk if key == "task_list" and value is not None else value) != current:
+                return False
+        return True
+
     def validate_exceptions(self, value):
         if len(value) > 500:
             raise serializers.ValidationError("Use no more than 500 occurrence changes per series.")
@@ -279,7 +308,8 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"kind": "Keep the original type. Create a separate task or note instead."})
         if kind == "note":
             effective = lambda key, default=None: attrs.get(key, getattr(self.instance, key, default))
-            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_time", "reminder_plan", "repeat_until"))
+            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_time", "repeat_until"))
+                    or attrs.get("reminder_plan") is not None
                     or effective("priority", 1) != 1 or effective("is_completed", False)
                     or effective("recurrence", "none") != "none" or effective("repeat_interval", 1) != 1
                     or effective("reminder_anchor", "planned") != "planned" or effective("reminder_minutes") not in (None, -1)

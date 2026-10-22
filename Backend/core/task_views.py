@@ -1,13 +1,24 @@
 from django.db import IntegrityError, transaction
+from django.db.models import Prefetch
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
-from .models import Task
+from .models import Task, TaskReminderPlan
 from .collaboration import record_event, task_change_details
 from .serializers import TaskSerializer
 from .attachment_views import delete_task_attachments, check_list_transfer
 from .list_access import visible_tasks, lock_task, display_name
+
+NOT_SENT = object()
+
+
+def set_plan(task, user, plan):
+    """The person's own reminder plan for the task (docs/REMINDER_PLANS.md, D6); None removes it."""
+    if plan is None:
+        TaskReminderPlan.objects.filter(task=task, user=user).delete()
+    else:
+        TaskReminderPlan.objects.update_or_create(task=task, user=user, defaults={"plan": plan})
 
 
 class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -16,7 +27,9 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
     lookup_value_regex = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
     def get_queryset(self):
-        query = visible_tasks(self.request.user).select_related("created_by", "assignee")
+        mine = TaskReminderPlan.objects.filter(user=self.request.user)
+        query = visible_tasks(self.request.user).select_related("created_by", "assignee").prefetch_related(
+            Prefetch("reminder_plans", queryset=mine, to_attr="asker_plans"))
         if self.action == "list" and self.request.query_params.get("include_deleted") != "true":
             query = query.filter(is_deleted=False)
         return query
@@ -32,14 +45,21 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
             previous = dict(task.__dict__) if task else {}
             serializer = self.get_serializer(task, data=request.data)
             serializer.is_valid(raise_exception=True)
+            # The asker's own plan isn't part of the task: no version, activity or notification.
+            plan = serializer.validated_data.pop("reminder_plan", NOT_SENT)
             destination = serializer.validated_data.get("task_list", task.task_list if task else None)
             if task and task.task_list_id and locked[task.task_list_id].shared and (destination is None or destination.pk != task.task_list_id):
                 raise ValidationError({"list_id": "Shared tasks stay in their list. Export and import a personal copy if needed."})
             expected = serializer.validated_data.get("version", 0)
+            if task and plan is not NOT_SENT:
+                # Saved even when the version is stale: nobody else can have changed it.
+                set_plan(task, request.user, plan)
             if task and expected != task.version:
                 return Response({"detail": "This task changed on another device.", "current": self.get_serializer(task).data}, status=409)
             if not task and expected != 0:
                 raise ValidationError({"version": "New tasks must start at version 0."})
+            if task and plan is not NOT_SENT and serializer.leaves_unchanged(task):
+                return Response(self.get_serializer(task).data)
             check_list_transfer(task, destination)
             is_new = task is None
             # Typed, dictated and imported tasks all arrive here; the creator never changes after.
@@ -54,6 +74,8 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
                 if not current:
                     raise NotFound()
                 return Response({"detail": "Task was already uploaded.", "current": self.get_serializer(current).data}, status=409)
+            if is_new and plan not in (NOT_SENT, None):
+                set_plan(task, request.user, plan)
             details = task_change_details(previous, task)
             action = "deleted" if task.is_deleted else ("created" if is_new else "updated")
             if not is_new and not task.is_deleted:

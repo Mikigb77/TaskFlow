@@ -4,6 +4,12 @@ Every agent in the UX web loop reads this before reviewing or planning. Only the
 
 The app's decisions are in `.claude/ux-review/DECISIONS.md`. They bind the site too: the site may only say what the app does, and anything open there is open here.
 
+## 2026-10-22 (evening) — WD20 and WD21 of run 2026-10-22-changes
+The owner answered both "yes", WD21 against the recommendation («not now»):
+- **WD20, the calendar card's reminder sentence:** yes. It says that reminders can come more often as a task's day gets closer.
+- **WD21, the FAQ's Pro list:** yes: "Let's add that your way in [the FAQ]". «A tu manera», reminders asked for in your own words, joins the Pro list next to unlimited dictation and file space. The free answer still says the until-the-day reminders are for everyone, and the privacy pages already cover the words going to Google's AI.
+- The app's answers the same evening bind the site too (see `.claude/ux-review/DECISIONS.md`, «D1–D7 of run 2026-10-22-changes»). Plans on shared tasks are personal (D6), and a rhythm said is kept as said (D2). Say no more than the site needs.
+
 ## 2026-10-21 (evening) — WD18 and WD19 of run 2026-10-21-changes
 The owner answered both, and not as recommended («not now» for both):
 - **WD18, changing many tasks at once beyond the FAQ:** "Yes, on the card". One sentence on the «Say several things at once» card says that voice can also move or finish many tasks at once, as in «move all of yesterday's tasks to tomorrow». The hero stays as it is. The FAQ's voice answer still names it too (WP53).

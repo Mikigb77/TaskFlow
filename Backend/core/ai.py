@@ -48,10 +48,19 @@ class PlanPhase(BaseModel):
 
 class ReadPlan(BaseModel):
     """A reminder plan as the prompts ask for it (docs/REMINDER_PLANS.md). The fields give Vertex
-    the shape; read_plan has already checked every value, so validation here never fails."""
-    phases: list[PlanPhase]
+    the shape; read_plan has already checked every value, so validation here never fails. A
+    dictation's «until the day», with no rhythm said, is a strength and no phases (D4)."""
+    phases: list[PlanPhase] = Field(default_factory=list)
     time: str | None = None
     said: str | None = None
+    strength: Literal["gentle", "normal", "intense"] | None = None
+
+    def contract(self):
+        """The plan as the task field takes it: a rhythm, or the custom phases."""
+        if self.strength:
+            return {"kind": "rhythm", "strength": self.strength, "time": self.time}
+        return {"kind": "custom", "phases": [phase.model_dump() for phase in self.phases],
+                "time": self.time, "said": self.said}
 
 
 class PlanAnswer(BaseModel):
@@ -96,7 +105,7 @@ class ExtractedTask(BaseModel):
     @field_validator("reminder_plan", mode="before")
     @classmethod
     def dictated_plan(cls, value):
-        return read_plan(value.model_dump() if isinstance(value, ReadPlan) else value)
+        return read_plan(value.model_dump() if isinstance(value, ReadPlan) else value, strengths=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -545,11 +554,13 @@ def task_payload(draft, text, zone):
     # Reminders said while dictating (docs/REMINDER_PLANS.md). A plan counts back from the deadline,
     # else the day, and a repeating task has none in this first version. Minutes before need a time
     # to count from: the planned start's, or the deadline's when there is no planned day, as the app
-    # anchors a draft's reminder.
+    # anchors a draft's reminder. With no day and no deadline, what was said is kept for the day the
+    # task gets, and reminder_needs_day tells the card to ask for one (D3).
     anchor = draft.deadline_date or draft.date
-    plan = ({"kind": "custom", **draft.reminder_plan.model_dump()}
-            if draft.reminder_plan and anchor and draft.recurrence == "none" else None)
+    plan = draft.reminder_plan.contract() if draft.reminder_plan and draft.recurrence == "none" else None
     timed = due is not None if draft.date else deadline is not None
+    minutes = draft.reminder_minutes if timed or anchor is None else None
+    needs_day = anchor is None and (plan is not None or minutes is not None)
     return {"title": draft.title, "due_date": due.isoformat() if due else None,
             "deadline_at": deadline.isoformat() if deadline else None,
             "deadline_date": draft.deadline_date.isoformat() if draft.deadline_date and deadline is None else None,
@@ -562,7 +573,7 @@ def task_payload(draft, text, zone):
             "repeat_weekdays": sorted(set(draft.repeat_weekdays)) if draft.recurrence == "weekly" else [],
             "repeat_until": draft.repeat_until.isoformat() if draft.repeat_until and draft.recurrence != "none" else None,
             "priority": draft.priority, "notes": draft.notes,
-            "reminder_minutes": draft.reminder_minutes if timed else None, "reminder_plan": plan,
+            "reminder_minutes": minutes, "reminder_plan": plan, "reminder_needs_day": needs_day,
             "checklist": [{"id": str(uuid.uuid4()), "title": title.strip(), "completed": False, "completed_dates": []}
                           for title in draft.checklist],
             "questions": draft.questions, "clarifications": [c.model_dump() for c in draft.clarifications],

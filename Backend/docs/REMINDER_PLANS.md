@@ -1,6 +1,8 @@
 # Reminder plans
 
-Decided by the owner on 2026-10-22 (`.claude/ux-review/DECISIONS.md`, «Reminder plans»). A reminder plan nudges about one task more and more often as its day comes closer: «Presentar el proyecto en 3 semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». It's never a copy of the task: the task stays one row on its day, and the plan only sends notifications about it.
+Decided by the owner on 2026-10-22 (`.claude/ux-review/DECISIONS.md`, «Reminder plans», and his answers to D1–D7 of run 2026-10-22-changes the same evening). A reminder plan nudges about one task more and more often as its day comes closer: «Presentar el proyecto en 3 semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». It's never a copy of the task: the task stays one row on its day, and the plan only sends notifications about it.
+
+A plan is personal: it rings only for the person who set it, and each member of a shared project can set their own on the same task (D6).
 
 ## Who gets what
 
@@ -14,7 +16,7 @@ No other AI call is added for anyone.
 
 ## The anchor
 
-The plan counts back from the task's **deadline** when it has one, otherwise from the task's **own day** (its planned day). Most tasks only have a day: the owner, "the deadline most of the time … will be the same as the task". A task with neither has no plan, and the sheet doesn't offer one.
+The plan counts back from the task's **deadline** when it has one, otherwise from the task's **own day** (its planned day). Most tasks only have a day: the owner, "the deadline most of the time … will be the same as the task". A task without a deadline treats its own day, and its time, as the deadline, so «Hasta la fecha límite» means until that day (D4). A task with neither has no plan, and the sheet doesn't offer one.
 
 - Moving the anchor, by hand or by voice, moves the whole plan, because it's counted back from the anchor.
 - Marking the task done cancels every reminder left. Undoing that brings them back.
@@ -22,7 +24,13 @@ The plan counts back from the task's **deadline** when it has one, otherwise fro
 
 ## The field: `reminder_plan`
 
-A task field, synced like the others: `null`, or
+Each person's own plan for a task (D6). The server keeps one per person and task (`TaskReminderPlan`), and the task API shows it as the task's `reminder_plan`, always the plan of the account asking:
+- **Reading:** every task answer carries your own plan, or `null`. Nobody else's is ever sent.
+- **Writing:** a task `PUT` with `reminder_plan` sets your own plan, and `null` removes it. Without the key, the plan stays as it is.
+- **A change to your plan alone isn't a change to the task:** no new `version`, no activity entry, no notification to the project. Your other phones get it at their next sync, which reads every task anyway. A `PUT` whose `version` is stale still saves the plan before it answers 409.
+- **Plans set before D6** became the plan of the person whose phone rang for the task: the person it's given to, else its creator, else its owner (migration 0024).
+
+The plan is `null`, or
 
 ```json
 {"kind": "rhythm", "strength": "normal", "time": null}
@@ -39,15 +47,18 @@ A task field, synced like the others: `null`, or
 | `time` | `"HH:MM"`, the time of day for every reminder of the plan, in the person's time zone. `null`: the reminder time for all-day tasks in Settings. |
 | `said` | `custom` only: the words as typed or said, shown in the sheet. At most 200 characters. |
 
-The three strengths, as phases (366 means "from now on"; only days still to come are scheduled), each with a reminder on the day itself:
+The three strengths, as phases, each with a reminder on the day itself. They start at most 4 weeks (28 days) before the day, so a far task never gets more than a few weeks of them (D2). Only days still to come are scheduled.
 
-| Strength | Phases |
-|---|---|
-| Suave (`gentle`) | every 7 days down to 4 days before, then daily for the last 3 days and the day |
-| Normal (`normal`) | every 3 days down to 8 days before, then daily for the last 7 days and the day |
-| Intenso (`intense`) | every 2 days down to 15 days before, then daily for the last 14 days and the day |
+| Strength | Phases | At most |
+|---|---|---|
+| Suave (`gentle`) | every 7 days from 28 down to 4 days before, then daily for the last 3 days and the day | 8 |
+| Normal (`normal`) | every 3 days from 28 down to 8 days before, then daily for the last 7 days and the day | 15 |
+| Intenso (`intense`) | every 2 days from 28 down to 15 days before, then daily for the last 14 days and the day | 22 |
+
+A rhythm the person says or types (`custom`) is kept as said, however far back it reaches, up to 366 days: "if you specifically say it" (D2). A rhythm said without a start runs from now on.
 
 - A plan replaces the single reminder: with a plan, `reminder_minutes` and `reminder_time` are left as they are but not used. The sheet's choices are exclusive: no reminders, once (today's single reminder), until the day (a strength), or «A tu manera».
+- **Except on the day of a timed task (D1).** A task with a time, or a deadline with a time, gets that day's notice at the single reminder's moment: its own lead (`reminder_minutes`, when it's 0 or more), else «Tareas con hora» (10 minutes by default), in the single reminder's words («Hoy a las 17:00 · en 10 min»). The earlier days keep the plan's time, and the number of notices doesn't change.
 - The server checks the shape, and nothing else: the plan is the phone's to schedule.
 
 ## The notifications
@@ -63,7 +74,8 @@ The three strengths, as phases (366 means "from now on"; only days still to come
 - **The reminder sheet:** the choices above, then the preview of whichever is chosen: the plan in words, a strip of dots from today to the anchor, and «N avisos · el próximo sáb 25, 9:00».
   - **The strengths:** Suave, Normal and Intenso sit under «Hasta la fecha límite».
   - **«A tu manera»:** a text field with a microphone, «Escríbelo o dilo como se lo dirías a alguien.» The words go to `POST /api/ai/reminder-plan/`, and the preview updates. It needs a connection; offline it says so, and the strengths still work.
-- **The offer:** after saving a task whose anchor is 14 or more days away, with no plan, the reminder question offers one: «Faltan 3 semanas: ¿te lo recuerdo hasta entonces?», where «Sí» sets Normal. It's asked at most once per task, and never when reminders are off.
+- **The offer:** after saving a task whose anchor is 14 or more days away, with no plan, the reminder question offers one: «Faltan 3 semanas: ¿te lo recuerdo hasta entonces?», where «Sí» sets Normal. It's asked at most once per task, and never when reminders are off. After two «Ahora no» in a row on this phone it's no longer asked; «Hasta la fecha límite» stays in every task's sheet (D5).
+- **Shared tasks (D6):** the plan choices show wherever the task's reminders ring on this phone: a personal task, a «Todos» task, one given to you, and an unassigned one in a project you manage. They don't show on a task given to someone else. On a shared task the sheet says that a plan rings only for you, and the offer can come for it too, since «Sí» sets only your own plan.
 - **The capture's review card:** a plan read from a dictation shows as its one line, like the other details. Tapping it opens the same sheet.
 
 ## The dictation (drafts)
@@ -71,7 +83,9 @@ The three strengths, as phases (366 means "from now on"; only days still to come
 The drafts endpoint (`POST /api/ai/drafts/`) reads reminders said while dictating, for everyone:
 - **A rhythm, or a reminder some days before:** the draft gets `reminder_plan` with `kind` `"custom"` and its `phases`, counted back from the draft's anchor (its deadline, else its day). A rhythm also gets a reminder on the day itself, unless the words exclude it. A single reminder said is just that one: «recuérdamelo el día antes a las 9» is one phase, `{"from_days":1,"to_days":1,"every_days":1}`, at `"09:00"`.
 - **A reminder some minutes or hours before a timed task** («una hora antes»): the existing `reminder_minutes`, 60.
-- **No anchor, or nothing said about reminders:** neither key is set.
+- **Until the day, with no rhythm said** («recuérdamelo hasta la fecha límite», «hasta el jueves», «fins al termini», "until the due date"): `{"kind": "rhythm", "strength": "normal", "time": null}`, the same as Normal in the sheet, counted back from the anchor. A task that only has a day counts back from that day (D4).
+- **No anchor (D3):** a reminder said for a task with neither a day nor a deadline isn't dropped. The draft keeps its `reminder_plan` (counted back from whatever day the task gets) or its `reminder_minutes`, and gets `"reminder_needs_day": true`. The card says «Para recordártelo, ponle un día.» under the date, and tapping it opens the date. Once the task has a day, the reminder said applies; saved without one, it's dropped.
+- **Nothing said about reminders:** neither key is set.
 
 ## «A tu manera»: `POST /api/ai/reminder-plan/`
 

@@ -1,5 +1,5 @@
-"""Reminder plans (docs/REMINDER_PLANS.md): the task field, plans said while dictating, and «A tu
-manera», POST /api/ai/reminder-plan/. The model is always mocked."""
+"""Reminder plans (docs/REMINDER_PLANS.md): each person's own plan on the task API, plans said while
+dictating, and «A tu manera», POST /api/ai/reminder-plan/. The model is always mocked."""
 import json
 import uuid
 from copy import deepcopy
@@ -7,15 +7,17 @@ from datetime import date, datetime, timezone
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.db import IntegrityError, transaction
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from google.genai import _transformers, errors
 from rest_framework.test import APIClient
 
 from . import views
+from .account_deletion import delete_account
 from .ai import (_generate_reviewable_once, build_plan_prompt, build_prompt, extract_tasks, validate_draft,
                  vertex_plan_schema, vertex_response_schema)
-from .models import FreeDictation, Task, User
+from .models import FreeDictation, ListMembership, Task, TaskEvent, TaskList, TaskNotification, TaskReminderPlan, User
 from .reminder_plans import InvalidPlan, check_plan, read_plan
 
 REFERENCE = datetime(2026, 10, 22, 8, tzinfo=timezone.utc)  # Thursday 22 October 2026, 10:00 in Madrid.
@@ -114,11 +116,13 @@ class ReminderPlanFieldTests(TestCase):
         self.assertEqual(self.client.get(self.path).data["reminder_plan"], CUSTOM)
         listed = self.client.get("/api/tasks/").data["results"]
         self.assertEqual([task["reminder_plan"] for task in listed], [CUSTOM])
+        # Only the plan changes: the task keeps its version.
         changed = self.put(reminder_plan=RHYTHM, version=1)
-        self.assertEqual((changed.status_code, changed.data["reminder_plan"]), (200, RHYTHM))
-        cleared = self.put(reminder_plan=None, version=2)
+        self.assertEqual((changed.status_code, changed.data["reminder_plan"], changed.data["version"]),
+                         (200, RHYTHM, 1))
+        cleared = self.put(reminder_plan=None, version=1)
         self.assertEqual((cleared.status_code, cleared.data["reminder_plan"]), (200, None))
-        self.assertIsNone(Task.objects.get().reminder_plan)
+        self.assertFalse(TaskReminderPlan.objects.exists())
 
     def test_without_a_plan_a_task_has_null(self):
         created = self.put()
@@ -126,14 +130,20 @@ class ReminderPlanFieldTests(TestCase):
         self.assertIsNone(created.data["reminder_plan"])
         self.assertIsNone(self.client.post("/api/tasks/", {"title": "Comprar pan"}, format="json").data["reminder_plan"])
 
-    def test_an_app_that_doesnt_send_the_plan_keeps_it_and_a_conflict_carries_it(self):
+    def test_an_app_that_doesnt_send_the_plan_keeps_it(self):
         self.assertEqual(self.put(reminder_plan=CUSTOM).status_code, 201)
         older = self.put(title="Presentar el proyecto final", version=1)
         self.assertEqual(older.status_code, 200, older.data)
-        self.assertEqual(older.data["reminder_plan"], CUSTOM)
+        self.assertEqual((older.data["reminder_plan"], older.data["version"]), (CUSTOM, 2))
+
+    def test_a_stale_version_still_saves_the_plan_and_the_conflict_carries_it(self):
+        # Nobody else can have changed the plan, so the app's 409 compares equal on it.
+        self.assertEqual(self.put(reminder_plan=CUSTOM).status_code, 201)
+        self.assertEqual(self.put(title="Presentar el proyecto final", version=1).status_code, 200)
         conflict = self.put(reminder_plan=RHYTHM, version=1)
         self.assertEqual(conflict.status_code, 409)
-        self.assertEqual(conflict.data["current"]["reminder_plan"], CUSTOM)
+        self.assertEqual(conflict.data["current"]["reminder_plan"], RHYTHM)
+        self.assertEqual(self.client.get(self.path).data["reminder_plan"], RHYTHM)
 
     def test_the_single_reminder_is_left_as_it_is_beside_a_plan(self):
         created = self.put(reminder_plan=RHYTHM, reminder_minutes=30, reminder_time=540)
@@ -161,9 +171,128 @@ class ReminderPlanFieldTests(TestCase):
         self.assertIsNone(created.data["reminder_plan"])
         later = self.client.put(path, {**note, "version": 1, "reminder_plan": RHYTHM}, format="json")
         self.assertEqual(later.status_code, 400, later.data)
-        # The database refuses one too, as it does a note's other reminders.
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Task.objects.create(owner=self.user, kind="note", title="Nota", reminder_plan=RHYTHM)
+        self.assertFalse(TaskReminderPlan.objects.exists())
+
+
+class PersonalPlanTests(TestCase):
+    """D6: a plan rings only for the person who set it, and each member can have their own. The
+    owner's example: a math group's «Terminar la presentación», where Ana asks for reminders."""
+
+    def setUp(self):
+        cache.clear()
+        self.ana = User.objects.create_user("ana-plans@example.invalid", PASSWORD, first_name="Ana")
+        self.marc = User.objects.create_user("marc-plans@example.invalid", PASSWORD, first_name="Marc")
+        self.project = TaskList.objects.create(owner=self.ana, name="Grupo de mates", shared=True)
+        ListMembership.objects.create(task_list=self.project, user=self.marc, role="editor")
+        self.path = f"/api/tasks/{uuid.uuid4()}/"
+        self.task = {"title": "Terminar la presentación", "scheduled_date": "2026-10-29",
+                     "list_id": str(self.project.pk), "assignment": "group"}
+
+    def client_for(self, user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client
+
+    def put(self, user, version, **fields):
+        return self.client_for(user).put(self.path, {**self.task, "version": version, **fields}, format="json")
+
+    def plan_seen_by(self, user):
+        return self.client_for(user).get(self.path).data["reminder_plan"]
+
+    def test_each_member_sees_and_sets_only_their_own_plan(self):
+        created = self.put(self.ana, 0, reminder_plan=CUSTOM)
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual((self.plan_seen_by(self.ana), self.plan_seen_by(self.marc)), (CUSTOM, None))
+        listed = self.client_for(self.marc).get("/api/tasks/").data["results"]
+        self.assertEqual([task["reminder_plan"] for task in listed], [None])
+        mine = self.put(self.marc, 1, reminder_plan=RHYTHM)
+        self.assertEqual((mine.status_code, mine.data["reminder_plan"]), (200, RHYTHM))
+        self.assertEqual((self.plan_seen_by(self.ana), self.plan_seen_by(self.marc)), (CUSTOM, RHYTHM))
+        # Marc removes his, and Ana's stays; an app that doesn't send the key changes neither.
+        self.assertEqual(self.put(self.marc, 1, reminder_plan=None).status_code, 200)
+        self.assertEqual(self.put(self.marc, 1, title="Terminar la presentación de mates").status_code, 200)
+        self.assertEqual((self.plan_seen_by(self.ana), self.plan_seen_by(self.marc)), (CUSTOM, None))
+
+    def test_a_change_to_a_plan_alone_is_not_a_change_to_the_task(self):
+        self.assertEqual(self.put(self.ana, 0).status_code, 201)
+        events, told = TaskEvent.objects.count(), TaskNotification.objects.filter(recipient=self.ana).count()
+        changed = self.put(self.marc, 1, reminder_plan=RHYTHM)
+        self.assertEqual((changed.status_code, changed.data["version"]), (200, 1))
+        self.assertEqual(Task.objects.get().version, 1)
+        self.assertEqual(TaskEvent.objects.count(), events)
+        self.assertEqual(TaskNotification.objects.filter(recipient=self.ana).count(), told)
+        # A real change still makes a version and tells the others, and leaves the plans alone.
+        renamed = self.put(self.marc, 1, title="Terminar la presentación de mates")
+        self.assertEqual(renamed.data["version"], 2)
+        self.assertEqual(TaskNotification.objects.filter(recipient=self.ana).count(), told + 1)
+        self.assertEqual((self.plan_seen_by(self.marc), self.plan_seen_by(self.ana)), (RHYTHM, None))
+
+    def test_the_whole_task_sent_back_with_a_plan_changes_only_the_plan(self):
+        # The app sends every field it has, as the API gave them.
+        created = self.put(self.ana, 0, due_date="2026-10-29T17:00:00+01:00", scheduled_date=None,
+                           deadline_date="2026-10-30", duration_minutes=45, priority=3, labels=["Mates"],
+                           notes="Diapositivas 3 a 7", reminder_minutes=30,
+                           checklist=[{"id": str(uuid.uuid4()), "title": "Gráficas", "completed": True,
+                                       "completed_dates": []}])
+        self.assertEqual(created.status_code, 201, created.data)
+        sent = self.client_for(self.ana).put(self.path, {**created.data, "reminder_plan": RHYTHM}, format="json")
+        self.assertEqual((sent.status_code, sent.data["version"], sent.data["reminder_plan"]), (200, 1, RHYTHM))
+
+    def test_an_unchanged_task_sent_again_is_not_a_new_version(self):
+        created = self.put(self.ana, 0)
+        again = self.client_for(self.ana).put(self.path, created.data, format="json")
+        self.assertEqual((again.status_code, again.data["version"]), (200, 1))
+        self.assertEqual(TaskEvent.objects.count(), 1)
+
+    def test_a_deleted_account_takes_only_its_own_plans(self):
+        self.put(self.ana, 0, reminder_plan=CUSTOM)
+        self.put(self.marc, 1, reminder_plan=RHYTHM)
+        delete_account(self.marc)
+        self.assertEqual(list(TaskReminderPlan.objects.values_list("user_id", "plan")), [(self.ana.pk, CUSTOM)])
+        self.assertEqual(self.plan_seen_by(self.ana), CUSTOM)
+
+
+class PersonalPlansMigrationTests(TransactionTestCase):
+    """Migration 0024: a plan set on a task before D6 goes to the person whose phone it rang on."""
+    before = [("core", "0023_task_reminder_plan")]
+    after = [("core", "0024_personal_reminder_plans")]
+
+    def migrate(self, target):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(target)
+        return executor.loader.project_state(target).apps
+
+    def test_each_plan_goes_to_the_person_it_rang_for_and_back(self):
+        apps = self.migrate(self.before)
+        User, Task, TaskList = (apps.get_model("core", name) for name in ("User", "Task", "TaskList"))
+        ana, marc, laia = (User.objects.create(email=f"{name}-migration@example.invalid") for name in ("ana", "marc", "laia"))
+        project = TaskList.objects.create(owner=ana, name="Grupo", shared=True)
+        tasks = {
+            "personal": Task.objects.create(owner=ana, created_by=ana, title="Personal", reminder_plan=RHYTHM),
+            "given to Marc": Task.objects.create(owner=ana, created_by=laia, title="Marc's", task_list=project,
+                                                 assignment="member", assignee=marc, reminder_plan=CUSTOM),
+            "Todos, by Laia": Task.objects.create(owner=ana, created_by=laia, title="Todos", task_list=project,
+                                                  assignment="group", reminder_plan=RHYTHM),
+            "creator deleted": Task.objects.create(owner=ana, created_by=None, title="Heredada", task_list=project,
+                                                   assignment="group", reminder_plan=CUSTOM),
+            "no plan": Task.objects.create(owner=ana, created_by=ana, title="Sin plan"),
+        }
+        apps = self.migrate(self.after)
+        rows = {(row.task_id, row.user_id): row.plan for row in apps.get_model("core", "TaskReminderPlan").objects.all()}
+        self.assertEqual(rows, {
+            (tasks["personal"].pk, ana.pk): RHYTHM,
+            (tasks["given to Marc"].pk, marc.pk): CUSTOM,
+            (tasks["Todos, by Laia"].pk, laia.pk): RHYTHM,
+            (tasks["creator deleted"].pk, ana.pk): CUSTOM,
+        })
+        apps.get_model("core", "TaskReminderPlan").objects.create(task_id=tasks["given to Marc"].pk, user_id=ana.pk,
+                                                                   plan=RHYTHM)
+        apps = self.migrate(self.before)  # Back: the plan of the person it rang for wins.
+        back = dict(apps.get_model("core", "Task").objects.values_list("title", "reminder_plan"))
+        self.assertEqual(back, {"Personal": RHYTHM, "Marc's": CUSTOM, "Todos": RHYTHM, "Heredada": CUSTOM,
+                                "Sin plan": None})
+        self.migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
 
 
 def task(**fields):
@@ -206,23 +335,53 @@ class DictatedPlanTests(SimpleTestCase):
         # Without a planned day the app counts from the deadline, so its time is enough.
         self.assertEqual(deadline["reminder_minutes"], 30)
         self.assertIsNone(day_only["reminder_minutes"])
-        self.assertIsNone(nowhere["reminder_minutes"])
+        # With no day at all, it waits for the day and time the task gets (D3).
+        self.assertEqual((nowhere["reminder_minutes"], nowhere["reminder_needs_day"]), (15, True))
+        self.assertEqual([draft["reminder_needs_day"] for draft in (timed, deadline, day_only)], [False] * 3)
 
-    def test_without_an_anchor_or_on_a_repeating_task_there_is_no_plan(self):
-        plan = {"phases": [phase(366, 0, 1)], "time": None, "said": "cada día"}
-        nowhere, repeating, timeless = self.extract(
-            task(reminder_plan=plan),
-            task(title="Regar las plantas", date="2026-10-26", recurrence="weekly", reminder_plan=plan),
-            task(time="09:00", reminder_plan=plan))  # A time without a day isn't an anchor either.
-        self.assertEqual([draft["reminder_plan"] for draft in (nowhere, repeating, timeless)], [None, None, None])
-        self.assertEqual(repeating["recurrence"], "weekly")
+    def test_a_reminder_said_without_a_day_waits_for_one(self):
+        # D3: «Renovar el pasaporte, recuérdamelo cada semana» keeps its reminders, and the card asks for a day.
+        plan = {"phases": [phase(366, 0, 7)], "time": None, "said": "cada semana"}
+        nowhere, timeless, deadline, repeating = self.extract(
+            task(title="Renovar el pasaporte", reminder_plan=plan),
+            task(time="09:00", reminder_plan=plan),  # A time without a day isn't an anchor either.
+            task(deadline_date="2026-11-12", reminder_plan=plan),
+            task(title="Regar las plantas", date="2026-10-26", recurrence="weekly", reminder_plan=plan))
+        kept = {"kind": "custom", "phases": [phase(366, 0, 7)], "time": None, "said": "cada semana"}
+        self.assertEqual([(draft["reminder_plan"], draft["reminder_needs_day"]) for draft in (nowhere, timeless, deadline)],
+                         [(kept, True), (kept, True), (kept, False)])
+        self.assertEqual(check_plan(nowhere["reminder_plan"]), kept)  # The task API takes it once there's a day.
+        # A repeating task still has no plan in this first version, and nothing to ask.
+        self.assertEqual((repeating["recurrence"], repeating["reminder_plan"], repeating["reminder_needs_day"]),
+                         ("weekly", None, False))
+
+    def test_until_the_day_with_no_rhythm_said_is_normal(self):
+        # D4: «Terminar la solicitud el jueves y recuérdamelo hasta la fecha límite»: the task's own day is its deadline.
+        day_only, with_time, written_as_rhythm, deadline, nowhere = self.extract(
+            task(title="Terminar la solicitud", date="2026-10-29", reminder_plan={"strength": "normal", "time": None}),
+            task(date="2026-10-29", reminder_plan={"strength": "normal", "time": "9:00"}),
+            task(date="2026-10-29", reminder_plan={"kind": "rhythm", "strength": "normal"}),
+            task(deadline_date="2026-11-12", reminder_plan={"strength": "normal"}),
+            task(reminder_plan={"strength": "normal"}))
+        self.assertEqual(day_only["reminder_plan"], RHYTHM)
+        self.assertEqual(check_plan(day_only["reminder_plan"]), RHYTHM)
+        self.assertEqual(with_time["reminder_plan"], {**RHYTHM, "time": "09:00"})
+        self.assertEqual([draft["reminder_plan"] for draft in (written_as_rhythm, deadline)], [RHYTHM, RHYTHM])
+        self.assertEqual((nowhere["reminder_plan"], nowhere["reminder_needs_day"]), (RHYTHM, True))
+        # Phases said win over a strength the model added; «A tu manera» never reads a strength.
+        mixed, = self.extract(task(date="2026-11-12", reminder_plan={"strength": "normal", "phases": PHASES}))
+        self.assertEqual(mixed["reminder_plan"], {"kind": "custom", "phases": PHASES, "time": None, "said": None})
+        self.assertIsNone(read_plan({"strength": "normal", "time": None}))
 
     def test_nothing_said_about_reminders_sets_neither(self):
         for commands in (True, False):
             with self.subTest(commands=commands):
                 draft, = self.extract(task(date="2026-11-12"), commands=commands)
                 self.assertIn("reminder_plan", draft)
-                self.assertEqual((draft["reminder_minutes"], draft["reminder_plan"]), (None, None))
+                self.assertEqual((draft["reminder_minutes"], draft["reminder_plan"], draft["reminder_needs_day"]),
+                                 (None, None, False))
+                nowhere, = self.extract(task(), commands=commands)
+                self.assertFalse(nowhere["reminder_needs_day"])
 
     def test_older_apps_get_the_plan_too(self):
         draft, = self.extract(task(date="2026-11-12", reminder_plan={"phases": PHASES}), commands=False)
@@ -231,7 +390,7 @@ class DictatedPlanTests(SimpleTestCase):
     def test_an_invalid_plan_or_lead_is_dropped_not_the_dictation(self):
         plans = [
             "cada tres días",
-            {"kind": "rhythm", "strength": "normal"},  # Not what a dictation reads.
+            {"kind": "rhythm", "strength": "strong"},
             {"phases": []},
             {"phases": [phase(5, 5, 1)] * 5},
             {"phases": [phase(400, 0, 1)]},
@@ -283,14 +442,14 @@ class DictatedPlanTests(SimpleTestCase):
         with patch("core.ai._generate_once", side_effect=[json.dumps(source), json.dumps(repaired)]):
             result = validate_draft(_generate_reviewable_once("Words", 10000))
         self.assertEqual(result.tasks[0].title, "Presentar el proyecto")
-        self.assertEqual(result.tasks[0].reminder_plan.model_dump(), plan)
+        self.assertEqual(result.tasks[0].reminder_plan.contract(), {"kind": "custom", **plan})
 
     def test_vertex_accepts_the_new_fields(self):
         for commands in (False, True):
             schema = vertex_response_schema(commands)
             fields = schema["$defs"]["ExtractedTask"]["properties"]
             self.assertEqual(fields["reminder_minutes"], {"anyOf": [{"type": "integer"}, {"type": "null"}]})
-            self.assertEqual(set(schema["$defs"]["ReadPlan"]["properties"]), {"phases", "time", "said"})
+            self.assertEqual(set(schema["$defs"]["ReadPlan"]["properties"]), {"phases", "time", "said", "strength"})
             converted = _transformers.t_schema(None, deepcopy(schema)).properties["tasks"].items
             plan = converted.properties["reminder_plan"]
             self.assertEqual(plan.properties["phases"].items.properties["every_days"].type.value, "INTEGER")
@@ -313,7 +472,12 @@ class DictationPromptTests(SimpleTestCase):
                              "its deadline_date when it has one, else its date",
                              "A rhythm also reminds on the day itself, to_days 0, unless the words exclude it",
                              "a single reminder said is just that one",
-                             "a repeating task, or a task without a date or a deadline, has no reminder_plan"):
+                             "a repeating task has no reminder_plan",
+                             "A task with neither yet still keeps every reminder asked for",
+                             'are reminder_plan {"strength":"normal","time":null} with no phases',
+                             "Those words name no deadline of their own",
+                             "'una semana antes' is {\"from_days\":7,\"to_days\":7,\"every_days\":1}",
+                             "'una hora antes' is 60, also for a task said without a time"):
                     self.assertIn(rule, text)
                 self.assertLess(text.index("Reminders:"), text.index("User words (JSON string)"))
 
@@ -335,6 +499,12 @@ class DictationPromptTests(SimpleTestCase):
             "'Renew the passport in two weeks, remind me every day the last week but not on the day' has "
             '{"title":"Renew the passport","date":"2026-11-05","reminder_plan":{"phases":[{"from_days":7,'
             '"to_days":1,"every_days":1}],"time":null,"said":"every day the last week but not on the day"}}',
+            "'Terminar la solicitud en 10 días y recuérdamelo hasta la fecha límite' has "
+            '{"title":"Terminar la solicitud","date":"2026-11-01","deadline_date":null,'
+            '"reminder_plan":{"strength":"normal","time":null}}',
+            "'Renovar el passaport, recorda-m’ho cada setmana' has "
+            '{"title":"Renovar el passaport","date":null,"reminder_plan":{"phases":[{"from_days":366,"to_days":0,'
+            '"every_days":7}],"time":null,"said":"cada setmana"}}',
             "'Recorda’m prendre la pastilla cada dia' is a daily repeating task from today, not a reminder plan.",
         ):
             self.assertIn(example, text)
