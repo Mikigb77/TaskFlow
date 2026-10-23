@@ -142,16 +142,33 @@ class ReminderEngine {
   static String identity(String owner, Task task) =>
       '$owner/task/${task.id}/${task.occurrenceId ?? 'once'}';
 
-  /// One reminder of [task]'s plan, by the day it rings.
-  static String planIdentity(String owner, Task task, PlanAlert alert) =>
-      '$owner/task/${task.id}/plan/${Task.dateKey(alert.when)}';
+  /// One reminder of [task]'s plan, by the day it rings. [onTime] marks the
+  /// day's own one ringing at the task's usual reminder ([isPlanDayAlert]).
+  static String planIdentity(
+    String owner,
+    Task task,
+    PlanAlert alert, {
+    bool onTime = false,
+  }) =>
+      '$owner/task/${task.id}/plan/${Task.dateKey(alert.when)}'
+      '${onTime ? '/time' : ''}';
 
   static bool isPlanAlert(Object? identity) =>
       identity is String && identity.contains('/plan/');
 
+  /// A plan's notice on its timed anchor's own day, at the task's usual
+  /// reminder (D1): it reads as the task's reminder and offers its snooze;
+  /// in every other way it's a plan alert.
+  static bool isPlanDayAlert(Object? identity) =>
+      isPlanAlert(identity) && (identity as String).endsWith('/time');
+
   /// The days before its task's day that plan alert [row] rings.
   static int _planDaysBefore(Map<String, Object?> row, Task task) {
-    final key = (row['identity'] as String).split('/plan/').last;
+    final key = (row['identity'] as String)
+        .split('/plan/')
+        .last
+        .split('/')
+        .first;
     final day = DateTime.tryParse(key);
     final anchor = ReminderPlans.anchor(task);
     if (day == null || anchor == null) return 0;
@@ -161,7 +178,8 @@ class ReminderEngine {
   /// The next few reminders of [task]'s [plan], never the whole plan, and
   /// always its last days still ahead (the day before, the day itself and
   /// the day after), so a phone that defers background work still rings
-  /// them.
+  /// them. On a timed anchor's own day, the day's one rings at the task's
+  /// usual reminder, in its words (D1).
   static List<PlannedReminder> planReminders(
     String owner,
     Task task,
@@ -171,23 +189,32 @@ class ReminderEngine {
     ReminderCopy copy,
   ) {
     final anchor = ReminderPlans.anchor(task)!;
+    final lead = ReminderPlans.dayLead(task, preferences.leadMinutes);
     final alerts = ReminderPlans.alerts(
       plan,
       anchor,
       ReminderPlans.minute(plan, preferences.dateOnlyTime),
       now,
+      dayLead: lead,
     );
     return [
       for (final (index, alert) in alerts.indexed)
         if (index < ReminderPlans.window || alert.daysBefore <= 1)
           PlannedReminder(
-            identity: planIdentity(owner, task, alert),
+            identity: planIdentity(
+              owner,
+              task,
+              alert,
+              onTime: lead != null && alert.daysBefore == 0,
+            ),
             taskId: task.id,
             due: anchor,
             when: alert.when,
             title: task.title,
             languageCode: copy.languageCode,
-            body: copy.planBody(task, alert.daysBefore),
+            body: lead != null && alert.daysBefore == 0
+                ? copy.planDayBody(task, alert.when, lead)
+                : copy.planBody(task, alert.daysBefore),
           ),
     ];
   }
@@ -247,7 +274,8 @@ class ReminderEngine {
   /// Whether [task]'s next alert would still ring after [now] were reminders
   /// on, by the steps [plan] takes: [preferences] taken as enabled, and a
   /// task without a time reminding at the default 9:00 when no time was
-  /// chosen. False for a task whose reminder is off.
+  /// chosen. False for a task whose reminder is off. A plan's last notice,
+  /// the day after, isn't a reminder before the task.
   static bool alertAhead(
     Task task,
     ReminderPreferences preferences,
@@ -259,6 +287,8 @@ class ReminderEngine {
         task,
         preferences.dateOnlyTime,
         now,
+        defaultLead: preferences.leadMinutes,
+        late: false,
       ).isNotEmpty;
     }
     if (task.reminderMinutes == -1) return false;
@@ -285,7 +315,8 @@ class ReminderEngine {
     final c = copy ?? ReminderCopy.fallback();
     final l = c.strings;
     final result = <PlannedReminder>[];
-    // A plan replaces its task's single reminder while it's set.
+    // A plan replaces its task's single reminder while it's set: on a timed
+    // anchor's own day, its notice rings at that reminder's moment instead.
     final single = <Task>[];
     for (final task in tasks) {
       final plan = ReminderPlans.active(task);
@@ -429,9 +460,11 @@ class ReminderEngine {
             when: when,
             title: task.title,
             languageCode: copy.languageCode,
-            body: ofPlan
-                ? copy.planBody(task, _planDaysBefore(row, task))
-                : copy.body(task, when.toLocal(), 0),
+            body: !ofPlan
+                ? copy.body(task, when.toLocal(), 0)
+                : isPlanDayAlert(row['identity'])
+                ? copy.planDayBody(task, when.toLocal(), 0)
+                : copy.planBody(task, _planDaysBefore(row, task)),
           ),
         );
       }

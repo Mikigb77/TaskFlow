@@ -84,6 +84,23 @@ class ReminderPreferenceStore {
         {'scope': 'plan-offers:$owner', 'data': jsonEncode(kept)},
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
+
+  /// How many times in a row this account answered «Ahora no» to the plan
+  /// offer on this phone: at two it's no longer asked. 0 when unknown.
+  Future<int> planOfferDeclines(String owner) async {
+    final rows = await (await database.database).query('app_preferences',
+        where: 'scope = ?', whereArgs: ['plan-offer-declines:$owner']);
+    if (rows.isEmpty) return 0;
+    final data = jsonDecode(rows.single['data'] as String);
+    return data is int && data > 0 ? data : 0;
+  }
+
+  /// Sets how many «Ahora no» in a row: one more after «Ahora no», 0 after
+  /// «Sí, recuérdamelo».
+  Future<void> setPlanOfferDeclines(String owner, int count) async =>
+      (await database.database).insert('app_preferences',
+          {'scope': 'plan-offer-declines:$owner', 'data': jsonEncode(count)},
+          conflictAlgorithm: ConflictAlgorithm.replace);
 }
 
 String reminderLeadLabel(int? minutes) => switch (minutes) {

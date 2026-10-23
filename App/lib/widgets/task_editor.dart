@@ -951,8 +951,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             ].join(' · '),
                             style: TextStyle(color: colors.onSurfaceVariant),
                           ),
-                        // A plan shows, as its one line, once it's set.
-                        if (ReminderPlans.active(_planningTask) != null)
+                        // A plan shows, as its one line, once it's set, and
+                        // only where it rings: it's this account's own.
+                        if (ReminderPlans.active(_planningTask) != null &&
+                            reminderRingsHere(ref, _responsibility))
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(

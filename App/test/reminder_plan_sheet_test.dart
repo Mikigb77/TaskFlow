@@ -30,6 +30,8 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/revenuecat_service.dart';
+import 'package:agenda/widgets/capture_command_cards.dart';
+import 'package:agenda/widgets/capture_review_editor.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/reminder_plan_sheet.dart';
 import 'package:flutter/material.dart';
@@ -1065,7 +1067,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-1811: «Sin fecha» turns the row into «Añade una fecha…», and the task saves with no plan',
+      'UX-1811: «Sin fecha» asks for the day under the date instead of the row, and the task saves with no plan',
       (tester) async {
         final (app, captures) = await card(tester, [said(plan: ownersPlan)]);
         await tapVisible(
@@ -1076,8 +1078,14 @@ void main() {
           tester,
           inSheet(find.widgetWithText(ChoiceChip, es.noDate)),
         );
-        expect(row(), findsOneWidget);
-        expect(inRow(find.text(es.dateForReminder)), findsOneWidget);
+        expect(row(), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('draft-reminder-needs-day-d1')),
+            matching: find.text(es.reminderNeedsDay),
+          ),
+          findsOneWidget,
+        );
         expect(inRow(find.text(ownersLine)), findsNothing);
         await saveCapture(tester);
         final saved = app.container
@@ -2223,12 +2231,12 @@ void main() {
     // ---- Run 2026-10-22-changes, round 3 · P251 ----
 
     test(
-      'UX-2019: in es, en and ca the helper and the Pro example join the hour to its preposition with a no-break space',
+      'UX-2019, UX-2020: in es, en and ca the helper and the Pro example keep the time phrase together with no-break spaces',
       () {
-        for (final (language, l, open, close, preposition) in [
-          ('es', es, '«', '»', 'las'),
-          ('en', en, '“', '”', 'at'),
-          ('ca', ca, '«', '»', 'les'),
+        for (final (language, l, open, close, preposition, spaces) in [
+          ('es', es, '«', '»', 'a\u00A0las', 2),
+          ('en', en, '“', '”', 'at', 1),
+          ('ca', ca, '«', '»', 'a\u00A0les', 2),
         ]) {
           for (final (key, value) in [
             ('reminderPlanYourWayHint', l.reminderPlanYourWayHint),
@@ -2249,8 +2257,8 @@ void main() {
             );
             expect(
               ' '.allMatches(value).length,
-              1,
-              reason: '$language $key: only that one space changed',
+              spaces,
+              reason: '$language $key: only the time phrase’s spaces changed',
             );
           }
           // Still the helper's own example, quotes included.
@@ -2288,7 +2296,11 @@ void main() {
           );
           expect(tester.takeException(), isNull);
           expect(textOf(tester, example), es.billingReasonReminderPlansExample);
-          final lines = _expectHourKeptWithPreposition(tester, example, 'las');
+          final lines = _expectHourKeptWithPreposition(
+            tester,
+            example,
+            'a\u00A0las',
+          );
           if (textScale == 2) {
             expect(
               lines,
@@ -2312,7 +2324,11 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         expect(textOf(tester, example), ca.billingReasonReminderPlansExample);
-        final lines = _expectHourKeptWithPreposition(tester, example, 'les');
+        final lines = _expectHourKeptWithPreposition(
+          tester,
+          example,
+          'a\u00A0les',
+        );
         expect(lines, greaterThan(1));
 
         const screen = Rect.fromLTWH(0, 0, 360, 800);
@@ -3026,7 +3042,9 @@ void main() {
       },
     );
 
-    group('UX-2003: only for a task that rings on this phone alone', () {
+    // D6 (P256): a plan is each person's own, so the offer comes for any
+    // task that rings on this phone, shared or not.
+    group('UX-2003: only for a task that rings on this phone', () {
       final shared = TaskListInfo(
         id: 'team',
         name: 'Equipo',
@@ -3072,17 +3090,23 @@ void main() {
         return shown;
       }
 
-      testWidgets('a «Todos» task in a shared project: no offer', (
+      testWidgets('a «Todos» task in a shared project: the offer', (
         tester,
       ) async {
-        expect(await offered(tester, 'team', assignment: 'group'), isFalse);
+        expect(await offered(tester, 'team', assignment: 'group'), isTrue);
       });
 
-      testWidgets('an unassigned task in a shared project: no offer', (
+      testWidgets('an unassigned task in a shared project I own: the offer', (
+        tester,
+      ) async {
+        expect(await offered(tester, 'team', assignment: 'unassigned'), isTrue);
+      });
+
+      testWidgets('a task given to Marta in a shared project: no offer', (
         tester,
       ) async {
         expect(
-          await offered(tester, 'team', assignment: 'unassigned'),
+          await offered(tester, 'team', assignment: 'member', assigneeId: 2),
           isFalse,
         );
       });
@@ -3454,7 +3478,9 @@ void main() {
     );
 
     testWidgets(
-      'UX-1806, UX-1807: after another member’s name, the plan reads lowercase with its next reminder',
+      // D6 (P256): a plan is each person's own, so one kept on a task given
+      // to Ana rings for nobody and isn't read as hers.
+      'UX-1806, UX-1807: a task given to another member reads her name, never the plan',
       (tester) async {
         await (await _App.open(tester, [
           Task(
@@ -3469,10 +3495,7 @@ void main() {
             assigneeName: 'Ana',
           ),
         ], size: phone)).detail(1);
-        expect(
-          chipLine(tester),
-          'Recordatorio para Ana: cada 3 días, y a diario la última semana · próximo: sáb 24, 09:00',
-        );
+        expect(chipLine(tester), es.reminderForPersonOnly('Ana'));
       },
     );
 
@@ -3863,13 +3886,13 @@ void main() {
       (
         'es',
         es,
-        'Por ejemplo: «una semana antes y el día antes a las\u00A08».',
+        'Por ejemplo: «una semana antes y el día antes a\u00A0las\u00A08».',
       ),
       ('en', en, 'For example: “a week before, and the day before at\u00A08”.'),
       (
         'ca',
         ca,
-        'Per exemple: «una setmana abans i el dia abans a les\u00A08».',
+        'Per exemple: «una setmana abans i el dia abans a\u00A0les\u00A08».',
       ),
     ]) {
       testWidgets(
@@ -4005,7 +4028,11 @@ void main() {
             matching: find.text(es.reminderPlanYourWayHint),
           );
           expect(helper, findsOneWidget);
-          final lines = _expectHourKeptWithPreposition(tester, helper, 'las');
+          final lines = _expectHourKeptWithPreposition(
+            tester,
+            helper,
+            'a\u00A0las',
+          );
           if (textScale == 2) {
             expect(
               lines,
@@ -4018,6 +4045,2195 @@ void main() {
       );
     }
   });
+
+  group('P252 · D1', () {
+    const normal = ReminderPlan.rhythm(ReminderPlan.normal);
+    const phone = Size(360, 800);
+
+    /// «Presentar el proyecto» on Fri 13 Nov 2026 at 17:00, or with no time.
+    Task timed({bool hasTime = true}) => Task(
+      id: 1,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: hasTime ? DateTime(2026, 11, 13, 17) : friday13,
+      hasTime: hasTime,
+      reminderPlan: normal,
+    );
+
+    String chipLine(WidgetTester tester) => tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: find.byType(ReminderChip),
+                matching: find.byType(Text),
+              )
+              .first,
+        )
+        .data!;
+
+    /// «Recordatorios normales hasta hoy · próximo: hoy, [time]».
+    String todayLine(String time) => es.reminderPlanLine(
+      es.reminderPlanStrengthLine('normal', 'today', ''),
+      'today',
+      '',
+      time,
+    );
+
+    Future<String> sheetCount(WidgetTester tester) async {
+      await openSheet(tester);
+      final count = find.byKey(const ValueKey('reminder-plan-count'));
+      if (count.evaluate().isEmpty) {
+        await tapVisible(tester, inSheet(find.text(es.reminderPlanUntilDay)));
+      }
+      await tester.ensureVisible(count);
+      await tester.pumpAndSettle();
+      return tester.widget<Text>(count).data!;
+    }
+
+    testWidgets(
+      'UX-2001: on the day at 10:00, a task at 17:00 with Normal reads «… hasta hoy · próximo: hoy, 16:50», and the sheet «1 aviso: hoy, 16:50»',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [timed()],
+          size: phone,
+          at: DateTime(2026, 11, 13, 10),
+        )).detail(1);
+        expect(chipLine(tester), todayLine('16:50'));
+        expect(
+          chipLine(tester),
+          isNot(es.noReminderTimePassed),
+          reason: 'The 9:00 notice is no longer the day’s one.',
+        );
+        expect(
+          await sheetCount(tester),
+          es.reminderPlanCount(1, 'today', '', '16:50'),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2001: at 17:00 the same day, the chip says the time has passed',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [timed()],
+          size: phone,
+          at: DateTime(2026, 11, 13, 17),
+        )).detail(1);
+        expect(chipLine(tester), es.noReminderTimePassed);
+      },
+    );
+
+    testWidgets(
+      'UX-2001: with «Tareas con hora» at 30 minutes, at 10:00 it reads «… próximo: hoy, 16:30»',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [timed()],
+          size: phone,
+          at: DateTime(2026, 11, 13, 10),
+          reminders: const ReminderPreferences(
+            enabled: true,
+            dateOnlyTime: 540,
+            leadMinutes: 30,
+            asked: true,
+          ),
+        )).detail(1);
+        expect(chipLine(tester), todayLine('16:30'));
+      },
+    );
+
+    testWidgets(
+      'UX-2001: a date-only task that day at 10:00 still reads «Sin recordatorio: ya ha pasado la hora del aviso»',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [timed(hasTime: false)],
+          size: phone,
+          at: DateTime(2026, 11, 13, 10),
+        )).detail(1);
+        expect(chipLine(tester), es.noReminderTimePassed);
+      },
+    );
+
+    testWidgets(
+      'UX-2001: far away nothing changes: «… hasta el vie 13 · próximo: sáb 24, 09:00» and «13 avisos · próximo: sáb 24, 09:00»',
+      (tester) async {
+        await (await _App.open(tester, [timed()], size: phone)).detail(1);
+        expect(
+          chipLine(tester),
+          es.reminderPlanLine(
+            es.reminderPlanStrengthLine('normal', 'other', 'vie 13'),
+            'other',
+            'sáb 24',
+            '09:00',
+          ),
+        );
+        expect(
+          await sheetCount(tester),
+          es.reminderPlanCount(13, 'other', 'sáb 24', '09:00'),
+        );
+      },
+    );
+
+    testWidgets(
+      'UX-2001: at 2× text on 360×800, the timed-today chip reads whole, with no overflow',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [timed()],
+          size: phone,
+          textScale: 2,
+          at: DateTime(2026, 11, 13, 10),
+        )).detail(1);
+        final line = find.descendant(
+          of: find.byType(ReminderChip),
+          matching: find.text(todayLine('16:50')),
+        );
+        expect(line, findsOneWidget);
+        await tester.ensureVisible(line);
+        await tester.pumpAndSettle();
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: line, matching: find.byType(RichText)).first,
+        );
+        expect(
+          paragraph.didExceedMaxLines,
+          isFalse,
+          reason: 'The whole line shows, not cut off.',
+        );
+        final box = tester.getRect(line);
+        expect(box.left, greaterThanOrEqualTo(0));
+        expect(box.right, lessThanOrEqualTo(phone.width));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // P253 (UX-1912, the owner's D2): the strengths start at most 4 weeks
+  // before the day, so a task 60 days away gets 8, 15 or 22 reminders.
+  group('P253 · UX-1912', () {
+    /// Monday 21 December 2026, 60 days away.
+    final monday21 = DateTime(2026, 12, 21);
+    const phone = Size(360, 800);
+    const later =
+        'cada 3 días desde 4 semanas antes, y a diario la última semana';
+
+    /// A reminder's day as the preview writes it (planDay, in the open
+    /// sheet's locale), with its month this far ahead.
+    String day(WidgetTester tester, DateTime date, String weekday) {
+      final locale = tester.element(sheet().last).localeName;
+      final text = planDay(date, now, locale);
+      expect(text, startsWith(weekday));
+      expect(text, contains('${date.day}'));
+      expect(text, contains('nov'));
+      return text;
+    }
+
+    testWidgets(
+      'UX-1912: on a task 60 days away the sheet says Normal starts 4 weeks '
+      'before, with 15 reminders; Suave 8 and Intenso 22',
+      (tester) async {
+        await (await _App.open(tester, [
+          presentation(day: monday21),
+        ], size: phone)).detail(1);
+        await openSheet(tester);
+        await tapVisible(tester, inSheet(find.text(es.reminderPlanUntilDay)));
+        expect(
+          tester
+              .widget<ChoiceChip>(
+                find.widgetWithText(ChoiceChip, es.reminderPlanNormal),
+              )
+              .selected,
+          isTrue,
+        );
+        expect(
+          inSheet(
+            find.text(
+              'Cada 3 días desde 4 semanas antes, y a diario la última semana',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          inSheet(
+            find.text(
+              es.reminderPlanCount(
+                15,
+                'other',
+                day(tester, DateTime(2026, 11, 25), 'mié'),
+                '09:00',
+              ),
+            ),
+          ),
+          findsOneWidget,
+        );
+
+        await tapVisible(
+          tester,
+          find.widgetWithText(ChoiceChip, es.reminderPlanGentle),
+        );
+        expect(
+          inSheet(
+            find.text(
+              es.reminderPlanCount(
+                8,
+                'other',
+                day(tester, DateTime(2026, 11, 26), 'jue'),
+                '09:00',
+              ),
+            ),
+          ),
+          findsOneWidget,
+        );
+
+        await tapVisible(
+          tester,
+          find.widgetWithText(ChoiceChip, es.reminderPlanIntense),
+        );
+        expect(
+          inSheet(
+            find.text(
+              es.reminderPlanCount(
+                22,
+                'other',
+                day(tester, DateTime(2026, 11, 24), 'mar'),
+                '09:00',
+              ),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1912: moving a task to Mon 21 Dec offers Normal from 4 weeks before',
+      (tester) async {
+        final app = await _App.open(tester, [
+          presentation(day: DateTime(2026, 10, 23)),
+        ], size: phone);
+        app.navigator.pushNamed('/editTask', arguments: 1);
+        await tester.pumpAndSettle();
+        final date = find.byKey(const ValueKey('task-date'));
+        await tester.ensureVisible(date);
+        await tester.pumpAndSettle();
+        await tester.tap(date);
+        await tester.pumpAndSettle();
+        final picker = find.byType(CalendarDatePicker);
+        final next = MaterialLocalizations.of(
+          tester.element(picker),
+        ).nextMonthTooltip;
+        for (var page = 0; page < 2; page++) {
+          await tester.tap(
+            find.descendant(of: picker, matching: find.byTooltip(next)),
+          );
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(
+          find.descendant(of: picker, matching: find.text('21')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('schedule-done')));
+        await tester.pumpAndSettle();
+        final save = find.byKey(const ValueKey('task-save'));
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(app.task(1).dueDate, monday21);
+        expect(find.byType(SnackBar), findsOneWidget);
+        // Once the save message has gone.
+        await tester.pump(FeedbackTimeout.defaultDuration);
+        await tester.pumpAndSettle();
+        final question = es.reminderPlanOfferMonths(2, later);
+        expect(
+          question,
+          'Faltan 2 meses. ¿Te aviso cada 3 días desde 4 semanas antes, y a '
+          'diario la última semana?',
+        );
+        expect(inSheet(find.text(question)), findsOneWidget);
+        expect(app.reminders.offered, {1});
+      },
+    );
+  });
+
+  // P254 (UX-1812, the owner's D3): a reminder said for a task with no day
+  // asks for the day in one line under the date, whose tap opens the date;
+  // once the task has a day the reminder applies, and saved without one
+  // it's dropped.
+  group('P254 · D3', () {
+    late WidgetTester shown;
+
+    /// What the server sends for «Llamar a mamá, recuérdamelo cada día»:
+    /// no day, the plan said, and `reminder_needs_day`.
+    Map<String, dynamic> server(
+      String title, {
+      Map<String, dynamic> extra = const {},
+    }) => {
+      'title': title,
+      'priority': 1,
+      'notes': '',
+      'questions': [],
+      'transcript': title,
+      ...extra,
+    };
+    const dailyPlan = {
+      'kind': 'custom',
+      'phases': [
+        {'from_days': 366, 'to_days': 0, 'every_days': 1},
+      ],
+      'time': null,
+      'said': 'cada día',
+    };
+    CaptureDraft draftOf(Map<String, dynamic> json) =>
+        CaptureDraft.fromAI(TaskDraft.fromJson(json));
+    CaptureDraft dailyNoDay([String title = 'Llamar a mamá']) => draftOf(
+      server(
+        title,
+        extra: {'reminder_plan': dailyPlan, 'reminder_needs_day': true},
+      ),
+    );
+
+    /// The capture's result for [drafts] on a 360×800 phone, reminders on
+    /// and allowed; saving adds them to the app's tasks.
+    Future<(_App, MemoryCaptures)> open(
+      WidgetTester tester,
+      List<CaptureDraft> drafts, {
+      String language = 'es',
+      double textScale = 1,
+      DateTime? at,
+    }) async {
+      shown = tester;
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        language: language,
+        textScale: textScale,
+        size: const Size(360, 800),
+        at: at,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p254',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: (at ?? now).toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Llamar a mamá, recuérdamelo cada día',
+        drafts: drafts,
+      );
+      await openCaptureResult(tester, 'p254');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      return (app, captures);
+    }
+
+    Finder line(String id) =>
+        find.byKey(ValueKey('draft-reminder-needs-day-$id'));
+    Finder row(String id) => find.byKey(ValueKey('draft-reminder-$id'));
+    Finder date(String id) => find.byKey(ValueKey('draft-schedule-$id'));
+    Finder inLine(String id, String text) =>
+        find.descendant(of: line(id), matching: find.text(text));
+    Finder inRow(String id, Finder finder) =>
+        find.descendant(of: row(id), matching: finder);
+    double top(Finder finder) => shown.getTopLeft(finder.first).dy;
+    double bottom(Finder finder) => shown.getBottomLeft(finder.first).dy;
+
+    /// The line sits under the date line, before anything else of the card.
+    void underTheDate(String id) {
+      expect(top(line(id)), greaterThanOrEqualTo(bottom(date(id)) - 0.5));
+      expect(
+        find.descendant(of: date(id), matching: find.text(es.noDate)),
+        findsOneWidget,
+      );
+    }
+
+    Task saved(_App app, String title) => app.container
+        .read(taskProvider)
+        .requireValue
+        .singleWhere((task) => task.title == title);
+
+    test(
+      'UX-1812: TaskDraft reads reminder_needs_day, false when absent; CaptureDraft keeps a lead only where it can apply',
+      () {
+        final without = TaskDraft.fromJson(
+          server('Llamar a mamá', extra: {'reminder_minutes': 60}),
+        );
+        expect(without.reminderNeedsDay, isFalse);
+        expect(
+          TaskDraft.fromJson(
+            server('Llamar a mamá', extra: {'reminder_needs_day': true}),
+          ).reminderNeedsDay,
+          isTrue,
+        );
+        expect(
+          TaskDraft.fromJson(
+            server('Llamar a mamá', extra: {'reminder_needs_day': 'yes'}),
+          ).reminderNeedsDay,
+          isFalse,
+        );
+        // No day, the minutes and the flag: kept for the day it gets.
+        expect(
+          draftOf(
+            server(
+              'Llamar a mamá',
+              extra: {'reminder_minutes': 60, 'reminder_needs_day': true},
+            ),
+          ).task.reminderMinutes,
+          60,
+        );
+        // The same without the flag (an older server): none.
+        expect(CaptureDraft.fromAI(without).task.reminderMinutes, isNull);
+        // A day with no time: none, as before.
+        expect(
+          draftOf(
+            server(
+              'Llamar a mamá',
+              extra: {
+                'scheduled_date': '2026-11-13',
+                'reminder_minutes': 60,
+                'reminder_needs_day': true,
+              },
+            ),
+          ).task.reminderMinutes,
+          isNull,
+        );
+        // At a time: kept, as before.
+        expect(
+          draftOf(
+            server(
+              'Llamar a mamá',
+              extra: {
+                'due_date': '2026-11-13T17:00:00',
+                'reminder_minutes': 60,
+              },
+            ),
+          ).task.reminderMinutes,
+          60,
+        );
+        // A note keeps none.
+        expect(
+          draftOf(
+            server(
+              'Llamar a mamá',
+              extra: {
+                'kind': 'note',
+                'reminder_minutes': 60,
+                'reminder_needs_day': true,
+              },
+            ),
+          ).task.reminderMinutes,
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'UX-1812: a task saved with neither a day nor a deadline keeps no lead; a dated one keeps it',
+      () {
+        final noDay = Task(
+          title: 'Llamar a mamá',
+          priority: 1,
+          reminderMinutes: 60,
+        );
+        expect(CaptureStore.withoutStalePlan(noDay).reminderMinutes, isNull);
+        final atTime = Task(
+          title: 'Llamar a mamá',
+          priority: 1,
+          dueDate: DateTime(2026, 11, 13, 17),
+          hasTime: true,
+          reminderMinutes: 60,
+        );
+        expect(CaptureStore.withoutStalePlan(atTime).reminderMinutes, 60);
+      },
+    );
+
+    testWidgets(
+      'UX-1812: a plan said for a task with no day is one line under «Sin fecha», read as one button, and nowhere else',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final draft = dailyNoDay();
+        final id = draft.id;
+        await open(tester, [draft]);
+        expect(inLine(id, es.reminderNeedsDay), findsOneWidget);
+        expect(find.text(es.reminderNeedsDay), findsOneWidget);
+        underTheDate(id);
+        expect(
+          find.descendant(
+            of: line(id),
+            matching: find.byIcon(Icons.notifications_off_outlined),
+          ),
+          findsOneWidget,
+        );
+        // TalkBack reads the line's words, as one button.
+        expect(
+          tester.getSemantics(line(id)),
+          isSemantics(
+            label: es.reminderNeedsDay,
+            isButton: true,
+            hasTapAction: true,
+          ),
+        );
+        expect(row(id), findsNothing);
+        expect(find.text(es.dateForReminder), findsNothing);
+        await tester.ensureVisible(find.byKey(ValueKey('draft-options-$id')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('draft-options-$id')));
+        await tester.pumpAndSettle();
+        // «Más opciones» open: still said once.
+        expect(find.text(es.dateForReminder), findsNothing);
+        expect(find.byType(ReminderControl), findsNothing);
+        expect(row(id), findsNothing);
+        expect(find.text(es.reminderNeedsDay), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-1812: the line opens the date; «Mañana» applies the plan in its row, «Sin fecha» brings the line back',
+      (tester) async {
+        // The date sheet's «Mañana» is the phone's tomorrow: the app's clock
+        // is today at 10:00, after the day's 09:00 notice.
+        final phone = DateTime.now();
+        final draft = dailyNoDay();
+        final id = draft.id;
+        final (_, captures) = await open(tester, [
+          draft,
+        ], at: DateTime(phone.year, phone.month, phone.day, 10));
+        await tester.ensureVisible(line(id));
+        await tester.pumpAndSettle();
+        await tester.tap(line(id));
+        await tester.pumpAndSettle();
+        expect(find.byType(CalendarDatePicker), findsOneWidget);
+        await tester.tap(find.widgetWithText(ChoiceChip, es.tomorrow).last);
+        await tester.pumpAndSettle();
+        expect(find.byType(CalendarDatePicker), findsNothing);
+        expect(line(id), findsNothing);
+        expect(find.text(es.reminderNeedsDay), findsNothing);
+        expect(row(id), findsOneWidget);
+        expect(inRow(id, find.text(es.reminder)), findsOneWidget);
+        expect(
+          inRow(
+            id,
+            find.text('Recordatorios: a diario · próximo: mañana, 09:00'),
+          ),
+          findsOneWidget,
+        );
+        expect(captures.current!.drafts.single.task.reminderPlan, isNotNull);
+
+        await tester.ensureVisible(date(id));
+        await tester.pumpAndSettle();
+        await tester.tap(date(id));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ChoiceChip, es.noDate).last);
+        await tester.pumpAndSettle();
+        expect(inLine(id, es.reminderNeedsDay), findsOneWidget);
+        underTheDate(id);
+        expect(row(id), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1812: saved with the line still there, the task has no day, no plan and no lead',
+      (tester) async {
+        final draft = dailyNoDay();
+        final (app, captures) = await open(tester, [draft]);
+        expect(line(draft.id), findsOneWidget);
+        await saveCapture(tester);
+        final task = saved(app, 'Llamar a mamá');
+        expect(task.dueDate, isNull);
+        expect(task.reminderPlan, isNull);
+        expect(task.reminderMinutes, isNull);
+        final stored = captures.current!.drafts.single.task;
+        expect(stored.dueDate, isNull);
+        expect(stored.reminderPlan, isNull);
+        expect(stored.reminderMinutes, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1812: «una hora antes» said with no day asks for the day; Fri 13 reads «09:00», at 17:00 «1 hora antes», and saves 60',
+      (tester) async {
+        final draft = draftOf(
+          server(
+            'Llamar a mamá',
+            extra: {'reminder_minutes': 60, 'reminder_needs_day': true},
+          ),
+        );
+        final id = draft.id;
+        final (app, captures) = await open(tester, [draft]);
+        expect(inLine(id, es.reminderNeedsDay), findsOneWidget);
+        underTheDate(id);
+        expect(row(id), findsNothing);
+
+        await tester.ensureVisible(line(id));
+        await tester.pumpAndSettle();
+        await tester.tap(line(id));
+        await tester.pumpAndSettle();
+        // Fri 13 Nov in the sheet's calendar, as a tap on that day gives it.
+        tester
+            .widget<CalendarDatePicker>(find.byType(CalendarDatePicker))
+            .onDateChanged(friday13);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('schedule-done')));
+        await tester.pumpAndSettle();
+        expect(line(id), findsNothing);
+        expect(row(id), findsOneWidget);
+        expect(inRow(id, find.text('09:00')), findsOneWidget);
+        expect(captures.current!.drafts.single.task.dueDate, friday13);
+
+        await tester.ensureVisible(date(id));
+        await tester.pumpAndSettle();
+        await tester.tap(date(id));
+        await tester.pumpAndSettle();
+        final toggle = find.byKey(const ValueKey('schedule-has-time'));
+        await tester.ensureVisible(toggle);
+        await tester.pumpAndSettle();
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(const ValueKey('schedule-hour')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('schedule-hour')),
+          '17',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('schedule-minute')),
+          '00',
+        );
+        await tester.pumpAndSettle();
+        final done = find.byKey(const ValueKey('schedule-done'));
+        await tester.ensureVisible(done);
+        await tester.pumpAndSettle();
+        await tester.tap(done);
+        await tester.pumpAndSettle();
+        expect(line(id), findsNothing);
+        expect(inRow(id, find.text(es.hourBefore)), findsOneWidget);
+
+        await saveCapture(tester);
+        final task = saved(app, 'Llamar a mamá');
+        expect(task.dueDate, DateTime(2026, 11, 13, 17));
+        expect(task.hasTime, isTrue);
+        expect(task.reminderMinutes, 60);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1811 with UX-1812: a said plan on Fri 13, then «Sin fecha», asks for the day under the date, with no row, and saves no plan',
+      (tester) async {
+        final draft = draftOf(
+          server(
+            'Presentar el proyecto',
+            extra: {
+              'scheduled_date': '2026-11-13',
+              'reminder_plan': ownersPlan.toJson(),
+            },
+          ),
+        );
+        final id = draft.id;
+        final (app, captures) = await open(tester, [draft]);
+        expect(row(id), findsOneWidget);
+        expect(line(id), findsNothing);
+        await tester.ensureVisible(date(id));
+        await tester.pumpAndSettle();
+        await tester.tap(date(id));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ChoiceChip, es.noDate).last);
+        await tester.pumpAndSettle();
+        expect(inLine(id, es.reminderNeedsDay), findsOneWidget);
+        underTheDate(id);
+        expect(row(id), findsNothing);
+        expect(find.text(es.dateForReminder), findsNothing);
+        await saveCapture(tester);
+        final task = saved(app, 'Presentar el proyecto');
+        expect(task.dueDate, isNull);
+        expect(task.reminderPlan, isNull);
+        expect(captures.current!.drafts.single.task.reminderPlan, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1812: of two collapsed rows, only the one with no day and a said plan asks for the day, under its date',
+      (tester) async {
+        final first = draftOf(
+          server(
+            'Comprar pan y leche',
+            extra: {'scheduled_date': '2026-10-22'},
+          ),
+        );
+        final second = dailyNoDay();
+        await open(tester, [first, second]);
+        expect(find.byType(CaptureReviewEditor), findsNWidgets(2));
+        expect(line(first.id), findsNothing);
+        expect(inLine(second.id, es.reminderNeedsDay), findsOneWidget);
+        expect(find.text(es.reminderNeedsDay), findsOneWidget);
+        expect(top(line(second.id)), greaterThan(top(date(second.id))));
+        // Collapsed: no «Más opciones» and no «Recordatorio» rows.
+        expect(find.byKey(ValueKey('draft-options-${first.id}')), findsNothing);
+        expect(
+          find.byKey(ValueKey('draft-options-${second.id}')),
+          findsNothing,
+        );
+        expect(row(first.id), findsNothing);
+        expect(row(second.id), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-1812: a plain dictation with no day has no line and no reminder row',
+      (tester) async {
+        final draft = draftOf(server('Comprar pan'));
+        await open(tester, [draft]);
+        expect(line(draft.id), findsNothing);
+        expect(find.text(es.reminderNeedsDay), findsNothing);
+        expect(row(draft.id), findsNothing);
+        expect(find.text(es.reminder), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (language, words) in [
+      ('es', es.reminderNeedsDay),
+      ('ca', ca.reminderNeedsDay),
+    ]) {
+      testWidgets(
+        'UX-1812: at 2× on 360×800 in $language the line is whole under the date, with a 48 dp target',
+        (tester) async {
+          final draft = dailyNoDay();
+          final id = draft.id;
+          await open(tester, [draft], language: language, textScale: 2);
+          expect(tester.takeException(), isNull);
+          final text = find.descendant(
+            of: line(id),
+            matching: find.text(words),
+          );
+          expect(text, findsOneWidget);
+          await tester.ensureVisible(line(id));
+          await tester.pumpAndSettle();
+          expect(top(line(id)), greaterThanOrEqualTo(bottom(date(id)) - 0.5));
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: text, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final box = tester.getRect(text);
+          expect(box.left, greaterThanOrEqualTo(0));
+          expect(box.right, lessThanOrEqualTo(360));
+          // The words fit their box: nothing cut off at the end.
+          expect(
+            paragraph.size.height,
+            greaterThanOrEqualTo(
+              paragraph
+                      .getBoxesForSelection(
+                        TextSelection(
+                          baseOffset: 0,
+                          extentOffset: words.length,
+                        ),
+                      )
+                      .map((b) => b.bottom)
+                      .reduce((a, b) => a > b ? a : b) -
+                  0.5,
+            ),
+          );
+          expect(tester.getSize(line(id)).height, greaterThanOrEqualTo(48));
+          final screen = tester.getRect(find.byType(VoiceTaskScreen));
+          expect(
+            tester.getRect(line(id)).bottom,
+            lessThanOrEqualTo(screen.bottom),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  // P255 (UX-2013, the owner's D5): after two «Ahora no» in a row on this
+  // phone the offer after saving is no longer asked; «Sí» starts the count
+  // again, closing the offer without an answer neither counts nor resets,
+  // and «Hasta la fecha límite» stays in every task's reminder sheet.
+  group('P255 · UX-2013: two «Ahora no» in a row and the offer stops', () {
+    const question =
+        'Faltan 3 semanas. ¿Te aviso cada 3 días, y a diario la última semana?';
+    const titles = [
+      'Presentar el proyecto',
+      'Entregar el informe',
+      'Preparar el examen',
+      'Renovar el pasaporte',
+    ];
+
+    /// [count] personal tasks, each on Thu 12 Nov, none with a reminder.
+    List<Task> farTasks(int count) => [
+      for (var id = 1; id <= count; id++)
+        presentation(
+          id: id,
+          day: DateTime(2026, 11, 12),
+        ).copyWith(title: titles[id - 1]),
+    ];
+
+    Finder anyOffer() => find.textContaining('¿Te aviso');
+
+    /// Task [id] moved in the form to Fri 13 Nov and saved; then the save
+    /// message's time, and whatever comes after it.
+    Future<void> moveToFriday13(WidgetTester tester, _App app, int id) async {
+      app.navigator.pushNamed('/editTask', arguments: id);
+      await tester.pumpAndSettle();
+      final date = find.byKey(const ValueKey('task-date'));
+      await tester.ensureVisible(date);
+      await tester.pumpAndSettle();
+      await tester.tap(date);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CalendarDatePicker),
+          matching: find.text('13'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-done')));
+      await tester.pumpAndSettle();
+      final save = find.byKey(const ValueKey('task-save'));
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(app.task(id).dueDate, friday13);
+      // The offer, if any, waits for the save message to close.
+      expect(anyOffer(), findsNothing);
+      await tester.pump(FeedbackTimeout.defaultDuration);
+      await tester.pumpAndSettle();
+    }
+
+    /// The offer is on screen, naming task [id].
+    void expectOffer(WidgetTester tester, int id) {
+      expect(inSheet(find.text(question)), findsOneWidget, reason: 'task $id');
+      expect(
+        inSheet(find.textContaining(titles[id - 1])),
+        findsOneWidget,
+        reason: 'task $id',
+      );
+    }
+
+    Future<void> notNow(WidgetTester tester) async {
+      await tester.tap(inSheet(find.text(es.reminderAskNotNow)));
+      await tester.pumpAndSettle();
+      expect(anyOffer(), findsNothing);
+    }
+
+    Future<void> yes(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('reminder-plan-offer-yes')));
+      await tester.pumpAndSettle();
+      expect(anyOffer(), findsNothing);
+      // «Listo», with Deshacer, has its own time on screen.
+      await tester.pump(FeedbackTimeout.defaultDuration);
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+    }
+
+    testWidgets(
+      'UX-2013: after «Ahora no» on two far tasks in a row, the third gets '
+      'no offer once its save message has gone, and isn’t recorded as offered',
+      (tester) async {
+        final app = await _App.open(tester, farTasks(3));
+        expect(es.reminderAskNotNow, 'Ahora no');
+        await moveToFriday13(tester, app, 1);
+        expectOffer(tester, 1);
+        await notNow(tester);
+        await moveToFriday13(tester, app, 2);
+        expectOffer(tester, 2);
+        await notNow(tester);
+        await moveToFriday13(tester, app, 3);
+        expect(anyOffer(), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(app.reminders.offered, {1, 2});
+        expect(app.task(3).reminderPlan, isNull);
+        // Still nothing a while later.
+        await tester.pump(const Duration(seconds: 30));
+        await tester.pumpAndSettle();
+        expect(anyOffer(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2013: after two «Ahora no», the third task’s reminder sheet still '
+      'shows «Hasta la fecha límite» and «A tu manera»',
+      (tester) async {
+        final app = await _App.open(tester, farTasks(3));
+        for (final id in [1, 2]) {
+          await moveToFriday13(tester, app, id);
+          expectOffer(tester, id);
+          await notNow(tester);
+        }
+        await moveToFriday13(tester, app, 3);
+        expect(anyOffer(), findsNothing);
+        await app.detail(3);
+        await openSheet(tester);
+        expect(inSheet(find.text(es.reminderPlanUntilDay)), findsOneWidget);
+        expect(inSheet(find.text(es.reminderPlanYourWay)), findsOneWidget);
+        // And it still sets a plan from there.
+        await tapVisible(tester, inSheet(find.text(es.reminderPlanUntilDay)));
+        expect(
+          find.widgetWithText(ChoiceChip, es.reminderPlanNormal),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2013: «Ahora no», then «Sí, recuérdamelo», then «Ahora no»: the '
+      'following far task still gets the offer',
+      (tester) async {
+        final app = await _App.open(tester, farTasks(4));
+        await moveToFriday13(tester, app, 1);
+        expectOffer(tester, 1);
+        await notNow(tester);
+        await moveToFriday13(tester, app, 2);
+        expectOffer(tester, 2);
+        await yes(tester);
+        expect(
+          app.task(2).reminderPlan,
+          const ReminderPlan.rhythm(ReminderPlan.normal),
+        );
+        await moveToFriday13(tester, app, 3);
+        expectOffer(tester, 3);
+        await notNow(tester);
+        await moveToFriday13(tester, app, 4);
+        expectOffer(tester, 4);
+        expect(app.reminders.offered, {1, 2, 3, 4});
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2013: «Ahora no», then the next offer closed with Back without an '
+      'answer, then «Ahora no»: the following far task gets no offer',
+      (tester) async {
+        final app = await _App.open(tester, farTasks(4));
+        await moveToFriday13(tester, app, 1);
+        expectOffer(tester, 1);
+        await notNow(tester);
+        await moveToFriday13(tester, app, 2);
+        expectOffer(tester, 2);
+        // The phone's Back closes the offer without an answer.
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(anyOffer(), findsNothing);
+        expect(app.task(2).reminderPlan, isNull);
+        // Not a reset: the third is asked, and its «Ahora no» is the second.
+        await moveToFriday13(tester, app, 3);
+        expectOffer(tester, 3);
+        await notNow(tester);
+        await moveToFriday13(tester, app, 4);
+        expect(anyOffer(), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(app.reminders.offered, {1, 2, 3});
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- Run 2026-10-22-changes, round 1 · P257 ----
+  group('P257 · UX-2020', () {
+    const nbsp = ' ';
+
+    /// The catalog's own value of [key] in app_[language].arb.
+    String arb(String language, String key) {
+      final catalog =
+          jsonDecode(File('lib/l10n/app_$language.arb').readAsStringSync())
+              as Map<String, dynamic>;
+      return catalog[key] as String;
+    }
+
+    test(
+      'UX-2020: es and ca join «a», the article and «8» with two no-break spaces, en keeps its one, and every value reads as before',
+      () {
+        // The words as they were before P251 and P257, plain spaces only.
+        const before = {
+          'es': (
+            'Por ejemplo: «una semana antes y el día antes a las 8».',
+            '«una semana antes y el día antes a las 8»',
+            'a${nbsp}las${nbsp}8',
+            2,
+            '«',
+            '»',
+          ),
+          'ca': (
+            'Per exemple: «una setmana abans i el dia abans a les 8».',
+            '«una setmana abans i el dia abans a les 8»',
+            'a${nbsp}les${nbsp}8',
+            2,
+            '«',
+            '»',
+          ),
+          'en': (
+            'For example: “a week before, and the day before at 8”.',
+            '“a week before, and the day before at 8”',
+            'at${nbsp}8',
+            1,
+            '“',
+            '”',
+          ),
+        };
+        for (final MapEntry(key: language, value: expected) in before.entries) {
+          final (hintWords, exampleWords, phrase, spaces, open, close) =
+              expected;
+          final l = lookupAppLocalizations(Locale(language));
+          for (final (key, words, generated) in [
+            ('reminderPlanYourWayHint', hintWords, l.reminderPlanYourWayHint),
+            (
+              'billingReasonReminderPlansExample',
+              exampleWords,
+              l.billingReasonReminderPlansExample,
+            ),
+          ]) {
+            final value = arb(language, key);
+            expect(
+              generated,
+              value,
+              reason: '$language $key: flutter gen-l10n is up to date',
+            );
+            expect(
+              value,
+              contains(phrase),
+              reason: '$language $key: the time phrase is one unit',
+            );
+            expect(
+              nbsp.allMatches(value).length,
+              spaces,
+              reason: '$language $key: no-break spaces only in the time phrase',
+            );
+            expect(
+              nbsp.allMatches(value.replaceFirst(phrase, '')).length,
+              0,
+              reason: '$language $key: no no-break space outside «$phrase»',
+            );
+            expect(
+              value.replaceAll(nbsp, ' '),
+              words,
+              reason: '$language $key: the words are unchanged',
+            );
+          }
+          // The Pro example is exactly the helper's quoted part.
+          final hint = l.reminderPlanYourWayHint;
+          final quoted = hint.substring(
+            hint.indexOf(open),
+            hint.lastIndexOf(close) + close.length,
+          );
+          expect(
+            l.billingReasonReminderPlansExample,
+            quoted,
+            reason: '$language: the Pro example is the helper’s own',
+          );
+        }
+      },
+    );
+
+    final example = find.byKey(const ValueKey('subscription-reason-example'));
+    final heading = find.byKey(const ValueKey('subscription-reason'));
+    final paywall = find.byKey(const ValueKey('subscription-paywall'));
+    final wordsField = find.byKey(const ValueKey('reminder-plan-words'));
+
+    /// A free account's Pro screen, opened from «A tu manera · Pro».
+    Future<void> openProScreen(
+      WidgetTester tester,
+      AppLocalizations l, {
+      required String language,
+      required double textScale,
+    }) async {
+      final app = await _App.open(
+        tester,
+        [presentation()],
+        pro: false,
+        language: language,
+        textScale: textScale,
+        size: const Size(360, 800),
+      );
+      await app.detail(1);
+      await openSheet(tester);
+      await tapVisible(tester, inSheet(find.text(l.reminderPlanYourWay)));
+      expect(find.byType(SubscriptionScreen), findsOneWidget);
+    }
+
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2020: on the Pro screen at ${textScale.toInt()}× on 360×800 (es), «a», «las» and «8»» sit on one line, the example’s last',
+        (tester) async {
+          await openProScreen(tester, es, language: 'es', textScale: textScale);
+          expect(tester.takeException(), isNull);
+          expect(
+            tester.widget<Text>(example).data,
+            es.billingReasonReminderPlansExample,
+          );
+          final lines = _p257TimePhraseOnLastLine(tester, example, 'a', 'las');
+          if (textScale == 2) {
+            expect(
+              lines,
+              greaterThan(1),
+              reason: 'At 2× the example wraps, so where it breaks matters.',
+            );
+          }
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2020: on the Pro screen at 2× on 360×800 (ca), «a les 8»» sits on one line, and the heading, the example and «Mostra la subscripció» are on screen, unclipped',
+      (tester) async {
+        await openProScreen(tester, ca, language: 'ca', textScale: 2);
+        expect(tester.takeException(), isNull);
+        expect(
+          tester.widget<Text>(example).data,
+          ca.billingReasonReminderPlansExample,
+        );
+        expect(
+          _p257TimePhraseOnLastLine(tester, example, 'a', 'les'),
+          greaterThan(1),
+        );
+
+        final button = find.descendant(
+          of: paywall,
+          matching: find.text(ca.billingViewPlans),
+        );
+        expect(button, findsOneWidget);
+        const screen = Rect.fromLTWH(0, 0, 360, 800);
+        for (final (name, finder) in [
+          ('heading', heading),
+          ('example', example),
+          ('«${ca.billingViewPlans}»', button),
+        ]) {
+          final rect = tester.getRect(finder);
+          expect(
+            rect.left >= 0 &&
+                rect.top >= 0 &&
+                rect.right <= screen.right &&
+                rect.bottom <= screen.bottom,
+            isTrue,
+            reason: '$name at $rect is not wholly on screen',
+          );
+          expect(finder.hitTestable(), findsOneWidget, reason: name);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: finder, matching: find.byType(RichText)).first,
+          );
+          expect(
+            paragraph.didExceedMaxLines,
+            isFalse,
+            reason: '$name is cut short',
+          );
+          expect(
+            paragraph.size.width,
+            lessThanOrEqualTo(rect.width + 0.5),
+            reason: '$name is wider than its box',
+          );
+        }
+      },
+    );
+
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2020: «A tu manera»’s empty helper at ${textScale.toInt()}× on 360×800 (es, Pro) never ends a line with «a» before «las 8»',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [presentation()],
+            textScale: textScale,
+            size: const Size(360, 800),
+          );
+          await app.detail(1);
+          await openSheet(tester);
+          final yourWay = inSheet(find.text(es.reminderPlanYourWay));
+          await Scrollable.ensureVisible(
+            tester.element(yourWay),
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(yourWay);
+          await tester.pumpAndSettle();
+          expect(wordsField, findsOneWidget);
+          expect(
+            tester.widget<TextField>(wordsField).controller!.text,
+            isEmpty,
+          );
+          final helper = find.descendant(
+            of: wordsField,
+            matching: find.text(es.reminderPlanYourWayHint),
+          );
+          expect(helper, findsOneWidget);
+          final lines = _p257TimePhraseOnLastLine(tester, helper, 'a', 'las');
+          if (textScale == 2) {
+            expect(
+              lines,
+              greaterThan(1),
+              reason: 'At 2× the helper wraps, so where it breaks matters.',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  // P256 (UX-2014, the owner's D6; UX-2021): a plan is each person's own. It
+  // is offered wherever this phone rings for the task, says on a shared task
+  // that it's only for you, never reads as someone else's, and the offer may
+  // come for any task that rings here. «A tu manera» shows the newest words
+  // while listening.
+  group('P256 · D6', () {
+    const phone = Size(360, 800);
+    // A shared project you own, with Marta (member 2) in it.
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Marta', role: 'editor'),
+      ],
+    );
+    // A shared project where you're an editor: you don't manage it.
+    final club = TaskListInfo(
+      id: 'club',
+      name: 'Club',
+      shared: true,
+      ownerId: 2,
+      role: 'editor',
+      people: const [
+        ProjectMember(id: 2, name: 'Marta', role: 'owner'),
+        ProjectMember(id: 1, name: 'Yo', role: 'editor'),
+      ],
+    );
+    final muted = TaskListInfo(
+      id: 'quiet',
+      name: 'Silencio',
+      notifications: 'muted',
+    );
+    final archived = TaskListInfo(id: 'old', name: 'Antiguo', archived: true);
+    final projects = [team, club, muted, archived];
+
+    /// «Presentar el proyecto» on Fri 13 Nov in [listId], as [assignment].
+    Task shared({
+      int? id = 1,
+      String? listId = 'team',
+      String assignment = 'group',
+      int? assigneeId,
+      String? assigneeName,
+      ReminderPlan? plan,
+      DateTime? day,
+      bool timed = false,
+      int? minutes,
+    }) => Task(
+      id: id,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: day ?? friday13,
+      hasTime: timed,
+      reminderMinutes: minutes,
+      reminderPlan: plan,
+      listId: listId,
+      assignment: assignment,
+      assigneeId: assigneeId,
+      assigneeName: assigneeName,
+    );
+    Task forMarta({
+      int? id = 1,
+      ReminderPlan? plan,
+      bool timed = false,
+      int? minutes,
+    }) => shared(
+      id: id,
+      assignment: 'member',
+      assigneeId: 2,
+      assigneeName: 'Marta',
+      plan: plan,
+      day: timed ? DateTime(2026, 11, 13, 17) : null,
+      timed: timed,
+      minutes: minutes,
+    );
+
+    final justYou = find.byKey(const ValueKey('reminder-plan-just-you'));
+    final listo = find.byKey(const ValueKey('reminder-plan-apply'));
+    final untilDay = find.byKey(const ValueKey('reminder-plan-until-day'));
+    final yourWay = find.byKey(const ValueKey('reminder-plan-your-way'));
+
+    /// The line reads [l]'s copy and sits directly above «Listo»: nothing
+    /// between them, and below what the plan gives.
+    void expectJustAboveListo(WidgetTester tester, AppLocalizations l) {
+      expect(inSheet(justYou), findsOneWidget);
+      expect(inSheet(listo), findsOneWidget);
+      expect(tester.widget<Text>(justYou).data, l.reminderPlanJustYou);
+      final line = tester.getRect(justYou);
+      final button = tester.getRect(listo);
+      expect(line.bottom, lessThanOrEqualTo(button.top + 0.5));
+      expect(
+        button.top - line.bottom,
+        lessThanOrEqualTo(16),
+        reason: 'The line sits directly above «Listo».',
+      );
+      final count = find.byKey(const ValueKey('reminder-plan-count'));
+      if (count.evaluate().isNotEmpty) {
+        expect(tester.getRect(count).bottom, lessThanOrEqualTo(line.top));
+      }
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: justYou, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+    }
+
+    /// The single reminder's list only: its title and rows, no plan.
+    void expectSingleListOnly(AppLocalizations l) {
+      expect(sheet(), findsOneWidget);
+      expect(inSheet(find.text(l.reminder)), findsOneWidget);
+      expect(inSheet(find.text(l.off)), findsOneWidget);
+      expect(inSheet(find.text(l.chooseAlertTime)), findsOneWidget);
+      expect(untilDay, findsNothing);
+      expect(yourWay, findsNothing);
+      expect(justYou, findsNothing);
+      expect(find.text(l.reminderPlanUntilDay), findsNothing);
+      expect(find.text(l.reminderPlanYourWay), findsNothing);
+    }
+
+    test(
+      'UX-2014: the line’s copy in the three catalogs, as the brief gives it',
+      () {
+        expect(es.reminderPlanJustYou, 'Estos avisos son solo para ti.');
+        expect(en.reminderPlanJustYou, 'These reminders are only for you.');
+        expect(ca.reminderPlanJustYou, 'Aquests avisos són només per a tu.');
+      },
+    );
+
+    for (final (what, task) in [
+      ('a «Todos» task', shared()),
+      ('a task given to you', shared(assignment: 'member', assigneeId: 1)),
+      (
+        'an unassigned task in a project you own',
+        shared(assignment: 'unassigned'),
+      ),
+    ]) {
+      testWidgets(
+        'UX-2014: on $what in a shared project, the sheet offers the plans, '
+        'and «Hasta la fecha límite» says «Estos avisos son solo para ti.» '
+        'directly above «Listo»',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [task],
+            size: phone,
+            projects: projects,
+          );
+          await app.detail(1);
+          await openSheet(tester);
+          expect(inSheet(untilDay), findsOneWidget);
+          expect(inSheet(yourWay), findsOneWidget);
+          expect(justYou, findsNothing, reason: 'Only in an open plan.');
+          await tapVisible(tester, inSheet(untilDay));
+          await tester.ensureVisible(listo);
+          await tester.pumpAndSettle();
+          expectJustAboveListo(tester, es);
+          // Listo still sets this person's plan.
+          await tapVisible(tester, listo);
+          expect(
+            app.task(1).reminderPlan,
+            const ReminderPlan.rhythm(ReminderPlan.normal),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2014: on a «Todos» task, «A tu manera» says the line above «Listo» '
+      'once a plan is read',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [shared()],
+          size: phone,
+          projects: projects,
+        );
+        app.api.answer = {'reminder_plan': ownersPlan.toJson()};
+        await app.detail(1);
+        await openSheet(tester);
+        await tapVisible(tester, inSheet(yourWay));
+        expect(justYou, findsNothing, reason: 'No plan read yet.');
+        await tester.enterText(
+          find.byKey(const ValueKey('reminder-plan-words')),
+          'cada 3 días y la última semana a diario',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(listo);
+        await tester.pumpAndSettle();
+        expectJustAboveListo(tester, es);
+      },
+    );
+
+    for (final (what, task) in [
+      (
+        'a task given to Marta',
+        shared(assignment: 'member', assigneeId: 2, assigneeName: 'Marta'),
+      ),
+      (
+        'an unassigned task in a shared project where you’re an editor',
+        shared(listId: 'club', assignment: 'unassigned'),
+      ),
+    ]) {
+      testWidgets(
+        'UX-2014: $what gets the title and the single reminder’s rows only',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [task],
+            size: phone,
+            projects: projects,
+          );
+          await app.detail(1);
+          await openSheet(tester);
+          expectSingleListOnly(es);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2014: a personal task with no project, Pro: plan rows, and no '
+      '«Estos avisos son solo para ti.» in «Hasta la fecha límite» nor in '
+      '«A tu manera» once a plan is read',
+      (tester) async {
+        final app = await _App.open(tester, [presentation()], size: phone);
+        app.api.answer = {'reminder_plan': ownersPlan.toJson()};
+        await app.detail(1);
+        await openSheet(tester);
+        expect(inSheet(untilDay), findsOneWidget);
+        expect(inSheet(yourWay), findsOneWidget);
+        await tapVisible(tester, inSheet(untilDay));
+        await tester.ensureVisible(listo);
+        await tester.pumpAndSettle();
+        expect(listo, findsOneWidget);
+        expect(justYou, findsNothing);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+        await tapVisible(tester, inSheet(yourWay));
+        await tester.enterText(
+          find.byKey(const ValueKey('reminder-plan-words')),
+          'cada 3 días y la última semana a diario',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(listo);
+        await tester.pumpAndSettle();
+        expect(listo, findsOneWidget);
+        expect(justYou, findsNothing);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'UX-2014: a task given to Marta that carries a plan reads «Recordatorio '
+      'para Marta», never the plan, with no plan-line key, and the form’s '
+      'closed details show no plan line',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [forMarta(plan: const ReminderPlan.rhythm(ReminderPlan.normal))],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        final chip = find.byType(ReminderChip);
+        expect(
+          find
+              .descendant(of: chip, matching: find.byType(Text))
+              .evaluate()
+              .map((e) => (e.widget as Text).data)
+              .toList(),
+          [es.reminderForPersonOnly('Marta')],
+        );
+        expect(find.byKey(const ValueKey('reminder-plan-line')), findsNothing);
+        expect(find.textContaining('Recordatorios normales'), findsNothing);
+        expect(find.textContaining('próximo'), findsNothing);
+        app.navigator.pushNamed('/editTask', arguments: 1);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('task-reminder-plan')), findsNothing);
+        expect(find.textContaining('Recordatorios normales'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'UX-2014: the same with its own lead of 60 reads «Recordatorio para '
+      'Marta: 1 hora antes», and a single reminder chosen clears the plan',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [
+            forMarta(
+              plan: const ReminderPlan.rhythm(ReminderPlan.normal),
+              timed: true,
+              minutes: 60,
+            ),
+          ],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(
+          es.reminderForPerson('Marta', es.hourBefore),
+          'Recordatorio para Marta: 1 hora antes',
+        );
+        expect(
+          chipText(es.reminderForPerson('Marta', es.hourBefore)),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('reminder-plan-line')), findsNothing);
+        await openSheet(tester);
+        expect(untilDay, findsNothing);
+        expect(yourWay, findsNothing);
+        await tapVisible(tester, inSheet(find.text(es.off)));
+        expect(app.task(1).reminderPlan, isNull);
+        expect(app.task(1).reminderMinutes, -1);
+      },
+    );
+
+    testWidgets(
+      'UX-2014: the same plan on a «Todos» task of the project still reads as '
+      'the plan, on the chip and in the form',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [shared(plan: const ReminderPlan.rhythm(ReminderPlan.normal))],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(
+          find.byKey(const ValueKey('reminder-plan-line')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Recordatorios normales'), findsOneWidget);
+        app.navigator.pushNamed('/editTask', arguments: 1);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('task-reminder-plan')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    /// The form for task 1, «Más detalles» › «Recordatorio».
+    Future<void> formReminder(WidgetTester tester, _App app) async {
+      app.navigator.pushNamed('/editTask', arguments: 1);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const ValueKey('task-more-details')));
+      await tapVisible(
+        tester,
+        find.descendant(
+          of: find.byType(ReminderControl),
+          matching: find.text(es.reminder),
+        ),
+      );
+      expect(sheet(), findsOneWidget);
+    }
+
+    testWidgets(
+      'UX-2014: in the form, a «Todos» task’s «Hasta la fecha límite» shows '
+      'the line above «Listo»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [shared()],
+          size: phone,
+          projects: projects,
+        );
+        await formReminder(tester, app);
+        await tapVisible(tester, inSheet(untilDay));
+        await tester.ensureVisible(listo);
+        await tester.pumpAndSettle();
+        expectJustAboveListo(tester, es);
+      },
+    );
+
+    testWidgets(
+      'UX-2014: in the form, the same task given to Marta has no plan rows',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [forMarta()],
+          size: phone,
+          projects: projects,
+        );
+        await formReminder(tester, app);
+        expectSingleListOnly(es);
+      },
+    );
+
+    /// The capture's result with one draft, [task].
+    Future<_App> card(WidgetTester tester, Task task) async {
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        size: phone,
+        projects: projects,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p256',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Presentar el proyecto…',
+        drafts: [CaptureDraft(id: 'd1', task: task)],
+      );
+      await openCaptureResult(tester, 'p256');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      return app;
+    }
+
+    Finder cardRow() => find.byKey(const ValueKey('draft-reminder-d1'));
+
+    testWidgets(
+      'UX-2014: on the capture card, a draft in the project given to Marta '
+      'with a said plan reads «Recordatorio para Marta», and opens the single '
+      'reminder’s list only',
+      (tester) async {
+        await card(tester, forMarta(id: null, plan: ownersPlan));
+        expect(cardRow(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: cardRow(),
+            matching: find.text(es.reminderForPersonOnly('Marta')),
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('cada 3 días'), findsNothing);
+        await tapVisible(
+          tester,
+          find.descendant(of: cardRow(), matching: find.text(es.reminder)),
+        );
+        expect(untilDay, findsNothing);
+        expect(yourWay, findsNothing);
+        expect(justYou, findsNothing);
+        expect(inSheet(find.text(es.off)), findsOneWidget);
+        expect(inSheet(find.text(es.chooseAlertTime)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2014: on the capture card, a draft in a project muted here with a '
+      'said plan reads «Sin recordatorio: proyecto silenciado»',
+      (tester) async {
+        await card(
+          tester,
+          shared(
+            id: null,
+            listId: 'quiet',
+            assignment: 'personal',
+            plan: ownersPlan,
+          ),
+        );
+        expect(
+          find.descendant(
+            of: cardRow(),
+            matching: find.text(es.noReminderProjectMuted),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    // The offer (UX-2003's flow): task 1 on Thu 12 Nov, moved in the form to
+    // Fri 13 Nov, with reminders on and allowed.
+    for (final (what, task, expected) in [
+      ('a «Todos» task in a shared project', shared(), true),
+      (
+        'an unassigned task in a shared project you own',
+        shared(assignment: 'unassigned'),
+        true,
+      ),
+      (
+        'a task given to you',
+        shared(assignment: 'member', assigneeId: 1, assigneeName: 'Yo'),
+        true,
+      ),
+      (
+        'a task given to Marta',
+        shared(assignment: 'member', assigneeId: 2, assigneeName: 'Marta'),
+        false,
+      ),
+      (
+        'a personal task in a project muted here',
+        shared(listId: 'quiet', assignment: 'personal'),
+        false,
+      ),
+      (
+        'a personal task in an archived project',
+        shared(listId: 'old', assignment: 'personal'),
+        false,
+      ),
+    ]) {
+      testWidgets('UX-2014: the offer after moving $what to Fri 13 Nov: '
+          '${expected ? 'it comes' : 'none'}', (tester) async {
+        final app = await _App.open(
+          tester,
+          [task.copyWith(dueDate: DateTime(2026, 11, 12))],
+          size: phone,
+          projects: projects,
+        );
+        app.navigator.pushNamed('/editTask', arguments: 1);
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.byKey(const ValueKey('task-date')));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CalendarDatePicker),
+            matching: find.text('13'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('schedule-done')));
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.byKey(const ValueKey('task-save')));
+        expect(app.task(1).dueDate, friday13);
+        expect(find.byType(SnackBar), findsOneWidget);
+        await tester.pump(FeedbackTimeout.defaultDuration);
+        await tester.pumpAndSettle();
+        final offer = find.byKey(const ValueKey('reminder-plan-offer-yes'));
+        expect(offer, expected ? findsOneWidget : findsNothing);
+        expect(app.reminders.offered, expected ? {1} : isEmpty);
+        if (expected) {
+          await tapVisible(tester, offer);
+          expect(
+            app.task(1).reminderPlan,
+            const ReminderPlan.rhythm(ReminderPlan.normal),
+          );
+        }
+      });
+    }
+
+    testWidgets(
+      'UX-2021: while listening at 2× on 360×800, after long words the field '
+      'is scrolled to its end, «…por la tarde» on its last line, and «Dejar '
+      'de escuchar» and «Escuchando» stay on screen',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [presentation()],
+          textScale: 2,
+          size: phone,
+        );
+        await app.detail(1);
+        await openSheet(tester);
+        await tapVisible(tester, inSheet(yourWay));
+        final words = find.byKey(const ValueKey('reminder-plan-words'));
+        expect(words, findsOneWidget);
+        await tapVisible(
+          tester,
+          find.byKey(const ValueKey('reminder-plan-speak')),
+        );
+        expect(app.speech.starts, 1);
+        const said =
+            'cada 3 días las dos primeras semanas, luego cada día, y el último '
+            'día por la mañana y por la tarde';
+        app.speech.send('partial', text: said);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(words).controller!.text, said);
+        // Unfocused while listening: no keyboard.
+        expect(tester.widget<TextField>(words).focusNode!.hasFocus, isFalse);
+        final scroll = tester
+            .state<ScrollableState>(
+              find.descendant(of: words, matching: find.byType(Scrollable)),
+            )
+            .position;
+        expect(
+          scroll.maxScrollExtent,
+          greaterThan(0),
+          reason: 'More than 4 lines of words.',
+        );
+        expect(scroll.pixels, moreOrLessEquals(scroll.maxScrollExtent));
+        final editable = tester
+            .state<EditableTextState>(
+              find.descendant(of: words, matching: find.byType(EditableText)),
+            )
+            .renderEditable;
+        final lineHeight = editable.preferredLineHeight;
+        expect(
+          (editable.size.height / lineHeight).round(),
+          4,
+          reason: 'The field keeps its 4 lines.',
+        );
+        final end = editable.getLocalRectForCaret(
+          const TextPosition(offset: said.length),
+        );
+        expect(end.center.dy, greaterThan(editable.size.height - lineHeight));
+        expect(end.center.dy, lessThan(editable.size.height));
+        final start = editable.getLocalRectForCaret(
+          const TextPosition(offset: 0),
+        );
+        expect(
+          start.bottom,
+          lessThanOrEqualTo(0),
+          reason: 'The oldest words are out of sight above.',
+        );
+        for (final finder in [
+          inSheet(find.text(es.reminderPlanStopListening)),
+          inSheet(find.text(es.captureListening)),
+        ]) {
+          expect(finder.hitTestable(), findsOneWidget);
+          final box = tester.getRect(finder);
+          expect(box.top, greaterThanOrEqualTo(0));
+          expect(box.bottom, lessThanOrEqualTo(phone.height));
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (language, l) in [('es', es), ('ca', ca)]) {
+      testWidgets(
+        'UX-2014: at 2× on 360×800 in $language, a «Todos» task’s open '
+        '«${l.reminderPlanUntilDay}» shows «${l.reminderPlanJustYou}» and '
+        '«${l.done}» on screen, uncut',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [shared()],
+            language: language,
+            textScale: 2,
+            size: phone,
+            projects: projects,
+          );
+          await app.detail(1);
+          await openSheet(tester);
+          await tapVisible(tester, inSheet(find.text(l.reminderPlanUntilDay)));
+          await tester.ensureVisible(listo);
+          await tester.pumpAndSettle();
+          expectJustAboveListo(tester, l);
+          for (final finder in [justYou, listo]) {
+            final box = tester.getRect(finder);
+            expect(box.top, greaterThanOrEqualTo(0), reason: '$finder');
+            expect(
+              box.bottom,
+              lessThanOrEqualTo(phone.height),
+              reason: '$finder',
+            );
+            expect(box.left, greaterThanOrEqualTo(0), reason: '$finder');
+            expect(
+              box.right,
+              lessThanOrEqualTo(phone.width),
+              reason: '$finder',
+            );
+          }
+          expect(listo.hitTestable(), findsOneWidget);
+          expect(
+            find.descendant(of: listo, matching: find.text(l.done)),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  // P258 (UX-2023): on a draft with no day, a said reminder and an open
+  // `schedule` question, the question stays under its date line, and
+  // «Para recordártelo, ponle un día.» comes after it.
+  group('P258 · UX-2023', () {
+    late WidgetTester shown;
+    const question = '¿Qué día?';
+    const dailyPlan = {
+      'kind': 'custom',
+      'phases': [
+        {'from_days': 366, 'to_days': 0, 'every_days': 1},
+      ],
+      'time': null,
+      'said': 'cada día',
+    };
+
+    /// «Llamar a mamá, recuérdamelo cada día» as the server sends it: no
+    /// day, the plan said, `reminder_needs_day`, and «¿Qué día?» open.
+    CaptureDraft asked({String title = 'Llamar a mamá', bool open = true}) =>
+        CaptureDraft.fromAI(
+          TaskDraft.fromJson({
+            'title': title,
+            'priority': 1,
+            'notes': '',
+            'questions': [],
+            'transcript': title,
+            'reminder_plan': dailyPlan,
+            'reminder_needs_day': true,
+            'clarifications': [
+              if (open) {'field': 'schedule', 'question': question},
+            ],
+          }),
+        );
+
+    Future<void> open(
+      WidgetTester tester,
+      List<CaptureDraft> drafts, {
+      String language = 'es',
+      double textScale = 1,
+    }) async {
+      shown = tester;
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        language: language,
+        textScale: textScale,
+        size: const Size(360, 800),
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p258',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Llamar a mamá, recuérdamelo cada día',
+        drafts: drafts,
+      );
+      await openCaptureResult(tester, 'p258');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+    }
+
+    Finder editor(String id) => find.byKey(ValueKey(id));
+    Finder date(String id) => find.byKey(ValueKey('draft-schedule-$id'));
+    Finder line(String id) =>
+        find.byKey(ValueKey('draft-reminder-needs-day-$id'));
+    Finder box(String id) => find.ancestor(
+      of: find.descendant(of: editor(id), matching: find.text(question)),
+      matching: find.byType(QuestionBox),
+    );
+    double top(Finder finder) => shown.getTopLeft(finder.first).dy;
+    double bottom(Finder finder) => shown.getBottomLeft(finder.first).dy;
+
+    /// Date line, then «¿Qué día?», then the needs-day line.
+    void inOrder(String id) {
+      expect(date(id), findsOneWidget);
+      expect(box(id), findsOneWidget);
+      expect(line(id), findsOneWidget);
+      expect(top(box(id)), greaterThanOrEqualTo(bottom(date(id)) - 0.5));
+      expect(top(line(id)), greaterThanOrEqualTo(bottom(box(id)) - 0.5));
+    }
+
+    testWidgets(
+      'UX-2023: on the opened card «¿Qué día?» sits between the date line and «Para recordártelo, ponle un día.»',
+      (tester) async {
+        final draft = asked();
+        await open(tester, [draft]);
+        expect(find.byType(CaptureReviewEditor), findsOneWidget);
+        expect(
+          find.descendant(
+            of: line(draft.id),
+            matching: find.text(es.reminderNeedsDay),
+          ),
+          findsOneWidget,
+        );
+        inOrder(draft.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2023: in a collapsed second row the order is again date line, «¿Qué día?», then the needs-day line',
+      (tester) async {
+        final first = CaptureDraft.fromAI(
+          TaskDraft.fromJson({
+            'title': 'Comprar pan y leche',
+            'priority': 1,
+            'notes': '',
+            'questions': [],
+            'transcript': 'Comprar pan y leche',
+            'scheduled_date': '2026-10-22',
+          }),
+        );
+        final second = asked();
+        await open(tester, [first, second]);
+        expect(find.byType(CaptureReviewEditor), findsNWidgets(2));
+        // Both collapsed: neither shows «Más opciones».
+        expect(find.byKey(ValueKey('draft-options-${first.id}')), findsNothing);
+        expect(
+          find.byKey(ValueKey('draft-options-${second.id}')),
+          findsNothing,
+        );
+        expect(line(first.id), findsNothing);
+        expect(find.text(es.reminderNeedsDay), findsOneWidget);
+        inOrder(second.id);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2023: once «¿Qué día?» is confirmed, its box goes and the needs-day line is directly under the date line',
+      (tester) async {
+        final draft = asked();
+        final id = draft.id;
+        await open(tester, [draft]);
+        inOrder(id);
+        final confirm = find.descendant(
+          of: box(id),
+          matching: find.text(es.reviewConfirmDetail),
+        );
+        await tester.ensureVisible(confirm);
+        await tester.pumpAndSettle();
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(box(id), findsNothing);
+        expect(find.text(question), findsNothing);
+        expect(line(id), findsOneWidget);
+        // Nothing between them: the line starts where the date line ends.
+        expect(top(line(id)) - bottom(date(id)), inInclusiveRange(-0.5, 1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2023: with no open question the needs-day line is directly under the date line on the opened card',
+      (tester) async {
+        final draft = asked(open: false);
+        final id = draft.id;
+        await open(tester, [draft]);
+        expect(find.byType(QuestionBox), findsNothing);
+        expect(top(line(id)) - bottom(date(id)), inInclusiveRange(-0.5, 1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2023: with no open question a collapsed row has the needs-day line directly under its date line',
+      (tester) async {
+        final first = asked(title: 'Comprar pan', open: false);
+        final second = asked(open: false);
+        await open(tester, [first, second]);
+        expect(
+          find.byKey(ValueKey('draft-options-${second.id}')),
+          findsNothing,
+        );
+        expect(find.byType(QuestionBox), findsNothing);
+        expect(
+          top(line(second.id)) - bottom(date(second.id)),
+          inInclusiveRange(-0.5, 1),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2023: at 2× on 360×800 in $language the date line, «¿Qué día?» and the needs-day line are whole, in that order',
+        (tester) async {
+          final l = language == 'es' ? es : ca;
+          final draft = asked();
+          final id = draft.id;
+          await open(tester, [draft], language: language, textScale: 2);
+          expect(tester.takeException(), isNull);
+          inOrder(id);
+          expect(
+            find.descendant(
+              of: line(id),
+              matching: find.text(l.reminderNeedsDay),
+            ),
+            findsOneWidget,
+          );
+          final screen = tester.getRect(find.byType(VoiceTaskScreen));
+          for (final part in [date(id), box(id), line(id)]) {
+            await tester.ensureVisible(part);
+            await tester.pumpAndSettle();
+            final rect = tester.getRect(part);
+            expect(rect.left, greaterThanOrEqualTo(0), reason: '$part');
+            expect(rect.right, lessThanOrEqualTo(360), reason: '$part');
+            expect(rect.top, greaterThanOrEqualTo(screen.top), reason: '$part');
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(screen.bottom),
+              reason: '$part',
+            );
+            // Every text in it is whole: not ellipsized, no line cut off.
+            for (final paragraph in tester.renderObjectList<RenderParagraph>(
+              find.descendant(of: part, matching: find.byType(RichText)),
+            )) {
+              expect(paragraph.didExceedMaxLines, isFalse, reason: '$part');
+              // It got all the height its lines need: none cut off.
+              final text = paragraph.text.toPlainText();
+              expect(
+                paragraph.size.height,
+                greaterThanOrEqualTo(
+                  paragraph.getMaxIntrinsicHeight(paragraph.size.width) - 0.5,
+                ),
+                reason: '$part: $text',
+              );
+            }
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+}
+
+/// UX-2020: in the [text] widget's laid-out paragraph, the time phrase
+/// «[preposition] [article] 8» (spaces of either kind) and the text's last
+/// character all sit on one line, and that line is the paragraph's last, so
+/// no line ends with the lone «[preposition]». Returns how many lines the
+/// paragraph has.
+int _p257TimePhraseOnLastLine(
+  WidgetTester tester,
+  Finder text,
+  String preposition,
+  String article,
+) {
+  final paragraph = tester.renderObject<RenderParagraph>(
+    find.descendant(of: text, matching: find.byType(RichText)).first,
+  );
+  final plain = paragraph.text.toPlainText();
+  final match = RegExp(
+    '(?<![\\p{L}])${RegExp.escape(preposition)}[  ]'
+    '${RegExp.escape(article)}[  ]8',
+    unicode: true,
+  ).firstMatch(plain);
+  expect(match, isNotNull, reason: '«$preposition $article 8» in «$plain»');
+  double top(int index) => paragraph
+      .getBoxesForSelection(
+        TextSelection(baseOffset: index, extentOffset: index + 1),
+      )
+      .first
+      .top;
+  final allTops = paragraph
+      .getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: plain.length),
+      )
+      .map((box) => box.top)
+      .toList();
+  final lastLine = allTops.reduce((a, b) => a > b ? a : b);
+  final start = match!.start;
+  final articleStart = start + preposition.length + 1;
+  for (final (what, index) in [
+    ('«$preposition»', start),
+    ('«$article»', articleStart),
+    ('the end of «$article»', articleStart + article.length - 1),
+    ('«8»', match.end - 1),
+    ('the last character', plain.length - 1),
+  ]) {
+    expect(
+      top(index),
+      moreOrLessEquals(lastLine, epsilon: 0.5),
+      reason: '$what must sit on the last line of «$plain»',
+    );
+  }
+  return allTops.map((t) => t.round()).toSet().length;
 }
 
 /// The app on a phone with reminders allowed, on a fixed day, with the

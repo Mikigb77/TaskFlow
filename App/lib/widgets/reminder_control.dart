@@ -68,6 +68,7 @@ bool _alertPassed(WidgetRef ref, Task? task) {
       task,
       settings.dateOnlyTime,
       now,
+      defaultLead: settings.leadMinutes,
       late: false,
     ).isEmpty;
   }
@@ -102,6 +103,10 @@ String reminderPlanText(
     clock: context.clockTime,
     done: task.isCompleted,
     bare: bare,
+    dayLead: ReminderPlans.dayLead(
+      task,
+      (settings ?? const ReminderPreferences()).leadMinutes,
+    ),
   );
 }
 
@@ -146,22 +151,8 @@ class _Reason {
 /// this account's read as before.
 _Reason? _reasonFor(WidgetRef ref, Task? task) {
   if (task == null) return null;
-  final project = task.listId == null
-      ? null
-      : (ref.watch(taskListsProvider).valueOrNull ?? const <TaskListInfo>[])
-            .where((p) => p.id == task.listId)
-            .firstOrNull;
-  final accountId =
-      task.assignment == 'member' || task.assignment == 'unassigned'
-      ? ref.watch(authProvider).account?.id
-      : null;
-  final block = TaskDatabase.reminderBlock(
-    task,
-    accountId,
-    archived: project?.inactive == true,
-    muted: project?.notifications == 'muted',
-    role: project?.role,
-  );
+  final project = _projectOf(ref, task);
+  final block = _blockFor(ref, task, project);
   if (block == null) return null;
   if (block == ReminderBlock.notForAccount &&
       (task.assignment != 'member' || task.assigneeName == null)) {
@@ -169,6 +160,38 @@ _Reason? _reasonFor(WidgetRef ref, Task? task) {
   }
   return _Reason(block, project: project, person: task.assigneeName);
 }
+
+TaskListInfo? _projectOf(WidgetRef ref, Task task) => task.listId == null
+    ? null
+    : (ref.watch(taskListsProvider).valueOrNull ?? const <TaskListInfo>[])
+          .where((p) => p.id == task.listId)
+          .firstOrNull;
+
+ReminderBlock? _blockFor(WidgetRef ref, Task task, TaskListInfo? project) {
+  final accountId =
+      task.assignment == 'member' || task.assignment == 'unassigned'
+      ? ref.watch(authProvider).account?.id
+      : null;
+  return TaskDatabase.reminderBlock(
+    task,
+    accountId,
+    archived: project?.inactive == true,
+    muted: project?.notifications == 'muted',
+    role: project?.role,
+  );
+}
+
+/// True when this phone rings for [task], by the rule the reminder engine
+/// schedules with ([TaskDatabase.reminderBlock]): only then can a plan, which
+/// is this account's own, ring at all. True for a null [task].
+bool reminderRingsHere(WidgetRef ref, Task? task) =>
+    task == null || _blockFor(ref, task, _projectOf(ref, task)) == null;
+
+/// True when [task] is shared: its project is, or it's given to the project's
+/// people rather than kept personal. Its plan is still only this account's.
+bool reminderShared(WidgetRef ref, Task? task) =>
+    task != null &&
+    (task.assignment != 'personal' || _projectOf(ref, task)?.shared == true);
 
 /// True when the reminder is the default one: a timed task with no lead of
 /// its own, or a date-only task with no time of its own that isn't off.
@@ -284,7 +307,8 @@ Future<bool> turnOnReminders(
 /// a default time. A task with a deadline or a day ([schedule], as it would
 /// be saved) also gets the plans under the list (reminder_plan_sheet.dart):
 /// the choices are exclusive, so a plan keeps [minutes] and [time] as they
-/// are, unused, and a single reminder clears the [plan].
+/// are, unused, and a single reminder clears the [plan]. On a [shared] task
+/// the plans say they're only for this person.
 Future<void> _chooseReminder(
   BuildContext context, {
   required bool hasTime,
@@ -294,6 +318,7 @@ Future<void> _chooseReminder(
   required int? defaultTime,
   ReminderPlan? plan,
   Task? schedule,
+  bool shared = false,
   required void Function(int? minutes, int? time, ReminderPlan? plan) onChosen,
 }) async {
   const useDefault = -2;
@@ -343,8 +368,10 @@ Future<void> _chooseReminder(
           ),
       ],
       current: active == null ? current : null,
-      task: schedule,
+      // As it would be saved, with its reminder as chosen so far.
+      task: schedule.copyWith(reminderMinutes: minutes, reminderTime: time),
       plan: active,
+      shared: shared,
     );
     if (choice == null || !context.mounted) return;
     if (choice.plan case final chosen?) {
@@ -455,8 +482,10 @@ Future<int?> _pickFrom(
   final preferences =
       ref.watch(reminderPreferencesProvider).valueOrNull ??
       const ReminderPreferences();
-  // A plan replaces the single reminder: the line is its one line.
-  final plan = ReminderPlans.active(task);
+  // A plan replaces the single reminder: the line is its one line. It's this
+  // account's own, so it counts only where this phone rings.
+  final ringsHere = reminderRingsHere(ref, task);
+  final plan = ringsHere ? ReminderPlans.active(task) : null;
   final reason = _reasonFor(ref, task);
   final blocked =
       reason == null &&
@@ -469,7 +498,10 @@ Future<int?> _pickFrom(
         planned: plan != null,
       );
   // Last: a tap still opens the choices, where a later time can be set.
-  final passed = reason == null && !blocked && _alertPassed(ref, task);
+  final passed =
+      reason == null &&
+      !blocked &&
+      _alertPassed(ref, ringsHere ? task : task.copyWith(reminderPlan: null));
   final minute = task.reminderTime ?? preferences.dateOnlyTime;
   final label = task.reminderMinutes == -1
       ? context.l10n.off
@@ -521,8 +553,10 @@ Future<int?> _pickFrom(
             time: task.reminderTime,
             defaultLead: preferences.leadMinutes,
             defaultTime: preferences.dateOnlyTime,
-            plan: task.reminderPlan,
-            schedule: task,
+            plan: plan,
+            // Plans only where they can ring.
+            schedule: ringsHere ? task : null,
+            shared: reminderShared(ref, task),
             onChosen: (minutes, time, plan) => onChanged(
               task.copyWith(
                 reminderMinutes: minutes,
@@ -543,7 +577,7 @@ class ReminderChip extends ConsumerWidget {
     final line = reminderLine(context, ref, task, onChanged: onChanged);
     return LayoutBuilder(
       builder: (context, constraints) => ActionChip(
-        key: ReminderPlans.active(task) == null
+        key: ReminderPlans.active(task) == null || !reminderRingsHere(ref, task)
             ? null
             : const ValueKey('reminder-plan-line'),
         // The icon keeps its own room at any text size, so a long reading
@@ -609,8 +643,11 @@ class ReminderControl extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final preferences = ref.watch(reminderPreferencesProvider);
     final settings = preferences.valueOrNull ?? const ReminderPreferences();
-    // The task as it would be saved, with this plan, when it applies.
-    final planned = schedule == null || plan == null || onChanged == null
+    // The task as it would be saved, with this plan, when it applies: only
+    // where this phone rings, as the plan is this account's own.
+    final ringsHere = reminderRingsHere(ref, task);
+    final planned =
+        schedule == null || plan == null || onChanged == null || !ringsHere
         ? null
         : schedule!.copyWith(
             reminderMinutes: minutes,
@@ -637,7 +674,12 @@ class ReminderControl extends ConsumerWidget {
         _alertPassed(
           ref,
           planned ??
-              schedule?.copyWith(reminderMinutes: minutes, reminderTime: time),
+              schedule?.copyWith(
+                reminderMinutes: minutes,
+                reminderTime: time,
+                // A plan that can't ring here doesn't count.
+                reminderPlan: ringsHere ? schedule!.reminderPlan : null,
+              ),
         );
     final minute = time ?? settings.dateOnlyTime;
     final value = active != null
@@ -659,8 +701,9 @@ class ReminderControl extends ConsumerWidget {
             defaultLead: settings.leadMinutes,
             defaultTime: settings.dateOnlyTime,
             plan: plan,
-            // Plans only where they can be kept.
-            schedule: onChanged == null ? null : schedule,
+            // Plans only where they can be kept, and ring.
+            schedule: onChanged == null || !ringsHere ? null : schedule,
+            shared: reminderShared(ref, task),
             onChosen: (value, chosenTime, chosenPlan) {
               if (onChanged case final changed?) {
                 changed(value, chosenTime, chosenPlan);

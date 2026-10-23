@@ -437,6 +437,37 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     },
   );
 
+  /// A reminder said for a task with no day: one line under the date, in
+  /// the reminder line's style, whose tap opens the date.
+  Widget _needsDayLine() {
+    final text = context.l10n.reminderNeedsDay;
+    final onTap = widget.enabled ? _schedule : null;
+    return Semantics(
+      label: text,
+      button: true,
+      enabled: onTap != null,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: ListTile(
+        key: ValueKey('draft-reminder-needs-day-${widget.draft.id}'),
+        contentPadding: EdgeInsets.zero,
+        horizontalTitleGap: 8,
+        minLeadingWidth: 0,
+        leading: Icon(
+          Icons.notifications_off_outlined,
+          color: Theme.of(context).colorScheme.primary,
+          size: 18,
+        ),
+        title: Text(text),
+        titleTextStyle: Theme.of(context).textTheme.bodyMedium,
+        trailing: onTap == null
+            ? null
+            : const Icon(Icons.chevron_right_rounded, size: 20),
+        onTap: onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -532,9 +563,17 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
         borderSide: BorderSide(color: colors.primary, width: 2),
       ),
     );
+    // A reminder kept for a task with neither a day nor a deadline (said
+    // for it, or its day cleared here) asks for the day, in one line under
+    // the date; it applies, in its row, once the task has one.
+    final needsDay =
+        !task.isNote &&
+        task.dueDate == null &&
+        task.deadline == null &&
+        (task.reminderPlan != null || (task.reminderMinutes ?? -1) >= 0);
     // A reminder said («una hora antes», a plan) is one row above `Más
     // opciones`; otherwise its control stays inside them.
-    final showReminder = _reminderOpen && !task.isNote;
+    final showReminder = _reminderOpen && !task.isNote && !needsDay;
     // A reminder changed inside `Más opciones` has no row: its line shows in
     // their subtitle and on the collapsed row, as priority and repeat do.
     final reminderInOptions =
@@ -551,6 +590,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
       minutes: task.reminderMinutes,
       time: task.reminderTime,
       plan: task.reminderPlan,
+      task: task,
       schedule: task,
       onMinutes: (value) {
         if (widget.enabled) {
@@ -679,11 +719,13 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             onChanged: (value) => _change(task.copyWith(title: value)),
           ),
           _questions('title'),
-          // The date is the main line, with an open time question under it.
+          // The date is the main line, with its open question right under it;
+          // the line asking for a day for the reminder comes after both.
           if (!task.isNote) ...[
             _dateLine(main: true),
             if (fromWords && task.dueDate != null) _fromWords(),
             _questions('schedule'),
+            if (needsDay) _needsDayLine(),
           ],
           if (showNotes) ...[
             const SizedBox(height: 8),
@@ -832,7 +874,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                 task: task,
                 onChanged: widget.enabled ? _change : null,
               ),
-              if (!showReminder) reminder(),
+              if (!showReminder && !needsDay) reminder(),
             ],
             if (task.checklist.isEmpty)
               ChecklistEditor(
@@ -858,6 +900,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
             _dateLine(main: false),
             // The date's open time question stays next to it.
             _questions('schedule'),
+            if (needsDay) _needsDayLine(),
             if ((showReminder &&
                     (task.reminderDate != null ||
                         ReminderPlans.active(task) != null)) ||

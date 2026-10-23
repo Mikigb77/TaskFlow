@@ -509,8 +509,8 @@ void main() {
         19,
         21,
       ]);
-      // «From now on»: the far phase reaches 366 days before.
-      expect(const ReminderPlan.rhythm(ReminderPlan.normal).days.last, 365);
+      // The strengths start at most 4 weeks before the day (D2).
+      expect(const ReminderPlan.rhythm(ReminderPlan.normal).days.last, 26);
     });
 
     test(
@@ -581,6 +581,7 @@ void main() {
             dayTask(day: friday13, plan: normal),
             480,
             now,
+            defaultLead: 10,
           ).first.when,
           DateTime(2026, 10, 24, 8),
         );
@@ -589,6 +590,7 @@ void main() {
             dayTask(day: friday13, plan: normal, done: true),
             480,
             now,
+            defaultLead: 10,
           ),
           isEmpty,
           reason: 'Done: nothing more.',
@@ -1065,6 +1067,110 @@ void main() {
         ),
         '3 weeks to go. Shall I remind you every 3 days, and daily for the '
         'last week?',
+      );
+    });
+  });
+
+  // P253 (UX-1912, the owner's D2): the strengths start at most 4 weeks
+  // before the day; a rhythm said or typed keeps its reach.
+  group('P253 · UX-1912', () {
+    const gentle = ReminderPlan.rhythm(ReminderPlan.gentle);
+    const normal = ReminderPlan.rhythm(ReminderPlan.normal);
+    const intense = ReminderPlan.rhythm(ReminderPlan.intense);
+
+    /// Monday 21 December 2026, 60 days away.
+    final monday21 = DateTime(2026, 12, 21);
+
+    /// Thursday 12 November, 21 days away: the owner's 3-week example.
+    final thursday12 = DateTime(2026, 11, 12);
+
+    List<PlanAlert> ahead(ReminderPlan plan, DateTime anchor) =>
+        ReminderPlans.alerts(plan, anchor, 540, now, late: false);
+
+    test('UX-1912: each strength starts at most 28 days before the day: '
+        'Suave 8 days, Normal 15, Intenso 22', () {
+      expect(normal.days, [
+        for (var day = 0; day <= 7; day++) day,
+        8,
+        11,
+        14,
+        17,
+        20,
+        23,
+        26,
+      ]);
+      expect(normal.days, hasLength(15));
+      expect(gentle.days, [0, 1, 2, 3, 4, 11, 18, 25]);
+      expect(intense.days, [
+        for (var day = 0; day <= 14; day++) day,
+        15,
+        17,
+        19,
+        21,
+        23,
+        25,
+        27,
+      ]);
+      expect(intense.days, hasLength(22));
+      for (final plan in [gentle, normal, intense]) {
+        expect(
+          plan.days.every((day) => day <= 28),
+          isTrue,
+          reason: plan.strength,
+        );
+      }
+    });
+
+    test('UX-1912: Normal counts 13 at 3 weeks, and 15 at 60 days and at 6 '
+        'months; Suave 8 and Intenso 22 on Mon 21 Dec', () {
+      // The owner's example, unchanged.
+      expect(ahead(normal, thursday12), hasLength(13));
+      final far = ahead(normal, monday21);
+      expect(far, hasLength(15));
+      expect(far.first.when, DateTime(2026, 11, 25, 9));
+      expect(far.first.daysBefore, 26);
+      expect(ahead(normal, DateTime(2027, 4, 22)), hasLength(15));
+      expect(ahead(gentle, monday21), hasLength(8));
+      expect(ahead(intense, monday21), hasLength(22));
+    });
+
+    test('UX-1912: a rhythm of one’s own keeps its reach, and one said '
+        'without a start runs from now on', () {
+      final said = custom(const [PlanPhase(60, 8, 3), PlanPhase(7, 0, 1)]);
+      final alerts = ahead(said, monday21);
+      expect(alerts, hasLength(26));
+      expect(alerts.first.when, DateTime(2026, 10, 23, 9));
+      final daily = custom(const [PlanPhase(PlanPhase.longest, 0, 1)]);
+      final everyDay = ahead(daily, monday21);
+      expect(everyDay, hasLength(60));
+      expect(everyDay.first.when, DateTime(2026, 10, 23, 9));
+      expect(everyDay.last.when, DateTime(2026, 12, 21, 9));
+    });
+
+    test('UX-1912: Normal 60 days away says it starts 4 weeks before; 3 '
+        'weeks away it doesn’t', () {
+      String words(String code, DateTime anchor) => planRhythm(
+        strings(code),
+        normal,
+        anchor: anchor,
+        now: now,
+        minute: 540,
+      );
+      expect(
+        words('es', monday21),
+        'Cada 3 días desde 4 semanas antes, y a diario la última semana',
+      );
+      expect(
+        words('ca', monday21),
+        'Cada 3 dies des de 4 setmanes abans, i cada dia l’última setmana',
+      );
+      expect(
+        words('en', monday21),
+        'Every 3 days from 4 weeks before, and daily for the last week',
+      );
+      expect(
+        words('es', thursday12),
+        'Cada 3 días, y a diario la última semana',
       );
     });
   });

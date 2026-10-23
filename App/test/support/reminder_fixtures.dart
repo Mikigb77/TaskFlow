@@ -33,6 +33,15 @@ class MemoryReminderStore extends ReminderPreferenceStore {
   Future<void> addPlanOffer(String owner, int taskId) async {
     offered.add(taskId);
   }
+
+  /// How many «Ahora no» in a row the plan offer has had.
+  int declines = 0;
+  @override
+  Future<int> planOfferDeclines(String owner) async => declines;
+  @override
+  Future<void> setPlanOfferDeclines(String owner, int count) async {
+    declines = count;
+  }
 }
 
 /// Stands in for the phone: whether notifications and exact alarms are

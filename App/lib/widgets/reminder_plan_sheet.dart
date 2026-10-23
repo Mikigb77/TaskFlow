@@ -20,6 +20,7 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/capture_problem.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/reminder_plans.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 
 /// What the reminder sheet chose: one of the single reminder's values, as
 /// the list has always given them, or a plan.
@@ -39,7 +40,9 @@ typedef ReminderRow = ({int value, String label, String? subtitle});
 /// for Pro, a field to type or say a rhythm. A plan shows what it gives
 /// (its words, a strip of dots from today to the day, the count and the
 /// next one) and applies with «Listo». [current] is the single row in use,
-/// null while [plan] is set. [task] is the task as it would be saved.
+/// null while [plan] is set. [task] is the task as it would be saved. On a
+/// [shared] task each plan says, above «Listo», that it's only for this
+/// person: a plan is each account's own.
 Future<ReminderSheetChoice?> showReminderPlanSheet(
   BuildContext context, {
   required String title,
@@ -47,6 +50,7 @@ Future<ReminderSheetChoice?> showReminderPlanSheet(
   required int? current,
   required Task task,
   required ReminderPlan? plan,
+  bool shared = false,
 }) => showModalBottomSheet<ReminderSheetChoice>(
   context: context,
   isScrollControlled: true,
@@ -56,6 +60,7 @@ Future<ReminderSheetChoice?> showReminderPlanSheet(
     current: current,
     task: task,
     plan: plan,
+    shared: shared,
   ),
 );
 
@@ -75,12 +80,14 @@ class _ReminderPlanSheet extends ConsumerStatefulWidget {
     required this.current,
     required this.task,
     required this.plan,
+    required this.shared,
   });
   final String title;
   final List<ReminderRow> rows;
   final int? current;
   final Task task;
   final ReminderPlan? plan;
+  final bool shared;
 
   @override
   ConsumerState<_ReminderPlanSheet> createState() => _ReminderPlanSheetState();
@@ -108,6 +115,9 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     text: _kept?.words ?? widget.plan?.said ?? '',
   );
   final _wordsFocus = FocusNode();
+
+  /// The field's own scroll: while listening, it follows the newest words.
+  final _wordsScroll = ScrollController();
   final _section = GlobalKey();
   final _untilDayRow = GlobalKey();
   final _yourWayRow = GlobalKey();
@@ -205,6 +215,7 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     }
     _words.dispose();
     _wordsFocus.dispose();
+    _wordsScroll.dispose();
     super.dispose();
   }
 
@@ -409,6 +420,11 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
       );
       // The field grows as words come: «Dejar de escuchar» stays in view.
       _reveal();
+      // Past its four lines, the newest words on its last one (UX-105).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_closed || !_wordsScroll.hasClients) return;
+        _wordsScroll.jumpTo(_wordsScroll.position.maxScrollExtent);
+      });
     }
     if (event.kind == 'error') {
       final heard = _words.text.trim().isNotEmpty;
@@ -455,6 +471,11 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
     final now = ref.watch(calendarClockProvider)();
     final minute = settings?.dateOnlyTime;
+    // On a timed day, its own reminder rings at the task's usual one (D1).
+    final dayLead = ReminderPlans.dayLead(
+      widget.task,
+      (settings ?? const ReminderPreferences()).leadMinutes,
+    );
     final current = widget.plan;
     // A rhythm said while dictating is the person's, with or without Pro.
     final dictated = current?.isRhythm == false ? current : null;
@@ -563,8 +584,10 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
                         anchor: _anchor,
                         now: now,
                         minute: ReminderPlans.minute(rhythm, minute),
+                        dayLead: dayLead,
                       ),
                       const SizedBox(height: 16),
+                      if (widget.shared) const _JustYou(),
                       _Apply(plan: rhythm, onApply: _choose),
                     ],
                   ),
@@ -598,6 +621,7 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
                                 anchor: _anchor,
                                 now: now,
                                 minute: ReminderPlans.minute(dictated, minute),
+                                dayLead: dayLead,
                               ),
                             ),
                       selected: dictated != null,
@@ -618,8 +642,10 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
                         anchor: _anchor,
                         now: now,
                         minute: ReminderPlans.minute(dictated, minute),
+                        dayLead: dayLead,
                       ),
                       const SizedBox(height: 16),
+                      if (widget.shared) const _JustYou(),
                       _Apply(plan: dictated, onApply: _choose),
                     ],
                   ),
@@ -634,6 +660,7 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
                           key: const ValueKey('reminder-plan-words'),
                           controller: _words,
                           focusNode: _wordsFocus,
+                          scrollController: _wordsScroll,
                           enabled: !_reading,
                           minLines: 1,
                           maxLines: 4,
@@ -708,8 +735,10 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
                           anchor: _anchor,
                           now: now,
                           minute: ReminderPlans.minute(plan, minute),
+                          dayLead: dayLead,
                         ),
                         const SizedBox(height: 16),
+                        if (widget.shared) const _JustYou(),
                         _Apply(plan: plan, onApply: _choose),
                       ],
                     ],
@@ -737,6 +766,25 @@ class _Section extends StatelessWidget {
   );
 }
 
+/// On a shared task, above «Listo»: the plan rings only for this person.
+class _JustYou extends StatelessWidget {
+  const _JustYou();
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        context.l10n.reminderPlanJustYou,
+        key: const ValueKey('reminder-plan-just-you'),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
 /// Applies the plan shown and closes: the sheet's one primary action, as
 /// wide as the other sheets' are.
 class _Apply extends StatelessWidget {
@@ -760,11 +808,16 @@ class PlanPreview extends StatelessWidget {
     required this.anchor,
     required this.now,
     required this.minute,
+    this.dayLead,
   });
   final ReminderPlan plan;
   final DateTime anchor;
   final DateTime now;
   final int minute;
+
+  /// How long before the anchor's time its day's reminder rings
+  /// ([ReminderPlans.dayLead]); null at [minute], as the others.
+  final int? dayLead;
 
   @override
   Widget build(BuildContext context) {
@@ -778,6 +831,7 @@ class PlanPreview extends StatelessWidget {
         minute,
         now,
         late: false,
+        dayLead: dayLead,
       ))
         alert.daysBefore,
     ];
@@ -786,7 +840,14 @@ class PlanPreview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          planRhythm(l, plan, anchor: anchor, now: now, minute: minute),
+          planRhythm(
+            l,
+            plan,
+            anchor: anchor,
+            now: now,
+            minute: minute,
+            dayLead: dayLead,
+          ),
           style: theme.textTheme.titleSmall,
         ),
         const SizedBox(height: 12),
@@ -838,6 +899,7 @@ class PlanPreview extends StatelessWidget {
               minute: minute,
               locale: locale,
               clock: context.clockTime,
+              dayLead: dayLead,
             ),
             key: const ValueKey('reminder-plan-count'),
             style: theme.textTheme.bodyMedium,

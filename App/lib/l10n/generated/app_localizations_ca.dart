@@ -865,6 +865,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get dateForReminder => 'Afegeix una data per utilitzar un recordatori';
 
   @override
+  String get reminderNeedsDay => 'Per recordar-t’ho, posa-li un dia.';
+
+  @override
   String get chooseAlertTime => 'Tria l’hora de l’avís';
 
   @override
@@ -4654,7 +4657,10 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get reminderPlanYourWayHint =>
-      'Per exemple: «una setmana abans i el dia abans a les 8».';
+      'Per exemple: «una setmana abans i el dia abans a les 8».';
+
+  @override
+  String get reminderPlanJustYou => 'Aquests avisos són només per a tu.';
 
   @override
   String get proBadge => 'Pro';
@@ -4972,5 +4978,5 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get billingReasonReminderPlansExample =>
-      '«una setmana abans i el dia abans a les 8»';
+      '«una setmana abans i el dia abans a les 8»';
 }

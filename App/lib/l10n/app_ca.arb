@@ -235,6 +235,7 @@
   "reminder": "Recordatori",
   "off": "Desactivat",
   "dateForReminder": "Afegeix una data per utilitzar un recordatori",
+  "reminderNeedsDay": "Per recordar-t’ho, posa-li un dia.",
   "chooseAlertTime": "Tria l’hora de l’avís",
   "reminderDefaultsError": "No s’han pogut carregar els recordatoris per defecte. Revisa la configuració de notificacions.",
   "loadingReminders": "S’està carregant la configuració dels recordatoris…",
@@ -1067,7 +1068,8 @@
   "reminderPlanNormal": "Normal",
   "reminderPlanIntense": "Intens",
   "reminderPlanYourWay": "A la teva manera",
-  "reminderPlanYourWayHint": "Per exemple: «una setmana abans i el dia abans a les 8».",
+  "reminderPlanYourWayHint": "Per exemple: «una setmana abans i el dia abans a les 8».",
+  "reminderPlanJustYou": "Aquests avisos són només per a tu.",
   "proBadge": "Pro",
   "reminderPlanSpeak": "Dicta-ho",
   "reminderPlanStopListening": "Deixa d’escoltar",
@@ -1110,5 +1112,5 @@
   "reminderPlanOfferMonths": "{months, plural, =1{Falta 1 mes. T’aviso {rhythm}?} other{Falten {months} mesos. T’aviso {rhythm}?}}",
   "reminderPlanOfferDone": "Fet. T’ho recordaré fins al {date}.",
   "billingReasonReminderPlans": "Amb Pro, demana els avisos amb les teves paraules:",
-  "billingReasonReminderPlansExample": "«una setmana abans i el dia abans a les 8»"
+  "billingReasonReminderPlansExample": "«una setmana abans i el dia abans a les 8»"
 }

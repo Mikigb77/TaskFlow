@@ -1510,6 +1510,12 @@ abstract class AppLocalizations {
   /// **'Add a date to use a reminder'**
   String get dateForReminder;
 
+  /// The capture card's line under the date when a reminder was said for a task with no day; tapping it opens the date.
+  ///
+  /// In en, this message translates to:
+  /// **'To remind you, give it a day.'**
+  String get reminderNeedsDay;
+
   /// No description provided for @chooseAlertTime.
   ///
   /// In en, this message translates to:
@@ -6502,11 +6508,17 @@ abstract class AppLocalizations {
   /// **'Your way'**
   String get reminderPlanYourWay;
 
-  /// Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line.
+  /// Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart.
   ///
   /// In en, this message translates to:
   /// **'For example: “a week before, and the day before at 8”.'**
   String get reminderPlanYourWayHint;
+
+  /// On a task in a shared project, says that a reminder plan rings only for the person who sets it. Shown above the Done button of each open plan in the reminder sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'These reminders are only for you.'**
+  String get reminderPlanJustYou;
 
   /// A small badge beside a choice that comes with TaskFlow Pro. Tapping the choice opens the Pro screen.
   ///
@@ -6760,7 +6772,7 @@ abstract class AppLocalizations {
   /// **'With Pro, ask for reminders in your own words:'**
   String get billingReasonReminderPlans;
 
-  /// On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line.
+  /// On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart.
   ///
   /// In en, this message translates to:
   /// **'“a week before, and the day before at 8”'**

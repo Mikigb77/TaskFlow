@@ -58,8 +58,40 @@ abstract final class ReminderPlans {
     minute % 60,
   );
 
+  /// When a plan's reminder [daysBefore] [anchor]'s day rings: at [minute],
+  /// except on the day itself with a [dayLead], [dayLead] minutes before the
+  /// anchor's time.
+  static DateTime moment(
+    DateTime anchor,
+    int daysBefore,
+    int minute, {
+    int? dayLead,
+  }) => daysBefore == 0 && dayLead != null
+      ? anchor.subtract(Duration(minutes: dayLead))
+      : at(anchor, daysBefore, minute);
+
+  /// How long before its time the day's own reminder of [task]'s plan rings
+  /// when the anchor has a time (D1): as the task's single reminder would,
+  /// with its own lead, else [defaultLead] (Settings' «Tareas con hora», -1
+  /// when off). Only a lead that still rings on the anchor's own day counts.
+  /// Null when the anchor has no time or no lead does: the day's reminder
+  /// then rings at the plan's time, as the others do.
+  static int? dayLead(Task task, int defaultLead) {
+    final day = anchor(task);
+    final timed = task.deadline != null ? task.deadlineHasTime : task.hasTime;
+    if (day == null || !timed) return null;
+    for (final lead in [task.reminderMinutes, defaultLead]) {
+      if (lead == null || lead < 0) continue;
+      if (Task.day(day.subtract(Duration(minutes: lead))) == Task.day(day)) {
+        return lead;
+      }
+    }
+    return null;
+  }
+
   /// Every reminder of [plan] still to come after [now], earliest first,
-  /// counted back from [anchor]'s day at [minute]; then, with [late], the
+  /// counted back from [anchor]'s day at [minute], the day's own [dayLead]
+  /// minutes before the anchor's time when it's set; then, with [late], the
   /// one last notice the day after.
   static List<PlanAlert> alerts(
     ReminderPlan plan,
@@ -67,10 +99,11 @@ abstract final class ReminderPlans {
     int minute,
     DateTime now, {
     bool late = true,
+    int? dayLead,
   }) {
     final result = <PlanAlert>[];
     for (final day in plan.days.reversed) {
-      final when = at(anchor, day, minute);
+      final when = moment(anchor, day, minute, dayLead: dayLead);
       if (when.isAfter(now)) result.add(PlanAlert(when, day));
     }
     if (late) {
@@ -81,11 +114,13 @@ abstract final class ReminderPlans {
   }
 
   /// [task]'s reminders still to come, with its plan in effect and
-  /// [dateOnlyTime] from Settings. None for a task that's done.
+  /// [dateOnlyTime] and [defaultLead] («Tareas sin hora» and «Tareas con
+  /// hora») from Settings. None for a task that's done.
   static List<PlanAlert> taskAlerts(
     Task task,
     int? dateOnlyTime,
     DateTime now, {
+    required int defaultLead,
     bool late = true,
   }) {
     final plan = active(task);
@@ -96,6 +131,7 @@ abstract final class ReminderPlans {
       minute(plan, dateOnlyTime),
       now,
       late: late,
+      dayLead: dayLead(task, defaultLead),
     );
   }
 

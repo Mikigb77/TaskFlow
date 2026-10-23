@@ -84,8 +84,10 @@ class CaptureDraft {
       checklist: draft.checklist,
       notes: draft.notes,
       // Reminders said while dictating; a note takes none. Minutes before
-      // count only when what the reminder is about has a time.
-      reminderMinutes: draft.kind != 'note' && _timedReminder(draft)
+      // count only when what the reminder is about has a time, or wait for
+      // the day a task said without one gets on the card.
+      reminderMinutes:
+          draft.kind != 'note' && (_timedReminder(draft) || _waitsForDay(draft))
           ? draft.reminderMinutes
           : null,
       reminderPlan: draft.kind == 'note' ? null : draft.reminderPlan,
@@ -106,6 +108,11 @@ class CaptureDraft {
       draft.dueDate == null && draft.deadline != null
       ? draft.deadlineHasTime
       : draft.dueDate != null && draft.hasTime;
+
+  /// A reminder said for a task with neither a day nor a deadline, which the
+  /// server keeps for the day the task gets.
+  static bool _waitsForDay(TaskDraft draft) =>
+      draft.reminderNeedsDay && draft.dueDate == null && draft.deadline == null;
 
   bool get pending => savedTaskId == null && !removed;
   bool get ready =>

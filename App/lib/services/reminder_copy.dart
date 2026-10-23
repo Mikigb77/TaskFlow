@@ -133,6 +133,18 @@ class ReminderCopy {
         : strings.notificationInMinutes(at, lead);
   }
 
+  /// A plan's notice on its timed anchor's own day, at [when], [lead]
+  /// minutes before (D1): the single reminder's text for that anchor, «Hoy a
+  /// las 17:00 · en 10 min», or «Fecha límite: hoy a las 17:00». A snoozed
+  /// one passes lead 0.
+  String planDayBody(Task task, DateTime when, int lead) => body(
+    task.copyWith(
+      reminderAnchor: task.deadline != null ? 'deadline' : 'planned',
+    ),
+    when,
+    lead,
+  );
+
   /// [value]'s time as the app's clock writes it, and the hour as shown:
   /// Spanish and Catalan say `a la 1:00` but `a las 17:00`.
   ({String clock, int hour}) _clock(DateTime value) {

@@ -68,14 +68,23 @@ class ReminderPlan {
   static const strengths = [gentle, normal, intense];
   static const saidLimit = 200;
 
-  /// The three strengths as phases, each with a reminder on the day itself.
+  /// The strengths start at most 4 weeks before the day (D2); a rhythm said
+  /// or typed is kept as said, up to [PlanPhase.longest].
+  static const strengthStart = 28;
+
+  /// The three strengths as phases, each starting at most [strengthStart]
+  /// days before the day and with a reminder on the day itself: at most 8
+  /// reminders for [gentle], 15 for [normal] and 22 for [intense].
   static const strengthPhases = {
-    // Every 7 days down to 4 days before, then daily the last 3 and the day.
-    gentle: [PlanPhase(PlanPhase.longest, 4, 7), PlanPhase(3, 0, 1)],
-    // Every 3 days down to 8 days before, then daily the last 7 and the day.
-    normal: [PlanPhase(PlanPhase.longest, 8, 3), PlanPhase(7, 0, 1)],
-    // Every 2 days down to 15 days before, then daily the last 14 and the day.
-    intense: [PlanPhase(PlanPhase.longest, 15, 2), PlanPhase(14, 0, 1)],
+    // Every 7 days from 25 down to 4 days before, then daily the last 3 and
+    // the day.
+    gentle: [PlanPhase(strengthStart, 4, 7), PlanPhase(3, 0, 1)],
+    // Every 3 days from 26 down to 8 days before, then daily the last 7 and
+    // the day.
+    normal: [PlanPhase(strengthStart, 8, 3), PlanPhase(7, 0, 1)],
+    // Every 2 days from 27 down to 15 days before, then daily the last 14 and
+    // the day.
+    intense: [PlanPhase(strengthStart, 15, 2), PlanPhase(14, 0, 1)],
   };
 
   final String kind;

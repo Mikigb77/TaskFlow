@@ -256,6 +256,7 @@
   "reminder": "Recordatorio",
   "off": "Desactivado",
   "dateForReminder": "Añade una fecha para usar un recordatorio",
+  "reminderNeedsDay": "Para recordártelo, ponle un día.",
   "chooseAlertTime": "Elegir hora del aviso",
   "reminderDefaultsError": "No se pudieron cargar los valores predeterminados. Revisa los ajustes de notificaciones.",
   "loadingReminders": "Cargando los ajustes de recordatorios…",
@@ -1363,7 +1364,8 @@
   "reminderPlanNormal": "Normal",
   "reminderPlanIntense": "Intenso",
   "reminderPlanYourWay": "A tu manera",
-  "reminderPlanYourWayHint": "Por ejemplo: «una semana antes y el día antes a las 8».",
+  "reminderPlanYourWayHint": "Por ejemplo: «una semana antes y el día antes a las 8».",
+  "reminderPlanJustYou": "Estos avisos son solo para ti.",
   "proBadge": "Pro",
   "reminderPlanSpeak": "Dictarlo",
   "reminderPlanStopListening": "Dejar de escuchar",
@@ -1406,5 +1408,5 @@
   "reminderPlanOfferMonths": "{months, plural, =1{Falta 1 mes. ¿Te aviso {rhythm}?} other{Faltan {months} meses. ¿Te aviso {rhythm}?}}",
   "reminderPlanOfferDone": "Listo. Te lo recordaré hasta el {date}.",
   "billingReasonReminderPlans": "Con Pro, pide los avisos con tus palabras:",
-  "billingReasonReminderPlansExample": "«una semana antes y el día antes a las 8»"
+  "billingReasonReminderPlansExample": "«una semana antes y el día antes a las 8»"
 }

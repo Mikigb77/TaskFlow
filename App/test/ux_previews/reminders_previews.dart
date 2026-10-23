@@ -43,7 +43,7 @@ const planLine = Screen(
 const planCard = Screen(
   'reminders',
   'capture-card',
-  'A dictation with a rhythm said: its «Recordatorio» row on the capture\'s card, or its line in a collapsed row',
+  'A dictation with a rhythm said: its «Recordatorio» row on the capture\'s card, or its line in a collapsed row; with no day, a line under the date asking for one',
   sources: [
     'lib/widgets/capture_review_editor.dart',
     'lib/models/task_draft.dart',
@@ -80,23 +80,41 @@ String _said(Preview p) => switch (p.variant.lang) {
   _ => 'cada 3 días las dos primeras semanas y luego cada día',
 };
 
-/// A presentation three weeks away, or [days] away, with only a day.
-Task _presentation({ReminderPlan? plan, int days = 21}) => Task(
+/// A presentation three weeks away, or [days] away, with only a day, or at
+/// [hour].
+Task _presentation({ReminderPlan? plan, int days = 21, int? hour}) => Task(
   id: 90,
   title: 'Presentar el proyecto de empresa',
-  dueDate: day(days),
-  hasTime: false,
+  dueDate: day(days, hour ?? 0),
+  hasTime: hour != null,
   priority: 2,
   reminderPlan: plan,
 );
 
+/// «Terminar la presentación», three weeks away in the shared project
+/// «Matemáticas»: for everyone («Todos»), or given to [assigneeName].
+Task _sharedTask({int? assigneeId, String? assigneeName}) => Task(
+  id: 90,
+  title: 'Terminar la presentación',
+  dueDate: day(21),
+  hasTime: false,
+  priority: 1,
+  listId: matematicas.id,
+  assignment: assigneeId == null ? 'group' : 'member',
+  assigneeId: assigneeId,
+  assigneeName: assigneeName,
+);
+
 /// The task's details, with its reminder line in view. Without [pro], an
 /// account with free dictations, and the store answering for the Pro screen.
+/// [task] stands in for the presentation.
 Future<PreviewApp> _detail(
   Preview p, {
   ReminderPlan? plan,
   bool pro = true,
   int days = 21,
+  int? hour,
+  Task? task,
 }) async {
   final app = await PreviewApp.open(
     p,
@@ -105,7 +123,7 @@ Future<PreviewApp> _detail(
     billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
     tasks: [
       ...normalDay(),
-      _presentation(plan: plan, days: days),
+      task ?? _presentation(plan: plan, days: days, hour: hour),
     ],
     projects: allProjects,
   );
@@ -176,6 +194,19 @@ void remindersPreviews() {
 
     preview(
       planSheet,
+      'strength-far',
+      'The same as strength on a task 60 days away: Normal starts at most 4 weeks before the day, so the plan reads «Cada 3 días desde 4 semanas antes, y a diario la última semana», the dots run from that start to the day, and the count is «15 avisos · próximo: …» with the first reminder\'s day, 26 days before the task\'s.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await _detail(p, days: 60);
+        await _openSheet(app);
+        await _tapKey(app, 'reminder-plan-until-day');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      planSheet,
       'your-way',
       '«A tu manera» with Pro: the words typed, as the assistant read them (the field\'s example, «Por ejemplo: …», gives way to the plan), with what the plan gives and Listo, brought into view by the sheet itself.',
       [es1, es2, ca2],
@@ -217,7 +248,7 @@ void remindersPreviews() {
     preview(
       planSheet,
       'your-way-listening-long',
-      '«A tu manera» with Pro at 2×, while the phone listens to a long rhythm: the field grown to four lines, and «Dejar de escuchar» and «Escuchando» still in view under it, with no scrolling.',
+      '«A tu manera» with Pro at 2×, while the phone listens to a long rhythm: the field grown to four lines and scrolled to its end, so it shows the newest words, «…por la mañana y por la tarde», on its last line; «Dejar de escuchar» and «Escuchando» still in view under it, with no scrolling of the sheet.',
       [es2],
       (p) async {
         final app = await _detail(p);
@@ -289,6 +320,34 @@ void remindersPreviews() {
       },
     );
 
+    preview(
+      planSheet,
+      'shared',
+      'A «Todos» task in the shared project «Matemáticas», «Terminar la presentación», three weeks away, «Hasta la fecha límite» open: above Listo, «Estos avisos son solo para ti.», since a plan is each person\'s own.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await _detail(p, task: _sharedTask());
+        await _openSheet(app);
+        await _tapKey(app, 'reminder-plan-until-day');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      planSheet,
+      'given-to-someone',
+      'The same task given to Ana: it rings on Ana\'s phone, not this one, so the sheet has the title and the single reminder\'s rows only, with no «Hasta la fecha límite» or «A tu manera».',
+      [es1],
+      (p) async {
+        final app = await _detail(
+          p,
+          task: _sharedTask(assigneeId: ana, assigneeName: 'Ana'),
+        );
+        await _openSheet(app);
+        await p.shoot();
+      },
+    );
+
     // -------------------------------------------------------- task line
     preview(
       planLine,
@@ -312,6 +371,22 @@ void remindersPreviews() {
       },
     );
 
+    preview(
+      planLine,
+      'timed-today',
+      'A task today at 17:00 with Normal, at 9:41: «Recordatorios normales hasta hoy · próximo: hoy, 16:50». On a timed task\'s own day its plan rings at the task\'s usual reminder, 10 minutes before, not at the plan\'s 09:00.',
+      [es1, es2],
+      (p) async {
+        await _detail(
+          p,
+          plan: const ReminderPlan.rhythm(ReminderPlan.normal),
+          days: 0,
+          hour: 17,
+        );
+        await p.shoot();
+      },
+    );
+
     // ----------------------------------------------------- capture card
     preview(
       planCard,
@@ -320,6 +395,39 @@ void remindersPreviews() {
       [es1, es2, ca2],
       (p) async {
         await _planCapture(p);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      planCard,
+      'needs-day',
+      'Said: «Llamar a mamá, recuérdamelo cada día», with no day. The date line reads «Sin fecha», with «Para recordártelo, ponle un día.» under it, whose tap opens the date; there is no «Recordatorio» row.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          reminders: const ReminderPreferences(enabled: true, asked: true),
+        );
+        const transcript = 'Llamar a mamá, recuérdamelo cada día';
+        await resume(app, [
+          CaptureDraft.fromAI(
+            TaskDraft.fromJson({
+              ...serverTask('Llamar a mamá'),
+              'reminder_plan': {
+                'kind': 'custom',
+                'phases': [
+                  {'from_days': 366, 'to_days': 0, 'every_days': 1},
+                ],
+                'time': null,
+                'said': 'cada día',
+              },
+              'reminder_needs_day': true,
+              'transcript': transcript,
+            }),
+          ),
+        ], transcript: transcript);
         await p.shoot();
       },
     );

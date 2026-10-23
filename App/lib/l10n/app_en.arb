@@ -461,6 +461,10 @@
   "reminder": "Reminder",
   "off": "Off",
   "dateForReminder": "Add a date to use a reminder",
+  "reminderNeedsDay": "To remind you, give it a day.",
+  "@reminderNeedsDay": {
+    "description": "The capture card's line under the date when a reminder was said for a task with no day; tapping it opens the date."
+  },
   "chooseAlertTime": "Choose alert time",
   "reminderDefaultsError": "Reminder defaults could not load. Check notification settings.",
   "loadingReminders": "Loading reminder settings…",
@@ -3429,7 +3433,11 @@
   },
   "reminderPlanYourWayHint": "For example: “a week before, and the day before at 8”.",
   "@reminderPlanYourWayHint": {
-    "description": "Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line."
+    "description": "Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart."
+  },
+  "reminderPlanJustYou": "These reminders are only for you.",
+  "@reminderPlanJustYou": {
+    "description": "On a task in a shared project, says that a reminder plan rings only for the person who sets it. Shown above the Done button of each open plan in the reminder sheet."
   },
   "proBadge": "Pro",
   "@proBadge": {
@@ -3780,6 +3788,6 @@
   },
   "billingReasonReminderPlansExample": "“a week before, and the day before at 8”",
   "@billingReasonReminderPlansExample": {
-    "description": "On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep a no-break space between the preposition and the hour, so the hour never wraps alone onto its own line."
+    "description": "On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart."
   }
 }

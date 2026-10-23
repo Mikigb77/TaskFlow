@@ -144,4 +144,12 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - U+00A0 in «las 8» stopped the lone «8» but left «a» dangling (UX-2019 → UX-2020, open).
     - Bind the whole phrase («a las 8», «a les 8») and check es 1×/2× renders, not only the widest locale.
 
+33. **A new line inserted between an element and its attached question.**
+    - The needs-day line went "under the date", landing between the date line and its open «¿Qué día?» box, asking for the day twice (R1A-1 → UX-2023).
+    - When adding a row next to a field, check the field's open-question/helper children first; new rows go after them.
+
+34. **A new preview exposes an old narrow-label wrap.**
+    - P253's far-date strength preview showed the strip's end label «dt., 22 de des.» wrapping its final «.» at ca 2× (`reminder_plan_sheet.dart` strip labels each `Expanded` half width); pre-existing, not filed.
+    - Abbreviated Catalan dates end in «.»; check half-width date labels at ca 2× with far dates.
+
 Related: [[ui-patterns]], [[review-techniques]].

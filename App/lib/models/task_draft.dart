@@ -42,10 +42,15 @@ class TaskDraft {
   final ReminderPlan? reminderPlan;
   final int? reminderMinutes;
 
+  /// A reminder was said for a task with neither a day nor a deadline: it
+  /// applies once the task has a day. Absent from older servers.
+  final bool reminderNeedsDay;
+
   TaskDraft.fromJson(Map<String, dynamic> data)
     : title = data['title'] as String,
       reminderPlan = ReminderPlan.tryParse(data['reminder_plan']),
       reminderMinutes = _minutes(data['reminder_minutes']),
+      reminderNeedsDay = data['reminder_needs_day'] == true,
       clarifications = (data['clarifications'] as List? ?? [])
           .map(
             (value) =>

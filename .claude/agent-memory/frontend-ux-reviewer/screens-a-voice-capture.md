@@ -55,7 +55,7 @@ Current as of 2026-10-13 (whole-app run, slice A). The capture direction in UX_R
   - the snackbar "1 tarea guardada · Deshacer" never times out.
 - **Voice notes:** Notes → "Dictar una nota" → "Revisar nota" → "Guardar". The whole transcript becomes the title.
 
-- **Reminder on the result card (2026-10-22):** a said reminder or rhythm shows a «Recordatorio» row under the date (plan line); otherwise it's inside «Más opciones» and stays there when changed. Collapsed multi-task rows show a bell line only for a said plan or a reminder changed there. Open: UX-2021 (the «A tu manera» field shows the start of long words, not the newest, while listening). See [[ui-patterns]] › Reminder plans.
+- **Reminder on the result card (2026-10-22):** a said reminder or rhythm shows a «Recordatorio» row under the date (plan line); otherwise it's inside «Más opciones» and stays there when changed. Collapsed multi-task rows show a bell line only for a said plan or a reminder changed there. A said reminder with no day shows «Para recordártelo, ponle un día.» under the date (after its open question) instead (2026-10-23). Plans show only when the task rings on this phone. See [[ui-patterns]] › Reminder plans.
 
 ## Recovery
 - **The path back:**

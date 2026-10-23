@@ -45,12 +45,15 @@ void reminderWorker() {
 
 /// How a reminder shows. Marked as a reminder, so Do Not Disturb lets it
 /// through when its «Reminders» exception is allowed. A plan's notice offers
-/// only «Completar»: a snooze would bring the same notice back.
+/// only «Completar»: a snooze would bring the same notice back. Its notice on
+/// a timed day, at the task's usual reminder, is that reminder, with its
+/// «Posponer 10 min».
 @visibleForTesting
 NotificationDetails reminderNotificationDetails(PlannedReminder reminder,
     {bool silent = false}) {
   final l = lookupAppLocalizations(Locale(reminder.languageCode));
-  final ofPlan = ReminderEngine.isPlanAlert(reminder.identity);
+  final ofPlan = ReminderEngine.isPlanAlert(reminder.identity) &&
+      !ReminderEngine.isPlanDayAlert(reminder.identity);
   return NotificationDetails(
       android: AndroidNotificationDetails(
           'taskflow_reminders', l.notificationChannel,

@@ -194,10 +194,21 @@ class CaptureStore {
   }
 
   /// [task] as a draft saves it: a plan that no longer applies (the day
-  /// cleared, a repeat added on the card) isn't kept, so a day given later
-  /// can't turn it back on unseen.
-  static Task withoutStalePlan(Task task) =>
-      ReminderPlans.plannable(task) ? task : task.copyWith(reminderPlan: null);
+  /// cleared, a repeat added on the card) isn't kept, nor a lead on a task
+  /// with neither a day nor a deadline, so a day given later can't turn
+  /// them back on unseen.
+  static Task withoutStalePlan(Task task) {
+    final stalePlan =
+        task.reminderPlan != null && !ReminderPlans.plannable(task);
+    final lead = task.reminderMinutes;
+    final staleLead =
+        task.dueDate == null && task.deadline == null && (lead ?? -1) >= 0;
+    if (!stalePlan && !staleLead) return task;
+    return task.copyWith(
+      reminderPlan: stalePlan ? null : task.reminderPlan,
+      reminderMinutes: staleLead ? null : lead,
+    );
+  }
 
   /// Saved draft IDs remain in the journal even if a task is later deleted.
   /// Repeating Save after a lost response cannot insert the tasks again.

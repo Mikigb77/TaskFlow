@@ -569,6 +569,432 @@ void main() {
       isFalse,
     );
   });
+
+  group(
+    'P252 · D1: on a timed task’s own day, its plan rings at the task’s usual reminder',
+    () {
+      final es = lookupAppLocalizations(const Locale('es'));
+      const normal = ReminderPlan.rhythm(ReminderPlan.normal);
+
+      /// Reminders on, «Tareas sin hora» 9:00, «Tareas con hora» [lead], and
+      /// the app in Spanish on the 24-hour clock.
+      Future<void> settings({int lead = 10}) async {
+        await RegionalPreferenceStore(database).write(
+          const RegionalPreferences(
+            language: 'es',
+            clock: ClockFormat.twentyFour,
+          ),
+        );
+        await ReminderPreferenceStore(database).write(
+          'local',
+          ReminderPreferences(
+            enabled: true,
+            dateOnlyTime: 540,
+            leadMinutes: lead,
+            asked: true,
+          ),
+        );
+      }
+
+      /// «Presentar el proyecto» on Fri 13 Nov 2026 at [hour]:00, with Normal.
+      Task timed({int hour = 17, int? minutes}) => Task(
+        title: 'Presentar el proyecto',
+        priority: 1,
+        dueDate: DateTime(2026, 11, 13, hour),
+        hasTime: true,
+        reminderAnchor: 'planned',
+        reminderPlan: normal,
+        reminderMinutes: minutes,
+      );
+
+      String today(String clock, int hour) =>
+          es.notificationAt('today', '', clock, hour);
+
+      /// The task's pending notice on Fri 13 Nov, or null.
+      (DateTime, String)? fridays() => pending()
+          .where((alert) => Task.day(alert.$1) == DateTime(2026, 11, 13))
+          .singleOrNull;
+
+      MapEntry<int, PlannedReminder> onDay(DateTime day) => driver
+          .pending
+          .entries
+          .singleWhere((entry) => Task.day(entry.value.when) == day);
+
+      List<String?> actionIds(PlannedReminder reminder) => [
+        for (final action in reminderNotificationDetails(
+          reminder,
+        ).android!.actions!)
+          action.id,
+      ];
+
+      test(
+        'UX-2001: a Normal task at 17:00 rings on its day at 16:50, «Hoy a las 17:00 · en 10 min», not at 9:00; earlier days and the day after keep 9:00; 13 notices still',
+        () async {
+          await settings();
+          await add(timed());
+          await engine.reconcile('local');
+          expect(pending().map((alert) => alert.$1), [
+            DateTime(2026, 10, 24, 9),
+            DateTime(2026, 10, 27, 9),
+            DateTime(2026, 10, 30, 9),
+            DateTime(2026, 11, 2, 9),
+            DateTime(2026, 11, 12, 9),
+            DateTime(2026, 11, 13, 16, 50),
+            DateTime(2026, 11, 14, 9),
+          ]);
+          expect(pending().skip(4), [
+            (
+              DateTime(2026, 11, 12, 9),
+              es.reminderPlanNoticeTomorrowAt(17, '17:00'),
+            ),
+            (
+              DateTime(2026, 11, 13, 16, 50),
+              es.notificationInMinutes(today('17:00', 17), 10),
+            ),
+            (DateTime(2026, 11, 14, 9), es.reminderPlanNoticeWas),
+          ]);
+          expect(
+            pending().where((alert) => alert.$1 == DateTime(2026, 11, 13, 9)),
+            isEmpty,
+            reason: 'Nothing on the day at 9:00.',
+          );
+          // The number of notices doesn't change: as for the same task without
+          // a time.
+          final dateOnly = timed().copyWith(
+            dueDate: DateTime(2026, 11, 13),
+            hasTime: false,
+          );
+          expect(
+            ReminderPlans.taskAlerts(
+              timed(),
+              540,
+              now,
+              defaultLead: 10,
+              late: false,
+            ).length,
+            13,
+          );
+          expect(
+            ReminderPlans.taskAlerts(
+              dateOnly,
+              540,
+              now,
+              defaultLead: 10,
+              late: false,
+            ).length,
+            13,
+          );
+        },
+      );
+
+      test(
+        'UX-2001: at 8:00 the day’s notice rings at 7:50, «Hoy a las 08:00 · en 10 min» on the 24-hour clock',
+        () async {
+          await settings();
+          await add(timed(hour: 8));
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 7, 50),
+            // The time as the app's 24-hour clock writes it.
+            es.notificationInMinutes(today('08:00', 8), 10),
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: the task’s own lead of 60 minutes rings at 16:00, «… · en 1 h»',
+        () async {
+          await settings();
+          await add(timed(minutes: 60));
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 16),
+            es.notificationInHours(today('17:00', 17), 1),
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: no lead of its own and «Tareas con hora» at 30 rings at 16:30, «… · en 30 min»',
+        () async {
+          await settings(lead: 30);
+          await add(timed());
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 16, 30),
+            es.notificationInMinutes(today('17:00', 17), 30),
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: its own «1 día antes» reaches the day before, so Settings’ 10 minutes count: 16:50',
+        () async {
+          await settings();
+          await add(timed(minutes: 1440));
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 16, 50),
+            es.notificationInMinutes(today('17:00', 17), 10),
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: no lead of its own and «Tareas con hora» off: the day’s notice stays at 9:00, «Es hoy a las 17:00»',
+        () async {
+          await settings(lead: -1);
+          await add(timed());
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 9),
+            es.reminderPlanNoticeTodayAt(17, '17:00'),
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: a deadline at 17:00 rings on its day at 16:50, «Fecha límite: hoy a las 17:00»',
+        () async {
+          await settings();
+          await add(
+            Task(
+              title: 'Presentar el proyecto',
+              priority: 1,
+              dueDate: null,
+              hasTime: false,
+              deadline: DateTime(2026, 11, 13, 17),
+              deadlineHasTime: true,
+              reminderAnchor: 'deadline',
+              reminderPlan: normal,
+            ),
+          );
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 16, 50),
+            es.notificationDeadlineAt('today', '', '17:00', 17),
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: a date-only task is unchanged: its day’s notice at 9:00 reads «Es hoy»',
+        () async {
+          await settings();
+          await add(presentation());
+          await engine.reconcile('local');
+          expect(fridays(), (
+            DateTime(2026, 11, 13, 9),
+            es.reminderPlanNoticeToday,
+          ));
+        },
+      );
+
+      test(
+        'UX-2001: the day’s notice has «Completar» and «Posponer 10 min» and task_es; the others only «Completar» and plan_es; a snooze brings it back 10 minutes later as «Hoy a las 17:00»',
+        () async {
+          await settings();
+          await add(timed());
+          await engine.reconcile('local');
+          final day = onDay(DateTime(2026, 11, 13)).value;
+          expect(actionIds(day), ['complete', 'snooze']);
+          expect(
+            reminderNotificationDetails(day).iOS!.categoryIdentifier,
+            'task_es',
+          );
+          for (final other in [
+            DateTime(2026, 11, 12),
+            DateTime(2026, 10, 24),
+          ]) {
+            final notice = onDay(other).value;
+            expect(actionIds(notice), ['complete'], reason: '$other');
+            expect(
+              reminderNotificationDetails(notice).iOS!.categoryIdentifier,
+              'plan_es',
+              reason: '$other',
+            );
+          }
+
+          // It rings at 16:50; «Posponer 10 min» is tapped at 16:52.
+          now = DateTime(2026, 11, 13, 16, 50);
+          driver.ring(now);
+          now = DateTime(2026, 11, 13, 16, 52);
+          final row = (await rows()).singleWhere(
+            (row) =>
+                ReminderEngine.isPlanAlert(row['identity']) &&
+                DateTime.parse(row['fire_at'] as String).toLocal() ==
+                    DateTime(2026, 11, 13, 16, 50),
+          );
+          expect(
+            await engine.action(
+              row['id'] as int,
+              'snooze',
+              token: row['token'] as String,
+            ),
+            isTrue,
+          );
+          final snoozed = driver.pending[row['id']]!;
+          expect(snoozed.when.toLocal(), DateTime(2026, 11, 13, 17, 2));
+          expect(snoozed.body, today('17:00', 17));
+          expect(actionIds(snoozed), ['complete', 'snooze']);
+        },
+      );
+
+      test(
+        'UX-2001, UX-2004: once the 16:50 notice has rung, it is the only plan notice left in the shade; done cancels it, «Deshacer» brings it back',
+        () async {
+          await settings();
+          final task = await add(timed());
+          await engine.reconcile('local');
+          final thursday = onDay(DateTime(2026, 11, 12)).key;
+          final friday = onDay(DateTime(2026, 11, 13)).key;
+
+          // Thursday's rings at 9:00, and the refresh a minute later runs.
+          now = DateTime(2026, 11, 12, 9);
+          driver.ring(now);
+          now = DateTime(2026, 11, 12, 9, 1);
+          await engine.reconcile('local');
+          expect(driver.shade.keys, [thursday]);
+          expect(
+            driver.shade[thursday]!.body,
+            es.reminderPlanNoticeTomorrowAt(17, '17:00'),
+          );
+
+          // Friday's rings at 16:50, and the refresh a minute later runs.
+          now = DateTime(2026, 11, 13, 16, 50);
+          driver.ring(now);
+          now = DateTime(2026, 11, 13, 16, 51);
+          await engine.reconcile('local');
+          expect(driver.cancelled, contains(thursday));
+          expect(driver.shade.keys, [friday]);
+          final body = es.notificationInMinutes(today('17:00', 17), 10);
+          expect(driver.shade[friday]!.body, body);
+
+          // «Completar» on it marks the task done and cancels it.
+          final row = (await rows()).singleWhere((row) => row['id'] == friday);
+          expect(
+            await engine.action(
+              friday,
+              'complete',
+              token: row['token'] as String,
+            ),
+            isTrue,
+          );
+          expect(
+            (await database.getTasks())
+                .singleWhere((t) => t.id == task.id)
+                .isCompleted,
+            isTrue,
+          );
+          expect(driver.cancelled, contains(friday));
+          expect(driver.shade.containsKey(friday), isFalse);
+          expect(
+            driver.pending.values.where(
+              (reminder) => reminder.taskId == task.id,
+            ),
+            isEmpty,
+          );
+
+          // «Deshacer» reopens the task and shows the same notice again, still
+          // the task's reminder, with its snooze.
+          expect(
+            await engine.action(friday, 'undo', token: row['token'] as String),
+            isTrue,
+          );
+          expect(
+            (await database.getTasks())
+                .singleWhere((t) => t.id == task.id)
+                .isCompleted,
+            isFalse,
+          );
+          final back = driver.shown[friday];
+          expect(back, isA<PlannedReminder>());
+          back as PlannedReminder;
+          expect(back.body, body);
+          expect(actionIds(back), ['complete', 'snooze']);
+        },
+      );
+
+      test(
+        'UX-2001: the reminder question’s check is true at 10:00 on the day of a task at 17:00, false at 17:00',
+        () {
+          const preferences = ReminderPreferences(enabled: true);
+          final task = timed();
+          expect(
+            ReminderEngine.alertAhead(
+              task,
+              preferences,
+              DateTime(2026, 11, 13, 10),
+            ),
+            isTrue,
+          );
+          expect(
+            ReminderEngine.alertAhead(
+              task,
+              preferences,
+              DateTime(2026, 11, 13, 17),
+            ),
+            isFalse,
+          );
+        },
+      );
+    },
+  );
+
+  // P253 (UX-1912, the owner's D2): Normal starts at most 4 weeks before.
+  group('P253 · UX-1912', () {
+    test('UX-1912: Normal on Mon 21 Dec rings first on Wed 25 Nov at 9:00, '
+        'never earlier', () async {
+      await remindersOn();
+      await add(
+        Task(
+          title: 'Presentar el proyecto',
+          priority: 1,
+          dueDate: DateTime(2026, 12, 21),
+          hasTime: false,
+          reminderAnchor: 'planned',
+          reminderPlan: const ReminderPlan.rhythm(ReminderPlan.normal),
+        ),
+      );
+      await engine.reconcile('local');
+      final notices = pending();
+      expect(notices, isNotEmpty);
+      expect(notices.first, (
+        DateTime(2026, 11, 25, 9),
+        'Faltan 26 días · lun, 21 dic',
+      ));
+      expect(
+        notices.where(
+          (notice) => notice.$1.isBefore(DateTime(2026, 11, 25, 9)),
+        ),
+        isEmpty,
+      );
+    });
+  });
+
+  // P255 (UX-2013, D5): how many «Ahora no» in a row the offer after saving
+  // has had, per account on this phone, kept in the phone's database.
+  group('P255 · UX-2013: the offer’s «Ahora no» count', () {
+    test('two owners keep separate counts, and a new store on the same '
+        'database reads them back', () async {
+      final store = ReminderPreferenceStore(database);
+      expect(await store.planOfferDeclines('owner-a'), 0);
+      expect(await store.planOfferDeclines('owner-b'), 0);
+      await store.setPlanOfferDeclines('owner-a', 1);
+      await store.setPlanOfferDeclines('owner-a', 2);
+      await store.setPlanOfferDeclines('owner-b', 1);
+      await store.setPlanOfferDeclines('owner-b', 0);
+      expect(await store.planOfferDeclines('owner-a'), 2);
+      expect(await store.planOfferDeclines('owner-b'), 0);
+      final again = ReminderPreferenceStore(database);
+      expect(await again.planOfferDeclines('owner-a'), 2);
+      expect(await again.planOfferDeclines('owner-b'), 0);
+      // The count doesn't touch the tasks already offered, nor the reverse.
+      await again.addPlanOffer('owner-a', 7);
+      expect(await again.planOfferDeclines('owner-a'), 2);
+      expect(await again.planOffers('owner-a'), {7});
+    });
+  });
 }
 
 class _Driver implements ReminderDriver {

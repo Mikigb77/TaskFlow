@@ -44,6 +44,8 @@ final _offeredProvider = Provider<Set<String>>((ref) => {});
 /// a saved task (with its id) whose deadline, else day, is two weeks or more
 /// away and has none (Backend/docs/REMINDER_PLANS.md, «The offer»). Only
 /// when [offerPlan]: an edit save passes false unless it moved that day.
+/// After two «Ahora no» in a row from this account on this phone it's no
+/// longer offered; «Hasta la fecha límite» stays in every task's sheet.
 void askAboutRemindersAfterSave(
   BuildContext context,
   Iterable<Task> saved, {
@@ -193,8 +195,12 @@ Future<void> _ask(
 /// title and day: «Faltan 3 semanas. ¿Te aviso cada 3 días, y a diario la
 /// última semana?». «Sí, recuérdamelo» sets Normal, with Deshacer. At most
 /// once per task, whatever the answer; only for a task that rings on this
-/// phone alone (personal, or assigned to this account, in a project not
-/// muted or archived here), and never when this phone can't ring.
+/// phone (personal, «Todos», assigned to this account, or unassigned in a
+/// project this account manages, in a project not muted or archived here),
+/// since the plan is this account's own, and never when this phone can't
+/// ring. Not after
+/// two «Ahora no» in a row from this account on this phone: «Sí» starts the
+/// count again, and closing the sheet without an answer leaves it as it was.
 Future<void> _offer(
   ProviderContainer container,
   NavigatorState navigator,
@@ -204,6 +210,14 @@ Future<void> _offer(
   DateTime now,
   int? dateOnlyTime,
 ) async {
+  int declines;
+  try {
+    declines = await store.planOfferDeclines(owner);
+  } catch (_) {
+    declines = 0;
+  }
+  // Two «Ahora no» in a row: no longer asked.
+  if (declines >= 2) return;
   final me = container.read(authProvider).account?.id;
   final offered = container.read(_offeredProvider);
   Set<int> before;
@@ -218,14 +232,13 @@ Future<void> _offer(
   } catch (_) {
     projects = const [];
   }
-  // A plan on a «Todos» task rings every member's phone; one in a project
-  // muted or archived here never rings on this one (UX-1601's rule).
-  bool ringsHereAlone(Task task) {
-    if (task.assignment != 'personal' &&
-        !(task.assignment == 'member' && me != null && task.assigneeId == me)) {
-      return false;
+  // A plan is this account's own, so «Sí» rings only here, on a shared task
+  // too; but not on a task for someone else, nor in a project muted or
+  // archived here (UX-1601's rule).
+  bool ringsHere(Task task) {
+    if (task.listId == null) {
+      return TaskDatabase.reminderBlock(task, me) == null;
     }
-    if (task.listId == null) return true;
     final project = projects
         .where((project) => project.id == task.listId)
         .firstOrNull;
@@ -245,7 +258,7 @@ Future<void> _offer(
       .where(
         (task) =>
             task.id != null &&
-            ringsHereAlone(task) &&
+            ringsHere(task) &&
             ReminderPlans.offerable(task, now) &&
             !before.contains(task.id) &&
             !offered.contains('$owner/${task.id}'),
@@ -273,6 +286,14 @@ Future<void> _offer(
       dateOnlyTime: dateOnlyTime,
     ),
   );
+  // Only the answers count: «Ahora no» adds one, «Sí» starts again.
+  if (yes != null) {
+    unawaited(
+      store
+          .setPlanOfferDeclines(owner, yes ? 0 : declines + 1)
+          .catchError((Object _) {}),
+    );
+  }
   if (yes != true || !navigator.mounted) return;
   // The task as it is now: only one that still has no plan gets Normal.
   final current = container

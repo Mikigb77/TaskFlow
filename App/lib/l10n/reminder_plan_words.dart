@@ -28,7 +28,9 @@ String planWhen(DateTime date, DateTime now) =>
 /// The plan's rhythm in words, from the phases with reminders still to come:
 /// «Cada 3 días, y a diario la última semana». A phase already over isn't
 /// said; once every reminder has gone by, the whole plan is. Without
-/// [capitalized], it reads as it does after a colon: «cada 3 días, …».
+/// [capitalized], it reads as it does after a colon: «cada 3 días, …». With
+/// a [dayLead], the day's own reminder rings that long before the anchor's
+/// time ([ReminderPlans.dayLead]).
 String planRhythm(
   AppLocalizations l,
   ReminderPlan plan, {
@@ -36,12 +38,18 @@ String planRhythm(
   required DateTime now,
   required int minute,
   bool capitalized = true,
+  int? dayLead,
 }) {
   final until = math.max(0, ReminderPlans.daysUntil(anchor, now));
   final phases = [...plan.phases]
     ..sort((a, b) => b.fromDays.compareTo(a.fromDays));
   bool ahead(PlanPhase phase) => phase.days.any(
-    (day) => ReminderPlans.at(anchor, day, minute).isAfter(now),
+    (day) => ReminderPlans.moment(
+      anchor,
+      day,
+      minute,
+      dayLead: dayLead,
+    ).isAfter(now),
   );
   final shown = phases.where(ahead).toList();
   final said = shown.isEmpty ? phases : shown;
@@ -65,6 +73,7 @@ String planSummary(
   required int minute,
   required String locale,
   bool bare = false,
+  int? dayLead,
 }) {
   final when = planWhen(anchor, now);
   final day = planDay(anchor, now, locale);
@@ -80,6 +89,7 @@ String planSummary(
     now: now,
     minute: minute,
     capitalized: false,
+    dayLead: dayLead,
   );
   return bare ? rhythm : l.reminderPlanOwnLine(rhythm);
 }
@@ -87,6 +97,7 @@ String planSummary(
 /// The task's one line: the plan, then its next reminder on or before the
 /// task's day, with its time («… · próximo: sáb 24, 9:00»). A task that's
 /// [done] reads as the plan alone. [clock] writes a time as the app does.
+/// [dayLead] as [planRhythm] takes it.
 String planLine(
   AppLocalizations l,
   ReminderPlan plan, {
@@ -97,6 +108,7 @@ String planLine(
   required String Function(DateTime time) clock,
   bool done = false,
   bool bare = false,
+  int? dayLead,
 }) {
   final summary = planSummary(
     l,
@@ -106,6 +118,7 @@ String planLine(
     minute: minute,
     locale: locale,
     bare: bare,
+    dayLead: dayLead,
   );
   // The last notice, the day after, isn't promised: nothing rings for the
   // task itself then.
@@ -117,6 +130,7 @@ String planLine(
           minute,
           now,
           late: false,
+          dayLead: dayLead,
         ).firstOrNull;
   return next == null
       ? summary
@@ -129,7 +143,8 @@ String planLine(
 }
 
 /// The preview's count and next reminder: «13 avisos · próximo: sáb 24,
-/// 9:00». [clock] writes a time as the app does.
+/// 9:00». [clock] writes a time as the app does. [dayLead] as [planRhythm]
+/// takes it.
 String planCount(
   AppLocalizations l,
   ReminderPlan plan, {
@@ -138,8 +153,16 @@ String planCount(
   required int minute,
   required String locale,
   required String Function(DateTime time) clock,
+  int? dayLead,
 }) {
-  final alerts = ReminderPlans.alerts(plan, anchor, minute, now, late: false);
+  final alerts = ReminderPlans.alerts(
+    plan,
+    anchor,
+    minute,
+    now,
+    late: false,
+    dayLead: dayLead,
+  );
   if (alerts.isEmpty) return l.reminderPlanNoneLeft;
   final next = alerts.first.when;
   return l.reminderPlanCount(
