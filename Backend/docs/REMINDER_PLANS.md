@@ -2,7 +2,7 @@
 
 Decided by the owner on 2026-10-22 (`.claude/ux-review/DECISIONS.md`, «Reminder plans», and his answers to D1–D7 of run 2026-10-22-changes the same evening). A reminder plan nudges about one task more and more often as its day comes closer: «Presentar el proyecto en 3 semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». It's never a copy of the task: the task stays one row on its day, and the plan only sends notifications about it.
 
-A plan is personal: it rings only for the person who set it, and each member of a shared project can set their own on the same task (D6).
+**Every reminder is personal.** A plan rings only for the person who set it, and each member of a shared project can set their own on the same task (D6). The single reminder is personal too, with its lead, its time and what it counts from: one person's change never reaches anyone else's phone (the owner, 2026-10-23).
 
 ## Who gets what
 
@@ -24,11 +24,20 @@ The plan counts back from the task's **deadline** when it has one, otherwise fro
 
 ## The field: `reminder_plan`
 
-Each person's own plan for a task (D6). The server keeps one per person and task (`TaskReminderPlan`), and the task API shows it as the task's `reminder_plan`, always the plan of the account asking:
-- **Reading:** every task answer carries your own plan, or `null`. Nobody else's is ever sent.
-- **Writing:** a task `PUT` with `reminder_plan` sets your own plan, and `null` removes it. Without the key, the plan stays as it is.
-- **A change to your plan alone isn't a change to the task:** no new `version`, no activity entry, no notification to the project. Your other phones get it at their next sync, which reads every task anyway. A `PUT` whose `version` is stale still saves the plan before it answers 409.
-- **Plans set before D6** became the plan of the person whose phone rang for the task: the person it's given to, else its creator, else its owner (migration 0024).
+Each person's own reminders for a task. The server keeps one row per person and task (`TaskReminder`), and the task API shows it as the task's four reminder fields, always those of the account asking:
+
+| Field | Meaning | Default |
+|---|---|---|
+| `reminder_minutes` | Minutes before a timed task; `-1` is no reminder | `null`: the lead in Settings |
+| `reminder_time` | A date-only task's reminder time, in minutes after midnight | `null`: the time in Settings |
+| `reminder_anchor` | What the single reminder counts from: `"planned"` or `"deadline"` | `"planned"` |
+| `reminder_plan` | The plan, below | `null`: no plan |
+
+- **Reading:** every task answer carries your own values, or the defaults. Nobody sees anyone else's.
+- **Writing:** a task `PUT` sets your own values for the fields it sends. A field it leaves out stays as it is. Back at every default, the row goes.
+- **A change to your reminders alone isn't a change to the task:** no new `version`, no activity entry, no notification to the project. Your other phones get it at their next sync, which reads every task anyway. A `PUT` whose `version` is stale still saves your reminders before it answers 409.
+- **The deadline:** `reminder_anchor` `"deadline"` is refused for a task without one. When someone removes a task's deadline, everyone's reminders on it count from the planned start again.
+- **Reminders chosen before they were personal** went to the person whose phone rang for the task: the person it's given to, else its creator, else its owner (plans in migration 0024, single reminders in 0025). Everyone else has their defaults.
 
 The plan is `null`, or
 
@@ -59,6 +68,7 @@ A rhythm the person says or types (`custom`) is kept as said, however far back i
 
 - A plan replaces the single reminder: with a plan, `reminder_minutes` and `reminder_time` are left as they are but not used. The sheet's choices are exclusive: no reminders, once (today's single reminder), until the day (a strength), or «A tu manera».
 - **Except on the day of a timed task (D1).** A task with a time, or a deadline with a time, gets that day's notice at the single reminder's moment: its own lead (`reminder_minutes`, when it's 0 or more), else «Tareas con hora» (10 minutes by default), in the single reminder's words («Hoy a las 17:00 · en 10 min»). The earlier days keep the plan's time, and the number of notices doesn't change.
+- **A time of the plan's own stays (D8).** A plan whose `time` was said or typed («recuérdamelo el mismo día a las 9», «cada día a las 8») keeps that time on the task's day too. Only a plan without a time of its own (a strength, «Sí» to the offer, a rhythm said without an hour) moves the day's notice as D1 says.
 - The server checks the shape, and nothing else: the plan is the phone's to schedule.
 
 ## The notifications
@@ -75,7 +85,7 @@ A rhythm the person says or types (`custom`) is kept as said, however far back i
   - **The strengths:** Suave, Normal and Intenso sit under «Hasta la fecha límite».
   - **«A tu manera»:** a text field with a microphone, «Escríbelo o dilo como se lo dirías a alguien.» The words go to `POST /api/ai/reminder-plan/`, and the preview updates. It needs a connection; offline it says so, and the strengths still work.
 - **The offer:** after saving a task whose anchor is 14 or more days away, with no plan, the reminder question offers one: «Faltan 3 semanas: ¿te lo recuerdo hasta entonces?», where «Sí» sets Normal. It's asked at most once per task, and never when reminders are off. After two «Ahora no» in a row on this phone it's no longer asked; «Hasta la fecha límite» stays in every task's sheet (D5).
-- **Shared tasks (D6):** the plan choices show wherever the task's reminders ring on this phone: a personal task, a «Todos» task, one given to you, and an unassigned one in a project you manage. They don't show on a task given to someone else. On a shared task the sheet says that a plan rings only for you, and the offer can come for it too, since «Sí» sets only your own plan.
+- **Shared tasks (D6, and the single reminder since 2026-10-23):** the reminder choices show wherever the task's reminders ring on this phone: a personal task, a «Todos» task, one given to you, and an unassigned one in a project you manage. They don't show on a task given to someone else, whose reminders are theirs and never sent to this phone. On a shared task the sheet says that its reminders ring only for you, and the offer can come for it too, since «Sí» sets only your own plan.
 - **The capture's review card:** a plan read from a dictation shows as its one line, like the other details. Tapping it opens the same sheet.
 
 ## The dictation (drafts)

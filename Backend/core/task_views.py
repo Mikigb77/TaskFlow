@@ -4,21 +4,28 @@ from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
-from .models import Task, TaskReminderPlan
+from .models import Task, TaskReminder
 from .collaboration import record_event, task_change_details
-from .serializers import TaskSerializer
+from .serializers import PERSONAL_REMINDERS, TaskSerializer
 from .attachment_views import delete_task_attachments, check_list_transfer
 from .list_access import visible_tasks, lock_task, display_name
 
-NOT_SENT = object()
 
-
-def set_plan(task, user, plan):
-    """The person's own reminder plan for the task (docs/REMINDER_PLANS.md, D6); None removes it."""
-    if plan is None:
-        TaskReminderPlan.objects.filter(task=task, user=user).delete()
+def set_reminders(task, user, values):
+    """The person's own reminders for the task (docs/REMINDER_PLANS.md): only the values sent
+    change, and a row back at every default goes."""
+    row = TaskReminder.objects.filter(task=task, user=user).first()
+    merged = {**({key: getattr(row, key) for key in TaskReminder.DEFAULTS} if row else TaskReminder.DEFAULTS),
+              **values}
+    if merged == TaskReminder.DEFAULTS:
+        if row:
+            row.delete()
+    elif row:
+        for key, value in values.items():
+            setattr(row, key, value)
+        row.save()
     else:
-        TaskReminderPlan.objects.update_or_create(task=task, user=user, defaults={"plan": plan})
+        TaskReminder.objects.create(task=task, user=user, **merged)
 
 
 class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -27,9 +34,9 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
     lookup_value_regex = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
     def get_queryset(self):
-        mine = TaskReminderPlan.objects.filter(user=self.request.user)
+        mine = TaskReminder.objects.filter(user=self.request.user)
         query = visible_tasks(self.request.user).select_related("created_by", "assignee").prefetch_related(
-            Prefetch("reminder_plans", queryset=mine, to_attr="asker_plans"))
+            Prefetch("reminders", queryset=mine, to_attr="asker_reminders"))
         if self.action == "list" and self.request.query_params.get("include_deleted") != "true":
             query = query.filter(is_deleted=False)
         return query
@@ -45,20 +52,23 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
             previous = dict(task.__dict__) if task else {}
             serializer = self.get_serializer(task, data=request.data)
             serializer.is_valid(raise_exception=True)
-            # The asker's own plan isn't part of the task: no version, activity or notification.
-            plan = serializer.validated_data.pop("reminder_plan", NOT_SENT)
+            # The asker's own reminders aren't part of the task: no version, activity or notification.
+            personal = {PERSONAL_REMINDERS[key]: serializer.validated_data.pop(key)
+                        for key in PERSONAL_REMINDERS if key in serializer.validated_data}
+            if serializer.validated_data.get("kind", task.kind if task else "task") == "note":
+                personal = {}  # A note has no reminders; the serializer refused any that were set.
             destination = serializer.validated_data.get("task_list", task.task_list if task else None)
             if task and task.task_list_id and locked[task.task_list_id].shared and (destination is None or destination.pk != task.task_list_id):
                 raise ValidationError({"list_id": "Shared tasks stay in their list. Export and import a personal copy if needed."})
             expected = serializer.validated_data.get("version", 0)
-            if task and plan is not NOT_SENT:
-                # Saved even when the version is stale: nobody else can have changed it.
-                set_plan(task, request.user, plan)
+            if task and personal:
+                # Saved even when the version is stale: nobody else can have changed them.
+                set_reminders(task, request.user, personal)
             if task and expected != task.version:
                 return Response({"detail": "This task changed on another device.", "current": self.get_serializer(task).data}, status=409)
             if not task and expected != 0:
                 raise ValidationError({"version": "New tasks must start at version 0."})
-            if task and plan is not NOT_SENT and serializer.leaves_unchanged(task):
+            if task and personal and serializer.leaves_unchanged(task):
                 return Response(self.get_serializer(task).data)
             check_list_transfer(task, destination)
             is_new = task is None
@@ -74,8 +84,11 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
                 if not current:
                     raise NotFound()
                 return Response({"detail": "Task was already uploaded.", "current": self.get_serializer(current).data}, status=409)
-            if is_new and plan not in (NOT_SENT, None):
-                set_plan(task, request.user, plan)
+            if is_new and personal:
+                set_reminders(task, request.user, personal)
+            if task.deadline_at is None and task.deadline_date is None:
+                # Without a deadline, everyone's reminder counts from the planned start again.
+                TaskReminder.objects.filter(task=task, anchor="deadline").update(anchor="planned")
             details = task_change_details(previous, task)
             action = "deleted" if task.is_deleted else ("created" if is_new else "updated")
             if not is_new and not task.is_deleted:

@@ -2,6 +2,10 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-23 — D8 of run 2026-10-22-changes, and the single reminder on shared tasks
+- **D8 (UX-2022), a time said for the day itself:** (b), as recommended: "yeah, absolutely, it should be kept". A plan with a time of its own, said or typed («recuérdamelo el mismo día a las 9», «cada día a las 8»), keeps that time on the task's own day too. Only plans without a time of their own (the strengths, «Sí» to the offer, a rhythm said without an hour) move the day's notice to the task's usual reminder, as D1 says.
+- **«Una vez» on shared tasks is personal, like plans:** "one person change affects everyone's phone. That shouldn't happen. So it should become personal, like plans. Absolutely." Every reminder choice for a task (none, once and its lead or time, a plan) is each person's own: it rings only for them, and changing it changes nobody else's. Someone who hasn't chosen gets their own defaults from Settings. This closes the Open item of 2026-10-22.
+
 ## 2026-10-22 (evening) — D1–D7 of run 2026-10-22-changes: reminder plans
 The owner answered the run's seven questions. The contract, `Backend/docs/REMINDER_PLANS.md`, says how each works.
 - **D1 (UX-2001), a plan on a timed task:** "let's go with your recommendation". On the anchor's own day, a timed task (or a deadline with a time) rings at its usual reminder: its own lead, else «Tareas con hora» (10 minutes by default), with the single reminder's words («Hoy a las 17:00 · en 10 min»), not at 9:00. Earlier days keep the plan's time, and the count doesn't change.
@@ -348,4 +352,4 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - ~~UX-617~~: answered by the owner on 2026-10-15 (see above).
 - **Finding the tasks that hold files** (from UX-506, b7). When a free account's file space is full, the message asks people to remove files from other tasks, but nothing lists which tasks have files. Whether to add a way to find them is the owner's call: it adds a feature, so the loop doesn't.
 - **The two-tab layout** (U13, D7a): after the UX loop and the owner's tests with his father, family and friends.
-- **The single reminder on shared tasks (2026-10-22, after D6).** Plans are personal since D6, but «Una vez» is still one setting for the whole task, so one member's change rings, or silences, everyone's phone. Making it personal too is the owner's call; until then it stays shared.
+- ~~The single reminder on shared tasks (2026-10-22, after D6)~~: answered by the owner on 2026-10-23: personal, like plans (see above).

@@ -203,7 +203,6 @@ class Task(models.Model):
     deadline_at = models.DateTimeField(null=True, blank=True)
     deadline_date = models.DateField(null=True, blank=True)
     duration_minutes = models.PositiveSmallIntegerField(null=True, blank=True)
-    reminder_anchor = models.CharField(max_length=8, default="planned", choices=[("planned", "planned"), ("deadline", "deadline")])
     recurrence = models.CharField(max_length=8, default="none", choices=[
         (value, value) for value in ("none", "daily", "weekly", "monthly", "yearly")])
     repeat_until = models.DateField(null=True, blank=True)
@@ -212,9 +211,7 @@ class Task(models.Model):
     exceptions = models.JSONField(default=list, blank=True)
     completed_dates = models.JSONField(default=list, blank=True)
     priority = models.PositiveSmallIntegerField(default=1)
-    reminder_minutes = models.SmallIntegerField(null=True, blank=True)
-    reminder_time = models.PositiveSmallIntegerField(null=True, blank=True)
-    # Reminder plans are each person's own: TaskReminderPlan.
+    # Reminders are each person's own: TaskReminder.
     notes = models.TextField(blank=True, default="", max_length=8000)
     checklist = models.JSONField(default=list, blank=True)
     task_list = models.ForeignKey(TaskList, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks")
@@ -229,11 +226,10 @@ class Task(models.Model):
         ordering = ["created_at", "id"]
         indexes = [models.Index(fields=["owner", "updated_at"])]
         constraints = [
-            models.CheckConstraint(condition=models.Q(kind="task") | (models.Q(kind="note", due_date__isnull=True, scheduled_date__isnull=True, deadline_at__isnull=True, deadline_date__isnull=True, duration_minutes__isnull=True, recurrence="none", priority=1, is_completed=False, reminder_time__isnull=True, reminder_anchor="planned") & (models.Q(reminder_minutes__isnull=True) | models.Q(reminder_minutes=-1))), name="valid_item_kind"),
+            models.CheckConstraint(condition=models.Q(kind="task") | models.Q(kind="note", due_date__isnull=True, scheduled_date__isnull=True, deadline_at__isnull=True, deadline_date__isnull=True, duration_minutes__isnull=True, recurrence="none", priority=1, is_completed=False), name="valid_item_kind"),
             models.CheckConstraint(condition=models.Q(priority__gte=1, priority__lte=3), name="valid_priority"),
             models.CheckConstraint(condition=models.Q(deadline_at__isnull=True) | models.Q(deadline_date__isnull=True), name="one_task_deadline"),
             models.CheckConstraint(condition=models.Q(duration_minutes__isnull=True) | models.Q(duration_minutes__gte=1, duration_minutes__lte=1440), name="valid_task_duration"),
-            models.CheckConstraint(condition=models.Q(reminder_anchor="planned") | (models.Q(reminder_anchor="deadline") & (models.Q(deadline_at__isnull=False) | models.Q(deadline_date__isnull=False))), name="valid_reminder_anchor"),
         ]
 
     def save(self, *args, **kwargs):
@@ -243,18 +239,28 @@ class Task(models.Model):
         super().save(*args, **kwargs)
 
 
-class TaskReminderPlan(models.Model):
-    """One person's reminder plan for one task (docs/REMINDER_PLANS.md): reminders more and more
-    often as the task's day comes, ringing only for that person, so each member of a shared project
-    can have their own. The task API shows it as the task's reminder_plan, always the asker's. The
-    phone schedules it, and the server only checks the shape (TaskSerializer)."""
-    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="reminder_plans")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reminder_plans")
-    plan = models.JSONField()
+class TaskReminder(models.Model):
+    """One person's reminders for one task (docs/REMINDER_PLANS.md, «Every reminder is personal»):
+    they ring only for that person, and each member of a shared project has their own. The task API
+    shows them as the task's reminder_minutes, reminder_time, reminder_anchor and reminder_plan,
+    always the asker's; someone with no row has the defaults (null, null, "planned", null). The
+    phone schedules them, and the server only checks their shape (TaskSerializer)."""
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="reminders")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reminders")
+    # Minutes before a timed task; -1 is no reminder, and null the lead in Settings.
+    minutes = models.SmallIntegerField(null=True, blank=True)
+    # A date-only task's reminder time, in minutes after midnight; null is the time in Settings.
+    time = models.PositiveSmallIntegerField(null=True, blank=True)
+    # What the single reminder counts from: the planned start, or the deadline.
+    anchor = models.CharField(max_length=8, default="planned", choices=[("planned", "planned"), ("deadline", "deadline")])
+    # Reminders more and more often as the day comes; null is no plan.
+    plan = models.JSONField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    DEFAULTS = {"minutes": None, "time": None, "anchor": "planned", "plan": None}
+
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["task", "user"], name="one_reminder_plan_per_person")]
+        constraints = [models.UniqueConstraint(fields=["task", "user"], name="one_reminder_per_person")]
 
 
 class TaskEvent(models.Model):

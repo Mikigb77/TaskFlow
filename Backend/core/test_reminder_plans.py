@@ -17,7 +17,7 @@ from . import views
 from .account_deletion import delete_account
 from .ai import (_generate_reviewable_once, build_plan_prompt, build_prompt, extract_tasks, validate_draft,
                  vertex_plan_schema, vertex_response_schema)
-from .models import FreeDictation, ListMembership, Task, TaskEvent, TaskList, TaskNotification, TaskReminderPlan, User
+from .models import FreeDictation, ListMembership, Task, TaskEvent, TaskList, TaskNotification, TaskReminder, User
 from .reminder_plans import InvalidPlan, check_plan, read_plan
 
 REFERENCE = datetime(2026, 10, 22, 8, tzinfo=timezone.utc)  # Thursday 22 October 2026, 10:00 in Madrid.
@@ -122,7 +122,7 @@ class ReminderPlanFieldTests(TestCase):
                          (200, RHYTHM, 1))
         cleared = self.put(reminder_plan=None, version=1)
         self.assertEqual((cleared.status_code, cleared.data["reminder_plan"]), (200, None))
-        self.assertFalse(TaskReminderPlan.objects.exists())
+        self.assertFalse(TaskReminder.objects.exists())
 
     def test_without_a_plan_a_task_has_null(self):
         created = self.put()
@@ -171,7 +171,7 @@ class ReminderPlanFieldTests(TestCase):
         self.assertIsNone(created.data["reminder_plan"])
         later = self.client.put(path, {**note, "version": 1, "reminder_plan": RHYTHM}, format="json")
         self.assertEqual(later.status_code, 400, later.data)
-        self.assertFalse(TaskReminderPlan.objects.exists())
+        self.assertFalse(TaskReminder.objects.exists())
 
 
 class PersonalPlanTests(TestCase):
@@ -248,7 +248,7 @@ class PersonalPlanTests(TestCase):
         self.put(self.ana, 0, reminder_plan=CUSTOM)
         self.put(self.marc, 1, reminder_plan=RHYTHM)
         delete_account(self.marc)
-        self.assertEqual(list(TaskReminderPlan.objects.values_list("user_id", "plan")), [(self.ana.pk, CUSTOM)])
+        self.assertEqual(list(TaskReminder.objects.values_list("user_id", "plan")), [(self.ana.pk, CUSTOM)])
         self.assertEqual(self.plan_seen_by(self.ana), CUSTOM)
 
 
@@ -292,6 +292,109 @@ class PersonalPlansMigrationTests(TransactionTestCase):
         back = dict(apps.get_model("core", "Task").objects.values_list("title", "reminder_plan"))
         self.assertEqual(back, {"Personal": RHYTHM, "Marc's": CUSTOM, "Todos": RHYTHM, "Heredada": CUSTOM,
                                 "Sin plan": None})
+        self.migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+
+class PersonalSingleReminderTests(TestCase):
+    """The owner, 2026-10-23: «Una vez» on a shared task is personal too. One member's choice of a
+    single reminder, its time, what it counts from, or none at all, changes nobody else's."""
+
+    def setUp(self):
+        cache.clear()
+        self.ana = User.objects.create_user("ana-once@example.invalid", PASSWORD, first_name="Ana")
+        self.marc = User.objects.create_user("marc-once@example.invalid", PASSWORD, first_name="Marc")
+        self.project = TaskList.objects.create(owner=self.ana, name="Grupo de mates", shared=True)
+        ListMembership.objects.create(task_list=self.project, user=self.marc, role="editor")
+        self.path = f"/api/tasks/{uuid.uuid4()}/"
+        self.task = {"title": "Presentar en clase", "due_date": "2026-10-29T17:00:00+01:00",
+                     "deadline_date": "2026-10-30", "list_id": str(self.project.pk), "assignment": "group"}
+
+    def client_for(self, user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client
+
+    def put(self, user, version, **fields):
+        return self.client_for(user).put(self.path, {**self.task, "version": version, **fields}, format="json")
+
+    def reminders_seen_by(self, user):
+        data = self.client_for(user).get(self.path).data
+        return tuple(data[key] for key in ("reminder_minutes", "reminder_time", "reminder_anchor", "reminder_plan"))
+
+    def test_each_member_has_their_own_single_reminder(self):
+        created = self.put(self.ana, 0, reminder_minutes=60, reminder_anchor="deadline")
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(self.reminders_seen_by(self.ana), (60, None, "deadline", None))
+        self.assertEqual(self.reminders_seen_by(self.marc), (None, None, "planned", None))  # His defaults.
+        told = TaskNotification.objects.filter(recipient=self.ana).count()
+        silenced = self.put(self.marc, 1, reminder_minutes=-1, reminder_time=540)
+        self.assertEqual((silenced.status_code, silenced.data["version"]), (200, 1))
+        self.assertEqual(self.reminders_seen_by(self.marc), (-1, 540, "planned", None))
+        self.assertEqual(self.reminders_seen_by(self.ana), (60, None, "deadline", None))
+        self.assertEqual(TaskNotification.objects.filter(recipient=self.ana).count(), told)
+        # An app that doesn't send a reminder field keeps it.
+        self.assertEqual(self.put(self.marc, 1, title="Presentar en clase de mates").status_code, 200)
+        self.assertEqual(self.reminders_seen_by(self.marc), (-1, 540, "planned", None))
+        # Back at every default, the row goes.
+        self.put(self.marc, 2, reminder_minutes=None, reminder_time=None)
+        self.assertEqual(list(TaskReminder.objects.values_list("user_id", flat=True)), [self.ana.pk])
+
+    def test_a_deadline_removed_by_anyone_moves_every_kept_anchor_back_to_the_start(self):
+        self.assertEqual(self.put(self.ana, 0, reminder_anchor="deadline", reminder_minutes=30).status_code, 201)
+        self.assertEqual(self.put(self.marc, 1, deadline_date=None, reminder_anchor="planned").status_code, 200)
+        self.assertEqual(self.reminders_seen_by(self.ana), (30, None, "planned", None))
+        # Sending a deadline anchor for a task without a deadline is still refused.
+        refused = self.put(self.ana, 2, deadline_date=None, reminder_anchor="deadline")
+        self.assertEqual(refused.status_code, 400, refused.data)
+        self.assertIn("reminder_anchor", refused.data)
+
+    def test_a_note_keeps_no_reminders(self):
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        note = {"kind": "note", "title": "Ideas", "version": 0, "list_id": str(self.project.pk),
+                "assignment": "group", "reminder_minutes": -1, "reminder_anchor": "planned", "reminder_plan": None}
+        created = self.client_for(self.ana).put(path, note, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(created.data["reminder_minutes"], None)
+        self.assertFalse(TaskReminder.objects.exists())
+
+
+class PersonalRemindersMigrationTests(TransactionTestCase):
+    """Migration 0025: a single reminder chosen on a task before 2026-10-23 goes to the person whose
+    phone it rang on, beside that person's plan; everyone else keeps their defaults."""
+    before = [("core", "0024_personal_reminder_plans")]
+    after = [("core", "0025_personal_reminders")]
+
+    def migrate(self, target):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(target)
+        return executor.loader.project_state(target).apps
+
+    def test_each_single_reminder_goes_to_the_person_it_rang_for_and_back(self):
+        apps = self.migrate(self.before)
+        User, Task, TaskList = (apps.get_model("core", name) for name in ("User", "Task", "TaskList"))
+        ana, marc = (User.objects.create(email=f"{name}-once-migration@example.invalid") for name in ("ana", "marc"))
+        project = TaskList.objects.create(owner=ana, name="Grupo", shared=True)
+        personal = Task.objects.create(owner=ana, created_by=ana, title="Personal", reminder_minutes=30)
+        given = Task.objects.create(owner=ana, created_by=ana, title="Marc's", task_list=project, assignment="member",
+                                    assignee=marc, reminder_time=540, deadline_date="2026-11-12",
+                                    reminder_anchor="deadline")
+        Task.objects.create(owner=ana, created_by=ana, title="Por defecto")
+        Task.objects.create(owner=ana, created_by=ana, kind="note", title="Nota", reminder_minutes=-1)
+        apps.get_model("core", "TaskReminderPlan").objects.create(task=personal, user=ana, plan=RHYTHM)
+        apps = self.migrate(self.after)
+        rows = {(row.task_id, row.user_id): (row.minutes, row.time, row.anchor, row.plan)
+                for row in apps.get_model("core", "TaskReminder").objects.all()}
+        self.assertEqual(rows, {(personal.pk, ana.pk): (30, None, "planned", RHYTHM),
+                                (given.pk, marc.pk): (None, 540, "deadline", None)})
+        apps = self.migrate(self.before)  # Back: the task's fields again, and only rows with a plan.
+        back = {title: (minutes, time, anchor) for title, minutes, time, anchor in apps.get_model("core", "Task")
+                .objects.values_list("title", "reminder_minutes", "reminder_time", "reminder_anchor")}
+        # A note's -1 meant what null means for a note, no reminder, so it isn't kept.
+        self.assertEqual(back, {"Personal": (30, None, "planned"), "Marc's": (None, 540, "deadline"),
+                                "Por defecto": (None, None, "planned"), "Nota": (None, None, "planned")})
+        self.assertEqual(list(apps.get_model("core", "TaskReminderPlan").objects.values_list("plan", flat=True)),
+                         [RHYTHM])
         self.migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
 
 

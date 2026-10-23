@@ -2,7 +2,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.password_validation import validate_password
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
-from .models import User, Task, TaskList, TaskGroup, ProjectPreference, TaskReminderPlan
+from .models import User, Task, TaskList, TaskGroup, ProjectPreference, TaskReminder
 from .billing import complimentary_pro
 from .email_verification import unconfirmed
 from .free_tier import free_voice
@@ -166,6 +166,11 @@ class ChecklistItemSerializer(serializers.Serializer):
         return attrs
 
 
+# The task API's reminder fields, each the asker's own, and the TaskReminder field each is kept in.
+PERSONAL_REMINDERS = {"reminder_minutes": "minutes", "reminder_time": "time", "reminder_anchor": "anchor",
+                      "reminder_plan": "plan"}
+
+
 class TaskSerializer(serializers.ModelSerializer):
     kind = serializers.ChoiceField(choices=["task", "note"], required=False)
     due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
@@ -173,14 +178,15 @@ class TaskSerializer(serializers.ModelSerializer):
     deadline_at = ZonedDateTimeField(allow_null=True, required=False)
     deadline_date = serializers.DateField(allow_null=True, required=False)
     duration_minutes = serializers.IntegerField(min_value=1, max_value=1440, allow_null=True, required=False)
-    reminder_anchor = serializers.ChoiceField(choices=["planned", "deadline"], required=False)
+    # The four reminder fields are the asker's own (docs/REMINDER_PLANS.md, «Every reminder is
+    # personal»), kept apart from the task (TaskReminder) and saved by the view. Without a default,
+    # an app that doesn't send one keeps it.
+    reminder_anchor = serializers.ChoiceField(choices=["planned", "deadline"], required=False, write_only=True)
     repeat_until = serializers.DateField(allow_null=True, required=False, default=None)
     completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, required=False, default=list)
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
-    reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, default=None)
-    reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, default=None)
-    # docs/REMINDER_PLANS.md: the asker's own plan, kept apart from the task (TaskReminderPlan) and
-    # saved by the view. Without a default, an older app that doesn't send it keeps the plan.
+    reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, write_only=True)
+    reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, write_only=True)
     reminder_plan = serializers.JSONField(allow_null=True, required=False, write_only=True)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
@@ -244,26 +250,28 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def to_representation(self, task):
         data = super().to_representation(task)
-        data["reminder_plan"] = self.asker_plan(task)
+        row = self.asker_reminders(task)
+        values = {key: getattr(row, key) for key in TaskReminder.DEFAULTS} if row else TaskReminder.DEFAULTS
+        data.update({field: values[key] for field, key in PERSONAL_REMINDERS.items()})
         return data
 
-    def asker_plan(self, task):
-        """The plan of the account asking, never anyone else's (docs/REMINDER_PLANS.md, D6). The
-        task views prefetch it as asker_plans; a task fetched another way reads it here."""
+    def asker_reminders(self, task):
+        """The reminders of the account asking, never anyone else's (docs/REMINDER_PLANS.md), or
+        None for the defaults. The task views prefetch them as asker_reminders; a task fetched
+        another way reads them here."""
         request = self.context.get("request")
         if request is None or not request.user.is_authenticated:
             return None
-        prefetched = getattr(task, "asker_plans", None)
+        prefetched = getattr(task, "asker_reminders", None)
         if prefetched is not None:
-            return prefetched[0].plan if prefetched else None
-        row = TaskReminderPlan.objects.filter(task_id=task.pk, user=request.user).only("plan").first()
-        return row.plan if row else None
+            return prefetched[0] if prefetched else None
+        return TaskReminder.objects.filter(task_id=task.pk, user=request.user).first()
 
     def leaves_unchanged(self, task):
         """True when saving would leave task as it is. The view asks it of a PUT that sends the
-        asker's plan: when nothing else changed, there's no new version and nothing to tell."""
+        asker's reminders: when nothing else changed, there's no new version and nothing to tell."""
         for key, value in self.validated_data.items():
-            if key in ("version", "reminder_plan"):
+            if key == "version" or key in PERSONAL_REMINDERS:
                 continue
             current = task.task_list_id if key == "task_list" else getattr(task, key)
             if (value.pk if key == "task_list" and value is not None else value) != current:
@@ -308,11 +316,11 @@ class TaskSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"kind": "Keep the original type. Create a separate task or note instead."})
         if kind == "note":
             effective = lambda key, default=None: attrs.get(key, getattr(self.instance, key, default))
-            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_time", "repeat_until"))
-                    or attrs.get("reminder_plan") is not None
+            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "repeat_until"))
+                    or attrs.get("reminder_time") is not None or attrs.get("reminder_plan") is not None
+                    or attrs.get("reminder_anchor", "planned") != "planned" or attrs.get("reminder_minutes") not in (None, -1)
                     or effective("priority", 1) != 1 or effective("is_completed", False)
                     or effective("recurrence", "none") != "none" or effective("repeat_interval", 1) != 1
-                    or effective("reminder_anchor", "planned") != "planned" or effective("reminder_minutes") not in (None, -1)
                     or any(effective(key, []) for key in ("completed_dates", "repeat_weekdays", "exceptions"))
                     or any(item.get("completed_dates") for item in effective("checklist", []))):
                 raise serializers.ValidationError({"kind": "Notes hold information and checklists, without task schedules, priority, reminders or completion."})
@@ -320,7 +328,9 @@ class TaskSerializer(serializers.ModelSerializer):
         deadline_date = attrs.get("deadline_date", getattr(self.instance, "deadline_date", None))
         if deadline_at is not None and deadline_date is not None:
             raise serializers.ValidationError("Use a date-only or a timed deadline, not both.")
-        if attrs.get("reminder_anchor", getattr(self.instance, "reminder_anchor", "planned")) == "deadline" and deadline_at is None and deadline_date is None:
+        # Only an anchor sent is checked: the view moves every kept one back to the planned start
+        # when the task loses its deadline, whoever removes it.
+        if attrs.get("reminder_anchor") == "deadline" and deadline_at is None and deadline_date is None:
             raise serializers.ValidationError({"reminder_anchor": "Set a deadline or use the planned start for reminders."})
         repeat = attrs.get("recurrence", getattr(self.instance, "recurrence", "none"))
         weekdays = attrs.get("repeat_weekdays", getattr(self.instance, "repeat_weekdays", []))

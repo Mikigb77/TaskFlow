@@ -181,9 +181,12 @@ class APITests(TestCase):
         restored = self.client.get(path).data
         self.assertEqual(restored["reminder_minutes"], 30)
         self.assertEqual(restored["reminder_time"], 540)
+        # A reminder is the asker's own (docs/REMINDER_PLANS.md): changing it alone makes no new version.
         updated = self.client.put(path, {**payload, "reminder_minutes": -1, "version": 1}, format="json")
-        self.assertEqual(updated.status_code, 200, updated.data)
-        conflict = self.client.put(path, {**payload, "version": 1}, format="json")
+        self.assertEqual((updated.status_code, updated.data["version"]), (200, 1), updated.data)
+        renamed = self.client.put(path, {**payload, "title": "Renamed", "reminder_minutes": -1, "version": 1}, format="json")
+        self.assertEqual(renamed.data["version"], 2)
+        conflict = self.client.put(path, {**payload, "reminder_minutes": -1, "version": 1}, format="json")
         self.assertEqual(conflict.status_code, 409)
         self.assertEqual(conflict.data["current"]["reminder_minutes"], -1)
 
