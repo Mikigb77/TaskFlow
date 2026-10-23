@@ -41,8 +41,9 @@ typedef ReminderRow = ({int value, String label, String? subtitle});
 /// (its words, a strip of dots from today to the day, the count and the
 /// next one) and applies with «Listo». [current] is the single row in use,
 /// null while [plan] is set. [task] is the task as it would be saved. On a
-/// [shared] task each plan says, above «Listo», that it's only for this
-/// person: a plan is each account's own.
+/// [shared] task one line under the title, which stays in view while the
+/// choices scroll, says that every choice here is only for this person:
+/// none, once or a plan, each is each account's own.
 Future<ReminderSheetChoice?> showReminderPlanSheet(
   BuildContext context, {
   required String title,
@@ -471,10 +472,13 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
     final now = ref.watch(calendarClockProvider)();
     final minute = settings?.dateOnlyTime;
-    // On a timed day, its own reminder rings at the task's usual one (D1).
-    final dayLead = ReminderPlans.dayLead(
+    // On a timed day, the day's own reminder of a plan without a time of its
+    // own rings at the task's usual one (D1); one with its own keeps it (D8).
+    // Each plan shown is asked for its own.
+    int? dayLead(ReminderPlan plan) => ReminderPlans.dayLead(
       widget.task,
       (settings ?? const ReminderPreferences()).leadMinutes,
+      plan: plan,
     );
     final current = widget.plan;
     // A rhythm said while dictating is the person's, with or without Pro.
@@ -503,250 +507,266 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     Widget expander(bool open) =>
         Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded);
     final rhythm = ReminderPlan.rhythm(_strength);
+    final title = Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      child: Text(widget.title, style: theme.textTheme.titleMedium),
+    );
+    Widget choices({required bool withTitle}) => SingleChildScrollView(
+      padding: EdgeInsets.only(top: withTitle ? 16 : 0, bottom: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (withTitle) title,
+          // The single reminder, as the list has always been: a tap
+          // applies it and closes.
+          for (final row in widget.rows)
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              title: Text(row.label),
+              subtitle: row.subtitle == null ? null : Text(row.subtitle!),
+              selected: current == null && row.value == widget.current,
+              trailing: check(current == null && row.value == widget.current),
+              onTap: () => _choose(ReminderSheetChoice.single(row.value)),
+            ),
+          if (plans) ...[
+            const Divider(height: 17),
+            expandable(
+              key: _untilDayRow,
+              open: _open == _Open.rhythm,
+              child: ListTile(
+                key: const ValueKey('reminder-plan-until-day'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: Text(l.reminderPlanUntilDay),
+                subtitle: _open == _Open.rhythm
+                    ? null
+                    : Text(
+                        l.reminderPlanGrowing(
+                          planWhen(_anchor, now),
+                          planDay(_anchor, now, context.localeName),
+                        ),
+                      ),
+                selected: current?.isRhythm == true,
+                trailing: current?.isRhythm == true && _open != _Open.rhythm
+                    ? check(true)
+                    : expander(_open == _Open.rhythm),
+                onTap: () => _toggle(_Open.rhythm),
+              ),
+            ),
+            if (_open == _Open.rhythm)
+              _Section(
+                key: _section,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final strength in ReminderPlan.strengths)
+                        ChoiceChip(
+                          key: ValueKey('reminder-plan-$strength'),
+                          label: Text(switch (strength) {
+                            ReminderPlan.gentle => l.reminderPlanGentle,
+                            ReminderPlan.intense => l.reminderPlanIntense,
+                            _ => l.reminderPlanNormal,
+                          }),
+                          selected: _strength == strength,
+                          onSelected: (_) =>
+                              setState(() => _strength = strength),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  PlanPreview(
+                    plan: rhythm,
+                    anchor: _anchor,
+                    now: now,
+                    minute: ReminderPlans.minute(rhythm, minute),
+                    dayLead: dayLead(rhythm),
+                  ),
+                  const SizedBox(height: 16),
+                  _Apply(plan: rhythm, onApply: _choose),
+                ],
+              ),
+            if (!yourWay)
+              ListTile(
+                key: const ValueKey('reminder-plan-your-way'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.record_voice_over_outlined),
+                title: Text(l.reminderPlanYourWay),
+                trailing: const ProBadge(),
+                // Without Pro, the Pro screen says what it gives here.
+                onTap: _openPro,
+              )
+            else
+              expandable(
+                key: _yourWayRow,
+                open: _open == _Open.custom,
+                child: ListTile(
+                  key: const ValueKey('reminder-plan-your-way'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                  leading: const Icon(Icons.record_voice_over_outlined),
+                  title: Text(l.reminderPlanYourWay),
+                  subtitle: dictated == null || _open == _Open.custom
+                      ? null
+                      : Text(
+                          planRhythm(
+                            l,
+                            dictated,
+                            anchor: _anchor,
+                            now: now,
+                            minute: ReminderPlans.minute(dictated, minute),
+                            dayLead: dayLead(dictated),
+                          ),
+                        ),
+                  selected: dictated != null,
+                  trailing: dictated != null && _open != _Open.custom
+                      ? check(true)
+                      : expander(_open == _Open.custom),
+                  onTap: () => _toggle(_Open.custom),
+                ),
+              ),
+            // Without Pro, the rhythm said while dictating, kept with
+            // «Listo»: no field and no «Dictarlo», which ask the assistant.
+            if (!pro && dictated != null && _open == _Open.custom)
+              _Section(
+                key: _section,
+                children: [
+                  PlanPreview(
+                    plan: dictated,
+                    anchor: _anchor,
+                    now: now,
+                    minute: ReminderPlans.minute(dictated, minute),
+                    dayLead: dayLead(dictated),
+                  ),
+                  const SizedBox(height: 16),
+                  _Apply(plan: dictated, onApply: _choose),
+                ],
+              ),
+            if (pro && _open == _Open.custom)
+              _Section(
+                key: _section,
+                children: [
+                  // Named as capture's words field is.
+                  Semantics(
+                    label: l.captureYourWords,
+                    child: TextField(
+                      key: const ValueKey('reminder-plan-words'),
+                      controller: _words,
+                      focusNode: _wordsFocus,
+                      scrollController: _wordsScroll,
+                      enabled: !_reading,
+                      minLines: 1,
+                      maxLines: 4,
+                      maxLength: ReminderPlan.saidLimit,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => unawaited(_read()),
+                      // What to put in it stays in view while typing,
+                      // until the plan read from the words says it.
+                      decoration: InputDecoration(
+                        helperText: _custom == null
+                            ? l.reminderPlanYourWayHint
+                            : null,
+                        helperMaxLines: 4,
+                        counterText: '',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    children: [
+                      TextButton.icon(
+                        key: const ValueKey('reminder-plan-speak'),
+                        onPressed: _reading
+                            ? null
+                            : () => unawaited(_toggleListening()),
+                        icon: Icon(
+                          _listening
+                              ? Icons.stop_rounded
+                              : Icons.mic_none_rounded,
+                        ),
+                        label: Text(
+                          _listening
+                              ? l.reminderPlanStopListening
+                              : l.reminderPlanSpeak,
+                        ),
+                      ),
+                      if (_listening)
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            l.captureListening,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_reading) ...[
+                    const SizedBox(height: 8),
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 8),
+                    Text(l.reminderPlanReading),
+                  ],
+                  if (_problem case final problem?) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      problem,
+                      key: const ValueKey('reminder-plan-problem'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (_custom case final plan? when !_reading) ...[
+                    const SizedBox(height: 16),
+                    PlanPreview(
+                      plan: plan,
+                      anchor: _anchor,
+                      now: now,
+                      minute: ReminderPlans.minute(plan, minute),
+                      dayLead: dayLead(plan),
+                    ),
+                    const SizedBox(height: 16),
+                    _Apply(plan: plan, onApply: _choose),
+                  ],
+                ],
+              ),
+          ],
+        ],
+      ),
+    );
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: Text(widget.title, style: theme.textTheme.titleMedium),
-              ),
-              // The single reminder, as the list has always been: a tap
-              // applies it and closes.
-              for (final row in widget.rows)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                  title: Text(row.label),
-                  subtitle: row.subtitle == null ? null : Text(row.subtitle!),
-                  selected: current == null && row.value == widget.current,
-                  trailing: check(
-                    current == null && row.value == widget.current,
-                  ),
-                  onTap: () => _choose(ReminderSheetChoice.single(row.value)),
-                ),
-              if (plans) ...[
-                const Divider(height: 17),
-                expandable(
-                  key: _untilDayRow,
-                  open: _open == _Open.rhythm,
-                  child: ListTile(
-                    key: const ValueKey('reminder-plan-until-day'),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                    leading: const Icon(Icons.notifications_active_outlined),
-                    title: Text(l.reminderPlanUntilDay),
-                    subtitle: _open == _Open.rhythm
-                        ? null
-                        : Text(
-                            l.reminderPlanGrowing(
-                              planWhen(_anchor, now),
-                              planDay(_anchor, now, context.localeName),
-                            ),
-                          ),
-                    selected: current?.isRhythm == true,
-                    trailing: current?.isRhythm == true && _open != _Open.rhythm
-                        ? check(true)
-                        : expander(_open == _Open.rhythm),
-                    onTap: () => _toggle(_Open.rhythm),
-                  ),
-                ),
-                if (_open == _Open.rhythm)
-                  _Section(
-                    key: _section,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final strength in ReminderPlan.strengths)
-                            ChoiceChip(
-                              key: ValueKey('reminder-plan-$strength'),
-                              label: Text(switch (strength) {
-                                ReminderPlan.gentle => l.reminderPlanGentle,
-                                ReminderPlan.intense => l.reminderPlanIntense,
-                                _ => l.reminderPlanNormal,
-                              }),
-                              selected: _strength == strength,
-                              onSelected: (_) =>
-                                  setState(() => _strength = strength),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      PlanPreview(
-                        plan: rhythm,
-                        anchor: _anchor,
-                        now: now,
-                        minute: ReminderPlans.minute(rhythm, minute),
-                        dayLead: dayLead,
-                      ),
-                      const SizedBox(height: 16),
-                      if (widget.shared) const _JustYou(),
-                      _Apply(plan: rhythm, onApply: _choose),
-                    ],
-                  ),
-                if (!yourWay)
-                  ListTile(
-                    key: const ValueKey('reminder-plan-your-way'),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                    leading: const Icon(Icons.record_voice_over_outlined),
-                    title: Text(l.reminderPlanYourWay),
-                    trailing: const ProBadge(),
-                    // Without Pro, the Pro screen says what it gives here.
-                    onTap: _openPro,
-                  )
-                else
-                  expandable(
-                    key: _yourWayRow,
-                    open: _open == _Open.custom,
-                    child: ListTile(
-                      key: const ValueKey('reminder-plan-your-way'),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                      ),
-                      leading: const Icon(Icons.record_voice_over_outlined),
-                      title: Text(l.reminderPlanYourWay),
-                      subtitle: dictated == null || _open == _Open.custom
-                          ? null
-                          : Text(
-                              planRhythm(
-                                l,
-                                dictated,
-                                anchor: _anchor,
-                                now: now,
-                                minute: ReminderPlans.minute(dictated, minute),
-                                dayLead: dayLead,
-                              ),
-                            ),
-                      selected: dictated != null,
-                      trailing: dictated != null && _open != _Open.custom
-                          ? check(true)
-                          : expander(_open == _Open.custom),
-                      onTap: () => _toggle(_Open.custom),
+        // On a shared task the title and the line that every choice is only
+        // this person's stay above the choices as they scroll (UX-2026). A
+        // thin line marks where the choices scroll under the title and the
+        // note (UX-2035).
+        child: widget.shared
+            ? Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    title,
+                    const _JustYou(),
+                    const Divider(
+                      height: 1,
+                      key: ValueKey('reminder-sheet-header-edge'),
                     ),
-                  ),
-                // Without Pro, the rhythm said while dictating, kept with
-                // «Listo»: no field and no «Dictarlo», which ask the assistant.
-                if (!pro && dictated != null && _open == _Open.custom)
-                  _Section(
-                    key: _section,
-                    children: [
-                      PlanPreview(
-                        plan: dictated,
-                        anchor: _anchor,
-                        now: now,
-                        minute: ReminderPlans.minute(dictated, minute),
-                        dayLead: dayLead,
-                      ),
-                      const SizedBox(height: 16),
-                      if (widget.shared) const _JustYou(),
-                      _Apply(plan: dictated, onApply: _choose),
-                    ],
-                  ),
-                if (pro && _open == _Open.custom)
-                  _Section(
-                    key: _section,
-                    children: [
-                      // Named as capture's words field is.
-                      Semantics(
-                        label: l.captureYourWords,
-                        child: TextField(
-                          key: const ValueKey('reminder-plan-words'),
-                          controller: _words,
-                          focusNode: _wordsFocus,
-                          scrollController: _wordsScroll,
-                          enabled: !_reading,
-                          minLines: 1,
-                          maxLines: 4,
-                          maxLength: ReminderPlan.saidLimit,
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => unawaited(_read()),
-                          // What to put in it stays in view while typing,
-                          // until the plan read from the words says it.
-                          decoration: InputDecoration(
-                            helperText: _custom == null
-                                ? l.reminderPlanYourWayHint
-                                : null,
-                            helperMaxLines: 4,
-                            counterText: '',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 12,
-                        children: [
-                          TextButton.icon(
-                            key: const ValueKey('reminder-plan-speak'),
-                            onPressed: _reading
-                                ? null
-                                : () => unawaited(_toggleListening()),
-                            icon: Icon(
-                              _listening
-                                  ? Icons.stop_rounded
-                                  : Icons.mic_none_rounded,
-                            ),
-                            label: Text(
-                              _listening
-                                  ? l.reminderPlanStopListening
-                                  : l.reminderPlanSpeak,
-                            ),
-                          ),
-                          if (_listening)
-                            Semantics(
-                              liveRegion: true,
-                              child: Text(
-                                l.captureListening,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (_reading) ...[
-                        const SizedBox(height: 8),
-                        const LinearProgressIndicator(),
-                        const SizedBox(height: 8),
-                        Text(l.reminderPlanReading),
-                      ],
-                      if (_problem case final problem?) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          problem,
-                          key: const ValueKey('reminder-plan-problem'),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                      if (_custom case final plan? when !_reading) ...[
-                        const SizedBox(height: 16),
-                        PlanPreview(
-                          plan: plan,
-                          anchor: _anchor,
-                          now: now,
-                          minute: ReminderPlans.minute(plan, minute),
-                          dayLead: dayLead,
-                        ),
-                        const SizedBox(height: 16),
-                        if (widget.shared) const _JustYou(),
-                        _Apply(plan: plan, onApply: _choose),
-                      ],
-                    ],
-                  ),
-              ],
-            ],
-          ),
-        ),
+                    Flexible(child: choices(withTitle: false)),
+                  ],
+                ),
+              )
+            : choices(withTitle: true),
       ),
     );
   }
@@ -766,14 +786,15 @@ class _Section extends StatelessWidget {
   );
 }
 
-/// On a shared task, above «Listo»: the plan rings only for this person.
+/// On a shared task, under the sheet's title: every choice rings only for
+/// this person.
 class _JustYou extends StatelessWidget {
   const _JustYou();
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
       child: Text(
         context.l10n.reminderPlanJustYou,
         key: const ValueKey('reminder-plan-just-you'),
@@ -864,15 +885,15 @@ class PlanPreview extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      l.today,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                  Text(
+                    l.today,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  // The task's day under the strip's end.
+                  const SizedBox(width: 8),
+                  // The task's day under the strip's end, in the rest of
+                  // the row: a long one stays on one line (UX-2031).
                   Expanded(
                     child: Text(
                       planDay(anchor, now, locale),

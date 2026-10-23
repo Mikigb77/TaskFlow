@@ -2284,13 +2284,7 @@ abstract class AppLocalizations {
   /// **'Reminder: {value}'**
   String reminderValue(String value);
 
-  /// Reminder chip and form row on a shared task assigned to someone else: the reminder rings on that person's phone, not this one. name is the assignee's name; value is the reminder the task sets itself, e.g. '10 minutes before'. A task that follows the default uses reminderForPersonOnly instead.
-  ///
-  /// In en, this message translates to:
-  /// **'Reminder for {name}: {value}'**
-  String reminderForPerson(String name, String value);
-
-  /// The reminder line on a task given to someone else that follows the reminder default. Their phone uses their own default, which this phone doesn't know, so no time is said. {name} is the person's name.
+  /// The reminder line on a task given to someone else. Their reminders are their own and never reach this phone, so none of this account's reminder values is shown. {name} is the person's name.
   ///
   /// In en, this message translates to:
   /// **'Reminder for {name}'**
@@ -3196,10 +3190,10 @@ abstract class AppLocalizations {
   /// **'How sharing works'**
   String get howSharingWorks;
 
-  /// No description provided for @sharedDataHelp.
+  /// Sharing screen, under “How sharing works”: what a shared project shares. Reminders are each person’s own (none of their values reaches anyone else), so the last sentence says they aren’t shared.
   ///
   /// In en, this message translates to:
-  /// **'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.'**
+  /// **'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Reminders aren’t shared: each person has their own.'**
   String get sharedDataHelp;
 
   /// No description provided for @sharingRemovalHelp.
@@ -6514,7 +6508,7 @@ abstract class AppLocalizations {
   /// **'For example: “a week before, and the day before at 8”.'**
   String get reminderPlanYourWayHint;
 
-  /// On a task in a shared project, says that a reminder plan rings only for the person who sets it. Shown above the Done button of each open plan in the reminder sheet.
+  /// On a task in a shared project, says that every reminder choice there rings only for the person who makes it: shown under the title of the reminder sheet and of the one-tap reminder list, and as the helper of “Remind before”.
   ///
   /// In en, this message translates to:
   /// **'These reminders are only for you.'**

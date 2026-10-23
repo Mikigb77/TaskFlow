@@ -75,8 +75,13 @@ abstract final class ReminderPlans {
   /// with its own lead, else [defaultLead] (Settings' «Tareas con hora», -1
   /// when off). Only a lead that still rings on the anchor's own day counts.
   /// Null when the anchor has no time or no lead does: the day's reminder
-  /// then rings at the plan's time, as the others do.
-  static int? dayLead(Task task, int defaultLead) {
+  /// then rings at the plan's time, as the others do. Null too when [plan]
+  /// (by default [task]'s own) has a time of its own, said or typed (D8):
+  /// that time stays on the task's own day, as on its other days. Only a
+  /// plan without one (the strengths, «Sí» to the offer, a rhythm said
+  /// without an hour) moves the day's notice to the task's usual reminder.
+  static int? dayLead(Task task, int defaultLead, {ReminderPlan? plan}) {
+    if ((plan ?? task.reminderPlan)?.time != null) return null;
     final day = anchor(task);
     final timed = task.deadline != null ? task.deadlineHasTime : task.hasTime;
     if (day == null || !timed) return null;

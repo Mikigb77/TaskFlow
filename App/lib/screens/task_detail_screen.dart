@@ -159,6 +159,10 @@ class TaskDetailScreen extends ConsumerWidget {
             );
             final showCreator = creator.isNotEmpty && project?.shared == true;
             final hasBody = task.notes?.trim().isNotEmpty == true;
+            final reminderShown =
+                (task.reminderDate != null ||
+                    ReminderPlans.active(task) != null) &&
+                reminderShows(ref, task);
             void edit() =>
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
             void reschedule() =>
@@ -365,9 +369,9 @@ class TaskDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                     ],
-                    // The task's reminder, or its plan's one line.
-                    if (task.reminderDate != null ||
-                        ReminderPlans.active(task) != null)
+                    // The task's reminder, or its plan's one line; none when
+                    // its reminders are someone else's and it names nobody.
+                    if (reminderShown)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: ReminderChip(
@@ -397,9 +401,7 @@ class TaskDetailScreen extends ConsumerWidget {
                                 },
                         ),
                       ),
-                    if (!task.isNote &&
-                        (task.reminderDate != null ||
-                            ReminderPlans.active(task) != null))
+                    if (!task.isNote && reminderShown)
                       const SizedBox(height: 16),
                     if (task.checklist.isNotEmpty) ...[
                       SectionLabel(

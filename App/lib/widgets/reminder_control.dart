@@ -111,34 +111,36 @@ String reminderPlanText(
 }
 
 /// Why the reminder line can't simply read «Recordatorio: …» on this phone:
-/// the task rings only on someone else's phone, or its project gives none.
+/// the task's reminders are someone else's, or its project gives none.
 /// The chip and the form both read it, so each reason is said in one place.
 class _Reason {
   const _Reason(this.block, {this.project, this.person});
   final ReminderBlock block;
   final TaskListInfo? project;
 
-  /// Whose phone rings, for [ReminderBlock.notForAccount].
+  /// Whose reminders they are, for [ReminderBlock.notForAccount]: the
+  /// member the task is given to. Null when the task names nobody.
   final String? person;
 
   /// False when the reminder still rings, on [person]'s phone.
   bool get silent => block != ReminderBlock.notForAccount;
 
-  /// What the line says, around the reminder's own [value]. [value] is null
-  /// when the task follows the default: [person]'s phone uses their own,
-  /// which this phone doesn't know, so only the person is named.
-  String text(BuildContext context, String? value) => switch (block) {
+  /// True when the task shows no reminder at all: its reminders are someone
+  /// else's and it names nobody, so there's nothing true to say about them.
+  bool get hidden => block == ReminderBlock.notForAccount && person == null;
+
+  /// What the line says. Someone else's reminders are their own and never
+  /// reach this phone, so only the person is named: none of this account's
+  /// values on the task is theirs.
+  String text(BuildContext context) => switch (block) {
     ReminderBlock.archived => context.l10n.noReminderProjectArchived,
     ReminderBlock.muted => context.l10n.noReminderProjectMuted,
-    ReminderBlock.notForAccount =>
-      value == null
-          ? context.l10n.reminderForPersonOnly(person!)
-          : context.l10n.reminderForPerson(person!, value),
+    ReminderBlock.notForAccount => context.l10n.reminderForPersonOnly(person!),
   };
 
-  /// What a tap does on a [silent] line: a muted project opens its
-  /// «Novedades del proyecto», where muting is undone; an archived one
-  /// offers nothing.
+  /// What a tap does: a muted project opens its «Novedades del proyecto»,
+  /// where muting is undone; an archived one, or someone else's reminders,
+  /// offer nothing.
   VoidCallback? action(BuildContext context, WidgetRef ref) => switch (block) {
     ReminderBlock.muted => () => showProjectPreferences(context, ref, project!),
     _ => null,
@@ -146,19 +148,26 @@ class _Reason {
 }
 
 /// The reason, by the rule the reminder engine schedules with
-/// ([TaskDatabase.reminderBlock]), or null when [task] reads as usual. Only
-/// a task given to someone named says whose it is; other tasks that aren't
-/// this account's read as before.
+/// ([TaskDatabase.reminderBlock]), or null when [task] reads as usual. A
+/// task given to someone named says whose it is; another task that isn't
+/// this account's is [_Reason.hidden].
 _Reason? _reasonFor(WidgetRef ref, Task? task) {
   if (task == null) return null;
   final project = _projectOf(ref, task);
   final block = _blockFor(ref, task, project);
   if (block == null) return null;
-  if (block == ReminderBlock.notForAccount &&
-      (task.assignment != 'member' || task.assigneeName == null)) {
-    return null;
-  }
-  return _Reason(block, project: project, person: task.assigneeName);
+  final name = task.assigneeName?.trim();
+  return _Reason(
+    block,
+    project: project,
+    person:
+        block == ReminderBlock.notForAccount &&
+            task.assignment == 'member' &&
+            name != null &&
+            name.isNotEmpty
+        ? name
+        : null,
+  );
 }
 
 TaskListInfo? _projectOf(WidgetRef ref, Task task) => task.listId == null
@@ -167,19 +176,19 @@ TaskListInfo? _projectOf(WidgetRef ref, Task task) => task.listId == null
           .where((p) => p.id == task.listId)
           .firstOrNull;
 
-ReminderBlock? _blockFor(WidgetRef ref, Task task, TaskListInfo? project) {
-  final accountId =
-      task.assignment == 'member' || task.assignment == 'unassigned'
-      ? ref.watch(authProvider).account?.id
-      : null;
-  return TaskDatabase.reminderBlock(
-    task,
-    accountId,
-    archived: project?.inactive == true,
-    muted: project?.notifications == 'muted',
-    role: project?.role,
-  );
-}
+int? _accountFor(WidgetRef ref, Task task) =>
+    task.assignment == 'member' || task.assignment == 'unassigned'
+    ? ref.watch(authProvider).account?.id
+    : null;
+
+ReminderBlock? _blockFor(WidgetRef ref, Task task, TaskListInfo? project) =>
+    TaskDatabase.reminderBlock(
+      task,
+      _accountFor(ref, task),
+      archived: project?.inactive == true,
+      muted: project?.notifications == 'muted',
+      role: project?.role,
+    );
 
 /// True when this phone rings for [task], by the rule the reminder engine
 /// schedules with ([TaskDatabase.reminderBlock]): only then can a plan, which
@@ -187,19 +196,30 @@ ReminderBlock? _blockFor(WidgetRef ref, Task task, TaskListInfo? project) {
 bool reminderRingsHere(WidgetRef ref, Task? task) =>
     task == null || _blockFor(ref, task, _projectOf(ref, task)) == null;
 
+/// True when [task]'s reminders are someone else's, whatever its project's
+/// state on this phone: it's given to another member, or it's unassigned in
+/// a project this account doesn't own or administer. Their reminders are
+/// theirs and never reach this phone, and a choice here would be this
+/// account's own and never ring, so none is offered.
+bool reminderSomeoneElses(WidgetRef ref, Task? task) =>
+    task != null &&
+    TaskDatabase.reminderBlock(
+          task,
+          _accountFor(ref, task),
+          role: _projectOf(ref, task)?.role,
+        ) ==
+        ReminderBlock.notForAccount;
+
+/// False when [task] shows no reminder at all on this phone: its reminders
+/// are someone else's and it names nobody. True for a null [task].
+bool reminderShows(WidgetRef ref, Task? task) =>
+    _reasonFor(ref, task)?.hidden != true;
+
 /// True when [task] is shared: its project is, or it's given to the project's
 /// people rather than kept personal. Its plan is still only this account's.
 bool reminderShared(WidgetRef ref, Task? task) =>
     task != null &&
     (task.assignment != 'personal' || _projectOf(ref, task)?.shared == true);
-
-/// True when the reminder is the default one: a timed task with no lead of
-/// its own, or a date-only task with no time of its own that isn't off.
-bool _followsDefault({
-  required bool hasTime,
-  required int? minutes,
-  required int? time,
-}) => hasTime ? minutes == null : time == null && minutes != -1;
 
 String _clock(BuildContext context, int minute) =>
     TimeOfDay(hour: minute ~/ 60, minute: minute % 60).format(context);
@@ -308,7 +328,7 @@ Future<bool> turnOnReminders(
 /// be saved) also gets the plans under the list (reminder_plan_sheet.dart):
 /// the choices are exclusive, so a plan keeps [minutes] and [time] as they
 /// are, unused, and a single reminder clears the [plan]. On a [shared] task
-/// the plans say they're only for this person.
+/// the choices say they're only for this person.
 Future<void> _chooseReminder(
   BuildContext context, {
   required bool hasTime,
@@ -387,6 +407,7 @@ Future<void> _chooseReminder(
       current: current,
       label: label,
       subtitle: subtitle,
+      note: shared ? context.l10n.reminderPlanJustYou : null,
     );
   }
   if (value == null || !context.mounted) return;
@@ -423,7 +444,8 @@ Future<int?> chooseDefaultLead(
   label: (context, value) => context.reminderLead(value),
 );
 
-/// One-tap list: picking a row closes it with that row's value.
+/// One-tap list: picking a row closes it with that row's value. A [note]
+/// sits under the title, above the first row.
 Future<int?> _pickFrom(
   BuildContext context, {
   required String title,
@@ -431,6 +453,7 @@ Future<int?> _pickFrom(
   required int current,
   required String Function(BuildContext context, int value) label,
   String? Function(BuildContext context, int value)? subtitle,
+  String? note,
 }) => showModalBottomSheet<int>(
   context: context,
   isScrollControlled: true,
@@ -445,6 +468,17 @@ Future<int?> _pickFrom(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
             child: Text(title, style: Theme.of(context).textTheme.titleMedium),
           ),
+          if (note != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                note,
+                key: const ValueKey('reminder-plan-just-you'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           for (final value in values)
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -472,13 +506,17 @@ Future<int?> _pickFrom(
 /// otherwise a tap opens the reminder choices and gives [onChanged] the task
 /// with the one chosen. The task's chip and a collapsed row on the capture's
 /// card both read it, so they can't drift. For a task with a reminder date
-/// or a plan that applies.
-({IconData icon, String text, VoidCallback? onTap}) reminderLine(
+/// or a plan that applies. A task given to someone else reads «Recordatorio
+/// para Ana», with no tap; null when its reminders are someone else's and it
+/// names nobody, which shows no reminder.
+({IconData icon, String text, VoidCallback? onTap})? reminderLine(
   BuildContext context,
   WidgetRef ref,
   Task task, {
   ValueChanged<Task>? onChanged,
 }) {
+  final reason = _reasonFor(ref, task);
+  if (reason?.hidden == true) return null;
   final preferences =
       ref.watch(reminderPreferencesProvider).valueOrNull ??
       const ReminderPreferences();
@@ -486,7 +524,6 @@ Future<int?> _pickFrom(
   // account's own, so it counts only where this phone rings.
   final ringsHere = reminderRingsHere(ref, task);
   final plan = ringsHere ? ReminderPlans.active(task) : null;
-  final reason = _reasonFor(ref, task);
   final blocked =
       reason == null &&
       _cannotFire(
@@ -520,19 +557,7 @@ Future<int?> _pickFrom(
         ? Icons.notifications_active_outlined
         : Icons.notifications_outlined,
     text: reason != null
-        ? reason.text(
-            context,
-            plan != null
-                // After the person's name, the plan without its noun.
-                ? reminderPlanText(context, ref, task, bare: true)
-                : _followsDefault(
-                    hasTime: task.reminderHasTime,
-                    minutes: task.reminderMinutes,
-                    time: task.reminderTime,
-                  )
-                ? null
-                : value,
-          )
+        ? reason.text(context)
         : blocked
         ? context.l10n.noReminderTurnOn
         : passed
@@ -540,8 +565,8 @@ Future<int?> _pickFrom(
         : plan != null
         ? value
         : context.l10n.reminderValue(value),
-    onTap: reason?.silent == true
-        ? reason!.action(context, ref)
+    onTap: reason != null
+        ? reason.action(context, ref)
         : blocked
         ? () => turnOnReminders(context)
         : onChanged == null
@@ -575,19 +600,18 @@ class ReminderChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final line = reminderLine(context, ref, task, onChanged: onChanged);
+    if (line == null) return const SizedBox.shrink();
+    final key =
+        ReminderPlans.active(task) == null || !reminderRingsHere(ref, task)
+        ? null
+        : const ValueKey('reminder-plan-line');
+    // The icon keeps its own room at any text size, so a long reading wraps
+    // in the label's width instead of the label's height.
+    const avatarBox = BoxConstraints.tightFor(width: 20, height: 20);
+    final avatar = Icon(line.icon, size: 16);
     return LayoutBuilder(
-      builder: (context, constraints) => ActionChip(
-        key: ReminderPlans.active(task) == null || !reminderRingsHere(ref, task)
-            ? null
-            : const ValueKey('reminder-plan-line'),
-        // The icon keeps its own room at any text size, so a long reading
-        // wraps in the label's width instead of the label's height.
-        avatarBoxConstraints: const BoxConstraints.tightFor(
-          width: 20,
-          height: 20,
-        ),
-        avatar: Icon(line.icon, size: 16),
-        label: ConstrainedBox(
+      builder: (context, constraints) {
+        final label = ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth:
                 ((constraints.maxWidth.isFinite
@@ -597,9 +621,36 @@ class ReminderChip extends ConsumerWidget {
                     .clamp(0, double.infinity),
           ),
           child: Text(line.text, softWrap: true, maxLines: 10),
-        ),
-        onPressed: line.onTap,
-      ),
+        );
+        // A line with no tap is information: drawn with no outline and at
+        // full contrast, rather than as a control or a switched-off one. The
+        // chip's own Material takes the canvas colour, so that goes clear too.
+        return line.onTap == null
+            ? Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(canvasColor: Colors.transparent),
+                child: Chip(
+                  key: key,
+                  side: BorderSide.none,
+                  backgroundColor: Colors.transparent,
+                  avatarBoxConstraints: avatarBox,
+                  avatar: avatar,
+                  label: label,
+                  // In the words' colour of the chip that has a tap.
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              )
+            : ActionChip(
+                key: key,
+                avatarBoxConstraints: avatarBox,
+                avatar: avatar,
+                label: label,
+                onPressed: line.onTap,
+              );
+      },
     );
   }
 }
@@ -641,6 +692,12 @@ class ReminderControl extends ConsumerWidget {
   });
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final found = _reasonFor(ref, task);
+    // Someone else's reminders that name nobody: no row at all.
+    if (found?.hidden == true) return const SizedBox.shrink();
+    // Someone else's reminders are theirs: the row names them, with or
+    // without a date, and offers nothing.
+    final person = found?.block == ReminderBlock.notForAccount;
     final preferences = ref.watch(reminderPreferencesProvider);
     final settings = preferences.valueOrNull ?? const ReminderPreferences();
     // The task as it would be saved, with this plan, when it applies: only
@@ -656,7 +713,7 @@ class ReminderControl extends ConsumerWidget {
           );
     final active = planned == null ? null : ReminderPlans.active(planned);
     final dated = hasDate || active != null;
-    final reason = dated ? _reasonFor(ref, task) : null;
+    final reason = dated || person ? found : null;
     final blocked =
         reason == null &&
         _cannotFire(
@@ -689,10 +746,10 @@ class ReminderControl extends ConsumerWidget {
         : minutes == -1 || minute == null
         ? context.l10n.off
         : _clock(context, minute);
-    final onTap = !dated
+    final onTap = reason != null
+        ? reason.action(context, ref)
+        : !dated
         ? null
-        : reason?.silent == true
-        ? reason!.action(context, ref)
         : () => _chooseReminder(
             context,
             hasTime: hasTime,
@@ -727,36 +784,22 @@ class ReminderControl extends ConsumerWidget {
           ),
           title: Text(context.l10n.reminder),
           subtitle: Text(
-            !dated
-                ? context.l10n.dateForReminder
-                : reason?.text(
-                        context,
-                        active != null
-                            // After the person's name, the plan without its
-                            // noun.
-                            ? reminderPlanText(
-                                context,
-                                ref,
-                                planned!,
-                                bare: true,
-                              )
-                            : _followsDefault(
-                                hasTime: hasTime,
-                                minutes: minutes,
-                                time: time,
-                              )
-                            ? null
-                            : value,
-                      ) ??
-                      (passed ? context.l10n.noReminderTimePassed : value),
+            reason?.text(context) ??
+                (!dated
+                    ? context.l10n.dateForReminder
+                    : passed
+                    ? context.l10n.noReminderTimePassed
+                    : value),
           ),
           trailing: onTap == null
               ? null
               : const Icon(Icons.chevron_right_rounded),
           onTap: onTap,
         ),
-        if (preferences.hasError) Text(context.l10n.reminderDefaultsError),
-        if (preferences.isLoading) Text(context.l10n.loadingReminders),
+        if (preferences.hasError && !person)
+          Text(context.l10n.reminderDefaultsError),
+        if (preferences.isLoading && !person)
+          Text(context.l10n.loadingReminders),
         if (blocked)
           TextButton.icon(
             onPressed: () => turnOnReminders(context),

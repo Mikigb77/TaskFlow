@@ -269,6 +269,34 @@ void sharingPreviews() {
       },
     );
 
+    preview(
+      sharing,
+      'how-it-works',
+      'Your shared project\'s «Miembros» with «Cómo funciona el acceso '
+          'compartido» open, scrolled to its middle paragraph: what a shared '
+          'project shares, and that reminders aren\'t shared (each person has '
+          'their own). At 1× the roles and leaving paragraphs show around it.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ...sharedProjectTasks()],
+          projects: allProjects,
+          overrides: [
+            listSharingProvider.overrideWith((ref, id) async => _sharingData()),
+          ],
+        );
+        await app.pushPage(const ListSharingScreen(listId: 'matematicas'));
+        await app.tap(p.l.howSharingWorks);
+        await Scrollable.ensureVisible(
+          p.tester.element(find.text(p.l.sharedDataHelp)),
+          alignment: 0.5,
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
     // ------------------------------------------------------- invitations
     preview(
       review,

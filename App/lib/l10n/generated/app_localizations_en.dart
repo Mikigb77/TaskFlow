@@ -1330,11 +1330,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String reminderForPerson(String name, String value) {
-    return 'Reminder for $name: $value';
-  }
-
-  @override
   String reminderForPersonOnly(String name) {
     return 'Reminder for $name';
   }
@@ -1887,7 +1882,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharedDataHelp =>
-      'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Task reminder choices are shared, but each phone must enable its own notifications.';
+      'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Reminders aren’t shared: each person has their own.';
 
   @override
   String get sharingRemovalHelp =>

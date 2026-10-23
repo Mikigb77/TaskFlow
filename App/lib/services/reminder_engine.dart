@@ -157,8 +157,9 @@ class ReminderEngine {
       identity is String && identity.contains('/plan/');
 
   /// A plan's notice on its timed anchor's own day, at the task's usual
-  /// reminder (D1): it reads as the task's reminder and offers its snooze;
-  /// in every other way it's a plan alert.
+  /// reminder (D1, for a plan without a time of its own; one with its own
+  /// keeps that time on the day too, D8): it reads as the task's reminder
+  /// and offers its snooze; in every other way it's a plan alert.
   static bool isPlanDayAlert(Object? identity) =>
       isPlanAlert(identity) && (identity as String).endsWith('/time');
 
@@ -178,8 +179,10 @@ class ReminderEngine {
   /// The next few reminders of [task]'s [plan], never the whole plan, and
   /// always its last days still ahead (the day before, the day itself and
   /// the day after), so a phone that defers background work still rings
-  /// them. On a timed anchor's own day, the day's one rings at the task's
-  /// usual reminder, in its words (D1).
+  /// them. On a timed anchor's own day, the day's one of a plan without a
+  /// time of its own rings at the task's usual reminder, in its words (D1);
+  /// a plan with a time of its own, said or typed, keeps that time on the
+  /// day too, as a plain plan notice (D8).
   static List<PlannedReminder> planReminders(
     String owner,
     Task task,

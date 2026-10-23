@@ -18,9 +18,19 @@ class TaskPlanningControl extends StatelessWidget {
     super.key,
     required this.task,
     required this.onChanged,
+    this.showReminderAnchor = true,
+    this.reminderNote,
   });
   final Task task;
   final ValueChanged<Task>? onChanged;
+
+  /// False when the task's reminders are someone else's: what this
+  /// account's reminder counts from would never ring, so it isn't offered.
+  final bool showReminderAnchor;
+
+  /// A line under «Recordar antes de», as on a shared task, whose reminders
+  /// are each person's own.
+  final String? reminderNote;
 
   Future<void> _duration(BuildContext context) async {
     var text = task.durationMinutes?.toString() ?? '';
@@ -162,19 +172,24 @@ class TaskPlanningControl extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(l.deadlineRecurringHelp),
             ),
-          DropdownButtonFormField<String>(
-            key: ValueKey('reminder-anchor-${task.reminderAnchor}'),
-            initialValue: task.reminderAnchor,
-            isExpanded: true,
-            decoration: InputDecoration(labelText: l.reminderAnchor),
-            items: [
-              DropdownMenuItem(value: 'planned', child: Text(l.plannedFor)),
-              DropdownMenuItem(value: 'deadline', child: Text(l.deadline)),
-            ],
-            onChanged: onChanged == null
-                ? null
-                : (value) => onChanged!(task.copyWith(reminderAnchor: value)),
-          ),
+          if (showReminderAnchor)
+            DropdownButtonFormField<String>(
+              key: ValueKey('reminder-anchor-${task.reminderAnchor}'),
+              initialValue: task.reminderAnchor,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: l.reminderAnchor,
+                helperText: reminderNote,
+                helperMaxLines: 3,
+              ),
+              items: [
+                DropdownMenuItem(value: 'planned', child: Text(l.plannedFor)),
+                DropdownMenuItem(value: 'deadline', child: Text(l.deadline)),
+              ],
+              onChanged: onChanged == null
+                  ? null
+                  : (value) => onChanged!(task.copyWith(reminderAnchor: value)),
+            ),
         ],
         if (task.plannedAfterDeadline)
           MessageBanner(l.deadlineLatePlan, icon: Icons.info_outline),

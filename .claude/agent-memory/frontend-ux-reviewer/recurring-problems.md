@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Twenty-six problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
+description: Thirty-six problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -151,5 +151,13 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
 34. **A new preview exposes an old narrow-label wrap.**
     - P253's far-date strength preview showed the strip's end label «dt., 22 de des.» wrapping its final «.» at ca 2× (`reminder_plan_sheet.dart` strip labels each `Expanded` half width); pre-existing, not filed.
     - Abbreviated Catalan dates end in «.»; check half-width date labels at ca 2× with far dates.
+
+35. **A no-tap element keeps its control look or state.**
+    - A reminder line made non-tappable kept the outlined chip box (R1B-1 → UX-2034), and the capture row kept `enabled: onTap != null`, so TalkBack would read «Recordatorio para Marta, desactivado» — "the reminder is off" (UX-2025).
+    - When a control loses its tap, check both the look (outline, fill, chevron) and the semantics (button role, enabled state); tests asserting only `hasTapAction: false` miss the enabled state.
+
+36. **Pinning a header removes the scroll cue.**
+    - Fixing the reminder sheet's title + note above a list that opens scrolled to a plan hid that rows sat above (R1D-1 → UX-2035, fixed with a 1 dp edge).
+    - When content moves out of a scroll view into a fixed header, check the "opens mid-list" state at 2×: there must be an edge, and check what sliver of a scrolled row peeks under it (it is still a tap target).
 
 Related: [[ui-patterns]], [[review-techniques]].

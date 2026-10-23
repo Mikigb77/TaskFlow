@@ -1356,11 +1356,6 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String reminderForPerson(String name, String value) {
-    return 'Recordatori per a $name: $value';
-  }
-
-  @override
   String reminderForPersonOnly(String name) {
     return 'Recordatori per a $name';
   }
@@ -1920,7 +1915,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get sharedDataHelp =>
-      'Les tasques, notes i fitxers pujats es comparteixen. Els editors els poden canviar o suprimir; els lectors els poden consultar. Les opcions dels recordatoris es comparteixen, però cada telèfon ha d’activar les seves notificacions.';
+      'Les tasques, notes i fitxers pujats es comparteixen. Els editors els poden canviar o suprimir; els lectors els poden consultar. Els recordatoris no es comparteixen: cada persona té els seus.';
 
   @override
   String get sharingRemovalHelp =>

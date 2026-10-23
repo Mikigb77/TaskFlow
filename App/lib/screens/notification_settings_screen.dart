@@ -363,12 +363,15 @@ class _NotificationSettingsScreenState
     return '${MaterialLocalizations.of(context).formatMediumDate(date)} ${TimeOfDay.fromDateTime(date).format(context)}';
   }
 
-  /// Whether an open task has a plan that takes its hour from «Tareas sin
-  /// hora».
+  /// Whether an open task that rings on this phone has a plan that takes its
+  /// hour from «Tareas sin hora».
   bool _plansWithoutTime() =>
       (ref.watch(taskProvider).valueOrNull ?? const []).any((task) {
         final plan = ReminderPlans.active(task);
-        return plan != null && plan.time == null && !task.isCompleted;
+        return plan != null &&
+            plan.time == null &&
+            !task.isCompleted &&
+            reminderRingsHere(ref, task);
       });
 
   /// [off] replaces «Desactivado» while [value] is null.

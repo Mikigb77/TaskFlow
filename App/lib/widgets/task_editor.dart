@@ -1044,6 +1044,14 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           const SizedBox(height: 16),
                           TaskPlanningControl(
                             task: _planningTask,
+                            // Reminders are each person's own.
+                            showReminderAnchor: !reminderSomeoneElses(
+                              ref,
+                              _responsibility,
+                            ),
+                            reminderNote: reminderShared(ref, _responsibility)
+                                ? context.l10n.reminderPlanJustYou
+                                : null,
                             onChanged: (task) => setState(() {
                               _deadline = task.deadline;
                               _deadlineHasTime = task.deadlineHasTime;

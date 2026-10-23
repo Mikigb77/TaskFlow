@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:agenda/screens/task_lists_screen.dart';
 import 'package:agenda/providers/groups_provider.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -1236,6 +1239,161 @@ void main() {
         findsOneWidget);
     expect(find.text(_Recorder.code), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('P260 · reminders aren’t shared', () {
+    // Measure wrapping in the app's own font, not the square test font.
+    setUpAll(() async {
+      await (FontLoader('Manrope')
+            ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+          .load();
+    });
+
+    // The brief's exact copy for the second paragraph of «Cómo funciona…».
+    const expected = {
+      'es':
+          'Se comparten tareas, notas y archivos subidos. Los editores pueden '
+              'modificarlos o eliminarlos; los lectores pueden consultarlos. '
+              'Los recordatorios no se comparten: cada persona tiene los suyos.',
+      'en': 'Tasks, notes and uploaded files are shared. Editors can change '
+          'or remove them; viewers can read them. Reminders aren’t shared: '
+          'each person has their own.',
+      'ca': 'Les tasques, notes i fitxers pujats es comparteixen. Els editors '
+          'els poden canviar o suprimir; els lectors els poden consultar. '
+          'Els recordatoris no es comparteixen: cada persona té els seus.',
+    };
+    const sharedData = {
+      'list': {'name': 'Casa', 'role': 'owner', 'version': 3},
+      'members': [
+        {'user_id': 2, 'user__email': 'ana@example.invalid', 'role': 'editor'},
+        {'user_id': 3, 'user__email': 'luis@example.invalid', 'role': 'viewer'},
+      ],
+      'invitations': [],
+    };
+    final sharedProjects = [
+      TaskListInfo(
+          id: 'casa',
+          name: 'Casa',
+          version: 3,
+          shared: true,
+          ownerId: 1,
+          people: const [
+            ProjectMember(id: 1, name: 'María', role: 'owner'),
+            ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+            ProjectMember(id: 3, name: 'Luis', role: 'viewer'),
+          ]),
+    ];
+
+    /// Opens the owner's «Miembros» of the shared project «Casa» and
+    /// expands «Cómo funciona compartir».
+    Future<AppLocalizations> openHelp(WidgetTester tester,
+        {required String language, double scale = 1}) async {
+      final l = lookupAppLocalizations(Locale(language));
+      await _openSharing(tester,
+          data: sharedData,
+          projects: sharedProjects,
+          language: language,
+          scale: scale);
+      final title = find.text(l.howSharingWorks);
+      await tester.scrollUntilVisible(title, 120,
+          scrollable: find
+              .descendant(
+                  of: find.byType(ListSharingScreen),
+                  matching: find.byType(Scrollable))
+              .first);
+      await tester.pumpAndSettle();
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      return l;
+    }
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2029: ($language, 1×, 360×800) on the owner’s Miembros of a shared project, the second paragraph of Cómo funciona compartir says reminders aren’t shared: each person has their own',
+          (tester) async {
+        final l = await openHelp(tester, language: language);
+        expect(l.sharedDataHelp, expected[language],
+            reason: 'the catalog holds the brief’s exact text');
+        final paragraphs = [
+          l.sharingRolesHelp,
+          l.sharedDataHelp,
+          l.sharingRemovalHelp
+        ];
+        for (final text in paragraphs) {
+          expect(find.text(text), findsOneWidget);
+        }
+        final tops = [
+          for (final text in paragraphs) tester.getTopLeft(find.text(text)).dy
+        ];
+        expect(tops[0] < tops[1] && tops[1] < tops[2], isTrue,
+            reason: 'the sharing paragraph is the second of the three');
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+          'UX-2029: ($language, 2×, 360×800) the reminders-aren’t-shared paragraph shows whole, nothing clipped, once scrolled into view',
+          (tester) async {
+        final l = await openHelp(tester, language: language, scale: 2);
+        final paragraph = find.text(l.sharedDataHelp);
+        expect(paragraph, findsOneWidget);
+        await tester.ensureVisible(paragraph);
+        await tester.pumpAndSettle();
+        final box = tester.getRect(paragraph);
+        final bar = tester.getRect(find
+            .descendant(
+                of: find.byType(ListSharingScreen),
+                matching: find.byType(AppBar))
+            .first);
+        expect(box.top, greaterThanOrEqualTo(bar.bottom),
+            reason: 'its first line is below the app bar');
+        expect(box.bottom, lessThanOrEqualTo(800));
+        expect(box.left, greaterThanOrEqualTo(0));
+        expect(box.right, lessThanOrEqualTo(360));
+        final render = tester.renderObject<RenderParagraph>(find.descendant(
+            of: paragraph, matching: find.byType(RichText)));
+        expect(render.didExceedMaxLines, isFalse);
+        expect(render.textScaler, const TextScaler.linear(2));
+        // Every line of the text is laid out inside the paragraph's box.
+        final end = render.getOffsetForCaret(
+            TextPosition(offset: l.sharedDataHelp.length), Rect.zero);
+        expect(end.dy, lessThan(render.size.height));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    test(
+        'UX-2029: no catalog keeps the old sentence that reminder choices are shared, and the generated strings match the catalogs',
+        () {
+      const old = {
+        'es': 'opciones de recordatorio se comparten',
+        'en': 'reminder choices are shared',
+        'ca': 'opcions dels recordatoris es comparteixen',
+      };
+      for (final language in ['en', 'es', 'ca']) {
+        final raw = File('lib/l10n/app_$language.arb').readAsStringSync();
+        expect(raw.contains(old[language]!), isFalse,
+            reason: 'app_$language.arb still says “${old[language]}”');
+        final arb = jsonDecode(raw) as Map<String, dynamic>;
+        expect(arb['sharedDataHelp'], expected[language]);
+        // flutter gen-l10n ran: the generated class says what the catalog says.
+        expect(lookupAppLocalizations(Locale(language)).sharedDataHelp,
+            arb['sharedDataHelp']);
+      }
+    });
+
+    test('UX-2029: @sharedDataHelp in app_en.arb carries the brief’s description',
+        () {
+      final arb = jsonDecode(File('lib/l10n/app_en.arb').readAsStringSync())
+          as Map<String, dynamic>;
+      expect(arb['@sharedDataHelp'], isA<Map<String, dynamic>>());
+      expect(
+          (arb['@sharedDataHelp'] as Map<String, dynamic>)['description'],
+          'Sharing screen, under “How sharing works”: what a shared project '
+          'shares. Reminders are each person’s own (none of their values '
+          'reaches anyone else), so the last sentence says they aren’t shared.');
+    });
   });
 }
 

@@ -11,6 +11,7 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_draft.dart';
@@ -30,6 +31,7 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/revenuecat_service.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/capture_command_cards.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
 import 'package:agenda/widgets/reminder_control.dart';
@@ -5366,41 +5368,26 @@ void main() {
     final untilDay = find.byKey(const ValueKey('reminder-plan-until-day'));
     final yourWay = find.byKey(const ValueKey('reminder-plan-your-way'));
 
-    /// The line reads [l]'s copy and sits directly above «Listo»: nothing
-    /// between them, and below what the plan gives.
-    void expectJustAboveListo(WidgetTester tester, AppLocalizations l) {
+    /// The line reads [l]'s copy, once in the sheet (none above «Listo»),
+    /// directly under the sheet's title, which stays above the choices
+    /// (UX-2026).
+    void expectJustUnderTitle(WidgetTester tester, AppLocalizations l) {
+      expect(justYou, findsOneWidget);
       expect(inSheet(justYou), findsOneWidget);
-      expect(inSheet(listo), findsOneWidget);
       expect(tester.widget<Text>(justYou).data, l.reminderPlanJustYou);
       final line = tester.getRect(justYou);
-      final button = tester.getRect(listo);
-      expect(line.bottom, lessThanOrEqualTo(button.top + 0.5));
+      final title = tester.getRect(inSheet(find.text(l.reminder)));
+      expect(line.top, greaterThanOrEqualTo(title.bottom - 0.5));
       expect(
-        button.top - line.bottom,
+        line.top - title.bottom,
         lessThanOrEqualTo(16),
-        reason: 'The line sits directly above «Listo».',
+        reason: 'The line sits directly under the title.',
       );
-      final count = find.byKey(const ValueKey('reminder-plan-count'));
-      if (count.evaluate().isNotEmpty) {
-        expect(tester.getRect(count).bottom, lessThanOrEqualTo(line.top));
-      }
+      expect(line.top, greaterThanOrEqualTo(0));
       final paragraph = tester.renderObject<RenderParagraph>(
         find.descendant(of: justYou, matching: find.byType(RichText)),
       );
       expect(paragraph.didExceedMaxLines, isFalse);
-    }
-
-    /// The single reminder's list only: its title and rows, no plan.
-    void expectSingleListOnly(AppLocalizations l) {
-      expect(sheet(), findsOneWidget);
-      expect(inSheet(find.text(l.reminder)), findsOneWidget);
-      expect(inSheet(find.text(l.off)), findsOneWidget);
-      expect(inSheet(find.text(l.chooseAlertTime)), findsOneWidget);
-      expect(untilDay, findsNothing);
-      expect(yourWay, findsNothing);
-      expect(justYou, findsNothing);
-      expect(find.text(l.reminderPlanUntilDay), findsNothing);
-      expect(find.text(l.reminderPlanYourWay), findsNothing);
     }
 
     test(
@@ -5422,8 +5409,8 @@ void main() {
     ]) {
       testWidgets(
         'UX-2014: on $what in a shared project, the sheet offers the plans, '
-        'and «Hasta la fecha límite» says «Estos avisos son solo para ti.» '
-        'directly above «Listo»',
+        'and says «Estos avisos son solo para ti.» once, under its title, '
+        'before and after opening «Hasta la fecha límite»',
         (tester) async {
           final app = await _App.open(
             tester,
@@ -5435,11 +5422,11 @@ void main() {
           await openSheet(tester);
           expect(inSheet(untilDay), findsOneWidget);
           expect(inSheet(yourWay), findsOneWidget);
-          expect(justYou, findsNothing, reason: 'Only in an open plan.');
+          expectJustUnderTitle(tester, es);
           await tapVisible(tester, inSheet(untilDay));
           await tester.ensureVisible(listo);
           await tester.pumpAndSettle();
-          expectJustAboveListo(tester, es);
+          expectJustUnderTitle(tester, es);
           // Listo still sets this person's plan.
           await tapVisible(tester, listo);
           expect(
@@ -5452,8 +5439,8 @@ void main() {
     }
 
     testWidgets(
-      'UX-2014: on a «Todos» task, «A tu manera» says the line above «Listo» '
-      'once a plan is read',
+      'UX-2014: on a «Todos» task, the line stays once, under the title, '
+      'while «A tu manera» reads a plan',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -5465,7 +5452,7 @@ void main() {
         await app.detail(1);
         await openSheet(tester);
         await tapVisible(tester, inSheet(yourWay));
-        expect(justYou, findsNothing, reason: 'No plan read yet.');
+        expectJustUnderTitle(tester, es);
         await tester.enterText(
           find.byKey(const ValueKey('reminder-plan-words')),
           'cada 3 días y la última semana a diario',
@@ -5474,36 +5461,51 @@ void main() {
         await tester.pumpAndSettle();
         await tester.ensureVisible(listo);
         await tester.pumpAndSettle();
-        expectJustAboveListo(tester, es);
+        expectJustUnderTitle(tester, es);
       },
     );
 
-    for (final (what, task) in [
-      (
-        'a task given to Marta',
-        shared(assignment: 'member', assigneeId: 2, assigneeName: 'Marta'),
-      ),
-      (
-        'an unassigned task in a shared project where you’re an editor',
-        shared(listId: 'club', assignment: 'unassigned'),
-      ),
-    ]) {
-      testWidgets(
-        'UX-2014: $what gets the title and the single reminder’s rows only',
-        (tester) async {
-          final app = await _App.open(
-            tester,
-            [task],
-            size: phone,
-            projects: projects,
-          );
-          await app.detail(1);
-          await openSheet(tester);
-          expectSingleListOnly(es);
-          expect(tester.takeException(), isNull);
-        },
-      );
-    }
+    // P259 (UX-2025, UX-2028): someone else's reminders offer no choices.
+    testWidgets(
+      'UX-2014: a task given to Marta reads «Recordatorio para Marta», and a '
+      'tap opens nothing',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [shared(assignment: 'member', assigneeId: 2, assigneeName: 'Marta')],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(chipText(es.reminderForPersonOnly('Marta')), findsOneWidget);
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2014: an unassigned task in a shared project where you’re an editor '
+      'shows no reminder',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [shared(listId: 'club', assignment: 'unassigned')],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(
+          find.descendant(
+            of: find.byType(ReminderChip),
+            matching: find.byType(Text),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
       'UX-2014: a personal task with no project, Pro: plan rows, and no '
@@ -5570,7 +5572,7 @@ void main() {
 
     testWidgets(
       'UX-2014: the same with its own lead of 60 reads «Recordatorio para '
-      'Marta: 1 hora antes», and a single reminder chosen clears the plan',
+      'Marta», and a tap changes nothing',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -5585,21 +5587,16 @@ void main() {
           projects: projects,
         );
         await app.detail(1);
-        expect(
-          es.reminderForPerson('Marta', es.hourBefore),
-          'Recordatorio para Marta: 1 hora antes',
-        );
-        expect(
-          chipText(es.reminderForPerson('Marta', es.hourBefore)),
-          findsOneWidget,
-        );
+        expect(chipText(es.reminderForPersonOnly('Marta')), findsOneWidget);
         expect(find.byKey(const ValueKey('reminder-plan-line')), findsNothing);
-        await openSheet(tester);
-        expect(untilDay, findsNothing);
-        expect(yourWay, findsNothing);
-        await tapVisible(tester, inSheet(find.text(es.off)));
-        expect(app.task(1).reminderPlan, isNull);
-        expect(app.task(1).reminderMinutes, -1);
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(
+          app.task(1).reminderPlan,
+          const ReminderPlan.rhythm(ReminderPlan.normal),
+        );
+        expect(app.task(1).reminderMinutes, 60);
       },
     );
 
@@ -5644,8 +5641,8 @@ void main() {
     }
 
     testWidgets(
-      'UX-2014: in the form, a «Todos» task’s «Hasta la fecha límite» shows '
-      'the line above «Listo»',
+      'UX-2014: in the form, a «Todos» task’s sheet shows the line under its '
+      'title with «Hasta la fecha límite» open',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -5657,12 +5654,13 @@ void main() {
         await tapVisible(tester, inSheet(untilDay));
         await tester.ensureVisible(listo);
         await tester.pumpAndSettle();
-        expectJustAboveListo(tester, es);
+        expectJustUnderTitle(tester, es);
       },
     );
 
     testWidgets(
-      'UX-2014: in the form, the same task given to Marta has no plan rows',
+      'UX-2014: in the form, the same task given to Marta reads «Recordatorio '
+      'para Marta» and opens nothing',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -5670,8 +5668,19 @@ void main() {
           size: phone,
           projects: projects,
         );
-        await formReminder(tester, app);
-        expectSingleListOnly(es);
+        app.navigator.pushNamed('/editTask', arguments: 1);
+        await tester.pumpAndSettle();
+        await tapVisible(
+          tester,
+          find.byKey(const ValueKey('task-more-details')),
+        );
+        final row = find.descendant(
+          of: find.byType(ReminderControl),
+          matching: find.text(es.reminderForPersonOnly('Marta')),
+        );
+        expect(row, findsOneWidget);
+        await tapVisible(tester, row);
+        expect(sheet(), findsNothing);
       },
     );
 
@@ -5705,8 +5714,7 @@ void main() {
 
     testWidgets(
       'UX-2014: on the capture card, a draft in the project given to Marta '
-      'with a said plan reads «Recordatorio para Marta», and opens the single '
-      'reminder’s list only',
+      'with a said plan reads «Recordatorio para Marta», and opens nothing',
       (tester) async {
         await card(tester, forMarta(id: null, plan: ownersPlan));
         expect(cardRow(), findsOneWidget);
@@ -5718,15 +5726,14 @@ void main() {
           findsOneWidget,
         );
         expect(find.textContaining('cada 3 días'), findsNothing);
+        // The capture's result may hold a sheet of its own: none opens.
+        final sheets = sheet().evaluate().length;
         await tapVisible(
           tester,
           find.descendant(of: cardRow(), matching: find.text(es.reminder)),
         );
-        expect(untilDay, findsNothing);
-        expect(yourWay, findsNothing);
-        expect(justYou, findsNothing);
-        expect(inSheet(find.text(es.off)), findsOneWidget);
-        expect(inSheet(find.text(es.chooseAlertTime)), findsOneWidget);
+        expect(sheet(), findsNWidgets(sheets));
+        expect(find.text(es.chooseAlertTime), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
@@ -5918,7 +5925,7 @@ void main() {
           await tapVisible(tester, inSheet(find.text(l.reminderPlanUntilDay)));
           await tester.ensureVisible(listo);
           await tester.pumpAndSettle();
-          expectJustAboveListo(tester, l);
+          expectJustUnderTitle(tester, l);
           for (final finder in [justYou, listo]) {
             final box = tester.getRect(finder);
             expect(box.top, greaterThanOrEqualTo(0), reason: '$finder');
@@ -6181,6 +6188,2302 @@ void main() {
         },
       );
     }
+  });
+
+  // P259 (UX-2024, UX-2025, UX-2027, UX-2028; DECISIONS.md «D8 of run
+  // 2026-10-22-changes, and the single reminder on shared tasks»): every
+  // reminder choice is each person's own. A task given to someone else names
+  // them and offers nothing; one that isn't this account's and names nobody
+  // shows no reminder; on a shared task the one-tap list and «Recordar antes
+  // de» say the reminders are only for you.
+  group('P259 · personal reminders', () {
+    const phone = Size(360, 800);
+    // A shared project this account owns, with Marta (member 2) in it.
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Marta', role: 'editor'),
+      ],
+    );
+    // A shared project where this account is an editor: it doesn't manage it.
+    final club = TaskListInfo(
+      id: 'club',
+      name: 'Club',
+      shared: true,
+      ownerId: 2,
+      role: 'editor',
+      people: const [
+        ProjectMember(id: 2, name: 'Marta', role: 'owner'),
+        ProjectMember(id: 1, name: 'Yo', role: 'editor'),
+      ],
+    );
+    final muted = TaskListInfo(
+      id: 'quiet',
+      name: 'Silencio',
+      notifications: 'muted',
+    );
+    final archived = TaskListInfo(id: 'old', name: 'Antiguo', archived: true);
+    final projects = [team, club, muted, archived];
+    final at17 = DateTime(2026, 11, 13, 17);
+    // Monday 26 October 2026 at 17:00, the first of a weekly series.
+    final monday17 = DateTime(2026, 10, 26, 17);
+    final justYou = find.byKey(const ValueKey('reminder-plan-just-you'));
+    final untilDay = find.byKey(const ValueKey('reminder-plan-until-day'));
+    const reminderOff = ReminderPreferences(
+      enabled: false,
+      dateOnlyTime: 540,
+      asked: true,
+    );
+
+    /// «Presentar el proyecto» on Fri 13 Nov (at 17:00 when [timed]) in
+    /// [listId], as [assignment]; with no day at all when [noDay].
+    Task task({
+      int? id = 1,
+      String? listId = 'team',
+      String assignment = 'group',
+      int? assigneeId,
+      String? assigneeName,
+      bool timed = false,
+      bool noDay = false,
+      int? minutes,
+      int? time,
+      String anchor = 'planned',
+      DateTime? deadline,
+      ReminderPlan? plan,
+      String recurrence = 'none',
+      DateTime? day,
+      String title = 'Presentar el proyecto',
+      List<ChecklistItem> checklist = const [],
+    }) => Task(
+      id: id,
+      title: title,
+      priority: 1,
+      dueDate: noDay ? null : day ?? (timed ? at17 : friday13),
+      hasTime: timed && !noDay,
+      reminderMinutes: minutes,
+      reminderTime: time,
+      reminderAnchor: anchor,
+      deadline: deadline,
+      reminderPlan: plan,
+      recurrence: recurrence,
+      listId: listId,
+      assignment: assignment,
+      assigneeId: assigneeId,
+      assigneeName: assigneeName,
+      checklist: checklist,
+    );
+    Task forMarta({
+      int? id = 1,
+      bool timed = false,
+      bool noDay = false,
+      int? minutes,
+      int? time,
+      String anchor = 'planned',
+      DateTime? deadline,
+      ReminderPlan? plan,
+    }) => task(
+      id: id,
+      assignment: 'member',
+      assigneeId: 2,
+      assigneeName: 'Marta',
+      timed: timed,
+      noDay: noDay,
+      minutes: minutes,
+      time: time,
+      anchor: anchor,
+      deadline: deadline,
+      plan: plan,
+    );
+    Task inClub({
+      int? id = 1,
+      int? minutes,
+      DateTime? deadline,
+      bool noDay = false,
+    }) => task(
+      id: id,
+      listId: 'club',
+      assignment: 'unassigned',
+      timed: true,
+      noDay: noDay,
+      minutes: minutes,
+      deadline: deadline,
+    );
+
+    /// The words on the task's reminder chip, one per Text.
+    List<String> chipWords(WidgetTester tester) => [
+      for (final text in tester.widgetList<Text>(
+        find.descendant(
+          of: find.byType(ReminderChip),
+          matching: find.byType(Text),
+        ),
+      ))
+        text.data ?? text.textSpan!.toPlainText(),
+    ];
+
+    /// The colour the chip's [words] are drawn in.
+    Color chipColor(WidgetTester tester, String words) => tester
+        .widget<RichText>(
+          find.descendant(
+            of: find.descendant(
+              of: find.byType(ReminderChip),
+              matching: find.text(words),
+            ),
+            matching: find.byType(RichText),
+          ),
+        )
+        .text
+        .style!
+        .color!;
+
+    /// The edit form of task 1, «Más detalles» open.
+    Future<_App> form(
+      WidgetTester tester,
+      Task task, {
+      ReminderPreferences reminders = const ReminderPreferences(
+        enabled: true,
+        dateOnlyTime: 540,
+        asked: true,
+      ),
+      String language = 'es',
+      double textScale = 1,
+    }) async {
+      final app = await _App.open(
+        tester,
+        [task],
+        size: phone,
+        projects: projects,
+        reminders: reminders,
+        language: language,
+        textScale: textScale,
+      );
+      app.navigator.pushNamed('/editTask', arguments: 1);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const ValueKey('task-more-details')));
+      return app;
+    }
+
+    /// The form's «Recordatorio» row.
+    Finder formRow() => find.descendant(
+      of: find.byType(ReminderControl),
+      matching: find.byType(ListTile),
+    );
+
+    /// The capture's result for [tasks], one draft each (`d1`, `d2`, …).
+    Future<(_App, MemoryCaptures)> capture(
+      WidgetTester tester,
+      List<Task> tasks,
+    ) async {
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        size: phone,
+        projects: projects,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p259',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Presentar el proyecto…',
+        drafts: [
+          for (final (i, task) in tasks.indexed)
+            CaptureDraft(id: 'd${i + 1}', task: task),
+        ],
+      );
+      await openCaptureResult(tester, 'p259');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      return (app, captures);
+    }
+
+    Finder cardRow([String id = 'd1']) =>
+        find.byKey(ValueKey('draft-reminder-$id'));
+    Finder cardLine([String id = 'd1']) =>
+        find.byKey(ValueKey('draft-reminder-line-$id'));
+    Finder needsDay([String id = 'd1']) =>
+        find.byKey(ValueKey('draft-reminder-needs-day-$id'));
+    Finder chevron(Finder of) => find.descendant(
+      of: of,
+      matching: find.byIcon(Icons.chevron_right_rounded),
+    );
+
+    // ---- UX-2024: the chip names Marta, and none of this account's values.
+
+    final martas = <(String, Task)>[
+      (
+        'at 17:00 with this account’s «1 hora antes»',
+        forMarta(timed: true, minutes: 60),
+      ),
+      ('date-only with this account’s 8:00', forMarta(time: 480)),
+      ('with this account’s reminder off', forMarta(minutes: -1)),
+      (
+        'counted from its deadline',
+        forMarta(deadline: DateTime(2026, 11, 20), anchor: 'deadline'),
+      ),
+      (
+        'with this account’s «Normal» plan',
+        forMarta(plan: const ReminderPlan.rhythm(ReminderPlan.normal)),
+      ),
+    ];
+    for (final (language, expected) in [
+      ('es', 'Recordatorio para Marta'),
+      ('en', 'Reminder for Marta'),
+      ('ca', 'Recordatori per a Marta'),
+    ]) {
+      for (final (what, given) in martas) {
+        testWidgets(
+          'UX-2024: a task given to Marta $what reads exactly «$expected», '
+          'with no value after the name ($language)',
+          (tester) async {
+            final l = lookupAppLocalizations(Locale(language));
+            final app = await _App.open(
+              tester,
+              [given],
+              size: phone,
+              projects: projects,
+              language: language,
+            );
+            await app.detail(1);
+            expect(find.byType(ReminderChip), findsOneWidget);
+            final words = chipWords(tester);
+            expect(words, [l.reminderForPersonOnly('Marta')]);
+            expect(words.single, isNot(contains(':')));
+            expect(words.single.trim(), endsWith('Marta'));
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    test('UX-2024: the catalogs have no «reminderForPerson», and '
+        '«reminderForPersonOnly» carries its new description', () {
+      for (final language in ['en', 'es', 'ca']) {
+        final arb =
+            jsonDecode(File('lib/l10n/app_$language.arb').readAsStringSync())
+                as Map<String, dynamic>;
+        expect(arb.containsKey('reminderForPerson'), isFalse);
+        expect(arb.containsKey('@reminderForPerson'), isFalse);
+        expect(arb['reminderForPersonOnly'], isA<String>());
+      }
+      final en =
+          jsonDecode(File('lib/l10n/app_en.arb').readAsStringSync())
+              as Map<String, dynamic>;
+      expect(
+        (en['@reminderForPersonOnly'] as Map<String, dynamic>)['description'],
+        'The reminder line on a task given to someone else. Their reminders '
+                'are their own and never reach this phone, so none of this '
+                'account’s reminder values is shown. {name} is the person’s name.'
+            .replaceAll('’', "'"),
+      );
+    });
+
+    // ---- UX-2025: someone else's reminders offer nothing.
+
+    testWidgets(
+      'UX-2025: the chip on Marta’s task opens nothing and changes nothing, '
+      'is drawn at full contrast, and TalkBack hears no button',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final given = forMarta(timed: true, minutes: 60);
+        final app = await _App.open(
+          tester,
+          [given],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        final words = es.reminderForPersonOnly('Marta');
+        expect(chipText(words), findsOneWidget);
+        final color = chipColor(tester, words);
+        expect(
+          color.a,
+          closeTo(1, 0.001),
+          reason: 'information, not Material’s 38% disabled label',
+        );
+        final scheme = Theme.of(
+          tester.element(find.byType(ReminderChip)),
+        ).colorScheme;
+        expect(color, scheme.onSurface);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(words)),
+          isSemantics(isButton: false, hasTapAction: false),
+        );
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(find.byType(Dialog), findsNothing);
+        final after = app.task(1);
+        expect(after.reminderMinutes, 60);
+        expect(after.reminderTime, isNull);
+        expect(after.reminderPlan, isNull);
+        expect(after.reminderAnchor, 'planned');
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2025: in the form, Marta’s row reads «Recordatorio para Marta» '
+      'with no chevron, and a tap opens nothing',
+      (tester) async {
+        await form(tester, forMarta(timed: true, minutes: 60));
+        expect(formRow(), findsOneWidget);
+        final tile = tester.widget<ListTile>(formRow());
+        expect(
+          (tile.subtitle! as Text).data,
+          es.reminderForPersonOnly('Marta'),
+        );
+        expect(tile.trailing, isNull);
+        expect(tile.onTap, isNull);
+        expect(chevron(find.byType(ReminderControl)), findsNothing);
+        await tapVisible(tester, formRow());
+        expect(sheet(), findsNothing);
+        expect(find.text(es.chooseAlertTime), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-2025: with reminders off on this phone, Marta’s row has no '
+        '«Activar recordatorios» (and a «Todos» task’s does)', (tester) async {
+      await form(
+        tester,
+        forMarta(timed: true, minutes: 60),
+        reminders: reminderOff,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ReminderControl),
+          matching: find.text(es.reminderForPersonOnly('Marta')),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(es.enableReminders), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'UX-2025: control: with reminders off, a «Todos» task’s row offers '
+      '«Activar recordatorios»',
+      (tester) async {
+        await form(tester, task(timed: true), reminders: reminderOff);
+        expect(
+          find.descendant(
+            of: find.byType(ReminderControl),
+            matching: find.text(es.enableReminders),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'UX-2025: with no day, Marta’s row still reads «Recordatorio para '
+      'Marta», not «Añade una fecha para usar un recordatorio»',
+      (tester) async {
+        await form(tester, forMarta(noDay: true, minutes: 60));
+        expect(formRow(), findsOneWidget);
+        final tile = tester.widget<ListTile>(formRow());
+        expect(
+          (tile.subtitle! as Text).data,
+          es.reminderForPersonOnly('Marta'),
+        );
+        expect(find.text(es.dateForReminder), findsNothing);
+        expect(tile.onTap, isNull);
+        expect(tile.trailing, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2025: with a deadline, Marta’s form shows «Fecha límite» and no '
+      '«Recordar antes de»',
+      (tester) async {
+        await form(
+          tester,
+          forMarta(timed: true, deadline: DateTime(2026, 11, 20)),
+        );
+        final deadline = find.byKey(const ValueKey('task-deadline'));
+        await tester.ensureVisible(deadline);
+        await tester.pumpAndSettle();
+        expect(deadline, findsOneWidget);
+        expect(find.text(es.reminderAnchor), findsNothing);
+        expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2025: on the capture card, Marta’s draft at 17:00 with «1 hora '
+      'antes» reads «Recordatorio para Marta» above «Más opciones», with no '
+      'chevron, and a tap opens nothing',
+      (tester) async {
+        await capture(tester, [forMarta(id: null, timed: true, minutes: 60)]);
+        expect(cardRow(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: cardRow(),
+            matching: find.text(es.reminderForPersonOnly('Marta')),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: cardRow(), matching: find.text(es.hourBefore)),
+          findsNothing,
+        );
+        expect(chevron(cardRow()), findsNothing);
+        final options = find.byKey(const ValueKey('draft-options-d1'));
+        expect(
+          tester.getTopLeft(cardRow()).dy,
+          lessThan(tester.getTopLeft(options).dy),
+        );
+        // The capture's result is itself a bottom sheet: no other opens.
+        final sheets = sheet().evaluate().length;
+        await tapVisible(
+          tester,
+          find.descendant(of: cardRow(), matching: find.text(es.reminder)),
+        );
+        expect(sheet(), findsNWidgets(sheets));
+        expect(find.text(es.chooseAlertTime), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2025: on the capture card, Marta’s draft with no day and «1 hora '
+      'antes» doesn’t ask «Para recordártelo, ponle un día.»',
+      (tester) async {
+        await capture(tester, [forMarta(id: null, noDay: true, minutes: 60)]);
+        expect(needsDay(), findsNothing);
+        expect(find.text(es.reminderNeedsDay), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-2025: in a result of three, Marta’s collapsed row shows '
+        '«Recordatorio para Marta» under its date line, with no chevron, read '
+        'as text', (tester) async {
+      final handle = tester.ensureSemantics();
+      await capture(tester, [
+        Task(
+          title: 'Comprar pan y leche',
+          priority: 1,
+          dueDate: DateTime(2026, 10, 22),
+          hasTime: false,
+        ),
+        forMarta(id: null, timed: true, minutes: 60),
+        Task(
+          title: 'Recoger a los niños del colegio',
+          priority: 1,
+          dueDate: DateTime(2026, 10, 22, 17),
+          hasTime: true,
+        ),
+      ]);
+      final words = es.reminderForPersonOnly('Marta');
+      expect(cardLine('d2'), findsOneWidget);
+      expect(
+        find.descendant(of: cardLine('d2'), matching: find.text(words)),
+        findsOneWidget,
+      );
+      expect(chevron(cardLine('d2')), findsNothing);
+      expect(
+        tester.getTopLeft(cardLine('d2')).dy,
+        greaterThan(
+          tester.getTopLeft(find.byKey(const ValueKey('draft-schedule-d2'))).dy,
+        ),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(words)),
+        isSemantics(label: words, isButton: false, hasTapAction: false),
+      );
+      expect(tester.takeException(), isNull);
+      handle.dispose();
+    });
+
+    // ---- UX-2028: not this account's, naming nobody: no reminder at all.
+
+    // A task with one step: the details' card, then 28 dp, then the
+    // reminder chip and its 16 dp when there is one, then the steps.
+    final steps = [ChecklistItem(title: 'Revisar')];
+    double stepsBelowCard(WidgetTester tester) =>
+        tester.getTopLeft(find.text(es.checklistCount(0, 1).toUpperCase())).dy -
+        tester
+            .getBottomLeft(
+              find.ancestor(
+                of: find.byIcon(Icons.schedule_outlined),
+                matching: find.byType(AppSurface),
+              ),
+            )
+            .dy;
+
+    testWidgets(
+      'UX-2028: an unassigned task in «Club», where you’re an editor, has no '
+      'reminder chip and no gap for one',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [inClub().copyWith(checklist: steps)],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(find.byType(ReminderChip), findsNothing);
+        expect(find.textContaining(es.minutesBefore(10)), findsNothing);
+        expect(
+          stepsBelowCard(tester),
+          moreOrLessEquals(28, epsilon: 0.5),
+          reason: 'With no chip, its 16 dp gap goes too.',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2028: the same unassigned task in «Equipo», which you own, reads '
+      '«Recordatorio: 10 minutos antes» and opens the reminder sheet',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [
+            task(
+              assignment: 'unassigned',
+              timed: true,
+            ).copyWith(checklist: steps),
+          ],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(chipWords(tester), [es.reminderValue(es.minutesBefore(10))]);
+        final chip = tester.getSize(find.byType(ReminderChip)).height;
+        expect(
+          stepsBelowCard(tester),
+          moreOrLessEquals(28 + chip + 16, epsilon: 0.5),
+        );
+        await openSheet(tester);
+        expect(inSheet(untilDay), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2028: a member’s task in «Equipo» with no name shows no reminder',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [task(assignment: 'member', assigneeId: 3, timed: true, minutes: 60)],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(find.byType(ReminderChip), findsNothing);
+        expect(find.textContaining(es.hourBefore), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2028: the edit form of the unassigned task in «Club» has no '
+      '«Recordatorio» row and, with a deadline, no «Recordar antes de»',
+      (tester) async {
+        await form(tester, inClub(deadline: DateTime(2026, 11, 20)));
+        expect(formRow(), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(ReminderControl),
+            matching: find.text(es.reminder),
+          ),
+          findsNothing,
+        );
+        expect(find.text(es.dateForReminder), findsNothing);
+        final deadline = find.byKey(const ValueKey('task-deadline'));
+        await tester.ensureVisible(deadline);
+        await tester.pumpAndSettle();
+        expect(deadline, findsOneWidget);
+        expect(find.text(es.reminderAnchor), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2028: as a capture draft with «1 hora antes», the unassigned task '
+      'in «Club» shows no reminder row, and with no day no needs-day line',
+      (tester) async {
+        await capture(tester, [
+          inClub(id: null, minutes: 60),
+          inClub(id: null, minutes: 60, noDay: true),
+        ]);
+        // Two drafts: each card may be open or collapsed; neither shows any
+        // reminder.
+        for (final id in ['d1', 'd2']) {
+          expect(cardRow(id), findsNothing);
+          expect(cardLine(id), findsNothing);
+          expect(needsDay(id), findsNothing);
+        }
+        expect(find.text(es.reminderNeedsDay), findsNothing);
+        expect(find.textContaining(es.hourBefore), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2028: a single «Club» draft with «1 hora antes» has no reminder row '
+      'and nothing about it in «Más opciones»',
+      (tester) async {
+        await capture(tester, [inClub(id: null, minutes: 60)]);
+        expect(cardRow(), findsNothing);
+        expect(cardLine(), findsNothing);
+        expect(needsDay(), findsNothing);
+        expect(find.textContaining(es.hourBefore), findsNothing);
+        expect(find.textContaining(es.reminderValue('')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2028: in a result of three, the «Club» draft’s collapsed row has '
+      'no reminder line',
+      (tester) async {
+        await capture(tester, [
+          Task(
+            title: 'Comprar pan y leche',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 22),
+            hasTime: false,
+          ),
+          inClub(id: null, minutes: 60),
+          Task(
+            title: 'Recoger a los niños del colegio',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 22, 17),
+            hasTime: true,
+          ),
+        ]);
+        expect(find.byKey(const ValueKey('draft-schedule-d2')), findsOneWidget);
+        expect(cardLine('d2'), findsNothing);
+        expect(needsDay('d2'), findsNothing);
+        expect(find.textContaining(es.hourBefore), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- UX-2027: on a shared task, the one-tap list says «solo para ti».
+
+    final weekly = task(
+      timed: true,
+      day: monday17,
+      recurrence: 'weekly',
+      title: 'Sacar la basura',
+    );
+    for (final (language, textScale) in [('es', 1.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2027: a «Todos» task repeating every Monday opens the one-tap '
+        'list with «solo para ti» under «Recordatorio», whole, and «1 hora '
+        'antes» sets 60 ($language ${textScale}x)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final app = await _App.open(
+            tester,
+            [weekly],
+            size: phone,
+            projects: projects,
+            language: language,
+            textScale: textScale,
+          );
+          await app.detail(1);
+          await openSheet(tester);
+          // The one-tap list, not the plans' sheet.
+          expect(inSheet(untilDay), findsNothing);
+          final title = inSheet(find.text(l.reminder));
+          expect(title, findsOneWidget);
+          expect(inSheet(justYou), findsOneWidget);
+          expect(tester.widget<Text>(justYou).data, l.reminderPlanJustYou);
+          final titleBox = tester.getRect(title);
+          final line = tester.getRect(justYou);
+          final firstRow = tester.getRect(inSheet(find.byType(ListTile)).first);
+          expect(line.top, greaterThanOrEqualTo(titleBox.bottom - 0.5));
+          expect(
+            line.top - titleBox.bottom,
+            lessThanOrEqualTo(8.5),
+            reason: 'Directly under the title.',
+          );
+          expect(line.bottom, lessThanOrEqualTo(firstRow.top + 0.5));
+          expect(line.left, moreOrLessEquals(titleBox.left, epsilon: 0.5));
+          expect(line.left, greaterThanOrEqualTo(24 - 0.5));
+          expect(line.right, lessThanOrEqualTo(phone.width - 24 + 0.5));
+          expect(line.top, greaterThanOrEqualTo(0));
+          expect(line.bottom, lessThanOrEqualTo(phone.height));
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: justYou, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final style = tester.widget<Text>(justYou).style!;
+          final theme = Theme.of(tester.element(justYou));
+          expect(style.color, theme.colorScheme.onSurfaceVariant);
+          expect(style.fontSize, theme.textTheme.bodyMedium!.fontSize);
+          await tapVisible(tester, inSheet(find.text(l.hourBefore)));
+          expect(sheet(), findsNothing);
+          expect(app.task(1).reminderMinutes, 60);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2027: a personal task repeating every Monday opens the one-tap list '
+      'with no «solo para ti»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [
+            task(
+              listId: null,
+              assignment: 'personal',
+              timed: true,
+              day: monday17,
+              recurrence: 'weekly',
+              title: 'Sacar la basura',
+            ),
+          ],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        await openSheet(tester);
+        expect(inSheet(find.text(es.reminder)), findsOneWidget);
+        expect(inSheet(find.text(es.hourBefore)), findsOneWidget);
+        expect(justYou, findsNothing);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'UX-2027: Ajustes › Recordatorios › «Tareas con hora» has no «solo para '
+      'ti»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          const [],
+          size: phone,
+          projects: projects,
+        );
+        app.navigator.pushNamed('/notifications');
+        await tester.pumpAndSettle();
+        final timed = find.text(es.timedTasks);
+        await tester.scrollUntilVisible(
+          timed,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byType(Scaffold).last,
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(timed);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.text(es.hourBefore)), findsOneWidget);
+        expect(justYou, findsNothing);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (language, textScale) in [('es', 1.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2027: a «Todos» task’s «Recordar antes de» says «solo para ti» as '
+        'its helper, whole ($language ${textScale}x)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await form(
+            tester,
+            task(timed: true, deadline: DateTime(2026, 11, 20)),
+            language: language,
+            textScale: textScale,
+          );
+          final anchor = find.byKey(const ValueKey('reminder-anchor-planned'));
+          await tester.ensureVisible(anchor);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(of: anchor, matching: find.text(l.reminderAnchor)),
+            findsOneWidget,
+          );
+          final helper = find.descendant(
+            of: anchor,
+            matching: find.text(l.reminderPlanJustYou),
+          );
+          expect(helper, findsOneWidget);
+          await tester.ensureVisible(helper);
+          await tester.pumpAndSettle();
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: helper, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(
+            paragraph.getMaxIntrinsicWidth(double.infinity) <=
+                    paragraph.size.width + 0.5 ||
+                paragraph.size.height >
+                    paragraph.getMinIntrinsicHeight(paragraph.size.width) - 0.5,
+            isTrue,
+            reason: 'one line holds it, or it wraps whole',
+          );
+          final rect = tester.getRect(helper);
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(phone.width));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2027: a personal task’s «Recordar antes de» has no helper',
+      (tester) async {
+        await form(
+          tester,
+          task(
+            listId: null,
+            assignment: 'personal',
+            timed: true,
+            deadline: DateTime(2026, 11, 20),
+          ),
+        );
+        final anchor = find.byKey(const ValueKey('reminder-anchor-planned'));
+        await tester.ensureVisible(anchor);
+        await tester.pumpAndSettle();
+        expect(anchor, findsOneWidget);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+        final decoration = tester
+            .widget<InputDecorator>(
+              find.descendant(
+                of: anchor,
+                matching: find.byType(InputDecorator),
+              ),
+            )
+            .decoration;
+        expect(decoration.helperText, isNull);
+      },
+    );
+
+    // ---- Unchanged.
+
+    for (final (what, given) in [
+      ('a «Todos» task', task(timed: true)),
+      (
+        'a task given to this account',
+        task(
+          assignment: 'member',
+          assigneeId: 1,
+          assigneeName: 'Yo',
+          timed: true,
+        ),
+      ),
+    ]) {
+      testWidgets(
+        'UX-2024: $what still reads «Recordatorio: 10 minutos antes» and '
+        'opens the reminder sheet',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [given],
+            size: phone,
+            projects: projects,
+          );
+          await app.detail(1);
+          expect(chipWords(tester), [es.reminderValue(es.minutesBefore(10))]);
+          await openSheet(tester);
+          expect(inSheet(untilDay), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2025: a project muted here still reads «Sin recordatorio: proyecto '
+      'silenciado» and opens «Novedades del proyecto»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [task(listId: 'quiet', assignment: 'personal', timed: true)],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(chipWords(tester), [es.noReminderProjectMuted]);
+        await tapVisible(tester, find.byType(ReminderChip));
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.text(es.projectNotifications)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2025: an archived project’s «Sin recordatorio: proyecto archivado» '
+      'has no tap and is drawn at full contrast',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final app = await _App.open(
+          tester,
+          [task(listId: 'old', assignment: 'personal', timed: true)],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        final words = es.noReminderProjectArchived;
+        expect(chipWords(tester), [words]);
+        expect(chipColor(tester, words).a, closeTo(1, 0.001));
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(words)),
+          isSemantics(isButton: false, hasTapAction: false),
+        );
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+  });
+
+  // P261: D8 (UX-2022), a plan's own hour stays on the task's day wherever
+  // the app shows it; UX-2026, on a shared task the sheet's «solo para ti»
+  // sits once under its title, over every choice; UX-2031, the strip's end
+  // label keeps its date on one line at 2×.
+  group('P261 · D8, UX-2026, UX-2031', () {
+    const phone = Size(360, 800);
+    const short = Size(360, 740);
+    final sameDay = ReminderPlan.custom(
+      const [PlanPhase(0, 0, 1)],
+      time: 540,
+      said: 'el mismo día a las 9',
+    );
+    final everyDay = ReminderPlan.custom(
+      const [PlanPhase(366, 0, 1)],
+      time: 480,
+      said: 'cada día a las 8',
+    );
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Marta', role: 'editor'),
+      ],
+    );
+
+    /// «Presentar el proyecto» on Fri 13 Nov 2026 at 17:00 with [plan].
+    Task timed({int? id = 1, ReminderPlan? plan}) => Task(
+      id: id,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: DateTime(2026, 11, 13, 17),
+      hasTime: true,
+      reminderPlan: plan,
+    );
+
+    /// A «Todos» task in «Equipo», 22 days away.
+    Task forAll({ReminderPlan? plan}) => Task(
+      id: 1,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: friday13,
+      hasTime: false,
+      reminderPlan: plan,
+      listId: 'team',
+      assignment: 'group',
+    );
+
+    /// «Recordatorios: [rhythm] · próximo: [when] [date], [time]».
+    String ownLine(String rhythm, String when, String date, String time) =>
+        es.reminderPlanLine(es.reminderPlanOwnLine(rhythm), when, date, time);
+
+    final justYou = find.byKey(const ValueKey('reminder-plan-just-you'));
+    final listo = find.byKey(const ValueKey('reminder-plan-apply'));
+    final untilDay = find.byKey(const ValueKey('reminder-plan-until-day'));
+    final yourWay = find.byKey(const ValueKey('reminder-plan-your-way'));
+    final count = find.byKey(const ValueKey('reminder-plan-count'));
+
+    Future<String> countText(WidgetTester tester) async {
+      expect(count, findsOneWidget);
+      await tester.ensureVisible(count);
+      await tester.pumpAndSettle();
+      return tester.widget<Text>(count).data!;
+    }
+
+    void wholeOnScreen(WidgetTester tester, Finder finder, Size size) {
+      final box = tester.getRect(finder);
+      expect(box.top, greaterThanOrEqualTo(0), reason: '$finder');
+      expect(box.bottom, lessThanOrEqualTo(size.height), reason: '$finder');
+      expect(box.left, greaterThanOrEqualTo(0), reason: '$finder');
+      expect(box.right, lessThanOrEqualTo(size.width), reason: '$finder');
+    }
+
+    RenderParagraph paragraphOf(WidgetTester tester, Finder text) =>
+        tester.renderObject<RenderParagraph>(
+          find.descendant(of: text, matching: find.byType(RichText)).first,
+        );
+
+    int lines(RenderParagraph paragraph) => paragraph
+        .getBoxesForSelection(
+          TextSelection(
+            baseOffset: 0,
+            extentOffset: paragraph.text.toPlainText().length,
+          ),
+        )
+        .map((box) => box.top.round())
+        .toSet()
+        .length;
+
+    // UX-2022: the task's chip.
+    for (final scale in [1.0, 2.0]) {
+      for (final (what, plan, at, line) in [
+        (
+          '«el mismo día a las 9», at now',
+          sameDay,
+          now,
+          ownLine(es.reminderPlanOnTheDay, 'other', 'vie 13', '09:00'),
+        ),
+        (
+          '«el mismo día a las 9», at Fri 13 Nov 08:00',
+          sameDay,
+          DateTime(2026, 11, 13, 8),
+          ownLine(es.reminderPlanOnTheDay, 'today', '', '09:00'),
+        ),
+        (
+          '«cada día a las 8», at Fri 13 Nov 07:00',
+          everyDay,
+          DateTime(2026, 11, 13, 7),
+          ownLine(es.reminderPlanEveryDays(1), 'today', '', '08:00'),
+        ),
+      ]) {
+        testWidgets(
+          'UX-2022: at $scale× on 360×800, a task at 17:00 with $what reads '
+          '«$line», whole',
+          (tester) async {
+            await (await _App.open(
+              tester,
+              [timed(plan: plan)],
+              size: phone,
+              textScale: scale,
+              at: at,
+            )).detail(1);
+            final text = chipText(line);
+            expect(text, findsOneWidget);
+            expect(find.textContaining('16:50'), findsNothing);
+            await tester.ensureVisible(text);
+            await tester.pumpAndSettle();
+            expect(paragraphOf(tester, text).didExceedMaxLines, isFalse);
+            wholeOnScreen(tester, text, phone);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'UX-2022: Pro at Fri 13 Nov 08:00, the sheet opens on «A tu manera» '
+      'with «1 aviso: hoy, 09:00», and Normal on the same sheet reads '
+      '«1 aviso: hoy, 16:50»',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [timed(plan: sameDay)],
+          size: phone,
+          at: DateTime(2026, 11, 13, 8),
+        )).detail(1);
+        await openSheet(tester);
+        expect(
+          find.byKey(const ValueKey('reminder-plan-words')),
+          findsOneWidget,
+          reason: 'Opened on «A tu manera».',
+        );
+        expect(
+          await countText(tester),
+          es.reminderPlanCount(1, 'today', '', '09:00'),
+        );
+        await tapVisible(tester, inSheet(untilDay));
+        expect(
+          await countText(tester),
+          es.reminderPlanCount(1, 'today', '', '16:50'),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('UX-2022: a free account with the same dictated plan sees the '
+        'read-only count «1 aviso: hoy, 09:00»', (tester) async {
+      await (await _App.open(
+        tester,
+        [timed(plan: sameDay)],
+        pro: false,
+        size: phone,
+        at: DateTime(2026, 11, 13, 8),
+      )).detail(1);
+      await openSheet(tester);
+      expect(find.byKey(const ValueKey('reminder-plan-words')), findsNothing);
+      expect(
+        await countText(tester),
+        es.reminderPlanCount(1, 'today', '', '09:00'),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'UX-2022: «A tu manera» typing «el mismo día a las 9» on the task at '
+      '17:00 previews «1 aviso: vie 13, 09:00», not 16:50',
+      (tester) async {
+        final app = await _App.open(tester, [timed()], size: phone);
+        app.api.answer = {'reminder_plan': sameDay.toJson()};
+        await app.detail(1);
+        await openSheet(tester);
+        await tapVisible(tester, inSheet(yourWay));
+        await tester.enterText(
+          find.byKey(const ValueKey('reminder-plan-words')),
+          'el mismo día a las 9',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(app.api.requests, hasLength(1));
+        final text = await countText(tester);
+        expect(text, es.reminderPlanCount(1, 'other', 'vie 13', '09:00'));
+        expect(text, isNot(contains('16:50')));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2022: at Thu 12 Nov 10:00, a dictated draft for Fri 13 Nov at 17:00 '
+      'with «el mismo día a las 9» reads «Recordatorios: el mismo día · '
+      'próximo: mañana, 09:00» on the capture card',
+      (tester) async {
+        final at = DateTime(2026, 11, 12, 10);
+        final captures = MemoryCaptures();
+        final app = await _App.open(
+          tester,
+          const [],
+          captures: captures,
+          size: phone,
+          at: at,
+        );
+        captures.tasks = app.container;
+        captures.current = CaptureSession(
+          id: 'p261',
+          ownerKey: app.container.read(captureOwnerProvider),
+          timezone: 'Europe/Madrid',
+          capturedAt: at.toUtc(),
+          status: 'ready',
+          source: 'speech',
+          transcript: 'Presentar el proyecto el viernes a las 17…',
+          drafts: [
+            CaptureDraft(
+              id: 'd1',
+              task: timed(id: null, plan: sameDay),
+            ),
+          ],
+        );
+        await openCaptureResult(tester, 'p261');
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(
+          find.text(ownLine(es.reminderPlanOnTheDay, 'tomorrow', '', '09:00')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('16:50'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // UX-2026: on a shared task, one line under the title.
+
+    /// The line reads [l]'s copy, once in the sheet, directly under the
+    /// title and above the choices: the scrolling list of rows and plans
+    /// starts under it. Unscrolled ([top]), the first single row is right
+    /// under it too.
+    void expectUnderTitle(
+      WidgetTester tester,
+      AppLocalizations l, {
+      bool top = false,
+    }) {
+      expect(justYou, findsOneWidget);
+      expect(inSheet(justYou), findsOneWidget);
+      expect(tester.widget<Text>(justYou).data, l.reminderPlanJustYou);
+      final title = tester.getRect(inSheet(find.text(l.reminder)));
+      final line = tester.getRect(justYou);
+      expect(line.top, greaterThanOrEqualTo(title.bottom - 0.5));
+      expect(line.top - title.bottom, lessThanOrEqualTo(16));
+      final choices = tester.getRect(
+        find
+            .descendant(
+              of: sheet().last,
+              matching: find.byType(SingleChildScrollView),
+            )
+            .first,
+      );
+      expect(
+        choices.top,
+        greaterThanOrEqualTo(line.bottom - 0.5),
+        reason: 'The choices scroll under the line, not over it.',
+      );
+      if (top) {
+        final firstRow = tester.getRect(
+          find
+              .descendant(of: sheet().last, matching: find.byType(ListTile))
+              .first,
+        );
+        expect(line.bottom, lessThanOrEqualTo(firstRow.top + 0.5));
+        expect(firstRow.top - line.bottom, lessThanOrEqualTo(24));
+        expect(
+          line.bottom,
+          lessThanOrEqualTo(tester.getRect(inSheet(find.text(l.off))).top),
+        );
+      }
+    }
+
+    testWidgets(
+      'UX-2026: a «Todos» task in «Equipo»: «Recordatorio», then «Estos avisos '
+      'son solo para ti.» under it and above the first row, once, before and '
+      'after opening «Hasta la fecha límite» and «A tu manera», none above '
+      '«Listo»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [forAll()],
+          size: phone,
+          projects: [team],
+        );
+        app.api.answer = {'reminder_plan': ownersPlan.toJson()};
+        await app.detail(1);
+        await openSheet(tester);
+        expectUnderTitle(tester, es, top: true);
+        await tapVisible(tester, inSheet(untilDay));
+        expect(listo, findsOneWidget);
+        expectUnderTitle(tester, es);
+        expect(
+          tester.getRect(justYou).bottom,
+          lessThan(tester.getRect(untilDay).top),
+          reason: 'Not above «Listo»: above the plans.',
+        );
+        await tapVisible(tester, inSheet(yourWay));
+        expectUnderTitle(tester, es);
+        await tester.enterText(
+          find.byKey(const ValueKey('reminder-plan-words')),
+          'cada 3 días y la última semana a diario',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(listo, findsOneWidget);
+        expectUnderTitle(tester, es);
+        expect(
+          tester.getRect(justYou).bottom,
+          lessThan(tester.getRect(yourWay).top),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (language, l) in [('es', es), ('ca', ca)]) {
+      testWidgets('UX-2026: at 2× on 360×740 in $language, after opening '
+          '«${l.reminderPlanUntilDay}» the line and «${l.done}» are on screen, '
+          'and scrolling the choices leaves the title and the line in place', (
+        tester,
+      ) async {
+        await (await _App.open(
+          tester,
+          [forAll()],
+          language: language,
+          textScale: 2,
+          size: short,
+          projects: [team],
+        )).detail(1);
+        await openSheet(tester);
+        await tapVisible(tester, inSheet(find.text(l.reminderPlanUntilDay)));
+        expectUnderTitle(tester, l);
+        wholeOnScreen(tester, justYou, short);
+        wholeOnScreen(tester, listo, short);
+        expect(listo.hitTestable(), findsOneWidget);
+        expect(paragraphOf(tester, justYou).didExceedMaxLines, isFalse);
+
+        final title = inSheet(find.text(l.reminder));
+        final titleBefore = tester.getRect(title);
+        final lineBefore = tester.getRect(justYou);
+        final listoBefore = tester.getRect(listo);
+        final choices = find
+            .descendant(
+              of: sheet().last,
+              matching: find.byType(SingleChildScrollView),
+            )
+            .first;
+        await tester.drag(choices, const Offset(0, 300));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(listo).top,
+          isNot(moreOrLessEquals(listoBefore.top, epsilon: 1)),
+          reason: 'The choices scrolled.',
+        );
+        expect(tester.getRect(title), titleBefore);
+        expect(tester.getRect(justYou), lineBefore);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets(
+        'UX-2026: at 2× on 360×740 in $language, with Normal set, the sheet '
+        'opens scrolled to «${l.reminderPlanUntilDay}» with the line on '
+        'screen',
+        (tester) async {
+          await (await _App.open(
+            tester,
+            [forAll(plan: const ReminderPlan.rhythm(ReminderPlan.normal))],
+            language: language,
+            textScale: 2,
+            size: short,
+            projects: [team],
+          )).detail(1);
+          await openSheet(tester);
+          await tester.pumpAndSettle();
+          expectUnderTitle(tester, l);
+          wholeOnScreen(tester, justYou, short);
+          final line = tester.getRect(justYou);
+          final row = tester.getRect(untilDay);
+          expect(row.top, greaterThanOrEqualTo(line.bottom - 0.5));
+          expect(
+            row.top - line.bottom,
+            lessThanOrEqualTo(24),
+            reason: '«${l.reminderPlanUntilDay}» at the top of the choices.',
+          );
+          expect(untilDay.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2026: on that task «Desactivado» still turns the reminder off in '
+      'one tap and closes the sheet',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [forAll()],
+          size: phone,
+          projects: [team],
+        );
+        await app.detail(1);
+        await openSheet(tester);
+        await tapVisible(tester, inSheet(find.text(es.off)));
+        expect(sheet(), findsNothing);
+        expect(app.task(1).reminderMinutes, -1);
+        expect(app.task(1).reminderPlan, isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2026: a personal task’s sheet has no such line, and its title '
+      'scrolls with its rows',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [presentation()],
+          textScale: 2,
+          size: short,
+        )).detail(1);
+        await openSheet(tester);
+        expect(justYou, findsNothing);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+        final title = inSheet(find.text(es.reminder));
+        final before = tester.getRect(title);
+        final choices = find
+            .descendant(
+              of: sheet().last,
+              matching: find.byType(SingleChildScrollView),
+            )
+            .first;
+        await tester.drag(choices, const Offset(0, -200));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(title).top, lessThan(before.top - 1));
+        await tapVisible(tester, inSheet(untilDay));
+        expect(justYou, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // UX-2031: the strip's end label on one line.
+    for (final (language, l) in [('ca', ca), ('es', es), ('en', en)]) {
+      testWidgets(
+        'UX-2031: at 2× on 360×740 in $language, a task 60 days away: the '
+        'strip’s end label is on one line at the row’s end, and '
+        '«${l.today}» on one line at its start',
+        (tester) async {
+          final day = DateTime(2026, 12, 21);
+          await (await _App.open(
+            tester,
+            [presentation(day: day)],
+            language: language,
+            textScale: 2,
+            size: short,
+          )).detail(1);
+          await openSheet(tester);
+          await tapVisible(tester, inSheet(find.text(l.reminderPlanUntilDay)));
+          final preview = find.byKey(const ValueKey('reminder-plan-preview'));
+          // The day as planDay writes it in the app's own locale.
+          final locale = tester.element(preview).localeName;
+          final label = find.descendant(
+            of: preview,
+            matching: find.text(planDay(day, now, locale)),
+          );
+          final today = find.descendant(
+            of: preview,
+            matching: find.text(l.today),
+          );
+          expect(label, findsOneWidget);
+          expect(today, findsOneWidget);
+          if (language == 'ca') {
+            expect(planDay(day, now, 'ca'), 'dl., 21 de des.');
+          }
+          await tester.ensureVisible(label);
+          await tester.pumpAndSettle();
+          final strip = tester.getRect(
+            find.descendant(of: preview, matching: find.byType(PlanStrip)),
+          );
+          final end = paragraphOf(tester, label);
+          final start = paragraphOf(tester, today);
+          for (final (what, paragraph) in [('end', end), ('start', start)]) {
+            expect(lines(paragraph), 1, reason: 'The $what label.');
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(
+              paragraph.textScaler.scale(10),
+              moreOrLessEquals(20),
+              reason: 'No smaller text.',
+            );
+          }
+          double glyphs(RenderParagraph paragraph, bool right) {
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            final x = right
+                ? boxes.map((b) => b.right).reduce((a, b) => a > b ? a : b)
+                : boxes.map((b) => b.left).reduce((a, b) => a < b ? a : b);
+            return paragraph.localToGlobal(Offset(x, 0)).dx;
+          }
+
+          expect(
+            glyphs(end, true),
+            moreOrLessEquals(strip.right, epsilon: 1),
+            reason: 'The day ends at the row’s end.',
+          );
+          expect(
+            glyphs(start, false),
+            moreOrLessEquals(strip.left, epsilon: 1),
+            reason: '«${l.today}» starts at the row’s start.',
+          );
+          expect(
+            find.ancestor(of: label, matching: find.byType(FittedBox)),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2026: @reminderPlanJustYou carries the new description, and its '
+        'three values are unchanged', () {
+      final catalog =
+          jsonDecode(File('lib/l10n/app_en.arb').readAsStringSync())
+              as Map<String, dynamic>;
+      expect(
+        (catalog['@reminderPlanJustYou'] as Map)['description'],
+        'On a task in a shared project, says that every reminder choice '
+        'there rings only for the person who makes it: shown under the '
+        'title of the reminder sheet and of the one-tap reminder list, and '
+        'as the helper of “Remind before”.',
+      );
+      expect(catalog['reminderPlanJustYou'], en.reminderPlanJustYou);
+      expect(en.reminderPlanJustYou, 'These reminders are only for you.');
+      expect(es.reminderPlanJustYou, 'Estos avisos son solo para ti.');
+      expect(ca.reminderPlanJustYou, 'Aquests avisos són només per a tu.');
+    });
+  });
+
+  group('P262 · UX-2030', () {
+    // A shared project you own, with Marta (member 2) in it.
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Marta', role: 'editor'),
+      ],
+    );
+    final muted = TaskListInfo(
+      id: 'quiet',
+      name: 'Silencio',
+      notifications: 'muted',
+    );
+    final archived = TaskListInfo(id: 'old', name: 'Antiguo', archived: true);
+    const normal = ReminderPlan.rhythm(ReminderPlan.normal);
+
+    /// «Presentar el proyecto» on Fri 13 Nov, on this account's Normal, in
+    /// [listId] as [assignment].
+    Task planned({
+      String? listId,
+      String assignment = 'personal',
+      int? assigneeId,
+      String? assigneeName,
+    }) => Task(
+      id: 1,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: friday13,
+      hasTime: false,
+      reminderPlan: normal,
+      listId: listId,
+      assignment: assignment,
+      assigneeId: assigneeId,
+      assigneeName: assigneeName,
+    );
+
+    /// Ajustes › Recordatorios in Spanish at 1× on 390×844, reminders on and
+    /// «Tareas sin hora» off, with [task] the only task; returns the
+    /// «Tareas sin hora» row's subtitle as the screen shows it.
+    Future<String> dateOnlyRow(WidgetTester tester, Task task) async {
+      final app = await _App.open(
+        tester,
+        [task],
+        size: const Size(390, 844),
+        projects: [team, muted, archived],
+        reminders: const ReminderPreferences(enabled: true, asked: true),
+      );
+      app.navigator.pushNamed('/notifications');
+      await tester.pumpAndSettle();
+      final row = find.widgetWithText(ListTile, es.dateOnlyTasks);
+      expect(row, findsOneWidget);
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final subtitle = (tester.widget<ListTile>(row).subtitle! as Text).data!;
+      expect(
+        find.descendant(of: row, matching: find.text(subtitle)),
+        findsOneWidget,
+      );
+      return subtitle;
+    }
+
+    for (final (what, task) in [
+      (
+        'given to Marta in a shared project',
+        planned(
+          listId: 'team',
+          assignment: 'member',
+          assigneeId: 2,
+          assigneeName: 'Marta',
+        ),
+      ),
+      ('in a project muted on this phone', planned(listId: 'quiet')),
+      ('in an archived project', planned(listId: 'old')),
+    ]) {
+      testWidgets(
+        'UX-2030: with the only planned task $what, «Tareas sin hora» reads '
+        '«Desactivado» alone',
+        (tester) async {
+          final subtitle = await dateOnlyRow(tester, task);
+          expect(subtitle, es.off);
+          expect(find.textContaining(es.reminderPlanUntilDay), findsNothing);
+        },
+      );
+    }
+
+    for (final (what, task) in [
+      (
+        'a «Todos» task of the shared project',
+        planned(listId: 'team', assignment: 'group'),
+      ),
+      ('a personal task', planned()),
+    ]) {
+      testWidgets(
+        'UX-2030: as $what it still reads «Desactivado · «Hasta la fecha '
+        'límite»: 9:00»',
+        (tester) async {
+          final subtitle = await dateOnlyRow(tester, task);
+          final time = const TimeOfDay(
+            hour: 9,
+            minute: 0,
+          ).format(tester.element(find.text(es.dateOnlyTasks)));
+          expect(time, anyOf('9:00', '09:00'));
+          expect(subtitle, es.dateOnlyOffPlans(time));
+          expect(subtitle, startsWith('${es.off} · '));
+          expect(subtitle, contains('«${es.reminderPlanUntilDay}»'));
+        },
+      );
+    }
+  });
+
+  // P264 (UX-2025, UX-2034): a reminder line with no tap is information.
+  // TalkBack hears it as plain text, with no enabled state (so never
+  // «desactivado»), and the task's chip draws it with no outline and no
+  // fill, at full contrast; a line with a tap keeps its button and outline.
+  group('P264 · UX-2025, UX-2034', () {
+    const phone = Size(360, 800);
+    // A shared project this account owns, with Marta (member 2) in it.
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Marta', role: 'editor'),
+      ],
+    );
+    final muted = TaskListInfo(
+      id: 'quiet',
+      name: 'Silencio',
+      notifications: 'muted',
+    );
+    final archived = TaskListInfo(id: 'old', name: 'Antiguo', archived: true);
+    final projects = [team, muted, archived];
+
+    /// «Presentar el proyecto» on Fri 13 Nov at 17:00 in [listId].
+    Task task({
+      int? id = 1,
+      String? listId = 'team',
+      String assignment = 'group',
+      int? assigneeId,
+      String? assigneeName,
+      int? minutes,
+    }) => Task(
+      id: id,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: DateTime(2026, 11, 13, 17),
+      hasTime: true,
+      reminderMinutes: minutes,
+      listId: listId,
+      assignment: assignment,
+      assigneeId: assigneeId,
+      assigneeName: assigneeName,
+    );
+    Task forMarta({int? id = 1}) => task(
+      id: id,
+      assignment: 'member',
+      assigneeId: 2,
+      assigneeName: 'Marta',
+      minutes: 60,
+    );
+
+    Finder inChip(Finder finder) =>
+        find.descendant(of: find.byType(ReminderChip), matching: finder);
+
+    /// The colour the chip's [words] are drawn in.
+    Color wordsColor(WidgetTester tester, String words) => tester
+        .widget<RichText>(
+          find.descendant(of: chipText(words), matching: find.byType(RichText)),
+        )
+        .text
+        .style!
+        .color!;
+
+    /// Every outline the chip paints: its Material's shape and its Ink's.
+    List<BorderSide> outlines(WidgetTester tester) => [
+      for (final material in tester.widgetList<Material>(
+        inChip(find.byType(Material)),
+      ))
+        if (material.shape case final OutlinedBorder shape) shape.side,
+      for (final ink in tester.widgetList<Ink>(inChip(find.byType(Ink))))
+        if (ink.decoration case ShapeDecoration(
+          shape: final OutlinedBorder shape,
+        ))
+          shape.side,
+    ];
+
+    /// Every fill the chip paints: its Material's colour (the canvas's when
+    /// it sets none) and its Ink's.
+    List<Color> fills(WidgetTester tester) => [
+      for (final element in inChip(find.byType(Material)).evaluate())
+        if ((element.widget as Material).type != MaterialType.transparency)
+          (element.widget as Material).color ?? Theme.of(element).canvasColor,
+      for (final ink in tester.widgetList<Ink>(inChip(find.byType(Ink))))
+        if (ink.decoration case ShapeDecoration(color: final color?)) color,
+    ];
+
+    /// A chip with no tap: a plain [Chip] with no outline and no fill, its
+    /// [words] at full contrast in the theme's onSurface, beside the bell;
+    /// TalkBack reads it as text, with no button and no enabled state.
+    void expectInformation(WidgetTester tester, String words) {
+      expect(inChip(find.byType(ActionChip)), findsNothing);
+      expect(inChip(find.byType(Chip)), findsOneWidget);
+      final chip = tester.widget<Chip>(inChip(find.byType(Chip)));
+      expect(chip.side, BorderSide.none);
+      expect(chip.backgroundColor, Colors.transparent);
+      final sides = outlines(tester);
+      expect(sides, isNotEmpty);
+      for (final side in sides) {
+        expect(
+          side.style == BorderStyle.none || side.width == 0,
+          isTrue,
+          reason: 'no outline is painted around «$words»: $side',
+        );
+      }
+      final painted = fills(tester);
+      expect(painted, isNotEmpty);
+      for (final fill in painted) {
+        expect(fill.a, 0, reason: 'nothing is filled behind «$words»: $fill');
+      }
+      final color = wordsColor(tester, words);
+      final scheme = Theme.of(
+        tester.element(find.byType(ReminderChip)),
+      ).colorScheme;
+      expect(color, scheme.onSurface);
+      expect(color.a, closeTo(1, 0.001));
+      final bells = tester
+          .widgetList<Icon>(inChip(find.byType(Icon)))
+          .map((icon) => icon.icon)
+          .toList();
+      expect(bells, hasLength(1));
+      expect(
+        bells.single,
+        anyOf(Icons.notifications_outlined, Icons.notifications_off_outlined),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(words)),
+        isSemantics(
+          label: words,
+          isButton: false,
+          hasTapAction: false,
+          hasEnabledState: false,
+        ),
+      );
+    }
+
+    /// The capture's result for [tasks], one draft each (`d1`, `d2`, …).
+    Future<_App> capture(
+      WidgetTester tester,
+      List<Task> tasks,
+      MemoryCaptures captures,
+    ) async {
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        size: phone,
+        projects: projects,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p264',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Presentar el proyecto…',
+        drafts: [
+          for (final (i, task) in tasks.indexed)
+            CaptureDraft(id: 'd${i + 1}', task: task),
+        ],
+      );
+      await openCaptureResult(tester, 'p264');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+      return app;
+    }
+
+    Finder cardLine(String id) =>
+        find.byKey(ValueKey('draft-reminder-line-$id'));
+
+    /// The three drafts: bread for today; Marta's at 17:00 on Fri 13 Nov
+    /// with «1 hora antes»; the children today at 17:00 with «1 hora antes»,
+    /// this account's own.
+    List<Task> three() => [
+      Task(
+        title: 'Comprar pan y leche',
+        priority: 1,
+        dueDate: DateTime(2026, 10, 22),
+        hasTime: false,
+      ),
+      forMarta(id: null),
+      Task(
+        title: 'Recoger a los niños del colegio',
+        priority: 1,
+        dueDate: DateTime(2026, 10, 22, 17),
+        hasTime: true,
+        reminderMinutes: 60,
+      ),
+    ];
+
+    testWidgets(
+      'UX-2025: on a result of three, Marta’s collapsed «Recordatorio para '
+      'Marta» is plain text for TalkBack: no button, no tap and no enabled '
+      'state, so never «desactivado»',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        await capture(tester, three(), MemoryCaptures());
+        final words = es.reminderForPersonOnly('Marta');
+        expect(cardLine('d2'), findsOneWidget);
+        expect(
+          find.descendant(of: cardLine('d2'), matching: find.text(words)),
+          findsOneWidget,
+        );
+        expect(
+          tester.getSemantics(cardLine('d2')),
+          isSemantics(
+            label: words,
+            isButton: false,
+            hasTapAction: false,
+            hasEnabledState: false,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2025: in the same result, the personal draft’s collapsed reminder '
+      'line is an enabled button with a tap; while the result saves it stays '
+      'a button, disabled and with no tap, like the date line (UX-462), and '
+      'Marta’s line still has no enabled state',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final captures = _P264HeldCaptures();
+        await capture(tester, three(), captures);
+        final own = es.reminderValue(es.hourBefore);
+        final marta = es.reminderForPersonOnly('Marta');
+        expect(cardLine('d3'), findsOneWidget);
+        expect(
+          find.descendant(of: cardLine('d3'), matching: find.text(own)),
+          findsOneWidget,
+        );
+        expect(
+          tester.getSemantics(cardLine('d3')),
+          isSemantics(
+            label: own,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
+
+        captures.hold = Completer<void>();
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        expect(captures.saving, isTrue, reason: 'the result is saving');
+        expect(cardLine('d3'), findsOneWidget);
+        expect(
+          tester.getSemantics(cardLine('d3')),
+          isSemantics(
+            label: own,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: false,
+            hasTapAction: false,
+          ),
+        );
+        expect(
+          tester.getSemantics(cardLine('d2')),
+          isSemantics(
+            label: marta,
+            isButton: false,
+            hasTapAction: false,
+            hasEnabledState: false,
+          ),
+        );
+
+        captures.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2034: on the task’s page, Marta’s «Recordatorio para Marta» is a '
+      'plain Chip with no outline and no fill, at full contrast beside the '
+      'bell, read as text; a tap opens nothing and changes nothing',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final app = await _App.open(
+          tester,
+          [forMarta()],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        final words = es.reminderForPersonOnly('Marta');
+        expect(chipText(words), findsOneWidget);
+        expectInformation(tester, words);
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(find.byType(Dialog), findsNothing);
+        final after = app.task(1);
+        expect(after.reminderMinutes, 60);
+        expect(after.reminderTime, isNull);
+        expect(after.reminderPlan, isNull);
+        expect(after.reminderAnchor, 'planned');
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2034: at CA 2× on 360×800, «Recordatori per a Marta» is whole and '
+      'unclipped beside its bell, with no outline, and nothing overflows',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final app = await _App.open(
+          tester,
+          [forMarta()],
+          size: phone,
+          projects: projects,
+          language: 'ca',
+          textScale: 2,
+        );
+        await app.detail(1);
+        final words = ca.reminderForPersonOnly('Marta');
+        await tester.ensureVisible(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        expect(chipText(words), findsOneWidget);
+        expectInformation(tester, words);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: chipText(words), matching: find.byType(RichText)),
+        );
+        expect(paragraph.text.toPlainText(), words);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        // Whole: every character is laid out inside the paragraph's box.
+        for (final box in paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: words.length),
+        )) {
+          expect(box.left, greaterThanOrEqualTo(-0.5));
+          expect(box.right, lessThanOrEqualTo(paragraph.size.width + 0.5));
+          expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 0.5));
+        }
+        final text = tester.getRect(chipText(words));
+        final chip = tester.getRect(find.byType(ReminderChip));
+        final bell = tester.getRect(inChip(find.byType(Icon)));
+        expect(text.left, greaterThanOrEqualTo(chip.left - 0.5));
+        expect(text.right, lessThanOrEqualTo(chip.right + 0.5));
+        expect(text.top, greaterThanOrEqualTo(chip.top - 0.5));
+        expect(text.bottom, lessThanOrEqualTo(chip.bottom + 0.5));
+        expect(chip.left, greaterThanOrEqualTo(0));
+        expect(chip.right, lessThanOrEqualTo(phone.width));
+        expect(text.bottom, lessThanOrEqualTo(phone.height));
+        // Beside: the bell sits before the words, level with them.
+        expect(bell.right, lessThanOrEqualTo(text.left + 0.5));
+        expect(bell.center.dy, greaterThanOrEqualTo(text.top));
+        expect(bell.center.dy, lessThanOrEqualTo(text.bottom));
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2034: an archived project’s «Sin recordatorio: proyecto archivado» '
+      'has no outline, no fill and no tap, at full contrast, read as text',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        final app = await _App.open(
+          tester,
+          [task(listId: 'old', assignment: 'personal')],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        final words = es.noReminderProjectArchived;
+        expect(chipText(words), findsOneWidget);
+        expectInformation(tester, words);
+        await tester.tap(find.byType(ReminderChip), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(sheet(), findsNothing);
+        expect(tester.takeException(), isNull);
+        handle.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2034: unchanged: a «Todos» task in «Equipo» keeps an ActionChip '
+      'with the theme’s outline, and it opens the reminder sheet',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [task()],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(inChip(find.byType(ActionChip)), findsOneWidget);
+        expect(inChip(find.byType(Chip)), findsNothing);
+        final scheme = Theme.of(
+          tester.element(find.byType(ReminderChip)),
+        ).colorScheme;
+        final sides = outlines(tester);
+        expect(
+          sides.any(
+            (side) =>
+                side.style == BorderStyle.solid &&
+                side.width > 0 &&
+                side.color == scheme.outline,
+          ),
+          isTrue,
+          reason: 'the tappable chip keeps its outline: $sides',
+        );
+        await openSheet(tester);
+        expect(
+          inSheet(find.byKey(const ValueKey('reminder-plan-until-day'))),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2034: unchanged: a project muted here keeps an ActionChip «Sin '
+      'recordatorio: proyecto silenciado» with its outline, and it opens '
+      '«Novedades del proyecto»',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [task(listId: 'quiet', assignment: 'personal')],
+          size: phone,
+          projects: projects,
+        );
+        await app.detail(1);
+        expect(chipText(es.noReminderProjectMuted), findsOneWidget);
+        expect(inChip(find.byType(ActionChip)), findsOneWidget);
+        final scheme = Theme.of(
+          tester.element(find.byType(ReminderChip)),
+        ).colorScheme;
+        final sides = outlines(tester);
+        expect(
+          sides.any(
+            (side) =>
+                side.style == BorderStyle.solid &&
+                side.width > 0 &&
+                side.color == scheme.outline,
+          ),
+          isTrue,
+          reason: 'the tappable chip keeps its outline: $sides',
+        );
+        await tapVisible(tester, find.byType(ReminderChip));
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.text(es.projectNotifications)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // UX-2035: on a shared task the title and «solo para ti» stay put while
+  // the choices scroll under them; a thin line marks that edge, so a sheet
+  // opened part-way down its list looks part-way down.
+  group('P265 · UX-2035', () {
+    const phone = Size(360, 800);
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+        ProjectMember(id: 2, name: 'Marta', role: 'editor'),
+      ],
+    );
+
+    /// A «Todos» task in «Equipo», 22 days away, with [plan].
+    Task forAll({ReminderPlan? plan}) => Task(
+      id: 1,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: friday13,
+      hasTime: false,
+      reminderPlan: plan,
+      listId: 'team',
+      assignment: 'group',
+    );
+
+    final edge = find.byKey(const ValueKey('reminder-sheet-header-edge'));
+    final justYou = find.byKey(const ValueKey('reminder-plan-just-you'));
+    final untilDay = find.byKey(const ValueKey('reminder-plan-until-day'));
+
+    Rect rectOf(Element element) {
+      final box = element.renderObject! as RenderBox;
+      return box.localToGlobal(Offset.zero) & box.size;
+    }
+
+    Finder choices() => find
+        .descendant(
+          of: sheet().last,
+          matching: find.byType(SingleChildScrollView),
+        )
+        .first;
+
+    /// One 1 dp line keyed `reminder-sheet-header-edge`, in the sheet, on
+    /// screen, under the note and no more than 8 dp below it.
+    Rect expectEdgeUnderNote(WidgetTester tester, AppLocalizations l) {
+      expect(edge, findsOneWidget);
+      expect(inSheet(edge), findsOneWidget);
+      expect(tester.widget(edge), isA<Divider>());
+      expect(tester.widget<Divider>(edge).height, 1);
+      final line = tester.getRect(edge);
+      expect(line.height, moreOrLessEquals(1, epsilon: 0.01));
+      expect(line.top, greaterThanOrEqualTo(0));
+      expect(line.bottom, lessThanOrEqualTo(phone.height));
+      expect(justYou, findsOneWidget);
+      expect(tester.widget<Text>(justYou).data, l.reminderPlanJustYou);
+      final note = tester.getRect(justYou);
+      expect(line.top, greaterThanOrEqualTo(note.bottom - 0.5));
+      expect(
+        line.top - note.bottom,
+        lessThanOrEqualTo(8),
+        reason: 'The line sits right under «${l.reminderPlanJustYou}».',
+      );
+      return line;
+    }
+
+    for (final (language, l) in [('es', es), ('ca', ca)]) {
+      testWidgets(
+        'UX-2035: at 2× on 360×800 in $language, a «Todos» task in «Equipo» '
+        'with Normal opens scrolled to «${l.reminderPlanUntilDay}», and a '
+        'line under «${l.reminderPlanJustYou}» sits above every row in view',
+        (tester) async {
+          await (await _App.open(
+            tester,
+            [forAll(plan: const ReminderPlan.rhythm(ReminderPlan.normal))],
+            language: language,
+            textScale: 2,
+            size: phone,
+            projects: [team],
+          )).detail(1);
+          await openSheet(tester);
+          await tester.pumpAndSettle();
+          final line = expectEdgeUnderNote(tester, l);
+
+          // Opened scrolled to the plan: the single rows are above it.
+          expect(untilDay.hitTestable(), findsOneWidget);
+          expect(
+            inSheet(find.text(l.off)).hitTestable(),
+            findsNothing,
+            reason: 'The sheet opened scrolled past «${l.off}».',
+          );
+          final rows = inSheet(find.byType(ListTile)).hitTestable();
+          expect(rows, findsWidgets);
+          final hit = rows.evaluate().toList();
+          expect(
+            hit.map((e) => e.widget.key),
+            contains(const ValueKey('reminder-plan-until-day')),
+          );
+          for (final row in hit) {
+            expect(
+              rectOf(row).top,
+              greaterThanOrEqualTo(line.bottom - 0.5),
+              reason: '${row.widget} must start under the line.',
+            );
+          }
+          expect(
+            tester.getRect(untilDay).top,
+            greaterThanOrEqualTo(line.bottom - 0.5),
+          );
+          expect(
+            tester.getRect(choices()).top,
+            greaterThanOrEqualTo(line.bottom - 0.5),
+            reason: 'The choices scroll under the line, not over it.',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2035: at 2× on 360×800 in $language, scrolling the choices 200 dp '
+        'down and up leaves the line, the title and the note in place',
+        (tester) async {
+          await (await _App.open(
+            tester,
+            [forAll(plan: const ReminderPlan.rhythm(ReminderPlan.normal))],
+            language: language,
+            textScale: 2,
+            size: phone,
+            projects: [team],
+          )).detail(1);
+          await openSheet(tester);
+          await tester.pumpAndSettle();
+          expectEdgeUnderNote(tester, l);
+          final title = inSheet(find.text(l.reminder));
+          final titleBefore = tester.getRect(title);
+          final noteBefore = tester.getRect(justYou);
+          final lineBefore = tester.getRect(edge);
+
+          for (final dy in [200.0, -200.0, -200.0]) {
+            final rowBefore = tester.getRect(untilDay);
+            await tester.drag(choices(), Offset(0, dy));
+            await tester.pumpAndSettle();
+            expect(
+              tester.getRect(untilDay).top,
+              isNot(moreOrLessEquals(rowBefore.top, epsilon: 1)),
+              reason: 'The choices scrolled by $dy.',
+            );
+            expect(tester.getRect(title), titleBefore);
+            expect(tester.getRect(justYou), noteBefore);
+            expect(tester.getRect(edge), lineBefore);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2035: a «Todos» task in «Equipo» without a plan opens at its top, '
+      'and at 1× on 360×800 reads «Recordatorio», «Estos avisos son solo '
+      'para ti.», the line, then «Desactivado»',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [forAll()],
+          size: phone,
+          projects: [team],
+        )).detail(1);
+        await openSheet(tester);
+        final title = tester.getRect(inSheet(find.text(es.reminder)));
+        final note = tester.getRect(justYou);
+        final line = expectEdgeUnderNote(tester, es);
+        final off = tester.getRect(inSheet(find.text(es.off)));
+        expect(note.top, greaterThanOrEqualTo(title.bottom - 0.5));
+        expect(line.top, greaterThanOrEqualTo(note.bottom - 0.5));
+        expect(off.top, greaterThanOrEqualTo(line.bottom - 0.5));
+        expect(inSheet(find.text(es.off)).hitTestable(), findsOneWidget);
+        // Opened at its top: the first row starts right under the line.
+        final firstRow = tester.getRect(inSheet(find.byType(ListTile)).first);
+        expect(firstRow.top, greaterThanOrEqualTo(line.bottom - 0.5));
+        expect(firstRow.top - line.bottom, lessThanOrEqualTo(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2035: a personal task due today, as in UX-1904, has no such line '
+      'and no Divider at all',
+      (tester) async {
+        await (await _App.open(tester, [
+          presentation(day: DateTime(2026, 10, 22)),
+        ])).detail(1);
+        await openSheet(tester);
+        expect(inSheet(find.text(es.reminder)), findsOneWidget);
+        expect(edge, findsNothing);
+        expect(inSheet(find.byType(Divider)), findsNothing);
+        expect(justYou, findsNothing);
+      },
+    );
   });
 }
 
@@ -6459,4 +8762,22 @@ int _expectHourKeptWithPreposition(
       .toSet()
       .length;
   return lines;
+}
+
+/// P264: a capture store whose `Añadir…` stays saving while [hold] is set,
+/// until the test completes it; then it saves as [MemoryCaptures] does.
+class _P264HeldCaptures extends MemoryCaptures {
+  Completer<void>? hold;
+  bool saving = false;
+  @override
+  Future<CaptureSession> saveReady(
+    String id,
+    String ownerKey,
+    Set<String> draftIds,
+  ) async {
+    saving = true;
+    if (hold case final gate?) await gate.future;
+    saving = false;
+    return super.saveReady(id, ownerKey, draftIds);
+  }
 }

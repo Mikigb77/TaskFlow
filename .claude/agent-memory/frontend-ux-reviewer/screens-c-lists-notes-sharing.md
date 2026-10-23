@@ -43,7 +43,7 @@ Current as of 2026-10-13 (whole-app run, slice C). Paths are under `App/lib/`.
     - invite — a dialog with an email field, a role dropdown and two paragraphs, then a code dialog;
     - members, shown as raw emails;
     - pending invitations — a tap re-sends and replaces the code; X revokes;
-    - "How sharing works", folded away;
+    - "How sharing works", folded away (its data paragraph `sharedDataHelp` ends «Los recordatorios no se comparten: cada persona tiene los suyos.», 2026-10-23; render `sharing/project-sharing.how-it-works.*`);
     - "Delete project for everyone", the only way to delete a project;
   - for a member: leave.
 - **GroupsScreen → GroupScreen** (`screens/groups_screen.dart`; the group page is titled "Groups"):

@@ -1,10 +1,111 @@
 # UX run 2026-10-22-changes — reminder plans
 
-## Plan 2 — your answers to D1–D7, built (P252–P257)
+## Plan 3 — your answers of 2026-10-23: D8, and every reminder personal (P259–P263)
+
+You answered D8 and made the single reminder («Una vez») personal, like plans. The server half and the contract are done (49c8eeb). Plan 3 builds the app half in five packages that run side by side. It files nine problems (UX-2024 to UX-2031, one of them review B's Catalan strip, and UX-2033) and asks you one small question, D9.
+
+**How it runs:** this is a scoped run, so nothing waits for you. P259–P263 share no file, so they run in one wave. The full briefs are in `plan.json`. Plan 2's version of that file is in git at 845ba2f.
+
+### Your answers, and where each goes
+- **D8 → P261.** A plan with an hour of its own («recuérdamelo el mismo día a las 9», «cada día a las 8») keeps that hour on the task's day. The notice says «Es hoy a las 17:00» at 9:00, with «Completar». The strengths, «Sí» to the offer and a rhythm said without an hour still ring at the task's usual reminder (D1). The task's line, the sheet and the capture card show the kept hour.
+- **Every reminder is personal → P259, P260, P261 and P262.**
+  - On a task given to Ana, the line says only «Recordatorio para Ana». It never shows your own value as if it were hers, and it offers no choices, since nothing you'd choose there rings anywhere (P259).
+  - On a shared task, «Estos avisos son solo para ti.» covers every choice: under the reminder sheet's title (P261), in the one-tap list of a repeating task, and under «Recordar antes de» (P259).
+  - «Cómo funciona compartir» stops saying that reminder choices are shared (P260).
+  - Ajustes › Recordatorios stops counting plans that can't ring on your phone (P262).
+  - The first «¿Quieres un recordatorio antes?» no longer comes after saving a task that can't ring on your phone, such as one given to Ana (P263). That gap predates your answer; I found it while checking these flows.
+- **The Catalan strip → P261.** At 2×, «dt., 22 de des.» keeps its final «.» on its line.
+
+### A question for you
+
+#### D9 — Can a reader choose their own reminders? (UX-2032, S1)
+- **What happens:** a «lector» in a shared project gets the reminders of «Todos» tasks on their phone, with their own defaults from Ajustes, but can choose none.
+  - The app gives the reminder line no tap without edit rights (`task_detail_screen.dart:375`).
+  - The server refuses any change to a task from a reader, their own reminders included (`Backend/core/list_access.py:75`).
+  - Your words for D6: "everyone should be able to set their own pattern for reminder frequency".
+- **Options:**
+  - (a) as now: a reader keeps their own defaults, and can mute the project on their phone;
+  - (b) a reader can choose their own reminders on the tasks that ring for them. The server accepts a reader's change that touches only their own reminders, with no version, activity or notification, as for anyone.
+- **Recommendation: (b).** A reader's reminders now change nothing for anyone else, so being a reader needn't stop them. The server goes first, then one small app package; reversible. Readers are rare (everyone joins as an editor), so nothing waits for this.
+
+### Packages, in run order
+
+#### P259 · S2 · B · L · A task given to someone else shows none of your reminder and offers no choices; shared choices outside the sheet say «solo para ti»
+- **UX-2024** (S2) On a task given to Ana, the line reads only «Recordatorio para Ana», never «Recordatorio para Ana: 1 hora antes», which was your own value. `reminderForPerson` goes.
+- **UX-2025** (S2) There, the line, the form's row and the card's row open nothing, «Recordar antes de» goes, and the card asks for no day for it. A line with no tap is drawn at full contrast, not in Material's disabled grey.
+- **UX-2027** (S2) On a shared task, the one-tap list of a repeating task and «Recordar antes de» say «Estos avisos son solo para ti.».
+- **UX-2028** (S1) An unassigned task in a project you don't manage shows no reminder line at all, instead of your own reminder as if it rang.
+
+#### P260 · S2 · C · S · The sharing help says reminders aren't shared
+- **UX-2029** (S2) «Los recordatorios no se comparten: cada persona tiene los suyos.» / “Reminders aren’t shared: each person has their own.” / «Els recordatoris no es comparteixen: cada persona té els seus.» (my Catalan) replaces «Las opciones de recordatorio se comparten, pero cada teléfono debe activar sus propias notificaciones.»
+
+#### P261 · S2 · D · M · D8 in the app; the reminder sheet's «solo para ti» over every choice; the Catalan strip
+- **UX-2022** (S2) D8: a plan's own hour stays on the task's day, in the notice, the line, the sheet and the card. Normal, which has no hour, still moves.
+- **UX-2026** (S2) On a shared task, «Estos avisos son solo para ti.» sits once under the sheet's title and stays in view, instead of above each «Listo».
+- **UX-2031** (S1) At Catalan 2×, the strip's end date stays on one line.
+
+#### P262 · S1 · D · S · Ajustes › Recordatorios counts only the plans that ring here
+- **UX-2030** (S1) «Desactivado · «Hasta la fecha límite»: 9:00» shows only for plans that ring on this phone.
+
+#### P263 · S1 · D · S · The first reminder question comes only after saving a task that rings here
+- **UX-2033** (S1) Saving a task given to Ana, or in a project muted here, no longer asks «¿Quieres un recordatorio antes?». The next save of a task that rings here asks, as the offer already does.
+
+### Skipped
+- None.
+
+### Notes
+- **Evidence:** the code at 845ba2f with the server's 49c8eeb, the contract, and plan 2's verifications. The previews and device captures predate plans 1 and 2, and no reviewer has seen these states. So UX-2024 to UX-2030, UX-2032 and UX-2033 are mine, from the code, with my severities. UX-2031 is review B's, from plan 2's round 1.
+- **Where I settled things** (for the verifiers):
+  - On a task given to Ana I kept «Recordatorio para Ana», with no value, rather than removing the line. It still says why your phone won't ring (UX-1505), and it claims nothing about Ana's reminders.
+  - A task that isn't yours and names nobody gets no line, rather than new copy.
+  - A reminder said for a task given to someone else isn't shown as theirs: the card's row says «Recordatorio para Ana». It can't reach Ana, and nothing new says so.
+  - The sheet's line moves under the title and stays there on shared tasks, so it's read before a one-tap row and when the sheet opens on a plan. That's one line instead of up to three.
+  - A chip with no tap is now drawn at full contrast, archived projects and readers included.
+  - D8 reads the plan's own hour. The sheet works it out for each plan it shows, so Normal still moves while your words keep their hour.
+- **For the main session, once verified:**
+  - The contract: a plan with an hour of its own rings its day as a plan notice («Es hoy a las 17:00», «Completar» only, no snooze). The shared-task lines are where P259 and P261 put them. Plan 1's stale quotes are still to update, as plan 2's notes say.
+  - D9 needs the server first, if you choose (b).
+  - The website: nothing on TaskFlowWeb reads wrong now, but its privacy page says what members of a shared project can access. `/ux-web` should check it once these are verified.
+- **Ledger:** the lines of UX-1634, UX-2014 and UX-2001 say which parts of them plan 3 changes. Their phone checks stand.
+
+### Phone checks added
+- **P259:** two phones on two accounts, with a server at 49c8eeb or later. On a task given to Ana, your phone shows «Recordatorio para Ana» with no choices, and Ana's phone rings at her own reminder. Your «1 hora antes» on a «Todos» task rings only on your phone.
+- **P261:** a 17:00 task dictated with «recuérdamelo el mismo día a las 9» rings at 9:00 on its day, with «Es hoy a las 17:00» and «Completar» only. «cada día a las 8» rings at 8:00 on the day too.
+
+### Round 2 (p3)
+
+Round 1 (P259–P263) passed its round check, and no test failed. Reviews B, C and D found everything fixed except one gap in UX-2025, and they found two severity-1 regressions. Round 2 fixes all three in two small packages, P264 and P265. They share no file, so they run side by side. Nothing is escalated, and there's no new question for you. The full briefs are in `plan-p3-r2.json`.
+
+#### P264 · S2 · B · S · A reminder line with no tap is information: no «desactivado» for TalkBack, and no outline on the task's chip
+- **UX-2025** (S2, failed once) Round 1 fixed everything on screen. One gap is left: on the capture card's collapsed row, Marta's line with no tap still carries an enabled state that is off (`capture_review_editor.dart:418-419`). TalkBack would read it as «Recordatorio para Marta, desactivado», which sounds like the reminder is off. The tester's check looked only at «button» and «tap», so it passed. Fix: a line with no tap has no enabled state, and a line with a tap stays a button that's disabled while saving, like the date line.
+- **UX-2034** (S1, regression R1B-1 from P259) On the task's page, the chip with no tap («Recordatorio para Ana», an archived project's line) keeps the outlined box of the chips that do something, so it looks broken when a tap does nothing. Fix: the same chip with no outline and a transparent background. The words, the bell and the full contrast stay.
+
+#### P265 · S1 · D · S · Shared task's reminder sheet: a thin line under «solo para ti»
+- **UX-2035** (S1, regression R1D-1 from P261) On a shared task, the title and «Estos avisos son solo para ti.» now stay fixed while the choices scroll under them. A sheet that opens scrolled to a plan then shows «Hasta la fecha límite» right under the note, and nothing hints that «Desactivado» is above. Fix: a 1 dp line under the note, on shared tasks only.
+- **Settled:** I show the line always rather than only while the list is scrolled. It needs no state, and at the top it reads as the header's edge. The reviewer offered both.
+
+#### Phone checks added
+- **P264:** with TalkBack, «Recordatorio para Marta» on the capture card's collapsed row and on the task's page is read as text, with no «botón» and no «desactivado». This replaces P259's TalkBack check.
+
+#### Notes for the main session (from round 1's implementers)
+- **`Backend/docs/REMINDER_PLANS.md`, «Shared tasks»** could add:
+  - **P259:** on a task given to someone else, the app shows only «Recordatorio para {name}», with no value and no choices. A task that isn't this account's and names nobody shows no reminder at all. On a shared task, the one-tap list and «Recordar antes de» say «Estos avisos son solo para ti.».
+  - **P262:** the «Tareas sin hora» hint in Ajustes › Recordatorios counts only the tasks whose reminders ring on this phone.
+  - **P263:** the one-time reminder question (D2 of 2026-10-13) follows the same «rings on this phone» rule as the offer.
+- **P260 and P261:** nothing to add to the contract.
+- **P259** removed the test helper `expectSingleListOnly` from the group 'P256 · D6', because it was left unused. The round check passed, so nothing else relied on it.
+- **P260** ran `dart format` on `sharing_previews.dart` by mistake, then rebuilt it so the diff holds only its 28 added lines.
+- The modified plugin registrant files under `App/linux`, `App/macos` and `App/windows` come from a seed's `flutter pub get`. Leave them out of the commit.
+
+---
+
+## Plan 2 — your answers to D1–D7 (P252–P258, done and committed in 845ba2f)
+
+Report: `report-p2.md`. D8 was answered on 2026-10-23 and is built in plan 3 (P261).
 
 You answered all seven questions. Five of the answers become P252–P256, and the run's two open findings go in too (UX-2021 in P256, UX-2020 in P257). D4 and D7 need no app change and are recorded as yours. One small new question came up while planning D1: D8, below.
 
-**How it runs:** this is a scoped run, so nothing waits for you. There are two waves, set by the files the packages share: P252, P253, P254, P255 and P257 run side by side, then P256, which builds on three of them. The full briefs are in `plan.json`.
+**How it runs:** this is a scoped run, so nothing waits for you. There are two waves, set by the files the packages share: P252, P253, P254, P255 and P257 run side by side, then P256, which builds on three of them. The full briefs were in `plan.json`; plan 3 replaced that file, so plan 2's version is in git at 845ba2f.
 
 ### Your answers, and where each goes
 - **D1 → P252.** On a timed task's own day, its plan's notice rings at the task's usual reminder: «Hoy a las 17:00 · en 10 min», with «Posponer 10 min». Earlier days keep the plan's time, and the count stays the same. The task's line and the sheet show the new time.

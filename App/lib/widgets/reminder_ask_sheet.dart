@@ -31,8 +31,10 @@ final _waitingProvider = Provider<Set<String>>((ref) => {});
 final _offeredProvider = Provider<Set<String>>((ref) => {});
 
 /// Asks once per account on this phone whether to turn reminders on, after
-/// the first saved task with a date whose reminder can still ring: not one
-/// for today saved after its 9:00, nor one saved inside its lead time. Call
+/// the first saved task with a date whose reminder can still ring on this
+/// phone: not one for today saved after its 9:00, nor one saved inside its
+/// lead time, nor one given to someone else or in a project muted or
+/// archived here. Call
 /// it from the saved form's context, right after its route was popped, and
 /// pass the save message's [feedback]. The question waits until that route
 /// is gone and the save message has closed, so the person first sees where
@@ -145,8 +147,19 @@ Future<void> _ask(
     if (settings.asked || container.read(_askingProvider).contains(owner)) {
       return;
     }
-    // Only for a reminder that can still come; the next dated save asks.
-    if (!dated.any((task) => ReminderEngine.alertAhead(task, settings, now))) {
+    // Only for a reminder that can still come on this phone: not for a task
+    // given to someone else, nor in a project muted or archived here. The
+    // next dated save asks.
+    final ringsHere = await _ringsHere(container);
+    if (!dated.any(
+      (task) =>
+          ringsHere(task) && ReminderEngine.alertAhead(task, settings, now),
+    )) {
+      return;
+    }
+    if (!navigator.mounted ||
+        container.read(taskRepositoryProvider).ownerKey != owner ||
+        container.read(_askingProvider).contains(owner)) {
       return;
     }
     // Asked: not again in this run, whatever happens next.
@@ -190,6 +203,37 @@ Future<void> _ask(
   }
 }
 
+/// Whether a task's reminders ring on this phone, for this account (UX-1601's
+/// rule): a personal task, a «Todos» task, one given to this account, or an
+/// unassigned one in a project it manages, in a project not muted or
+/// archived here. A project this phone doesn't know yet doesn't ring.
+Future<bool Function(Task)> _ringsHere(ProviderContainer container) async {
+  final me = container.read(authProvider).account?.id;
+  List<TaskListInfo> projects;
+  try {
+    projects = await container.read(taskListsProvider.future);
+  } catch (_) {
+    projects = const [];
+  }
+  return (task) {
+    if (task.listId == null) {
+      return TaskDatabase.reminderBlock(task, me) == null;
+    }
+    final project = projects
+        .where((project) => project.id == task.listId)
+        .firstOrNull;
+    if (project == null) return false;
+    return TaskDatabase.reminderBlock(
+          task,
+          me,
+          archived: project.inactive,
+          muted: project.notifications == 'muted',
+          role: project.role,
+        ) ==
+        null;
+  };
+}
+
 /// The offer: a saved task whose day is two weeks or more away, with no
 /// plan and its reminder still the default, gets one question under its
 /// title and day: «Faltan 3 semanas. ¿Te aviso cada 3 días, y a diario la
@@ -218,7 +262,6 @@ Future<void> _offer(
   }
   // Two «Ahora no» in a row: no longer asked.
   if (declines >= 2) return;
-  final me = container.read(authProvider).account?.id;
   final offered = container.read(_offeredProvider);
   Set<int> before;
   try {
@@ -226,34 +269,10 @@ Future<void> _offer(
   } catch (_) {
     before = {};
   }
-  List<TaskListInfo> projects;
-  try {
-    projects = await container.read(taskListsProvider.future);
-  } catch (_) {
-    projects = const [];
-  }
   // A plan is this account's own, so «Sí» rings only here, on a shared task
   // too; but not on a task for someone else, nor in a project muted or
   // archived here (UX-1601's rule).
-  bool ringsHere(Task task) {
-    if (task.listId == null) {
-      return TaskDatabase.reminderBlock(task, me) == null;
-    }
-    final project = projects
-        .where((project) => project.id == task.listId)
-        .firstOrNull;
-    // A project this phone doesn't know yet: not asked.
-    if (project == null) return false;
-    return TaskDatabase.reminderBlock(
-          task,
-          me,
-          archived: project.inactive,
-          muted: project.notifications == 'muted',
-          role: project.role,
-        ) ==
-        null;
-  }
-
+  final ringsHere = await _ringsHere(container);
   final task = dated
       .where(
         (task) =>

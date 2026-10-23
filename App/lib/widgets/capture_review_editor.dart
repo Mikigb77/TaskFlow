@@ -19,7 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The same draft stays mounted as a compact card or a direct editor. All
 /// changes go immediately to the parent's durable capture journal.
-class CaptureReviewEditor extends StatefulWidget {
+class CaptureReviewEditor extends ConsumerStatefulWidget {
   const CaptureReviewEditor({
     super.key,
     required this.draft,
@@ -43,10 +43,11 @@ class CaptureReviewEditor extends StatefulWidget {
   /// the name it had, and the one typed. Nothing is created yet.
   final void Function(String from, String to)? onRenameProject;
   @override
-  State<CaptureReviewEditor> createState() => _CaptureReviewEditorState();
+  ConsumerState<CaptureReviewEditor> createState() =>
+      _CaptureReviewEditorState();
 }
 
-class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
+class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
   late final _title = TextEditingController(text: widget.draft.task.title);
   late final _notes = TextEditingController(
     text: widget.draft.task.notes ?? '',
@@ -405,15 +406,18 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
   /// A collapsed row's reminder said while dictating, under its date line
   /// and in its style: the task's reminder line (the plan's, «Recordatorio:
   /// 1 hora antes», or why it won't ring here), whose tap opens the reminder
-  /// choices or turns reminders on. TalkBack reads its words, as a button.
+  /// choices or turns reminders on. TalkBack reads its words, as a button
+  /// when it has a tap, disabled while the result is saving (UX-462); a
+  /// line with no tap is plain text, with no enabled state.
   Widget _reminderLine() => Consumer(
     builder: (context, ref, _) {
       final line = reminderLine(context, ref, task, onChanged: _change);
+      if (line == null) return const SizedBox.shrink();
       final onTap = widget.enabled ? line.onTap : null;
       return Semantics(
         label: line.text,
-        button: true,
-        enabled: onTap != null,
+        button: line.onTap != null,
+        enabled: line.onTap == null ? null : widget.enabled,
         excludeSemantics: true,
         onTap: onTap,
         child: ListTile(
@@ -566,19 +570,25 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
     // A reminder kept for a task with neither a day nor a deadline (said
     // for it, or its day cleared here) asks for the day, in one line under
     // the date; it applies, in its row, once the task has one.
+    // Not for a task whose reminders are someone else's: this account's
+    // could never ring for it.
+    final someoneElses = !task.isNote && reminderSomeoneElses(ref, task);
     final needsDay =
         !task.isNote &&
+        !someoneElses &&
         task.dueDate == null &&
         task.deadline == null &&
         (task.reminderPlan != null || (task.reminderMinutes ?? -1) >= 0);
+    // No reminder at all for someone else's task that names nobody.
+    final reminderShown = !task.isNote && reminderShows(ref, task);
     // A reminder said («una hora antes», a plan) is one row above `Más
     // opciones`; otherwise its control stays inside them.
-    final showReminder = _reminderOpen && !task.isNote && !needsDay;
+    final showReminder = _reminderOpen && reminderShown && !needsDay;
     // A reminder changed inside `Más opciones` has no row: its line shows in
     // their subtitle and on the collapsed row, as priority and repeat do.
     final reminderInOptions =
         !showReminder &&
-        !task.isNote &&
+        reminderShown &&
         (task.reminderPlan != null ||
             task.reminderMinutes != null ||
             task.reminderTime != null) &&
@@ -823,7 +833,7 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
                     builder: (context, ref, _) => Text(
                       [
                         ...optionsSummary,
-                        reminderLine(context, ref, task).text,
+                        reminderLine(context, ref, task)!.text,
                       ].join(' · '),
                     ),
                   )
@@ -873,6 +883,11 @@ class _CaptureReviewEditorState extends State<CaptureReviewEditor> {
               TaskPlanningControl(
                 task: task,
                 onChanged: widget.enabled ? _change : null,
+                // Reminders are each person's own.
+                showReminderAnchor: !someoneElses,
+                reminderNote: reminderShared(ref, task)
+                    ? l.reminderPlanJustYou
+                    : null,
               ),
               if (!showReminder && !needsDay) reminder(),
             ],

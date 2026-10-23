@@ -3,10 +3,12 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/edit_task_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
@@ -60,6 +62,8 @@ void main() {
     bool pro = false,
     // The time the app reads as now; early today unless a test sets it.
     DateTime Function()? clock,
+    // The projects this phone knows; none unless a test sets them.
+    List<TaskListInfo>? projects,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -72,6 +76,7 @@ void main() {
         RegionalPreferences(language: language),
       ),
       tasks: () => _GivenTasks(tasks),
+      projects: projects,
       pro: pro,
       overrides: [
         ...reminderOverrides(store, access),
@@ -941,7 +946,9 @@ void main() {
         await tester.pumpAndSettle();
         final choices = find.byType(BottomSheet);
         expect(choices, findsOneWidget);
-        await tester.tap(find.descendant(of: choices, matching: find.text(l.off)));
+        await tester.tap(
+          find.descendant(of: choices, matching: find.text(l.off)),
+        );
         await tester.pumpAndSettle();
         expect(
           find.descendant(of: row, matching: find.text(l.off)),
@@ -1092,6 +1099,216 @@ void main() {
         await save(tester, 'Llamar a mamá', dayKey: 'new-task-tomorrow');
         await letSaveMessageClose(tester);
         expect(question(l), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- Run 2026-10-22-changes, round 1 · P263 (UX-2033): the first
+  // reminder question only after a save that rings on this phone ----
+  group('P263 · the question only for a task that rings here', () {
+    const phone = Size(360, 800);
+    // Thu 22 Oct 2026, 10:00: tomorrow at 17:00 can still be reminded of.
+    DateTime clock() => DateTime(2026, 10, 22, 10);
+    const me = ProjectMember(id: 1, name: 'Yo', role: 'owner');
+    const marta = ProjectMember(id: 2, name: 'Marta', role: 'editor');
+    // A shared project this account owns, with Marta in it.
+    final team = TaskListInfo(
+      id: 'team',
+      name: 'Equipo',
+      shared: true,
+      ownerId: 1,
+      people: const [me, marta],
+    );
+    // A project of this account's, muted on this phone.
+    final quiet = TaskListInfo(
+      id: 'quiet',
+      name: 'Silencio',
+      notifications: 'muted',
+    );
+    final projects = [team, quiet];
+
+    /// The task form for a new task, opened in [projectId] under
+    /// [person]'s chip when given (as the project's page opens it, D7):
+    /// [title] for tomorrow at 17:00, then added.
+    Future<Task> save(
+      WidgetTester tester,
+      ProviderContainer container,
+      String title, {
+      String? projectId,
+      ProjectMember? person,
+    }) async {
+      final l = strings(tester);
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed(
+            '/newTask',
+            arguments: NewTaskArguments(projectId: projectId, person: person),
+          );
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('task-title')), title);
+      await tester.pumpAndSettle();
+      final tomorrow = find.byKey(const ValueKey('new-task-tomorrow'));
+      await tester.ensureVisible(tomorrow);
+      await tester.pumpAndSettle();
+      await tester.tap(tomorrow);
+      await tester.pumpAndSettle();
+      final addTime = find.widgetWithText(ActionChip, l.addTime);
+      await tester.ensureVisible(addTime);
+      await tester.pumpAndSettle();
+      await tester.tap(addTime);
+      await tester.pumpAndSettle();
+      final dialog = find.byType(TimePickerDialog);
+      expect(dialog, findsOneWidget);
+      final boxes = find.descendant(
+        of: dialog,
+        matching: find.byType(TextField),
+      );
+      final material = MaterialLocalizations.of(tester.element(dialog));
+      // A 12-hour picker shows a. m. and p. m.; a 24-hour one takes 17.
+      final pm = find.descendant(
+        of: dialog,
+        matching: find.text(material.postMeridiemAbbreviation),
+      );
+      final twelve = pm.evaluate().isNotEmpty;
+      await tester.enterText(boxes.at(0), twelve ? '5' : '17');
+      await tester.enterText(boxes.at(1), '00');
+      await tester.pumpAndSettle();
+      if (twelve) {
+        await tester.tap(pm);
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text(material.okButtonLabel));
+      await tester.pumpAndSettle();
+      expect(dialog, findsNothing);
+      expect(question(l), findsNothing);
+      final add = find.byKey(const ValueKey('task-save'));
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsNothing);
+      final saved = container
+          .read(taskProvider)
+          .requireValue
+          .singleWhere((t) => t.title == title);
+      expect(saved.dueDate, DateTime(2026, 10, 23, 17));
+      expect(saved.hasTime, isTrue);
+      expect(saved.listId, projectId);
+      return saved;
+    }
+
+    /// The save message closes, and a little more passes: no question, and
+    /// the account is still not asked, with reminders still off.
+    Future<void> noQuestion(
+      WidgetTester tester,
+      MemoryReminderStore store,
+    ) async {
+      final l = strings(tester);
+      await letSaveMessageClose(tester);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(sheet(), findsNothing);
+      expect(question(l), findsNothing);
+      expect(store.value.asked, isFalse);
+      expect(store.value.enabled, isFalse);
+    }
+
+    /// The save message closes, then the question shows in its sheet.
+    Future<void> asks(WidgetTester tester) async {
+      final l = strings(tester);
+      await letSaveMessageClose(tester);
+      expect(sheet(), findsOneWidget);
+      expect(
+        find.descendant(of: sheet(), matching: question(l)),
+        findsOneWidget,
+      );
+    }
+
+    testWidgets(
+      'UX-2033: a task given to Marta for tomorrow at 17:00 brings no question and leaves the account not asked; a personal one afterwards asks',
+      (tester) async {
+        final store = MemoryReminderStore();
+        expect(store.value.enabled, isFalse);
+        expect(store.value.asked, isFalse);
+        final container = await openApp(
+          tester,
+          store,
+          FakeReminderAccess(),
+          size: phone,
+          clock: clock,
+          projects: projects,
+        );
+        final forMarta = await save(
+          tester,
+          container,
+          'Preparar la reunión',
+          projectId: 'team',
+          person: marta,
+        );
+        expect(forMarta.assignment, 'member');
+        expect(forMarta.assigneeId, 2);
+        await noQuestion(tester, store);
+
+        final mine = await save(tester, container, 'Comprar pan');
+        expect(mine.assignment, 'personal');
+        await asks(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (what, person) in [
+      ('a «Todos» task of the shared project', null),
+      ('a task of the shared project given to this account', me),
+    ]) {
+      testWidgets('UX-2033: $what for tomorrow at 17:00 asks, as before', (
+        tester,
+      ) async {
+        final store = MemoryReminderStore();
+        final container = await openApp(
+          tester,
+          store,
+          FakeReminderAccess(),
+          size: phone,
+          clock: clock,
+          projects: projects,
+        );
+        final saved = await save(
+          tester,
+          container,
+          'Preparar la reunión',
+          projectId: 'team',
+          person: person,
+        );
+        if (person == null) {
+          expect(saved.assignment, 'group');
+        } else {
+          expect(saved.assignment, 'member');
+          expect(saved.assigneeId, 1);
+        }
+        await asks(tester);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+      'UX-2033: a task in a project muted on this phone brings no question; a personal one afterwards asks',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final container = await openApp(
+          tester,
+          store,
+          FakeReminderAccess(),
+          size: phone,
+          clock: clock,
+          projects: projects,
+        );
+        await save(tester, container, 'Regar las plantas', projectId: 'quiet');
+        await noQuestion(tester, store);
+
+        await save(tester, container, 'Comprar pan');
+        await asks(tester);
         expect(tester.takeException(), isNull);
       },
     );

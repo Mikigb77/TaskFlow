@@ -6,6 +6,7 @@ import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_draft.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/services/feedback_timeout.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/widgets/reminder_control.dart';
@@ -107,7 +108,7 @@ Task _sharedTask({int? assigneeId, String? assigneeName}) => Task(
 
 /// The task's details, with its reminder line in view. Without [pro], an
 /// account with free dictations, and the store answering for the Pro screen.
-/// [task] stands in for the presentation.
+/// [task] stands in for the presentation; [at] for the preview's clock.
 Future<PreviewApp> _detail(
   Preview p, {
   ReminderPlan? plan,
@@ -115,6 +116,7 @@ Future<PreviewApp> _detail(
   int days = 21,
   int? hour,
   Task? task,
+  DateTime? at,
 }) async {
   final app = await PreviewApp.open(
     p,
@@ -126,6 +128,9 @@ Future<PreviewApp> _detail(
       task ?? _presentation(plan: plan, days: days, hour: hour),
     ],
     projects: allProjects,
+    overrides: [
+      if (at != null) calendarClockProvider.overrideWithValue(() => at),
+    ],
   );
   await app.push('/taskDetails', arguments: 90);
   await p.tester.ensureVisible(find.byType(ReminderChip));
@@ -195,7 +200,7 @@ void remindersPreviews() {
     preview(
       planSheet,
       'strength-far',
-      'The same as strength on a task 60 days away: Normal starts at most 4 weeks before the day, so the plan reads «Cada 3 días desde 4 semanas antes, y a diario la última semana», the dots run from that start to the day, and the count is «15 avisos · próximo: …» with the first reminder\'s day, 26 days before the task\'s.',
+      'The same as strength on a task 60 days away: Normal starts at most 4 weeks before the day, so the plan reads «Cada 3 días desde 4 semanas antes, y a diario la última semana», the dots run from that start to the day, and the count is «15 avisos · próximo: …» with the first reminder\'s day, 26 days before the task\'s. Under the strip, «Hoy» takes its own width and the task\'s day the rest of the row, right-aligned, each on one line (in Catalan at 2× too).',
       [es1, es2, ca2],
       (p) async {
         final app = await _detail(p, days: 60);
@@ -323,7 +328,7 @@ void remindersPreviews() {
     preview(
       planSheet,
       'shared',
-      'A «Todos» task in the shared project «Matemáticas», «Terminar la presentación», three weeks away, «Hasta la fecha límite» open: above Listo, «Estos avisos son solo para ti.», since a plan is each person\'s own.',
+      'A «Todos» task in the shared project «Matemáticas», «Terminar la presentación», three weeks away, «Hasta la fecha límite» open: under the title «Recordatorio», over every choice (the single reminder\'s rows and the plans), «Estos avisos son solo para ti.», since every reminder choice is each person\'s own. The title and the line stay put while the choices scroll under them; there is no line above Listo.',
       [es1, es2, ca2],
       (p) async {
         final app = await _detail(p, task: _sharedTask());
@@ -334,14 +339,40 @@ void remindersPreviews() {
     );
 
     preview(
-      planSheet,
+      planLine,
       'given-to-someone',
-      'The same task given to Ana: it rings on Ana\'s phone, not this one, so the sheet has the title and the single reminder\'s rows only, with no «Hasta la fecha límite» or «A tu manera».',
-      [es1],
+      'The same task given to Ana, carrying this account\'s own «1 hora antes»: its reminders are Ana\'s, so the chip reads only «Recordatorio para Ana», at full contrast and with no outline, with no value and no tap.',
+      [es1, ca2],
+      (p) async {
+        await _detail(
+          p,
+          task: _sharedTask(
+            assigneeId: ana,
+            assigneeName: 'Ana',
+          ).copyWith(reminderMinutes: 60),
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      planSheet,
+      'shared-repeating',
+      'A «Todos» task in «Matemáticas», «Sacar la basura», every Monday at 17:00, opened from its chip: a repeating task gets the one-tap list, with «Estos avisos son solo para ti.» under «Recordatorio» and above its first row.',
+      [es1, ca2],
       (p) async {
         final app = await _detail(
           p,
-          task: _sharedTask(assigneeId: ana, assigneeName: 'Ana'),
+          task: Task(
+            id: 90,
+            title: 'Sacar la basura',
+            dueDate: next(DateTime.monday).add(const Duration(hours: 17)),
+            hasTime: true,
+            priority: 1,
+            recurrence: 'weekly',
+            listId: matematicas.id,
+            assignment: 'group',
+          ),
         );
         await _openSheet(app);
         await p.shoot();
@@ -382,6 +413,32 @@ void remindersPreviews() {
           plan: const ReminderPlan.rhythm(ReminderPlan.normal),
           days: 0,
           hour: 17,
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      planLine,
+      'own-time-today',
+      '«Presentar el proyecto» today at 17:00 with the plan said «el mismo día a las 9», at 8:00: «Recordatorios: el mismo día · próximo: hoy, 09:00». A plan with a time of its own keeps it on the task\'s own day (D8), rather than ringing at the task\'s usual reminder, 16:50.',
+      [es1, es2],
+      (p) async {
+        await _detail(
+          p,
+          task: Task(
+            id: 90,
+            title: 'Presentar el proyecto',
+            dueDate: day(0, 17),
+            hasTime: true,
+            priority: 2,
+            reminderPlan: ReminderPlan.custom(
+              const [PlanPhase(0, 0, 1)],
+              time: 540,
+              said: 'el mismo día a las 9',
+            ),
+          ),
+          at: day(0, 8),
         );
         await p.shoot();
       },

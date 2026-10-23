@@ -787,18 +787,6 @@ void main() {
       final en = lookupAppLocalizations(const Locale('en'));
       final es = lookupAppLocalizations(const Locale('es'));
       final ca = lookupAppLocalizations(const Locale('ca'));
-      expect(
-        en.reminderForPerson('Ana', '10 minutes before'),
-        'Reminder for Ana: 10 minutes before',
-      );
-      expect(
-        es.reminderForPerson('Ana', '10 minutos antes'),
-        'Recordatorio para Ana: 10 minutos antes',
-      );
-      expect(
-        ca.reminderForPerson('Ana', '10 minuts abans'),
-        'Recordatori per a Ana: 10 minuts abans',
-      );
       expect(en.noReminderProjectMuted, 'No reminder: project muted');
       expect(
         es.noReminderProjectMuted,
@@ -1003,13 +991,15 @@ void main() {
       );
     });
 
-    for (final (language, followsDefault, ownLead) in [
-      ('es', 'Recordatorio para Ana', 'Recordatorio para Ana: 30 minutos antes'),
-      ('en', 'Reminder for Ana', 'Reminder for Ana: 30 minutes before'),
-      ('ca', 'Recordatori per a Ana', 'Recordatori per a Ana: 30 minuts abans'),
+    // P259 (UX-2024): the values on the task are this account's own, never
+    // Ana's, so none is said after her name.
+    for (final (language, followsDefault) in [
+      ('es', 'Recordatorio para Ana'),
+      ('en', 'Reminder for Ana'),
+      ('ca', 'Recordatori per a Ana'),
     ]) {
       testWidgets(
-        'UX-1634: Ana’s timed task viewed by María reads «$followsDefault» with no reminder of its own, and «$ownLead» with 30 minutes set ($language)',
+        'UX-1634, UX-2024: Ana’s timed task viewed by María reads «$followsDefault» with no reminder of its own, and with 30 minutes set ($language)',
         (tester) async {
           final l = lookupAppLocalizations(Locale(language));
           await pumpChip(
@@ -1027,11 +1017,8 @@ void main() {
             projects: [project()],
             language: language,
           );
-          expect(chipLabel(tester), ownLead);
-          expect(
-            chipLabel(tester),
-            l.reminderForPerson('Ana', l.minutesBefore(30)),
-          );
+          expect(chipLabel(tester), followsDefault);
+          expect(chipLabel(tester), isNot(contains(l.minutesBefore(30))));
           expect(tester.takeException(), isNull);
         },
       );
@@ -1050,7 +1037,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-1634: Ana’s date-only task reads «Recordatorio para Ana» with no time of its own, and «Recordatorio para Ana: 8:00» with 8:00 set',
+      'UX-1634, UX-2024: Ana’s date-only task reads «Recordatorio para Ana» with no time of its own, with 8:00 set, and with «Desactivado»',
       (tester) async {
         final es = lookupAppLocalizations(const Locale('es'));
         await pumpChip(tester, anasDateOnly, projects: [project()]);
@@ -1061,19 +1048,14 @@ void main() {
           anasDateOnly.copyWith(reminderTime: 8 * 60),
           projects: [project()],
         );
-        // 8:00 as this phone writes the time.
-        final eight = tester
-            .element(find.byType(ReminderChip))
-            .clockTime(DateTime(2000, 1, 1, 8));
-        expect(eight, anyOf('8:00', '08:00'));
-        expect(chipLabel(tester), 'Recordatorio para Ana: $eight');
-        // Off on the task itself is the task's own: it still says so.
+        expect(chipLabel(tester), 'Recordatorio para Ana');
+        // Off is this account's own too: Ana's phone keeps hers.
         await pumpChip(
           tester,
           anasDateOnly.copyWith(reminderMinutes: -1),
           projects: [project()],
         );
-        expect(chipLabel(tester), es.reminderForPerson('Ana', es.off));
+        expect(chipLabel(tester), es.reminderForPersonOnly('Ana'));
         expect(tester.takeException(), isNull);
       },
     );
@@ -1087,7 +1069,7 @@ void main() {
       (
         'Ana’s timed task with 30 minutes set',
         anas.copyWith(reminderMinutes: 30),
-        'Recordatorio para Ana: 30 minutos antes',
+        'Recordatorio para Ana',
       ),
       (
         'Ana’s date-only task with no time of its own',
@@ -1097,7 +1079,7 @@ void main() {
       (
         'Ana’s date-only task with 8:00 set',
         anasDateOnly.copyWith(reminderTime: 8 * 60),
-        'Recordatorio para Ana: 8:00',
+        'Recordatorio para Ana',
       ),
     ]) {
       testWidgets(
@@ -1107,11 +1089,7 @@ void main() {
           final row = await pumpForm(tester, task, projects: [project()]);
           final subtitle =
               (tester.widget<ListTile>(row).subtitle! as Text).data!;
-          // 8:00 as this phone writes the time.
-          final eight = tester
-              .element(row)
-              .clockTime(DateTime(2000, 1, 1, 8));
-          expect(subtitle, reading.replaceFirst('8:00', eight));
+          expect(subtitle, reading);
           expect(subtitle, isNot(contains(es.defaultChoice)));
           expect(subtitle.toLowerCase(), isNot(contains('predeterminado')));
           expect(tester.takeException(), isNull);
@@ -2043,9 +2021,13 @@ void main() {
     final upcoming = <String, Object?>{
       'identity': 'local/task/1/once',
       'title': 'Médico',
-      'fire_at': DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 45)
-          .toUtc()
-          .toIso8601String(),
+      'fire_at': DateTime(
+        tomorrow.year,
+        tomorrow.month,
+        tomorrow.day,
+        9,
+        45,
+      ).toUtc().toIso8601String(),
       'status': 'scheduled',
       'daily': 0,
       'error': null,
@@ -2163,7 +2145,6 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
-
   });
 
   // ---- Run 2026-10-19-app, round 1 · P190 (UX-1601): an alert time that
@@ -2546,9 +2527,9 @@ void main() {
       testWidgets(
         'UX-1601: ${language.toUpperCase()}, 2× on 360×800, the passed reading on the detail is whole, inside the screen, with no overflow',
         (tester) async {
-          await (FontLoader('Manrope')
-                ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
-              .load();
+          await (FontLoader(
+            'Manrope',
+          )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
           final l = lookupAppLocalizations(Locale(language));
           await openApp(
             tester,
