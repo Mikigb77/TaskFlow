@@ -865,6 +865,24 @@ def apk_facts(apk: Path, source: str) -> dict:
             "commit": commit, "short": short}
 
 
+# Apps that Google Play keeps updating on this Play Store image, and that the lane never opens.
+# Their updates had filled /data by 2026-10-29 (24 updated apps, about 2 GB). Going back to the
+# image's own versions frees the space without touching TaskFlow, Chrome, Play services,
+# WebView, or the text-to-speech engine TalkBack reads with.
+UNUSED_UPDATES = ("com.google.android.youtube", "com.google.android.apps.youtube.music",
+                  "com.google.android.apps.photos", "com.google.android.apps.maps",
+                  "com.google.android.gm", "com.google.android.googlequicksearchbox",
+                  "com.google.android.dialer")
+
+
+def free_storage() -> None:
+    log("  the emulator's storage is full: clearing system caches, and the updates of apps "
+        "the lane never opens")
+    sh("pm trim-caches 999G", timeout=120)
+    for package in UNUSED_UPDATES:
+        sh(f"pm uninstall-system-updates {package}", timeout=120)
+
+
 def install(apk: Path) -> None:
     verify()
     log("installing the APK (adb install -r -d)")
@@ -874,12 +892,11 @@ def install(apk: Path) -> None:
     try:
         out = adb("install", "-r", "-d", str(apk), timeout=300)
     except RuntimeError as error:
-        # The emulator's /data fills up over many runs (2026-10-22). Clearing the system's
-        # caches frees it without touching any app's data; then one more try.
-        if "INSUFFICIENT_STORAGE" not in str(error):
+        # The emulator's /data fills up over many runs (2026-10-22, 2026-10-29), and Android
+        # says so in two ways. Freeing it touches no app's data; then one more try.
+        if "INSUFFICIENT_STORAGE" not in str(error) and "not enough space" not in str(error):
             raise
-        log("  the emulator's storage is full: clearing system caches and trying again")
-        sh("pm trim-caches 999G", timeout=120)
+        free_storage()
         out = adb("install", "-r", "-d", str(apk), timeout=300)
     if "Success" not in out:
         raise RuntimeError(f"install failed: {out.strip()[-300:]}")
