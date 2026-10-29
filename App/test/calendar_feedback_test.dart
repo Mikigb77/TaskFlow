@@ -43,6 +43,21 @@ import 'device_calendar_test.dart'
     show FakeDeviceCalendars, MemoryCalendarPreferences, workCalendar;
 import 'package:table_calendar/table_calendar.dart';
 
+/// [day]'s cell in the calendar. The month grid also shows the last days of
+/// the month before (always the 22nd or later) and the first of the month
+/// after (the 14th or earlier), so a number can show twice: the month's own
+/// is the last match after the 14th and the first before it. The week strip
+/// never repeats one.
+Finder dayCell(DateTime day) {
+  final matches = find
+      .descendant(
+        of: find.byType(TableCalendar<Task>),
+        matching: find.text('${day.day}'),
+      )
+      .hitTestable();
+  return day.day > 14 ? matches.last : matches.first;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const timeoutChannel = MethodChannel('taskflow/accessibility');
@@ -469,14 +484,7 @@ void main() {
     final other = tomorrow.month == now.month
         ? tomorrow
         : DateTime(now.year, now.month, now.day - 1);
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byType(TableCalendar<Task>),
-            matching: find.text('${other.day}'),
-          )
-          .hitTestable(),
-    );
+    await tester.tap(dayCell(other));
     await tester.pumpAndSettle();
     expect(find.text(l.overdueCount(1)), findsNothing);
     await tester.tap(find.widgetWithText(TextButton, l.today));
@@ -999,14 +1007,7 @@ void main() {
   }
 
   Future<void> tapDay(WidgetTester tester, DateTime day) async {
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byType(TableCalendar<Task>),
-            matching: find.text('${day.day}'),
-          )
-          .hitTestable(),
-    );
+    await tester.tap(dayCell(day));
     await tester.pumpAndSettle();
   }
 
@@ -1434,14 +1435,7 @@ void main() {
     // Only today's open task has a dot.
     expect(dots(), findsOneWidget);
     final dot = tester.getCenter(dots());
-    final todayCell = tester.getRect(
-      find
-          .descendant(
-            of: find.byType(TableCalendar<Task>),
-            matching: find.text('${now.day}'),
-          )
-          .first,
-    );
+    final todayCell = tester.getRect(dayCell(now));
     expect((dot.dx - todayCell.center.dx).abs(), lessThan(24));
     expect(tester.takeException(), isNull);
   });
