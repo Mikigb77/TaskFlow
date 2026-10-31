@@ -30,7 +30,7 @@ After user-facing work, the main session runs `/ux` by itself; AGENTS.md asks it
    So the reviewer judges what a person sees, not only the code. It is still widget-test evidence, not a phone.
 
    For what previews can't draw, the main session also captures the app on the `TaskFlow_Review` test emulator, into `App/build/ux/device/` with its own `INDEX.md` (`scripts/emulator/README.md`). That's emulator evidence: closer, but still not your phone.
-3. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder. It reviews against `GUIDELINES.md` and cites its rule IDs.
+3. **Review.** `frontend-ux-reviewer` (Opus, max effort) writes a report for each area into the run folder. It reviews against `references/guidelines.md` and cites its rule IDs.
 4. **Plan.** `ux-organizer` (Opus, max effort):
    - merges duplicates;
    - sends product decisions to you;

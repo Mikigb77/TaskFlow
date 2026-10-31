@@ -42,7 +42,7 @@ Current as of 2026-10-13 (whole-app run, slice A). The capture direction in UX_R
 - **Waiting after Stop:** "Preparando tu plan…" with a progress bar. About 5 s typically, 20.5 s at worst; the app gives up at 100 s.
 
 ## Review and save
-- **The review page.** VoiceTaskScreen is replaced by ReviewTasksScreen (`lib/screens/review_tasks_screen.dart` with `lib/widgets/capture_review_editor.dart`).
+- **The review page is gone (U4).** After «Listo» the capture sheet itself says «Entendiendo…» over the words, then shows the result (`lib/screens/voice_task_screen.dart` with `lib/widgets/capture_review_editor.dart`); no page is pushed. ReviewTasksScreen (`review_tasks_screen.dart`) no longer exists.
   - It shows one task, or batch cards that expand.
   - The date is the 4th row's subtitle, with no weekday.
   - An AM/PM question shows time chips plus "Cambiar este dato" and "Mantener este dato tal como está".

@@ -132,7 +132,7 @@ The evidence base for `frontend-ux-reviewer`. It turns research and platform rul
 - **PL-8 Gestures are shortcuts, never the only way.** Do: every swipe, long press or drag also has a visible button or menu item and a TalkBack custom action.
   Check: list gesture handlers (`Dismissible`, `onLongPress`, drags) and find each one's visible twin. Gestures have no signifier; swipe actions are hard to discover; older adults perform gestures well but rarely find gesture-only functions. — *standard/law* + *platform guideline* + *study/data* · [WCAG 2.2] (2.5.1, 2.5.7) [Android A11y principles] [Norman 2010] [Li 2017s] [Kobayashi 2011]
 - **PL-9 Launcher shortcuts: few and short.** Do: at most 4 shortcuts; short label ≈ 10 characters, long label ≈ 25.
-  Check: `res/xml/capture_shortcuts.xml` and its ES and CA strings against those lengths. — *platform guideline* · [Android Shortcuts]
+  Check: the shortcuts `CaptureShortcuts.kt` publishes, and their labels (`capture_voice_short`, `capture_voice`, `capture_text_short` and `capture_text` in `res/values*/strings.xml`) in ES and CA against those lengths. — *platform guideline* · [Android Shortcuts]
 - **PL-10 The home-screen widget meets Android's widget bar.** Do: 48 × 48 dp targets, enough contrast, light and dark palettes, an update right after any action in the widget or the app, and an intentional empty or signed-out state with a call to action.
   Check: widget layouts, strings and refresh triggers. — *platform guideline* · [Android Widget quality]
 - **PL-11 Edge to edge, inside the insets.** Do: draw behind the system bars but keep text and controls inside the safe insets.

@@ -69,7 +69,7 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 - The task-detail reminder chip and the off-by-default switch are described in [[ui-patterns]].
 
 ## Native surfaces
-- **Android** (`android/app/src/main/res/values*/strings.xml`, `res/xml/capture_shortcuts.xml`):
+- **Android** (`android/app/src/main/res/values*/strings.xml`; the launcher shortcuts come from code, `CaptureShortcuts.kt`, since 3a6ad40 removed `res/xml/capture_shortcuts.xml`):
   - launcher icon (b7, UX-1608): adaptive `mipmap-anydpi-v26/ic_launcher.xml`, teal #146C5C background + white double-tick (`done_all_rounded`) foreground and monochrome (themed icons); legacy PNGs are the same mark. Notification small icon `drawable/app_notifications_icon.xml`, the same tick; the old `app_icon` is gone;
   - the widget's label has its own string `capture_widget_label` (layout text, TalkBack name, 13+ label, picker name): EN "Dictate a task", ES «Dictar una tarea», CA «Dicta una tasca»; description "Tap to dictate a task." / «Toca para dictar una tarea.»;
   - launcher shortcuts `capture_voice`/`capture_text` with short labels (Android shows the short one at 2.0 when the long one is ~15+ chars): EN "Dictate a new task"/"Type a new task" → "Dictate"/"Type"; ES «Dictar una tarea»/«Escribir una tarea» → «Dictar»/«Escribir»; CA «Dicta una tasca»/«Escriu una tasca» → «Dicta»/«Escriu»;
