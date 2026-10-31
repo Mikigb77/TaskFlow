@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-31 (later) — D1 and D2 of run 2026-10-28-app
+The owner: "D1 and D2 both yes, as recommended".
+- **D1 (UX-2612), «Guardar como tarea»:** (a). The phone's own reading shows as a normal result card with «Añadir al calendario» before it's saved, after the 8 s wait, after a failure and on «No se encontraron tareas». One more tap on a rare path; the person sees the day it read, and that it's one task.
+- **D2 (UX-2311), Completadas newest first:** (a). Each completion's time is kept, per task and per repeat, on the phone and on the server, and Completadas lists by it, newest first; older completions without a time keep today's order after them. Nothing shows the time; only the order uses it. Server first, then one small app package.
+
 ## 2026-10-31 — "do everything": D9, WD34, the stopped whole-app review
 The owner answered the list of what waited on him with "do everything", then: "after everything finishes, make a pr and merge it onto main". Each item below is the recommendation he was given.
 - **D9 of run 2026-10-22-changes (UX-2032), a reader's own reminders:** (b). A «lector» can choose their own reminders on the tasks that ring for them. The server accepts a reader's change that touches only their own reminders, with no version, activity or notification, as for anyone; nothing else a reader sends changes. Server first, then one small app package.
