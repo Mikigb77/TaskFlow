@@ -1,4 +1,5 @@
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/task_database.dart';
@@ -11,24 +12,46 @@ void main() {
   late _Api api;
   late CloudTaskRepository repository;
   final task = Task(
-      title: 'Doctor appointment',
-      dueDate: DateTime(2026, 9, 25, 17),
-      priority: 3,
-      notes: 'Bring blood test results',
-      filePaths: ['/private/report.pdf']);
+    title: 'Doctor appointment',
+    dueDate: DateTime(2026, 9, 25, 17),
+    priority: 3,
+    notes: 'Bring blood test results',
+    filePaths: ['/private/report.pdf'],
+  );
 
   setUp(() async {
     final sql = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
     await sql.execute(
-        'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)');
+      'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)',
+    );
     await sql.insert(
-        'tasks',
-        task.toMap()
-          ..remove('hasTime')
-          ..remove('recurrence')
-          ..remove('repeatUntil')
-          ..remove('completedDates'));
-    await TaskDatabase.upgrade(sql, 3, 5);
+      'tasks',
+      task.toMap()
+        ..remove('assignment')
+        ..remove('assigneeId')
+        ..remove('assigneeName')
+        ..remove('createdBy')
+        ..remove('createdByName')
+        ..remove('kind')
+        ..remove('hasTime')
+        ..remove('recurrence')
+        ..remove('repeatUntil')
+        ..remove('completedDates')
+        ..remove('reminderMinutes')
+        ..remove('deadline')
+        ..remove('deadlineHasTime')
+        ..remove('durationMinutes')
+        ..remove('reminderAnchor')
+        ..remove('checklist')
+        ..remove('listId')
+        ..remove('labels')
+        ..remove('repeatInterval')
+        ..remove('repeatWeekdays')
+        ..remove('exceptions')
+        ..remove('reminderTime')
+        ..remove('reminderPlan'),
+    );
+    await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
     database = TaskDatabase.forTesting(sql);
     api = _Api();
     repository = CloudTaskRepository(database, api, 1);
@@ -38,26 +61,30 @@ void main() {
     api.close();
   });
 
-  test('migration preserves old tasks locally until explicit one-time import',
-      () async {
-    expect((await database.getTasks()).single.title, task.title);
-    expect(await repository.getAllTasks(), isEmpty);
-    expect(await database.pending(repository.ownerKey), isEmpty);
-    expect(await repository.importLocalTasks(), 1);
-    expect(await repository.importLocalTasks(), 0);
-    expect((await repository.getAllTasks()).single.filePaths, task.filePaths);
-    expect(await database.getTasks(), isEmpty);
-  });
+  test(
+    'migration preserves old tasks locally until explicit one-time import',
+    () async {
+      expect((await database.getTasks()).single.title, task.title);
+      expect(await repository.getAllTasks(), isEmpty);
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      expect(await repository.importLocalTasks(), 1);
+      expect(await repository.importLocalTasks(), 0);
+      expect((await repository.getAllTasks()).single.filePaths, task.filePaths);
+      expect(await database.getTasks(), isEmpty);
+    },
+  );
 
-  test('account caches cannot read, update, or delete another account task',
-      () async {
-    final id = await repository.addTask(task);
-    final other = CloudTaskRepository(database, api, 2);
-    expect(await other.getAllTasks(), isEmpty);
-    expect(() => other.updateTask(task.copyWith(id: id)), throwsStateError);
-    expect(await other.deleteTask(id), 0);
-    expect((await repository.getAllTasks()).single.id, id);
-  });
+  test(
+    'account caches cannot read, update, or delete another account task',
+    () async {
+      final id = await repository.addTask(task);
+      final other = CloudTaskRepository(database, api, 2);
+      expect(await other.getAllTasks(), isEmpty);
+      expect(() => other.updateTask(task.copyWith(id: id)), throwsStateError);
+      expect(await other.deleteTask(id), 0);
+      expect((await repository.getAllTasks()).single.id, id);
+    },
+  );
 
   test('offline writes remain available and deletion remains queued', () async {
     api.offline = true;
@@ -69,26 +96,36 @@ void main() {
     await repository.deleteTask(id);
     expect(await repository.getAllTasks(), isEmpty);
     expect(
-        (await database.pending(repository.ownerKey)).single['is_deleted'], 1);
+      (await database.pending(repository.ownerKey)).single['is_deleted'],
+      1,
+    );
   });
 
-  test('successful upload excludes device paths and downloads to a fresh cache',
-      () async {
-    await repository.addTask(task);
-    await repository.sync();
-    expect(await database.pending(repository.ownerKey), isEmpty);
-    expect(api.lastUpload!.keys, isNot(contains('filePaths')));
-    expect(api.lastUpload!.keys, isNot(contains('imagePaths')));
-    expect(DateTime.parse(api.lastUpload!['due_date']), task.dueDate!.toUtc());
-    final rows = await database.database;
-    await rows.delete('tasks',
-        where: 'owner_key = ?', whereArgs: [repository.ownerKey]);
-    await repository.sync();
-    final restored = (await repository.getAllTasks()).single;
-    expect(restored.title, task.title);
-    expect(restored.dueDate, task.dueDate);
-    expect(restored.filePaths, isEmpty);
-  });
+  test(
+    'successful upload excludes device paths and downloads to a fresh cache',
+    () async {
+      await repository.addTask(task);
+      await repository.sync();
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      expect(api.lastUpload!.keys, isNot(contains('filePaths')));
+      expect(api.lastUpload!.keys, isNot(contains('imagePaths')));
+      expect(
+        DateTime.parse(api.lastUpload!['due_date']),
+        task.dueDate!.toUtc(),
+      );
+      final rows = await database.database;
+      await rows.delete(
+        'tasks',
+        where: 'owner_key = ?',
+        whereArgs: [repository.ownerKey],
+      );
+      await repository.sync();
+      final restored = (await repository.getAllTasks()).single;
+      expect(restored.title, task.title);
+      expect(restored.dueDate, task.dueDate);
+      expect(restored.filePaths, isEmpty);
+    },
+  );
 
   test('an edit during upload is not cleared by acknowledgement', () async {
     final id = await repository.addTask(task);
@@ -100,60 +137,147 @@ void main() {
     expect(pending['remote_version'], 1);
   });
 
-  test('Inbox, date-only and repeated completion survive sync and restoration',
-      () async {
-    await repository.addTasks([
-      Task(title: 'Coffee', priority: 1),
-      Task(
+  test(
+    'Inbox, date-only and repeated completion survive sync and restoration',
+    () async {
+      await repository.addTasks([
+        Task(title: 'Coffee', priority: 1),
+        Task(
           title: 'Pay invoice',
           dueDate: DateTime(2026, 9, 25),
           hasTime: false,
-          priority: 2),
-      Task(
+          priority: 2,
+        ),
+        Task(
           title: 'Water plants',
           dueDate: DateTime(2026, 9, 27, 9),
           priority: 1,
           recurrence: 'weekly',
           repeatUntil: DateTime(2027, 1, 31),
-          completedDates: ['2026-09-27']),
-    ]);
-    await repository.sync();
-    expect(repository.syncError, isNull);
-    expect(api.remote.firstWhere((t) => t['title'] == 'Coffee')['due_date'],
-        isNull);
-    final invoice = api.remote.firstWhere((t) => t['title'] == 'Pay invoice');
-    expect(invoice['scheduled_date'], '2026-09-25');
-    expect(invoice['due_date'], isNull);
-    final sql = await database.database;
-    await sql.delete('tasks',
-        where: 'owner_key = ?', whereArgs: [repository.ownerKey]);
-    await repository.sync();
-    final restored = (await repository.getAllTasks())
-      ..sort((a, b) => a.title.compareTo(b.title));
-    expect(restored[0].dueDate, isNull);
-    expect(restored[1].hasTime, isFalse);
-    expect(restored[1].dueDate, DateTime(2026, 9, 25));
-    expect(
-        restored[2].occurrenceOn(DateTime(2026, 9, 27))!.isCompleted, isTrue);
-    expect(
+          completedDates: ['2026-09-27'],
+        ),
+      ]);
+      await repository.sync();
+      expect(repository.syncError, isNull);
+      expect(
+        api.remote.firstWhere((t) => t['title'] == 'Coffee')['due_date'],
+        isNull,
+      );
+      final invoice = api.remote.firstWhere((t) => t['title'] == 'Pay invoice');
+      expect(invoice['scheduled_date'], '2026-09-25');
+      expect(invoice['due_date'], isNull);
+      final sql = await database.database;
+      await sql.delete(
+        'tasks',
+        where: 'owner_key = ?',
+        whereArgs: [repository.ownerKey],
+      );
+      await repository.sync();
+      final restored = (await repository.getAllTasks())
+        ..sort((a, b) => a.title.compareTo(b.title));
+      expect(restored[0].dueDate, isNull);
+      expect(restored[1].hasTime, isFalse);
+      expect(restored[1].dueDate, DateTime(2026, 9, 25));
+      expect(
+        restored[2].occurrenceOn(DateTime(2026, 9, 27))!.isCompleted,
+        isTrue,
+      );
+      expect(
         restored[2]
             .nextOpenOccurrence(from: DateTime(2026, 9, 27))!
             .displayDate,
-        DateTime(2026, 10, 4, 9));
-  });
+        DateTime(2026, 10, 4, 9),
+      );
+    },
+  );
 
   test('batch save rolls back entirely on database failure', () async {
     final sql = await database.database;
     await sql.execute(
-        "CREATE TRIGGER reject_task BEFORE INSERT ON tasks WHEN NEW.title = 'Fail' BEGIN SELECT RAISE(ABORT, 'test'); END");
+      "CREATE TRIGGER reject_task BEFORE INSERT ON tasks WHEN NEW.title = 'Fail' BEGIN SELECT RAISE(ABORT, 'test'); END",
+    );
     await expectLater(
-        repository.addTasks([
-          Task(title: 'First', priority: 1),
-          Task(title: 'Fail', priority: 1)
-        ]),
-        throwsA(isA<DatabaseException>()));
+      repository.addTasks([
+        Task(title: 'First', priority: 1),
+        Task(title: 'Fail', priority: 1),
+      ]),
+      throwsA(isA<DatabaseException>()),
+    );
     expect(await repository.getAllTasks(), isEmpty);
   });
+
+  test(
+    'offline checklist edits survive sync restoration and conflicting completions',
+    () async {
+      final passport = ChecklistItem(title: 'Passport');
+      final charger = ChecklistItem(title: 'Charger');
+      final packing = task.copyWith(
+        title: 'Pack',
+        checklist: [passport, charger],
+      );
+      api.offline = true;
+      final id = await repository.addTask(packing);
+      await repository.updateTask(
+        packing.copyWith(
+          id: id,
+          checklist: [
+            charger.setDone(true),
+            passport.copyWith(title: 'New passport'),
+          ],
+        ),
+      );
+      await repository.sync();
+      expect(
+        (await repository.getAllTasks()).single.checklist.first.completed,
+        isTrue,
+      );
+      api.offline = false;
+      await repository.sync();
+      expect(repository.syncError, isNull);
+      final sql = await database.database;
+      await sql.delete(
+        'tasks',
+        where: 'owner_key = ?',
+        whereArgs: [repository.ownerKey],
+      );
+      await repository.sync();
+      final restored = (await repository.getAllTasks()).single;
+      expect(restored.checklist.map((item) => item.id), [
+        charger.id,
+        passport.id,
+      ]);
+      expect(restored.checklist.first.completed, isTrue);
+      expect(restored.checklist.last.title, 'New passport');
+      expect(restored.isCompleted, isFalse);
+      api.remote.single['version'] = 2;
+      api.remote.single['checklist'] = [
+        charger.setDone(false).toJson(),
+        passport.toJson(),
+      ];
+      await repository.updateTask(
+        restored.copyWith(
+          checklist: [charger.setDone(true), passport.setDone(true)],
+        ),
+      );
+      await repository.sync();
+      final all = await repository.getAllTasks();
+      expect(all.length, 2);
+      expect(
+        all
+            .singleWhere((task) => task.title.endsWith('(offline copy)'))
+            .checklist
+            .every((item) => item.completed),
+        isTrue,
+      );
+      expect(
+        all
+            .singleWhere((task) => task.title == 'Pack')
+            .checklist
+            .every((item) => !item.completed),
+        isTrue,
+      );
+    },
+  );
 
   test('retry after lost upload response is idempotent', () async {
     await repository.addTask(task);
@@ -168,42 +292,207 @@ void main() {
   });
 
   test(
-      'conflicting edits preserve an offline copy and remote deletion propagates',
-      () async {
-    final id = await repository.addTask(task);
-    await repository.sync();
-    api.remote.single['version'] = 2;
-    api.remote.single['title'] = 'Changed on another phone';
-    await repository.updateTask(task.copyWith(id: id, title: 'Offline edit'));
-    await repository.sync();
-    final titles = (await repository.getAllTasks()).map((task) => task.title);
-    expect(
+    'planning fields survive lost responses, empty-cache restore and deadline-only conflicts',
+    () async {
+      final planned = task.copyWith(
+        deadline: DateTime(2026, 9, 28, 17),
+        deadlineHasTime: true,
+        durationMinutes: 75,
+        reminderAnchor: 'deadline',
+      );
+      await repository.addTask(planned);
+      api.loseResponse = true;
+      await repository.sync();
+      api.loseResponse = false;
+      await repository.sync();
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      expect(api.remote, hasLength(1));
+      final sql = await database.database;
+      await sql.delete(
+        'tasks',
+        where: 'owner_key = ?',
+        whereArgs: [repository.ownerKey],
+      );
+      await repository.sync();
+      final restored = (await repository.getAllTasks()).single;
+      expect(restored.toApi(), planned.toApi());
+      api.remote.single['version'] = 2;
+      api.remote.single['deadline_at'] = DateTime(
+        2026,
+        9,
+        29,
+        17,
+      ).toUtc().toIso8601String();
+      await repository.updateTask(restored.copyWith(durationMinutes: 90));
+      await repository.sync();
+      final tasks = await repository.getAllTasks();
+      expect(tasks, hasLength(2));
+      final offline = tasks.singleWhere(
+        (task) => task.title.endsWith('(offline copy)'),
+      );
+      expect(offline.deadline, planned.deadline);
+      expect(offline.durationMinutes, 90);
+      expect(
+        tasks.singleWhere((task) => task.title == planned.title).deadline,
+        DateTime(2026, 9, 29, 17),
+      );
+    },
+  );
+
+  test(
+    'conflicting edits preserve an offline copy and remote deletion propagates',
+    () async {
+      final id = await repository.addTask(task);
+      await repository.sync();
+      api.remote.single['version'] = 2;
+      api.remote.single['title'] = 'Changed on another phone';
+      await repository.updateTask(task.copyWith(id: id, title: 'Offline edit'));
+      await repository.sync();
+      final titles = (await repository.getAllTasks()).map((task) => task.title);
+      expect(
         titles,
-        containsAll(
-            ['Changed on another phone', 'Offline edit (offline copy)']));
-    await repository.sync();
-    api.remote.first['version'] = 3;
-    api.remote.first['is_deleted'] = true;
-    await repository.sync();
-    expect((await repository.getAllTasks()).single.title,
-        'Offline edit (offline copy)');
-  });
+        containsAll([
+          'Changed on another phone',
+          'Offline edit (offline copy)',
+        ]),
+      );
+      await repository.sync();
+      api.remote.first['version'] = 3;
+      api.remote.first['is_deleted'] = true;
+      await repository.sync();
+      expect(
+        (await repository.getAllTasks()).single.title,
+        'Offline edit (offline copy)',
+      );
+    },
+  );
+
+  test(
+    'notes retain type after lost upload, fresh cache and conflict copy',
+    () async {
+      final note = Task(
+        kind: 'note',
+        title: 'Reference',
+        priority: 1,
+        notes: 'Opening on Friday at 17:00',
+      );
+      await repository.addTask(note);
+      api.loseResponse = true;
+      await repository.sync();
+      api.loseResponse = false;
+      await repository.sync();
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      expect(api.remote, hasLength(1));
+      await (await database.database).delete(
+        'tasks',
+        where: 'owner_key = ?',
+        whereArgs: [repository.ownerKey],
+      );
+      await repository.sync();
+      final restored = (await repository.getAllTasks()).single;
+      expect(restored.toApi(), note.toApi());
+      api.remote.single['version'] = 2;
+      api.remote.single['notes'] = 'New remote information';
+      await repository.updateTask(restored.copyWith(notes: 'Unsent reference'));
+      await repository.sync();
+      final both = await repository.getAllTasks();
+      expect(both, hasLength(2));
+      expect(both.every((item) => item.isNote), isTrue);
+      expect(
+        both.map((item) => item.notes),
+        containsAll(['Unsent reference', 'New remote information']),
+      );
+    },
+  );
+
+  test(
+    'an older server cannot silently turn a pending note into a task',
+    () async {
+      await repository.addTask(
+        Task(kind: 'note', title: 'Reference', priority: 1),
+      );
+      api.supportsNotes = false;
+      await repository.sync();
+      expect(api.remote, isEmpty);
+      expect(
+        (await database.pending(repository.ownerKey)).single['kind'],
+        'note',
+      );
+      expect(repository.syncError, contains('Update this server'));
+      api.supportsNotes = true;
+      await repository.sync();
+      expect(api.remote.single['kind'], 'note');
+      expect(await database.pending(repository.ownerKey), isEmpty);
+    },
+  );
+
+  test(
+    'UX-208: a soft-deleted task restored before sync goes out as not deleted, at the same id, with its date, reminder and steps',
+    () async {
+      final full = task.copyWith(
+        reminderMinutes: 30,
+        checklist: [ChecklistItem(id: 'a', title: 'Llevar la tarjeta')],
+      );
+      final id = await repository.addTask(full);
+      await repository.sync();
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      final before = (await repository.getAllTasks()).single;
+
+      await repository.deleteTask(id);
+      expect(await repository.getAllTasks(), isEmpty);
+      expect(
+        (await database.pending(repository.ownerKey)).single['is_deleted'],
+        1,
+      );
+
+      await repository.restoreTask(before);
+      final pending = (await database.pending(repository.ownerKey)).single;
+      expect(pending['is_deleted'], 0);
+      expect(pending['id'], id);
+      final back = (await repository.getAllTasks()).single;
+      expect(back.id, id);
+      expect(back.dueDate, full.dueDate);
+      expect(back.reminderMinutes, 30);
+      expect(back.checklist.single.title, 'Llevar la tarjeta');
+
+      await repository.sync();
+      expect(api.lastUpload!['is_deleted'], isFalse);
+      expect(await database.pending(repository.ownerKey), isEmpty);
+      expect(api.remote.single['is_deleted'], isFalse);
+      expect((await repository.getAllTasks()).single.title, task.title);
+    },
+  );
 }
 
 class _Api extends ApiClient {
   _Api() : super(url: 'http://localhost:8088');
   bool offline = false;
   bool loseResponse = false;
+  bool supportsNotes = true;
   final List<Map<String, dynamic>> remote = [];
   Map<String, dynamic>? lastUpload;
 
   @override
-  Future<dynamic> request(String method, String path,
-      {Map<String, dynamic>? data,
-      String? audioPath,
-      bool authenticated = true,
-      int? accountId}) async {
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
     if (offline) throw ApiException(0, 'Offline');
+    if (path == 'health/') {
+      return {
+        'status': 'ok',
+        'features': {'notes': supportsNotes},
+      };
+    }
+    if (path == 'lists/access/') return {'lists': []};
+    if (path.startsWith('attachments/')) return {'results': [], 'next': null};
+    if (method == 'GET' && path.startsWith('lists/')) {
+      return {'results': [], 'next': null};
+    }
     if (method == 'GET') return {'results': remote, 'next': null};
     lastUpload = data;
     final id = path.split('/')[1];

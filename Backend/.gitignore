@@ -8,4 +8,8 @@ __pycache__/
 .coverage
 htmlcov/
 artifacts/
+private_media/
+.env.local
+.env.production
+.credentials/
 tests/fixtures/*.wav

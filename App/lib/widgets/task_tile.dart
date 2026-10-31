@@ -1,148 +1,398 @@
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/widgets/task_assignment_picker.dart';
+import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:agenda/models/task.dart';
-import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/screens/task_detail_screen.dart';
+import 'package:agenda/widgets/task_interactions.dart';
 import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/widgets/task_list_picker.dart';
 
 class TaskTile extends ConsumerWidget {
-  const TaskTile({super.key, required this.task, this.showDate = false});
+  const TaskTile({
+    super.key,
+    required this.task,
+    this.showDate = false,
+    this.color,
+    this.project,
+    this.showUndated = true,
+    this.markOverdue = false,
+  });
   final Task task;
+
+  /// The date line leads with the day. Without it a row shows its time
+  /// alone, and a row with a date but no time shows no line.
   final bool showDate;
 
-  Future<void> _toggle(BuildContext context, WidgetRef ref) async {
-    final container = ProviderScope.containerOf(context, listen: false);
-    final notifier = ref.read(taskProvider.notifier);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await notifier.setCompleted(task, !task.isCompleted);
-      if (!messenger.mounted) return;
-      HapticFeedback.selectionClick();
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(
-        content: Text(task.isCompleted ? 'Task reopened' : 'Task completed'),
-        action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              try {
-                // The completed row may already be gone. Use the live account's
-                // notifier and latest task so undo never reverts other edits.
-                if (!messenger.mounted ||
-                    !identical(
-                        container.read(taskProvider.notifier), notifier)) {
-                  return;
-                }
-                await notifier.setCompleted(task, task.isCompleted);
-              } catch (_) {
-                if (messenger.mounted) {
-                  messenger.showSnackBar(const SnackBar(
-                      content: Text('Could not undo. Please try again.')));
-                }
-              }
-            }),
-      ));
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not update this task. Please try again.')));
-      }
+  /// Replaces the surface colour, for example to highlight a new task.
+  final Color? color;
+
+  /// The page's project: a row leaves out a project label naming it.
+  final String? project;
+
+  /// Whether a row with no date and no deadline says so. On the Sin fecha page it doesn't; a row with a deadline shows its «Vence …» line instead.
+  final bool showUndated;
+
+  /// In task lists, an open task whose day has passed says «Atrasada».
+  final bool markOverdue;
+
+  /// The row's date line, or null when it has nothing to say.
+  String? _dateLine(BuildContext context, WidgetRef ref) {
+    final date = task.displayDate;
+    if (date == null) {
+      return showUndated && task.deadline == null ? context.l10n.noDate : null;
     }
+    if (!showDate) return task.hasTime ? context.clockTime(date) : null;
+    final line = taskDayLine(context, task);
+    final today = DateUtils.dateOnly(ref.watch(calendarClockProvider)());
+    return markOverdue &&
+            !task.isCompleted &&
+            !task.isNote &&
+            DateUtils.dateOnly(date).isBefore(today)
+        ? context.l10n.overdueDate(line)
+        : line;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
     final priority = AppTheme.priorityColor(context, task.priority);
-    return Material(
-      color: colors.surface,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: colors.outlineVariant)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () =>
-            Navigator.pushNamed(context, '/taskDetails', arguments: task.id),
-        child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Semantics(
-                  label: task.isCompleted
-                      ? 'Reopen ${task.title}'
-                      : 'Complete ${task.title}',
-                  child: Checkbox(
-                      value: task.isCompleted,
-                      shape: const CircleBorder(),
-                      onChanged: (_) => _toggle(context, ref))),
-              const SizedBox(width: 4),
-              Expanded(
-                  child: Column(
+    final lists = ref.watch(taskListsProvider);
+    final list = (lists.valueOrNull ?? [])
+        .where((list) => list.id == task.listId)
+        .firstOrNull;
+    final editable = ref.watch(listCanEditProvider(task.listId));
+    // Known not to be changeable: while the projects load, a task in one
+    // keeps its circle, so the row doesn't shift when they arrive.
+    final viewOnly = !editable && lists.hasValue;
+    // On a lit row the grey text darkens, so it stays readable on the tint.
+    final muted = (color ?? colors.surface) == colors.surface
+        ? colors.onSurfaceVariant
+        : colors.onSurface;
+    final small = TextStyle(fontSize: 12, color: muted);
+    Widget iconText(
+      IconData icon,
+      String text, {
+      Color? iconColor,
+      Color? textColor,
+      String? semanticsLabel,
+      bool wraps = false,
+    }) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: iconColor ?? textColor ?? muted),
+        const SizedBox(width: 4),
+        Flexible(
+          child: spokenAs(
+            semanticsLabel,
+            Text(
+              text,
+              overflow: wraps ? null : TextOverflow.ellipsis,
+              style: small.copyWith(color: textColor),
+            ),
+          ),
+        ),
+      ],
+    );
+    final when = _dateLine(context, ref);
+    final deadlinePassed =
+        task.deadline != null && task.deadlinePassed(DateTime.now());
+    final deadline = task.deadline == null
+        ? null
+        : deadlinePassed
+        ? '${taskDeadlineLabel(context, task)} · ${context.l10n.deadlineOverdue}'
+        : taskDeadlineLabel(context, task);
+    // Who a task in a shared project is for, and what TalkBack reads for it.
+    final assignee = list?.shared == true
+        ? responsibilityLabel(
+            context,
+            task,
+            ref.watch(authProvider).account?.id,
+          )
+        : null;
+    final unassigned = task.assignment == 'unassigned';
+    final assigneeSpoken = assignee == null || unassigned
+        ? assignee
+        : context.l10n.assigneeLabel(assignee);
+    final repeat = task.isRecurring ? context.repeatLabel(task) : null;
+    final duration = task.durationMinutes == null
+        ? null
+        : context.l10n.durationMinutes(task.durationMinutes!);
+    final steps = task.checklist.isEmpty
+        ? null
+        : context.l10n.checklistCount(
+            task.checklistDone,
+            task.checklist.length,
+          );
+    final importance = task.priority > 1
+        ? context.l10n.priorityValue(context.priorityName(task.priority))
+        : null;
+    final notes = (task.notes?.trim().isNotEmpty ?? false) ? task.notes! : null;
+    // Each detail under the title, and what TalkBack reads for it.
+    final details = <(Widget, String)>[
+      if (when != null)
+        (iconText(Icons.schedule_rounded, when, wraps: true), when),
+      if (repeat != null) (iconText(Icons.repeat_rounded, repeat), repeat),
+      if (duration != null) (Text(duration, style: small), duration),
+      if (deadline != null)
+        (
+          Text(
+            deadline,
+            style: small.copyWith(color: deadlinePassed ? colors.error : null),
+          ),
+          deadline,
+        ),
+      if (list != null && list.id != project)
+        (
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: iconText(
+              Icons.folder_outlined,
+              list.name,
+              iconColor: taskListColor(list.color),
+            ),
+          ),
+          list.name,
+        ),
+      if (assignee != null)
+        (
+          iconText(
+            task.assignment == 'group'
+                ? Icons.groups_outlined
+                : Icons.person_outline,
+            assignee,
+            textColor: unassigned ? colors.error : null,
+            semanticsLabel: assigneeSpoken,
+            wraps: true,
+          ),
+          assigneeSpoken!,
+        ),
+      if (steps != null) (Text(steps, style: small), steps),
+      if (importance != null)
+        (
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: priority.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              importance,
+              style: TextStyle(
+                color: priority,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          importance,
+        ),
+    ];
+    final titleOnly = details.isEmpty && notes == null;
+    void open() => Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: '/taskDetails'),
+        builder: (_) => TaskDetailScreen(
+          taskId: task.id!,
+          occurrenceDate: task.occurrenceDate,
+          occurrenceKey: task.occurrenceId,
+        ),
+      ),
+    );
+    void reschedule() => TaskInteractions.reschedule(context, ref, task);
+    return Semantics(
+      container: true,
+      // A row that can't be changed is one button that opens the task. An
+      // editable one names what its long press does, and its circle is apart.
+      button: viewOnly,
+      label: !viewOnly
+          ? null
+          : [
+              task.title,
+              for (final (_, text) in details) text,
+              ?notes,
+            ].join(', '),
+      excludeSemantics: viewOnly,
+      onTap: open,
+      customSemanticsActions: editable
+          ? {CustomSemanticsAction(label: context.l10n.reschedule): reschedule}
+          : null,
+      child: Dismissible(
+        direction: editable
+            ? DismissDirection.horizontal
+            : DismissDirection.none,
+        key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            await TaskInteractions.toggle(context, ref, task);
+          } else {
+            await TaskInteractions.reschedule(context, ref, task);
+          }
+          return false;
+        },
+        background: _gestureBackground(
+          context,
+          Icons.check_rounded,
+          task.isCompleted ? context.l10n.reopen : context.l10n.complete,
+          Alignment.centerLeft,
+        ),
+        secondaryBackground: _gestureBackground(
+          context,
+          Icons.event_outlined,
+          context.l10n.reschedule,
+          Alignment.centerRight,
+        ),
+        child: Material(
+          color: color ?? colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: colors.outlineVariant),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            // The Semantics above carries the tap and names the long press.
+            excludeFromSemantics: true,
+            onTap: open,
+            onLongPress: editable ? reschedule : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
+              child: Row(
+                // A title alone sits level with its circle.
+                crossAxisAlignment: titleOnly
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
+                children: [
+                  // A task that can't be changed has no circle to tick; an
+                  // empty slot as wide as the circle and its gap keeps its
+                  // title in line with the others.
+                  if (viewOnly)
+                    const SizedBox(width: kMinInteractiveDimension + 4)
+                  else ...[
+                    Semantics(
+                      label: task.isCompleted
+                          ? context.l10n.reopenNamedTask(task.title)
+                          : context.l10n.completeNamedTask(task.title),
+                      child: Checkbox(
+                        value: task.isCompleted,
+                        shape: const CircleBorder(),
+                        onChanged: editable
+                            ? (_) => TaskInteractions.toggle(context, ref, task)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    const SizedBox(height: 3),
-                    Text(task.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium!
-                            .copyWith(
+                        if (!titleOnly) const SizedBox(height: 3),
+                        Text(
+                          task.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium!
+                              .copyWith(
                                 color: task.isCompleted
-                                    ? colors.onSurfaceVariant
+                                    ? muted
                                     : colors.onSurface,
                                 decoration: task.isCompleted
                                     ? TextDecoration.lineThrough
-                                    : null)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                        spacing: 12,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.schedule_rounded,
-                                size: 14, color: colors.onSurfaceVariant),
-                            const SizedBox(width: 5),
-                            Flexible(
-                                child: Text(
-                                    taskScheduleLabel(task, showDate: showDate),
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: colors.onSurfaceVariant)))
-                          ]),
-                          if (task.isRecurring)
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.repeat_rounded,
-                                  size: 14, color: colors.onSurfaceVariant),
-                              const SizedBox(width: 4),
-                              Text(Task.repeats[task.recurrence]!,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: colors.onSurfaceVariant)),
-                            ]),
-                          Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                  color: priority.withValues(alpha: .10),
-                                  borderRadius: BorderRadius.circular(6)),
-                              child: Text(
-                                  '${AppTheme.priorityLabel(task.priority)} priority',
-                                  style: TextStyle(
-                                      color: priority,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700))),
-                        ]),
-                    if (task.notes?.trim().isNotEmpty ?? false) ...[
-                      const SizedBox(height: 8),
-                      Text(task.notes!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: colors.onSurfaceVariant, fontSize: 12))
-                    ],
-                  ])),
-            ])),
+                                    : null,
+                              ),
+                        ),
+                        if (details.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              for (final (detail, _) in details) detail,
+                            ],
+                          ),
+                        ],
+                        if (notes != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            notes,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: small,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _gestureBackground(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Alignment alignment,
+  ) => Container(
+    alignment: alignment,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [Icon(icon), const SizedBox(height: 4), Text(label)],
+    ),
+  );
+}
+
+/// A just-saved task: its tile lights up, then fades back when [lit] turns
+/// off. With animations off it changes at once.
+class LandedTaskTile extends StatelessWidget {
+  const LandedTaskTile({
+    super.key,
+    required this.task,
+    required this.lit,
+    this.showDate = false,
+    this.project,
+    this.showUndated = true,
+    this.markOverdue = false,
+  });
+  final Task task;
+  final bool lit;
+  final bool showDate;
+  final String? project;
+  final bool showUndated;
+  final bool markOverdue;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(end: lit ? colors.primaryContainer : colors.surface),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 600),
+      builder: (context, color, _) => TaskTile(
+        task: task,
+        showDate: showDate,
+        color: color,
+        project: project,
+        showUndated: showUndated,
+        markOverdue: markOverdue,
       ),
     );
   }

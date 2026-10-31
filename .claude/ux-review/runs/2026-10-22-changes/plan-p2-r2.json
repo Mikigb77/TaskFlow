@@ -1,0 +1,37 @@
+{
+ "runId": "2026-10-22-changes",
+ "mode": "changes",
+ "round": "p2-r2",
+ "packages": [
+  {
+   "id": "P258",
+   "title": "The capture card: a date's open question stays next to its date line, above «Para recordártelo, ponle un día.»",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-2023"
+   ],
+   "files": [
+    "App/lib/widgets/capture_review_editor.dart"
+   ],
+   "brief": [
+    "UX-2023 (S1), regression R1A-1 of plan 2's round 1, from P254 (UX-1812, verified in code by review A, verify-p2-r1-A.md:13-18). What the last attempt did: P254 added `if (needsDay) _needsDayLine()` directly under the date line, in both places: the opened card (App/lib/widgets/capture_review_editor.dart:724-727: `_dateLine(main: true)`, then the needs-day line, then `if (fromWords && task.dueDate != null) _fromWords()`, then `_questions('schedule')`) and a collapsed row (:899-903: `_dateLine(main: false)`, then the needs-day line, then the comment «The date's open time question stays next to it.» and `_questions('schedule')`). Why it's a regression: on a draft with no day, a said reminder and an open `schedule` clarification («¿Qué día?» with its answers), the card reads date line, then «Para recordártelo, ponle un día.», then the question box. The question is cut off from the date line it's about (proximity), and the user is asked for the day twice in a row, the second time below the first. The P254 brief had put the collapsed row's line «where `_reminderLine()` goes», which is after `_questions('schedule')`; the implementer read that as «the same area» to match the opened card.",
+    "Fix, in App/lib/widgets/capture_review_editor.dart only. Move the line, don't hide it (a `schedule` question can be about the time as well as the day, so hiding the line while one is open would drop the reminder's reason for questions that don't ask for a day). (a) Opened card: the order becomes `_dateLine(main: true)`, `if (fromWords && task.dueDate != null) _fromWords()`, `_questions('schedule')`, then `if (needsDay) _needsDayLine()`. Update the comment above it to say the date's open question stays under the date line and the needs-day line comes after it. (b) Collapsed row: `_dateLine(main: false)`, the existing comment and `_questions('schedule')`, then `if (needsDay) _needsDayLine()`, then the existing `_reminderLine()` condition, unchanged. With no open `schedule` question (every state P254 tested), nothing moves: the line is still directly under the date line.",
+    "No copy change and no ARB change. Don't touch: `_needsDayLine()` itself (:442), the `needsDay` flag (:569) and its rule, `showReminder`, `_reminderOpen`, `reminderInOptions`, `_questions()`, ReminderControl, the date sheet, the offer, or any other field's questions. A plain dictation (no reminder said) has no line and stays as it is (App/test/voice_command_cards_test.dart:1019 keeps passing). P254's tests in the `P254 · D3` group (App/test/reminder_plan_sheet_test.dart:4366 onwards) check that the line's top is at or below the date line's bottom; they have no open question, so they should keep passing unchanged. If one breaks, say which and why in your notes rather than loosening it.",
+    "No new preview is required: the state is proven by a widget test (acceptance). Re-render `reminders/capture-card.needs-day` only to confirm it is unchanged (it has no open question)."
+   ],
+   "acceptance": [
+    "Capture result card, Spanish, 1×, 360×800, clock Thu 22 Oct 2026 10:00, reminders on and allowed, one opened draft from `TaskDraft.fromJson` with no date, `reminder_plan` custom (366→0 daily, said «cada día»), `reminder_needs_day: true` and `clarifications: [{\"field\": \"schedule\", \"question\": \"¿Qué día?\"}]`: the question box «¿Qué día?» sits between the date line (`draft-schedule-<id>`) and «Para recordártelo, ponle un día.» (`draft-reminder-needs-day-<id>`): the question's top is at or below the date line's bottom, and the needs-day line's top is at or below the question box's bottom.",
+    "Same draft as one of two drafts on a several-task card, both collapsed: in the second row, the order is again date line, «¿Qué día?», then «Para recordártelo, ponle un día.».",
+    "Same draft with the `schedule` question resolved (answered or confirmed on the card): the question box goes and the needs-day line is directly under the date line, as in P254.",
+    "With no open question (P254's `P254 · D3` group as it stands), the line is still directly under the date line on the opened card and on a collapsed row, and every test in that group passes unchanged.",
+    "At 2× on 360×800, in Spanish and in Catalan, with the open «¿Qué día?» question: the date line, the question box and the needs-day line are all whole (nothing clipped, no overflow exception), in that order."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

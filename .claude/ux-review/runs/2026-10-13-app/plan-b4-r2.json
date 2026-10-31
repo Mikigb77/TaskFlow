@@ -1,0 +1,136 @@
+{
+  "runId": "2026-10-13-app",
+  "mode": "app",
+  "round": "b4-r2",
+  "packages": [
+    {
+      "id": "P67",
+      "title": "Capture sheet: messages name what's on screen; slow is spoken",
+      "area": "A",
+      "size": "M",
+      "severity": 3,
+      "findings": ["UX-103", "UX-467", "UX-468", "UX-469", "UX-470"],
+      "aliases": {"UX-467": "R1A-3", "UX-468": "R1A-4", "UX-469": "R1A-5", "UX-470": "R1A-6"},
+      "files": [
+        "App/lib/screens/voice_task_screen.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb"
+      ],
+      "brief": [
+        "Context: this is round 2 of batch 4. P40 (round 1) did most of UX-103: no raw fallback (capture_messages.dart:35-36 → captureFailed), 400/404/other → failed and 422 → noSpeech (capture_problem.dart:64-83), captureKept dropped, the error under the status line (voice_task_screen.dart ~1557-1565), and MessageBanner a live region (app_components.dart:137-139). Keep all of that. Line numbers below are from the current working tree; search for the code they point at.",
+        "UX-103, what failed last time: two messages tell the user to tap `Seguir` when `Seguir` isn't on screen. (a) `captureNoSpeech` comes from a 422 on saved audio. There `canContinue` is false because it needs `!recorded` (voice_task_screen.dart ~1433-1439), so the only button is `Reintentar` (~1461-1465), which resends the same silent audio and gets the same 422. (b) `captureSpeechStopped` with no words yet shows `Empezar a hablar` (`waiting`, ~1430), not `Seguir`. P40 used the copy its brief gave; the brief was wrong, not the implementation.",
+        "UX-103 fix, copy. Replace the values (keep the keys): `captureNoSpeech` EN `I didn’t catch that. Try again, or type it.` / ES `No te he entendido. Vuelve a intentarlo o escríbelo.` / CA `No t’he entès. Torna-ho a provar o escriu-ho.` `captureSpeechStopped` EN `Listening stopped. You can talk again, or type.` / ES `Se ha dejado de escuchar. Puedes volver a hablar o escribir.` / CA `S’ha deixat d’escoltar. Pots tornar a parlar o escriure.` Neither names a button, so they fit both the `Seguir` and the `Empezar a hablar` states. Write the apostrophes as the catalogs already do (’).",
+        "UX-103 fix, behaviour after a 422 on audio. When understanding fails with the noSpeech problem and the capture has audio (`_session?.audioPath != null`) and no words: drop that capture, as erasing every word already does (UX-102, ~589-596: discard the stored record and remove its audio file with the store's existing methods), set `_session` to null, clear `_failed`, and keep the noSpeech message on screen. The sheet then falls into the existing `waiting` state: `Empezar a hablar` (plus the keyboard), not `Reintentar`. The sheet stays open. This also applies to such a capture reopened from the pending list: the server found no speech in it, so there is nothing to keep.",
+        "UX-103, a related slip the P40 implementer flagged (verified in code, capture_problem.dart:80): every 422 maps to noSpeech, including the server's 422s for typed text (note length, 'update the app'). Where the sheet shows the problem, if it is noSpeech and the attempt sent no audio, show `captureFailed` instead. Don't change capture_problem.dart's mapping itself.",
+        "UX-467 (R1A-3, S2): after 8 s the `captureSlow` hint and `Guardar tal cual` appear silently for TalkBack (`_slowTimer`, ~1021-1024; hint at ~1417-1419). In the timer's callback, when `_slow` turns true, also call `_announce(context.l10n.captureSlow)` (`_announce`, ~620), as listening (~684) and pausing (~925) already do. No new strings.",
+        "UX-468 (R1A-4, S2): the typing field's hint is always `examplePlan` (~1492): `Médico el viernes a las 17:00. Llevar mis resultados. También comprar café.` When typed words are understood on the phone (local_capture.dart:111-116), that becomes one task `Médico` with the rest in its notes, so the example teaches something that doesn't happen. Add a key `exampleTask`: EN `Doctor Friday at 5 p.m.` / ES `Médico el viernes a las 17:00` / CA `Metge divendres a les 17 h`, with a description in app_en.arb. Use it when `!_voice` — the same condition that sends typed words to the phone (`local: !_voice`, ~1044) — so the hint follows that flag when the free tier changes it. Keep `examplePlan` when `_voice` is true. Notes keep `noteHint`. Before finishing, check that QuickScheduleParser reads each language's hint as Friday at 17:00; if one doesn't, say so in your notes and use the closest wording it does read (for example CA `Metge divendres a les 17:00`). Don't change the parser.",
+        "UX-469 (R1A-5, S1): after a failure, `Reintentar` (tonal) and `Guardar tal cual` (filled) share a row below 440 dp (built at ~1451-1460, laid out by `_controls` ~1676-1699). At 360 dp with 1.0× text each gets about 104 dp for its label; ES `Guardar tal cual` (117 dp), CA `Torna-ho a provar` (129 dp) and `Desa-ho tal com està` (151 dp) wrap. Fix: lay out this failed pair always stacked, full width, in the same order the existing stacked layout already uses at 1.3× and above. No width measuring. While slow there is only one button, which is already full width. Don't change how `_controls` lays out the listening, paused and waiting states (P33, P35, P54).",
+        "UX-470 (R1A-6, S1): `captureSpeakingIsPro` in Spanish and Catalan uses a pronoun for a task the sentence never names. Replace: ES `Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.` / CA `Dictar una tasca forma part de TaskFlow Pro. La pots escriure aquí.` English stays `Speaking a task is part of TaskFlow Pro. You can type it here.` How this fits the free tier (DECISIONS.md, 2026-10-13 late): when the free-tier front end is built, this line becomes the 'free dictations used up' line; that work is outside this package.",
+        "Don't touch: the result layout and the review editor (P36, P68), landing (P37, P69), the listening states, `CaptureProcessor`, capture_problem.dart's status mapping, Backend/. No other new keys."
+      ],
+      "acceptance": [
+        "Widget test, Spanish, 1.0× text, 360×740: a recorded capture (audio, no words) whose processor throws ApiException 422 shows `No te he entendido. Vuelve a intentarlo o escríbelo.`, no text containing `Toca Seguir`, the button `Empezar a hablar` and no `Reintentar`; the store has no pending capture for that audio; tapping `Empezar a hablar` starts a new recording.",
+        "Widget test, Spanish: native speech stops with no words (CaptureProblem.speechStopped) → `Se ha dejado de escuchar. Puedes volver a hablar o escribir.` and `Empezar a hablar`; no text on screen contains `Toca Seguir`.",
+        "Widget test, Spanish: typed text whose processor throws ApiException 422 shows `No ha funcionado. Tus palabras siguen aquí; inténtalo de nuevo.`, not the noSpeech message, and the words stay in the field.",
+        "Widget test with a processor that never answers: at 8 s a SemanticsService announcement `Está tardando más de lo normal.` is sent (Spanish), once.",
+        "Widget test, hasPro false, Spanish: the empty typing field's hint is `Médico el viernes a las 17:00`; in English `Doctor Friday at 5 p.m.`. With Pro (voice), the hint is the existing `examplePlan`.",
+        "Unit test: localDrafts on `Médico el viernes a las 17:00` (es), `Doctor Friday at 5 p.m.` (en) and `Metge divendres a les 17 h` (ca) each returns one task dated the coming Friday at 17:00.",
+        "Widget test, Catalan, 1.0× text, 360×740: after a failure with words, `Torna-ho a provar` and `Desa-ho tal com està` are one above the other, each as wide as the controls area.",
+        "grep: app_es.arb `captureSpeakingIsPro` is `Dictar una tarea es parte de TaskFlow Pro. Puedes escribirla aquí.`; app_ca.arb is `Dictar una tasca forma part de TaskFlow Pro. La pots escriure aquí.`"
+      ],
+      "deviceChecks": [
+        "With TalkBack on and a slow or stopped backend: after about 8 s TalkBack says `Está tardando más de lo normal.`",
+        "Record silence (or tap the widget and say nothing) on the audio recorder: the sheet says `No te he entendido. Vuelve a intentarlo o escríbelo.` and offers `Empezar a hablar`; Pendientes shows nothing new.",
+        "On a 360 dp phone in Catalan with normal text, after a failure the two buttons each read on one line."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P68",
+      "title": "The phone's time question gets its line",
+      "area": "A",
+      "size": "S",
+      "severity": 2,
+      "findings": ["UX-465"],
+      "aliases": {"UX-465": "R1A-1"},
+      "files": [
+        "App/lib/widgets/capture_review_editor.dart",
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb"
+      ],
+      "brief": [
+        "UX-465 (R1A-1, S2, regression from P38/P40): when the result is built on the phone (typing without Pro, or `Guardar tal cual`) and the words have an ambiguous hour (`a las 5`), local_capture.dart:101-108 creates the AM/PM clarification with `question: ''`, and capture_review_editor.dart ~151-157 shows the question text only when it isn't empty. So the chips `05:00`, `17:00`, `Sin hora` sit with no prompt, and the save button is disabled as `Revisa los datos de arriba`. The assistant's AM/PM question on the same card has its text (UX-110).",
+        "Fix: add a key `captureWhatTime`: EN `What time?` / ES `¿A qué hora?` / CA `A quina hora?`, with a description in app_en.arb (the time question for a result made on the phone; neutral between morning and evening, and avoids Spanish `mañana`, which also means tomorrow). In capture_review_editor.dart, when `question.question` is empty, show `context.l10n.captureWhatTime` in the same Text and style the assistant's question uses. Remove the comment that says the phone's question asks with its chips alone. local_capture.dart stays free of BuildContext; leave its `question: ''`.",
+        "Don't touch: the chips, `Según lo que has escrito · Dejar como está`, the date line, the save button's labels."
+      ],
+      "acceptance": [
+        "Widget test (extends the UX-204 `a las 5` test), hasPro false, Spanish, 1.0× text: typing `llamar al médico el viernes a las 5` shows `¿A qué hora?` above the `05:00` and `17:00` chips; in English `What time?`.",
+        "Widget test: an assistant AM/PM clarification with its own question still shows that question, not `¿A qué hora?`."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    },
+    {
+      "id": "P69",
+      "title": "From the timeline, the saved task lands where it can be seen",
+      "area": "A",
+      "size": "M",
+      "severity": 2,
+      "findings": ["UX-466"],
+      "aliases": {"UX-466": "R1A-2"},
+      "files": [
+        "App/lib/screens/day_timeline_screen.dart"
+      ],
+      "brief": [
+        "UX-466 (R1A-2, S2, regression from P38's one `Añadir tarea`): day_timeline_screen.dart ~248-250 uses `TaskActions(day: _day)` with no `page`. After a save, landing (voice_task_screen.dart ~1884-1911) pops the sheet and sets `calendarFocusProvider` for the Calendar hidden under the timeline. The timeline highlights nothing, and a task with no date (D9: today's timeline adds no date) or dated another day isn't on the timeline at all. The user reads `Guardada en Sin fecha` and can't find it.",
+        "Fix, all in day_timeline_screen.dart, reusing the page mechanism Tareas uses (home_screen.dart ~252: `ref.listen<CalendarFocus?>(calendarFocusProvider, …)` with `identical(focus.page, this)`): (1) pass `page: this` to the timeline's TaskActions, so landing pops only the sheet and Calendar ignores the focus. (2) Listen to calendarFocusProvider in the timeline's build; for a focus whose page is this timeline: (a) if `focus.day` is the timeline's day (same date as `_day`), stay, scroll the first saved task's row into view with `Scrollable.ensureVisible` on a GlobalKey (as `Ir al primer elemento con hora` does, ~167-170, alignment .15), and highlight the saved rows for 1500 ms; (b) otherwise (no date, or another day), `Navigator.of(context).popUntil((route) => route.isFirst)` and then set `calendarFocusProvider` to `CalendarFocus(focus.day, focus.taskIds, showCalendar: true)` with no page, the same order the pending list uses (voice_task_screen.dart ~1886-1910). Calendar then selects the day (or the `Sin fecha` row) and highlights the task, as it already does.",
+        "Highlight: an untimed task shows in the timeline's `timelineUnblocked` list (~139-153) as a TaskTile; show the saved one as `LandedTaskTile(task:, showDate: true, lit:)` (as Calendar does at calendar_screen.dart ~634-640). A timed task is a `_TimelineBlock`; give it a `lit` flag drawn with the same highlight LandedTaskTile uses. Reuse the 1500 ms timer pattern from calendar_screen.dart ~161-164.",
+        "No new strings. The `Añadida…`/`Guardada en…` message and its Deshacer stay as they are. Don't touch voice_task_screen.dart, Calendar, Tareas or TaskActions."
+      ],
+      "acceptance": [
+        "Widget test, hasPro false, Spanish: from today's timeline, typing `comprar pan` and saving returns to Calendar, which shows the `Sin fecha` row highlighted; the timeline is no longer on the stack.",
+        "Widget test: on a later day's timeline (Thursday), typing `comprar pan` and saving keeps the timeline open; the new task's row is on screen in the unblocked list and highlighted.",
+        "Widget test: on Thursday's timeline, typing `comprar pan el viernes` returns to Calendar with Friday selected and the new row highlighted."
+      ],
+      "deviceChecks": [
+        "On the phone, open a day's timeline, add a task for another day: Calendar appears with that day selected and the task highlighted."
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "P70",
+      "title": "Task detail: every row answers, taps are spoken, Save offers Undo",
+      "area": "B",
+      "size": "S",
+      "severity": 2,
+      "findings": ["UX-471", "UX-472", "UX-473"],
+      "aliases": {"UX-471": "R1B-1", "UX-472": "R1B-2", "UX-473": "R1B-3"},
+      "files": [
+        "App/lib/screens/task_detail_screen.dart",
+        "App/lib/widgets/task_editor.dart"
+      ],
+      "brief": [
+        "Context: P10 made the date and time rows (task_detail_screen.dart ~245, ~255: `onTap: canEdit ? reschedule : null`) and the title (~179-186, InkWell → `edit`, /editTask) tappable. P42 made Back in the edit form save with Undo. Three loose ends came out of that. Keep task_detail_screen.dart's CRLF line endings.",
+        "UX-471 (R1B-1, S2): the Duración (~261-269), Fecha límite (~270-285), Repetir (~286-293) and Prioridad (~294-305, shown only above Low) rows sit in the same card and look the same as the date and time rows, but don't respond. Give each `onTap: canEdit ? edit : null` (the same `edit` the title uses, which opens /editTask where they're set). Nothing changes for a view-only task.",
+        "UX-472 (R1B-2, S1): the new tap targets are bare InkWells, so TalkBack says only 'double-tap to activate'. In `_detail` (~504: `onTap == null ? row : InkWell(onTap: onTap, child: row)`) add a `String? tapHint` parameter and wrap the InkWell in `Semantics(button: true, onTapHint: tapHint)`. Pass `context.l10n.reschedule` for the date and time rows (ES `Cambiar fecha`, CA `Reprograma`, EN `Reschedule`; report B called it 'Reprogramar', the catalog's Spanish is `Cambiar fecha`), and `context.l10n.editTask` for the four rows above. Wrap the title's InkWell the same way with `editNote` for a note and `editTask` for a task. No new copy.",
+        "UX-473 (R1B-3, S1): task_editor.dart ~278 `_save({bool undo = false})`: the Save button calls `_save()` and shows `Cambios guardados` without Undo, while Back (~275) calls `_save(undo: true)` and offers `Deshacer`. Remove the `undo` parameter so every save with changes shows `Cambios guardados · Deshacer` (~315-316: always pass `actionLabel: strings.undo` and the existing onAction). Keep the rest of D12: an unchanged form just closes, an emptied title shows its error and stays.",
+        "Don't touch: the bottom bar, the delete flow and its Undo (P42), the note body's tap (P10), AttachmentPanel."
+      ],
+      "acceptance": [
+        "Widget test, Spanish: an editable task with a duration, a deadline, a repeat and priority Alta: tapping each of the `Duración`, `Fecha límite`, `Repetir` and `Prioridad` rows opens the edit form (/editTask).",
+        "Widget test: for a view-only task, tapping the `Repetir` row opens nothing.",
+        "Semantics test, Spanish: the `Planificado para` and `Hora` rows have a tap action with hint `Cambiar fecha`; the `Repetir` row and the task title have the hint `Editar tarea`; a note's title has `Editar nota`.",
+        "Widget test, Spanish: edit a task's title, tap `Guardar`: `Cambios guardados` shows with `Deshacer`; tapping `Deshacer` restores the old title."
+      ],
+      "deviceChecks": [
+        "TalkBack on the task detail: the date row is read as a button with 'Cambiar fecha'."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": [],
+  "escalated": []
+}

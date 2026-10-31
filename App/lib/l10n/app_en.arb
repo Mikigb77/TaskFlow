@@ -1,0 +1,3784 @@
+{
+  "reviewSchedule": "Date and time",
+  "reviewChooseDate": "Choose a date before adding a time.",
+  "chooseAmPm": "Choose AM or PM.",
+  "scheduleHourRange24": "Hour from 0 to 23",
+  "@scheduleHourRange24": {
+    "description": "Under the hour field of Change date, on a 24-hour clock, when the hour typed is not a valid one."
+  },
+  "scheduleHourRange12": "Hour from 1 to 12",
+  "@scheduleHourRange12": {
+    "description": "Under the hour field of Change date, on a 12-hour clock, when the hour typed is not a valid one."
+  },
+  "scheduleMinuteRange": "Minutes from 0 to 59",
+  "@scheduleMinuteRange": {
+    "description": "Under the minutes field of Change date, when the minutes typed are not valid."
+  },
+  "reviewOptions": "More options",
+  "reviewOriginal": "See what I said",
+  "reviewOriginalText": "Original text",
+  "reviewRemove": "Remove",
+  "reviewRemoved": "Removed",
+  "reviewUndoSaved": "They’re back here, not saved yet.",
+  "reviewUndoChanged": "This task has changed. Your saved tasks were kept.",
+  "reviewRepair": "Repair text",
+  "reviewRepairHelp": "This text may have been saved with damaged accents. Review the correction before saving.",
+  "reviewConfirmDetail": "That’s right",
+  "reviewNoTime": "No time",
+  "captureWhatTime": "What time?",
+  "@captureWhatTime": {
+    "description": "The time question for a result made on the phone, above the morning and evening time chips. Neutral between morning and evening; in Spanish it avoids `mañana`, which also means tomorrow."
+  },
+  "reviewEditDetail": "Change this detail",
+  "reviewResolved": "Reviewed",
+  "reviewResolve": "Check this detail",
+  "languageNativeName": "English",
+  "sharingProblem": "{reason, select, alreadyMember{This person already has access. Manage their role in Members.} memberLimit{This project supports up to 20 members and 20 pending invitations. Remove someone or cancel an invitation first.} accepted{This invitation was already accepted. Manage the person’s access in Members.} owner{The owner cannot leave. You can delete the project if it is no longer needed.} expired{This invitation is no longer available. Ask the owner for a new one.} code{Ask the project owner for the current invitation code.} refresh{This project changed. Refresh before deleting it.} ownerOnly{Only the project owner can manage sharing and project details.} other{This project is read-only for your account. Ask the owner for editing access.}}",
+  "@sharingProblem": {
+    "description": "Actionable sharing API errors. Reasons stay internal and never get translated.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "syncProblem": "{reason, select, assignmentChanged{The responsible person changed. Your unsent edit was kept as a personal copy.} listConflict{A project changed on another device. Choose which version to keep in Projects.} readOnly{This project is now read-only. Your unsent edit was kept as a personal copy.} accessChanged{Shared-project access changed. Refresh to finish syncing permitted edits.} taskConflict{A task changed on another device. Your edit was kept as an offline copy; a conflicting deletion was cancelled.} serverUpdate{Update this server before syncing notes. Your notes are kept on this phone.} other{The server did not preserve this content type. Your local copy is kept.}}",
+  "@syncProblem": {
+    "description": "Sync notices with recovery instructions, including messages persisted by older app versions.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "requestError": "{reason, select, signOutFirst{Sign out before changing servers.} https{Use an HTTPS server address for this build.} serverAddress{Enter a valid server address, such as https://your-server.example.} emailUsed{This email already has an account.} email{Enter a valid email address.} credentials{We couldn’t find that account, or the password is wrong.} session{Please sign in again to continue. Your local tasks are kept.} accountChanged{The account changed. Reopen this screen and try again.} password{Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.} recoveryCode{The recovery code is invalid or expired. Request a new one.} forbidden{This account cannot perform that action. Check your access.} rateLimit{Too many requests. Please wait a little before trying again.} fileLimit{Choose a non-empty file up to 6 MB.} fileChanged{The file has changed or could not be verified. Choose it again or retry the download.} network{No connection. Check Wi-Fi or mobile data and try again.} networkKept{No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.} unavailable{The service is unavailable. Please try again later.} validation{Some details were not accepted. Review the information and try again.} other{Could not complete the request. Please try again.} otherKept{Could not complete the request. Please try again. Your tasks are still saved on this phone.}}",
+  "@requestError": {
+    "description": "Localized account, sync and file error categories. Never display raw server exception text.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@languageNativeName": {
+    "description": "This language's name in its own language, used in the language selector."
+  },
+  "languageAutomatic": "Same as phone",
+  "languageFollowing": "Same as phone · {language}",
+  "@languageFollowing": {
+    "description": "Summary of automatic language selection; language is the resolved language's native name.",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "regionalFormats": "Time & region",
+  "sharedCaptureRetained": "What you shared is kept. Open TaskFlow again to try again.",
+  "note": "Note",
+  "editNote": "Edit note",
+  "noteTitle": "Note title",
+  "noteBody": "Your note",
+  "notesEmpty": "A place for your thoughts",
+  "notesEmptyHelp": "Keep ideas and things to remember. For something to do, use a task.",
+  "@notesEmptyHelp": {
+    "description": "Under «A place for your thoughts», the only help on an empty Notes tab: what a note is for, and that something to do is a task."
+  },
+  "findNote": "Search notes",
+  "saveNote": "Save note",
+  "noteSaved": "Note saved",
+  "addNote": "Add a note",
+  "@addNote": {
+    "description": "The one button on Notes that adds a note: it opens the capture sheet."
+  },
+  "noteHint": "Ideas, meeting details, useful links…",
+  "noteTitleHint": "e.g. Wi-Fi password",
+  "@noteTitleHint": {
+    "description": "Example placeholder in the note title field."
+  },
+  "noteTitleRequired": "Give your note a title",
+  "noteNoMatches": "No matching notes",
+  "notesSavedOnDevice": "Your notes are still on this phone.",
+  "allNotes": "All notes",
+  "@allNotes": {
+    "description": "Option of the Notes project filter that shows the notes of every project."
+  },
+  "viewOnlyNote": "View-only note. To make changes, ask the project’s owner.",
+  "@viewOnlyNote": {
+    "description": "Banner on a note in a project the person can only view: who to ask to make changes."
+  },
+  "linkOpenError": "Could not open this link. You can copy it from the note.",
+  "noteLinks": "Links",
+  "plannedFor": "Planned for",
+  "plannedForHelp": "When you intend to do this task. A deadline can be set separately in More details.",
+  "duration": "Duration",
+  "durationUnset": "No duration set",
+  "durationMinutes": "{minutes} min",
+  "@durationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationInput": "Minutes (1–1440)",
+  "durationInvalid": "Enter a whole number from 1 to 1440.",
+  "removeDuration": "Remove duration",
+  "deadline": "Deadline",
+  "deadlineUnset": "No deadline",
+  "deadlineTime": "Deadline time",
+  "deadlineEndDay": "By the end of the day",
+  "removeDeadline": "Remove deadline",
+  "deadlineRecurringHelp": "Each repeat has its own deadline.",
+  "deadlineLatePlan": "This plan finishes after the deadline. Check the start or duration.",
+  "deadlineOverdue": "Deadline passed",
+  "deadlineLabel": "Due {date}",
+  "@deadlineLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderAnchor": "Remind before",
+  "dayTimeline": "Day timeline",
+  "timelineLimit": "Showing the first 200 timed items. Use the agenda to see every task.",
+  "timelineUnblocked": "No time",
+  "@timelineUnblocked": {
+    "description": "Day timeline: heading above the day's tasks and all-day calendar events that have no time, so they are not drawn on the hours. The same words the task rows use for a task with no time."
+  },
+  "timelineNoBlocks": "Nothing with a time on this day.",
+  "@timelineNoBlocks": {
+    "description": "Day timeline: shown when the shown day has no task, deadline or calendar event with a time."
+  },
+  "timelineHours": "{hours} hours in this day",
+  "@timelineHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "@@locale": "en",
+  "deviceCalendars": "Phone calendars",
+  "deviceCalendarIntro": "You’ll see your phone’s events in Calendar. They’re only read here, never uploaded.",
+  "@deviceCalendarIntro": {
+    "description": "Phone calendars, before access: the one line above «Connect phone calendars». Says what connecting does and that events stay on the phone."
+  },
+  "calendarEnable": "Connect phone calendars",
+  "calendarDisable": "Hide calendar events",
+  "calendarConnected": "Connected. Events show in Calendar.",
+  "@calendarConnected": {
+    "description": "Phone calendars: the first line while the phone’s events show in Calendar (access allowed and at least one calendar ticked)."
+  },
+  "calendarChoose": "Choose calendars",
+  "calendarChooseHelp": "Select up to 50 calendars. Calendar times follow your device; all-day dates stay on their original days.",
+  "calendarDenied": "Allow calendar access to display your events. Your tasks still work without it.",
+  "calendarRefused": "Without permission, TaskFlow can’t see your events.",
+  "@calendarRefused": {
+    "description": "Phone calendars, after the person refused calendar access: the one line above «Connect phone calendars»."
+  },
+  "calendarBlocked": "Calendar access is off. You can enable it in the phone’s app settings.",
+  "calendarUnsupported": "Phone calendar display is currently available on Android.",
+  "calendarSettings": "Open app settings",
+  "calendarEmptySources": "No visible calendars are synced to this phone. Connect an account in your calendar app, then refresh here.",
+  "calendarRefresh": "Refresh calendars",
+  "calendarReadError": "Calendar events could not be read. Refresh to try again; this view may be missing commitments.",
+  "calendarReadRetry": "Couldn’t read your events. Tap to try again.",
+  "changeView": "Change view",
+  "calendarPreferenceError": "Could not save that calendar choice. Try again. You can select up to 50 calendars.",
+  "calendarTruncated": "This calendar result is too large to show in full. Select fewer calendars to see the remaining events.",
+  "calendarEvents": "Calendar events",
+  "calendarReadOnly": "Calendar event · view only",
+  "calendarNoSelection": "Choose calendars to show your existing commitments.",
+  "calendarAllDay": "All day",
+  "calendarEventCount": "{count, plural, one{1 event} other{{count} events}}",
+  "@calendarEventCount": {
+    "description": "Calendar agenda line under the day’s tasks, followed by up to three start times.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "calendarOffline": "Offline — your tasks are saved on this phone.",
+  "calendarUntitled": "Untitled event",
+  "calendarOpenEvent": "Open in calendar app",
+  "calendarOpenError": "The calendar app could not open this event.",
+  "calendarEventGone": "This event is no longer available in the selected calendars.",
+  "noScheduledTasks": "No tasks for this day.",
+  "@noScheduledTasks": {
+    "description": "Calendar, an empty day while the phone's calendars are shown: the only line about tasks, followed by the line with the phone's events."
+  },
+  "calendar": "Calendar",
+  "tasks": "Tasks",
+  "settings": "Settings",
+  "inbox": "No date",
+  "inboxCount": "No date · {count}",
+  "@inboxCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "today": "Today",
+  "tomorrow": "Tomorrow",
+  "yesterday": "Yesterday",
+  "@yesterday": {
+    "description": "The day before today, before a time: when a kept capture was made (Yesterday, 18:05)."
+  },
+  "all": "All",
+  "upcoming": "Upcoming",
+  "noDate": "No date",
+  "anyTime": "Any time",
+  "addTime": "Add time",
+  "removeDate": "Remove date",
+  "editTask": "Edit task",
+  "taskScreenTitle": "Task",
+  "@taskScreenTitle": {
+    "description": "The app bar title of a task’s own page. A note’s page says Note instead."
+  },
+  "addTask": "Add a task",
+  "@addTask": {
+    "description": "The one button that adds a task: it opens the capture sheet."
+  },
+  "typeTasks": "Type tasks",
+  "unfinishedCaptures": "Not saved yet",
+  "captureDiagnostics": "Capture diagnostics",
+  "lists": "Projects",
+  "labels": "Labels",
+  "noList": "No project",
+  "priority": "Priority",
+  "low": "Low",
+  "medium": "Medium",
+  "high": "High",
+  "date": "Date",
+  "time": "Time",
+  "repeat": "Repeat",
+  "repeatNeedsDate": "Add a date to repeat",
+  "neverRepeat": "Does not repeat",
+  "daily": "Daily",
+  "weekly": "Weekly",
+  "monthly": "Monthly",
+  "yearly": "Yearly",
+  "noEndDate": "No end date",
+  "notes": "Notes",
+  "addNotes": "Add notes",
+  "attachments": "Files",
+  "complete": "Complete",
+  "reopen": "Reopen",
+  "reschedule": "Reschedule",
+  "undo": "Undo",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "keepChanges": "Keep changes",
+  "taskTitle": "Task title",
+  "additionalNotes": "Additional Notes",
+  "moreDetails": "More details",
+  "fewerDetails": "Fewer details",
+  "appearance": "Appearance",
+  "light": "Light",
+  "dark": "Dark",
+  "reminders": "Reminders",
+  "remindersOnLead": "On · {lead}",
+  "@remindersOnLead": {
+    "description": "Subtitle of the Reminders row in Settings when reminders are on; lead is the default reminder time, e.g. ‘10 minutes before’.",
+    "placeholders": {
+      "lead": {
+        "type": "String"
+      }
+    }
+  },
+  "remindersOff": "Off",
+  "remindersBlocked": "Blocked by your phone",
+  "@remindersBlocked": {
+    "description": "Subtitle of the Reminders row in Settings when reminders are on but the phone does not allow TaskFlow's notifications."
+  },
+  "remindersOnLate": "On · may arrive late",
+  "@remindersOnLate": {
+    "description": "Subtitle of the Reminders row in Settings when reminders are on and notifications allowed, but “Alarms & reminders” is off, so reminders may come late."
+  },
+  "otherSettings": "Other settings",
+  "appVersion": "TaskFlow {version}",
+  "@appVersion": {
+    "description": "Version line at the bottom of Other settings; version is the version and build, e.g. ‘1.0.5 (4007)’.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "completedTasks": "Completed tasks",
+  "exportImport": "Export & import",
+  "language": "Language",
+  "deviceDefault": "Same as phone",
+  "clockFormat": "Time format",
+  "clock12": "12-hour clock",
+  "clock24": "24-hour clock",
+  "weekStart": "First day of the week",
+  "monday": "Monday",
+  "sunday": "Sunday",
+  "saturday": "Saturday",
+  "timeZone": "Time zone",
+  "timeZoneSameAsPhone": "Same as phone ({city})",
+  "@timeZoneSameAsPhone": {
+    "description": "Time & region: the time-zone row’s value while it follows the phone. city is the phone zone’s city, such as Madrid.",
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "timezoneHelp": "New tasks use this time zone to read dates.",
+  "searchTimezone": "Find a timezone",
+  "preferenceError": "Could not save this preference. Please try again.",
+  "timezoneFallback": "The device timezone is unavailable. New tasks will use {zone}.",
+  "@timezoneFallback": {
+    "placeholders": {
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "week": "Week",
+  "month": "Month",
+  "day": "Day",
+  "previousWeek": "Previous week",
+  "@previousWeek": {
+    "description": "Calendar's back arrow, read aloud, in the week view: shows the week before."
+  },
+  "nextWeek": "Next week",
+  "@nextWeek": {
+    "description": "Calendar's forward arrow, read aloud, in the week view: shows the week after."
+  },
+  "previousMonth": "Previous month",
+  "@previousMonth": {
+    "description": "Calendar's back arrow, read aloud, in the month view: shows the month before."
+  },
+  "nextMonth": "Next month",
+  "@nextMonth": {
+    "description": "Calendar's forward arrow, read aloud, in the month view: shows the month after."
+  },
+  "dayTaskCount": "{count, plural, =1{1 task} other{{count} tasks}}",
+  "@dayTaskCount": {
+    "description": "Read aloud for a day in Calendar's week or month strip: how many open tasks it has. Follows the day's date, after “today · ” when the day is today. Lowercase.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "previousDay": "Previous day",
+  "nextDay": "Next day",
+  "licenses": "Open-source licences",
+  "privacyPolicy": "Privacy Policy",
+  "@privacyPolicy": {
+    "description": "Link that opens the website’s Privacy Policy in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page."
+  },
+  "termsAndConditions": "Terms and Conditions",
+  "@termsAndConditions": {
+    "description": "Link that opens the website’s Terms and Conditions in the app’s language: under the sign-in and create-account card, and a row in Other settings. Named as the site titles the page."
+  },
+  "todayAgenda": "Today’s agenda",
+  "loadTasksError": "Couldn’t load your tasks",
+  "refreshCalendar": "Try refreshing your calendar.",
+  "tryAgain": "Try again",
+  "rememberPrompt": "What would you like to remember?",
+  "calendarEmpty": "Nothing planned for this day.",
+  "calendarTrySaying": "Try it: tap Add a task and say “Tomorrow, call the dentist and buy bread.”",
+  "@calendarTrySaying": {
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens the mic. The quoted example names two tasks on one day, with one date word and no hour, so both land on the same day and Save as a task (the phone's parser) still dates it without a question."
+  },
+  "calendarTryTyping": "Try it: tap Add a task and type “Tomorrow, call the dentist.”",
+  "@calendarTryTyping": {
+    "description": "Calendar's empty state while the account has no tasks or notes yet and Add a task opens typing. One task, because typed words are parsed on the phone, which can't split them; one date word and no hour from 1 to 12, so it's added with no question."
+  },
+  "calendarTryForm": "Try it: tap New task, type “Call the dentist” and tap Tomorrow.",
+  "@calendarTryForm": {
+    "description": "Calendar's empty state while the account has no tasks or notes yet and the button reads New task: it opens the task form (an account without Pro and no free dictation left). The form doesn't read dates from the words: Tomorrow is the chip under the title."
+  },
+  "planTask": "Plan a task",
+  "homeCapture": "Mic button on your home screen",
+  "homeCaptureInstructions": "On Android, long-press the TaskFlow icon for its shortcuts, or add the Dictate a task widget from your launcher. Share text to TaskFlow from another app.",
+  "@homeCaptureInstructions": {
+    "description": "Settings, Other: how to reach capture from outside the app. Names the home-screen widget by its label (capture_widget_label in android/app/src/main/res/values/strings.xml); keep the two the same."
+  },
+  "widgetPickerHelp": "Add the TaskFlow widget from your launcher’s widget picker.",
+  "appearanceError": "Could not save your appearance preference.",
+  "list": "Project",
+  "archivedListAddHelp": "Archived project. Restore it to add tasks.",
+  "@archivedListAddHelp": {
+    "description": "Bar at the bottom of an archived project's page, in place of «Add task», for someone who can restore it. Shows only with the «Restore project» button under it."
+  },
+  "archivedListNoAdd": "Archived project.",
+  "@archivedListNoAdd": {
+    "description": "Bar at the bottom of an archived project's page, in place of «Add task», for someone who can't restore it (a reader, or a project archived with its group). No button follows."
+  },
+  "yourTasks": "Your tasks",
+  "findTask": "Find a task…",
+  "allTasks": "All tasks",
+  "highPriority": "High priority",
+  "filterLabel": "Filter by label",
+  "allLabels": "All labels",
+  "noMatches": "No matching tasks",
+  "freshStart": "A fresh start",
+  "differentFilter": "Try a different word or filter.",
+  "personNothingOpen": "{name} has nothing open here",
+  "@personNothingOpen": {
+    "description": "Empty-state title on a shared project's page when only a person's chip filters it and that person has no open tasks assigned in this project. {name} is the name on the chip.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "personNothingOpenHelp": "Tap All to see every task.",
+  "@personNothingOpenHelp": {
+    "description": "Empty-state message under personNothingOpen. 'All' names the chip forTeam, which shows every task of the project."
+  },
+  "listEmpty": "Add a task to this project. Its date and reminder are yours to choose.",
+  "readOnlyListEmpty": "No tasks in this project yet.",
+  "@readOnlyListEmpty": {
+    "description": "Empty-state message on a project page the user can only view; there is no add button there."
+  },
+  "tasksEmpty": "Tap Add a task to add one. A date is optional.",
+  "inboxEmpty": "Tasks without a date wait here until you choose one.\nStart with Add a task.",
+  "tasksEmptyForm": "Tap New task to add one. A date is optional.",
+  "@tasksEmptyForm": {
+    "description": "tasksEmpty while the button reads New task (newTask)."
+  },
+  "inboxEmptyForm": "Tasks without a date wait here until you choose one.\nStart with New task.",
+  "@inboxEmptyForm": {
+    "description": "inboxEmpty while the button reads New task (newTask)."
+  },
+  "savedOnDevice": "Your saved tasks are still on your device.",
+  "checkCaptures": "See what’s not saved yet",
+  "seriesEdits": "Edits apply to the whole repeating task.",
+  "titleRequired": "Please enter a task title.",
+  "nameTask": "What would you like to do?",
+  "reminder": "Reminder",
+  "off": "Off",
+  "dateForReminder": "Add a date to use a reminder",
+  "reminderNeedsDay": "To remind you, give it a day.",
+  "@reminderNeedsDay": {
+    "description": "The capture card's line under the date when a reminder was said for a task with no day; tapping it opens the date."
+  },
+  "chooseAlertTime": "Choose alert time",
+  "reminderDefaultsError": "Reminder defaults could not load. Check notification settings.",
+  "loadingReminders": "Loading reminder settings…",
+  "repeatInterval": "Repeat interval",
+  "repeatOn": "Repeat on",
+  "repeatUsesStart": "Uses the weekday of the start date.",
+  "intervalRange": "Choose a number from 1 to 99.",
+  "removeEndDate": "Remove end date",
+  "days": "days",
+  "weeks": "weeks",
+  "months": "months",
+  "years": "years",
+  "deleteTask": "Delete task",
+  "keepTask": "Keep task",
+  "deleteTaskError": "Could not delete this task. Please try again.",
+  "taskDeleted": "Task deleted",
+  "noteDeleted": "Note deleted",
+  "attachmentUnavailable": "This attachment is not available on this device.",
+  "attachmentOpenError": "Could not open this attachment.",
+  "taskUnavailable": "Task unavailable",
+  "occurrenceChanged": "Occurrence changed",
+  "taskRemoved": "This task may have been removed.",
+  "occurrenceSkipped": "This date is skipped or no longer part of the repeating schedule.",
+  "editRepeating": "Edit repeating task",
+  "moveError": "Could not move this task. Please retry.",
+  "occurrence": "Occurrence",
+  "starts": "Starts",
+  "updateReminderError": "Could not update the reminder. Please retry.",
+  "thisOccurrence": "This occurrence",
+  "wholeSeries": "Whole series",
+  "skipOccurrence": "Skip this occurrence",
+  "resetOccurrence": "Reset this occurrence",
+  "reset": "Reset",
+  "recordingKept": "Recording kept on this phone",
+  "onDeviceTranscript": "On this phone, as you speak",
+  "onlineAudio": "Online, after you finish",
+  "speechMethod": "How speech becomes text",
+  "@speechMethod": {
+    "description": "Heading on the Voice screen above the two choices for how speech becomes text: on this phone while speaking, or online after finishing."
+  },
+  "speechLanguage": "Speech language",
+  "voiceSettings": "Voice",
+  "@voiceSettings": {
+    "description": "Row in Other settings, and the title of the screen it opens, where the speech language, how speech becomes text and the privacy note live."
+  },
+  "sameAsApp": "Same as the app",
+  "@sameAsApp": {
+    "description": "Speech language option, the default: capture listens in the app's language."
+  },
+  "onDeviceUnavailable": "This phone can’t do this language by itself, so TaskFlow does it online.",
+  "setUpSpeech": "Set up on-device speech",
+  "checkAgain": "Check again",
+  "examplePlan": "Doctor Friday at 5 p.m. Bring my results. Also buy coffee.",
+  "exampleTask": "Doctor Friday at 5 p.m.",
+  "@exampleTask": {
+    "description": "Hint in the empty typing field of the capture sheet when typed words are understood on the phone, as one task: a short task with a day and a time the app reads."
+  },
+  "discard": "Discard",
+  "keep": "Keep",
+  "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.",
+  "@capturePrivacy": {
+    "description": "The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI, saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet."
+  },
+  "capturePrivacyLine": "Your words go online. More in Settings.",
+  "@capturePrivacyLine": {
+    "description": "One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings."
+  },
+  "lookRight": "Look right?",
+  "finalSay": "Tap a detail to change it. You have the final say.",
+  "changePriority": "Change priority",
+  "changeRepeat": "Change repeat",
+  "confirmedDetails": "I’ve checked this task",
+  "agendaCounts": "{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}",
+  "@agendaCounts": {
+    "description": "The day's count under its heading on Calendar. With nothing completed it is the open count alone.",
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "overdueDate": "{date} · Overdue",
+  "@overdueDate": {
+    "description": "Date line of an open task whose day has passed, in Tareas and on project pages. {date} is the row's date, such as Sat, 17 Oct.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "assigneeLabel": "Assignee: {name}",
+  "@assigneeLabel": {
+    "description": "What TalkBack reads for who a task in a shared project is for, on a task row and on the assignment chip. {name} is a person, Me or Everyone.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectLabel": "Project: {name}",
+  "@projectLabel": {
+    "description": "What TalkBack reads for the project chip on a task's details and in the form. {name} is the project's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "overdueCount": "{count, plural, other{Overdue · {count}}}",
+  "@overdueCount": {
+    "description": "Header above unfinished tasks from earlier days, shown first on Today.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pendingCaptureCount": "Not saved yet · {count}",
+  "@pendingCaptureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listeningSeconds": "Listening · {time}",
+  "@listeningSeconds": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatEvery": "{frequency, select, daily{{interval, plural, one{Every day} other{Every {interval} days}}} weekly{{interval, plural, one{Every week} other{Every {interval} weeks}}} monthly{{interval, plural, one{Every month} other{Every {interval} months}}} other{{interval, plural, one{Every year} other{Every {interval} years}}}}",
+  "@repeatEvery": {
+    "description": "How often a task repeats. frequency is the internal rule: daily, weekly, monthly or yearly.",
+    "placeholders": {
+      "interval": {
+        "type": "int"
+      },
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatEveryPrompt": "Repeat every… {unit}",
+  "@repeatEveryPrompt": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "untilDate": "Until {date}",
+  "@untilDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "priorityValue": "{priority} priority",
+  "@priorityValue": {
+    "placeholders": {
+      "priority": {
+        "type": "String"
+      }
+    }
+  },
+  "pickDate": "Pick a date",
+  "editStep": "Edit step",
+  "repeatingSteps": "These steps repeat with the task. Check them off from an occurrence’s details.",
+  "moveUp": "Move up",
+  "moveDown": "Move down",
+  "removeStep": "Remove step",
+  "addStep": "Add step",
+  "stepLimit": "A task can have up to 50 steps. Remove a step to add this one.",
+  "@stepLimit": {
+    "description": "Under the Add step field when a task already has 50 steps; the typed text stays in the field."
+  },
+  "listUnavailable": "Project unavailable",
+  "archived": "Archived",
+  "sharedProject": "Shared",
+  "taskReopened": "Task reopened",
+  "taskCompleted": "Task completed",
+  "undoError": "Could not undo. Please try again.",
+  "taskUpdateError": "Could not update this task. Please try again.",
+  "occurrenceSkippedNotice": "Occurrence skipped",
+  "originalRestored": "Original date restored",
+  "movedInbox": "Date removed",
+  "scheduleChangedAgain": "The date changed again. Open the task to check it.",
+  "scheduleError": "Couldn’t change the date. Try again.",
+  "rescheduleRepeating": "Reschedule repeating task",
+  "rescheduleTask": "Reschedule task",
+  "seriesRescheduleHelp": "Changes the start of the series and resets moved or skipped dates. No date stops the repeat.",
+  "occurrenceRescheduleHelp": "Other dates in the series stay the same.",
+  "restoreOriginal": "Restore original date",
+  "progressSmall": "Progress starts small",
+  "completedEmpty": "Every task you finish will find a home here.",
+  "completedButton": "Completed",
+  "@completedButton": {
+    "description": "Text button on the Tasks tab, beside Projects, that opens the completed tasks. Short: it shares a row with Projects."
+  },
+  "completedLoadError": "Couldn’t load completed tasks",
+  "tryLater": "Please try again in a moment.",
+  "changeSeriesQuestion": "Change how it repeats?",
+  "@changeSeriesQuestion": {
+    "description": "Title of the dialog when a repeating task's repeat changes while some of its dates were moved or skipped."
+  },
+  "changeSeriesHelp": "Dates you moved or skipped will follow the new repeat. Completed dates stay in the history.",
+  "@changeSeriesHelp": {
+    "description": "Text of the dialog titled changeSeriesQuestion: moved or skipped dates follow the new repeat; completed ones stay in the history."
+  },
+  "keepEditing": "Keep editing",
+  "resetSave": "Reset and save",
+  "taskSavedInbox": "Added with no date",
+  "taskAddedOn": "Added to {date}",
+  "@taskAddedOn": {
+    "description": "After saving a new task with a date. The date is a weekday and date such as Fri, Oct 17, never Today or Tomorrow.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "taskAddedDue": "Added · due {date}",
+  "@taskAddedDue": {
+    "description": "After saving one new task that has no day but a deadline; the app lands on the deadline's day. The date is the deadline's weekday and date such as Thu, 12 Nov, never Today or Tomorrow.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "changesSaved": "Changes saved",
+  "taskSaveError": "Could not save your task. Please try again.",
+  "localAttachmentHelp": "Attachments currently stay on this phone. Signing in restores your tasks, but these files will not appear on another device.",
+  "choosePhoto": "Choose a photo",
+  "attachFile": "Attach a file",
+  "attachError": "Could not attach that file. Please try again.",
+  "titleRequiredField": "Please enter a task title",
+  "fromYourWords": "From your words",
+  "@fromYourWords": {
+    "description": "Under a date read from typed words, before the Keep as typed button."
+  },
+  "keepAsTyped": "Keep as typed",
+  "@keepAsTyped": {
+    "description": "Text button: the typed words become the title again, without the date read from them."
+  },
+  "optionalTime": "Time (optional)",
+  "resetDateHelp": "Reset a date, then save your changes.",
+  "skipped": "Skipped",
+  "labelLimit": "Use up to 10 labels, each up to 32 characters.",
+  "notesHint": "Anything you’d like to remember…",
+  "addAttachment": "Add attachment",
+  "localAttachments": "Attachments stay on this device.",
+  "saving": "Saving…",
+  "saveChangesSentence": "Save changes",
+  "checklistCount": "Checklist · {done}/{total}",
+  "@checklistCount": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "checklistSemantics": "Checklist, {done} of {total} steps completed",
+  "@checklistSemantics": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "atScheduledTime": "At the scheduled time",
+  "hourBefore": "1 hour before",
+  "dayBefore": "1 day before",
+  "defaultChoice": "default",
+  "minutesBefore": "{minutes} minutes before",
+  "@minutesBefore": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderValue": "Reminder: {value}",
+  "reminderForPersonOnly": "Reminder for {name}",
+  "@reminderForPersonOnly": {
+    "description": "The reminder line on a task given to someone else. Their reminders are their own and never reach this phone, so none of this account's reminder values is shown. {name} is the person's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noReminderProjectMuted": "No reminder: project muted",
+  "@noReminderProjectMuted": {
+    "description": "Reminder chip and form row when the task's project is muted, so this phone gives no reminder. Tapping it opens the project's updates setting."
+  },
+  "noReminderProjectArchived": "No reminder: project archived",
+  "@noReminderProjectArchived": {
+    "description": "Reminder chip and form row when the task's project (or its group) is archived, so this phone gives no reminder."
+  },
+  "noReminderTimePassed": "No reminder: the alert time has passed",
+  "@noReminderTimePassed": {
+    "description": "Reminder chip and form row when reminders are on but the task's alert time (its own or the default, such as 9:00 for a task without a time) has already gone by, so nothing will ring. Tapping it opens the reminder choices, where a later time can be picked."
+  },
+  "fileLocal": "Only on this device",
+  "fileQueued": "Upload queued",
+  "fileBackedUp": "Backed up to your account",
+  "fileDownloadAvailable": "Available to download",
+  "fileMissing": "File unavailable on this device",
+  "fileRemovalPending": "Removal pending",
+  "fileUpload": "Upload",
+  "fileDownload": "Download",
+  "fileOpen": "Open",
+  "fileRetry": "Upload again",
+  "@fileRetry": {
+    "description": "Button on a file whose upload failed or is waiting: sends the file again."
+  },
+  "fileRemove": "Remove attachment",
+  "removeFileNamed": "Remove {file}",
+  "@removeFileNamed": {
+    "description": "Tooltip on the remove button next to an attached file. file is the file name.",
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "fileRemoveQuestion": "Remove this attachment?",
+  "fileRemoveHelp": "This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.",
+  "yourAccount": "Your account",
+  "accountSaved": "Saved to your account",
+  "syncNow": "Sync now",
+  "accountSyncing": "Syncing",
+  "importLocalItems": "Import local tasks and notes",
+  "accountImporting": "Importing tasks and notes",
+  "importLocalItemsQuestion": "Import local tasks and notes?",
+  "importLocalItemsHelp": "{count, plural, =1{Move 1 item from this phone into your account} other{Move {count} items from this phone into your account}} to back up your tasks and notes. Attachments stay on this phone until you choose Upload in item details.",
+  "@importLocalItemsHelp": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importItems": "Import",
+  "itemsImported": "{count, plural, =1{1 item imported.} other{{count} items imported.}}",
+  "@itemsImported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "connectionDetails": "Connection details",
+  "signOut": "Sign out",
+  "accountSigningOut": "Signing out",
+  "signOutQuestion": "Sign out? Reminders on this phone stop until you sign in again.",
+  "recoveryHeading": "Reset your password",
+  "registerHeading": "Create your account",
+  "signInHeading": "Sign in",
+  "authPitch": "Note down what you need to do, and TaskFlow puts it on your calendar.",
+  "signInAgainReason": "You were signed out. Sign in again to pick up where you left off.",
+  "@signInAgainReason": {
+    "description": "Shown above the sign-in form when the session ended while the app was open."
+  },
+  "recoveryHelp": "Request a recovery email, then use the code to set a new password.",
+  "email": "Email",
+  "enterEmail": "Enter your email",
+  "recoveryCode": "Recovery code",
+  "recoveryCodeHelp": "Leave empty to request an email.",
+  "newPassword": "New password",
+  "password": "Password",
+  "passwordHelp": "At least 12 characters, not only numbers",
+  "passwordTooShort": "Use at least 12 characters",
+  "enterPassword": "Enter your password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "createAccount": "Create account",
+  "signIn": "Sign in",
+  "alreadyHaveAccount": "Already have an account? Sign in",
+  "createAnAccount": "Create an account",
+  "createAccountWithEmail": "Create an account with this email",
+  "signInWithEmail": "Sign in with this email",
+  "backToSignIn": "Back to sign in",
+  "sendRecoveryCode": "Send code",
+  "saveNewPassword": "Save new password",
+  "forgotPassword": "Forgot password?",
+  "accountGuestHelp": "Sign in to access your tasks and notes.",
+  "connectionSettings": "Connection settings",
+  "backendAddress": "Backend address",
+  "backendAddressHelp": "Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.",
+  "recoveryEmailRequested": "If {email} has an account, an email with a code is on its way. Type it here.",
+  "@recoveryEmailRequested": {
+    "description": "Recovery, shown above the recovery code field after the code was requested. Names the address typed without saying whether it has an account.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "recoveryCodeRenewed": "That code no longer works. If {email} has an account, a new one is on its way.",
+  "@recoveryCodeRenewed": {
+    "description": "Recovery, shown above the recovery code field instead of recoveryEmailRequested when the code typed had expired or was locked: the app asked for a new code for that address at once and cleared the field. Names the address without saying whether it has an account.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "passwordResetComplete": "Password updated. Sign in with your new password.",
+  "verifyEmailHeading": "Confirm your email",
+  "@verifyEmailHeading": {
+    "description": "Heading of the screen that asks for the 6-digit code the server emailed: after creating an account, or after signing in to one whose address isn't confirmed yet."
+  },
+  "verifyEmailHelp": "We’ve sent a 6-digit code to {email}. Type it here.",
+  "@verifyEmailHelp": {
+    "description": "Under that heading. {email} is the address the code went to.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "verifyEmailCode": "Code",
+  "@verifyEmailCode": {
+    "description": "Label of the field for the emailed code. It confirms by itself once 6 digits are typed or pasted."
+  },
+  "verifyEmailCodeLength": "The code has 6 digits",
+  "@verifyEmailCodeLength": {
+    "description": "Under the code field when Confirm is tapped with fewer than 6 digits typed. Also under the recovery code field when Save new password is tapped without 6 digits."
+  },
+  "verifyEmailConfirm": "Confirm",
+  "@verifyEmailConfirm": {
+    "description": "Sends the typed code. When it is right, the person is signed in."
+  },
+  "verifyEmailConfirming": "Confirming",
+  "@verifyEmailConfirming": {
+    "description": "What TalkBack reads for the spinner inside the Confirm button (verifyEmailConfirm) while the code is being checked."
+  },
+  "verifyEmailResend": "Resend code",
+  "@verifyEmailResend": {
+    "description": "Emails a new code. For 60 seconds after each code is sent it is disabled and reads verifyEmailResendIn. When the server refuses because too many codes were asked for, it stays disabled for the wait it names, reading verifyEmailResendInMinutes while over a minute is left."
+  },
+  "verifyEmailResendIn": "{seconds, plural, =1{Resend code in 1 second} other{Resend code in {seconds} seconds}}",
+  "@verifyEmailResendIn": {
+    "description": "The resend button while it waits, counting down each second from 60, or through the last minute of a longer wait.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "verifyEmailResendInMinutes": "{minutes, plural, =1{Resend code in 1 minute} other{Resend code in {minutes} minutes}}",
+  "@verifyEmailResendInMinutes": {
+    "description": "The resend button while a wait the server set is longer than a minute, in whole minutes rounded up; under a minute the button counts seconds with verifyEmailResendIn.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "verifyEmailResendLimited": "{minutes, plural, =1{You’ve asked for a lot of codes. Wait a minute to ask for another.} other{You’ve asked for a lot of codes. Wait {minutes} minutes to ask for another.}}",
+  "@verifyEmailResendLimited": {
+    "description": "Under the code field when the server refused to send another code because too many were asked for, and the wait is longer than a minute. No new code went out, so the last one still works. The minutes are rounded up, at least 1.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "verifyEmailResent": "We’ve sent you a new code. If you can’t see it, check Spam or Promotions.",
+  "@verifyEmailResent": {
+    "description": "Under the code field after a new code was emailed, when the person has shown they didn’t get the first one. Names the mail folders where codes often land, as Gmail names them in the language (Spam and Promotions in English)."
+  },
+  "verifyEmailCodeInvalid": "That code isn’t right. Check the newest email we sent.",
+  "@verifyEmailCodeInvalid": {
+    "description": "Under the code field when the server says the code is wrong. Only the newest code emailed works. The same digits aren't sent again; changing one clears this line. Also under the recovery code field when the server says the recovery code is wrong; the new password typed stays."
+  },
+  "verifyEmailCodeSpentNew": "That code no longer works. We’ve sent you a new one.",
+  "@verifyEmailCodeSpentNew": {
+    "description": "Under the code field when the code is too old, or was tried too many times, and a minute or more has passed since the last code: a new code has just been emailed. The field is emptied and Resend code counts down again."
+  },
+  "verifyEmailCodeSpentWait": "That code no longer works. Tap “Resend code” when the countdown ends.",
+  "@verifyEmailCodeSpentWait": {
+    "description": "Under the code field when the code is too old, or was tried too many times, less than a minute after the last code was sent: no new code could be sent yet. Names the button verifyEmailResend, which is still counting down."
+  },
+  "verifyEmailOtherAddress": "Use another email",
+  "@verifyEmailOtherAddress": {
+    "description": "Goes back to creating an account, with the email kept so it can be corrected."
+  },
+  "verifyEmailReplaced": "Someone has created an account with this email again. Create it again to continue.",
+  "@verifyEmailReplaced": {
+    "description": "Under Create account, back from the confirm screen, when the address was registered again with another password before it was confirmed. The email is kept and the password field is empty."
+  },
+  "verifyEmailWrongPassword": "That isn’t this account’s password. Don’t remember it? Tap “Use another email” and create the account again.",
+  "@verifyEmailWrongPassword": {
+    "description": "Under the password field of the confirm screen, when it reopened after the app was closed and asks for the password itself: the password typed on this screen isn’t the account’s. Names “Use another email” (verifyEmailOtherAddress), the way out for a forgotten password; the quoted label must match it."
+  },
+  "newList": "New project",
+  "editList": "Edit project",
+  "listName": "Name",
+  "listNameHint": "Home, Work, Shopping…",
+  "listNameRequired": "Name your project.",
+  "colorTeal": "Teal",
+  "colorBlue": "Blue",
+  "colorViolet": "Violet",
+  "colorAmber": "Amber",
+  "colorRose": "Rose",
+  "saveList": "Save project",
+  "createList": "Create project",
+  "@createList": {
+    "description": "Button of the new-project dialog that creates the project. Editing a project says «Save project»."
+  },
+  "listSaveError": "Could not save this project. Please retry.",
+  "listRestored": "Project restored",
+  "projectArchivedNoReminders": "{name} archived — hidden from your calendar, no reminders.",
+  "@projectArchivedNoReminders": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "listUpdateError": "Could not update this project. Please retry.",
+  "chooseListDetails": "Choose project details",
+  "listConflictHelp": "This phone: {local}\n\nOther device: {remote}\n\nTask and note contents will stay the same.",
+  "@listConflictHelp": {
+    "placeholders": {
+      "local": {
+        "type": "String"
+      },
+      "remote": {
+        "type": "String"
+      }
+    }
+  },
+  "later": "Later",
+  "useOtherDevice": "Use other device",
+  "useThisPhone": "Use this phone",
+  "listResolveError": "Could not resolve this project. Please retry.",
+  "retryLists": "Retry projects",
+  "listsEmptyTitle": "A place for each part of life",
+  "listsEmptyHelp": "Start with Home, Work or Shopping. Tasks can move whenever you like.",
+  "roleOwner": "Owner",
+  "roleEditor": "Editor",
+  "roleViewer": "Viewer",
+  "sharedListRole": "{role} · shared",
+  "@sharedListRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "listConflict": "Changed on another device · choose details",
+  "archivedListHelp": "Archived · tasks and notes still available",
+  "listItemCount": "{count, plural, =0{No tasks or notes} =1{1 task or note} other{{count} tasks and notes}}",
+  "@listItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "manageItem": "Manage {name}",
+  "@manageItem": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "restoreList": "Restore project",
+  "archiveList": "Archive project",
+  "chooseDetails": "Choose details",
+  "invitationCode": "Invitation code",
+  "accountChanged": "The account changed.",
+  "copyCode": "Copy code",
+  "done": "Done",
+  "sharingUpdateError": "Could not update sharing. Check the connection and retry.",
+  "shareProject": "Share",
+  "@shareProject": {
+    "description": "Opens sharing for a project nobody else can see yet, on the project page and in its menu."
+  },
+  "projectMembersCount": "Members · {count}",
+  "@projectMembersCount": {
+    "description": "Project page button once others have access. {count} is everyone with access, the owner included.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shareProjectHelp": "They’ll see everything in {project}.",
+  "@shareProjectHelp": {
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "sendInvitation": "Send invitation",
+  "inviteWho": "Who are you inviting to {name}?",
+  "@inviteWho": {
+    "description": "Title of the email dialog that invites a person to a project or a group. {name} is the project’s or group’s name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteOwnEmail": "That’s your own email. Type the other person’s.",
+  "@inviteOwnEmail": {
+    "description": "Shown under the invite dialog’s email field when the person typed their own account’s address; nothing is sent."
+  },
+  "personYou": "{name} (you)",
+  "@personYou": {
+    "description": "The signed-in account’s own row in a project’s or a group’s member list. {name} is their name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitationSent": "Invitation sent",
+  "invitationCodeFallback": "If the email doesn’t arrive, send them this code:",
+  "connectToShare": "Connect to the internet to share.",
+  "sendInvitationAgain": "Send again",
+  "cancelInvitation": "Cancel invitation",
+  "enterEmailAddress": "Enter an email address.",
+  "sharingRolesHelp": "Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.",
+  "listSharing": "Project sharing",
+  "sharingLoadError": "Could not load sharing.",
+  "retry": "Retry",
+  "invitePerson": "Invite a person",
+  "people": "Members",
+  "noOtherMembers": "Only you have accepted access so far.",
+  "makeEditor": "Make editor",
+  "makeViewer": "Make viewer",
+  "removeAccess": "Remove access",
+  "removeAccessHelp": "This person will lose access to this project and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.",
+  "pendingInvitations": "Pending invitations",
+  "pendingRole": "{role} · pending",
+  "@pendingRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "howSharingWorks": "How sharing works",
+  "sharedDataHelp": "Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Reminders aren’t shared: each person has their own.",
+  "@sharedDataHelp": {
+    "description": "Sharing screen, under “How sharing works”: what a shared project shares. Reminders are each person’s own (none of their values reaches anyone else), so the last sentence says they aren’t shared."
+  },
+  "sharingRemovalHelp": "Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.",
+  "deleteList": "Delete project",
+  "deleteListHelp": "Delete this project and all its tasks, notes and uploaded files for everyone? This cannot be undone.",
+  "deleteListPrivateHelp": "Delete {name} with all its tasks, notes and files? This can’t be undone.",
+  "@deleteListPrivateHelp": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteListForEveryone": "Delete project for everyone",
+  "leaveList": "Leave project",
+  "leaveListHelp": "Shared tasks, notes, files and any unsent edits will be removed from this phone. Other members keep the project.",
+  "youLeft": "You left {name}",
+  "@youLeft": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectDeleted": "Project deleted",
+  "groupDeleted": "Group deleted",
+  "invitationCodeRequired": "Paste the full invitation code.",
+  "invitationCodeWrong": "Ask the person who invited you for the current code.",
+  "invitationResponseError": "Could not respond. Retry when connected.",
+  "acceptInvitation": "Accept invitation",
+  "decline": "Decline",
+  "invitedTo": "You’re invited to {name} · View",
+  "@invitedTo": {
+    "description": "A card for a pending invitation, on Calendar, Projects and Groups; tapping it opens the join dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitedByTo": "{sender} invited you to “{name}” · View",
+  "@invitedByTo": {
+    "description": "The invitation card when the server says who sent it: sender's name, then the project or group.",
+    "placeholders": {
+      "sender": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitationsMore": "+{count}",
+  "@invitationsMore": {
+    "description": "How many more invitations wait behind the one shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "joinInvitationTitle": "Join {name}",
+  "@joinInvitationTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinInvitationHelp": "Open your invitation email and tap its link. Or paste the code from it here.",
+  "joinInvitation": "Join",
+  "declineInvitationConfirm": "Decline the invitation to {name}? You’d need a new one to join later.",
+  "@declineInvitationConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinedInvitation": "You joined {name}",
+  "@joinedInvitation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitationNotNow": "Not now",
+  "signedInAs": "Signed in as {email}",
+  "@signedInAs": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "fileLoadError": "Could not load attachment status. Please retry.",
+  "fileActionError": "Could not complete this action. Your task is saved; please retry.",
+  "fileSignInHelp": "Sign in to upload your files and restore them on another device.",
+  "fileUploadHelp": "New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.",
+  "fileLocalHelp": "Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.",
+  "fileLimit": "Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.",
+  "@reminderValue": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationLoadError": "Could not load notification settings. Please retry.",
+  "notificationSaveError": "Could not save reminder settings. Please retry.",
+  "enableReminders": "Enable reminders",
+  "noReminderTurnOn": "No reminder · Turn on",
+  "exactAlarmsNeeded": "To get reminders on time, allow “Alarms & reminders”.",
+  "exactAlarmsNextScreen": "On the next screen, turn on the switch, then come back.",
+  "@exactAlarmsNextScreen": {
+    "description": "Second line of the sheet that asks for “Alarms & reminders”, under exactAlarmsNeeded: what to do on Android's page the button opens, which has a switch and no Done button."
+  },
+  "remindersOnConfirmation": "Done. Reminders are on.",
+  "reminderAskQuestion": "Want a reminder before it?",
+  "@reminderAskQuestion": {
+    "description": "Asked once, in a sheet, right after the first task with a date is saved; \"it\" is that task."
+  },
+  "reminderAskYes": "Yes, remind me",
+  "reminderAskNotNow": "Not now",
+  "nameAskTitle": "What’s your name?",
+  "@nameAskTitle": {
+    "description": "Title of a sheet asked once, right after an account without a name sends its first invitation or joins its first project or group."
+  },
+  "nameAskBody": "It’s how people you share projects with will see you.",
+  "@nameAskBody": {
+    "description": "Line under nameAskTitle: why the name is asked."
+  },
+  "nameAskField": "Name",
+  "@nameAskField": {
+    "description": "Label of the name field in the name sheet, prefilled from the email; also the title of the name row in the Account screen, over the person's name."
+  },
+  "accountAddName": "Add your name",
+  "@accountAddName": {
+    "description": "Account screen: the name row's title when the account has no name yet; opens the name sheet."
+  },
+  "nameAskNotNow": "Not now",
+  "@nameAskNotNow": {
+    "description": "Closes the name sheet without saving; it isn't asked again."
+  },
+  "details": "Details",
+  "mobileNotificationsOnly": "Mobile notifications only",
+  "notificationPermissionOff": "Your phone isn’t letting TaskFlow notify you.",
+  "@notificationPermissionOff": {
+    "description": "Reminders: the phone does not allow TaskFlow's notifications. Shown on the Reminders screen and as a message after the person refuses Android's prompt."
+  },
+  "allowNotifications": "Allow notifications",
+  "@allowNotifications": {
+    "description": "Button under notificationPermissionOff, and that message's action: opens TaskFlow's notifications page in the phone's settings."
+  },
+  "preciseAlarmsAvailable": "Precise alarm access available",
+  "approximateAlarmsHelp": "Alerts are approximate until precise alarm access is enabled",
+  "allowPreciseAlarms": "Allow “Alarms & reminders”",
+  "timedTasks": "Timed tasks",
+  "dateOnlyTasks": "Date-only tasks",
+  "dateOnlyOffPlans": "Off · “Until the deadline”: {time}",
+  "@dateOnlyOffPlans": {
+    "description": "Settings › Reminders, under “Date-only tasks” when it is off and some open task has an “Until the deadline” plan without its own time: those plans still ring at {time}. {time} is the default hour in the app’s clock format (9:00 AM). Follows the sheet’s name for the plan (reminderPlanUntilDay).",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyCheckIns": "Daily check-ins",
+  "dailyCheckInsHelp": "A gentle prompt to review your current tasks.",
+  "morningCheckIn": "Morning",
+  "eveningCheckIn": "Evening",
+  "upcomingAlerts": "Upcoming alerts",
+  "scheduledAlertHelp": "Scheduled means your phone accepted the alert. Battery restrictions, system settings and force-stop can delay or prevent delivery.",
+  "androidAlertRefreshHelp": "Upcoming alerts update when you open the app and, when Android allows it, every hour.",
+  "@androidAlertRefreshHelp": {
+    "description": "Reminders › Details on Android: when the list of upcoming alerts set on the phone is updated."
+  },
+  "backgroundAlertRefreshHelp": "Upcoming alerts update when you open the app and when your phone allows it.",
+  "@backgroundAlertRefreshHelp": {
+    "description": "Reminders › Details on other systems: when the list of upcoming alerts set on the phone is updated."
+  },
+  "noUpcomingAlerts": "No upcoming alerts. Choose a reminder on a scheduled task.",
+  "repeatsDaily": "repeats daily",
+  "alertPending": "pending",
+  "alertScheduled": "scheduled",
+  "alertApproximate": "approximate",
+  "alertBlocked": "blocked",
+  "alertFailed": "failed",
+  "alertInactive": "inactive",
+  "alertElapsed": "elapsed",
+  "reminderPermissionError": "Notifications are disabled in system settings.",
+  "reminderScheduleError": "The phone could not schedule this alert. Retry from Settings.",
+  "reminderBackgroundError": "Background refresh could not finish. Open TaskFlow to retry.",
+  "reminderBackgroundUnavailable": "Automatic background refresh is unavailable. Alerts refresh when you open TaskFlow.",
+  "reminderActionError": "A notification action could not finish. Open the task to retry.",
+  "reminderSetupError": "Notification setup could not finish. Retry from Settings.",
+  "reminderAccountError": "Account reminders could not refresh. Open notification settings to retry.",
+  "reminderRefreshError": "Reminders could not refresh. Your tasks are saved; retry from notification settings.",
+  "transferError": "Could not finish. Your existing tasks and notes are unchanged. Please retry.",
+  "exportSaved": "Export saved. Keep the file somewhere private.",
+  "exportImportIntro": "Save a copy of your tasks to a file, or bring tasks from Todoist.",
+  "exportTaskFlowFile": "Export TaskFlow file",
+  "chooseImportFile": "Choose import file",
+  "chooseImportFileHelp": "Choose a TaskFlow file or a project exported from Todoist. You’ll review it before importing.",
+  "importPreview": "Import preview",
+  "importCopiesHelp": "Selected tasks, notes and the file’s projects are added as personal copies. Existing content is kept. Re-importing this same file skips records already imported on this phone; a changed or newly exported file counts as a different import.",
+  "listsIncluded": "Projects included",
+  "archivedPersonalCopy": "Archived personal copy",
+  "personalCopy": "Personal copy",
+  "alreadyImported": "Already imported on this phone",
+  "taskFlowExportSource": "TaskFlow export",
+  "todoistCsvSource": "Todoist project CSV",
+  "deferredAlerts": "{count, plural, =1{1 later alert isn’t set yet.} other{{count} later alerts aren’t set yet.}} The next update sets the nearest ones.",
+  "@deferredAlerts": {
+    "description": "Reminders › Details: how many later alerts are not set on the phone yet, because only the nearest ones fit; the next update sets them.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "turnOffReminder": "Turn off {title}",
+  "@turnOffReminder": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "importResult": "Added {items, plural, =1{1 item} other{{items} items}} and {lists, plural, =1{1 project} other{{lists} projects}}.",
+  "@importResult": {
+    "placeholders": {
+      "items": {
+        "type": "int"
+      },
+      "lists": {
+        "type": "int"
+      }
+    }
+  },
+  "importSkipped": "Skipped {count, plural, =1{1 already imported item} other{{count} already imported items}}.",
+  "@importSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importCounts": "{source} · {tasks} tasks · {notes} notes · {lists} projects",
+  "@importCounts": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "tasks": {
+        "type": "int"
+      },
+      "notes": {
+        "type": "int"
+      },
+      "lists": {
+        "type": "int"
+      }
+    }
+  },
+  "cannotImport": "Cannot import: {reason}",
+  "@cannotImport": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "importSelected": "Import {count, plural, =1{1 selected item} other{{count} selected items}} and projects",
+  "@importSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importRow": "Record {row}",
+  "@importRow": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveFileTooLarge": "Choose a file smaller than 32 MB.",
+  "archiveUnsupportedArchive": "This is not a supported TaskFlow export (versions 1 and 2).",
+  "archiveInvalidList": "Invalid project metadata.",
+  "archiveDuplicateLists": "Duplicate project identifiers.",
+  "archiveInvalidListStyle": "Invalid project color or archive status.",
+  "archiveInvalidTask": "Invalid task record.",
+  "archiveDuplicateTask": "Duplicate task identifier.",
+  "archiveInvalidAttachments": "Invalid attachment information.",
+  "archiveMissingList": "The task refers to a project missing from this file.",
+  "archiveInvalidTaskFields": "Invalid task fields.",
+  "archiveUnsupportedKind": "Unsupported task or note type.",
+  "archiveInvalidCompletion": "Invalid completion status.",
+  "archiveTwoSchedules": "A task cannot have two schedules.",
+  "archiveTwoDeadlines": "Choose a timed or date-only deadline.",
+  "archiveInvalidReminderDate": "Choose an available reminder date.",
+  "archiveUnsupportedRepeat": "Unsupported repeat rule.",
+  "archiveWeekdaysNeedWeekly": "Weekdays require a weekly repeat.",
+  "archiveRepeatNeedsStart": "A repeating task needs a start date.",
+  "archiveInvalidOccurrence": "Invalid occurrence change.",
+  "archiveDuplicateOccurrence": "Duplicate occurrence changes.",
+  "archiveInvalidSkipped": "Invalid skipped date.",
+  "archiveInvalidOccurrenceSchedule": "Invalid occurrence schedule.",
+  "archiveRepeatSettingsNeedRepeat": "Repeat settings need a repeating task.",
+  "archiveRepeatUsesCompletedDates": "Repeating tasks use individual completed dates.",
+  "archiveInvalidChecklist": "Invalid checklist item.",
+  "archiveDuplicateChecklist": "Duplicate checklist identifiers.",
+  "archiveInvalidChecklistProgress": "Invalid checklist progress.",
+  "archiveRepeatEndBeforeStart": "Repeat end precedes the start.",
+  "archiveOccurrenceOutsideRepeat": "An occurrence change is outside this repeat rule.",
+  "archiveExportTooLarge": "This export exceeds the supported 32 MB or 5,000-task limit.",
+  "archiveInvalidDateFormat": "Dates must use YYYY-MM-DD.",
+  "archiveInvalidDate": "Invalid calendar date.",
+  "archiveMissingTimezone": "Timed dates need an ISO time and timezone offset.",
+  "archiveInvalidClock": "Invalid clock time.",
+  "archiveInvalidOffset": "Invalid timezone offset.",
+  "archiveInvalidTimedDate": "Invalid timed date.",
+  "archiveFileUnreadable": "This file could not be read. Choose a local copy.",
+  "archiveEmptyCsv": "This CSV is empty.",
+  "archiveCsvHeader": "Choose a Todoist project CSV with TYPE and CONTENT columns.",
+  "archiveCsvTaskLimit": "Choose a CSV with at most 5,000 tasks.",
+  "archiveCsvPriority": "Priority must be 1–4.",
+  "archiveCsvIndent": "Indent must be 1–4.",
+  "archiveCsvRecordLimit": "This CSV has too many records.",
+  "archiveCsvQuoting": "Malformed CSV quoting.",
+  "archiveCsvUnclosedQuote": "An unfinished quoted CSV field was found.",
+  "archiveNotesTooLong": "Task and comments exceed 8,000 note characters.",
+  "archiveInvalidFile": "The file is not valid JSON or UTF-8 text.",
+  "archiveUnknownFields": "Unrecognized task fields will be omitted.",
+  "archivePersonalCopies": "Imports create new personal copies. Account access, files, notification preferences and anything not saved yet are not included.",
+  "archiveCsvPriorities": "Todoist priorities 3 and 4 both become Low. Subtasks become separate tasks.",
+  "archiveCsvDates": "Only ISO calendar dates and times with explicit timezone offsets are scheduled. Other date expressions are kept in notes for you to review.",
+  "archiveCsvPersonalCopies": "This creates personal copies. Assignments, files and sharing access are not transferred. Todoist project CSV exports may omit completed tasks.",
+  "archiveReviewSchedule": "The original schedule needs review; this task will have no date.",
+  "archiveFlattenedSubtasks": "Subtask nesting will be flattened.",
+  "archiveInlineLabels": "Inline @labels remain in the title.",
+  "archiveAttachmentsOmitted": "{count, plural, =1{1 attachment file is} other{{count} attachment files are}} not included.",
+  "@archiveAttachmentsOmitted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidCollection": "Invalid {field} (maximum {max}).",
+  "@archiveInvalidCollection": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidText": "Invalid {field} (maximum {max} characters).",
+  "@archiveInvalidText": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidInteger": "Invalid {field} ({min}–{max}).",
+  "@archiveInvalidInteger": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveInvalidIdentifier": "Invalid {field}.",
+  "@archiveInvalidIdentifier": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveCsvExtraFields": "Row {row} has more fields than the header.",
+  "@archiveCsvExtraFields": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvInvalidSection": "Row {row}: section name is invalid; its tasks will have no project.",
+  "@archiveCsvInvalidSection": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvListDescription": "Row {row}: project descriptions are not supported.",
+  "@archiveCsvListDescription": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvOrphanComment": "Row {row}: comment has no valid preceding task; it will be skipped.",
+  "@archiveCsvOrphanComment": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvUnsupportedRow": "Row {row}: unsupported record type; it will be skipped.",
+  "@archiveCsvUnsupportedRow": {
+    "placeholders": {
+      "row": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveCsvFieldInNotes": "{field} will be kept as text in notes.",
+  "@archiveCsvFieldInNotes": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveField": "{field, select, export_id{export_id} tasks{tasks} lists{projects} list_id{project id} list_name{project name} task_identifier{task identifier} title{title} notes{notes} priority{priority} duration{duration} repeat_interval{repeat interval} repeat_weekdays{repeat weekdays} weekday{weekday} completed_dates{completed dates} individual_date_changes{individual date changes} list_identifier{list identifier} labels{labels} label{label} checklist{checklist} checklist_identifier{checklist identifier} checklist_title{checklist title} checklist_dates{checklist dates} reminder_lead{reminder lead} reminder_time{reminder time} other{field}}",
+  "notificationChannel": "Task reminders",
+  "notificationComplete": "Complete",
+  "notificationSnooze": "Snooze 10 min",
+  "notificationAt": "{hour, plural, other{{day, select, today{Today at {time}} tomorrow{Tomorrow at {time}} other{{date} at {time}}}}}",
+  "notificationDeadlineAt": "{hour, plural, other{{day, select, today{Deadline: today at {time}} tomorrow{Deadline: tomorrow at {time}} other{Deadline: {date} at {time}}}}}",
+  "notificationDeadlineToday": "Deadline: today",
+  "notificationInMinutes": "{when} · in {minutes} min",
+  "notificationInHours": "{when} · in {hours} h",
+  "notificationCompleted": "Completed: {title}",
+  "notificationToday": "On your list for today.",
+  "notificationMorning": "Make room for today",
+  "notificationEvening": "A moment to check in",
+  "notificationCheckIn": "Open TaskFlow to see your current tasks and plan your next step.",
+  "@notificationAt": {
+    "description": "Reminder body: when the task is due. day is today, tomorrow or other; date is the weekday date; hour is the hour as shown, for the article (Spanish and Catalan say a la 1:00).",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationDeadlineAt": {
+    "description": "Reminder body for a deadline. Placeholders as in notificationAt.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "hour": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationInMinutes": {
+    "description": "Reminder body: when, from notificationAt, then how far away.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationInHours": {
+    "description": "Reminder body: when, from notificationAt, then how far away.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "@notificationCompleted": {
+    "description": "Replaces a reminder for a few seconds after Complete, beside an Undo action. Also the message, with Undo, after a dictation marked exactly one task as done.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@archiveField": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "captureGone": "Your words are no longer available.",
+  "captureNoteLength": "A note needs 1 to 8000 characters.",
+  "captureNoTasks": "I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”",
+  "@captureNoTasks": {
+    "description": "Capture sheet banner, read out once, when the assistant found no task and no command in the words. Gives an example of what to say next; Say again (captureSayAgain) is the button under it."
+  },
+  "captureOffline": "No internet. Your words are saved — try again when you’re online.",
+  "captureUnavailable": "Couldn’t reach the assistant — your words are kept.",
+  "captureTooFast": "You’ve dictated a lot in a row. Wait a minute, then tap Try again.",
+  "@captureTooFast": {
+    "description": "Shown in the dictation sheet when many dictations came in a row and the per-minute limit refused this one. Names the Try again button under it; waiting a minute is enough."
+  },
+  "captureAllowance": "You’ve reached today’s dictation limit. Tap Save as a task, or try again tomorrow.",
+  "captureAllowanceRecording": "You’ve reached today’s dictation limit. Your recording is kept; try again tomorrow.",
+  "@captureAllowanceRecording": {
+    "description": "Capture sheet banner when the daily dictation limit refuses a recording that has no words yet. The only button is Close; the recording stays in Pending captures."
+  },
+  "captureSignIn": "Sign in again to turn your words into tasks.",
+  "captureForbidden": "This account can’t turn your words into tasks. Check your access and try again.",
+  "captureTooLarge": "This recording is too long. Discard it and dictate something shorter.",
+  "captureTypedFirst": "Save or discard what you typed before starting a recording.",
+  "captureMicrophone": "Without the microphone I can’t hear you. Tap Start talking to allow it, or Type instead.",
+  "@captureMicrophone": {
+    "description": "Capture sheet banner, not an error, after the person refused the microphone and Android can still ask. Names the two buttons shown under it: Start talking (captureStartTalking) and Type instead (captureTypeInstead)."
+  },
+  "captureMicrophoneBlocked": "To dictate again, open Settings and tap Permissions › Microphone › Allow.",
+  "@captureMicrophoneBlocked": {
+    "description": "Capture sheet banner, not an error, when Android will no longer ask for the microphone. The steps name Android’s own App info screen: Permissions, then Microphone, then Allow."
+  },
+  "captureOpenSettings": "Open Settings",
+  "@captureOpenSettings": {
+    "description": "Opens the phone’s settings for TaskFlow, to turn the microphone on."
+  },
+  "captureMicrophoneWhy": "Allow the microphone to dictate your tasks. It only listens while you dictate.",
+  "@captureMicrophoneWhy": {
+    "description": "One line in the capture sheet, in place of the Done button, while Android’s own microphone question is open the first time. Says why the app asks."
+  },
+  "captureStarting": "One moment…",
+  "@captureStarting": {
+    "description": "Capture status while the microphone starts, before it is listening."
+  },
+  "capturePaused": "Paused",
+  "@capturePaused": {
+    "description": "Capture status after leaving the app or an interruption ended listening; the words are kept."
+  },
+  "captureListening": "Listening",
+  "@captureListening": {
+    "description": "Announced to screen readers when the capture sheet starts listening."
+  },
+  "captureStartTalking": "Start talking",
+  "@captureStartTalking": {
+    "description": "With a screen reader on, the capture sheet waits for this button before it listens."
+  },
+  "captureContinue": "Continue",
+  "@captureContinue": {
+    "description": "Capture sheet: listens again and adds to the words already heard."
+  },
+  "captureTypeInstead": "Type instead",
+  "@captureTypeInstead": {
+    "description": "Keyboard button in the capture sheet: stops listening and lets you edit the words."
+  },
+  "captureStillListening": "Still listening. Tap Done when finished.",
+  "@captureStillListening": {
+    "description": "Shown under the words after about 5 seconds without new words, once some words were heard."
+  },
+  "captureNothingHeardYet": "Nothing heard yet. Speak when you’re ready, or tap Type instead.",
+  "@captureNothingHeardYet": {
+    "description": "Shown under the microphone after about 5 seconds of listening with no words heard yet, on the phone’s own speech recognition. Names the Type instead button (captureTypeInstead)."
+  },
+  "captureListeningOnline": "I’m listening. You’ll see your words when you tap Done.",
+  "@captureListeningOnline": {
+    "description": "Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done)."
+  },
+  "captureTimeLeft": "{seconds, plural, =1{1 second left} other{{seconds} seconds left}}",
+  "@captureTimeLeft": {
+    "description": "Shown under the microphone in the last 10 seconds of the 60-second listening limit, counting down each second; read out once, at 10 seconds left.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "captureKeepQuestion": "Keep what you said for later?",
+  "@captureKeepQuestion": {
+    "description": "The question asked when leaving the capture sheet with something said: by Cancel, Back, a tap above the sheet or a swipe down, while listening, or on the result of spoken words. No body text; its buttons are discard and keep."
+  },
+  "captureKeepTextQuestion": "Keep the text for later?",
+  "@captureKeepTextQuestion": {
+    "description": "The question asked when leaving the capture sheet with something typed or shared: by Cancel, Back, a tap above the sheet or a swipe down, while typing, or on the result of written words. No body text; its buttons are discard and keep."
+  },
+  "captureRecordingFirst": "Retry this recording or discard it before recording another.",
+  "captureEmptyInput": "Say or type what you need to do first.",
+  "captureSpeechStopped": "Listening stopped. You can talk again, or type.",
+  "captureNoSpeech": "I didn’t catch that. Try again, or type it.",
+  "captureCantListen": "I can’t listen on this phone right now. Tap Type instead.",
+  "@captureCantListen": {
+    "description": "Capture sheet, when neither the phone’s own speech recognition nor listening online could start. Names the Type instead button (captureTypeInstead)."
+  },
+  "captureIncompleteAudio": "This recording can’t be used. Discard it and dictate it again.",
+  "captureWriteFailed": "Couldn’t keep this on your phone. Try again before leaving.",
+  "captureStopFailed": "I couldn’t finish listening. What you said before is kept.",
+  "captureDiscardFailed": "Could not discard your words. They are still kept.",
+  "captureReviewWriteFailed": "Could not keep these changes. Please try again before leaving.",
+  "captureSaveFailed": "Couldn’t add it. Your words are still here; try again.",
+  "captureSetupRequested": "Speech setup was requested. Follow any Android prompt, then tap Check again. You can keep typing meanwhile.",
+  "voiceSetupRequested": "Follow Android’s steps, then tap Check again.",
+  "@voiceSetupRequested": {
+    "description": "Banner on the Voice screen after Android was asked to set up on-device speech for the language. The button name must match checkAgain."
+  },
+  "voiceSetupUnavailable": "This phone can’t set this up, so TaskFlow does it online.",
+  "@voiceSetupUnavailable": {
+    "description": "Banner on the Voice screen when Android's on-device speech setup for the language cannot be opened. Live transcription then runs online."
+  },
+  "captureSetupUnavailable": "Speech setup is unavailable here. Use saved audio or type.",
+  "voiceRecording": "Voice recording",
+  "capturesCaughtUp": "All caught up",
+  "capturesEmptyHelp": "Recordings and tasks you leave unfinished are kept here.",
+  "captureDraftSummary": "{count, plural, one{1 not added yet} other{{count} not added yet}}",
+  "@captureDraftSummary": {
+    "description": "In Unfinished captures, under a capture's first task: how many of its tasks are not added yet.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "editCaptureItem": "Edit {title}",
+  "@editCaptureItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "removeCaptureItem": "Remove {title}",
+  "@removeCaptureItem": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "captureTasksAdded": "{count, plural, one{1 task added} other{{count} tasks added}}",
+  "@captureTasksAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureKeptForReview": "{count, plural, one{1 kept for review} other{{count} kept for review}}",
+  "@captureKeptForReview": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureAlsoOn": "also on {date}",
+  "@captureAlsoOn": {
+    "description": "After a save, follows the count of tasks added (\"2 tasks added · also on Sat, Oct 17\") when one other task is on a day other than the one Calendar shows. The date is a weekday and date such as Sat, Oct 17.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "captureAlsoOnDays": "{count, plural, one{also on 1 other day} other{also on {count} other days}}",
+  "@captureAlsoOnDays": {
+    "description": "After a save, follows the count of tasks added (\"3 tasks added · also on 2 other days\") when the tasks fall on several days other than the one Calendar shows.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureConfirmDetails": "Use the details shown",
+  "captureNothingToReview": "Nothing left to review",
+  "captureRemovedDraftsHelp": "Nothing will change.",
+  "captureFinish": "Done",
+  "captureYourWords": "Your words",
+  "@captureYourWords": {
+    "description": "Screen-reader label of the field in the capture sheet where the person types (or sees) the words for their tasks. Not shown on screen."
+  },
+  "captureCheckDetails": "Check the details above",
+  "captureUnderstanding": "Understanding…",
+  "captureFailed": "That didn’t work. Your words are saved here — try again.",
+  "captureSlow": "Taking longer than usual.",
+  "captureSaveAsWritten": "Save as a task",
+  "@captureSaveAsWritten": {
+    "description": "Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant, after a failure (below Try again), and on a command result that found nothing."
+  },
+  "captureThingsToAdd": "{count, plural, one{1 thing to add} other{{count} things to add}}",
+  "@captureThingsToAdd": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureAddToCalendar": "Add to calendar",
+  "captureAddTask": "Add task",
+  "captureAddTasks": "{count, plural, one{Add 1 task} other{Add {count} tasks}}",
+  "@captureAddTasks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "captureSayAgain": "Say it again",
+  "labelsExample": "home, errands, calls",
+  "account": "Account",
+  "completedTaskSummary": "{count, plural, one {1 task completed. Tap its check to reopen it.} other {{count} tasks completed. Tap a check to reopen one.}}",
+  "@completedTaskSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taskTitleHint": "e.g. Doctor appointment",
+  "individualDateChanges": "{count, plural, one {1 individual date change} other {{count} individual date changes}}",
+  "@individualDateChanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "movedOccurrenceDate": "Moved to {date}",
+  "@movedOccurrenceDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reopenNamedTask": "Reopen {title}",
+  "completeNamedTask": "Complete {title}",
+  "viewOnlyTaskTitle": "View-only task",
+  "readOnlyList": "This project is read-only",
+  "listEditingAccessHelp": "To make changes, ask the project’s owner.",
+  "@listEditingAccessHelp": {
+    "description": "Under «This project is read-only», in a shared project the person can only view: who to ask to make changes."
+  },
+  "loadTaskError": "Couldn’t load this task",
+  "deleteSeriesHelp": "“{title}” and all its occurrences will be removed.",
+  "viewOnlyTask": "You can only view this task.",
+  "stepUpdateError": "Could not update this step. Please retry.",
+  "diagnosticsPrivacy": "Local counts and timing from the last 1,000 events. No task titles, words, recordings or account identifiers are included. Nothing here is uploaded.",
+  "diagnosticsPercentiles": "Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.",
+  "diagnosticsMeasurementHelp": "Keeping a capture for later is not a failure. Counts can include several visits to the same draft; they are not a user conversion rate. Correction time covers open editing dialogs, including cancelled ones. Local save timing excludes cloud sync. Audio transcription excludes typed and on-device input.",
+  "diagnosticsObservations": "{count, plural, one {1 observation} other {{count} observations}}",
+  "diagnosticsItems": "{count, plural, one {1 item} other {{count} items}}",
+  "diagnosticsTiming": "Median {median} s · P95 {p95} s · {count, plural, one {1 timed observation} other {{count} timed observations}}",
+  "diagnosticsClearError": "Could not clear diagnostics. Try again.",
+  "clearDiagnostics": "Clear local diagnostics",
+  "diagnosticsEvent": "{event, select, opened{Capture opened} ready{Capture ready to use} started{New durable captures} typedStarted{Typed input started} permissionDenied{Microphone permission denied} nativeStarted{On-device listening started} firstPartial{First on-device words} nativeListening{On-device listening duration} recordingStopped{Saved audio duration} transcription{Online audio transcription} extraction{Online task extraction} processing{Request and retained drafts} notePrepared{Local note prepared} noteTranscribed{Recorded note ready} failed{Failed requests} retried{Retried requests} edited{Draft changes} reviewOpened{Review opened} reviewTime{Time in review} correction{Correction dialog time} saved{Confirmed to local save} discarded{Explicitly discarded captures} resumed{Resumed captures} leftCapturePending{Capture kept for later} leftReviewPending{Review kept for later} recognizerFinish{Last words after Done} other{Other capture event}}",
+  "@reopenNamedTask": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@completeNamedTask": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@deleteSeriesHelp": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@diagnosticsObservations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@diagnosticsItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@diagnosticsTiming": {
+    "placeholders": {
+      "median": {
+        "type": "String"
+      },
+      "p95": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@diagnosticsEvent": {
+    "placeholders": {
+      "event": {
+        "type": "String"
+      }
+    }
+  },
+  "taskflowPro": "TaskFlow Pro",
+  "billingSettingsHelp": "Subscription, purchases and billing",
+  "billingIntro": "Unlimited dictations, and room for all your files.",
+  "@billingIntro": {
+    "description": "The Pro screen's first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro."
+  },
+  "billingComplimentary": "Complimentary Pro access. All Pro features are included, with no payment or renewal.",
+  "billingStatus": "{status, select, active{Pro is active} inactive{No active Pro subscription} other{Subscription status unavailable}}",
+  "billingUntil": "{kind, select, renews{Renews on {date}} other{Access until {date}}}",
+  "billingTestMode": "Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.",
+  "billingGuestHelp": "Sign in to link purchases to your TaskFlow account and recover Pro on your other devices.",
+  "billingSignIn": "Sign in to TaskFlow",
+  "billingWorking": "Updating subscription",
+  "billingMonthlyPrice": "{price} / month",
+  "billingRenewalHelp": "Automatically renews each month until cancelled. Review the final price and any trial terms before confirming.",
+  "billingViewPlans": "View subscription",
+  "billingTestMonthly": "Test monthly purchase",
+  "billingRestore": "Restore purchases",
+  "billingManage": "Manage subscription",
+  "billingRestoreHelp": "Already subscribed? Use the same store account, then restore purchases. Cancelling renewal keeps Pro available until your paid access ends.",
+  "billingError": "{reason, select, unsupportedPlatform{Subscriptions are available in the Android app.} configuration{Subscriptions are not available yet. Please try again later.} accountUnavailable{Could not connect to your TaskFlow account. Check your connection and open this screen again.} network{Could not check your subscription. Check your connection and open this screen again.} notAllowed{Purchases are restricted for this store account or device.} otherAccount{This purchase belongs to another account. Sign in to the original account to restore it.} store{The store didn’t answer. Open this screen again.} other{The store didn’t answer. Open this screen again.}}",
+  "billingResult": "{result, select, active{TaskFlow Pro is active.} restored{Your Pro subscription was restored.} noPurchases{No active Pro purchase was found for this account.} awaitingEntitlement{Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.} updated{Subscription status updated.} pending{Payment is pending. Pro will activate after the store confirms payment.} busy{Please wait for the current operation to finish.} accountChanged{The account changed. Check the subscription on the purchasing account.} other{The request could not be completed. Please try again.}}",
+  "@billingStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "@billingUntil": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@billingMonthlyPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "@billingError": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@billingResult": {
+    "placeholders": {
+      "result": {
+        "type": "String"
+      }
+    }
+  },
+  "continueWithGoogle": "Continue with Google",
+  "continueWithEmail": "Continue with email",
+  "@continueWithEmail": {
+    "description": "Sign-in's first screen, a text button under Continue with Google: shows the email and password form in place."
+  },
+  "invitationWaitingSignIn": "You have an invitation. Sign in with the email address it was sent to.",
+  "@invitationWaitingSignIn": {
+    "description": "Sign-in, above Continue with Google, while an invitation link opened before signing in waits: the invitation only works for the address it was sent to."
+  },
+  "linkGoogleAccount": "Link Google account",
+  "googleAccountLinked": "Google account linked",
+  "googleLinkHelp": "Confirm your TaskFlow password, then choose the Google account with the same email. Your tasks and subscription will stay in this account.",
+  "googleSignInSetupPending": "Google sign-in is not available in this build yet. You can use email and password.",
+  "googleSignInError": "{code, select, google_not_configured{Google sign-in is not available yet. Use email and password for now.} google_link_required{This email already has a TaskFlow account. Sign in with your password, then choose Link Google account.} google_password_required{Enter your current TaskFlow password to link Google.} google_email_mismatch{Choose the Google account with the same email as your TaskFlow account.} google_already_linked{This Google account is already linked. Sign in to the original TaskFlow account.} google_account_changed{Your account changed during sign-in. Please try again.} google_invalid_token{Google could not verify your sign-in. Please try again.} other{Google sign-in could not finish. Check your connection and try again.}}",
+  "@googleSignInError": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "authOr": "or",
+  "authRestoring": "Opening your space…",
+  "authHaveRecoveryCode": "I already have a code",
+  "useTestAccount": "Use test account",
+  "developmentOnly": "Development only",
+  "projectsAll": "All projects",
+  "projectsPersonal": "Personal projects",
+  "projectsShared": "Shared projects",
+  "projectsFind": "Find a project",
+  "projectsManage": "Manage projects",
+  "forMe": "For me",
+  "forTeam": "All",
+  "responsibility": "Responsible",
+  "assignedToMe": "Me",
+  "assignedToGroup": "Everyone",
+  "assignmentNeeded": "Needs an assignee",
+  "assignmentChoose": "Who is responsible?",
+  "assignmentGroupHelp": "One shared task. A member completes it for everyone.",
+  "assignmentHeard": "You mentioned: {names}",
+  "audiencePersonal": "Only you can see this.",
+  "audienceShared": "All members can see it.",
+  "@audienceShared": {
+    "description": "Under the assignee chip of a task in a shared project: who can see the task. The pair of «Only you can see this.»."
+  },
+  "shareTaskConfirm": "Share with {name}? Everyone there will see this task. It can’t be made private again.",
+  "@shareTaskConfirm": {
+    "description": "Asked before a personal task moves into a shared project. {name} is the group, or the project when it has no group.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareTask": "Share",
+  "sharedTaskStays": "Shared tasks stay in their project.",
+  "assignmentIsRight": "Is this right?",
+  "yes": "Yes",
+  "pinProject": "Pin project",
+  "unpinProject": "Unpin project",
+  "groups": "Groups",
+  "newGroup": "New group",
+  "groupName": "Group name",
+  "groupHelp": "Invite people once and share several projects with them.",
+  "groupMembers": "Members",
+  "groupAdmin": "Administrator",
+  "groupProjects": "Group projects",
+  "groupInviteHelp": "They’ll see every project in this group. We’ll email them an invitation.",
+  "@groupInviteHelp": {
+    "description": "Help under the group invite dialog’s title, above the email field."
+  },
+  "groupLeave": "Leave group",
+  "groupLeaveHelp": "You will lose access to this group’s projects and files. Your tasks stay in the group for reassignment.",
+  "groupTransfer": "Transfer ownership",
+  "groupTransferHelp": "The new owner controls this group and its projects. You will remain an administrator.",
+  "groupArchive": "Archive group",
+  "groupRestore": "Restore group",
+  "groupArchivedForEveryone": "{name} archived for everyone — hidden from calendars, no reminders.",
+  "@groupArchivedForEveryone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupDeleteHelp": "Only an empty group can be deleted. Archive a group to keep its projects and content.",
+  "groupActionError": "This change could not be saved. Check your connection and refresh; permissions may have changed.",
+  "groupVoiceName": "Name for voice assignments",
+  "groupVoiceHelp": "An optional name others can use when assigning tasks by voice.",
+  "createGroup": "Create group",
+  "enterName": "Enter a name.",
+  "groupRoleQuestion": "What can {name} do?",
+  "@groupRoleQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupInvited": "Invited",
+  "invitationPending": "Pending",
+  "loadFailed": "Couldn’t load. Check your connection.",
+  "projectDestination": "Where does this project belong?",
+  "projectNotifications": "Project updates",
+  "updatesAll": "All changes",
+  "updatesAssigned": "My assignments",
+  "updatesMuted": "Muted — no updates or reminders",
+  "activity": "Activity",
+  "activityEmpty": "You’re up to date.",
+  "activityHelp": "Assignments and updates from your shared projects appear here.",
+  "activityMarkRead": "Mark all as read",
+  "activityCreated": "Created a task",
+  "activityUpdated": "Updated a task",
+  "activityAssigned": "Changed responsibility",
+  "activityCompleted": "Completed a task",
+  "activityReopened": "Reopened a task",
+  "activityDeleted": "Deleted a task",
+  "activityUnassigned": "Removed the assignee",
+  "@activityUnassigned": {
+    "description": "A task’s history (task details, Activity section): the entry for someone taking the task’s assignee off, so it has nobody. The person’s name and the date show under it."
+  },
+  "activitySystem": "TaskFlow",
+  "groupActivity": "Updates",
+  "@groupActivity": {
+    "description": "Title of the screen that lists what others did in every shared project, and the tooltip of the header button (people icon) that opens it."
+  },
+  "activityUnread": "Unread",
+  "@activityUnread": {
+    "description": "Spoken by TalkBack before an unread activity row."
+  },
+  "activityFindingTask": "Finding the task…",
+  "@activityFindingTask": {
+    "description": "Activity: read by TalkBack, and the label of the thin progress bar, on an entry whose task isn’t on the phone yet, while the app fetches it. Keep it short."
+  },
+  "activityEntry": "{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}",
+  "@activityEntry": {
+    "description": "One activity row: who did what to which task. action is an internal code; actor is a person’s name; title is the task title.",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "actor": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "activityAssignedYou": "{actor} assigned you: {title}",
+  "@activityAssignedYou": {
+    "description": "An Updates row when someone made the reader responsible for a task. actor is that person’s name; title is the task title.",
+    "placeholders": {
+      "actor": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "activityAssignedTo": "{actor} assigned {name}: {title}",
+  "@activityAssignedTo": {
+    "description": "An Updates row when someone made another person responsible for a task; the previous assignee reads it too. actor is who did it; name is the new assignee’s name; title is the task title.",
+    "placeholders": {
+      "actor": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "captureSpeakingIsPro": "Speaking a task is part of TaskFlow Pro. You can type it here.",
+  "@captureSpeakingIsPro": {
+    "description": "Atop the capture sheet without Pro, when it was opened to speak (the home-screen widget, the voice shortcut): it types instead."
+  },
+  "voiceProAction": "Explore Pro",
+  "projectsNoneFound": "No matching projects",
+  "groupRename": "Rename group",
+  "groupRemoveHelp": "Removing this member ends their access to every project in this group. Their tasks stay and will need reassignment.",
+  "projectsPinned": "Pinned projects",
+  "invitationReview": "Review invitation",
+  "invitationFrom": "{sender} invited you to “{name}”",
+  "@invitationFrom": {
+    "description": "First line of the invitation review screen when the server says who sent it.",
+    "placeholders": {
+      "sender": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "invitationReviewHelp": "You’ll see its tasks, notes and files.",
+  "invitationUnavailable": "This invitation is unavailable for this account. Check that you signed in with the email address that received it, or ask for a new invitation.",
+  "invitationViewerAccess": "You’ll be able to see it, not change it.",
+  "@invitationViewerAccess": {
+    "description": "On the invitation screen, under the help line, only when the invitation gives view-only access to the project or group"
+  },
+  "invitationAdminAccess": "You’ll be able to manage the group.",
+  "@invitationAdminAccess": {
+    "description": "On the invitation screen, under the help line, only when the invitation makes the person an administrator of the group"
+  },
+  "close": "Close",
+  "@close": {
+    "description": "General button that closes the current screen. On the invitation screen, the only button when the invitation is no longer available; it also forgets the invitation link"
+  },
+  "stagingInviteOnly": "This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.",
+  "freeVoiceLeft": "{count, plural, =0{No free dictations left this month} =1{1 free dictation left this month} other{{count} free dictations left this month}}",
+  "@freeVoiceLeft": {
+    "description": "Under a spoken capture's result, for an account without Pro, only when 3 or fewer free dictations are left this month.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "freeVoiceUsedUp": "No free dictations until {date}.",
+  "@freeVoiceUsedUp": {
+    "description": "Atop the capture sheet for an account without Pro once this month's free dictations are used up: it types instead, with the field already focused, and also in Unfinished captures. {date} is the local short date they come back.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "freeVoiceUsedUpRecording": "Your recording is kept. It can be understood from {date}, or now with Pro.",
+  "@freeVoiceUsedUpRecording": {
+    "description": "For a capture that is only a recording, refused because this month's free dictations are used up: in the capture sheet and in Unfinished captures. {date} is the local short date they come back.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "captureClose": "Close",
+  "@captureClose": {
+    "description": "Closes the capture sheet when only a recording is kept and free dictations are used up"
+  },
+  "freeVoiceStatus": "Free dictations: {left} of {limit} left this month. More on {date}.",
+  "@freeVoiceStatus": {
+    "description": "On the Pro screen, for an account without Pro. {date} is the local short date this month's free dictations come back.",
+    "placeholders": {
+      "left": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "newTask": "New task",
+  "@newTask": {
+    "description": "Replaces Add a task, with a + icon, for an account without Pro once the mic isn't available (this month's free dictations are used up, or the server sends no count). It opens the task form, with no limit. Also the form's title while it creates a task."
+  },
+  "pickDay": "Pick a day",
+  "@pickDay": {
+    "description": "In the task form for a new task, the third day chip after Today and Tomorrow: opens the date sheet. Short, so the three fit on one row."
+  },
+  "removeTime": "Remove time",
+  "@removeTime": {
+    "description": "Tooltip of the small ✕ on a new task's time chip in the task form: the task keeps its day, with no time."
+  },
+  "createdBy": "Created by {name}",
+  "@createdBy": {
+    "description": "On a task's or note's details page in a shared project, under the project and who it's for. {name} is the display name of the account that created it; hidden when that account has left or been deleted.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "createdByYou": "Created by you",
+  "@createdByYou": {
+    "description": "On a task's or note's details page in a shared project, in place of “Created by {name}” when the signed-in account created it; the same screen calls that account “Me” in who it's for."
+  },
+  "freeVoiceNoticeTitle": "{limit, plural, =1{You’ve used your free dictation for this month} other{You’ve used your {limit} free dictations for this month}}",
+  "@freeVoiceNoticeTitle": {
+    "description": "Title of a sheet shown at most once a month: the first time an account without Pro taps New task with this month's free dictations used up. {limit} is the account's monthly free dictations (10).",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "freeVoiceNoticeBody": "You can keep creating tasks by hand, with no limit. {limit, plural, =1{On {date} you’ll get 1 more dictation.} other{On {date} you’ll get {limit} more dictations.}}",
+  "@freeVoiceNoticeBody": {
+    "description": "Under that title. {limit} is how many free dictations come back, and {date} the local short date they do.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "freeVoiceNoticeCreate": "Create a task",
+  "@freeVoiceNoticeCreate": {
+    "description": "That sheet's main button: opens the task form. Its other button is voiceProAction."
+  },
+  "storageUsage": "Files: {used} of {limit} MB used",
+  "@storageUsage": {
+    "description": "Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes.",
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "storageFull": "Your file space is full ({limit} MB).",
+  "@storageFull": {
+    "description": "Under an attachment the server refused because the user's own free file space is full. The card's buttons below it offer Pro and the list of tasks with files. {limit} is the free cap in whole megabytes.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "storageFullShared": "This project’s file space is full. Its owner can remove files to make room.",
+  "@storageFullShared": {
+    "description": "Under an attachment the server refused because the file space of the shared project's owner is full."
+  },
+  "storageSeeTasks": "Show tasks with files",
+  "@storageSeeTasks": {
+    "description": "Button beside Explore Pro, only while the user's own free file space is full: under a file refused for it, and on the Pro screen under the usage line. Opens the list of tasks with files."
+  },
+  "tasksWithFiles": "Tasks with files",
+  "@tasksWithFiles": {
+    "description": "Title of the screen listing the tasks and notes whose files use this account's file space, largest first."
+  },
+  "tasksWithFilesHelp": "Open a task to remove the files you no longer need.",
+  "@tasksWithFilesHelp": {
+    "description": "One line above the rows of the Tasks with files screen."
+  },
+  "tasksWithFilesRow": "{count, plural, =1{1 file} other{{count} files}} · {size} MB",
+  "@tasksWithFilesRow": {
+    "description": "Under a task's title on the Tasks with files screen: how many files it holds and their total size. {size} is already formatted in the app's locale, to one decimal (12.4).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "tasksWithFilesEmpty": "No tasks have files.",
+  "@tasksWithFilesEmpty": {
+    "description": "The Tasks with files screen when no task holds files in this account's space."
+  },
+  "projectPinned": "Pinned",
+  "@projectPinned": {
+    "description": "Spoken label of the pin icon before a pinned project's name in Projects."
+  },
+  "projectSharedRole": "Shared · {role}",
+  "@projectSharedRole": {
+    "description": "Subtitle of a project shared directly with people (not through a group) in Projects. {role} is the user's role, such as Editor; for the project's owner, its count of open tasks and notes, such as «5 tasks and notes».",
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "projectGroupSees": "Everyone in {group} will see it.",
+  "@projectGroupSees": {
+    "description": "Under 'Where does this project belong?' in the new-project dialog, once a group is chosen. {group} is the group's name.",
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccount": "Delete account",
+  "@deleteAccount": {
+    "description": "The last row of the Account screen, in the destructive colour, and the title of the page it opens."
+  },
+  "deleteAccountQuestion": "Delete your account?",
+  "@deleteAccountQuestion": {
+    "description": "Heading of the delete-account page."
+  },
+  "deleteAccountIntro": "This deletes your TaskFlow account and your tasks, notes and files on all your devices. It can’t be undone.",
+  "@deleteAccountIntro": {
+    "description": "First line of the delete-account page, under its heading."
+  },
+  "deleteAccountWhatGoes": "What will be deleted:",
+  "@deleteAccountWhatGoes": {
+    "description": "Introduces the list of counts (tasks, notes, files, projects, groups) that deleting the account removes."
+  },
+  "deleteAccountTasks": "{count, plural, =1{1 task} other{{count} tasks}}",
+  "@deleteAccountTasks": {
+    "description": "A line in the list under 'What will be deleted:'.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountNotes": "{count, plural, =1{1 note} other{{count} notes}}",
+  "@deleteAccountNotes": {
+    "description": "A line in the list under 'What will be deleted:'.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountFiles": "{count, plural, =1{1 file} other{{count} files}}",
+  "@deleteAccountFiles": {
+    "description": "A line in the list under 'What will be deleted:'. Attached files.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountProjects": "{count, plural, =1{1 project} other{{count} projects}}",
+  "@deleteAccountProjects": {
+    "description": "A line in the list under 'What will be deleted:'. The person's own unshared projects.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountGroups": "{count, plural, =1{1 group} other{{count} groups}}",
+  "@deleteAccountGroups": {
+    "description": "A line in the list under 'What will be deleted:'. Groups with no one else in them.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountKeptShared": "{count, plural, =1{1 task you added to shared projects, without your name} other{{count} tasks you added to shared projects, without your name}}",
+  "@deleteAccountKeptShared": {
+    "description": "A bullet under 'What stays for the others:' on the delete-account page, when tasks the person added to other people's shared projects stay after the account is deleted. The files they added there have their own bullet, deleteAccountKeptFiles. No final full stop.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountKeptFiles": "{count, plural, =1{1 file you added to shared projects, without your name} other{{count} files you added to shared projects, without your name}}",
+  "@deleteAccountKeptFiles": {
+    "description": "A bullet under 'What stays for the others:' on the delete-account page, after deleteAccountKeptShared, when files the person added in shared projects (on their own tasks or on other people's) stay after the account is deleted. Same wording as deleteAccountKeptShared, with files. No final full stop.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountHandover": "{kind, select, group{The group “{name}” and its projects will go to {person}} other{The project “{name}” will go to {person}}}",
+  "@deleteAccountHandover": {
+    "description": "A bullet under 'What stays for the others:' on the delete-account page, one per project or group the person owns that passes to someone else when the account is deleted; a group's projects go with it. Also a line of the banner after the page reloaded, when this handover is new or changed. {kind} is 'group' or 'project' and is never translated. {name} is the project or group; {person} is who receives it (a name or an email). No final full stop.",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      },
+      "person": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountWhatStays": "What stays for the others:",
+  "@deleteAccountWhatStays": {
+    "description": "Heading of the second list on the delete-account page: what stays for other people. Shown only when that list has a line."
+  },
+  "deleteAccountSubscription": "If you pay for TaskFlow Pro on Google Play, deleting your account doesn’t cancel the subscription.",
+  "@deleteAccountSubscription": {
+    "description": "On the delete-account page when the server says the account has Pro or billing could not be checked, except for complimentary Pro. True for anyone who reads it."
+  },
+  "deleteAccountSaveCopy": "Save a copy of your tasks first",
+  "@deleteAccountSaveCopy": {
+    "description": "Link on the delete-account page that saves a TaskFlow export file at once, through Android's save screen. Shown only when the person has tasks or notes."
+  },
+  "deleteAccountCopySaved": "Copy saved",
+  "@deleteAccountCopySaved": {
+    "description": "Replaces the save-a-copy link on the delete-account page once the file was saved."
+  },
+  "deleteAccountCopyNoFiles": "The copy doesn’t include files.",
+  "@deleteAccountCopyNoFiles": {
+    "description": "Under the save-a-copy link, or under Copy saved, when the person has attached files: the export keeps only the names of the files."
+  },
+  "deleteAccountPasswordHelp": "To confirm, enter your password.",
+  "@deleteAccountPasswordHelp": {
+    "description": "Above the password field that confirms deleting the account."
+  },
+  "deleteAccountGoogleHelp": "To confirm, choose {email} when Google asks. Your Google account isn’t deleted.",
+  "@deleteAccountGoogleHelp": {
+    "description": "Above the Confirm with Google button, for an account that signs in only with Google. {email} is the TaskFlow account's email, which for these accounts is the Google address. Says the Google account itself isn't deleted.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountGoogleInstead": "Or confirm with Google and choose {email}. Your Google account isn’t deleted.",
+  "@deleteAccountGoogleInstead": {
+    "description": "Above the Confirm with Google button, under the password field, for an account with a password and Google linked: confirming with Google instead of the password. {email} is the TaskFlow account's email. Says the Google account itself isn't deleted.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountConfirmGoogle": "Confirm with Google",
+  "@deleteAccountConfirmGoogle": {
+    "description": "Button that opens Google sign-in to confirm deleting the account."
+  },
+  "deleteAccountGoogleConfirmed": "Confirmed with Google",
+  "@deleteAccountGoogleConfirmed": {
+    "description": "Shown in place of the Confirm with Google button once Google sign-in succeeded."
+  },
+  "deleteAccountButton": "Delete my account",
+  "@deleteAccountButton": {
+    "description": "The destructive button at the bottom of the delete-account page."
+  },
+  "deleteAccountDeleting": "Deleting your account…",
+  "@deleteAccountDeleting": {
+    "description": "Inside Delete my account, after a spinner, while the request runs (up to a minute). Ends with an ellipsis."
+  },
+  "deleteAccountWrongPassword": "That password isn’t right. If you don’t remember it, sign out and tap “Forgot password?”",
+  "@deleteAccountWrongPassword": {
+    "description": "Under the password field on the delete-account page after a wrong password. Says how to recover a forgotten one: sign out, then Forgot password? on sign-in. The quoted words must match forgotPassword, and the verb the signOut button."
+  },
+  "deleteAccountWrongPasswordGoogle": "That password isn’t right. If you don’t remember it, tap “Confirm with Google”.",
+  "@deleteAccountWrongPasswordGoogle": {
+    "description": "Under the password field on the delete-account page after a wrong password, for an account with Google linked: the Confirm with Google button below confirms instead. The quoted words must match deleteAccountConfirmGoogle."
+  },
+  "deleteAccountOtherGoogle": "Choose {email}, the Google account you use for TaskFlow.",
+  "@deleteAccountOtherGoogle": {
+    "description": "On the delete-account page, when the Google account chosen to confirm isn't the one linked to this TaskFlow account. {email} is the TaskFlow account's email, which for these accounts is the Google address.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountOffline": "You need a connection to delete your account. Nothing was deleted.",
+  "@deleteAccountOffline": {
+    "description": "Under Delete my account when the phone is offline."
+  },
+  "deleteAccountNoAnswer": "There was no answer. Check your connection and try again.",
+  "@deleteAccountNoAnswer": {
+    "description": "Under Delete my account when the request timed out; it may or may not have arrived, so it doesn't say nothing was deleted."
+  },
+  "deleteAccountThrottled": "Too many tries. Try again later.",
+  "@deleteAccountThrottled": {
+    "description": "Under Delete my account when the server refuses more attempts for now."
+  },
+  "tooManyTriesWait": "{minutes, plural, =1{Too many tries. Wait a minute and try again.} other{Too many tries. Wait {minutes} minutes and try again.}}",
+  "@tooManyTriesWait": {
+    "description": "When the server refuses more attempts for {minutes} minutes, rounded up, at least 1: under Delete my account, and on sign-in, Create your account and the email-confirmation screen. After five wrong passwords it is 15 minutes.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteAccountPlanChanged": "Something has changed since you opened this screen. Check what will happen and confirm again.",
+  "@deleteAccountPlanChanged": {
+    "description": "Above Delete my account when the server refused because what the page showed changed meanwhile (for example, the person who would receive a project left it). The page has just reloaded; nothing was deleted. Used when no handover is new or changed."
+  },
+  "deleteAccountChangedIntro": "Something has changed since you opened this screen:",
+  "@deleteAccountChangedIntro": {
+    "description": "First line of the banner above Delete my account after the page reloaded because a handover is new or changed; the changed handover lines follow, then deleteAccountChangedCheck."
+  },
+  "deleteAccountChangedCheck": "Check it and confirm again.",
+  "@deleteAccountChangedCheck": {
+    "description": "Last line of that banner."
+  },
+  "deleteAccountConfirmAgain": "Confirm it’s you again.",
+  "@deleteAccountConfirmAgain": {
+    "description": "On the delete-account page when the server needs the password or Google confirmation again."
+  },
+  "deleteAccountFailed": "Your account couldn’t be deleted. Try again later.",
+  "@deleteAccountFailed": {
+    "description": "Under Delete my account for any other failure."
+  },
+  "webPageOpenError": "Couldn’t open the page.",
+  "@webPageOpenError": {
+    "description": "Brief message when nothing on the phone could open a web page: the Privacy Policy, the Terms and Conditions, or Google Play’s subscriptions page."
+  },
+  "accountDeleted": "Your account has been deleted.",
+  "@accountDeleted": {
+    "description": "On the sign-in screen, right after the account was deleted."
+  },
+  "commandNewProject": "New project: {name}",
+  "@commandNewProject": {
+    "description": "A dictation's result: the card of a project the confirming tap creates, and the row for it in a task's project sheet (the chip uses commandNewProjectChip). {name} is the project's name as said.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandNewProjectChip": "{name} (new)",
+  "@commandNewProjectChip": {
+    "description": "A dictation's result: the project chip of a task that goes into a project the confirming tap creates, name first so it shows at large text. {name} is the project's name as said, or as corrected.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandUseName": "Use this name",
+  "@commandUseName": {
+    "description": "The button of the dialog that corrects the name of a project a dictation creates, opened from the task's project sheet. Nothing is created until the result's confirming tap."
+  },
+  "commandRenameProject": "Change the name",
+  "@commandRenameProject": {
+    "description": "TalkBack name of the pencil on the project sheet's row for a project a dictation creates; a tap on the row opens the dialog that corrects that project's name. Nothing is created until the result's confirming tap."
+  },
+  "commandExistingProject": "You already have “{name}”",
+  "@commandExistingProject": {
+    "description": "A dictation's result, when the project the person asked to create already exists: nothing is created. {name} is that project's real name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandExistingProjectTasks": "{count, plural, =1{The task goes there.} other{The tasks go there.}}",
+  "@commandExistingProjectTasks": {
+    "description": "Under commandExistingProject, when tasks in the same dictation name that project. {count} is how many of the dictation's tasks go there.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandCreateProjectQuestion": "Create the project “{name}”?",
+  "@commandCreateProjectQuestion": {
+    "description": "A dictation's result, for a project the person asked to create that matches several projects, or one with a different name. Chips follow: create it, or pick an existing project. {name} is the name as said.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandCreateNamed": "Create “{name}”",
+  "@commandCreateNamed": {
+    "description": "First chip under commandCreateProjectQuestion and commandWhichProject: creates that project on the confirming tap. {name} is the name as said.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandWhichProject": "Which project should it go in?",
+  "@commandWhichProject": {
+    "description": "A dictation's task named a project that doesn't exist. Chips follow: commandCreateNamed, up to three projects with a similar name, commandOtherProject and No project."
+  },
+  "commandOtherProject": "Another project…",
+  "@commandOtherProject": {
+    "description": "Chip after the similar projects under commandWhichProject or commandCreateProjectQuestion: opens the list of the person's projects, where a pick answers the question. Shown only when they have other projects."
+  },
+  "commandWhichProjectOfTasks": "Which project?",
+  "@commandWhichProjectOfTasks": {
+    "description": "A dictation's search, change, deletion or completion named a project that matches two or more of the person's projects. One chip per project follows; a tap works the command out in that project. Not for placing a new task (that is commandWhichProject)."
+  },
+  "commandCreateProjects": "{count, plural, =1{Create project} other{Create {count} projects}}",
+  "@commandCreateProjects": {
+    "description": "The confirming button of a dictation's result that only creates projects.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandAddAndChange": "Add and change",
+  "@commandAddAndChange": {
+    "description": "The confirming button of a dictation's result that adds tasks and changes tasks, and deletes none."
+  },
+  "commandAddAndDelete": "Add and delete",
+  "@commandAddAndDelete": {
+    "description": "The confirming button of a dictation's result that adds tasks and deletes tasks, and changes none."
+  },
+  "commandChangeAndDelete": "Change and delete",
+  "@commandChangeAndDelete": {
+    "description": "The confirming button of a dictation's result that changes tasks and deletes tasks, and adds none."
+  },
+  "commandAddChangeAndDelete": "Add, change and delete",
+  "@commandAddChangeAndDelete": {
+    "description": "The confirming button of a dictation's result that adds, changes and deletes tasks."
+  },
+  "commandDontDelete": "Don’t delete {title}",
+  "@commandDontDelete": {
+    "description": "Tooltip and screen-reader label of the ✕ on a deletion's card in a dictation's result: the task is kept. {title} is the task's title, or the words said for it.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDontChange": "Don’t change {title}",
+  "@commandDontChange": {
+    "description": "Tooltip and screen-reader label of the ✕ on a change's card in a dictation's result: the task stays as it is. {title} is the task's title, or the words said for it.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDontChangeAny": "Don’t change any",
+  "@commandDontChangeAny": {
+    "description": "Tooltip and screen-reader label of the ✕ on a change's card in a dictation's result while it asks which of several tasks to change (“Which one do you want to change?”): none of them is changed."
+  },
+  "commandDontDeleteAny": "Don’t delete any",
+  "@commandDontDeleteAny": {
+    "description": "Tooltip and screen-reader label of the ✕ on a deletion's card in a dictation's result while it asks which of several tasks to delete (“Which one do you want to delete?”): none of them is deleted."
+  },
+  "commandDontCreate": "Don’t create {name}",
+  "@commandDontCreate": {
+    "description": "Tooltip and screen-reader label of the ✕ on a new project's card in a dictation's result: the project isn't created. {name} is the project's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandWontDelete": "{count, plural, =1{Won’t be deleted} other{Won’t be deleted}}",
+  "@commandWontDelete": {
+    "description": "Message, with Undo, after the ✕ on a deletion's card in a dictation's result: the tasks are kept. {count} is how many tasks the card would have deleted: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandWontChange": "{count, plural, =1{Won’t be changed} other{Won’t be changed}}",
+  "@commandWontChange": {
+    "description": "Message, with Undo, after the ✕ on a change's card in a dictation's result: the tasks stay as they are. {count} is how many tasks the card would have changed: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandWontCreate": "Won’t be created",
+  "@commandWontCreate": {
+    "description": "Message, with Undo, after the ✕ on a new project's card in a dictation's result: the project isn't created."
+  },
+  "commandFindWords": "Tasks with “{words}”",
+  "@commandFindWords": {
+    "description": "Heading of a dictation's search results. {words} are the words searched for.",
+    "placeholders": {
+      "words": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindProject": "Tasks in “{name}”",
+  "@commandFindProject": {
+    "description": "Heading of a dictation's search results for all of a project's tasks. {name} is the project.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindPerson": "Tasks for {name}",
+  "@commandFindPerson": {
+    "description": "Heading of a dictation's search results for the tasks assigned to someone. {name} is that person.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindMine": "Your tasks",
+  "@commandFindMine": {
+    "description": "Heading of a dictation's search results for the person's own tasks."
+  },
+  "commandFindProjectPerson": "Tasks in “{project}” for {name}",
+  "@commandFindProjectPerson": {
+    "description": "Heading of a dictation's search results for a project's tasks assigned to someone. {project} is the project; {name} is that person.",
+    "placeholders": {
+      "project": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindProjectMine": "Your tasks in “{project}”",
+  "@commandFindProjectMine": {
+    "description": "Heading of a dictation's search results for the person's own tasks in a project. {project} is the project.",
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindPeriod": "{from} to {to}",
+  "@commandFindPeriod": {
+    "description": "Under the heading of a dictation's search results: the period searched, longer than one day. {from} and {to} are its first and last days, weekday first (“Mon, Oct 19”).",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindOpen": "To do",
+  "@commandFindOpen": {
+    "description": "Under the heading of a dictation's search results, when it searched only tasks not yet done. Matches agendaCounts."
+  },
+  "commandFindDone": "Completed",
+  "@commandFindDone": {
+    "description": "Under the heading of a dictation's search results, when it searched only completed tasks. Matches agendaCounts."
+  },
+  "commandCompleted": "Completed",
+  "@commandCompleted": {
+    "description": "On a completed task in a dictation's search results."
+  },
+  "commandFindNone": "There’s no task with “{words}”",
+  "@commandFindNone": {
+    "description": "A dictation's search found nothing. {words} are the words searched for.",
+    "placeholders": {
+      "words": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFindNoneAtAll": "There are no tasks",
+  "@commandFindNoneAtAll": {
+    "description": "A dictation's search without words (a project's, a person's tasks) found nothing."
+  },
+  "commandMore": "{count, plural, =1{And 1 more} other{And {count} more}}",
+  "@commandMore": {
+    "description": "Under a dictation's search results, when more tasks match than are shown.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandShowMore": "{count, plural, =1{Show 1 more} other{Show {count} more}}",
+  "@commandShowMore": {
+    "description": "Button under a dictation's list of tasks to choose from, when more tasks match than are shown: shows the rest in the list.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandOpenProject": "Open “{name}”",
+  "@commandOpenProject": {
+    "description": "Under a dictation's search results in a project: opens that project's page. {name} is the project.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandProjectNotFound": "Can’t find the project “{name}”",
+  "@commandProjectNotFound": {
+    "description": "A dictation named a project to search or change tasks in, and none matched: nothing is searched. {name} is the name as said.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandPersonNotFound": "Can’t find {name}",
+  "@commandPersonNotFound": {
+    "description": "A dictation's search named a person, and nobody matched: nothing is searched. {name} is the name as said.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandTaskNotFound": "Can’t find a task with “{words}”",
+  "@commandTaskNotFound": {
+    "description": "A dictation asked to change or delete a task, and no task on the phone matched. {words} are the words looked for.",
+    "placeholders": {
+      "words": {
+        "type": "String"
+      }
+    }
+  },
+  "commandTaskNotFoundPlain": "Can’t find that task",
+  "@commandTaskNotFoundPlain": {
+    "description": "As commandTaskNotFound, when the task was described only by its day or project."
+  },
+  "commandViewOnly": "“{title}” is in a project you can only view.",
+  "@commandViewOnly": {
+    "description": "A dictation asked to change or delete a task, and the only tasks that match are in projects the person can only view, so it can't be changed. {title} is the first such task's title.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandWhichToChange": "Which one do you want to change?",
+  "@commandWhichToChange": {
+    "description": "A dictation asked to change a task and several match: a short list to tap one follows."
+  },
+  "commandWhichToDelete": "Which one do you want to delete?",
+  "@commandWhichToDelete": {
+    "description": "A dictation asked to delete a task and several match: a short list to tap one follows."
+  },
+  "commandWillDelete": "Will be deleted: {title}",
+  "@commandWillDelete": {
+    "description": "A dictation's result, in a destructive style: the task the confirming tap deletes. {title} is the task's title.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandWillDeleteOn": "Will be deleted: {title} ({date})",
+  "@commandWillDeleteOn": {
+    "description": "As commandWillDelete, for a task with a day or a repeat. {date} is its day (Tomorrow, Wed, Oct 21) or its repeat (Weekly).",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "commandChooseAnother": "Choose another",
+  "@commandChooseAnother": {
+    "description": "On a dictation's change or deletion card after one of several matching tasks was tapped: shows the list again."
+  },
+  "commandNothingToChange": "It’s already like that.",
+  "@commandNothingToChange": {
+    "description": "A dictation asked to change a task, and the task already is as asked."
+  },
+  "commandWhichDay": "{hour, plural, other{Which day, at {time}?}}",
+  "@commandWhichDay": {
+    "description": "A dictation set a time on a task with no day: Today, Tomorrow and Pick a day follow. {time} is the time said, as the app shows times; {hour} is its hour as shown, for the article (Spanish and Catalan say a la 1:00).",
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "commandMemberNotIn": "{name} isn’t in “{project}”",
+  "@commandMemberNotIn": {
+    "description": "A dictation named someone for a task, who can't be its assignee because they aren't in its existing shared project (a new project uses commandMemberNotInNew). The task is left as it is. {name} is the name as said; {project} the project.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "commandMemberNotInNew": "{name} isn’t in “{project}” yet. Afterwards, share the project with {name}.",
+  "@commandMemberNotInNew": {
+    "description": "A dictation named someone for a task going into a project the confirming tap creates, which has nobody yet. The task stays the account's own; the next step is the project page's Share button. {name} is the name as said; {project} the new project.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "commandAssignNeedsShared": "Only tasks in shared projects can be assigned.",
+  "@commandAssignNeedsShared": {
+    "description": "A dictation named someone for a task that isn't in a shared project: the assignee stays as it is."
+  },
+  "commandAmbiguousMember": "More than one person is called {name}.",
+  "@commandAmbiguousMember": {
+    "description": "A dictation named someone for a task, and two or more people match: under it, one chip per person with that name, to tap the one meant. {name} is the name as said.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandTasksChanged": "{count, plural, =1{Task changed} other{{count} tasks changed}}",
+  "@commandTasksChanged": {
+    "description": "Brief message after a dictation's changes were applied, with Undo.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandTasksDeleted": "{count, plural, =1{Task deleted} other{{count} tasks deleted}}",
+  "@commandTasksDeleted": {
+    "description": "Brief message after a dictation's deletions were applied, with Undo.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandProjectsCreated": "{count, plural, =1{Project created} other{{count} projects created}}",
+  "@commandProjectsCreated": {
+    "description": "Brief message after a dictation's new projects were created, with Undo.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandChangeSemantics": "{label}: from {before} to {after}",
+  "@commandChangeSemantics": {
+    "description": "What TalkBack reads for one line of a dictation's change card, shown as before → after. {label} names the field (Date and time, Deadline…).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "commandNotesAdd": "Added to the notes: {text}",
+  "@commandNotesAdd": {
+    "description": "On a dictation's change card: text the confirming tap adds at the end of the task's notes. {text} is that text.",
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "commandAssignee": "Assignee",
+  "@commandAssignee": {
+    "description": "What TalkBack calls the assignee line of a dictation's change card."
+  },
+  "commandMarkDone": "Mark as done",
+  "@commandMarkDone": {
+    "description": "The confirming button of a dictation's result whose only command marks one task as done (“I've already done…”). After the tap, commandTasksCompleted shows with Undo."
+  },
+  "commandWhichToComplete": "Which one do you want to mark as done?",
+  "@commandWhichToComplete": {
+    "description": "A dictation asked to mark a task as done and several match: a short list to tap one follows."
+  },
+  "commandDontComplete": "Don’t complete {title}",
+  "@commandDontComplete": {
+    "description": "Tooltip and screen-reader label of the ✕ on a card that marks a task as done in a dictation's result: the task stays to do. {title} is the task's title.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDontCompleteAny": "Don’t complete any",
+  "@commandDontCompleteAny": {
+    "description": "Tooltip and screen-reader label of the ✕ on a card that marks tasks as done, while it asks which one (commandWhichToComplete) or lists a set of them: none is marked done."
+  },
+  "commandWontComplete": "{count, plural, =1{Won’t be completed} other{Won’t be completed}}",
+  "@commandWontComplete": {
+    "description": "Message, with Undo, after the ✕ on a card that marks tasks as done in a dictation's result: nothing is marked. {count} is how many tasks the card would have marked done: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandTasksCompleted": "{count, plural, =1{Task completed} other{{count} tasks completed}}",
+  "@commandTasksCompleted": {
+    "description": "Brief message after a dictation marked two or more tasks as done, with Undo. For one task, notificationCompleted names it instead.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandTasksMoved": "{count, plural, =1{Task moved} other{{count} tasks moved}}",
+  "@commandTasksMoved": {
+    "description": "Brief message after a dictation moved several tasks to another day or time, with Undo. One task moved by a change of its own says movedOccurrenceDate instead.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandTasksMovedTo": "{count, plural, =1{Task moved to {date}} other{{count} tasks moved to {date}}}",
+  "@commandTasksMovedTo": {
+    "description": "Brief message after a dictation moved a set of tasks, with Undo, when every task moved landed on the same day. {count} is how many tasks moved; {date} is that day, weekday first (“Thu, Oct 22”). When they landed on several days, commandTasksMoved says it instead.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "commandTasksAssignedTo": "{count, plural, =1{Task assigned to {name}} other{{count} tasks assigned to {name}}}",
+  "@commandTasksAssignedTo": {
+    "description": "Brief message after a dictation assigned a set of tasks to someone, and changed nothing else, with Undo. {count} is how many tasks were assigned; {name} is that person, as the card's heading (commandBulkAssignTo) names them.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkMoveTo": "{when, select, today{{count, plural, =1{Move 1 task to today, {day}} other{Move {count} tasks to today, {day}}}} tomorrow{{count, plural, =1{Move 1 task to tomorrow, {day}} other{Move {count} tasks to tomorrow, {day}}}} other{{count, plural, =1{Move 1 task to {day}} other{Move {count} tasks to {day}}}}}",
+  "@commandBulkMoveTo": {
+    "description": "Heading of a dictation's card that moves a set of tasks to one day (“move all of yesterday's tasks to tomorrow”); each keeps its time. {count} is how many are still ticked, and changes as the person unticks them. {when} is today, tomorrow or other. {day} is, for today and tomorrow, the weekday and the day of the month (“Thu 22”); otherwise the day weekday first, as the app shows days (“Thu, Oct 29”).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      },
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkMoveLead": "{when, select, today{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}} tomorrow{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}} other{{count, plural, =1{Move 1 task to} other{Move {count} tasks to}}}}",
+  "@commandBulkMoveLead": {
+    "description": "The start of commandBulkMoveTo, shown before the day's chip (commandMoveDay) on a dictation's card that moves a set of tasks to one day: commandBulkMoveLead, a space and commandMoveDay read as commandBulkMoveTo, word for word. {count} is how many are still ticked, and changes as the person unticks them. {when} is today, tomorrow or other, as in commandBulkMoveTo.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "commandMoveDay": "{when, select, today{today, {day}} tomorrow{tomorrow, {day}} other{{day}}}",
+  "@commandMoveDay": {
+    "description": "The day of a move on a dictation's card, as a chip after commandBulkMoveLead; a tap opens “Pick a day” to choose another. It ends commandBulkMoveTo, word for word. {when} is today, tomorrow or other. {day} is, for today and tomorrow, the weekday and the day of the month (“Thu 22”); otherwise the day weekday first, as the app shows days (“Thu, Oct 29”).",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkShift": "{direction, select, earlier{{count, plural, =1{Move 1 task {span} earlier} other{Move {count} tasks {span} earlier}}} other{{count, plural, =1{Move 1 task {span} later} other{Move {count} tasks {span} later}}}}",
+  "@commandBulkShift": {
+    "description": "Heading of a dictation's card that moves a set of tasks by some days, each keeping its time (“move this week's to next week”). {count} is how many are still ticked. {span} is commandBulkSpan (“a week”, “2 days”). {direction} is earlier or later.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "span": {
+        "type": "String"
+      },
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkSpan": "{unit, select, weeks{{amount, plural, =1{a week} other{{amount} weeks}}} other{{amount, plural, =1{a day} other{{amount} days}}}}",
+  "@commandBulkSpan": {
+    "description": "How far commandBulkShift moves the tasks: in weeks when it is whole weeks ({unit} weeks), otherwise in days. {amount} is how many.",
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkMove": "{count, plural, =1{Move 1 task} other{Move {count} tasks}}",
+  "@commandBulkMove": {
+    "description": "The confirming button of a dictation's result that moves a set of tasks (commandBulkMoveTo, commandBulkShift). {count} is how many are still ticked.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkAssignTo": "{count, plural, =1{Assign 1 task to {name}} other{Assign {count} tasks to {name}}}",
+  "@commandBulkAssignTo": {
+    "description": "Heading of a dictation's card that assigns a set of tasks to someone. {count} is how many are still ticked; {name} is that person.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkAssign": "{count, plural, =1{Assign 1 task} other{Assign {count} tasks}}",
+  "@commandBulkAssign": {
+    "description": "The confirming button of a dictation's result that assigns a set of tasks (commandBulkAssignTo). {count} is how many are still ticked.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkChange": "{count, plural, =1{Change 1 task} other{Change {count} tasks}}",
+  "@commandBulkChange": {
+    "description": "Heading, and confirming button, of a dictation's card that changes a set of tasks in another way (time, priority, deadline): what it sets is the line under it (commandBulkField). {count} is how many are still ticked.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkComplete": "{count, plural, =1{Mark 1 task as done} other{Mark {count} tasks as done}}",
+  "@commandBulkComplete": {
+    "description": "Heading, and confirming button, of a dictation's card that marks a set of tasks as done. {count} is how many are still ticked.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkDelete": "{count, plural, =1{Delete 1 task} other{Delete {count} tasks}}",
+  "@commandBulkDelete": {
+    "description": "Heading, and confirming button in the delete style, of a dictation's card that deletes a set of tasks. {count} is how many are still ticked. Undo brings them all back.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkField": "{label}: {value}",
+  "@commandBulkField": {
+    "description": "Under the heading of a dictation's card that changes a set of tasks: one thing it sets on each, as label and value (“Time: 18:00”, “Priority: High”). Several are joined with ·.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkLeftRepeating": "{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}",
+  "@commandBulkLeftRepeating": {
+    "description": "On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "action": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkLeftUnassignable": "{count, plural, =1{{title} can’t be assigned to {name}} other{{count} tasks can’t be assigned to {name}}}",
+  "@commandBulkLeftUnassignable": {
+    "description": "On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many; {title} is the one task's title when only one is left out.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkLeftNoDay": "{count, plural, =1{{title} has no date: it won’t change} other{{count} tasks with no date won’t change}}",
+  "@commandBulkLeftNoDay": {
+    "description": "On a dictation's card that moves tasks by some days or sets their time: tasks with no date (and no deadline) are left as they are. {count} is how many; {title} is the one task's title when only one is left out.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkNone": "{status, select, completed{There are no completed tasks {period}} any{There are no tasks {period}} other{There are no tasks to do {period}}}",
+  "@commandBulkNone": {
+    "description": "A dictation's card for a set of tasks when none matched: what was looked for. {status} is completed, any or other (still to do, the default). {period} is commandBulkPeriod, or empty when no period was said.",
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkPeriod": "{kind, select, today{for today} yesterday{from yesterday} tomorrow{for tomorrow} range{from {from} to {to}} until{up to {to}} since{from {from} on} undated{with no date} other{on {from}}}",
+  "@commandBulkPeriod": {
+    "description": "The period at the end of commandBulkNone. {kind} is today, yesterday, tomorrow, range (two days), until (up to a day), since (from a day on), undated (tasks with no date) or other (one day). {from} and {to} are days, weekday first (“Thu, Oct 22”).",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "commandBulkTooMany": "That’s {count} tasks, too many. Say it again with one day or one project.",
+  "@commandBulkTooMany": {
+    "description": "A dictation's card for a set of more than 200 tasks: nothing is listed and nothing can be applied; the person says it again for fewer. {count} is how many matched.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkNothingToChange": "{count, plural, =1{It’s already like that.} other{They’re already like that.}}",
+  "@commandBulkNothingToChange": {
+    "description": "A dictation asked to change a set of tasks, and every task that matched already is as asked. {count} is how many matched. For one task's change card, commandNothingToChange.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandBulkViewOnly": "You can only view “{project}”: its tasks stay as they are.",
+  "@commandBulkViewOnly": {
+    "description": "A dictation asked to change, delete or mark done a set of tasks, and the only tasks that match are in a project the person can only view, so none changes. {project} is that project's name.",
+    "placeholders": {
+      "project": {
+        "type": "String"
+      }
+    }
+  },
+  "commandNoDayStays": "It has no date, so it stays.",
+  "@commandNoDayStays": {
+    "description": "Under one task's title on a dictation's card that moves it by some days: the task has no date (and no deadline), so it isn't moved."
+  },
+  "commandAlreadyDone": "It was already done.",
+  "@commandAlreadyDone": {
+    "description": "On a dictation's card that marks one task as done: the task was already done, so nothing changes."
+  },
+  "reminderPlanUntilDay": "Until the deadline",
+  "@reminderPlanUntilDay": {
+    "description": "In the reminder sheet: the choice of a plan of reminders that come more often as the task's day approaches, counted back from its deadline, or from its own day when it has none. Suave, Normal and Intenso sit under it."
+  },
+  "reminderPlanGentle": "Gentle",
+  "@reminderPlanGentle": {
+    "description": "One of the three strengths under reminderPlanUntilDay: the fewest reminders (weekly, then daily the last 3 days and the day)."
+  },
+  "reminderPlanNormal": "Normal",
+  "@reminderPlanNormal": {
+    "description": "One of the three strengths under reminderPlanUntilDay, the one chosen first: every 3 days, then daily the last week and the day."
+  },
+  "reminderPlanIntense": "Intense",
+  "@reminderPlanIntense": {
+    "description": "One of the three strengths under reminderPlanUntilDay: the most reminders (every 2 days, then daily the last 2 weeks and the day)."
+  },
+  "reminderPlanYourWay": "Your way",
+  "@reminderPlanYourWay": {
+    "description": "In the reminder sheet, a Pro choice: the person types or says the rhythm they want, and the assistant reads it."
+  },
+  "reminderPlanYourWayHint": "For example: “a week before, and the day before at 8”.",
+  "@reminderPlanYourWayHint": {
+    "description": "Under the field of reminderPlanYourWay: what to put in it, as an example of a rhythm the strengths of reminderPlanUntilDay can't give. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart."
+  },
+  "reminderPlanJustYou": "These reminders are only for you.",
+  "@reminderPlanJustYou": {
+    "description": "On a task in a shared project, says that every reminder choice there rings only for the person who makes it: shown under the title of the reminder sheet and of the one-tap reminder list, and as the helper of “Remind before”."
+  },
+  "proBadge": "Pro",
+  "@proBadge": {
+    "description": "A small badge beside a choice that comes with TaskFlow Pro. Tapping the choice opens the Pro screen."
+  },
+  "reminderPlanSpeak": "Say it",
+  "@reminderPlanSpeak": {
+    "description": "Button under the field of reminderPlanYourWay: listen with the phone's own speech recognition and write the words in the field. Catalan buttons are imperatives."
+  },
+  "reminderPlanStopListening": "Stop listening",
+  "@reminderPlanStopListening": {
+    "description": "The same button while the phone listens: stop, and read the words heard."
+  },
+  "reminderPlanReading": "One moment…",
+  "@reminderPlanReading": {
+    "description": "While the assistant reads the words typed or said in reminderPlanYourWay."
+  },
+  "reminderPlanUnclear": "I didn’t get that. Try saying it another way.",
+  "@reminderPlanUnclear": {
+    "description": "The assistant found no reminders in the words of reminderPlanYourWay: ask for them again. The field's helper, reminderPlanYourWayHint, gives the example; saying it again starts from an empty field."
+  },
+  "reminderPlanOffline": "This needs a connection. “Until the deadline” works without one.",
+  "@reminderPlanOffline": {
+    "description": "reminderPlanYourWay with no connection: it needs one, and the strengths of reminderPlanUntilDay work without."
+  },
+  "reminderPlanFailed": "I couldn’t read that just now. Try again later, or choose “Until the deadline”.",
+  "@reminderPlanFailed": {
+    "description": "reminderPlanYourWay: the assistant failed, was busy, or today's limit was reached. The strengths of reminderPlanUntilDay still work."
+  },
+  "reminderPlanMicOff": "Without the microphone I can’t hear you. You can type it.",
+  "@reminderPlanMicOff": {
+    "description": "reminderPlanSpeak tapped, and the microphone isn't allowed."
+  },
+  "reminderPlanCantListen": "I can’t listen on this phone right now. You can type it.",
+  "@reminderPlanCantListen": {
+    "description": "reminderPlanSpeak tapped, and the phone can't recognise speech on its own."
+  },
+  "reminderPlanCount": "{count, plural, =1{1 reminder: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}} other{{count} reminders · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}}}",
+  "@reminderPlanCount": {
+    "description": "The plan's preview in the reminder sheet: how many reminders are still to come, and the next one. {when} is today, tomorrow or other; {date} is the day (sat 25); {time} the clock time.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoneLeft": "No reminders left",
+  "@reminderPlanNoneLeft": {
+    "description": "The plan's preview when none of its reminders is still to come."
+  },
+  "reminderPlanGrowing": "More and more often {when, select, today{until today} tomorrow{until tomorrow} other{until {date}}}",
+  "@reminderPlanGrowing": {
+    "description": "A strength's plan in words, on the task and under reminderPlanUntilDay. {when} is today, tomorrow or other; {date} is the day the plan counts back from (thu 12).",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanEveryDays": "{days, plural, =1{daily} other{every {days} days}}",
+  "@reminderPlanEveryDays": {
+    "description": "A plan's rhythm, lowercase: part of a sentence such as «Cada 3 días, y a diario la última semana».",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanEveryWeeks": "{weeks, plural, =1{weekly} other{every {weeks} weeks}}",
+  "@reminderPlanEveryWeeks": {
+    "description": "A plan's rhythm in weeks, lowercase: part of a plan's sentence.",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanLastDays": "{days, plural, =1{for the last day} other{for the last {days} days}}",
+  "@reminderPlanLastDays": {
+    "description": "When a rhythm applies: the last days before the task's day, and the day. Goes after reminderPlanEveryDays: «a diario los últimos 3 días».",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanLastWeeks": "{weeks, plural, =1{for the last week} other{for the last {weeks} weeks}}",
+  "@reminderPlanLastWeeks": {
+    "description": "When a rhythm applies: the last weeks before the task's day, and the day: «a diario la última semana».",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanFromDays": "{days, plural, =1{from the day before} other{from {days} days before}}",
+  "@reminderPlanFromDays": {
+    "description": "When a rhythm starts, counted back from the task's day: «cada 2 días desde 10 días antes».",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanFromWeeks": "{weeks, plural, =1{from a week before} other{from {weeks} weeks before}}",
+  "@reminderPlanFromWeeks": {
+    "description": "When a rhythm starts, in weeks before the task's day: «cada 2 días desde 2 semanas antes».",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanUntilDays": "{days, plural, =1{until the day before} other{until {days} days before}}",
+  "@reminderPlanUntilDays": {
+    "description": "When a rhythm stops, before the task's day: «cada 3 días hasta 8 días antes».",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanUntilWeeks": "{weeks, plural, =1{until a week before} other{until {weeks} weeks before}}",
+  "@reminderPlanUntilWeeks": {
+    "description": "When a rhythm stops, in weeks before the task's day: «cada 3 días hasta una semana antes».",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanOnTheDay": "on the day",
+  "@reminderPlanOnTheDay": {
+    "description": "A single reminder of a plan, on the task's day itself, lowercase: «El día antes, y el mismo día»."
+  },
+  "reminderPlanDaysBefore": "{days, plural, =1{the day before} other{{days} days before}}",
+  "@reminderPlanDaysBefore": {
+    "description": "A single reminder of a plan, some days before the task's day, lowercase: «el día antes», «3 días antes».",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanWeeksBefore": "{weeks, plural, =1{a week before} other{{weeks} weeks before}}",
+  "@reminderPlanWeeksBefore": {
+    "description": "A single reminder of a plan, some weeks before the task's day, lowercase: «una semana antes».",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderPlanPhase": "{rhythm} {window}",
+  "@reminderPlanPhase": {
+    "description": "A rhythm and when it applies: «a diario» + «la última semana». Each is one of the reminderPlan… parts.",
+    "placeholders": {
+      "rhythm": {
+        "type": "String"
+      },
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanAnd": "{first}, and {last}",
+  "@reminderPlanAnd": {
+    "description": "The last two parts of a plan's sentence: «Cada 3 días, y a diario la última semana».",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "last": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanList": "{first}, {rest}",
+  "@reminderPlanList": {
+    "description": "A plan's sentence with three or four parts: the first, then the rest (which ends with reminderPlanAnd).",
+    "placeholders": {
+      "first": {
+        "type": "String"
+      },
+      "rest": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanLine": "{plan} · next: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}",
+  "@reminderPlanLine": {
+    "description": "On a task with a plan: the plan in words (reminderPlanStrengthLine or reminderPlanOwnLine), then its next reminder, on or before the task's day. {when} is today, tomorrow or other; {date} the day (sat 24); {time} the clock time, as the app writes it.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanStrengthLine": "{strength, select, gentle{Gentle} normal{Normal} other{Intense}} reminders {when, select, today{until today} tomorrow{until tomorrow} other{until {date}}}",
+  "@reminderPlanStrengthLine": {
+    "description": "On a task whose plan is one of the three strengths (reminderPlanGentle, reminderPlanNormal, reminderPlanIntense): the plan in words, naming its strength. {strength} is gentle, normal or other (intense); {when} is today, tomorrow or other; {date} is the day the plan counts back from (thu 12).",
+    "placeholders": {
+      "strength": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanOwnLine": "Reminders: {rhythm}",
+  "@reminderPlanOwnLine": {
+    "description": "On a task with a plan of one's own: the plan in words. {rhythm} is its rhythm, lowercase (every 3 days, and daily for the last week).",
+    "placeholders": {
+      "rhythm": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeDays": "{days, plural, =1{1 day left · {date}} other{{days} days left · {date}}}",
+  "@reminderPlanNoticeDays": {
+    "description": "A plan's notification text, under the task's title: how many days are left until its day (2 or more), then the day. {date} is the weekday date as notifications write it (Thu, Nov 12), followed by the time when the task has one (Thu, Nov 12, 5:00 PM).",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeDeadlineDays": "{days, plural, =1{Deadline: {date} · 1 day left} other{Deadline: {date} · {days} days left}}",
+  "@reminderPlanNoticeDeadlineDays": {
+    "description": "A plan's notification text for a task with a deadline, under the task's title: the deadline, then how many days are left (2 or more). {date} is the weekday date as notifications write it (Thu, Nov 12), followed by the time when the deadline has one (Thu, Nov 12, 5:00 PM).",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeTomorrowAt": "{hour, plural, other{It’s tomorrow at {time}}}",
+  "@reminderPlanNoticeTomorrowAt": {
+    "description": "A plan's notification text, the day before a task with a time. {time} is the task's time as the app's clock writes it; {hour} is the hour as shown, for the article (Spanish and Catalan say a la 1:00).",
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeTodayAt": "{hour, plural, other{It’s today at {time}}}",
+  "@reminderPlanNoticeTodayAt": {
+    "description": "A plan's notification text, on the day of a task with a time. Placeholders as in reminderPlanNoticeTomorrowAt.",
+    "placeholders": {
+      "hour": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanNoticeDeadlineTomorrow": "Deadline: tomorrow",
+  "@reminderPlanNoticeDeadlineTomorrow": {
+    "description": "A plan's notification text, the day before a deadline that has no time."
+  },
+  "reminderPlanNoticeTomorrow": "It’s tomorrow",
+  "@reminderPlanNoticeTomorrow": {
+    "description": "A plan's notification text, the day before a task's day that has no time."
+  },
+  "reminderPlanNoticeToday": "It’s today",
+  "@reminderPlanNoticeToday": {
+    "description": "A plan's notification text, on a task's day that has no time."
+  },
+  "reminderPlanNoticeWas": "It was planned for yesterday",
+  "@reminderPlanNoticeWas": {
+    "description": "A plan's one last notification, the day after, for a task with only a day that isn't done."
+  },
+  "reminderPlanNoticeDue": "It was due yesterday",
+  "@reminderPlanNoticeDue": {
+    "description": "A plan's one last notification, the day after, for a task with a deadline that isn't done."
+  },
+  "reminderPlanOfferWeeks": "{weeks, plural, =1{1 week to go. Shall I remind you {rhythm}?} other{{weeks} weeks to go. Shall I remind you {rhythm}?}}",
+  "@reminderPlanOfferWeeks": {
+    "description": "Asked once after saving a task whose day is 2 weeks or more away, under the task's title and day: shall the app remind the person with the Normal plan. {rhythm} is Normal's rhythm in lowercase words, as reminderPlanEveryDays and reminderPlanPhase write it (every 3 days, and daily for the last week). Yes, remind me (reminderAskYes) sets Normal.",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      },
+      "rhythm": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanOfferMonths": "{months, plural, =1{1 month to go. Shall I remind you {rhythm}?} other{{months} months to go. Shall I remind you {rhythm}?}}",
+  "@reminderPlanOfferMonths": {
+    "description": "reminderPlanOfferWeeks for a day 2 months or more away. {rhythm} is Normal's rhythm in lowercase words.",
+    "placeholders": {
+      "months": {
+        "type": "int"
+      },
+      "rhythm": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanOfferDone": "Done. I’ll remind you until {date}.",
+  "@reminderPlanOfferDone": {
+    "description": "After yes to the offer: the plan is set. {date} is the day it counts back from (thu 12).",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "billingReasonReminderPlans": "With Pro, ask for reminders in your own words:",
+  "@billingReasonReminderPlans": {
+    "description": "On the Pro screen, opened from “Your way” in the reminder sheet: what Pro adds there. A heading, followed by billingReasonReminderPlansExample."
+  },
+  "billingReasonReminderPlansExample": "“a week before, and the day before at 8”",
+  "@billingReasonReminderPlansExample": {
+    "description": "On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart."
+  }
+}

@@ -1,0 +1,100 @@
+{
+ "runId": "2026-10-13-app",
+ "mode": "app",
+ "round": "b9-r2",
+ "packages": [
+  {
+   "id": "P114",
+   "title": "Project page says read-only only when it is, and says it once",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-625",
+    "UX-626",
+    "UX-629"
+   ],
+   "aliases": {
+    "UX-625": [
+     "R1C-1"
+    ],
+    "UX-626": [
+     "R1C-2"
+    ]
+   },
+   "files": [
+    "App/lib/screens/home_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/home_screen_test.dart"
+   ],
+   "brief": [
+    "Context: P24 (b9 round 1) fixed UX-314 by replacing the `TaskActions` bar (`Añadir tarea`) with a read-only ListTile (`readOnlyList` + `listEditingAccessHelp`) on project pages the user can only view. Reviewer C found two regressions from it, plus one older problem in the same lines. All three are in App/lib/screens/home_screen.dart. Keep everything else P24 did (UX-219, UX-315, UX-333, UX-429) exactly as it is.",
+    "UX-626 (S2, R1C-2): a new project's page can show `Este proyecto es de solo lectura` for a moment. Cause: `readOnly` (home_screen.dart:279-281, `widget.listId != null && !ref.watch(listCanEditProvider(widget.listId))`) is true for any project that `taskListsProvider` doesn't hold yet. `listCanEditProvider` (App/lib/providers/task_lists_provider.dart:15-19) deliberately treats unknown projects as not editable. `createProject` (App/lib/screens/task_lists_screen.dart:416-430) pushes the new page straight after `editTaskList`, while `taskListsProvider` is still reloading without the new project. Fix: compute `readOnly` from the `list` already looked up at home_screen.dart:263-265: `final readOnly = widget.listId != null && list != null && !list.canEdit;`. The page says read-only only once the project is known and the user really can't edit it. Update the comment above it to say so. Don't change `listCanEditProvider` (edit_task_screen, task_detail, notes, voice capture, attachments and task_tile rely on its cautious default). Don't change the `TaskActions` branch (`projectId: ref.watch(listCanEditProvider(scope.projectId)) ? scope.projectId : null`).",
+    "UX-625 (S2, R1C-1): an empty view-only project page tells the viewer to add a task. The body shows `listEmpty` (`Añade una tarea a este proyecto. Tú eliges la fecha y el recordatorio.`) above the read-only bar, which has no button. P24's implementer flagged this too. Fix: in the `filtered.isEmpty` branch (about home_screen.dart:458-479), when the page is read-only and not filtering, the message is a new key `readOnlyListEmpty`. Keep the title `freshStart`. Order of the message: `filtering` → `differentFilter`; else `readOnly` → `readOnlyListEmpty`; else project page → `listEmpty`; else as today (`tasksEmpty` / `inboxEmpty`). Use the same `readOnly` value as the bottom bar (the one fixed above), so the two never disagree.",
+    "New key `readOnlyListEmpty`, a whole sentence, in all three ARB files next to `listEmpty`, with a description in app_en.arb (\"Empty-state message on a project page the user can only view; there is no add button there.\"): EN `No tasks in this project yet.` / ES `Este proyecto aún no tiene tareas.` / CA `Aquest projecte encara no té tasques.` Run `flutter gen-l10n` afterwards; never edit lib/l10n/generated/ by hand.",
+    "UX-629 (S1, noted by reviewer C; older than this run): on a project page with `Para mí` chosen (`_team == false`; the default `_team = true` is `Todas`, home_screen.dart:43), when none of the project's tasks are for the user, the page shows `Un nuevo comienzo` + `listEmpty`, as if the project had no tasks at all. Fix: add `|| (widget.listId != null && !_team)` to `filtering`, so it shows `noMatches` / `differentFilter` (`No hay tareas que coincidan` / `Prueba otra palabra o filtro.`) like any other filter. No copy change for this part.",
+    "Don't touch: `ProjectScopeControl` and the scope sheet; the header, title and archived line; the read-only ListTile's copy and layout; `TaskActions`; App/lib/providers/task_lists_provider.dart; App/lib/screens/task_lists_screen.dart (`createProject` keeps pushing at once); `listEmpty`'s copy.",
+    "Tests: keep App/test/home_screen_test.dart and the other suites passing, and update any test the change rightly breaks; ux-tester writes the acceptance tests. App/test/localization_catalog_test.dart may need the new key to exist in all three catalogs, which it will."
+   ],
+   "acceptance": [
+    "Widget test (home_screen_test.dart): in Spanish at 1× on 360×740, a project page (`HomeScreen(isRoot: false, listId: 'p1')`) for a project the user can only view (`canEdit` false), with no tasks, shows `Este proyecto aún no tiene tareas.` and the read-only line `Este proyecto es de solo lectura`, and doesn't show `Añade una tarea a este proyecto. Tú eliges la fecha y el recordatorio.` or `Añadir tarea`.",
+    "Widget test: the same page in English shows `No tasks in this project yet.`; in Catalan it shows `Aquest projecte encara no té tasques.`",
+    "Widget test: a project page for an editable project with no tasks still shows `Añade una tarea a este proyecto. Tú eliges la fecha y el recordatorio.` and the `Añadir tarea` button, and no read-only line.",
+    "Widget test: a project page whose `listId` isn't in `taskListsProvider` yet (the list loaded without it, as right after `createProject`) shows no `Este proyecto es de solo lectura` line and doesn't show `Este proyecto aún no tiene tareas.`. When the provider then returns the project with `canEdit` true, the page shows `Añadir tarea` and still no read-only line.",
+    "Widget test: on an editable shared project page whose only task is assigned to someone else, choosing `Para mí` shows `No hay tareas que coincidan` and `Prueba otra palabra o filtro.`, not `Un nuevo comienzo`.",
+    "Widget test: at 2× text on 320×568, in Catalan, the empty view-only project page shows `Aquest projecte encara no té tasques.` and the read-only line with no overflow error.",
+    "Code: `readOnly` in home_screen.dart is `widget.listId != null && list != null && !list.canEdit`; `listCanEditProvider` in task_lists_provider.dart is unchanged; `readOnlyListEmpty` exists in app_en.arb, app_es.arb and app_ca.arb."
+   ],
+   "deviceChecks": [
+    "On an Android phone, create a project from Proyectos (`Nuevo proyecto`, type a name, save) and watch the bottom of the new project's page during the transition: `Añadir tarea` shows, and `Este proyecto es de solo lectura` never flashes. (Inferred from code by reviewer C.)"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P115",
+   "title": "Group page drops the lone role word; Activity has one name",
+   "area": "C",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-627",
+    "UX-628"
+   ],
+   "aliases": {
+    "UX-627": [
+     "R1C-3"
+    ],
+    "UX-628": [
+     "R1C-4"
+    ]
+   },
+   "files": [
+    "App/lib/screens/groups_screen.dart",
+    "App/lib/screens/activity_screen.dart",
+    "App/test/groups_screen_test.dart",
+    "App/test/activity_screen_test.dart"
+   ],
+   "brief": [
+    "Context: P27 (UX-336) removed the group-name headline from a group's page, because the app bar now carries the group's name. P25 (UX-407) changed the Activity button's tooltip to `groupActivity` but left the screen titled `activity`. Reviewer C found one leftover from each. No ARB changes in this package.",
+    "UX-627 (S1, R1C-3): the group page now opens with a lone role word (`Editor`, `Propietario`) under the app bar, with nothing to say whose role it is. Remove `Text(groupRoleLabel(context, group.role)),` at App/lib/screens/groups_screen.dart:624 (the first child of the group page's ListView). The user's own row under `Miembros` (:640-644, `subtitle: Text(groupRoleLabel(context, person.role))`) already shows their role. After removing it, the page starts with the error banner or progress bar when there is one, otherwise with the `Miembros` heading: show the `SizedBox(height: 20)` before `Miembros` (:635) only when `_error != null || _busy`, so the heading doesn't sit 44 dp below the app bar. Keep `groupRoleLabel` itself: it's still used at :264, :493 and :644.",
+    "UX-628 (S1, R1C-4): the Activity button's tooltip says `Actividad del grupo` (`groupActivity`, App/lib/screens/activity_screen.dart:37), but the screen it opens is titled `Actividad` (`activity`, :111). Title the screen with `context.l10n.groupActivity` at :111, so the button and the screen use one name: EN `Group activity` / ES `Actividad del grupo` / CA `Activitat del grup` (existing key). Leave the `activity` key and its other use at :231 (the per-task history, TaskActivity) unchanged. P25's implementer had kept the title on purpose; the reviewer settled it the other way, and this brief follows the reviewer.",
+    "Don't touch: the members' rows and their ⋮ / manage buttons, the `Invitados` section, the app bar title logic (`_title()`), the group dialogs; ActivityButton's visibility rule, icon and badge; `_ActivityRow`; any ARB file.",
+    "Tests: keep App/test/groups_screen_test.dart and App/test/activity_screen_test.dart passing, and update any test that looked for the role line or the old screen title; ux-tester writes the acceptance tests."
+   ],
+   "acceptance": [
+    "Widget test (groups_screen_test.dart): in Spanish at 1× on 360×740, a group page where the user is an editor shows `Editor` exactly once, as the subtitle of the user's own row under `Miembros`, and no `Editor` text appears above the `Miembros` heading.",
+    "Widget test: the same page for the group's owner shows `Propietario` only in the owner's member row.",
+    "Widget test (activity_screen_test.dart): in Spanish, tapping the Activity button (tooltip `Actividad del grupo`) opens a screen whose app bar title is `Actividad del grupo`; in English the title is `Group activity`, in Catalan `Activitat del grup`.",
+    "Widget test: at 2× text on 320×568, in Catalan, the Activity screen's app bar shows `Activitat del grup` with no overflow error.",
+    "Code: groups_screen.dart's group page ListView no longer starts with `Text(groupRoleLabel(context, group.role))`; activity_screen.dart's ActivityScreen uses `groupActivity` for its title, and the per-task history still uses `activity`."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": [],
+ "escalated": []
+}

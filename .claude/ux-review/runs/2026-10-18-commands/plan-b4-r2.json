@@ -1,0 +1,104 @@
+{
+ "runId": "2026-10-18-commands",
+ "mode": "changes",
+ "round": "b4-r2",
+ "packages": [
+  {
+   "id": "P162",
+   "title": "The resend limit's line counts down with the button",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1231"
+   ],
+   "files": [
+    "App/lib/screens/verify_email_screen.dart",
+    "App/test/email_verification_test.dart"
+   ],
+   "brief": [
+    "Round 2 of b4, run 2026-10-18-commands. P156 is in the working tree (uncommitted) and its reviewer found UX-1206 fixed (verify-b4-r1-D.md); build on it and don't undo it. Line numbers are from the current working tree; search if they have moved. One problem is left: UX-1231 (regression R1D-1 from P156).",
+    "UX-1231 (S2): after «Reenviar código» is refused for 30 minutes, the line under the code field keeps saying 30 minutes while the button counts down. The person goes to the mail app, comes back 8 minutes later, and reads «Espera 30 minutos para pedir otro.» above «Reenviar código en 22 minutos». Where: `_problem` in App/lib/screens/verify_email_screen.dart:226-229 builds the line from `_minutes(limit.inSeconds)`, the wait the server first named. The button (:711-719) uses `_wait`, the time left on the clock, which `_countDown` (:148-172) refreshes every tick.",
+    "The fix: in `_problem`, when `_resendLimit(error)` is not null, build the line from the time left, the same number the button shows. If `_limitedUntil` is null or `_wait <= VerifyEmailScreen.resendWait` (60 s), return null: in the last minute the button's seconds already say it, as P156 decided for a 60 s refusal. Otherwise return `l.verifyEmailResendLimited(_minutes(_wait))`. Return null explicitly in that branch: don't fall through to `_refusal` or `requestProblemText`, which would print another 429 line. Comment it: «The time left, as the button counts it; in its last minute only the button's seconds say it.» `errorText: _problem(l)` (:598) is rebuilt on every tick by `_countDown`'s setState, so nothing else is needed. The resend catch (:474-496) calls `_problem(l)` after `_countDown` has set `_wait`, so the line it announces still reads the full wait («30 minutos»).",
+    "No new copy, no ARB change: `verifyEmailResendLimited` and `verifyEmailResendInMinutes` stay as P156 wrote them.",
+    "Tests: the five UX-1206 tests in App/test/email_verification_test.dart (from :2563) must keep passing unchanged. Time moves with that file's `_Clock` (`clock.now = …` then `tester.pump(const Duration(seconds: 1))`), as the UX-1206 tests at :2621-2646 do.",
+    "Don't touch: the button's label and when it turns on; `_resendLimit`; `_countDown`'s clock guard; how a typed digit clears the line (`_changed`); Confirmar's own 429 (UX-1208); the 60 s countdown after a code is sent."
+   ],
+   "acceptance": [
+    "ES: after Reenviar is answered 429 `{\"code\": \"resend_limited\", \"retry_after\": 1800}`, with the clock moved 8 minutes ahead and one tick: the line under the code field reads «Has pedido muchos códigos. Espera 22 minutos para pedir otro.» and the button reads «Reenviar código en 22 minutos».",
+    "ES: the same refusal with the clock 28 minutes 30 seconds ahead and one tick: the line reads «Has pedido muchos códigos. Espera 2 minutos para pedir otro.» and the button «Reenviar código en 2 minutos».",
+    "ES: the same refusal with the clock 29 minutes ahead and one tick: the code field has no error line, no text containing «Has pedido» shows, the button reads «Reenviar código en 60 segundos» and is off, and the typed digits are still there.",
+    "ES: right after the refusal, before the clock moves, the line still reads «Has pedido muchos códigos. Espera 30 minutos para pedir otro.» (the five UX-1206 tests pass unchanged)."
+   ],
+   "deviceChecks": [
+    "Phone, staging after a deploy of d447c5c: get the resend refusal, switch to the mail app for a few minutes and come back. The line and the button name the same number of minutes. With TalkBack on, the line isn't read again each minute."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P163",
+   "title": "«Tareas con archivos» counts only files already on the server",
+   "area": "B",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-1228"
+   ],
+   "files": [
+    "App/lib/services/attachment_store.dart",
+    "App/test/tasks_with_files_test.dart"
+   ],
+   "brief": [
+    "Round 2 of b4, run 2026-10-18-commands. P154 is in the working tree (uncommitted) and its reviewer found UX-1223 fixed (verify-b4-r1-B.md); build on it and don't undo it. Line numbers are from the current working tree; search if they have moved. One problem is left: UX-1228 (regression R1B-1 from P154).",
+    "UX-1228 (S1): files still waiting to upload count in «Tareas con archivos». They use none of the server's 100 MB yet. A file attached from the editor is stored with size 0 until its upload starts (the insert at App/lib/services/task_database.dart:275-278 sets only `upload_pending = 1`), so its row can read «1 archivo · 0,0 MB», and removing it frees nothing, against the help line «Abre una tarea para eliminar los archivos que ya no necesites.». Where: `AttachmentStore.usageByTask`, App/lib/services/attachment_store.dart:43-58, shown by App/lib/screens/tasks_with_files_screen.dart:52-56. It is rare: it needs a pending upload while the space is full.",
+    "The fix (subtract, not add): count only files the server holds. In `usageByTask`'s WHERE add `AND a.remote = 1`. `remote` is set to 1 exactly when the server confirms an upload (attachment_store.dart:300-304) and on every file synced from the server (`TaskAttachment` from the server has `remote: true`, models/task_attachment.dart:85; stored by `toMap`). A pending upload, and an upload the server refused, keep `remote = 0`. Keep the existing conditions (not deleted, not waiting to be removed, not refused): they cost nothing and keep the existing test's fixtures right. Update the method's doc comment to: «The files each task holds on the server, by the task's local id: uploaded, not deleted, not waiting to be removed, and not refused for a full file space. A file still waiting to upload uses none of the space yet.»",
+    "Leave the screen alone: `TasksWithFilesScreen._size`'s 0.1 MB floor for a real small file stays; a task whose only files are pending simply isn't listed.",
+    "Tests: the existing UX-1223 store test (App/test/tasks_with_files_test.dart:95-155) inserts files with `'remote': 1` and must keep passing unchanged. Its `file(...)` fixture can take a new optional `remote`/`uploadPending` flag for the new checks.",
+    "Don't touch: the storage messages, «Ver tareas con archivos» and when it shows, the screen's layout and copy, how a file is uploaded or removed, the server."
+   ],
+   "acceptance": [
+    "`AttachmentStore.usageByTask`: a task whose only file is waiting to upload (`remote` 0, `upload_pending` 1, size 0) has no entry.",
+    "`AttachmentStore.usageByTask`: a task with two files on the server (5 MB and 4 MB, `remote` 1) and one waiting to upload (3 MB, `remote` 0, `upload_pending` 1) counts 2 files and 9 MB.",
+    "ES: on «Tareas con archivos», that task reads «2 archivos · 9,0 MB», and a task holding only a file waiting to upload isn't listed; no row reads «0,0 MB».",
+    "The existing UX-1223 tests in App/test/tasks_with_files_test.dart pass unchanged."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P164",
+   "title": "The name sheet: a plain error, and progress while «Guardar» waits",
+   "area": "C",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-1229",
+    "UX-1230"
+   ],
+   "files": [
+    "App/lib/widgets/name_ask_sheet.dart",
+    "App/test/name_ask_test.dart"
+   ],
+   "brief": [
+    "Round 2 of b4, run 2026-10-18-commands. P155 is in the working tree (uncommitted) and its reviewer found UX-1112 and UX-1102 fixed (verify-b4-r1-C.md); build on it and don't undo it. Line numbers are from the current working tree; search if they have moved. Two problems are left in the new name sheet, both in App/lib/widgets/name_ask_sheet.dart: UX-1229 and UX-1230 (regressions R1C-1 and R1C-2 from P155).",
+    "UX-1229 (S1): with no connection, the error under the name field talks about tasks. `_NameAskSheet`'s `errorText` (:185-187) calls `requestProblemText(l, _error!)`, which outside sign-in adds the «Kept» sentence (App/lib/l10n/request_locale.dart:49-50), so it reads «No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.» The last sentence is about tasks, not the name just typed, and the field already shows the name is kept. The fix: call `requestProblemText(l, _error!, onSignIn: true)`. The flag leaves out the «Kept» sentence and keeps everything else `requestProblemText` maps (staging, sharing, a 429 with its wait). Add a comment above it: «Only the reason: nothing here is about the tasks, and the field keeps the name.» Don't change request_locale.dart. The text then is, for no connection, the existing `requestError` `network`: EN “No connection. Check Wi-Fi or mobile data and try again.” / ES «No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.» / CA «No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar.»; for an unknown failure, `other`: EN “Could not complete the request. Please try again.” / ES «No se ha podido completar la solicitud. Inténtalo de nuevo.» / CA «No s’ha pogut completar la petició. Torna-ho a provar.». No new copy, no ARB change.",
+    "UX-1230 (S1): nothing moves while «Guardar» waits. `_save` (:123-140) only turns the button off through `_canSave`, and «Ahora no» (:199-202) stays live, so on a slow connection nothing changes for over a second. The fix, as the join dialog does (App/lib/widgets/invitation_cards.dart:296-306): while `_saving`, the FilledButton's child is `SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, semanticsLabel: l.save))` instead of `Text(l.save, …)`. The button keeps its size: it is stretched by the Column and its height is the theme's 52 dp minimum. Its `onPressed` stays `_canSave ? _save : null`. «Ahora no» gets `onPressed: _saving ? null : () => Navigator.pop(context, false)`. When the call fails, `_saving` is false again, so «Guardar» and «Ahora no» come back with the error under the field. Back, the scrim and a swipe stay as they are: the save still finishes, and `_save`'s `mounted` check keeps it from popping twice.",
+    "Tests: App/test/name_ask_test.dart:278-306 ('UX-1112: «Guardar» answered with no connection…') computes its expected text with `requestProblemText(es, …)` without `onSignIn`, so this change rightly breaks it. Update it to expect `es.requestError('network')` and that no text containing «Tus tareas» shows; keep its other checks (the sheet stays open, the name kept, the line under the field, saved once the connection is back). For ux-tester: a slow save can be held with a `Completer` in `_NameApi.setFirstName` (name_ask_test.dart:453-486).",
+    "Don't touch: the sheet's copy, when it is asked, the prefill, «Guardar» being off while the field is empty, request_locale.dart, the sharing screens, the join dialog."
+   ],
+   "acceptance": [
+    "ES: «Guardar» answered with no connection (`ApiException(0, 'Offline. Retry when connected.')`): the error under the name field reads exactly «No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.», no text containing «Tus tareas» shows, and the sheet stays open with the name kept.",
+    "EN: the same failure reads exactly “No connection. Check Wi-Fi or mobile data and try again.”, and no text containing “Your tasks are still saved” shows.",
+    "ES, while «Guardar»'s call hasn't returned: the filled button shows a CircularProgressIndicator and no «Guardar» text, its size is the same as before the tap, and its semantics label is «Guardar». «Ahora no» is off (`onPressed` null), and tapping it leaves the sheet open.",
+    "ES: when that held call then fails, «Guardar» reads again, «Ahora no» is on, and the error shows under the field; when it succeeds, the sheet closes.",
+    "ES and CA at 2× on 320×640 with the keyboard, after the no-connection failure: the error line shows whole under the field and nothing overflows."
+   ],
+   "deviceChecks": [
+    "Phone, a password account on a slow connection: tap «Guardar» in the name sheet; the button shows a spinner at once and «Ahora no» is off until it answers."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

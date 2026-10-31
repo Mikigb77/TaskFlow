@@ -16,10 +16,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+4002
+version: 1.0.5+4007
 
 environment:
-  sdk: ^3.5.1
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -30,16 +31,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  crypto: ^3.0.7
 
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  intl: ^0.19.0
-  sqflite: ^2.3.3+1
+  intl: ^0.20.2
+  sqflite: ^2.4.4
   path: ^1.9.0
   flutter_riverpod: ^2.5.1
-  table_calendar: ^3.1.2
+  table_calendar: ^3.2.1
   flutter_local_notifications: ^17.2.2
   timezone: ^0.9.4
   permission_handler: ^11.3.1
@@ -56,6 +60,11 @@ dependencies:
   record: ^6.2.0
   path_provider: ^2.1.4
   uuid: ^4.5.1
+  workmanager: 0.10.10
+  purchases_flutter: ^10.13.2
+  purchases_ui_flutter: ^10.13.2
+  google_sign_in: ^7.2.0
+  app_links: ^7.2.2
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +86,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -84,6 +94,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/OFL.txt
+    - assets/brand/google-g.png
   fonts:
     - family: Manrope
       fonts:

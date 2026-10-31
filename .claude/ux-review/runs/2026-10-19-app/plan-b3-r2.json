@@ -1,0 +1,173 @@
+{
+ "runId": "2026-10-19-app",
+ "mode": "app",
+ "round": "b3-r2",
+ "packages": [
+  {
+   "id": "P202",
+   "title": "Día view: the banners and «Sin hora» stay above the hours, in view on arrival",
+   "area": "B",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-1633"
+   ],
+   "files": [
+    "App/lib/screens/day_timeline_screen.dart",
+    "App/test/day_timeline_test.dart",
+    "App/test/ux_previews/calendar_previews.dart"
+   ],
+   "brief": [
+    "Round 2 (b3). UX-1633 (R1B-1 from P180, S2), not failed before. What P180 built, and review B verified (UX-1402 fixed): `_opening` and `_place` (`App/lib/screens/day_timeline_screen.dart`, about :73-105) scroll the page's one `SingleChildScrollView` (key `timeline-scroll`, about :226) to the first timed item, or, on today once that item is over, to the hour before now. The first scroll waits until the tasks and that day's events have loaded (about :184-192). Everything above the timeline lives inside that same scroll view (about :238-280): the `LinearProgressIndicator`, the `loadTasksError` and `calendarReadError` banners, the `calendarDenied` button, the `calendarTruncated` banner, and the «Sin hora» section (`SectionLabel(timelineUnblocked)`, the all-day phone events and the date-only tasks); further down, `timelineNoBlocks`, the `timelineLimit` banner and `timelineHours`. The opening scroll moves all of them off the top, and nothing on screen says they're there. The moment: «¿Y la factura de la luz que puse para hoy? Aquí no está.» An error banner nobody sees gives no feedback.",
+    "Do: (a) Move the loading bar, the `loadTasksError` and `calendarReadError` banners, the `calendarDenied` button, the `calendarTruncated` banner and the `timelineLimit` banner out of the scroll view, into the body's Column right under the day header row (the ‹ date › Row), with 16 dp side padding. Keep their conditions and their order. They never scroll away. (b) Move the «Sin hora» section out of the scroll view too, under those banners and above the timeline's scroll view. Phone calendars pin all-day items above the hours the same way. Move it whole: the `SectionLabel(l.timelineUnblocked)`, the all-day event `ListTile`s and the date-only task rows, with the same widgets, `_landedRow` key, `LandedTaskTile`/`TaskTile` choice and 8 dp gaps as today. It takes at most a third of the height under the day header; past that it scrolls inside itself, and the next row shows cut at its lower edge, so it's clear there's more. With no untimed items, nothing shows there and nothing changes. (c) `_opening`/`_place` stay as P180 built them: they now place the first timed item at the top of the timeline's (smaller) scroll view. `_reveal` keeps working for a landed date-only task: `Scrollable.ensureVisible` finds the pinned area's own scroll. (d) Pull-to-refresh stays on the timeline's scroll view. `timelineNoBlocks` and `timelineHours` stay inside it, above the timeline, where they are.",
+    "Settled here: review B asked the organizer to pick between leaving «Sin hora» above the timeline inside the scroll (where it scrolls away) and putting its rows below the timeline. Neither shows them. Below a 24-hour timeline nobody reaches them, and above it they scroll away. Pinning them above the hours adds no element and no copy, and it's what the phone's own calendar does. Add a preview state `calendar/timeline.untimed` (es 1× and es 2×): `normalDay()` plus a date-only task for today, «Pagar la factura de la luz», as `fixtures.dart` (:167) builds it, at the preview clock (09:41).",
+    "No new strings. Don't touch: the timeline's drawing, the day arrows (UX-224), the opening rule and the glide on arrows (P180), landing on the timeline (UX-466), the TalkBack labels, the rows' own widgets, the all-day rows' subtitle."
+   ],
+   "acceptance": [
+    "ES, 1× and 2× on 360×800, today at 09:41 with `normalDay()` plus the date-only «Pagar la factura de la luz» (`calendar/timeline.untimed`): on arrival «Sin hora» and «Pagar la factura de la luz» are entirely on screen, and so is the 08:30 «Paseo por el parque» block.",
+    "ES, 1× and 2× on 360×800, with the tasks failing to load: «No se pudieron cargar tus tareas» is on screen on arrival, and still on screen after the timeline is scrolled to 20:00.",
+    "ES, 1×, phone calendar on and its read failing: «No se pudieron leer los eventos…» stays on screen after the timeline is scrolled to 20:00; with calendar access missing, the «Permite el acceso al calendario…» button does too.",
+    "ES, 2× on 360×800, a day with five date-only tasks and a task at 08:30: the «Sin hora» area is no taller than a third of the space under the day header, it scrolls by itself, and the 08:30 task is on screen on arrival.",
+    "ES, 1× and 2×, `calendar/timeline.normal` (no untimed items): no «Sin hora» label; the 08:30 block is on screen on arrival, as after P180.",
+    "Saving a date-only task from the Día view lights its row in the «Sin hora» area, on screen."
+   ],
+   "deviceChecks": [
+    "Emulator lane at 2.0 on 393 dp: the Día view of today with one date-only task shows «Sin hora», that task and the first timed task together on arrival."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P203",
+   "title": "Someone else's reminder: the time only when the task sets its own",
+   "area": "B",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1634"
+   ],
+   "files": [
+    "App/lib/widgets/reminder_control.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/reminder_settings_test.dart"
+   ],
+   "brief": [
+    "Round 2 (b3). UX-1634 (R1B-2 from P177, S2), not failed before. What P177 built, and review B verified (UX-1505 fixed): `_Reason` and `_reasonFor` (`App/lib/widgets/reminder_control.dart`, about :40-101) make the chip and the form's Recordatorio row say `reminderForPerson` («Recordatorio para {name}: {value}») on a task given to someone else. The value comes from this phone's preferences when the task follows the default: on the chip (about :296-306), `task.reminderMinutes ?? preferences.leadMinutes`, or `preferences.dateOnlyTime` for a date-only task; on the form row (about :384-388), the same, plus «· predeterminado». But Ana's phone uses Ana's own default (`reminder_engine.dart:172`, `task.reminderMinutes ?? preferences.leadMinutes`), which can be 1 hour. So María reads «Recordatorio para Ana: 10 minutos antes», a claim about someone else that the app can't know.",
+    "Do: when the task follows the default, the line names only the person, with new key `reminderForPersonOnly`: EN “Reminder for {name}” / ES «Recordatorio para {name}» / CA «Recordatori per a {name}» (the Catalan follows P177's `reminderForPerson`, the reviewer's text; a native read of «per a» is still noted). @description: “The reminder line on a task given to someone else that follows the reminder default. Their phone uses their own default, which this phone doesn't know, so no time is said. {name} is the person's name.” A `String` placeholder `name`. «Follows the default» means: a timed task (`reminderHasTime` on the chip, `hasTime` on the row) with `reminderMinutes == null`; a date-only task with no `reminderTime` and `reminderMinutes != -1`. Then there's no value at all: no lead, no time, no «Fecha límite ·»/«Planificado para ·» prefix, and no «· predeterminado». Keep `reminderForPerson` with the value when the task carries its own (a set lead, a set time, or «Desactivado» for -1). One way to build it: `_Reason.text(context, String? value)`, with null when the task follows the default. The chip and the row each pass their own value or null.",
+    "Don't touch: the order of the readings, the muted and archived lines, what a tap does, the chooser, `TaskDatabase.reminderBlock`, what the engine schedules, `capture_review_editor.dart`."
+   ],
+   "acceptance": [
+    "Widget, ES: Ana's timed task (assignment 'member', assigneeName «Ana»), viewed by another account, with `reminderMinutes: null`: the chip reads «Recordatorio para Ana»; with `reminderMinutes: 30`: «Recordatorio para Ana: 30 minutos antes». EN “Reminder for Ana” / “Reminder for Ana: 30 minutes before”; CA «Recordatori per a Ana» / «Recordatori per a Ana: 30 minuts abans».",
+    "Widget, ES: Ana's date-only task with no `reminderTime` reads «Recordatorio para Ana»; with `reminderTime` 8:00 it reads «Recordatorio para Ana: 8:00».",
+    "Widget, ES: the edit form's Recordatorio row shows the same readings, and Ana's default-following task's row doesn't contain «predeterminado».",
+    "AUDIT, `tasks/detail.created-by` (task 31, no reminder of its own), es 1×: the chip reads «Recordatorio para Ana», with no «10 minutos antes».",
+    "A task of this account still reads «Recordatorio: 10 minutos antes» with a 10-minute default."
+   ],
+   "deviceChecks": [
+    "Two accounts on a shared project, Ana's default at 1 hour: on María's phone Ana's task reads «Recordatorio para Ana»; Ana's phone rings an hour before."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P204",
+   "title": "Scoped Completed page: names the person filter; rows leave out the project",
+   "area": "B",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1635",
+    "UX-1636"
+   ],
+   "files": [
+    "App/lib/screens/completed_tasks_screen.dart",
+    "App/test/ux_previews/calendar_previews.dart",
+    "App/test/project_people_filter_test.dart"
+   ],
+   "brief": [
+    "Round 2 (b3). UX-1635 (R1B-3 from P176, S2) and UX-1636 (R1B-4 from P176, S1), not failed before. What P176 built, and review B verified (UX-1407 fixed): a project page's app-bar ✓ (`App/lib/screens/home_screen.dart`, about :459-471) opens `CompletedTasksScreen(listId:, team:, person:)`, which lists only that project's completed tasks for the person chip shown, with the project's name under the title (`App/lib/screens/completed_tasks_screen.dart`, about :41-43 and :81-84). With «Ana» or «Para mí» on, the page reads «Matemáticas · 1 tarea completada»: the filter carried over is invisible. The moment: «¿Solo una? Si hicimos cinco.» And the list (about :89, `TaskList(tasks:, newestFirst: true)`) shows «Matemáticas» on every row under a heading that already says it (`calendar/completed.project.es.light.1x.png`), against UX-1512's rule.",
+    "Do: (a) The line under the title names the filter, with existing strings joined by « · »: with a `person`, the project's name and that person's name, «Matemáticas · Ana» (look the name up as the project page does: `projectPeopleToFilter(project, accountId)`, the entry whose `id` is `person`); with `team` false and no person, the project's name and `forMe`: ES «Matemáticas · Para mí», EN «Matemáticas · For me», CA «Matemáticas · Per a mi» (the project's name is data, never translated); with `team` true and no person, the project's name alone, as now. A person no longer in the project: the project's name alone. Same in the empty state's heading line (about :62-66). (b) Pass `project: listId` to the `TaskList` (about :89), so rows leave out the project the heading names. On the root's «Completadas» (`listId` null) rows keep their project. (c) Add the preview state `completed.project-person` (es 1×): «Matemáticas» with «Ana» on.",
+    "No new strings. Don't touch: the count line, the empty state's copy, the root's «Completadas», the app-bar ✓, how the page filters."
+   ],
+   "acceptance": [
+    "ES, 1×, `calendar/completed.project-person` («Matemáticas», «Ana» on): under the title «Matemáticas · Ana».",
+    "Widget, ES: the same page with «Para mí» reads «Matemáticas · Para mí»; with «Todas», «Matemáticas» alone; EN “For me”, CA «Per a mi».",
+    "ES, 1×, `calendar/completed.project`: no row shows a «Matemáticas» label; `calendar/completed.list` (from the root): rows still show their project."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P205",
+   "title": "Catalog: plain words in the task's rarer corners; «(100 MB)» on one line; the transfer check covers files only",
+   "area": "B",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1414",
+    "UX-1421",
+    "UX-1638"
+   ],
+   "files": [
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/localization_catalog_test.dart"
+   ],
+   "brief": [
+    "Round 2 (b3). Catalog work only: no Dart file changes. Run `flutter gen-l10n` after editing the ARB files.",
+    "UX-1414 (S2), partly, failed once. What P179 did, and review B confirmed: Archivos opens in view from «Tareas con archivos»; the refused card has one sentence and 4 buttons, with «Eliminar archivo adjunto» last, in red, 12 dp below; the confirm button is red; `fileRetry` reads «Volver a subir». The only failing check was the catalog-wide one, «no EN value says “transfer”». It caught `groupTransfer` “Transfer ownership” and `archiveCsvPersonalCopies` (“…are not transferred…”). Both are about handing over ownership, where “transfer” is the right English word. They're not the file-upload jargon this finding is about. Review B asked to narrow the check. So no copy changes for UX-1414: the acceptance below exempts those two keys. ES and CA already pass.",
+    "UX-1638 (R1B-6 from P179, S1), not failed before. `storageFull` breaks between the number and «MB» (`tasks/detail.file-space-full.es.light.1x.png` reads «(100 / MB).»). In all three catalogs, put a non-breaking space (U+00A0, written `\\u00a0` in the ARB JSON) between `{limit}` and `MB`: EN “Your file space is full ({limit} MB).” / ES «Tu espacio para archivos está lleno ({limit} MB).» / CA «El teu espai per a fitxers és ple ({limit} MB).», with U+00A0 before MB in each. Keep the @description and the placeholder.",
+    "UX-1421 (S1), partly, failed once. What P179 did, and review B confirmed: every key the brief named reads as written. What failed: the finding's own catalog check still finds the words on keys the brief gave no copy for. The organizer's copy (EN / ES / CA; the Catalan is the organizer's, so a native read is noted): (1) `changeSeriesQuestion` (the dialog title when a repeat's rule changes and some dates were moved or skipped, `App/lib/widgets/task_editor.dart:504`): EN “Change how it repeats?” / ES «¿Cambiar cómo se repite?» / CA «Vols canviar com es repeteix?». (2) `changeSeriesHelp` (its text, :505): EN “Dates you moved or skipped will follow the new repeat. Completed dates stay in the history.” / ES «Las fechas que cambiaste u omitiste seguirán la nueva repetición. Las fechas completadas se quedan en el historial.» / CA «Les dates que vas moure o ometre seguiran la repetició nova. Les dates completades es queden a l’historial.». (3) `listEditingAccessHelp` (the read-only project's bottom bar, `App/lib/screens/home_screen.dart:783`, and `App/lib/screens/edit_task_screen.dart:32`): EN “To make changes, ask the project’s owner.” / ES «Si quieres hacer cambios, pídeselo al propietario del proyecto.» / CA «Si vols fer canvis, demana-ho al propietari del projecte.». (4) `viewOnlyNote` (`App/lib/screens/task_detail_screen.dart:218`): EN “View-only note. To make changes, ask the project’s owner.” / ES «Nota de solo lectura. Si quieres hacer cambios, pídeselo al propietario del proyecto.» / CA «Nota de només lectura. Si vols fer canvis, demana-ho al propietari del projecte.». (5) `androidAlertRefreshHelp` (Recordatorios › Detalles, `App/lib/screens/notification_settings_screen.dart:272`): EN “Upcoming alerts update when you open the app and, when Android allows it, every hour.” / ES «Los próximos avisos se actualizan al abrir la app y, cuando Android lo permite, cada hora.» / CA «Els avisos propers s’actualitzen quan obres l’aplicació i, quan Android ho permet, cada hora.». (6) `backgroundAlertRefreshHelp` (:273): EN “Upcoming alerts update when you open the app and when your phone allows it.” / ES «Los próximos avisos se actualizan al abrir la app y cuando el teléfono lo permite.» / CA «Els avisos propers s’actualitzen quan obres l’aplicació i quan el telèfon ho permet.». (7) `deferredAlerts` (:213), keeping the ICU plural and the `count` placeholder: EN `{count, plural, =1{1 later alert isn’t set yet.} other{{count} later alerts aren’t set yet.}} The next update sets the nearest ones.` / ES `{count, plural, =1{1 aviso posterior aún no está activado.} other{{count} avisos posteriores aún no están activados.}} La próxima actualización activará los más cercanos.` / CA `{count, plural, =1{1 avís posterior encara no està activat.} other{{count} avisos posteriors encara no estan activats.}} La pròxima actualització activarà els més propers.`. (8) `schedule` (ES «Programación»): nothing reads it in lib/ (search for `l10n.schedule` first, line breaks included). Remove it from all three catalogs. If something does read it, stop and report it. Update each changed key's @description in app_en.arb where it describes the old wording.",
+    "`retryScheduling` (EN “Refresh and retry scheduling”) is left alone: P187 (UX-1606 c) removes it for the existing `tryAgain`. The acceptance exempts it until then.",
+    "Don't touch: the keys P179 already changed, `groupTransfer`, `archiveCsvPersonalCopies`, `scheduledAlertHelp` (Recordatorios is P187's), any layout."
+   ],
+   "acceptance": [
+    "UX-1414, catalog: no ES value contains «transferencia» and no CA value «transferència»; the only EN values containing “transfer” are `groupTransfer` and `archiveCsvPersonalCopies` (ownership, not files).",
+    "UX-1638, catalog: `storageFull` holds U+00A0 between the limit and «MB» in EN, ES and CA; ES 1× and 2×, `tasks/detail.file-space-full`: «(100 MB).» sits on one line.",
+    "UX-1421, catalog: no ES value contains «instancia», «programación», «Revisa este valor» or «permisos de edición»; no EN value contains “instance”, “Check this value” or “edit permissions”, and “scheduling” only in `retryScheduling` (P187 removes it); no CA value contains «instància», «programació» or «permisos d’edició».",
+    "UX-1421: `changeSeriesQuestion`, `changeSeriesHelp`, `listEditingAccessHelp`, `viewOnlyNote`, `androidAlertRefreshHelp`, `backgroundAlertRefreshHelp` and `deferredAlerts` (count 1 and 3) read exactly as the brief writes them, in EN, ES and CA, through AppLocalizations.",
+    "`schedule` is in no catalog.",
+    "ES, 1×, `tasks/project.viewer`: the bottom bar reads «Este proyecto es de solo lectura» and «Si quieres hacer cambios, pídeselo al propietario del proyecto.», and AUDIT finds no cut text there."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P206",
+   "title": "View-only rows line up with the others",
+   "area": "B",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-1637"
+   ],
+   "files": [
+    "App/lib/widgets/task_tile.dart",
+    "App/test/calendar_feedback_test.dart"
+   ],
+   "brief": [
+    "Round 2 (b3). UX-1637 (R1B-5 from P178, S1), not failed before. What P178 built, and review B verified (UX-1416 fixed): a view-only row has no circle and reads as one TalkBack button. But the row's left padding became `viewOnly ? 16 : 8` (`App/lib/widgets/task_tile.dart`, about :263), and the circle with its 4 dp gap is gone (about :271-288). So in mixed lists a view-only title starts about 44 dp left of the others: on Calendar «Comer con Ana» starts at about 36 dp, the rest at about 80 dp (`calendar/agenda.added.es.light.1x.png`).",
+    "Do: keep the left padding at 8 for every row. On a view-only row, put an empty box where the circle and its gap were, as wide as the editable row's `Checkbox` slot plus the 4 dp gap (the Checkbox lays out at 48 dp under the app's theme, so 52 dp; measure it, don't guess). A plain `SizedBox` adds nothing to semantics, so the row stays one button. Add no icon. The title-only centring stays as it is.",
+    "No new strings. Don't touch: the view-only row's semantics and label, the circle on editable rows, the swipes, the custom action."
+   ],
+   "acceptance": [
+    "ES, 1× and 2× on 360×800, `calendar/agenda.added`: «Comer con Ana» (view-only) starts at the same x as the other rows' titles, within 1 dp.",
+    "Widget: a view-only row has no checkbox node and is still read as one button, «Comer con Ana, 13:30»."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [
+  {
+   "id": "D12",
+   "question": "UX-1403 (S2): what's left of Tareas at large text. Round 1 (P176) made every change the reviewers asked for: «Tus tareas» smaller, «Prioridad alta» only when it would find something, no search or chips on an empty list, one chip row that scrolls sideways, and no «Todas las tareas». At the preview's linear 2× on 360 dp with a shared project, the header still fills the screen. In order: the project filter (two rows), «Tus tareas», «Proyectos» and «Completadas» (a row each), the search and the chips. Only about 70 dp of the first task shows above «Añadir tarea». At 1× the preview's fixture shows one whole task, not two. «Les teves tasques» wraps at linear 2×, but the conventions judge headlines at Android's non-linear 2.0, which is still to check. To get a whole task above the button at that size, something you built has to move or hide: (a) wait for the two-tab decision (U13), which reshapes this tab anyway; (b) move «Completadas» to the end of the list; (c) put the search behind an icon; (d) fold the project filter into one control (P184 is changing its sheet).",
+   "findings": [
+    "UX-1403"
+   ],
+   "recommendation": "(a), after one measurement. The main session first captures the emulator lane at 393 dp and Android's 2.0 (`screen-tasks.list.es.light.2.0` and its CA twin), the size the plan judges headlines at. If a whole task shows above «Añadir tarea» and «Tus tareas» / «Les teves tasques» is on one line, UX-1403 closes as fixed on that evidence. If not, it joins U13's evidence for the §7 test with your father. The header scrolls away, so the tasks are one swipe up, which is why this is S2 and not S3. No package waits for this answer."
+  }
+ ],
+ "skipped": []
+}

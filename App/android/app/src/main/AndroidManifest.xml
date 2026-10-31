@@ -4,18 +4,20 @@
     <!-- Required permissions for notifications and alarms -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
-        android:label="TaskFlow"
+        android:label="${taskflowLabel}"
         android:name="${applicationName}"
-        android:icon="@drawable/app_icon"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true">
+
+        <!-- Foreground reads must not block a notification worker's transaction. -->
+        <meta-data android:name="com.tekartik.sqflite.wal_enabled" android:value="true" />
 
         <activity
             android:name=".MainActivity"
@@ -34,12 +36,29 @@
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${taskflowScheme}" android:host="invite" />
+            </intent-filter>
         </activity>
+
+        <receiver android:name=".CaptureWidget" android:exported="false" android:label="@string/capture_widget_label">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/capture_widget_info" />
+        </receiver>
 
         <!-- Don't delete the meta-data below. This is used by the Flutter tool to generate
         GeneratedPluginRegistrant.java -->
@@ -71,6 +90,9 @@
 
     <!-- Required to query activities that can process text -->
     <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />

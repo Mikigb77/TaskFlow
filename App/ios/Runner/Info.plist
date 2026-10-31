@@ -2,14 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>UIBackgroundModes</key>
+    <array><string>fetch</string></array>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Record your plans to create a task draft.</string>
+    <string>TaskFlow listens only while you use the microphone, so you can say a task instead of typing it.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Connect to your local TaskFlow backend.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>es</string>
+		<string>ca</string>
+	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Agenda</string>
+	<string>TaskFlow</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

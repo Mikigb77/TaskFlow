@@ -6,6 +6,8 @@ __pycache__
 .pytest_cache
 tests/fixtures/*.wav
 artifacts/
-compose.yaml
+private_media/
+compose*.yaml
+.credentials/
 README.md
 .gitignore

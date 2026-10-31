@@ -1,0 +1,10 @@
+[
+  {"id":"en-clean","language":"en-US","voice":"Microsoft Zira Desktop","segments":["On Friday at five in the afternoon I have a doctor appointment. Bring the blood test report from last month."]},
+  {"id":"en-noisy","language":"en-US","voice":"Microsoft Zira Desktop","noise_snr_db":12,"segments":["On Friday at five in the afternoon I have a doctor appointment. Bring the blood test report from last month."]},
+  {"id":"en-paused","language":"en-US","voice":"Microsoft Zira Desktop","pause_ms":1500,"segments":["On Friday I have a doctor appointment.","At five in the afternoon. Bring the blood test report."]},
+  {"id":"en-correction","language":"en-US","voice":"Microsoft Zira Desktop","segments":["Remind me to call the dentist on Friday at five. Actually, make that six in the evening."]},
+  {"id":"es-clean","language":"es-ES","voice":"Microsoft Helena Desktop","segments":["El viernes a las cinco de la tarde tengo una cita con el médico. Llevar el informe del análisis de sangre del mes pasado."]},
+  {"id":"es-noisy","language":"es-ES","voice":"Microsoft Helena Desktop","noise_snr_db":12,"segments":["El viernes a las cinco de la tarde tengo una cita con el médico. Llevar el informe del análisis de sangre del mes pasado."]},
+  {"id":"es-paused","language":"es-ES","voice":"Microsoft Helena Desktop","pause_ms":1500,"segments":["El viernes tengo una cita con el médico.","A las cinco de la tarde. Llevar el informe del análisis de sangre."]},
+  {"id":"es-correction","language":"es-ES","voice":"Microsoft Helena Desktop","segments":["Recuérdame llamar al dentista el viernes a las cinco. No, mejor a las seis de la tarde."]}
+]

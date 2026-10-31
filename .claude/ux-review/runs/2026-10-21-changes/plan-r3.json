@@ -1,0 +1,46 @@
+{
+ "runId": "2026-10-21-changes",
+ "mode": "changes",
+ "round": 3,
+ "packages": [
+  {
+   "id": "P230",
+   "title": "Answering a deletion set's project keeps its heading and ✕ in view",
+   "area": "A",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1719",
+    "UX-1718",
+    "UX-1717"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/test/bulk_voice_commands_test.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, round 3. Round 2 (P229) passed its round check, and review A found UX-1717 and UX-1718 fixed (.claude/ux-review/runs/2026-10-21-changes/verify-r2-A.md). This package fixes the one regression that review found, R2A-1, now UX-1719 (S2). It is in App/lib/screens/voice_task_screen.dart, which holds uncommitted work from P224-P229: build on it, and search for the code, as line numbers drift. No new copy, no ARB change, no change to any card's layout or to which tasks a set holds (D1, D2 and D3 stay open and are untouched).",
+    "What the last attempt did (P229, for UX-1718): `_firstOpen` (~2676-2702) now returns `({BuildContext card, bool heading})`, with `heading: view.bulk != null` for the deletion it picks when nothing asks; `_reveal` (~2747-2760) calls `Scrollable.ensureVisible(_questionIn(card) ?? card, alignment: open.heading ? 0 : 1, ...)`. That is right for a set deletion that never asked anything: its card has no QuestionBox, so the card itself is scrolled to the top.",
+    "Why it fails (UX-1719): a deletion set that asked «¿Qué proyecto?» keeps its QuestionBox after a chip is tapped (App/lib/widgets/capture_command_cards.dart ~57, `asksProject => projectChoices.isNotEmpty`; `_Frame` puts the question right under the heading, ~525-529). Once answered, the set stops blocking, `_changeCommand` (~2963) calls `_revealAfter`, `_firstOpen` picks the set with `heading: true`, and `_reveal` scrolls the QuestionBox, not the card, to the top of the view. At large text the set's card is taller than the view, so «Eliminar N tareas» and its ✕ («No eliminar ninguna») scroll out of view above it, just as the delete button becomes active. The person taps «Matemáticas», and the red title and its way out jump off the top.",
+    "Fix: in `_reveal`, when `open.heading` is true, reveal the card itself instead of its question: `Scrollable.ensureVisible(open.heading ? card : (_questionIn(card) ?? card), alignment: open.heading ? 0 : 1, ...)`. Keep the duration, the curve and `Duration.zero` when animations are disabled. Update `_reveal`'s doc comment so it says a set deletion is revealed by its card, heading at the top, even when it holds an answered question. Everything with `heading: false` is unchanged: an open question box or blocking card still scrolls its question (or the card) to `alignment: 1`, and a one-task deletion still scrolls to `alignment: 1`.",
+    "UX-1717 and UX-1718 are fixed (verify-r2-A.md) and listed here only so the reviewer re-checks them after this change. Don't touch `_commandCard`'s ✕ count (`view.bulk?.count ?? (command.bulk ? 2 : 1)`, ~4076-4080), `_removeCommand`'s doc comment, `_firstOpen`'s pick order or its `heading` flag, or `_announce` (~2814, which reads `_firstOpen()?.card` and its question box).",
+    "Don't touch: the set card (App/lib/widgets/capture_command_cards.dart), the QuestionBox staying after a tap (P225's reading, settled in round 1), the ARB files, the move and complete sets (still not revealed), and the preview states P229 added (cards.bulk-delete-mixed, `_doneLastWeek()`). Out of scope, as before: Backend/, App/pubspec.yaml, App/scripts/, App/config/, .claude/ux-web/. Don't run `dart format` over whole files; format only your hunks, or check the diff.",
+    "Tests: no existing test should break; the P224 (UX-1704) and P229 (UX-1717, UX-1718) tests in App/test/bulk_voice_commands_test.dart keep passing unchanged. Harness for the new state, all in that file: `_askingSet('delete', status: 'completed')`, `_mathsYesterday(done: true)`, `_maths`, `_mathsTwo`, `_projectChips`, `_resultView`, `_expectInside` and `_resultOffset` (~1755-1775, ~1927-1941, ~3635-3715). `_mathsYesterday` holds only two Matemáticas tasks, which may not make the answered card taller than the view at 2× on 360 dp; the test needs enough completed Matemáticas tasks that it is (five, for example), and should assert that, as the UX-1704 test does, so it fails without the fix. Known, outside this package: App/test/capture_landing_test.dart's UX-1628 test (resuming 31 minutes after a Friday landing; Expected 0.0, Actual 50.0) failed for P229's implementer with and without its change, on the real clock near midnight. If it fails for you, say so in your notes; don't fix it here.",
+    "Previews: no new preview state is needed (no preview covers the answered state, and the fix runs only after a tap). Re-render commands/ and confirm cards.bulk-delete.es.light.2x, cards.bulk-delete-mixed.es.light.2x and cards.bulk-ambiguous-project (es 1× and 2×) are unchanged."
+   ],
+   "acceptance": [
+    "Widget test (UX-1719): Spanish, 2×, 360 dp. A deletion set on «mates» (completed tasks) asking «¿Qué proyecto?», with Matemáticas and Matemáticas II as candidates and enough completed Matemáticas tasks that, once answered, the set's card is taller than the sheet's visible scroll area (asserted). Tap the «Matemáticas» chip and let it settle. The set's `command-headline` («Eliminar N tareas», N being the Matemáticas count) and its ✕ (tooltip «No eliminar ninguna») lie inside the visible part of the sheet's scroll view.",
+    "Widget test (UX-1719, before the answer unchanged): the same state before any chip is tapped. «¿Qué proyecto?» and both chips («Matemáticas», «Matemáticas II») lie inside the visible part of the sheet's scroll view, and the confirming button is disabled.",
+    "Widget test (UX-1718 still fixed): the existing P229 tests pass unchanged. At 2× on 360 dp, «Comprar pan» plus a 3-task deletion set opens with «Eliminar 3 tareas» and its ✕ in view, and the button reads «Añadir y eliminar»; a lone 3-task deletion set stays at scroll offset 0 with its heading and ✕ in view (UX-1704); a new task plus «Borra el dentista» brings the one-task deletion card's bottom edge into view above the buttons.",
+    "Widget test (UX-1717 still fixed): the existing P229 tests pass unchanged. In Spanish at 1×, ✕ on a set still asking «¿Qué proyecto?» shows «No se cambiarán», «No se eliminarán» or «No se completarán» with «Deshacer»; in Catalan the deletion set shows «No se suprimiran»; a one-task deletion still shows «No se eliminará».",
+    "Render (reviewer): cards.bulk-delete.es.light.2x, cards.bulk-delete-mixed.es.light.2x and cards.bulk-ambiguous-project (es 1× and 2×) are unchanged from round 2."
+   ],
+   "deviceChecks": [
+    "Main session, real model, emulator lane or phone, Android's largest font, with projects «Matemáticas» and «Matemáticas II» both holding several completed tasks: say «Borra todas las completadas de mates», then tap «Matemáticas» under «¿Qué proyecto?». «Eliminar N tareas» and its ✕ stay at the top of the sheet."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

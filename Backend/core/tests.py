@@ -15,8 +15,8 @@ from django.utils.http import urlsafe_base64_encode
 from rest_framework.test import APIClient
 from google.genai import types, errors
 
-from .ai import AIUnavailable, extract_task, extract_tasks, transcribe, generate
-from .models import User, Task, TaskEvent
+from .ai import AIUnavailable, extract_task, extract_tasks, transcribe, generate, make_drafts
+from .models import User, Task, TaskEvent, TaskList
 
 PASSWORD = "Strong-example-passphrase!2026"
 
@@ -77,6 +77,60 @@ class APITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("password", response.data["user"])
 
+    def test_missing_registration_timezone_uses_utc_without_changing_existing_profiles(self):
+        response = APIClient().post("/api/auth/register/", {
+            "email": "no-zone@example.invalid", "password": PASSWORD,
+        }, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["user"]["timezone"], "UTC")
+        self.assertEqual(User.objects.get(email=self.credentials["email"]).timezone, "Europe/Madrid")
+
+    def test_personal_lists_are_private_and_foreign_assignment_is_rejected(self):
+        list_id = str(uuid.uuid4())
+        payload = {"name": "Work", "color": "blue", "version": 0}
+        created = self.client.put(f"/api/lists/{list_id}/", payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        other = APIClient()
+        token = other.post("/api/auth/register/", {**self.credentials, "email": "other-list@example.invalid"}, format="json").data
+        other.credentials(HTTP_AUTHORIZATION="Bearer " + token["access"])
+        self.assertEqual(other.get("/api/lists/").data["results"], [])
+        self.assertEqual(other.get(f"/api/lists/{list_id}/").status_code, 404)
+        self.assertEqual(other.put(f"/api/lists/{list_id}/", payload, format="json").status_code, 404)
+        self.assertEqual(other.post("/api/tasks/", {**self.task_data, "list_id": list_id}, format="json").status_code, 400)
+        self.assertEqual(APIClient().get("/api/lists/").status_code, 401)
+
+    def test_list_move_archive_and_conflict_preserve_task_fields(self):
+        owner = User.objects.get(email=self.credentials["email"])
+        work = TaskList.objects.create(owner=owner, name="Work")
+        personal = TaskList.objects.create(owner=owner, name="Personal")
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        payload = {**self.task_data, "list_id": str(work.id), "labels": ["Errands", "errands", "Health"], "version": 0, "reminder_minutes": 15}
+        created = self.client.put(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(created.data["labels"], ["errands", "health"])
+        moved = self.client.put(path, {**payload, "list_id": str(personal.id), "version": 1}, format="json")
+        self.assertEqual(moved.status_code, 200, moved.data)
+        self.assertEqual(moved.data["id"], created.data["id"])
+        for field in ["due_date", "reminder_minutes", "notes", "priority", "labels"]:
+            self.assertEqual(moved.data[field], created.data[field])
+        archived = self.client.put(f"/api/lists/{personal.id}/", {"name": "Home", "archived": True, "version": 1}, format="json")
+        self.assertEqual(archived.status_code, 200, archived.data)
+        self.assertEqual(self.client.get(path).data["list_id"], personal.id)
+        conflict = self.client.put(f"/api/lists/{personal.id}/", {"name": "Conflicting", "version": 1}, format="json")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.data["current"]["name"], "Home")
+        old_client = self.client.put(path, {**self.task_data, "version": 2}, format="json")
+        self.assertEqual(old_client.data["list_id"], personal.id)
+        self.assertEqual(old_client.data["labels"], ["errands", "health"])
+
+    def test_list_and_label_bounds_are_enforced(self):
+        for name in ["", " " * 5, "x" * 81]:
+            response = self.client.put(f"/api/lists/{uuid.uuid4()}/", {"name": name}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+        for labels in [[""], ["x" * 33], [f"label-{i}" for i in range(11)]]:
+            response = self.client.post("/api/tasks/", {**self.task_data, "labels": labels}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+
     def test_weak_password_and_duplicate_email_rejected(self):
         other = APIClient()
         self.assertEqual(other.post("/api/auth/register/", {"email": "weak@example.invalid", "password": "password"}, format="json").status_code, 400)
@@ -85,7 +139,8 @@ class APITests(TestCase):
     def test_unauthenticated_tasks_are_blocked_and_drafts_require_valid_input(self):
         other = APIClient()
         self.assertEqual(other.get("/api/tasks/").status_code, 401)
-        self.assertEqual(other.post("/api/ai/drafts/", {}, format="json").status_code, 400)
+        self.assertEqual(other.post("/api/ai/drafts/", {}, format="json").status_code, 401)
+        self.assertEqual(self.client.post("/api/ai/drafts/", {}, format="json").status_code, 400)
 
     def test_tasks_keep_time_offset_and_are_isolated_by_owner(self):
         response = self.client.post("/api/tasks/", self.task_data, format="json")
@@ -118,6 +173,59 @@ class APITests(TestCase):
         for values in [{"priority": 5}, {"due_date": "2026-09-25T17:00:00"}, {"title": ""}]:
             self.assertEqual(self.client.post("/api/tasks/", {**self.task_data, **values}, format="json").status_code, 400)
 
+    def test_reminder_choices_roundtrip_and_conflict_without_priority_coupling(self):
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        payload = {**self.task_data, "priority": 1, "reminder_minutes": 30, "reminder_time": 540, "version": 0}
+        created = self.client.put(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        restored = self.client.get(path).data
+        self.assertEqual(restored["reminder_minutes"], 30)
+        self.assertEqual(restored["reminder_time"], 540)
+        # A reminder is the asker's own (docs/REMINDER_PLANS.md): changing it alone makes no new version.
+        updated = self.client.put(path, {**payload, "reminder_minutes": -1, "version": 1}, format="json")
+        self.assertEqual((updated.status_code, updated.data["version"]), (200, 1), updated.data)
+        renamed = self.client.put(path, {**payload, "title": "Renamed", "reminder_minutes": -1, "version": 1}, format="json")
+        self.assertEqual(renamed.data["version"], 2)
+        conflict = self.client.put(path, {**payload, "reminder_minutes": -1, "version": 1}, format="json")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.data["current"]["reminder_minutes"], -1)
+
+    def test_reminder_limits_and_defaults(self):
+        for field, value in [("reminder_minutes", -2), ("reminder_minutes", 10081),
+                             ("reminder_time", -1), ("reminder_time", 1440)]:
+            response = self.client.post("/api/tasks/", {**self.task_data, field: value}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+        created = self.client.post("/api/tasks/", self.task_data, format="json")
+        self.assertIsNone(created.data["reminder_minutes"])
+        self.assertIsNone(created.data["reminder_time"])
+
+    def test_checklist_roundtrip_conflict_and_older_client_preservation(self):
+        items = [{"id": str(uuid.uuid4()), "title": "Passport", "completed": False,
+                  "completed_dates": ["2026-09-25"]},
+                 {"id": str(uuid.uuid4()), "title": "Charger", "completed": True, "completed_dates": []}]
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        payload = {**self.task_data, "checklist": items, "recurrence": "weekly", "version": 0}
+        created = self.client.put(path, payload, format="json")
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual(self.client.get(path).data["checklist"], items)
+        changed = [{**items[0], "title": "Updated passport"}, items[1]]
+        updated = self.client.put(path, {**payload, "checklist": changed, "version": 1}, format="json")
+        self.assertEqual(updated.status_code, 200, updated.data)
+        conflict = self.client.put(path, {**payload, "version": 1}, format="json")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.data["current"]["checklist"], changed)
+        old_client = self.client.put(path, {**self.task_data, "recurrence": "weekly", "version": 2}, format="json")
+        self.assertEqual(old_client.status_code, 200, old_client.data)
+        self.assertEqual(old_client.data["checklist"], changed)
+
+    def test_checklist_rejects_invalid_ids_duplicate_ids_empty_titles_and_limits(self):
+        item = {"id": str(uuid.uuid4()), "title": "Passport", "completed": False}
+        for items in [[{**item, "id": "bad"}], [item, item], [{**item, "title": "   "}],
+                      [{**item, "title": "x" * 161}], [{**item, "completed_dates": ["bad-date"]}],
+                      [{**item, "id": str(uuid.uuid4())} for _ in range(51)]]:
+            response = self.client.post("/api/tasks/", {**self.task_data, "checklist": items}, format="json")
+            self.assertEqual(response.status_code, 400, response.data)
+
     def test_inbox_date_only_and_recurrence_roundtrip(self):
         for schedule in [
             {"due_date": None},
@@ -143,15 +251,19 @@ class APITests(TestCase):
             response = self.client.post("/api/tasks/", {**self.task_data, **schedule}, format="json")
             self.assertEqual(response.status_code, 400, response.data)
 
-    @override_settings(AI_GUEST_REQUESTS_PER_DAY=1)
-    @patch("core.views.ai.make_drafts", return_value={"tasks": [{"title": "Coffee"}], "transcript": "Buy coffee"})
-    def test_guest_trial_cannot_bypass_budget_with_forwarded_headers(self, mock):
+    @patch("core.views.ai.make_draft")
+    @patch("core.views.ai.make_drafts")
+    @patch("core.views.consume_budget")
+    def test_anonymous_ai_calls_require_login_before_provider_or_budget(self, budget, batch, single):
         payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}
         guest = APIClient()
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 200)
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json", HTTP_X_FORWARDED_FOR="1.2.3.4").status_code, 429)
-        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 200)
-        self.assertEqual(mock.call_count, 2)
+        for path in ["/api/ai/draft/", "/api/ai/drafts/"]:
+            for headers in [{}, {"HTTP_X_FORWARDED_FOR": "1.2.3.4"}]:
+                response = guest.post(path, payload, format="json", **headers)
+                self.assertEqual(response.status_code, 401, response.data)
+        batch.assert_not_called()
+        single.assert_not_called()
+        budget.assert_not_called()
         self.assertEqual(Task.objects.count(), 0)
 
     def test_malformed_task_id_returns_not_found(self):
@@ -168,7 +280,10 @@ class APITests(TestCase):
     def test_logout_revokes_access_and_refresh_immediately(self):
         self.assertEqual(self.client.post("/api/auth/logout/", {}, format="json").status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
-        self.assertEqual(APIClient().post("/api/auth/refresh/", {"refresh": self.tokens["refresh"]}, format="json").status_code, 401)
+        refresh = APIClient().post("/api/auth/refresh/", {"refresh": self.tokens["refresh"]}, format="json")
+        self.assertEqual(refresh.status_code, 401)
+        # An ended session is not a deleted account: the app keeps its local copy.
+        self.assertNotEqual(refresh.data.get("code"), "user_not_found")
 
     def test_recovery_email_does_not_enumerate_accounts(self):
         other = APIClient()
@@ -197,6 +312,7 @@ class APITests(TestCase):
 
     @override_settings(AI_REQUESTS_PER_DAY=1)
     @patch("core.views.ai.make_draft", return_value={"title": "Draft"})
+    @patch("core.views.has_pro", new=lambda user: True)
     def test_drafts_do_not_save_tasks_and_daily_budget_is_enforced(self, mock):
         payload = {"text": "Call tomorrow", "timezone": "Europe/Madrid"}
         self.assertEqual(self.client.post("/api/ai/draft/", payload, format="json").status_code, 200)
@@ -204,19 +320,123 @@ class APITests(TestCase):
         self.assertEqual(self.client.post("/api/ai/draft/", payload, format="json").status_code, 429)
         self.assertEqual(mock.call_count, 1)
 
-    @override_settings(AI_GUEST_REQUESTS_PER_DAY=1)
+    @override_settings(AI_REQUESTS_PER_DAY=1)
     @patch("core.views.ai.make_drafts")
-    def test_provider_failure_does_not_spend_guest_trial(self, mock):
+    @patch("core.views.has_pro", new=lambda user: True)
+    def test_provider_failure_does_not_spend_account_allowance(self, mock):
         mock.side_effect = [AIUnavailable("Provider busy"), {"tasks": [{"title": "Coffee"}]}]
-        guest = APIClient()
         payload = {"text": "Buy coffee", "timezone": "Europe/Madrid"}
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 503)
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 200)
-        self.assertEqual(guest.post("/api/ai/drafts/", payload, format="json").status_code, 429)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 503)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 200)
+        self.assertEqual(self.client.post("/api/ai/drafts/", payload, format="json").status_code, 429)
         self.assertEqual(mock.call_count, 2)
 
 
 class DraftTests(TestCase):
+    @patch("core.ai.generate")
+    def test_bare_task_array_preserves_deadline_and_assignment(self, provider):
+        provider.return_value = json.dumps([
+            {**self.output, "date": None, "time": None,
+             "deadline_date": "2026-09-25", "assignment_request": "member", "member_name": "Ana"},
+            {"title": "Prepare presentation", "date": None, "time": None, "priority": 2}])
+        context = {"user_id": 1, "default_project_id": "physics", "projects": [
+            {"id": "physics", "name": "Physics", "shared": True,
+             "people": [{"user_id": 2, "name": "Ana", "role": "editor"}]}]}
+        result = extract_tasks("Ana finishes the exercise by Friday. Prepare presentation.", "Europe/Madrid", self.reference, context)
+        self.assertEqual(len(result["tasks"]), 2)
+        self.assertEqual(result["tasks"][0]["deadline_date"], "2026-09-25")
+        self.assertIsNone(result["tasks"][0]["due_date"])
+        self.assertEqual(result["tasks"][0]["assignment"], "member")
+        self.assertEqual(result["tasks"][0]["assignee_id"], 2)
+        self.assertEqual(result["tasks"][1]["title"], "Prepare presentation")
+
+    @patch("core.ai.generate")
+    def test_an_envelope_wrapped_in_an_array_keeps_every_task(self, provider):
+        # The free model's real answer to the owner's three-task dictation, which used to be rejected whole.
+        provider.return_value = json.dumps([{"tasks": [
+            {"title": "Ir al médico", "date": "2026-09-25", "time": "17:00", "priority": 3,
+             "notes": "Llevar los análisis de sangre.", "questions": [], "recurrence": "none"},
+            {"title": "Terminar el diseño del front con los mockups", "date": None, "time": None, "priority": 2,
+             "notes": "", "questions": [], "deadline_date": "2026-09-24", "deadline_time": "17:00"},
+            {"title": "Comprar verduras", "date": "2026-09-21", "time": None, "priority": 1, "notes": "",
+             "questions": [], "checklist": ["tomates", "patatas", "zanahorias"]},
+        ], "clarifications": []}], ensure_ascii=False)
+        words = ("Tengo que ir al médico el viernes a las cinco y llevarme los análisis de sangre, terminar el diseño "
+                 "del front con los mockups para el jueves a las cinco y comprar tomates, patatas y zanahorias para mañana")
+        tasks = extract_tasks(words, "Europe/Madrid", self.reference)["tasks"]
+        self.assertEqual([task["title"] for task in tasks],
+                         ["Ir al médico", "Terminar el diseño del front con los mockups", "Comprar verduras"])
+        self.assertEqual((tasks[0]["time"], tasks[0]["notes"]), ("17:00:00", "Llevar los análisis de sangre."))
+        self.assertTrue(tasks[1]["deadline_at"].startswith("2026-09-24T17:00"))
+        self.assertEqual([step["title"] for step in tasks[2]["checklist"]], ["tomates", "patatas", "zanahorias"])
+        # Two envelopes, or one without a tasks list, stay malformed.
+        from pydantic import ValidationError
+        for wrapped in ([{"tasks": []}, {"tasks": []}], [{"tasks": "Comprar pan"}]):
+            provider.return_value = json.dumps(wrapped)
+            with self.assertRaises((ValidationError, AIUnavailable)):
+                extract_tasks("Comprar pan", "Europe/Madrid", self.reference)
+
+    @patch("core.ai.generate")
+    def test_a_clarification_written_into_questions_keeps_every_task(self, provider):
+        # The free model's real answer to the Catalan three-task dictation: its AM/PM question sat in questions.
+        provider.return_value = json.dumps({"tasks": [
+            {"title": "Anar al metge", "date": "2026-09-25", "time": None, "priority": 3,
+             "notes": "Portar les anàlisis de sang.", "questions": [
+                 {"field": "schedule", "question": "A les 5 de la tarda o de la matinada?", "times": ["05:00", "17:00"]},
+                 {"field": "nonsense", "question": "Kept as text"}, {"times": ["05:00"]}, "Plain question?"]},
+            {"title": "Comprar verdura", "date": "2026-09-21", "time": None, "priority": 1, "questions": [],
+             "checklist": ["tomàquets", "patates", "pastanagues"]},
+        ]}, ensure_ascii=False)
+        tasks = extract_tasks("Anar al metge divendres a les 5 i comprar verdura per demà", "Europe/Madrid",
+                              self.reference)["tasks"]
+        self.assertEqual(len(tasks), 2)
+        doctor = tasks[0]
+        self.assertEqual(doctor["clarifications"], [{"field": "schedule", "question": "A les 5 de la tarda o de la matinada?",
+                                                     "times": ["05:00", "17:00"]}])
+        self.assertEqual(doctor["questions"], ["Kept as text", "Plain question?", "A les 5 de la tarda o de la matinada?"])
+        self.assertIsNone(doctor["time"])
+        self.assertEqual(len(tasks[1]["checklist"]), 3)
+
+    @patch("core.ai.generate")
+    def test_bare_array_keeps_schema_and_batch_size_validation(self, provider):
+        from pydantic import ValidationError
+        for tasks in [[], [self.output] * 13, [{**self.output, "priority": 99}], ["not a task"]]:
+            provider.return_value = json.dumps(tasks)
+            with self.assertRaises(ValidationError):
+                extract_tasks("Synthetic task", "Europe/Madrid", self.reference)
+
+    @patch("core.ai.generate")
+    def test_checklist_extraction_stays_one_task_with_stable_validated_step_ids(self, provider):
+        provider.return_value = json.dumps({"tasks": [
+            {"title": "Pack for the trip", "date": None, "time": None, "priority": 1,
+             "checklist": ["Passport", "Charger", "Coat"]},
+            {"title": "Doctor appointment", "date": "2026-09-25", "time": "17:00", "priority": 3}]})
+        result = extract_tasks("Pack passport, charger and coat. Doctor Friday at 5 pm.", "Europe/Madrid", self.reference)
+        self.assertEqual(len(result["tasks"]), 2)
+        items = result["tasks"][0]["checklist"]
+        self.assertEqual([item["title"] for item in items], ["Passport", "Charger", "Coat"])
+        self.assertEqual(len({uuid.UUID(item["id"]) for item in items}), 3)
+        self.assertTrue(all(item["completed"] is False and not item["completed_dates"] for item in items))
+        self.assertEqual(result["tasks"][1]["checklist"], [])
+        self.assertIn("packing list stays one task", provider.call_args.args[0])
+
+    @patch("core.ai.generate")
+    def test_invalid_or_oversized_ai_checklist_is_not_silently_truncated(self, provider):
+        from pydantic import ValidationError
+        for checklist in [["   "], ["x" * 161], ["Step"] * 51]:
+            provider.return_value = json.dumps({**self.output, "checklist": checklist})
+            with self.assertRaises(ValidationError):
+                extract_tasks("Pack for the trip", "Europe/Madrid", self.reference)
+
+    @patch("core.ai.clock.monotonic", side_effect=[10.0, 10.5, 12.0])
+    @patch("core.ai.extract_tasks", return_value={"tasks": [], "transcript": "Synthetic words"})
+    @patch("core.ai.transcribe", return_value="Synthetic words")
+    def test_capture_stage_timings_are_numeric_without_input_in_metadata(self, transcription, extraction, clock):
+        result = make_drafts({"audio": object(), "timezone": "UTC", "reference_time": datetime.now(timezone.utc)})
+        self.assertEqual(result["timings"], {"transcription_ms": 500, "extraction_ms": 1500})
+        transcription.assert_called_once()
+        extraction.assert_called_once()
+
     def setUp(self):
         self.output = {"title": "Doctor appointment", "date": "2026-09-25", "time": "17:00", "priority": 3, "notes": "Bring last month's blood test results.", "questions": []}
         self.reference = datetime(2026, 9, 20, 10, tzinfo=timezone.utc)
@@ -315,6 +535,41 @@ class DraftTests(TestCase):
             candidates=[types.Candidate(content=types.Content(parts=[types.Part(
                 audio_transcription=types.Transcription(text="Doctor appointment on Friday at 5 p.m."))]))])
         self.assertEqual(transcribe(audio), "Doctor appointment on Friday at 5 p.m.")
+
+    def _recording(self):
+        audio = io.BytesIO()
+        with wave.open(audio, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(16000)
+            wav.writeframes(b"\0" * 32000)
+        audio.size = len(audio.getvalue())
+        audio.seek(0)
+        return audio
+
+    @patch("core.ai.client")
+    def test_transcription_hears_the_language_chosen_in_the_app(self, client):
+        api = client.return_value.__enter__.return_value
+        api.models.generate_content.return_value = types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(
+                audio_transcription=types.Transcription(text="Trucar al metge divendres"))]))])
+        self.assertEqual(transcribe(self._recording(), "ca-ES"), "Trucar al metge divendres")
+        config = api.models.generate_content.call_args.kwargs["config"]
+        self.assertEqual(config.audio_transcription_config.language_codes, ["ca-ES"])
+        transcribe(self._recording())
+        self.assertIsNone(api.models.generate_content.call_args.kwargs["config"].audio_transcription_config)
+
+    @patch("core.ai.client")
+    def test_a_refused_language_hint_never_costs_the_dictation(self, client):
+        api = client.return_value.__enter__.return_value
+        api.models.generate_content.side_effect = [
+            errors.ClientError(400, {"error": {"message": "Synthetic refusal"}}),
+            types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(parts=[types.Part(
+                audio_transcription=types.Transcription(text="Trucar al metge divendres"))]))]),
+        ]
+        self.assertEqual(transcribe(self._recording(), "ca-ES"), "Trucar al metge divendres")
+        self.assertEqual(api.models.generate_content.call_count, 2)
+        self.assertIsNone(api.models.generate_content.call_args.kwargs["config"].audio_transcription_config)
 
     def test_oversized_duration_is_rejected(self):
         audio = io.BytesIO()

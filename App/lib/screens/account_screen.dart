@@ -1,49 +1,43 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
-import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/widgets/google_login_button.dart';
+import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/screens/login_screen.dart';
 
 class AccountScreen extends ConsumerStatefulWidget {
-  const AccountScreen({super.key});
+  const AccountScreen({super.key, this.debug = kDebugMode});
+
+  /// Only debug builds show the server address here; staging builds reach it
+  /// from the version line in Other settings.
+  final bool debug;
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
 }
 
+enum _Action { sync, import, google, signOut }
+
 class _AccountScreenState extends ConsumerState<AccountScreen> {
-  final _form = GlobalKey<FormState>();
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  final _code = TextEditingController();
-  late final TextEditingController _server;
-  bool _register = false;
-  bool _recover = false;
-  bool _busy = false;
-  bool _showPassword = false;
+  _Action? _running;
   bool _failed = false;
   String? _message;
+  Object? _failure;
+  late Future<int> _localItems = ref
+      .read(taskRepositoryProvider)
+      .localTaskCount();
 
-  @override
-  void initState() {
-    super.initState();
-    _server = TextEditingController(text: ref.read(apiClientProvider).baseUrl);
-  }
-
-  @override
-  void dispose() {
-    for (final controller in [_email, _password, _code, _server]) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _run(_Action kind, Future<void> Function() action) async {
     setState(() {
-      _busy = true;
+      _running = kind;
       _message = null;
+      _failure = null;
       _failed = false;
     });
     try {
@@ -51,331 +45,356 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _message = error.toString();
+          _failure = error;
           _failed = true;
         });
       }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _running = null);
     }
   }
 
-  Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
-    await _run(() async {
-      final api = ref.read(apiClientProvider);
-      await api.setServer(_server.text);
-      if (_recover) {
-        final result = await api.request(
-            'POST',
-            _code.text.trim().isEmpty
-                ? 'auth/password-reset/'
-                : 'auth/password-reset/confirm/',
-            authenticated: false,
-            data: _code.text.trim().isEmpty
-                ? {'email': _email.text.trim()}
-                : {'code': _code.text.trim(), 'password': _password.text});
-        if (mounted) setState(() => _message = result['detail'] as String);
-        return;
+  Future<void> _sync() => _run(
+    _Action.sync,
+    () => ref.read(taskProvider.notifier).loadTasks(),
+  );
+
+  Future<void> _import() async {
+    final count = await _localItems;
+    if (count == 0 || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: Text(context.l10n.importLocalItemsQuestion),
+        content: Text(context.l10n.importLocalItemsHelp(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.importItems),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _run(_Action.import, () async {
+      final repository = ref.read(taskRepositoryProvider);
+      final imported = await repository.importLocalTasks();
+      await ref.read(taskProvider.notifier).loadTasks();
+      if (mounted) {
+        setState(() {
+          _message = context.l10n.itemsImported(imported);
+          _localItems = repository.localTaskCount();
+        });
       }
-      String zone = 'Europe/Madrid';
-      try {
-        zone = (await FlutterTimezone.getLocalTimezone()).identifier;
-      } catch (_) {/* Editable in voice form. */}
-      await ref.read(authProvider.notifier).signIn(_email.text, _password.text,
-          register: _register, timezone: zone);
     });
   }
 
-  Future<void> _import() async {
-    final local = await TaskDatabase().getTasks();
-    if (!mounted) return;
-    if (local.isEmpty) {
-      setState(() => _message = 'There are no local tasks to import.');
-      return;
-    }
+  Future<void> _signOut() async {
+    // Signing out cancels every reminder on this phone, so ask first.
     final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: const Text('Import local tasks?'),
-              content: Text(
-                  'Move ${local.length} tasks from this phone into your account and back up their titles, dates, priorities and notes. Attachments stay on this phone.'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Import'))
-              ],
-            ));
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        content: Text(context.l10n.signOutQuestion),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.signOut),
+          ),
+        ],
+      ),
+    );
     if (confirmed != true || !mounted) return;
-    await _run(() async {
-      final count = await ref.read(taskRepositoryProvider).importLocalTasks();
-      await ref.read(taskProvider.notifier).loadTasks();
-      if (mounted) setState(() => _message = '$count tasks imported.');
+    await _run(
+      _Action.signOut,
+      () => ref.read(authProvider.notifier).signOut(),
+    );
+  }
+
+  Future<void> _linkGoogle() async {
+    final current = ref.read(authProvider).account;
+    if (current == null) return;
+    final password = await showDialog<String>(
+      context: context,
+      builder: (context) => const _GoogleLinkDialog(),
+    );
+    if (password == null || !mounted) return;
+    await _run(_Action.google, () async {
+      final token = await ref.read(googleSignInServiceProvider).authenticate();
+      if (token == null || !mounted) return;
+      if (ref.read(authProvider).account?.id != current.id) return;
+      await ref.read(authProvider.notifier).linkGoogle(token, password);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final busy = _busy || auth.loading;
+    if (auth.account == null) return const LoginScreen();
+    final busy = _running != null || auth.loading;
     final colors = Theme.of(context).colorScheme;
+    final google = ref.watch(googleSignInServiceProvider);
     ref.watch(taskProvider);
+    final syncError = ref.read(taskRepositoryProvider).syncError;
+    final name = auth.account!.firstName.trim();
+    final email = auth.account!.email;
+    // In-button progress names what is happening, so TalkBack says it.
+    Widget progress(String label, {Color? color}) => SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: color,
+        semanticsLabel: label,
+      ),
+    );
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Your account'),
+      appBar: CustomAppBar(title: context.l10n.yourAccount),
       body: Center(
-          child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(
+                    Icons.person_outline_rounded,
+                    size: 32,
+                    color: colors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // The person's name, when the account has one; then the email.
+              if (name.isNotEmpty) ...[
+                Semantics(
+                  header: true,
+                  child: Text(name,
+                      style: Theme.of(context).textTheme.headlineMedium),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Text(
+                breakableAddress(email),
+                semanticsLabel: email,
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              // Sets or fixes the name people see on shared projects.
+              ListTile(
+                key: const ValueKey('account-name'),
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.badge_outlined),
+                title: Text(
+                  name.isEmpty
+                      ? context.l10n.accountAddName
+                      : context.l10n.nameAskField,
+                ),
+                subtitle: name.isEmpty ? null : Text(name),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: busy ? null : () => editName(context),
+              ),
+              const SizedBox(height: 12),
+              if (auth.account!.googleLinked) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.verified_user_outlined),
+                  title: Text(context.l10n.googleAccountLinked),
+                ),
+                const SizedBox(height: 12),
+              ] else if (google.configured) ...[
+                GoogleLoginButton(
+                  label: context.l10n.linkGoogleAccount,
+                  onPressed: busy ? null : _linkGoogle,
+                ),
+                if (_running == _Action.google) ...[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(),
+                ],
+                const SizedBox(height: 20),
+              ],
+              // The sync state in one line; a failed sync says so here, once.
+              if (syncError == null)
+                ListTile(
+                  key: const ValueKey('account-sync-status'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.cloud_done_outlined,
+                    color: colors.primary,
+                  ),
+                  title: Text(context.l10n.accountSaved),
+                )
+              else
+                MessageBanner(
+                  requestProblemText(context.l10n, syncError),
+                  key: const ValueKey('account-sync-status'),
+                  isError: true,
+                ),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: busy ? null : _sync,
+                  icon: _running == _Action.sync
+                      ? progress(context.l10n.accountSyncing)
+                      : const Icon(Icons.sync_rounded, size: 20),
+                  label: Text(context.l10n.syncNow),
+                ),
+              ),
+              FutureBuilder<int>(
+                future: _localItems,
+                builder: (context, snapshot) {
+                  if ((snapshot.data ?? 0) == 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      onPressed: busy ? null : _import,
+                      icon: _running == _Action.import
+                          ? progress(context.l10n.accountImporting)
+                          : const Icon(Icons.file_upload_outlined, size: 20),
+                      label: Text(context.l10n.importLocalItems),
+                    ),
+                  );
+                },
+              ),
+              if (_message != null || _failure != null || auth.error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: MessageBanner(
+                    _message ??
+                        requestProblemText(
+                          context.l10n,
+                          _failure ?? auth.error!,
+                        ),
+                    isError: auth.error != null || _failed,
+                  ),
+                ),
+              if (widget.debug) ...[
+                const SizedBox(height: 12),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(context.l10n.connectionDetails),
+                  shape: const Border(),
+                  collapsedShape: const Border(),
                   children: [
-                    if (auth.account != null) ...[
-                      Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                              width: 68,
-                              height: 68,
-                              decoration: BoxDecoration(
-                                  color: colors.primaryContainer,
-                                  borderRadius: BorderRadius.circular(24)),
-                              child: Icon(Icons.person_outline_rounded,
-                                  size: 32, color: colors.primary))),
-                      const SizedBox(height: 24),
-                      Text('Your own little space.',
-                          style: Theme.of(context).textTheme.headlineMedium),
-                      const SizedBox(height: 8),
-                      Text(auth.account!.email,
-                          style: TextStyle(color: colors.onSurfaceVariant)),
-                      const SizedBox(height: 28),
-                      AppSurface(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Icon(Icons.cloud_done_outlined,
-                                color: colors.primary, size: 28),
-                            const SizedBox(height: 12),
-                            Text('Your plans, kept close.',
-                                style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            Text(
-                                'Tasks are saved on this phone and backed up when connected. Your attachments stay on the device where you added them.',
-                                style:
-                                    TextStyle(color: colors.onSurfaceVariant)),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                                width: double.infinity,
-                                child: FilledButton.icon(
-                                    onPressed: busy
-                                        ? null
-                                        : () => _run(() async {
-                                              await ref
-                                                  .read(taskProvider.notifier)
-                                                  .loadTasks();
-                                              if (mounted) {
-                                                setState(() => _message = ref
-                                                        .read(
-                                                            taskRepositoryProvider)
-                                                        .syncError ??
-                                                    'Your tasks are up to date.');
-                                              }
-                                            }),
-                                    icon: const Icon(Icons.sync_rounded,
-                                        size: 20),
-                                    label: const Text('Sync now'))),
-                          ])),
-                      const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                          onPressed: busy ? null : _import,
-                          icon:
-                              const Icon(Icons.file_upload_outlined, size: 20),
-                          label: const Text('Import local tasks')),
-                      const SizedBox(height: 12),
-                      if (ref.read(taskRepositoryProvider).syncError != null)
-                        MessageBanner(
-                            ref.read(taskRepositoryProvider).syncError!,
-                            isError: true),
-                      ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          title: const Text('Connection details'),
-                          shape: const Border(),
-                          collapsedShape: const Border(),
-                          children: [
-                            Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: SelectableText(
-                                    ref.read(apiClientProvider).baseUrl)),
-                          ]),
-                      const SizedBox(height: 20),
-                      TextButton(
-                          onPressed: busy
-                              ? null
-                              : () => _run(() =>
-                                  ref.read(authProvider.notifier).signOut()),
-                          child: Text('Sign out',
-                              style: TextStyle(color: colors.error))),
-                    ] else ...[
-                      Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                  color: colors.primaryContainer,
-                                  borderRadius: BorderRadius.circular(22)),
-                              child: Icon(
-                                  _recover
-                                      ? Icons.lock_reset_rounded
-                                      : Icons.waving_hand_outlined,
-                                  color: colors.primary,
-                                  size: 28))),
-                      const SizedBox(height: 24),
-                      Text(
-                          _recover
-                              ? 'Let’s get you back in.'
-                              : _register
-                                  ? 'A space for your plans.'
-                                  : 'Welcome back.',
-                          style: Theme.of(context).textTheme.headlineLarge),
-                      const SizedBox(height: 10),
-                      Text(
-                          _recover
-                              ? 'Request a recovery email, then use the code to set a new password.'
-                              : 'Sign in to back up your tasks and get a larger voice allowance.',
-                          style: TextStyle(color: colors.onSurfaceVariant)),
-                      const SizedBox(height: 28),
-                      Form(
-                          key: _form,
-                          child: AutofillGroup(
-                              child: Column(children: [
-                            TextFormField(
-                                key: const ValueKey('account-email'),
-                                controller: _email,
-                                keyboardType: TextInputType.emailAddress,
-                                autofillHints: const [AutofillHints.username],
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                    labelText: 'Email',
-                                    prefixIcon: Icon(
-                                        Icons.alternate_email_rounded,
-                                        size: 20)),
-                                validator: (value) =>
-                                    value == null || !value.contains('@')
-                                        ? 'Enter your email'
-                                        : null),
-                            const SizedBox(height: 16),
-                            if (_recover) ...[
-                              TextFormField(
-                                  controller: _code,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Recovery code',
-                                      helperText:
-                                          'Leave empty to request an email.')),
-                              const SizedBox(height: 16),
-                            ],
-                            TextFormField(
-                                key: const ValueKey('account-password'),
-                                controller: _password,
-                                obscureText: !_showPassword,
-                                enableSuggestions: false,
-                                autocorrect: false,
-                                autofillHints: [
-                                  _register || _recover
-                                      ? AutofillHints.newPassword
-                                      : AutofillHints.password
-                                ],
-                                decoration: InputDecoration(
-                                    labelText:
-                                        _recover ? 'New password' : 'Password',
-                                    helperText: _register || _recover
-                                        ? 'At least 12 characters'
-                                        : null,
-                                    prefixIcon: const Icon(
-                                        Icons.lock_outline_rounded,
-                                        size: 20),
-                                    suffixIcon: IconButton(
-                                        tooltip: _showPassword
-                                            ? 'Hide password'
-                                            : 'Show password',
-                                        onPressed: () => setState(() =>
-                                            _showPassword = !_showPassword),
-                                        icon: Icon(
-                                            _showPassword
-                                                ? Icons.visibility_off_outlined
-                                                : Icons.visibility_outlined,
-                                            size: 20))),
-                                validator: (value) =>
-                                    _recover && _code.text.trim().isEmpty
-                                        ? null
-                                        : value == null || value.length < 12
-                                            ? 'Use at least 12 characters'
-                                            : null),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                    onPressed: busy ? null : _submit,
-                                    child: Text(_recover
-                                        ? 'Continue recovery'
-                                        : _register
-                                            ? 'Create account'
-                                            : 'Sign in'))),
-                          ]))),
-                      const SizedBox(height: 8),
-                      TextButton(
-                          onPressed: busy
-                              ? null
-                              : () => setState(() {
-                                    _register = !_register;
-                                    _recover = false;
-                                    _message = null;
-                                  }),
-                          child: Text(_register
-                              ? 'Already have an account? Sign in'
-                              : 'Create an account')),
-                      TextButton(
-                          onPressed: busy
-                              ? null
-                              : () => setState(() {
-                                    _recover = !_recover;
-                                    _message = null;
-                                  }),
-                          child: Text(_recover
-                              ? 'Back to sign in'
-                              : 'Forgot password?')),
-                      const SizedBox(height: 16),
-                      Text(
-                          'You can also use TaskFlow without an account. Your local tasks stay on this phone.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: colors.onSurfaceVariant, fontSize: 12)),
-                      const SizedBox(height: 20),
-                      ExpansionTile(
-                          title: const Text('Connection settings'),
-                          tilePadding: EdgeInsets.zero,
-                          shape: const Border(),
-                          collapsedShape: const Border(),
-                          children: [
-                            TextFormField(
-                                controller: _server,
-                                keyboardType: TextInputType.url,
-                                decoration: const InputDecoration(
-                                    labelText: 'Backend address',
-                                    helperText:
-                                        'Emulator: http://10.0.2.2:8088\nPhone: your computer’s LAN IP on the same Wi-Fi.')),
-                          ]),
-                    ],
-                    if (busy)
-                      const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(child: CircularProgressIndicator())),
-                    if (_message != null || auth.error != null)
-                      Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: MessageBanner(_message ?? auth.error!,
-                              isError: auth.error != null || _failed)),
-                  ]))),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: SelectableText(
+                        ref.read(apiClientProvider).baseUrl,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 20),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                // Sign-out can wait on the server; show progress in the button,
+                // and nothing at rest.
+                child: TextButton.icon(
+                  onPressed: busy ? null : _signOut,
+                  icon: _running == _Action.signOut
+                      ? progress(
+                          context.l10n.accountSigningOut,
+                          color: colors.error,
+                        )
+                      : null,
+                  label: Text(
+                    context.l10n.signOut,
+                    style: TextStyle(color: colors.error),
+                  ),
+                ),
+              ),
+              // Deleting the account is its own group, kept apart from
+              // signing out.
+              const SizedBox(height: 24),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  key: const ValueKey('account-delete'),
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.pushNamed(context, '/deleteAccount'),
+                  child: Text(
+                    context.l10n.deleteAccount,
+                    style: TextStyle(color: colors.error),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
+}
+
+class _GoogleLinkDialog extends StatefulWidget {
+  const _GoogleLinkDialog();
+  @override
+  State<_GoogleLinkDialog> createState() => _GoogleLinkDialogState();
+}
+
+class _GoogleLinkDialogState extends State<_GoogleLinkDialog> {
+  final password = TextEditingController();
+  @override
+  void dispose() {
+    password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: Text(context.l10n.linkGoogleAccount),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(context.l10n.googleLinkHelp),
+        const SizedBox(height: 16),
+        TextField(
+          key: const ValueKey('google-link-password'),
+          controller: password,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          autofillHints: const [AutofillHints.password],
+          decoration: InputDecoration(labelText: context.l10n.password),
+          onChanged: (_) => setState(() {}),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(context.l10n.cancel),
+      ),
+      FilledButton(
+        onPressed: password.text.isEmpty
+            ? null
+            : () => Navigator.pop(context, password.text),
+        child: Text(context.l10n.continueWithGoogle),
+      ),
+    ],
+  );
 }

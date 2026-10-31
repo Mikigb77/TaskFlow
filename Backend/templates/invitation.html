@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>You're invited · TaskFlow</title>
+<style nonce="{{ nonce }}">
+:root{color-scheme:light dark;--bg:#f6f8f3;--card:#fff;--ink:#193d36;--muted:#66786f;--accent:#176d5c;--line:#dfe7df}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#dcece0,transparent 55%),var(--bg);color:var(--ink);font:17px/1.65 system-ui,sans-serif;min-height:100vh}header,footer{max-width:1080px;margin:auto;padding:32px 24px}header a{font-size:23px;font-weight:750;text-decoration:none;letter-spacing:-1px}a{color:inherit}main{max-width:600px;margin:4vh auto 12vh;padding:0 24px}.eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:750}h1{font-size:clamp(36px,7vw,54px);line-height:1.08;letter-spacing:-2px;font-weight:650;margin:18px 0}p{color:var(--muted)}.card{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:30px;margin-top:30px;box-shadow:0 18px 70px #174c3610}.symbol{font-size:30px;border-radius:18px;background:var(--bg);width:64px;height:64px;display:grid;place-items:center}h2{font-size:23px;letter-spacing:-.6px;margin:20px 0 8px}.button,button{display:block;width:100%;padding:15px 20px;background:var(--accent);color:#fff;border:0;border-radius:16px;font:600 16px system-ui;text-align:center;text-decoration:none;cursor:pointer;margin:18px 0 10px}.secondary{background:transparent;color:var(--accent);border:1px solid var(--line)}small{font-size:14px;color:var(--muted)}footer{border-top:1px solid var(--line);font-size:13px;color:var(--muted)}[hidden]{display:none!important}a:focus-visible,button:focus-visible{outline:3px solid #96bd57;outline-offset:4px}#code{display:block;word-break:break-all;font:14px ui-monospace,monospace;margin-top:16px}#status{min-height:1.5em;font-size:14px} @media(prefers-color-scheme:dark){:root{--bg:#111a17;--card:#1a2521;--ink:#eff6ef;--muted:#a5b5ac;--accent:#8bd5bb;--line:#30423a}body{background:radial-gradient(ellipse at 15% 0%,#243d31,transparent 55%),var(--bg)}.button,button{color:#133b2e}.secondary{color:var(--accent)}}
+</style></head><body>
+<header><a href="https://taskflow.garbar.tech/">↗ TaskFlow</a></header>
+<main><span class="eyebrow">A little less on your mind</span>
+<h1 id="title">Better days.<br>Built together.</h1>
+<p id="intro">One calm place for your plans, projects, and the people you share them with.</p>
+<section class="card" id="invitation" hidden aria-labelledby="invitation-title">
+<div class="symbol" aria-hidden="true">↗</div><h2 id="invitation-title">You've been invited.</h2>
+<p>Open TaskFlow and sign in with the email address that received this invitation. Review the group or shared list before you join.</p>
+<a id="open" class="button">Open in TaskFlow</a>
+<button id="copy" class="secondary" type="button">Copy invitation code</button>
+<code id="code" hidden></code><p id="status" role="status" aria-live="polite"></p>
+<small>Opening this page does not join anything. Invitations expire after 7 days.</small>
+</section>
+<section class="card" aria-labelledby="download-title"><div class="symbol" aria-hidden="true">◷</div>
+<h2 id="download-title">The app is coming soon.</h2><p>TaskFlow will be available through the app stores. There is no public download yet.</p>
+<p>Already a private tester? Use the staging build provided by the TaskFlow team, then come back to your invitation.</p>
+<a class="button secondary" href="https://taskflow.garbar.tech/">Explore TaskFlow</a></section>
+</main><footer>TaskFlow · Clear your mind. Make room for your day.</footer>
+<script nonce="{{ nonce }}">
+const values=new URLSearchParams(location.hash.slice(1));
+history.replaceState(null,'',location.pathname);
+const kind=values.get('kind'),id=values.get('id'),code=values.get('code');
+const valid=['group','list'].includes(kind)&&/^[0-9a-f-]{36}$/i.test(id||'')&&/^[A-Za-z0-9_-]{16,128}$/.test(code||'');
+if(valid){
+ document.getElementById('invitation').hidden=false;
+ document.getElementById('title').textContent='Your next chapter, together.';
+ document.getElementById('intro').textContent='Someone has made room for you in TaskFlow.';
+ const query=new URLSearchParams({kind,id,code});
+ document.getElementById('open').href='{{ app_scheme }}://invite?'+query;
+ document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(code);document.getElementById('status').textContent='Copied. In TaskFlow, open your invitations and paste this code.'}catch{const fallback=document.getElementById('code');fallback.textContent=code;fallback.hidden=false;document.getElementById('status').textContent='Select and copy this code.'}};
+}
+</script></body></html>

@@ -1,0 +1,50 @@
+{
+ "runId": "2026-10-19-app",
+ "mode": "app",
+ "round": "b4-r3",
+ "packages": [
+  {
+   "id": "P213",
+   "title": "Activity waiting row: TalkBack hears «Buscando la tarea…», and the text stays where it was",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1646",
+    "UX-1647"
+   ],
+   "files": [
+    "App/lib/screens/activity_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/activity_screen_test.dart",
+    "App/test/ux_previews/sharing_previews.dart"
+   ],
+   "brief": [
+    "Round 3 (b4). UX-1646 (S2) and UX-1647 (S1) are regressions R2C-1 and R2C-2 from P210 (review C, `.claude/ux-review/runs/2026-10-19-app/verify-b4-r2-C.md`). Neither has failed before. UX-1640 itself was verified in round 2: keep everything in `_open` (about `App/lib/screens/activity_screen.dart:105-160`): the kept `synced` future, opening at once a task the phone has, `taskRemoved` at once for a 'deleted' entry, `_waiting`, `still()`, the re-check after the sync, the `finally` that clears the wait, and `onTap: null` while waiting.",
+    "What P210 built (`_ActivityRow`, about :229-272): while `waiting`, the `ListTile.trailing` is a 48 dp `SizedBox.square` centring a 24 dp `CircularProgressIndicator(strokeWidth: 2.5)`, copied from the Projects delete spinner, and `onTap` is null.",
+    "Why it fails. (1) UX-1646: the spinner has no label and the row loses its tap action, so a TalkBack user double-taps and hears nothing until the task opens or the message arrives; on a slow network each sync request can take up to 12 s (`App/lib/services/api_client.dart:628-636`). (2) UX-1647: Activity rows have no trailing widget, so the title is about 312 dp wide at 360 dp (the ListView has 24 dp padding). While waiting, the 48 dp trailing plus ListTile's 16 dp gap shrinks it to about 248 dp: a two-line entry at large text gains a line, and the rows below move under the finger that tapped. (The Projects spinner never reflows because it replaces a ⋮ that was already there.)",
+    "Fix, in `_ActivityRow` only. (a) Drop the `trailing` spinner entirely: `trailing` stays null in every state, so the title and subtitle keep their full width. (b) Show the wait as a thin bar along the bottom edge of the row, without changing the row's height: wrap the `ListTile` in a `Stack`, and while `waiting` add `Positioned(left: 0, right: 0, bottom: 0, child: …)` holding a `LinearProgressIndicator(minHeight: 2)` in the theme's default colours. Don't put the bar in a `Column` under the tile: that adds 2 dp and moves the rows below. The tile's `contentPadding` (vertical 4) leaves room for it under the subtitle; check in the render that it doesn't touch the subtitle's glyphs. (c) TalkBack: wrap the bar in `Semantics(liveRegion: true, label: context.l10n.activityFindingTask, child: ExcludeSemantics(child: LinearProgressIndicator(...)))`, so Android says the label once, when the bar appears, and the row's merged semantics read the entry followed by «Buscando la tarea…». Keep it all inside the existing `MergeSemantics`, so the row stays one TalkBack item. This follows the app's Android pattern (live regions: `App/lib/screens/delete_account_screen.dart:611`, and the note at `App/lib/screens/verify_email_screen.dart:240-252`). Don't also call `SemanticsService.sendAnnouncement`: where both work it would be said twice. (d) Keep `onTap: waiting ? null : onTap`.",
+    "New key `activityFindingTask`: EN “Finding the task…” / ES «Buscando la tarea…» / CA «S’està cercant la tasca…» (the Catalan is review C's). One character … (U+2026); ’ in the Catalan. @description in app_en.arb: “Activity: read by TalkBack, and the label of the thin progress bar, on an entry whose task isn’t on the phone yet, while the app fetches it. Keep it short.” Don't reuse `accountSyncing` («Sincronizando»): “sync” is an internal word to the owner's father. Run flutter gen-l10n.",
+    "Preview: there is no render of the waiting state (review C reasoned UX-1647 from code). In `App/test/ux_previews/sharing_previews.dart`, which renders Activity, add a state `activity.waiting` at ES 1× and ES 2×, 360×800: a list including a two-line entry such as «Paul te ha asignado: Llamar al fontanero por lo de la cocina», tapped, its task not on the phone, under a sync that never completes. Use P210's `HangingSyncTasks` (`App/test/support/hanging_sync.dart`) if it fits the preview suite; if it doesn't, say so in your notes rather than build a second fake.",
+    "Tests: in `App/test/activity_screen_test.dart`, group 'UX-1510' (about :419), the finder of the row's `CircularProgressIndicator` while waiting (about :638) now finds the `LinearProgressIndicator`; update only those. P210's harness: `HangingSyncTasks` with `sync` (a Completer) and `finishSync([tasks])`, `open(others:)` and `insert(tester, id:, syncId:, title:)`.",
+    "Don't touch: `_open` and its waiting logic, `activityEntry()` and its copy, `taskRemoved`, `_readAll`, the unread label, the `ListTile`'s padding and text styles, the task detail screen, the sync, and the Projects delete spinner (`App/lib/screens/task_lists_screen.dart:365-374`), which has a similar TalkBack gap but is out of scope. No other new strings."
+   ],
+   "acceptance": [
+    "ES, 1× on 360×800, Activity with an unread «Lucía ha creado: Comprar pan» entry whose task isn't in the phone's database and a sync that never completes: after tapping it, that row's semantics contain «Buscando la tarea…», and a Semantics widget with liveRegion true and label «Buscando la tarea…» is in the tree; no «Es posible que esta tarea se haya eliminado.» shows.",
+    "Same state: the waiting row shows a LinearProgressIndicator and no CircularProgressIndicator, and its ListTile has no trailing widget; the other rows show neither indicator.",
+    "EN and CA, same state: the waiting row's semantics contain “Finding the task…” (EN) and «S’està cercant la tasca…» (CA).",
+    "Same state, then the sync completes with the task now in the database: the task's detail opens; back on Activity, no row's semantics contain «Buscando la tarea…» and no LinearProgressIndicator shows. If instead the task is still missing: «Es posible que esta tarea se haya eliminado.» shows and the bar is gone.",
+    "ES, 2× text on 360×800 with Manrope loaded, an entry whose title wraps to two lines before the tap (e.g. «Paul te ha asignado: Llamar al fontanero por lo de la cocina»), its task not on the phone, sync hanging: the title Text's rendered size, the row's height and the top of the next row are the same before the tap and while waiting.",
+    "While waiting, a second tap on that row pushes nothing and shows no message (unchanged from P210)."
+   ],
+   "deviceChecks": [
+    "Emulator lane with TalkBack on (main session; not phone evidence), ES: in Activity, double-tap an entry whose task the phone hasn't synced yet (network slowed if needed): TalkBack says «Buscando la tarea…» once, then the task opens. At the largest system text, the entry's words don't move when the bar appears."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

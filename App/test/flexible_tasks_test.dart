@@ -1,4 +1,5 @@
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task_draft.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
@@ -8,6 +9,44 @@ import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+      'recurring checklist completion is occurrence-specific and preserves concurrent edits',
+      () async {
+    final passport = ChecklistItem(title: 'Passport');
+    final charger = ChecklistItem(title: 'Charger');
+    final task = Task(
+        id: 1,
+        title: 'Pack',
+        priority: 1,
+        recurrence: 'weekly',
+        dueDate: DateTime(2026, 9, 25),
+        hasTime: false,
+        checklist: [passport, charger]);
+    final repository = _Tasks(task);
+    final notifier = TaskNotifier(repository);
+    addTearDown(notifier.dispose);
+    await notifier.loadTasks();
+    final friday = task.occurrenceOn(DateTime(2026, 9, 25))!;
+    await Future.wait([
+      notifier.setChecklistCompleted(friday, passport.id, true),
+      notifier.setChecklistCompleted(friday, charger.id, true),
+    ]);
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 9, 25))!.checklistDone, 2);
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 10, 2))!.checklistDone, 0);
+    expect(repository.task.isCompleted, isFalse);
+    repository.task = repository.task.copyWith(title: 'Edited meanwhile');
+    await notifier.setChecklistCompleted(friday, charger.id, false);
+    expect(repository.task.title, 'Edited meanwhile');
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 9, 25))!.checklistDone, 1);
+    final restored =
+        Task.fromApi(Task.fromMap(repository.task.toMap()).toApi());
+    expect(restored.occurrenceOn(DateTime(2026, 9, 25))!.checklistDone, 1);
+    expect(restored.checklist.first.id, passport.id);
+  });
+
   test('date-only API storage is independent of timezone offsets', () {
     final date = Task(
         title: 'Invoice',
@@ -135,6 +174,71 @@ void main() {
     });
     expect(draft.dueDate, DateTime(2026, 9, 25));
     expect(draft.hasTime, isFalse);
+  });
+
+  test(
+      'reschedule Undo preserves intervening edits and refuses a newer schedule',
+      () async {
+    final repository = _Tasks(Task(
+        id: 1,
+        title: 'Call',
+        priority: 2,
+        dueDate: DateTime(2026, 9, 22, 14, 35),
+        reminderMinutes: 30));
+    final notifier = TaskNotifier(repository);
+    addTearDown(notifier.dispose);
+    await notifier.loadTasks();
+    final change = await notifier.rescheduleTask(1, null, false);
+    expect(repository.task.dueDate, isNull);
+    repository.task = repository.task.copyWith(
+        title: 'Call the clinic',
+        notes: 'Updated on another device',
+        isCompleted: true);
+    expect(await notifier.undoSchedule(change), isTrue);
+    expect(repository.task.dueDate, DateTime(2026, 9, 22, 14, 35));
+    expect(repository.task.title, 'Call the clinic');
+    expect(repository.task.isCompleted, isTrue);
+    expect(repository.task.reminderMinutes, 30);
+    final second =
+        await notifier.rescheduleTask(1, DateTime(2026, 10, 1), false);
+    repository.task = repository.task.copyWith(dueDate: DateTime(2026, 10, 2));
+    expect(await notifier.undoSchedule(second), isFalse);
+    expect(repository.task.dueDate, DateTime(2026, 10, 2));
+  });
+
+  test(
+      'series reschedule keeps anchor time and clears an invalid end; Undo restores it',
+      () async {
+    final before = Task(
+        id: 1,
+        title: 'Plants',
+        priority: 1,
+        dueDate: DateTime(2026, 9, 22, 9),
+        recurrence: 'weekly',
+        repeatUntil: DateTime(2026, 10, 22));
+    final repository = _Tasks(before);
+    final notifier = TaskNotifier(repository);
+    addTearDown(notifier.dispose);
+    await notifier.loadTasks();
+    final change =
+        await notifier.rescheduleTask(1, DateTime(2026, 11, 1, 9), true);
+    expect(repository.task.repeatUntil, isNull);
+    expect(repository.task.recurrence, 'weekly');
+    expect(
+        repository.task.occurrenceOn(DateTime(2026, 11, 8))!.displayDate!.hour,
+        9);
+    expect(await notifier.undoSchedule(change), isTrue);
+    expect(repository.task.repeatUntil, before.repeatUntil);
+    expect(repository.task.dueDate, before.dueDate);
+    repository.task = repository.task.copyWith(completedDates: ['2026-09-22']);
+    final inbox = await notifier.rescheduleTask(1, null, false);
+    expect(repository.task.completedDates, isEmpty);
+    expect(repository.task.toApi()['recurrence'], 'none');
+    expect(await notifier.undoSchedule(inbox), isTrue);
+    expect(repository.task.completedDates, ['2026-09-22']);
+    final newer = await notifier.rescheduleTask(1, null, false);
+    repository.task = repository.task.copyWith(isCompleted: true);
+    expect(await notifier.undoSchedule(newer), isFalse);
   });
 }
 

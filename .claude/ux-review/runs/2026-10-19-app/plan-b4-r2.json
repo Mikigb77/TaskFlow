@@ -1,0 +1,121 @@
+{
+ "runId": "2026-10-19-app",
+ "mode": "app",
+ "round": "b4-r2",
+ "packages": [
+  {
+   "id": "P210",
+   "title": "Activity: a task not on the phone yet waits for the sync before saying it may be deleted",
+   "area": "C",
+   "size": "S",
+   "severity": 3,
+   "findings": [
+    "UX-1640"
+   ],
+   "files": [
+    "App/lib/screens/activity_screen.dart",
+    "App/test/activity_screen_test.dart"
+   ],
+   "brief": [
+    "Round 2 (b4). UX-1640 (S3) is regression R1C-1 from P183 (review C, `verify-b4-r1-C.md`). It hasn't failed before. UX-1510 itself was verified in round 1; keep everything that fixed it.",
+    "What P183 built (`App/lib/screens/activity_screen.dart`, `_open`, about :100-126): a tap marks the entry read behind (`unawaited(_markRead…)`), starts `ref.read(taskProvider.notifier).loadTasks()` unawaited, looks the task up in the phone's database (`owner_key = ? AND sync_id = ? AND is_deleted = 0`), opens `TaskDetailScreen` at once when found, and otherwise shows `taskRemoved` («Es posible que esta tarea se haya eliminado.») at once.",
+    "Why it fails: opening Activity doesn't sync tasks (`collaborationActivityProvider` only fetches `notifications/`), so an entry newer than the phone's last sync («Lucía ha creado…», «Paul te ha asignado…») finds nothing and is told the task may be deleted. Before P183 the tap synced first and then opened it. The newcomer reads the message as true and doesn't try again.",
+    "Fix, in `_open`: (1) Keep the result of `loadTasks()` instead of discarding it (`final synced = ref.read(taskProvider.notifier).loadTasks();`); `TaskNotifier.loadTasks()` (`App/lib/providers/task_provider.dart:34-37`) returns the running sync's future and catches its own errors, but still guard the await with try/catch. (2) Found on the phone: open it at once, exactly as now. (3) Not found and `item['action'] == 'deleted'`: show `taskRemoved` at once, as now, without waiting. (4) Not found otherwise: put that row in a waiting state (a state field, e.g. `Object? _waiting` holding `item['id']`), await `synced`, then, if still mounted and on the same account, look the task up again with the same query. Found: open it. Still missing: only now show `taskRemoved`. Clear the waiting state in a `finally`.",
+    "The waiting row: `_ActivityRow` gets a `waiting` flag; while true, its `ListTile.trailing` is the same spinner as a deleting project row (`App/lib/screens/task_lists_screen.dart:363-372`: a 48 dp square box centring a 24 dp `CircularProgressIndicator(strokeWidth: 2.5)`), and its `onTap` is null so a second tap does nothing. Other rows stay tappable.",
+    "When the wait ends, act only if this row is still the one waiting and Activity is still on top (`ModalRoute.of(context)?.isCurrent == true`): if the person tapped another row and opened a task, or left Activity, drop the result quietly (no screen pushed over theirs, no message) and just clear the spinner. Add no timeout of your own: the sync's own timeout ends the wait.",
+    "Tests: in `App/test/activity_screen_test.dart`, group 'UX-1510: an Activity tap answers at once' (about :419), update 'an entry whose task isn’t on the phone says Es posible que esta tarea se haya eliminado.' so its fake sync completes and the task is still missing afterwards, and the message appears only after that sync. The fake task notifier there counts `syncs`; let its `loadTasks()` return a future the test controls (a Completer), and allow a row to be inserted into the temporary database before it completes, so ux-tester can write the acceptance tests.",
+    "Don't touch: marking read behind, the at-once opening of a task the phone has, `activityEntry()` and its copy, `_readAll`, the `taskRemoved` copy, the task detail screen, the sync itself, the Projects delete spinner. No new strings; the spinner gets no TalkBack label (no copy was given, as in P183)."
+   ],
+   "acceptance": [
+    "ES, 1× on 360×800, Activity with an unread «Lucía ha creado: Comprar pan» entry whose task isn't in the phone's database: tapping it shows a spinner on that row and no «Es posible que esta tarea se haya eliminado.»; when the sync completes and the task is now in the database, the task's detail screen opens with its title and no taskRemoved message shows.",
+    "Same state with a sync that never completes: after the tap and 5 seconds of pumping, no taskRemoved message shows, the row shows its spinner, and a second tap on that row pushes nothing.",
+    "Same state where the sync completes and the task is still missing: «Es posible que esta tarea se haya eliminado.» shows only after the sync completes; Activity stays on screen.",
+    "An entry with action 'deleted' whose task isn't on the phone shows «Es posible que esta tarea se haya eliminado.» at once, before the sync completes.",
+    "An entry whose task is already on the phone still opens its detail at once, before the sync completes, and marks the entry read (`notifications/<id>/read/`).",
+    "While one row waits on a sync that hasn't completed, tapping another entry whose task is on the phone opens that task; completing the first sync afterwards pushes no second screen and shows no message."
+   ],
+   "deviceChecks": [
+    "Phone, two accounts: Lucía creates a task in a shared project; on the other phone, open Activity before any other sync and tap «Lucía ha creado…»: a spinner on the row, then the task opens."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P211",
+   "title": "Archived project bar: say «Restáuralo» only to someone who has the button",
+   "area": "C",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1641"
+   ],
+   "files": [
+    "App/lib/screens/home_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/home_screen_test.dart"
+   ],
+   "brief": [
+    "Round 2 (b4). UX-1641 (S2) is regression R1C-2 from P184 (review C, `verify-b4-r1-C.md`). It hasn't failed before. UX-1504 itself was verified in round 1; keep the bar, the button and its rule.",
+    "What P184 built (`App/lib/screens/home_screen.dart`, the `bottomNavigationBar` for `archived`, about :785-814): a `ListTile` with the archive icon and `archivedListAddHelp` (EN “Archived project. Restore it to add tasks.” / ES «Proyecto archivado. Restáuralo para añadir tareas.» / CA «Projecte arxivat. Restaura’l per afegir-hi tasques.») for everyone, then «Restaurar proyecto» only when `list.archived && !list.groupArchived && list.canManage`. Why it fails: a reader of an archived shared project, or anyone on a project archived with its group, is told to restore it and has no button: a dead end. (The 'line without the button' case came from the round 1 brief; this corrects it.)",
+    "Fix: compute the button's condition once (e.g. `final canRestore = list!.archived && !list.groupArchived && list.canManage;`). The line reads `archivedListAddHelp` when `canRestore`, and a new key `archivedListNoAdd` otherwise: EN “Archived project.” / ES «Proyecto archivado.» / CA «Projecte arxivat.» (the reviewer's copy; the Catalan is plain and needs no native read). @archivedListNoAdd description: “Bar at the bottom of an archived project's page, in place of «Add task», for someone who can't restore it (a reader, or a project archived with its group). No button follows.” Update @archivedListAddHelp's description to say it shows only with «Restore project». Keep `home_screen.dart`'s CRLF line endings.",
+    "Tests rightly broken: `App/test/home_screen_test.dart` around :2035-2066 expect `archivedListAddHelp` for the group-archived «Tesis» (admin) and the viewer's «Obra»; they now expect `archivedListNoAdd`, still with no `restoreList` and no `addTask`. 'UX-333' (about :555) uses an owner's archived personal project and keeps `archivedListAddHelp`.",
+    "Don't touch: who sees «Restaurar proyecto» and what it does (`restoreProject`), the read-only bar, `archivedListHelp` on the Projects list, ticking and editing inside an archived project, the «Compartir» button on an archived project's page (review C noted it as unchanged; not in this brief)."
+   ],
+   "acceptance": [
+    "ES, 1× on 360×800, a viewer's archived shared project «Obra»: the bottom bar reads «Proyecto archivado.»; no «Restáuralo para añadir tareas.», no «Restaurar proyecto», no «Añadir tarea».",
+    "ES, 1×, an admin's group project «Tesis» archived with its group (`groupArchived: true`): the bar reads «Proyecto archivado.» with no «Restáuralo» and no «Restaurar proyecto».",
+    "ES, 1× and 2× on 360×800, an owner's archived personal project (`tasks/project.archived`): the bar still reads «Proyecto archivado. Restáuralo para añadir tareas.» with «Restaurar proyecto» under it.",
+    "Catalogs: `archivedListNoAdd` reads EN “Archived project.”, ES «Proyecto archivado.», CA «Projecte arxivat.»."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  },
+  {
+   "id": "P212",
+   "title": "Sharing polish: «Miembros» named once and the same everywhere, «(tú)» on the group, one invite wording",
+   "area": "C",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-1642",
+    "UX-1643",
+    "UX-1644",
+    "UX-1645"
+   ],
+   "files": [
+    "App/lib/screens/task_lists_screen.dart",
+    "App/lib/screens/list_sharing_screen.dart",
+    "App/lib/screens/groups_screen.dart",
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/sharing_ui_test.dart",
+    "App/test/groups_screen_test.dart",
+    "App/test/task_lists_widget_test.dart",
+    "App/test/ux_previews/sharing_previews.dart"
+   ],
+   "brief": [
+    "Round 2 (b4). Four polish regressions from P181 (review C, `verify-b4-r1-C.md`); none has failed before. UX-1503, UX-1506 and UX-1513 were verified in round 1: keep the members page title (`shared ? people : listSharing`, `App/lib/screens/list_sharing_screen.dart:352-354`), the owner's own row first marked «(tú)», and the shared invite dialogs and helpers (`showInvitationSent`, `ownEmailProblem`, `groupTextDialog`'s `label`/`check`).",
+    "UX-1642 (S1), R1C-3: Proyectos ⋮ «Compartir» opens a page titled «Miembros». In `App/lib/screens/task_lists_screen.dart`, the 'sharing' `PopupMenuItem` (about :405-414) reads `list.canManage ? shareProject : people`. Make it match the project page's own button (`App/lib/screens/home_screen.dart:575-590`): `shareProject` («Compartir») only when `!list.shared && list.groupId == null && list.role == 'owner'`; `people` («Miembros») in every other case. Keep the item for everyone signed in, and its action; update the comment above it. A test that taps «Compartir» on an unshared owned project (e.g. `App/test/sharing_ui_test.dart` about :651) keeps working.",
+    "UX-1643 (S1), R1C-4: «Miembros» three times on the owner's page (app bar «Miembros», the project name, then the section label «MIEMBROS»; render `sharing/project-sharing.owner.es.light.1x.png`). In `App/lib/screens/list_sharing_screen.dart` (owner view, about :413), show `SectionLabel(context.l10n.people)` only when `!shared`, i.e. when the app bar reads «Compartir proyecto». `shared` is already a parameter of `_sharing`. The «Invitaciones pendientes» label and everything else stay. Test rightly broken: `App/test/sharing_ui_test.dart` about :400-412 expects `label(es.people)` on an owner page with no local project (so `shared` defaults to true); either give that test an unshared local project, where the label stays, or expect no label, whichever matches its intent.",
+    "UX-1644 (S1), R1C-5: the group's members list doesn't mark the account's own row. In `App/lib/screens/groups_screen.dart`, the `for (final person in group.people)` `ListTile` (about :666-671), the title becomes `person.id == me ? context.l10n.personYou(person.name) : person.name` (`me` is at about :640; `personYou` is EN “{name} (you)” / ES «{name} (tú)» / CA «{name} (tu)»). Tooltips (`manageItem(person.name)`) keep the plain name. Preview fixture, so the render shows it cleanly: review C noted that `App/test/ux_previews/sharing_previews.dart:111,120,124` gives group roles 'member', which the server never sends (owner/admin/editor/viewer), so `group.owner` shows a raw «member»; change those three to 'editor' and keep the preview descriptions accurate.",
+    "UX-1645 (S1), R1C-6: `groupInviteHelp` still reads unlike the project's help under the new singular title «¿A quién invitas a {group}?» (`groups_screen.dart:476`). New copy in the three catalogs: EN “They’ll see every project in this group. We’ll email them an invitation.” / ES «Esa persona verá todos los proyectos de este grupo. Le enviaremos una invitación por correo.» / CA «Aquesta persona veurà tots els projectes d’aquest grup. Li enviarem una invitació per correu.» (the reviewer's Catalan). Add an @groupInviteHelp description in app_en.arb if it has none: “Help under the group invite dialog's title, above the email field.”",
+    "Run `flutter gen-l10n`; re-render `sharing/` (project-sharing.owner, project-sharing.reader, group.owner, the invite dialogs) and the Projects list.",
+    "Don't touch: the members page title rule, the member (non-owner) view, the invite dialogs' title, label, own-email check and code dialog, the role sheet, pending-invitation menus, Novedades and Salir, the project page's «Miembros · N» button, `shareProjectHelp`."
+   ],
+   "acceptance": [
+    "ES, 1× on 360×800, Proyectos: the ⋮ of a shared project the person owns reads «Miembros» and opens the members page; the ⋮ of an unshared personal project the person owns reads «Compartir»; a reader's shared project reads «Miembros».",
+    "ES, 1× on 360×800, the owner's page of a shared project with two other members (`sharing/project-sharing.owner`): «Miembros» appears once, in the app bar; no «MIEMBROS» section label; the owner's row «María (tú)» comes first.",
+    "ES, an owner's unshared personal project's sharing page: the app bar reads «Compartir proyecto» and the «MIEMBROS» section label still shows.",
+    "ES, 1× on 360×800, the group page as its owner María (`sharing/group.owner`): her row reads «María (tú)»; other rows show their names alone; no row shows a raw «member».",
+    "ES, the group invite dialog: under «¿A quién invitas a {group}?» the help reads «Esa persona verá todos los proyectos de este grupo. Le enviaremos una invitación por correo.»; EN “They’ll see every project in this group. We’ll email them an invitation.”; CA «Aquesta persona veurà tots els projectes d’aquest grup. Li enviarem una invitació per correu.»",
+    "ES, 2× on 360×800, the group invite dialog: the help text shows whole, with no clipping."
+   ],
+   "deviceChecks": [],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "TaskFlow (development)",
+            "type": "dart",
+            "request": "launch",
+            "flutterMode": "debug",
+            "emulatorId": "TaskFlow_API_36_1",
+            "preLaunchTask": "TaskFlow: start development emulator",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "templateFor": "lib",
+            "toolArgs": [
+                "--dart-define-from-file=${workspaceFolder}/config/development.json"
+            ]
+        }
+    ]
+}

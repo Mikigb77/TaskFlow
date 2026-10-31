@@ -1,64 +1,74 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/task.dart';
-import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/widgets/task_tile.dart';
 
-class TaskList extends ConsumerWidget {
-  const TaskList({super.key, required this.tasks});
+class TaskList extends StatelessWidget {
+  const TaskList({
+    super.key,
+    required this.tasks,
+    this.newestFirst = false,
+    this.landedIds = const {},
+    this.lit = false,
+    this.landedRow,
+    this.bottomPadding = 100,
+    this.project,
+    this.showUndated = true,
+  });
   final List<Task> tasks;
+
+  /// Latest date first, undated last: what was just done is on top.
+  final bool newestFirst;
+
+  /// Just-saved tasks, highlighted while [lit]. The first one's row carries
+  /// [landedRow], so it can be scrolled into view.
+  final Set<int> landedIds;
+  final bool lit;
+  final Key? landedRow;
+
+  /// Empty space after the last row.
+  final double bottomPadding;
+
+  /// The page's project, which its rows don't repeat.
+  final String? project;
+
+  /// Whether a row with no date says so; the Sin fecha page's rows don't.
+  final bool showUndated;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sorted = [...tasks]..sort(Task.compareBySchedule);
-    final colors = Theme.of(context).colorScheme;
+  Widget build(BuildContext context) {
+    final sorted = [...tasks]
+      ..sort(
+        newestFirst
+            ? (a, b) => a.displayDate == null || b.displayDate == null
+                  ? Task.compareBySchedule(a, b)
+                  : b.displayDate!.compareTo(a.displayDate!)
+            : Task.compareBySchedule,
+      );
+    final first = sorted.indexWhere((task) => landedIds.contains(task.id));
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPadding),
       itemCount: sorted.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
+      itemBuilder: (_, index) {
         final task = sorted[index];
-        return Dismissible(
-            key: ValueKey('${task.id}:${task.occurrenceDate}'),
-            direction: DismissDirection.endToStart,
-            confirmDismiss: (_) async {
-              final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                          title: const Text('Delete task?'),
-                          content: Text(task.isRecurring
-                              ? '“${task.title}” and all its occurrences will be removed.'
-                              : '“${task.title}” will be removed.'),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Keep task')),
-                            FilledButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Delete'))
-                          ]));
-              if (confirmed != true) return false;
-              try {
-                await ref.read(taskProvider.notifier).deleteTask(task.id!);
-                return true;
-              } catch (_) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text(
-                          'Could not delete the task. Please try again.')));
-                }
-                return false;
-              }
-            },
-            background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                    color: colors.errorContainer,
-                    borderRadius: BorderRadius.circular(20)),
-                child:
-                    Icon(Icons.delete_outline, color: colors.onErrorContainer)),
-            child: TaskTile(task: task, showDate: true));
+        return landedIds.contains(task.id)
+            ? LandedTaskTile(
+                key: index == first ? landedRow : null,
+                task: task,
+                lit: lit,
+                showDate: true,
+                project: project,
+                showUndated: showUndated,
+                markOverdue: true,
+              )
+            : TaskTile(
+                task: task,
+                showDate: true,
+                project: project,
+                showUndated: showUndated,
+                markOverdue: true,
+              );
       },
     );
   }

@@ -1,0 +1,150 @@
+{
+ "runId": "2026-10-21-changes",
+ "mode": "changes",
+ "plan": 2,
+ "batch": "d",
+ "round": 2,
+ "created": "2026-10-22",
+ "packages": [
+  {
+   "id": "P235",
+   "title": "A voice move of a task with only a deadline moves its deadline (D1), and an overdue task moved earlier lands where it went",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-1715",
+    "UX-1702",
+    "UX-1716",
+    "UX-1721",
+    "UX-1723"
+   ],
+   "files": [
+    "App/lib/services/command_plan.dart",
+    "App/lib/screens/voice_task_screen.dart",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/capture_landing_test.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, plan 2, round 2 (batch d). This is P231 again, which never ran in round 1, plus one regression of round 1 (R1A-2, now UX-1723) in the same file. Round 1's P232 («hoy» takes the overdue tasks, D2, and D4 below) and P233 (the day chip, D3) are built and are in the main checkout as uncommitted changes; build on them.",
+    "Why round 1 failed: not the fix. P231's worktree was created from main (50afe7a), not dev, so App/lib/services/command_plan.dart, bulk_plan.dart and the bulk tests weren't there, and nothing was changed. Before you edit anything, check your worktree: `git rev-parse --short HEAD` reads 1cfc622 (dev's HEAD; or whatever the main checkout has checked out, if the main session tells you so), App/lib/services/command_plan.dart and App/lib/services/bulk_plan.dart exist, `_fromToday` is in bulk_plan.dart, `_MoveDayChip` is in App/lib/widgets/capture_command_cards.dart, and the group 'UX loop 2026-10-21-changes, plan 2 round 1' is in App/test/bulk_voice_commands_test.dart (about :4354). If any of these is missing, stop at once and report blocked with what you found; don't recreate anything by hand. Reading git is fine; never change git state.",
+    "Supersedes one convention: the conventions line «D4 of this plan is open: no package changes how a move by days (`shift_days`) treats the overdue tasks a «hoy» set takes» is out of date. The owner answered D4 on 2026-10-22, as recommended (DECISIONS.md, «2026-10-22 — D4»): moved by days, the overdue tasks in a «hoy» set count from today, so «un día» puts them on tomorrow with the rest. P232 built it in `_fromToday` (App/lib/services/bulk_plan.dart:262-278), which hands `planUpdate` a copy of the task set on today. Keep it as it is.",
+    "D1 (owner, 2026-10-21 evening, as recommended; DECISIONS.md «Bulk commands: D1–D3»): a voice move to a day, for a set («pasa todo lo de ayer a mañana») or for one task, moves the deadline of a task that has only a deadline, as a move by days already does; a time said for such a task goes on its deadline too (UX-1709's fifth item); voice only, so Calendar's own «Cambiar fecha» keeps its rule. The contract already says so (Backend/docs/VOICE_COMMANDS.md, `changes`, the `date` and `time` rows).",
+    "UX-1715 (S2). `planUpdate` (App/lib/services/command_plan.dart:204-347; this file is unchanged since HEAD, so its line numbers hold) sets a new planned day from `changes.date` for every task (:225-244), so a task with only a deadline gets a planned day and keeps its old deadline. «Pasa todas las tareas de ayer a mañana» listed «Pagar la factura del gas · Vence mar, 20 oct» under «Mover 4 tareas a mañana, jue 22», and after the tap it sat on Thursday reading «Vence mar, 20 oct · Fecha límite vencida», in red: «Le he dicho que la pase a mañana… ¿por qué sigue en rojo, vencida?». Meanwhile «retrásalo todo un día» moves the same task's deadline (:246-254), so two ways of saying «move it» give two results. A time alone («a las 18:00») on such a task needs a day (`needsDay`, :239-241): one task asks «¿Qué día, a las 18:00?», and a set counts it under «sin fecha» (`noDayTasks`, App/lib/services/bulk_plan.dart:207, :222), though its row shows «Vence …».",
+    "Fix, in `planUpdate`, one rule for a task with only a deadline: `planned` (:217, `shown.displayDate`) is null and `due` (:218) isn't. Unless the change also names the deadline (`deadline_date` or `deadline_time`: then those apply as now, and `date` sets the planned day, as the shift branch already checks at :249-253): (1) `date` with a day moves the deadline to that day, keeping the deadline's time (`task.deadlineHasTime` and its clock), or taking the time said with it (`time`), and no planned day is set; (2) `time` with a time, and no `date`, sets that time on the deadline's own day, and `needsDay` stays false; (3) `shift_days` moves the deadline, as now. Fold the existing shift branch (:249-254) into this one rule, and skip the planned-day block (:225-244) for such a task whenever the rule applies. `_same` (:176) still drops a deadline already as asked, so the card says «Ya está así.». `date: null` and `time: null` stay as they are now (they take away a planned day or time, which this task doesn't have). A task with a planned day, with or without a deadline, is unchanged: the move sets its planned day and keeps its deadline. Repeating tasks always have a planned day, so they're unaffected. `UpdatePlan.after()` (:132-148) already keeps the reminder on the deadline when the task has no day. `_fromToday` passes an overdue deadline-only task with its deadline on today, so rule (3) from it gives today + N, as D4 asks; rules (1) and (2) are unaffected by it (it returns the task as is when a day is said or there is no `shift_days`).",
+    "Add to `UpdatePlan` (:25) a flag `movesDeadline`, true when the deadline moved in place of the planned day, by this rule or by days. `_onlyMoved` (App/lib/screens/voice_task_screen.dart:378-385) counts only `schedule` as a move, so today a task with only a deadline moved by voice reads «Guardar cambios» and then «Tarea cambiada», where a planned task reads «Cambiar fecha» and then «Movida al vie, 23 oct». Treat a plan with `movesDeadline`, a `deadline`, no `schedule` and no other change as a move too. Then the button (:4278-4288) reads `reschedule` («Cambiar fecha» / “Reschedule” / «Canvia la data»), and `moving` (:3682) is the new deadline (`moved.schedule ?? moved.deadline`), so the message (:3730-3738, `movedOccurrenceDate`: «Movida al {date}» / “Moved to {date}” / «Moguda al {date}») reads «Movida al vie, 23 oct», and `named` (:3716-3720) holds that day. No new copy. A move by days of one such task gets the same words. Sets need nothing more: `planBulk` calls `planUpdate`; `movesOnly` (bulk_plan.dart:138-142), «N tareas movidas al …» and `landing` (voice_task_screen.dart:3648: a task with only a deadline lands on its deadline's day) already work. Before the tap, the set row keeps showing the deadline as it is («Vence mié, 21 oct»).",
+    "The change card needs nothing: P233 already puts the day chip on the «Fecha límite» line when a move has `plan.deadline`, no `plan.schedule` and no planned day (App/lib/widgets/capture_command_cards.dart:1563-1582, `moveLine`), and a day picked there becomes a `date` change (`TaskChanges.movedTo`, App/lib/models/capture_command.dart:309). With your rule, that `date` moves the deadline, so the card stays on the «Fecha límite» line. Today it flips to «Fecha y hora: Sin fecha → …» (review A, verify-d-r1-A, «Related»): if a round 1 test pins that flip, it rightly breaks; update it. Don't edit capture_command_cards.dart (P237 changes its ▾ after you).",
+    "UX-1723 (S1, regression R1A-2 of round 1, from P232). In the landing after the tap (voice_task_screen.dart:3655-3676), `onToday` maps every marked overdue item whose landing day is before today to today, also when it was moved there. «Adelanta todo lo de hoy un día» moves the overdue tasks from today (D4) to yesterday, yet Calendar lands as if they were on Today, and the message can add «también en otro día» for a day where nothing is. Fix: for an update, map its landing day to today only when the day didn't change: `Task.day(landing(update.landed)) == Task.day(landing(update.before))` (the item was changed in place, for example its priority). An overdue item moved to an earlier day lands where it went. To do this, build the `landed` days from `applied.updates` (each `AppliedUpdate` has `before` and `landed`, App/lib/services/command_runner.dart:12-32) rather than from the bare `landed` list; leave the `landed` list as it is for `movedDays`, `movedTo` and the no-date check (:3690-3700, :3814-3815). Completions (`done`, :3675) keep mapping to today as now: they don't change their day.",
+    "Tests you must make pass, already written by ux-tester in round 1 and failing only because P231 never ran; don't rewrite them: in App/test/bulk_voice_commands_test.dart, 'UX-1702: «Pasa todo lo de hoy a mañana» moves B, which has only a deadline, by its deadline (P231)' (about :4623) and 'UX-1716: one task with only a deadline, «Pasa la factura del gas a mañana»: the «Fecha límite» line’s chip «Mañana»; a day picked moves the deadline there (P231)' (about :5132). Tests your change rightly breaks, in the same file (search by name; the line numbers have moved): 'a day for the set moves each task there, keeping its time' (about :612) pins the old rule for task 7 («Solo con fecha límite»): now it keeps no planned day and its deadline is day(1); 'a time for tasks with no day leaves them out, counted; what is already as asked isn’t listed' (about :584): task 7 now takes 18:00 on its deadline and is listed, and `noDay` is 1. Search App/test for other tests that expect a planned day, «Sin fecha → …» or «¿Qué día…?» on a task with only a deadline; a task with neither a day nor a deadline still asks «¿Qué día…?» (voice_command_cards_test.dart:732, :4120 stay).",
+    "Don't touch: Calendar's own «Cambiar fecha» (App/lib/widgets/task_interactions.dart:49, `editSchedule` with `moving`) and the task form, which keep giving such a task a planned day (D1 is voice only); App/lib/services/bulk_plan.dart and App/lib/services/task_matcher.dart (P232's work); App/lib/widgets/capture_command_cards.dart; `time: null` on a task with only a deadline; the ARB catalogs (no new copy); the contract and Backend/.",
+    "Previews: re-render commands/. applied.bulk-applied now shows «Pagar la factura del gas» on tomorrow reading «Vence <tomorrow>», without «Fecha límite vencida»: update its description. Add `cards.change-deadline-only` (es 1×, es 2×) in App/test/ux_previews/commands_previews.dart: «Pasa la factura del gas a mañana» for a task with only yesterday's deadline: one change line, the deadline's, «<yesterday> → [Mañana ▾]», and the button «Cambiar fecha». Check that cards.bulk-today-overdue and applied.bulk-today-overdue-applied still show what their descriptions say."
+   ],
+   "acceptance": [
+    "One task, Spanish, 1× on 360×800: «Pasa la factura del gas a mañana» for «Pagar la factura del gas», which has only a deadline (yesterday, no time) and no planned day: the card has one change line, the deadline's, with the day chip «Mañana» (TalkBack: «Fecha límite: de <yesterday> a Mañana»), and no «Fecha y hora» line; the button reads «Cambiar fecha».",
+    "Then the tap: the task still has no planned day and its deadline is tomorrow; Calendar lands on tomorrow with the task's row lit and no «Fecha límite vencida» on it; the message reads «Movida al <tomorrow, weekdayDate>» with Deshacer; Deshacer puts the deadline back on yesterday.",
+    "On that card, picking another day in the chip's «Elegir día» (say the day after tomorrow) keeps one «Fecha límite» line, now «<yesterday> → <that day>»; no «Fecha y hora: Sin fecha → …» line appears; after the tap the deadline is on that day and there is still no planned day.",
+    "One task with only a deadline, moved by days («retrásala un día»): the card's line is the «Fecha límite» line with the chip; picking a day in it keeps it a «Fecha límite» line, not «Fecha y hora».",
+    "One task, Spanish: «Pon la factura del gas a las 18:00» for the same task: no «¿Qué día, a las 18:00?» question; the deadline line reads «<yesterday> → <yesterday> · 18:00»; after the tap the deadline is yesterday at 18:00, with its time, and the task still has no planned day.",
+    "A deadline's time is kept: a task with only a deadline, yesterday at 9:00, moved «a mañana», ends with its deadline tomorrow at 9:00.",
+    "Unchanged: a task with a planned day and a deadline, moved «a mañana», gets tomorrow as its planned day and keeps its deadline; a change that also names the deadline (`date` tomorrow and `deadline_date` next Monday) sets the planned day to tomorrow and the deadline to Monday; a task with no day and no deadline, given a time, still asks «¿Qué día, a las 18:00?».",
+    "Set, Spanish, 1×: «Pasa todas las tareas de ayer a mañana» over 4 open tasks from yesterday, one of them with only a deadline (yesterday): the heading reads «Mover 4 tareas a» with the chip «mañana, <tomorrow, E d>»; after «Mover 4 tareas», that task has no planned day and its deadline is tomorrow, and the message reads «4 tareas movidas al <tomorrow, weekdayDate>».",
+    "Set with no period (`setTarget()`, «Pon todas mis tareas a las 18:00») over a task with only a deadline and a task with neither a day nor a deadline: the first is listed and, after the tap, has 18:00 on its deadline; the line after the list names only the other («<title> no tiene fecha: no cambia»).",
+    "UX-1702: «Pasa todo lo de hoy a mañana» over Today with overdue tasks: B («Pagar la factura del gas», only a deadline, overdue) ends with no planned day and its deadline tomorrow (the round 1 test passes).",
+    "UX-1721 (D4): «Retrasa todo lo de hoy un día» over a «hoy» set with one task planned today and one overdue since 3 days ago: both end on tomorrow; one with only a deadline overdue since 2 days ago ends with its deadline tomorrow and no planned day.",
+    "UX-1723: a «hoy» set with one task planned today and one task overdue since 3 days ago, moved by −1 day («adelanta todo lo de hoy un día»): both end on yesterday; Calendar lands on yesterday; the message reads «2 tareas movidas al <yesterday, weekdayDate>», with no «también».",
+    "Unchanged by UX-1723: an overdue task in a «hoy» set changed in place (say «pon todo lo de hoy en prioridad alta») lands on Today, not on its own earlier day; a «hoy» completion set still lands on Today with no «Atrasadas» (the round 1 tests 'UX-1702: all five done…' and 'a plain single-task dictation looks and saves exactly as before, with no new tap' pass).",
+    "Calendar's own Cambiar fecha on a task with only a deadline still gives it a planned day and keeps the deadline: the existing tests of task_interactions pass unchanged."
+   ],
+   "deviceChecks": [
+    "Main session, real model: «Pasa la factura del gas a mañana» and «Pon la factura del gas a las 18:00», said for a task with only a deadline, come back as a `date` change and a `time` change, and the card shows the deadline line as in the widget tests.",
+    "Main session, real model: «Adelanta todo lo de hoy un día» comes back as a «hoy» set with `shift_days: -1`."
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P236",
+   "title": "The Voz privacy paragraph says in plain words why your words go to Google",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-1720"
+   ],
+   "files": [
+    "App/lib/l10n/app_en.arb",
+    "App/lib/l10n/app_es.arb",
+    "App/lib/l10n/app_ca.arb",
+    "App/test/localization_catalog_test.dart",
+    "App/test/voice_settings_test.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, plan 2, round 2 (batch d). This is P234 again, which never ran in round 1. Passed on by the website review of 2026-10-21 (.claude/ux-web/runs/2026-10-21-changes/review-F.md:317, «App-side, for /ux»): the site's privacy summary now says your words go to Google's AI «to add, find or change tasks» (WEB-1002), but the app's own paragraph still says something narrower, in jargon.",
+    "Why round 1 failed: not the fix. P234's worktree was created from main (50afe7a), which has no App/lib/l10n/, so nothing was changed. Before you edit anything, check your worktree: `git rev-parse --short HEAD` reads 1cfc622 (dev's HEAD; or whatever the main checkout has checked out, if the main session tells you so), and App/lib/l10n/app_en.arb has `capturePrivacy` (about :523). If not, stop at once and report blocked with what you found. Reading git is fine; never change git state.",
+    "UX-1720 (S1). `capturePrivacy` (App/lib/l10n/app_en.arb:523, app_es.arb:306, app_ca.arb:285; search the key, other packages' keys may have moved the lines), shown only at the end of Ajustes › Otros ajustes › Voz (App/lib/screens/voice_settings_screen.dart:196-206), says in its second sentence «La extracción de tareas con IA necesita internet y envía tus palabras a Google.» «Extracción» is jargon, and since the voice commands a dictation also finds, changes, completes and deletes tasks, so «task extraction» no longer says what the words are sent for. The capture sheet's first-use line, `capturePrivacyLine` («Tus palabras van por internet. Más en Ajustes.»), sends people here.",
+    "Fix: replace only the second sentence, in all three catalogs. EN “AI task extraction still needs the internet and sends your words to Google.” → “To add, find or change tasks, your words go over the internet to Google’s AI.” ES «La extracción de tareas con IA necesita internet y envía tus palabras a Google.» → «Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google.» CA «L’extracció de tasques amb IA necessita internet i envia les teves paraules a Google.» → «Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google.» (the organizer's Catalan, following the site's «per afegir, cercar o canviar tasques»; a native read is welcome). The first, third and fourth sentences stay word for word; App/test/localization_catalog_test.dart:565-581 checks the last. If the current sentence in a catalog differs from the one quoted here, stop and report it rather than guess.",
+    "Add an `@capturePrivacy` description to app_en.arb (it has none), right after the `capturePrivacy` entry: “The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI, saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet.” Then run flutter gen-l10n from App/. Change only this key and its description; don't reorder or reformat other keys (P232 and P233 added keys in round 1 that are in the main checkout).",
+    "Don't touch: `capturePrivacyLine`, the Voz screen's layout, `diagnosticsEvent` (its “extraction” is on the developer-only diagnostics screen, D13 of 2026-10-13), Dart code other than the tests, and the website.",
+    "Previews: re-render settings/voice. (voice.on-phone es 1× and 2×, voice.not-on-phone ca 2×)."
+   ],
+   "acceptance": [
+    "In EN, ES and CA, `capturePrivacy`'s second sentence is exactly the new one, the paragraph contains none of «extracción», «extracció» or “extraction”, and its other three sentences are unchanged.",
+    "app_en.arb has an `@capturePrivacy` entry with a description.",
+    "Voz in Spanish at 2× on 320×640: after scrolling, the paragraph shows whole, with «Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google.», and nothing overflows; the same in Catalan at 2×.",
+    "`capturePrivacy` is still used only by the Voz screen (App/test/voice_settings_test.dart:655 passes)."
+   ],
+   "deviceChecks": [
+    "A native Catalan read of «Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google.»"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "P237",
+   "title": "The ▾ on the day, project and person chips grows with the text",
+   "area": "A",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-1722"
+   ],
+   "files": [
+    "App/lib/widgets/app_components.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/lib/widgets/task_list_picker.dart",
+    "App/lib/widgets/task_assignment_picker.dart",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/project_ui_test.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, plan 2, round 2 (batch d). Regression R1A-1 of round 1, now UX-1722, from P233's day chip. Runs after P235, which shares the bulk test file and re-renders the same cards; build on what it left. Check first that your worktree's `git rev-parse --short HEAD` is dev's HEAD (1cfc622, unless the main session says otherwise) and that `_MoveDayChip` is in App/lib/widgets/capture_command_cards.dart; if not, stop and report blocked. Never change git state.",
+    "UX-1722 (S1). The ▾ is the day chip's main cue that it can be tapped, and it stays 18 dp at any text size: `_MoveDayChip` (App/lib/widgets/capture_command_cards.dart:727-789), `const Icon(Icons.arrow_drop_down_rounded, size: 18)` at :768. Its label uses titleMedium (set card) or bodyLarge (one-task card) and scales to 2×, so in the renders cards.bulk-move.es.light.2x and cards.change.es.light.2x the ▾ is a speck beside a two-line label. The project chip (App/lib/widgets/task_list_picker.dart:302) and the person chip (App/lib/widgets/task_assignment_picker.dart:127) draw the same fixed 18 dp ▾.",
+    "Fix: one small widget in App/lib/widgets/app_components.dart, for example `class DropDownMark extends StatelessWidget`, that draws `Icon(Icons.arrow_drop_down_rounded, size: math.min(28.0, MediaQuery.textScalerOf(context).scale(18)))`: 18 dp at 1×, growing with the text, capped at 28 dp. Use it at the three sites, in place of the fixed icon, keeping each site's condition (the project chip only when `!locked && onChanged != null`, the person chip only when `changeable`). Its doc comment says what it is for: the ▾ that says a chip can be changed, as large as the text lets it be seen. Keep `_MoveDayChip._frame` and the label's wrapping as they are, but make sure the label's width still leaves room for the larger ▾: at 2× on 360 dp the chip's label wraps to at most 2 lines and nothing overflows.",
+    "Don't touch: the chips' avatars (the person and group icons), their labels, tooltips, semantics and padding; the other ActionChips (capture_review_editor.dart, task_editor.dart, reminder_control.dart, project_scope_control.dart, task_planning_control.dart), which have no ▾; App/lib/screens/; the ARB catalogs (no copy changes).",
+    "Tests: tests that find the ▾ by `find.byIcon(Icons.arrow_drop_down_rounded)` (bulk_voice_commands_test.dart about :4727 and :5110, project_ui_test.dart:298, voice_command_cards_test.dart:5360) keep finding it: `DropDownMark` builds that Icon. If one checks its size, it rightly changes at 2×.",
+    "Previews: re-render commands/, form/ and sharing/ (the project and person chips show in the task form and in shared projects), and check AUDIT.md: no text cut, no target under 48 dp. Don't add preview states."
+   ],
+   "acceptance": [
+    "Set card, Spanish, 2× on 360×800, «Pasa todas las tareas de ayer a mañana»: the ▾ in the day chip is 28×28 dp; at 1× it is 18×18 dp; at 1.3× it is about 23 dp; the chip's label wraps to at most 2 lines and nothing overflows.",
+    "One task's change card, Spanish, 2× on 360×800, «Pasa la cita del médico al miércoles»: the day chip's ▾ is 28 dp; the same in Catalan at 2×, with no overflow.",
+    "The task form's project chip and a shared project task's person chip, Spanish at 2× on 360×800: each ▾ is 28 dp, and at 1× 18 dp; the label still ends in “…” rather than overflowing when the name is long; a locked project chip and a person chip that can't be changed still show no ▾.",
+    "In the es 2× renders cards.bulk-move and cards.change, the ▾ is about as tall as the label's lowercase letters."
+   ],
+   "deviceChecks": [
+    "Owner's phone at the largest font: the ▾ on «Mover 4 tareas a [mañana, … ▾]» is easy to see, and the project and person chips in the task form look the same."
+   ],
+   "dependsOn": [
+    "P235"
+   ]
+  }
+ ],
+ "decisions": [],
+ "skipped": [],
+ "escalated": [],
+ "notes": [
+  "Round 1 (d) failed for an infrastructure reason: P231's and P234's worktrees were created from main (50afe7a), not dev's HEAD (1cfc622). Create every worktree of this round from the commit the main checkout has checked out, and seed it with the main checkout's uncommitted P232/P233 work. Both implementers suggest that `waves.py seed` check the worktree's HEAD against the main checkout's HEAD before copying. Discard round 1's P231 and P234 worktrees; nothing in them is to be merged.",
+  "UX-1715 and UX-1720 count one failure each, though neither fix was attempted. A second failure escalates them.",
+  "D4 (UX-1721) was answered on 2026-10-22 as (b) and built by P232; the contract already says it (Backend/docs/VOICE_COMMANDS.md:208, «Hoy»). Its one remaining piece, the landing of an overdue task moved to an earlier day, is UX-1723 in P235.",
+  "Run order: P235 and P236 side by side (no shared file), then P237 (it shares App/test/bulk_voice_commands_test.dart with P235 and re-renders the same cards)."
+ ]
+}

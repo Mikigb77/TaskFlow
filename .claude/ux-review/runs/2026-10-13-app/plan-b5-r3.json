@@ -1,0 +1,48 @@
+{
+  "runId": "2026-10-13-app",
+  "mode": "app",
+  "round": "b5-r3",
+  "packages": [
+    {
+      "id": "P76",
+      "title": "Tapping the current choice closes the Idioma and Apariencia sheets",
+      "area": "D",
+      "size": "S",
+      "severity": 1,
+      "findings": [
+        "UX-483"
+      ],
+      "aliases": {
+        "UX-483": "R2D-1"
+      },
+      "files": [
+        "App/lib/widgets/language_selector.dart",
+        "App/lib/screens/settings_screen.dart"
+      ],
+      "brief": [
+        "UX-483 (R2D-1, S1) is a regression from P75 (b5 round 2). P75 rebuilt the Idioma sheet (`_LanguageSheet`, App/lib/widgets/language_selector.dart:85-133) on the Apariencia pattern: a `RadioGroup<String>` with `RadioListTile<String>` rows. It also removed the close X, as its brief asked. The old `ListTile.onTap` re-saved the language and popped the sheet. Now nothing happens when the user taps the language that is already selected. Flutter's `RadioListTile._handleListTileTap` (flutter/packages/flutter/lib/src/material/radio_list_tile.dart:619-622) returns early when the row is checked and `toggleable` is false, so `onChanged` never runs. The Apariencia sheet (`_AppearanceSheet`, App/lib/screens/settings_screen.dart:153-210) has the same problem, and its `onChanged` also returns on null (:177). Someone who opens the sheet and taps the choice they already have gets no response: \"Is it stuck?\"",
+        "Fix, in both sheets: set `toggleable: true` on every `RadioListTile` (language_selector.dart:111 and settings_screen.dart:194). In that mode, tapping the checked row or its radio calls the RadioGroup's `onChanged` with `null` (radio_list_tile.dart:623-628). Treat that `null` as \"keep it and close\": call `Navigator.pop(context)` and don't save anything.",
+        "Idioma: change `onChanged` at language_selector.dart:102-104 so that `null` pops the sheet and any other value still calls `_choose(value)`. Pop only when `!_saving`. The rows are already disabled while saving (`enabled: !_saving`, :117), so this is just a guard. Don't re-save the language, don't call `TaskReminders.refreshLanguage()`, and don't show a message.",
+        "Apariencia: at settings_screen.dart:176-177, replace `if (value == null) return;` with a pop and return: `if (value == null) { Navigator.pop(context); return; }`. Leave the rest of the handler as it is (pop, then `setMode`, then `appearanceError` on failure).",
+        "Before relying on the SDK, confirm that with `toggleable: true` the checked row still draws as selected. Our `groupValue` doesn't change, so it should. If the radio draws empty, or semantics stop announcing the row as selected, don't use `toggleable`. Instead give each row its own tap handling: wrap the checked row so a tap pops the sheet. Write in your notes which way you took.",
+        "No copy changes and no new ARB keys. Keep the radio rows, the headings, the paddings, the keys (`language-$code`, `appearance-${option.name}`), the row order in both sheets, and the SingleChildScrollView. Don't add back a close X.",
+        "Don't touch: the order of Apariencia's options. Reviewer D noted that `Como el teléfono` is first in Idioma and last in Apariencia. That isn't part of this package. Also leave the Recordatorios row and its `remindersBlocked` subtitle (P75), Hora y región, `regionalSettingsHelp` (unused key, housekeeping noted separately), and every test file. ux-tester writes the acceptance tests."
+      ],
+      "acceptance": [
+        "Widget test (UX-483): in Spanish, with the app language set to `es`, open Ajustes › Idioma and tap the `Español` row (`ValueKey('language-es')`). The sheet closes: no RadioListTile with that key is left in the tree. The stored language is still `es`, and no snackbar is shown.",
+        "Widget test (UX-483): in Spanish, with the language set to follow the phone, open Idioma and tap `Como el teléfono` (`ValueKey('language-system')`). The sheet closes and the language still follows the phone.",
+        "Widget test (UX-483): in Spanish, with the theme mode set to light, open Ajustes › Apariencia and tap `Claro` (`ValueKey('appearance-light')`). The sheet closes, and the theme mode is still `ThemeMode.light`.",
+        "Widget test (UX-483, no change in behaviour): with the language set to `es`, open Idioma and tap `Català`. The sheet closes and the language becomes `ca`. With the theme mode set to light, open Apariencia and tap `Oscuro`. The sheet closes and the mode becomes `ThemeMode.dark`.",
+        "Widget test (UX-483): in Spanish, with the language set to `es`, the open Idioma sheet still shows the `Español` row as selected (its Radio is checked, or its semantics say selected). The same holds for `Claro` in Apariencia with the mode set to light.",
+        "Code (UX-483): neither sheet has a close IconButton, and their copy is unchanged."
+      ],
+      "deviceChecks": [
+        "With TalkBack on, open Idioma. The current language is announced as selected, and double-tapping it closes the sheet."
+      ],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": [],
+  "escalated": []
+}

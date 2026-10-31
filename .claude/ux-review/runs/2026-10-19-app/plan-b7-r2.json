@@ -1,0 +1,54 @@
+{
+ "runId": "2026-10-19-app",
+ "mode": "app",
+ "round": "b7-r2",
+ "packages": [
+  {
+   "id": "P222",
+   "title": "The widget gets its own label; the English voice shortcut reads «Dictate a new task»",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1656"
+   ],
+   "files": [
+    "App/android/app/src/main/res/values/strings.xml",
+    "App/android/app/src/main/res/values-es/strings.xml",
+    "App/android/app/src/main/res/values-ca/strings.xml",
+    "App/android/app/src/main/res/layout/capture_widget.xml",
+    "App/android/app/src/main/kotlin/com/example/agenda/CaptureWidget.kt",
+    "App/android/app/src/main/AndroidManifest.xml",
+    "App/test/native_resources_test.dart"
+   ],
+   "brief": [
+    "UX-1656 (S2), round 2. What round 1 (P221) did, and keep it: `capture_text` in `App/android/app/src/main/res/values/strings.xml:7` is now “Type a new task” (15 characters), so the English text shortcut should fall back to “Type” at Android's 2.0, as Spanish and Catalan do. Why it is only partly fixed (`.claude/ux-review/runs/2026-10-19-app/verify-b7-r1-D.md`, and ux-tester's failing test 'UX-1656: each English long shortcut label is at least 15 characters or its short label…'): `capture_voice` is still “Say a task” (10 characters), so the voice shortcut is still cut to «Say a ta…» at 2.0, and at 1.0 the English pair reads “Say a task” / “Type a new task”, two wordings for one idea. The implementer left it on purpose, rightly: `capture_voice` is also the widget's name in four places (the layout's text, `res/layout/capture_widget.xml:10`; its TalkBack name, `:6`; its Android 13+ label, `CaptureWidget.kt:25`; its widget-picker name, `AndroidManifest.xml:58`), and P221's brief forbade changing the widget. This round widens the scope (the implementer's option A, which review D recommends; it is not a product decision): the widget gets its own string, keeping today's text exactly, and the voice shortcut's English long label is then free to change.",
+    "1. New string `capture_widget_label`, in all three catalogs, placed right after `capture_text_short` and before `capture_widget_description`, each with a translator comment. Values are today's widget text, unchanged: EN “Say a task” / ES «Dictar una tarea» / CA «Dicta una tasca». Comments: EN `<!-- Home-screen widget: the label under the mic, its TalkBack name and its name in the widget picker. Two short lines in an 80 dp cell: about 20 characters at most. -->`; ES `<!-- Widget de la pantalla de inicio: el texto bajo el micrófono, su nombre para TalkBack y su nombre en el selector de widgets. Dos líneas cortas en una celda de 80 dp: unos 20 caracteres como máximo. -->`; CA `<!-- Giny de la pantalla d’inici: el text sota el micròfon, el seu nom per a TalkBack i el seu nom al selector de ginys. Dues línies curtes en una cel·la de 80 dp: uns 20 caràcters com a màxim. -->` (the comments are the organizer's; they are not shown to users). The layout already has a view id `@+id/capture_widget_label`; an id and a string with the same name are different resource types and don't clash. Leave the id as it is.",
+    "2. Point every widget surface at it, and only those: `res/layout/capture_widget.xml:6` `android:contentDescription=\"@string/capture_widget_label\"` and `:10` `android:text=\"@string/capture_widget_label\"`; `CaptureWidget.kt:25` `context.getString(R.string.capture_widget_label)` (keep the TIRAMISU check and the comment above it); `AndroidManifest.xml:58`, the `.CaptureWidget` receiver's `android:label=\"@string/capture_widget_label\"`. The manifest has P195's uncommitted icon change in it (line 15): build on it, change only line 58. After this, no widget surface names `capture_voice`; only `CaptureShortcuts.kt:26` does, as the voice shortcut's long label.",
+    "3. Then, in `res/values/strings.xml:3` only, set `capture_voice` to “Dictate a new task” (18 characters). It matches “Type a new task” and the short label “Dictate”, and is over the 15 characters the emulator showed falling back. Keep its comment, `capture_voice_short` “Dictate”, `capture_text` “Type a new task” and `capture_text_short` “Type”. Spanish and Catalan `capture_voice` («Dictar una tarea», «Dicta una tasca») and `capture_text` stay as they are: they already fall back at 2.0.",
+    "4. Tests in `App/test/native_resources_test.dart` that this change rightly breaks: 'UX-121: the shortcuts read Dictar una tarea / Escribir una tarea, matching the app' (line 179) now expects `en['capture_voice']` to be 'Dictate a new task'; 'UX-1316: the widget has a 24 dp mic…' (line 476) now expects `android:text=\"@string/capture_widget_label\"`. The two UX-1656 tests (from line 781) must pass unchanged: the second one finds whichever string each widget surface names and checks it reads “Say a task” / «Dictar una tarea» / «Dicta una tasca», so it covers the move. Run the whole suite and build the debug APK (`flutter build apk --debug --no-pub --target-platform android-x64`) so the resource links are proven.",
+    "Don't touch: `CaptureShortcuts.kt`; `capture_widget_description` («Tap to say a task.» / «Toca para dictar una tarea.» / «Toca per dictar una tasca.») and `res/xml/capture_widget_info.xml`; the widget's layout other than the two attributes named; any ARB file (`homeCaptureInstructions`, `app_en.arb:404`, still names “the Say a task widget”, which stays true); the share toasts; P195's icon resources; the other session's files (Backend/, App/pubspec.yaml, App/scripts/, App/config/); git state."
+   ],
+   "acceptance": [
+    "`res/values/strings.xml`: `capture_voice` is “Dictate a new task” and `capture_text` “Type a new task”, each at least 15 characters; `capture_voice_short` is “Dictate” and `capture_text_short` “Type”, one word each.",
+    "`capture_widget_label` exists in values, values-es and values-ca as “Say a task” / «Dictar una tarea» / «Dicta una tasca», each preceded by a translator comment.",
+    "The widget layout's text and contentDescription, the `getString` in `CaptureWidget.kt` and the `.CaptureWidget` receiver's label in `AndroidManifest.xml` all name `capture_widget_label`; none names `capture_voice`.",
+    "`CaptureShortcuts.kt` still passes `capture_voice_short`/`capture_voice` and `capture_text_short`/`capture_text`, unchanged.",
+    "Spanish and Catalan `capture_voice`, `capture_text` and their short labels, and `capture_widget_description` in all three languages, are unchanged; no ARB file changed.",
+    "In English, the widget reads “Say a task” (label, TalkBack name, picker name) and the voice shortcut's long label reads “Dictate a new task”; in Spanish and Catalan the widget and both shortcuts read as before.",
+    "`native_resources_test.dart`: both UX-1656 tests pass; the UX-121 and UX-1316 tests expect the new values; the whole suite passes and the debug APK links."
+   ],
+   "deviceChecks": [
+    "Emulator lane, English at Android's 2.0: the launcher shortcuts read «Dictate» and «Type», whole (`launcher.shortcuts.en.light.2.0`); at 1.0 they read «Dictate a new task» and «Type a new task», whole (`launcher.shortcuts.en.light.1.0`).",
+    "Emulator lane, the widget in EN, ES and CA at 1.0 and 2.0: its label reads «Say a task» / «Dictar una tarea» / «Dicta una tasca», whole, as before; TalkBack names it the same; the widget picker lists it under that name.",
+    "Emulator lane, Android 13+: with the phone in Spanish and TaskFlow's language set to English, an already placed widget reads «Say a task» after the app opens (the `CaptureWidget.kt` path)."
+   ],
+   "dependsOn": [
+    "P221",
+    "P186"
+   ]
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

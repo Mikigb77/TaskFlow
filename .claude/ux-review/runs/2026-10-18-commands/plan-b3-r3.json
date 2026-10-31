@@ -1,0 +1,15 @@
+{
+  "runId": "2026-10-18-commands",
+  "mode": "changes",
+  "round": "b3-r3",
+  "packages": [],
+  "decisions": [
+    {
+      "id": "D12",
+      "question": "After a year pick in «Elegir día» (the day-only sheet), Flutter keeps a day of the new year painted as selected, though nothing was applied and the sheet has no «Listo». Accept this as known Flutter polish, or build a custom displayed-month path for the calendar so nothing shows as chosen?",
+      "findings": ["UX-1227"],
+      "recommendation": "Accept it for now and check it on the phone. The reviewer recommends no change: CalendarDatePicker can't show a month with nothing selected, and remounting it with initialDate _day clears the highlight but jumps back to the old month, which undoes the year pick. Nothing is lost: the form's chip shows the real day, and tapping any day, the highlighted one included, applies it. Subtract first: only if the phone walk («Elegir día» → month header → 2027) shows the highlight makes people pause, plan the custom displayed-month path as a fix."
+    }
+  ],
+  "skipped": []
+}

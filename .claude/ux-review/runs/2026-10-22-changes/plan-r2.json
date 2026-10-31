@@ -1,0 +1,63 @@
+{
+  "runId": "2026-10-22-changes",
+  "mode": "changes",
+  "round": 2,
+  "packages": [
+    {
+      "id": "P248",
+      "title": "The capture card: a reminder changed inside «Más opciones» stays where it was changed",
+      "area": "A",
+      "size": "S",
+      "severity": 2,
+      "findings": ["UX-2016"],
+      "files": [
+        "App/lib/widgets/capture_review_editor.dart",
+        "App/test/reminder_plan_sheet_test.dart"
+      ],
+      "brief": [
+        "UX-2016 (S2), regression R1A-1 of round 1, from P242. What the last attempt did: P242 (UX-1805) added `_reminderOpen` (App/lib/widgets/capture_review_editor.dart:62-68) so a reminder said while dictating gets one «Recordatorio» row above «Más opciones» (`showReminder`, :536; the row :727; inside «Más opciones» only `if (!showReminder) reminder()`, :819). Following its brief's «set true by any change made through the row», it also put `setState(() => _reminderOpen = true);` in all three callbacks of the shared `reminder()` builder (:545-567: onMinutes :547, onTime :553, onChanged :559). Why it failed: that builder also makes the control inside «Más opciones». On a plain draft (nothing said about reminders), a change made there sets the flag, and on rebuild the control is taken out of «Más opciones» and re-inserted above its header, after the date and before the steps and chips. The place the user was looking at now holds something else, and at 2× the moved row is off screen, right after the change (change blindness).",
+        "Fix: subtract. Delete the three `setState(() => _reminderOpen = true);` lines (:547, :553, :559). Keep each callback's `if (widget.enabled)` guard and its `_change(...)` call exactly as they are. Nothing else is needed: the row above «Más opciones» only shows when `_reminderOpen` is already true, and the flag never resets, so the calls did nothing there. Without them, a reminder changed inside «Más opciones» stays inside «Más opciones», where the user changed it.",
+        "Update the comment above `_reminderOpen` (:62-64) so it stays true: drop «or once the reminder is changed», for example: «The reminder row shows above `Más opciones` when the task arrives with a reminder (said while dictating, or changed before a resume); then it stays for this card, as the notes do. A reminder changed inside `Más opciones` stays there.»",
+        "Don't touch: `_reminderOpen`'s initial value (:65-68), `showReminder`, `belowNotes`, `optionsSummary` (no reminder entry, as P242 left it), the collapsed row's reminder line (:845), ReminderControl, the reminder sheet, any copy or ARB file. The P242 tests in App/test/reminder_plan_sheet_test.dart (the «the capture’s card» group, about :770-1030) and the plain-dictation test (App/test/voice_command_cards_test.dart:1019) keep passing; if one of them expects a change made inside «Más opciones» to move the row above it, it was testing the regression: change it to the new behaviour and say so in your notes. No render needed: no preview shows this state, and capture/result.one-task and reminders/capture-card.* don't change."
+      ],
+      "acceptance": [
+        "Capture result card, Spanish, 1×, 360×800, clock Thu 22 Oct 2026 10:00, reminders on and allowed, a plain one-task draft dated Fri 13 Nov (nothing said about reminders): open «Más opciones» → tap its «Recordatorio» → «Elegir hora del aviso» → 18:00. Afterwards there is exactly one ReminderControl; its top is below the top of `draft-options-<id>`; it is inside the visible viewport; it reads «18:00»; there is no `draft-reminder-<id>` row above «Más opciones»; and the draft's task has reminderTime 18:00.",
+        "Same draft at 2× text on 360×800, Spanish: after the same steps the ReminderControl is still below «Más opciones», inside the visible viewport, and reads «18:00».",
+        "Same plain draft, 1×: inside «Más opciones» → «Recordatorio» → «Desactivado»: the control stays below «Más opciones» and reads «Desactivado».",
+        "Unchanged: a draft with `ownersPlan`, or with `reminder_minutes: 60` said, still shows its «Recordatorio» row above «Más opciones», and after «Elegir hora del aviso» → 18:00 the row is still above «Más opciones» and reads «18:00» (P242's acceptance). A plain single-task dictation still looks and saves as before (voice_command_cards_test.dart:1019)."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    },
+    {
+      "id": "P249",
+      "title": "The Pro screen's example is one no free strength gives",
+      "area": "D",
+      "size": "S",
+      "severity": 2,
+      "findings": ["UX-2017"],
+      "files": [
+        "App/lib/l10n/app_en.arb",
+        "App/lib/l10n/app_es.arb",
+        "App/lib/l10n/app_ca.arb",
+        "App/test/ux_previews/reminders_previews.dart"
+      ],
+      "brief": [
+        "UX-2017 (S2), regression R1D-1 of round 1, from P247. What the last attempt did: P247 (UX-2007) put an example under the Pro screen's heading, `billingReasonReminderPlansExample` (App/lib/l10n/app_es.arb:1409, app_en.arb:3781, app_ca.arb:1113; shown by App/lib/screens/subscription_screen.dart:109): ES «cada 3 días y la última semana a diario». Why it failed: in the same round P244's offer asks every free user «¿Te aviso cada 3 días, y a diario la última semana?», which is Normal and free. So the Pro screen now sells a free rhythm as what Pro adds (\"they just offered me that for free, and now they want to charge for it?\"). P245 (UX-1908) changed «A tu manera»'s helper to an example no strength can give for exactly this reason.",
+        "Fix: change only the three values, to the words of the field's own example (`reminderPlanYourWayHint`, app_es.arb:1366, app_en.arb:3430, app_ca.arb:1070) inside its quotes, without «Por ejemplo:» and with no final period: ES `«una semana antes y el día antes a las 8»`, EN `“a week before, and the day before at 8”`, CA `«una setmana abans i el dia abans a les 8»`. Keep the key name and its place in each file. In app_en.arb, keep the @billingReasonReminderPlansExample description and add one sentence: “Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro.” Run flutter gen-l10n.",
+        "Preview: in App/test/ux_previews/reminders_previews.dart:259-260, the 'pro-screen' description quotes the old example; replace «cada 3 días y la última semana a diario» with «una semana antes y el día antes a las 8». Re-render from App/: flutter test --no-pub --dart-define=WRITE_UX_PREVIEWS=true test/ux_previews/ux_previews_test.dart --plain-name reminders/ and check reminders/sheet.pro-screen in es 1×, es 2× and ca 2×: the heading, the new example and the pinned «Ver suscripción» / «Mostra la subscripció» all in view.",
+        "Tests: P247's tests (App/test/reminder_plan_sheet_test.dart, about :1630-1725) read the example through AppLocalizations and check its quotes and no final period, so they should pass unchanged; this package doesn't list that file. The literal «cada 3 días y la última semana a diario» at App/test/reminder_plan_sheet_test.dart:317-322 is a different test's words typed into «A tu manera»; leave it alone.",
+        "Don't touch: the heading `billingReasonReminderPlans`, subscription_screen.dart, `reminderPlanYourWayHint`, the offer's copy, the other Pro screen lines, RevenueCat's paywall (D7, UX-2015: the owner's). Backend/docs/REMINDER_PLANS.md doesn't quote this line, so there's no contract note."
+      ],
+      "acceptance": [
+        "Free account, the Pro screen opened from «A tu manera · Pro», Spanish, 1×: the card's first line, a heading for TalkBack, reads «Con Pro, pide los avisos con tus palabras:»; the next reads «una semana antes y el día antes a las 8», in « » with no final period; then the existing «Dictados sin límite…» (billingIntro).",
+        "In Spanish, English and Catalan, billingReasonReminderPlansExample is exactly the text inside the outer quotes of reminderPlanYourWayHint, with its own quotes: ES «una semana antes y el día antes a las 8», EN `“a week before, and the day before at 8”`, CA «una setmana abans i el dia abans a les 8». It does not contain «cada 3 días» / “every 3 days” / «cada 3 dies».",
+        "At 2× on 360×800, Spanish and Catalan, the Pro screen opened from «A tu manera»: the heading, the example and the pinned «Ver suscripción» / «Mostra la subscripció» are all on screen, with no clipped text."
+      ],
+      "deviceChecks": [],
+      "dependsOn": []
+    }
+  ],
+  "decisions": [],
+  "skipped": []
+}

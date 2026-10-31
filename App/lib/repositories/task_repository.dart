@@ -1,5 +1,6 @@
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/services/attachment_store.dart';
 
 class TaskRepository {
   final TaskDatabase _database;
@@ -7,8 +8,16 @@ class TaskRepository {
   TaskRepository(this._database);
 
   String? syncError;
+  String get ownerKey => 'local';
+  AttachmentStore get attachments => AttachmentStore(_database, ownerKey);
   Future<void> sync() async {}
+
+  /// Done once a sync already under way has finished; never starts one.
+  Future<void> get settled async {}
   Future<int> importLocalTasks() async => 0;
+
+  /// Tasks and notes saved on this phone before signing in.
+  Future<int> localTaskCount() async => 0;
 
   Future<int> addTask(Task task) async {
     return await _database.insertTask(task);
@@ -27,6 +36,9 @@ class TaskRepository {
   Future<int> deleteTask(int id) async {
     return await _database.deleteTask(id);
   }
+
+  /// Brings back a task deleted with [deleteTask], as it was.
+  Future<int> restoreTask(Task task) => _database.restoreTask(task);
 
   // Method to get tasks overdue by 4 months
   Future<List<Task>> getTasksOverdueByFourMonths() async {

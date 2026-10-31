@@ -1,0 +1,48 @@
+{
+ "runId": "2026-10-21-changes",
+ "mode": "changes",
+ "round": 2,
+ "packages": [
+  {
+   "id": "P229",
+   "title": "A set's ✕ says it in the plural while it asks its project, and a set deletion after another card is brought into view at its heading",
+   "area": "A",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-1718",
+    "UX-1717"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Context: run 2026-10-21-changes, round 2. Round 1 (P224-P228) passed its round check, no test failed, and review A found every finding fixed. This package fixes the two regressions review A found in round 1 (.claude/ux-review/runs/2026-10-21-changes/verify-r1-A.md, R1A-1 and R1A-2). Both are in App/lib/screens/voice_task_screen.dart, which holds uncommitted work from P224-P228: build on it, and search for the code, as line numbers drift. No new copy, no ARB change, no change to any card's layout or to which tasks a set holds (D1, D2 and D3 stay open and are untouched).",
+    "UX-1717 (S1), regression R1A-1 from P225 meeting P228. ✕ on a set that still asks «¿Qué proyecto?» says it in the singular. `_commandCard` (voice_task_screen.dart ~4073) has `void remove() => _removeCommand(command, count: view.bulk?.count ?? 1);`. A set waiting for its project chip has `view.bulk == null`, because `resolveCommand` (App/lib/widgets/capture_command_cards.dart ~170) returns `CommandView(command, projectChoices: choices)` before anything is counted. So ✕ on «Tareas de «mates»» shows «No se cambiará» / «No se eliminará» / «No se completará» about a set of tasks.",
+    "Fix UX-1717: when the command is a set (`command.bulk`, App/lib/models/capture_command.dart ~414) and nothing has been counted yet, pass a count that selects the plural: `count: view.bulk?.count ?? (command.bulk ? 2 : 1)`, with a one-line comment saying a set still asking its project isn't counted yet, so the plural is used. It then reads ES «No se cambiarán» / «No se eliminarán» / «No se completarán»; CA «No es canviaran» / «No se suprimiran» / «No es completaran»; EN “Won’t be changed” / “Won’t be deleted” / “Won’t be completed” (unchanged). No new copy. Keep `_removeCommand`'s doc comment true: [count] is a set's ticked tasks, a plural count for a set not yet counted, or 1. Don't touch the button's count (`actionable.fold(... view.bulk?.count ?? 1)`, ~4179): an asking set is blocking, so the button is disabled and doesn't count it.",
+    "UX-1718 (S2), regression R1A-2 from P224 (UX-1704). P224 added `&& view.bulk == null` to `_firstOpen` (voice_task_screen.dart ~2676-2700), so no set deletion is ever revealed, not only one that is the result's only card. In a mixed result, for example «Apunta comprar pan y borra todas las completadas de la semana pasada», the new task's card comes first, and at 1.3× to 2× the red «Eliminar N tareas» card starts below the fold. Nothing scrolls to it, while the button reads «Añadir y eliminar», so the deletion can be applied unseen. This is inferred from code; no preview covers this mix.",
+    "Fix UX-1718: reveal a set deletion again, but at its heading. (1) In `_firstOpen`, drop `&& view.bulk == null` from the last loop, so the first deletion the button applies, set or one task, is picked again when nothing asks. Update its doc comment: with nothing to answer, the first task or set the button deletes; a set's card is taller than the view, so it is revealed at its heading. (2) In `_reveal` (~2745-2757), call `Scrollable.ensureVisible` with `alignment: 0` (the card's top at the top of the view) when the picked card is a set's (`view.bulk != null`), and keep `alignment: 1` for everything else: a one-task deletion card, and a question box or card that still asks. How `_reveal` learns that the card is a set's is the implementer's choice. For example, `_firstOpen` can return the picked id, or a record of the context and whether it is a set, with `_announce` (~2811), which only reads the question box, adapted to match. Keep the duration and curve, and `Duration.zero` when animations are disabled. Update `_reveal`'s doc comment to match.",
+    "Why this keeps UX-1704 fixed: the result sheet's scroll view (`SingleChildScrollView` ~4329) has nothing above the first card («N cosas para añadir» and an error banner sit outside it), so a lone set deletion is already at offset 0, and `alignment: 0` leaves it there: cards.bulk-delete.es.light.2x still opens at «Eliminar 3 tareas» and its ✕. In a mixed result, the new task's card scrolls up out of view. That is the intended trade-off: the red heading, its ✕ and its first rows are what must be seen before «Añadir y eliminar». The task card is one scroll up, and the button names both actions. After a question is answered, `_revealAfter` brings the set deletion's heading to the top the same way. That includes the project chip on a deletion set that asked «¿Qué proyecto?».",
+    "Don't touch: the order in which `_firstOpen` picks cards (project questions, then tasks that ask, then other blocking cards, then deletions), `_announce`'s wording, the set card itself (App/lib/widgets/capture_command_cards.dart), the ARB files, and the move and complete sets, which are still not revealed: they open where the scroll is. Out of scope, as in round 1: Backend/, App/pubspec.yaml, App/scripts/, App/config/, .claude/ux-web/. Don't run `dart format` over whole files: round 1's implementers had to undo unrelated reformatting it caused. Format only your hunks, or check the diff.",
+    "Tests: no existing test should break. If one asserted that a set deletion is not scrolled (added by P224 for UX-1704), it should still pass for the lone set, because that set stays at offset 0. Harness: App/test/bulk_voice_commands_test.dart (the set card at 2×; the «¿Qué proyecto?» set at ~2540-2660, with `_inResult`). Previews: re-render commands/ and confirm cards.bulk-delete.es.light.2x and cards.bulk-ambiguous-project are unchanged. No new preview state is needed, but you may add cards.bulk-delete-mixed (es 2×: one new task «Comprar pan» and a 3-task deletion set), with a true description, if it is cheap."
+   ],
+   "acceptance": [
+    "Widget test (UX-1717): Spanish, 1×, the bulk-ambiguous-project state («Pasa todo lo de mates a mañana», Matemáticas and Matemáticas II both candidates, no chip tapped). Tapping the set card's ✕ shows the snackbar «No se cambiarán» with «Deshacer».",
+    "Widget test (UX-1717): Spanish, 1×, a deletion set and a completion set that each still ask «¿Qué proyecto?». ✕ shows «No se eliminarán» and «No se completarán» respectively. In Catalan, the deletion set shows «No se suprimiran».",
+    "Widget test (UX-1717, unchanged behaviour): Spanish, 1×, ✕ on a one-task deletion card still shows «No se eliminará», and ✕ on a counted 4-task deletion set shows «No se eliminarán».",
+    "Widget test (UX-1718): Spanish, 2×, 360 dp. A spoken result with one new task («Comprar pan», ready, nothing to answer) and a 3-task deletion set («Borra todas las completadas de la semana pasada»), opened and settled. The set's `command-headline` («Eliminar 3 tareas») and its ✕ (tooltip «No eliminar ninguna») lie inside the visible part of the sheet's scroll view, and the button reads «Añadir y eliminar».",
+    "Widget test (UX-1718, UX-1704 still fixed): Spanish, 2×, 360 dp, the cards.bulk-delete result (a lone 3-task deletion set) opened and settled. The sheet's scroll offset is 0, and «Eliminar 3 tareas» and its ✕ are visible.",
+    "Widget test (UX-1718, one task unchanged): Spanish, 2×, 360 dp, a result with one new task and a one-task deletion («Borra el dentista»). After settling, the deletion card's bottom edge lies inside the visible scroll area, just above the buttons, as before round 1.",
+    "Render (reviewer): cards.bulk-delete.es.light.2x and cards.bulk-ambiguous-project (es 1× and 2×) are unchanged from round 1."
+   ],
+   "deviceChecks": [
+    "Emulator lane or phone, Android's largest font: say «Apunta comprar pan y borra todas las completadas de la semana pasada». The result opens with «Eliminar N tareas» and its ✕ at the top of the sheet, and «Añadir y eliminar» below."
+   ],
+   "dependsOn": []
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

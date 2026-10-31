@@ -2,7 +2,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.password_validation import validate_password
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
-from .models import User, Task
+from .models import User, Task, TaskList, TaskGroup, ProjectPreference, TaskReminder
+from .billing import complimentary_pro
+from .email_verification import unconfirmed
+from .free_tier import free_voice
+from .reminder_plans import MAX_SAID, InvalidPlan, check_plan
+
+EMAIL_EXISTS = "An account with this email already exists."
 
 
 def validate_timezone(value):
@@ -14,9 +20,30 @@ def validate_timezone(value):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    google_linked = serializers.SerializerMethodField()
+    complimentary_pro = serializers.SerializerMethodField()
+    # The limits without Pro. Two cheap queries and never a billing call; the app
+    # knows whether the account has Pro.
+    free_voice = serializers.SerializerMethodField()
+    storage = serializers.SerializerMethodField()
+
+    def get_complimentary_pro(self, user):
+        return complimentary_pro(user)
+
+    def get_google_linked(self, user):
+        return hasattr(user, "google_identity")
+
+    def get_free_voice(self, user):
+        return free_voice(user)
+
+    def get_storage(self, user):
+        from .attachment_views import storage_usage
+        return storage_usage(user)
+
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "timezone"]
+        fields = ["id", "email", "first_name", "timezone", "billing_id", "google_linked", "complimentary_pro", "free_voice", "storage"]
+        read_only_fields = ["billing_id"]
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -26,11 +53,17 @@ class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["email", "password", "first_name", "timezone"]
+        # validate_email checks uniqueness itself, ignoring case. The model's exact-case check
+        # would also refuse a sign-up that replaces an unconfirmed one.
+        extra_kwargs = {"email": {"validators": []}}
 
     def validate_email(self, value):
         value = value.strip().casefold()
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
+        existing = User.objects.filter(email__iexact=value).first()
+        # With email verification, nobody could sign in to an unconfirmed sign-up, so a new
+        # sign-up replaces it (RegisterView).
+        if existing is not None and not (self.context.get("replace_unconfirmed") and unconfirmed(existing)):
+            raise serializers.ValidationError(EMAIL_EXISTS)
         return value
 
     def validate(self, attrs):
@@ -54,23 +87,261 @@ class ZonedDateTimeField(serializers.DateTimeField):
         return super().to_internal_value(value)
 
 
-class TaskSerializer(serializers.ModelSerializer):
+class TaskListSerializer(serializers.ModelSerializer):
+    version = serializers.IntegerField(min_value=0, default=0)
+    role = serializers.SerializerMethodField()
+    group_id = serializers.PrimaryKeyRelatedField(source="group", queryset=TaskGroup.objects.none(), allow_null=True, required=False)
+    group_name = serializers.CharField(source="group.name", read_only=True, default=None)
+    group_archived = serializers.BooleanField(source="group.archived", read_only=True, default=False)
+    people = serializers.SerializerMethodField()
+    pinned = serializers.SerializerMethodField()
+    notifications = serializers.SerializerMethodField()
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            from .list_access import visible_groups
+            fields["group_id"].queryset = visible_groups(request.user)
+        return fields
+
+    def get_people(self, value):
+        from .list_access import project_people
+        if value.group_id:
+            cache = self.context.setdefault("group_people", {})
+            if value.group_id not in cache:
+                cache[value.group_id] = project_people(value)
+            return cache[value.group_id]
+        return project_people(value)
+
+    def _preference(self, value):
+        key = "project_preferences"
+        if key not in self.context:
+            self.context[key] = {row.task_list_id: row for row in ProjectPreference.objects.filter(user=self.context["request"].user)}
+        return self.context[key].get(value.pk)
+
+    def get_pinned(self, value):
+        return getattr(self._preference(value), "pinned", False)
+
+    def get_notifications(self, value):
+        return getattr(self._preference(value), "notifications", "assigned")
+
+    def get_role(self, value):
+        from .list_access import list_role
+        return list_role(value, self.context["request"].user)
+
+    class Meta:
+        model = TaskList
+        fields = ["id", "name", "color", "archived", "version", "updated_at", "shared", "role", "group_id", "group_name", "group_archived", "owner_id", "people", "pinned", "notifications"]
+        read_only_fields = ["id", "updated_at", "shared", "role", "owner_id"]
+
+
+class OccurrenceExceptionSerializer(serializers.Serializer):
+    original_date = serializers.DateField()
+    skipped = serializers.BooleanField(default=False)
     due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
     scheduled_date = serializers.DateField(allow_null=True, required=False, default=None)
+
+    def validate(self, attrs):
+        due, day = attrs["due_date"], attrs["scheduled_date"]
+        if attrs["skipped"]:
+            if due is not None or day is not None:
+                raise serializers.ValidationError("A skipped occurrence cannot also be rescheduled.")
+        elif (due is None) == (day is None):
+            raise serializers.ValidationError("Choose a date-only or timed schedule for this occurrence.")
+        return {"original_date": attrs["original_date"].isoformat(), "skipped": attrs["skipped"],
+                "due_date": due.isoformat().replace("+00:00", "Z") if due else None,
+                "scheduled_date": day.isoformat() if day else None}
+
+
+class ChecklistItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField(max_length=160)
+    completed = serializers.BooleanField(default=False)
+    completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, default=list)
+
+    def validate(self, attrs):
+        attrs["id"] = str(attrs["id"])
+        attrs["completed_dates"] = sorted({value.isoformat() for value in attrs["completed_dates"]})
+        return attrs
+
+
+# The task API's reminder fields, each the asker's own, and the TaskReminder field each is kept in.
+PERSONAL_REMINDERS = {"reminder_minutes": "minutes", "reminder_time": "time", "reminder_anchor": "anchor",
+                      "reminder_plan": "plan"}
+
+
+class TaskSerializer(serializers.ModelSerializer):
+    kind = serializers.ChoiceField(choices=["task", "note"], required=False)
+    due_date = ZonedDateTimeField(allow_null=True, required=False, default=None)
+    scheduled_date = serializers.DateField(allow_null=True, required=False, default=None)
+    deadline_at = ZonedDateTimeField(allow_null=True, required=False)
+    deadline_date = serializers.DateField(allow_null=True, required=False)
+    duration_minutes = serializers.IntegerField(min_value=1, max_value=1440, allow_null=True, required=False)
+    # The four reminder fields are the asker's own (docs/REMINDER_PLANS.md, «Every reminder is
+    # personal»), kept apart from the task (TaskReminder) and saved by the view. Without a default,
+    # an app that doesn't send one keeps it.
+    reminder_anchor = serializers.ChoiceField(choices=["planned", "deadline"], required=False, write_only=True)
     repeat_until = serializers.DateField(allow_null=True, required=False, default=None)
     completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, required=False, default=list)
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
+    reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, write_only=True)
+    reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, write_only=True)
+    reminder_plan = serializers.JSONField(allow_null=True, required=False, write_only=True)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
     notes = serializers.CharField(max_length=8000, allow_blank=True, default="")
+    checklist = ChecklistItemSerializer(many=True, required=False)
+    list_id = serializers.PrimaryKeyRelatedField(source="task_list", queryset=TaskList.objects.none(),
+                                                allow_null=True, required=False)
+    labels = serializers.ListField(child=serializers.CharField(max_length=32), max_length=10, required=False)
+    repeat_interval = serializers.IntegerField(min_value=1, max_value=99, required=False)
+    repeat_weekdays = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=7), max_length=7, required=False)
+    exceptions = OccurrenceExceptionSerializer(many=True, required=False)
+    assignment = serializers.ChoiceField(choices=["personal", "member", "group", "unassigned"], required=False)
+    assignee_id = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+    assignee_name = serializers.SerializerMethodField()
+    # Who created the task. Null once that account is deleted: the task's owner then
+    # becomes the project's owner, who isn't its creator.
+    created_by = serializers.IntegerField(source="created_by_id", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+
+    def get_assignee_name(self, task):
+        from .list_access import display_name
+        return display_name(task.assignee) if task.assignee_id else None
+
+    def get_created_by_name(self, task):
+        from .list_access import display_name
+        return display_name(task.created_by) if task.created_by_id else None
+
+    def validate_assignment_context(self, attrs, kind):
+        from .list_access import project_people
+        project = attrs.get("task_list", getattr(self.instance, "task_list", None))
+        shared = bool(project and (project.shared or project.group_id))
+        assignment = attrs.get("assignment", getattr(self.instance, "assignment", "group" if shared else "personal"))
+        assignee_id = attrs.get("assignee_id", getattr(self.instance, "assignee_id", None))
+        if kind == "note":
+            if assignment not in ("personal", "group") or assignee_id is not None:
+                raise serializers.ValidationError({"assignment": "Notes do not have a responsible person."})
+            attrs.update(assignment="personal", assignee_id=None)
+            return
+        if not shared:
+            if assignment != "personal" or assignee_id is not None:
+                raise serializers.ValidationError({"assignment": "Choose a shared project before assigning a task."})
+        elif assignment == "personal":
+            # Older clients and personal-to-shared moves have no assignment field.
+            assignment = "group"
+        if assignment == "member":
+            eligible = {person["user_id"] for person in project_people(project) if person["role"] != "viewer"}
+            if assignee_id not in eligible:
+                raise serializers.ValidationError({"assignee_id": "Choose a current project member who can edit tasks."})
+        elif assignee_id is not None:
+            raise serializers.ValidationError({"assignee_id": "Only a member assignment can have a responsible person."})
+        attrs.update(assignment=assignment, assignee_id=assignee_id)
+
+    def validate_repeat_weekdays(self, value):
+        return sorted(set(value))
+
+    def validate_reminder_plan(self, value):
+        # Only the shape: the phone schedules the plan.
+        try:
+            return check_plan(value)
+        except InvalidPlan as error:
+            raise serializers.ValidationError(str(error))
+
+    def to_representation(self, task):
+        data = super().to_representation(task)
+        row = self.asker_reminders(task)
+        values = {key: getattr(row, key) for key in TaskReminder.DEFAULTS} if row else TaskReminder.DEFAULTS
+        data.update({field: values[key] for field, key in PERSONAL_REMINDERS.items()})
+        return data
+
+    def asker_reminders(self, task):
+        """The reminders of the account asking, never anyone else's (docs/REMINDER_PLANS.md), or
+        None for the defaults. The task views prefetch them as asker_reminders; a task fetched
+        another way reads them here."""
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return None
+        prefetched = getattr(task, "asker_reminders", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+        return TaskReminder.objects.filter(task_id=task.pk, user=request.user).first()
+
+    def leaves_unchanged(self, task):
+        """True when saving would leave task as it is. The view asks it of a PUT that sends the
+        asker's reminders: when nothing else changed, there's no new version and nothing to tell."""
+        for key, value in self.validated_data.items():
+            if key == "version" or key in PERSONAL_REMINDERS:
+                continue
+            current = task.task_list_id if key == "task_list" else getattr(task, key)
+            if (value.pk if key == "task_list" and value is not None else value) != current:
+                return False
+        return True
+
+    def validate_exceptions(self, value):
+        if len(value) > 500:
+            raise serializers.ValidationError("Use no more than 500 occurrence changes per series.")
+        if len({item["original_date"] for item in value}) != len(value):
+            raise serializers.ValidationError("Change each original occurrence at most once.")
+        return sorted(value, key=lambda item: item["original_date"])
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            from .list_access import visible_lists
+            fields["list_id"].queryset = visible_lists(request.user)
+        return fields
+
+    def validate_labels(self, value):
+        return list(dict.fromkeys(item.lower() for item in value))
+
+    def validate_checklist(self, value):
+        if len(value) > 50:
+            raise serializers.ValidationError("Use no more than 50 checklist items.")
+        if len({item["id"] for item in value}) != len(value):
+            raise serializers.ValidationError("Each checklist item must have a unique ID.")
+        return value
 
     class Meta:
         model = Task
-        fields = ["id", "title", "due_date", "scheduled_date", "recurrence", "repeat_until", "completed_dates", "priority", "notes", "is_completed", "is_deleted", "version", "created_at", "updated_at"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "reminder_plan", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
         due, day = attrs.get("due_date"), attrs.get("scheduled_date")
+        kind = attrs.get("kind", getattr(self.instance, "kind", "task"))
+        self.validate_assignment_context(attrs, kind)
+        if self.instance and kind != self.instance.kind:
+            raise serializers.ValidationError({"kind": "Keep the original type. Create a separate task or note instead."})
+        if kind == "note":
+            effective = lambda key, default=None: attrs.get(key, getattr(self.instance, key, default))
+            if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "repeat_until"))
+                    or attrs.get("reminder_time") is not None or attrs.get("reminder_plan") is not None
+                    or attrs.get("reminder_anchor", "planned") != "planned" or attrs.get("reminder_minutes") not in (None, -1)
+                    or effective("priority", 1) != 1 or effective("is_completed", False)
+                    or effective("recurrence", "none") != "none" or effective("repeat_interval", 1) != 1
+                    or any(effective(key, []) for key in ("completed_dates", "repeat_weekdays", "exceptions"))
+                    or any(item.get("completed_dates") for item in effective("checklist", []))):
+                raise serializers.ValidationError({"kind": "Notes hold information and checklists, without task schedules, priority, reminders or completion."})
+        deadline_at = attrs.get("deadline_at", getattr(self.instance, "deadline_at", None))
+        deadline_date = attrs.get("deadline_date", getattr(self.instance, "deadline_date", None))
+        if deadline_at is not None and deadline_date is not None:
+            raise serializers.ValidationError("Use a date-only or a timed deadline, not both.")
+        # Only an anchor sent is checked: the view moves every kept one back to the planned start
+        # when the task loses its deadline, whoever removes it.
+        if attrs.get("reminder_anchor") == "deadline" and deadline_at is None and deadline_date is None:
+            raise serializers.ValidationError({"reminder_anchor": "Set a deadline or use the planned start for reminders."})
         repeat = attrs.get("recurrence", getattr(self.instance, "recurrence", "none"))
+        weekdays = attrs.get("repeat_weekdays", getattr(self.instance, "repeat_weekdays", []))
+        if repeat == "none":
+            if attrs.get("repeat_interval", 1) != 1 or attrs.get("repeat_weekdays") or attrs.get("exceptions"):
+                raise serializers.ValidationError("Recurrence rules require a repeating task.")
+            attrs.update(repeat_interval=1, repeat_weekdays=[], exceptions=[])
+        elif repeat != "weekly" and weekdays:
+            if "repeat_weekdays" in attrs:
+                raise serializers.ValidationError({"repeat_weekdays": "Selected weekdays require weekly repetition."})
+            attrs["repeat_weekdays"] = []
         if due is not None and day is not None:
             raise serializers.ValidationError("Use a date-only schedule or a timed schedule, not both.")
         if repeat != "none" and due is None and day is None:
@@ -86,12 +357,34 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class DraftRequestSerializer(serializers.Serializer):
+    project_id = serializers.UUIDField(allow_null=True, required=False)
+    capture_type = serializers.ChoiceField(choices=["task", "note"], required=False, default="task")
     text = serializers.CharField(min_length=3, max_length=4000, required=False)
     timezone = serializers.CharField(max_length=64, validators=[validate_timezone])
     reference_time = ZonedDateTimeField(required=False)
     audio = serializers.FileField(required=False)
+    # The app's capture UUID: a retry with the same words is free, and it can be cancelled.
+    capture_id = serializers.UUIDField(required=False, allow_null=True)
+    # The speech language chosen in the app (BCP-47, e.g. "ca-ES"), a hint for transcription.
+    language = serializers.RegexField(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$", max_length=35,
+                                      required=False, allow_null=True)
+    # An app with voice commands sends true, and gets "commands" next to "tasks"
+    # (docs/VOICE_COMMANDS.md). Without it the answer is the one older apps know.
+    commands = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
         if bool(attrs.get("text")) == bool(attrs.get("audio")):
             raise serializers.ValidationError("Supply either text or one WAV recording.")
         return attrs
+
+
+class ReminderPlanRequestSerializer(serializers.Serializer):
+    """«A tu manera» (docs/REMINDER_PLANS.md): the words, read relative to the task's anchor."""
+    # The words become the plan's said, which holds at most 200 characters.
+    text = serializers.CharField(max_length=MAX_SAID)
+    timezone = serializers.CharField(max_length=64, validators=[validate_timezone])
+    reference_time = ZonedDateTimeField(required=False)
+    # The task's deadline when it has one, otherwise its own day: the plan counts back from it.
+    anchor_date = serializers.DateField()
+    language = serializers.RegexField(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$", max_length=35,
+                                      required=False, allow_null=True)

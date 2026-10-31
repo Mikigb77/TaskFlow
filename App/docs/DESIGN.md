@@ -27,7 +27,7 @@ From `App/`, run `flutter test` and `flutter analyze`.
 Run this on a disposable development emulator: Flutter drive can replace or uninstall the app as part of its test lifecycle. On a fresh test emulator:
 
 ```sh
-flutter drive -d emulator-5554 --driver=test_driver/appearance_test.dart --target=integration_test/appearance_test.dart
+flutter drive --keep-app-running -d emulator-5554 --driver=test_driver/appearance_test.dart --target=integration_test/appearance_test.dart
 ```
 
 This builds a test entry point. Reinstall the normal `lib/main.dart` app after testing. For the local backend, build debug APKs with `flutter build apk --debug --split-per-abi`; release builds require HTTPS.

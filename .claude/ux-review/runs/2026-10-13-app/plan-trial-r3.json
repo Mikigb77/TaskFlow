@@ -1,0 +1,64 @@
+{
+ "runId": "2026-10-13-app",
+ "mode": "app",
+ "batch": "trial",
+ "round": 3,
+ "created": "2026-10-13",
+ "basedOn": "Round 2 of the trial batch ran P45 and P46; the reviewer's notes are verify-trial-r2-C.md and verify-trial-r2-D.md in this folder. The top-level conventions in plan.json apply to every package here.",
+ "notes": [
+  "Round 2: the reviewer found UX-425, UX-426, UX-427 and UX-428 fixed (UX-426 and UX-427 still need their phone checks); the round check passed; no test failed. P45 caused one severity-1 regression, R2D-1, now UX-432. No finding failed in round 2, so nothing is escalated.",
+  "By default the loop allows two re-plan rounds, so this is likely the trial's last round. P47 is kept to the regression alone.",
+  "Seen in passing, older than round 2 and so not regressions: UX-433 (the tab bar's top hairline never shows; verify-trial-r2-D.md) and UX-434 (search treats ' and ’ as different; verify-trial-r2-C.md). They aren't in this round. They were added to P23 and P16 in plan.json: P23 already edits main_shell.dart, and P16 builds on the search helper. The reviewer suggested pairing UX-433 with R2D-1, but this round re-plans only what failed.",
+  "UX-428's last old Notas icon, the capture page's `Revisar nota` button (`Icons.notes_rounded`, voice_task_screen.dart:953), wasn't named by any package. P35 in plan.json now covers it in its brief and acceptance.",
+  "No decision changed. U13 (two tabs) still holds UX-421, U10 and UX-331. P47, like P45, is a stopgap that U13 removes."
+ ],
+ "packages": [
+  {
+   "id": "P47",
+   "title": "Tab tooltips follow the phone's text size again",
+   "area": "D",
+   "size": "S",
+   "severity": 1,
+   "findings": [
+    "UX-432"
+   ],
+   "aliases": {
+    "UX-432": [
+     "R2D-1"
+    ]
+   },
+   "files": [
+    "App/lib/screens/main_shell.dart",
+    "App/test/main_shell_test.dart"
+   ],
+   "brief": [
+    "Round 3 of the trial batch. In round 2, P45 fixed UX-427 (Spanish `Calendario` breaking mid-word on a 320 dp phone) in two parts: `letterSpacing: 0` in the tab label style (App/lib/theme/app_theme.dart:122-130) and, below 360 dp, `MediaQuery.withClampedTextScaling(maxScaleFactor: 1.2)` around the whole NavigationBar (App/lib/screens/main_shell.dart:75-83). The reviewer found UX-427 and UX-428 fixed, and one severity-1 regression from the second part: R2D-1 in .claude/ux-review/runs/2026-10-13-app/verify-trial-r2-D.md, now UX-432. Keep what P45 achieved: below 360 dp the labels are drawn at 12 × min(text scale, 1.2) px (14.4 px at 1.3× and 2×) and stay on one line; from 360 dp up nothing changes.",
+    "UX-432 (R2D-1): the clamp also caps the tabs' long-press tooltips. Each destination wraps itself in a Tooltip (Flutter 3.44.5, material/navigation_bar.dart:598-599 and :1047-1054), and the tooltip is drawn through an OverlayPortal, which inherits the MediaQuery where it sits (widgets/overlay.dart:1790-1797). Flutter caps tab labels at 1.3× on purpose and names that tooltip as where the phone's text size applies (navigation_bar.dart:46-48). Before P45, at 2× text the tooltip was drawn at 28 px (14 sp × 2); below 360 dp it's now 16.8 px. A low-vision user on a narrow phone long-presses `Calendario` to read it bigger and gets it no bigger. TalkBack is unaffected: the tooltip is excluded from semantics.",
+    "Fix: shrink only the label, not the bar's text scaling.",
+    "- Remove the `MediaQuery.withClampedTextScaling` wrapper (main_shell.dart:78-83), so the DecoratedBox's child is the NavigationBar at every width. Don't wrap the bar, or any destination, in another MediaQuery: whatever wraps a destination also reaches its tooltip.",
+    "- Below 360 dp (keep the `MediaQuery.sizeOf(context).width < 360` test), give the labels a font size that makes Flutter's own 1.3× label cap land on 1.2×. With s = `MediaQuery.textScalerOf(context).scale(12) / 12` (12 sp is the theme's label size, app_theme.dart:126), the label's fontSize is 12 × min(s, 1.2) / min(s, 1.3). Flutter then draws it at 12 × min(s, 1.2) px: 14.4 px at 1.3× and 2×, 12 px at 1×, exactly as now.",
+    "- Pass it through NavigationBar's own `labelTextStyle` parameter, which wins over the theme (navigation_bar.dart:484-494). Build it from the theme's resolver, so each state keeps its weight, colour, family and letter spacing: `WidgetStateProperty.resolveWith((states) => themed?.resolve(states)?.copyWith(fontSize: …))`, with `themed = NavigationBarTheme.of(context).labelTextStyle`. At 360 dp and wider, pass null, so the theme applies exactly as today. Wrapping the bar in a `NavigationBarTheme`, as the reviewer wrote, is equivalent; use one of the two, not both.",
+    "- Name 1.3 as a constant whose comment says it mirrors Flutter's private `_kMaxLabelTextScaleFactor` (navigation_bar.dart:31). Reword the comment at main_shell.dart:75-77: below 360 dp only the label stops at 1.2×, and the long-press tooltips keep the phone's text size. It's still a stopgap; U13's two tabs remove it.",
+    "- On Android 14 and later, text scaling isn't linear, so on a phone the label may land a fraction of a pixel off 14.4 px. That's fine; the device check covers it.",
+    "Existing tests: App/test/main_shell_test.dart:172 asserts the label style's `fontSize == 12` in every case. Below 360 dp the style's size is now smaller by design (about 11.08 at 1.3× and above), so keep that assertion only for the 360 and 390 dp cases; the drawn-size assertion (:173-177) stays for all three. The other UX-427 tests (:113-153) must pass unchanged, and so must App/test/appearance_test.dart: the tab tests from :416 run at 390×844, and the large-text screen tests from :501 include 320×568 at 1.6×. Don't write the tooltip tests: ux-tester writes them.",
+    "Don't touch: the label style in app_theme.dart, the tab icons, `labelBehavior`, the bar's 72 dp height, the 360 dp threshold and the 1.2× stop. Leave the DecoratedBox and its border as they are: the hidden hairline is UX-433, in P23. No copy changes, so no ARB edits and no gen-l10n."
+   ],
+   "acceptance": [
+    "Widget test (load Manrope and MaterialIcons, as App/test/main_shell_test.dart:22-29 does): the app shell in Spanish on a 320×640 surface with text at 2.0× and Calendario selected: a long press on the `Calendario` tab shows its tooltip, and the tooltip's text is drawn at 28 px (14 sp × 2.0), not 16.8 px.",
+    "Widget test: the same long press on a 390×844 surface with text at 2.0× also shows the tooltip drawn at 28 px, as before P45.",
+    "Widget test: in Spanish at 320×640, the tab labels are drawn at 14.4 px with text at 2.0× and at 12 px with text at 1.0×; at 360×800 and 390×844 with text at 1.3× they are drawn at 15.6 px, and there the style's font size is still 12.",
+    "Widget test (the existing UX-427 tests, kept): at 320×640, in Spanish at 1.3× and 2.0× and in English at 1.3×, first with Calendario and then with Tareas selected, every tab label lays out on one line and no icon pill rises above the bar; the labels keep `letterSpacing: 0` and Manrope.",
+    "Code: App/lib/screens/main_shell.dart has no `withClampedTextScaling`; below 360 dp, only the labels' font size changes.",
+    "Render: in the calendar-feedback previews (390 dp, light and dark), the tab bar looks as it did after round 2."
+   ],
+   "deviceChecks": [
+    "Spanish, Android font size at its largest, on a phone narrower than 360 dp (or a 360 dp phone with Display size raised): long-press `Calendario` → its tooltip shows in large text, clearly bigger than the tab label; every tab label still sits on one line, with the icons inside the bar (P45's UX-427 check, still pending). Inferred from the Flutter SDK; the widget tests cover the sizes."
+   ],
+   "dependsOn": [
+    "P45"
+   ]
+  }
+ ],
+ "decisions": [],
+ "skipped": []
+}

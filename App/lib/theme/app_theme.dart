@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Shared palette, type and controls for every screen and native picker.
 abstract final class AppTheme {
@@ -54,6 +55,12 @@ abstract final class AppTheme {
       appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
           foregroundColor: scheme.onSurface,
+          // A transparent app bar cannot infer the surface behind it.
+          systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarBrightness: brightness,
+              statusBarIconBrightness:
+                  dark ? Brightness.light : Brightness.dark),
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: false,
@@ -80,7 +87,7 @@ abstract final class AppTheme {
             borderSide: BorderSide(color: scheme.outlineVariant)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: scheme.outlineVariant)),
+            borderSide: BorderSide(color: scheme.outline)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide(color: scheme.primary, width: 2)),
@@ -103,7 +110,8 @@ abstract final class AppTheme {
           style: OutlinedButton.styleFrom(
               minimumSize: const Size(48, 52),
               shape: shape,
-              side: BorderSide(color: scheme.outlineVariant))),
+              // `outline`, as chips and fields: a border that shows (3:1).
+              side: BorderSide(color: scheme.outline))),
       textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(minimumSize: const Size(48, 48))),
       iconButtonTheme: IconButtonThemeData(
@@ -112,11 +120,15 @@ abstract final class AppTheme {
           height: 72,
           backgroundColor: scheme.surface,
           indicatorColor: scheme.primaryContainer,
-          labelTextStyle: WidgetStatePropertyAll(TextStyle(
-              fontFamily: 'Manrope',
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface))),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+                fontFamily: 'Manrope',
+                fontSize: 12,
+                letterSpacing: 0,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                color: selected ? scheme.onSurface : scheme.onSurfaceVariant);
+          })),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
@@ -124,15 +136,22 @@ abstract final class AppTheme {
           shape: shape),
       snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          backgroundColor: scheme.surfaceContainerHighest,
+          contentTextStyle: base.textTheme.bodyMedium!
+              .copyWith(color: scheme.onSurface),
+          actionTextColor: scheme.primary,
+          closeIconColor: scheme.onSurfaceVariant,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: scheme.outlineVariant))),
       bottomSheetTheme: BottomSheetThemeData(
           backgroundColor: scheme.surface,
           showDragHandle: true,
           shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)))),
       chipTheme: ChipThemeData(
-          side: BorderSide(color: scheme.outlineVariant),
+          side: BorderSide(color: scheme.outline),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
     );

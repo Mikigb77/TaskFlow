@@ -1,0 +1,18 @@
+<resources>
+    <!-- Drecera del llançador, etiqueta llarga: uns 25 caràcters com a màxim. -->
+    <string name="capture_voice">Dicta una tasca</string>
+    <!-- Drecera del llançador, etiqueta curta: una paraula, uns 10 caràcters com a màxim. -->
+    <string name="capture_voice_short">Dicta</string>
+    <!-- Drecera del llançador, etiqueta llarga: uns 25 caràcters com a màxim. -->
+    <string name="capture_text">Escriu una tasca</string>
+    <!-- Drecera del llançador, etiqueta curta: una paraula, uns 10 caràcters com a màxim. -->
+    <string name="capture_text_short">Escriu</string>
+    <!-- Giny de la pantalla d’inici: el text sota el micròfon, el seu nom per a TalkBack i el seu nom al selector de ginys. Dues línies curtes en una cel·la de 80 dp: uns 20 caràcters com a màxim. -->
+    <string name="capture_widget_label">Dicta una tasca</string>
+    <string name="capture_widget_description">Toca per dictar una tasca.</string>
+    <!-- Avisos en compartir: Android en mostra dues línies. 50 caràcters com a màxim. -->
+    <string name="share_empty">No hi ha cap text per afegir.</string>
+    <string name="share_too_long">Text massa llarg. Comparteix-ne un de més curt.</string>
+    <string name="share_queue_full">Obre TaskFlow i acaba el que ja has compartit.</string>
+    <string name="share_not_saved">No s’ha pogut desar. Torna-ho a compartir.</string>
+</resources>

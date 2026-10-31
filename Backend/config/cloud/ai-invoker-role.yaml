@@ -1,0 +1,6 @@
+title: TaskFlow AI Invoker
+description: Invoke managed AI models and use project quota without deploying infrastructure.
+stage: GA
+includedPermissions:
+  - aiplatform.endpoints.predict
+  - serviceusage.services.use

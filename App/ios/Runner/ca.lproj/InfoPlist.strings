@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "TaskFlow només escolta mentre fas servir el micròfon, perquè puguis dictar una tasca en lloc d’escriure-la.";
+"NSLocalNetworkUsageDescription" = "Connecta amb el servidor local de TaskFlow.";

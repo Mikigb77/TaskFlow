@@ -4,12 +4,14 @@ services:
     build: .
     env_file: .env
     environment:
+      RUN_LOCAL_BOOTSTRAP: "1"
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://cache:6379/0
       EMAIL_HOST: mailpit
       EMAIL_PORT: 1025
     ports:
       - "${API_PORT:-8088}:8000"
+    volumes: [taskflow_media:/app/private_media]
     depends_on:
       db:
         condition: service_healthy
@@ -52,3 +54,4 @@ services:
 volumes:
   taskflow_db:
   taskflow_cache:
+  taskflow_media:
