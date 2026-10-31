@@ -141,7 +141,7 @@ class SharingTests(TestCase):
         key, data = self.task(self.b)
         attachment = self.upload(self.b, key)
         self.assertEqual(self.a.post(self.path + 'member/', {'user_id': self.editor.pk, 'role': 'viewer'}, format='json').status_code, 204)
-        self.assertEqual(self.b.put(f'/api/tasks/{key}/', data, format='json').status_code, 403)
+        self.assertEqual(self.b.put(f'/api/tasks/{key}/', {**data, 'title': 'Changed'}, format='json').status_code, 403)
         self.assertEqual(self.b.get(f'/api/tasks/{key}/').status_code, 200)
         self.assertEqual(self.b.post(self.path + 'leave/').status_code, 204)
         self.assertEqual(self.b.get(f'/api/tasks/{key}/').status_code, 404)
