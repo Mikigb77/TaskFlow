@@ -72,7 +72,7 @@ const _routes = <String, String>{
 /// What the previews can't show, and why.
 const _notCovered = <String, String>{
   'Launcher shortcuts:':
-      'drawn by the Android launcher from `android/app/src/main/res/xml/capture_shortcuts.xml` and its strings; nothing Flutter renders. Check their labels in the XML and on a phone.',
+      'drawn by the Android launcher from the shortcuts `CaptureShortcuts.kt` publishes, with their labels in `strings.xml`; nothing Flutter renders. Check their labels there and on a phone.',
   'The home-screen widget:':
       'a native Android widget (`CaptureWidget.kt` and its layout), outside Flutter. Phone only.',
   'Notifications and reminders in the shade:':

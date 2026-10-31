@@ -13,7 +13,7 @@ What the app does today, so a consistency finding can name the standard and the 
 ## Snackbars and undo
 - **The standard** is task completion in `widgets/task_interactions.dart`: `persist: false` plus `duration: FeedbackTimeout.forAction()`, which follows Android's accessibility timeout. On 2026-10-13 it was the only snackbar in `lib/` that did this.
 - Flutter 3.44: a snackbar with an action never times out unless `persist: false` is set. Undo bars without it:
-  - voice save and "Borrador retirado" (`screens/review_tasks_screen.dart`);
+  - voice save and "Borrador retirado" (`screens/review_tasks_screen.dart`, gone since U4);
   - move (`task_interactions.dart`);
   - "Sugerencia de fecha aplicada" (`widgets/task_editor.dart`).
 - Snackbars use the root messenger: they follow the user onto new screens and queue behind each other.

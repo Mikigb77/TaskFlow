@@ -4,7 +4,7 @@ model = "gpt-6.1-sol"
 model_reasoning_effort = "max"
 developer_instructions = """
 Read AGENTS.md, .codex/ux-workflow.md and your assigned domain's Codex skill.
-Read the relevant shared GUIDELINES.md, DECISIONS.md, issue entries and review
+Read the relevant shared guidelines.md, DECISIONS.md, issue entries and review
 memory. Use the corresponding Claude reviewer document as a reference for
 domain-specific audit criteria, not its model/runtime or execution instructions.
 
